@@ -148,7 +148,11 @@ export function useOrderStore() {
     const unsubscribe = orderStore.subscribe(() => {
       setOrders(orderStore.getAllOrders());
     });
-    return unsubscribe;
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const addOrder = useCallback((order: Order) => {

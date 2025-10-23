@@ -274,7 +274,7 @@ export default function PromoSuitePage() {
 
         {selectedCampaign && (
           <CampaignDetailModal
-            campaign={selectedCampaign}
+            campaign={selectedCampaign as any}
             onClose={() => setSelectedCampaign(null)}
           />
         )}

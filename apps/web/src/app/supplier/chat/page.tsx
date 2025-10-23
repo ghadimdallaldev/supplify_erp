@@ -34,7 +34,7 @@ export default function ChatPage() {
 
   const loadThreads = () => {
     try {
-      const userThreads = chatService.getThreadsForUser(user?.id || '', user?.role || 'restaurant');
+      const userThreads = chatService.getThreadsForUser(user?.id || '', (user?.role || 'supplier') as 'restaurant' | 'supplier');
       setThreads(userThreads);
     } catch (error) {
       console.error('Error loading threads:', error);

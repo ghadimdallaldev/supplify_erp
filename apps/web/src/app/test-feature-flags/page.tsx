@@ -43,7 +43,7 @@ export default function FeatureFlagsTest() {
       
     } catch (error) {
       console.error('Error fetching data:', error);
-      setError(error.message);
+      setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
     }

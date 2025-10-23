@@ -25,7 +25,7 @@ export async function GET(
     const orders = await response.json();
     
     // Extract unique suppliers from orders
-    const supplierIds = [...new Set(orders.map((order: any) => order.supplierId))];
+    const supplierIds: string[] = [...new Set(orders.map((order: any) => order.supplierId))] as string[];
     
     // Get supplier details (this would ideally come from a suppliers service)
     const suppliers = await Promise.all(

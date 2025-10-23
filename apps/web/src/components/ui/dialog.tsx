@@ -17,8 +17,16 @@ const Dialog = ({ open, onOpenChange, children, ...props }: DialogProps) => {
   )
 }
 
-const DialogTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
-  ({ className, children, ...props }, ref) => {
+const DialogTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }>(
+  ({ className, children, asChild, ...props }, ref) => {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children, {
+        ref,
+        className: cn(className, children.props.className),
+        ...props,
+      });
+    }
+    
     return (
       <button
         ref={ref}

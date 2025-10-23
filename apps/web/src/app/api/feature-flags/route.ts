@@ -164,10 +164,18 @@ function evaluateFlag(
     throw new Error(`Feature flag '${flagKey}' not found`);
   }
 
-  let evaluation = {
+  let evaluation: {
+    flagKey: string;
+    enabled: boolean;
+    reason: 'default' | 'rule' | 'override' | 'rollout';
+    ruleId?: string;
+    overrideId?: string;
+    rolloutPercentage?: number;
+    evaluatedAt: string;
+  } = {
     flagKey,
     enabled: flag.enabledByDefault,
-    reason: 'default' as const,
+    reason: 'default',
     evaluatedAt: new Date().toISOString(),
   };
 
@@ -180,7 +188,7 @@ function evaluateFlag(
       evaluation = {
         flagKey,
         enabled: userOverride.forcedStatus === 'FORCE_ON',
-        reason: 'override',
+        reason: 'override' as const,
         overrideId: userOverride.id,
         evaluatedAt: new Date().toISOString(),
       };

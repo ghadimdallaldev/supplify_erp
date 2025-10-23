@@ -43,10 +43,10 @@ export function usePerformanceMonitoring() {
     const fcp = fcpEntry ? fcpEntry.startTime : 0;
     
     // Largest Contentful Paint (simplified)
-    const lcp = navigation.loadEventEnd - navigation.navigationStart;
+    const lcp = navigation.loadEventEnd - navigation.fetchStart;
     
     // Time to Interactive (simplified)
-    const tti = navigation.domInteractive - navigation.navigationStart;
+    const tti = navigation.domInteractive - navigation.fetchStart;
     
     // First Input Delay (simplified)
     const fid = navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart;

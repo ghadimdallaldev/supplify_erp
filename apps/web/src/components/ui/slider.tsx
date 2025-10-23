@@ -2,10 +2,27 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 export interface SliderProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
+  value?: number | number[];
+  onValueChange?: (value: number[]) => void;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
 
 const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
-  ({ className, ...props }, ref) => {
+  ({ className, onValueChange, value, ...props }, ref) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = parseInt(e.target.value);
+      if (onValueChange) {
+        onValueChange([newValue]);
+      }
+      if (props.onChange) {
+        props.onChange(e);
+      }
+    };
+
+    // Convert array value to single number for HTML input
+    const inputValue = Array.isArray(value) ? value[0] : value;
+
     return (
       <input
         type="range"
@@ -15,6 +32,8 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
         )}
         ref={ref}
         {...props}
+        value={inputValue}
+        onChange={handleChange}
       />
     )
   }

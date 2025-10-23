@@ -1,7 +1,7 @@
 'use client';
 
-import { Badge } from '../../components/ui/badge';
-import { usePromoSuiteGate } from '../../hooks/usePromoSuiteFlag';
+import { Badge } from '@/components/ui/badge';
+import { usePromoSuiteGate } from '@/hooks/usePromoSuiteFlag';
 
 interface DiscountBadgeProps {
   discountType: 'PERCENT' | 'AMOUNT';

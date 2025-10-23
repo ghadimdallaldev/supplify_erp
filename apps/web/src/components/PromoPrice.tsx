@@ -1,6 +1,6 @@
 'use client';
 
-import { usePromoSuiteGate } from '../../hooks/usePromoSuiteFlag';
+import { usePromoSuiteGate } from '@/hooks/usePromoSuiteFlag';
 
 interface PromoPriceProps {
   originalPrice: number;

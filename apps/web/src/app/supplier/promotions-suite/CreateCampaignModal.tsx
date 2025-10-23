@@ -67,7 +67,7 @@ export function CreateCampaignModal({ onClose, onSuccess }: CreateCampaignModalP
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const submitData = {
+    const submitData: any = {
       type: campaignType,
       name: formData.name,
       description: formData.description,

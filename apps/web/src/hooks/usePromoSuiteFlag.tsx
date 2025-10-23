@@ -13,7 +13,7 @@ export function usePromoSuiteFlag(): PromoSuiteFlag {
   return {
     enabled: enabled || false,
     loading,
-    error,
+    error: error ? new Error(error) : undefined,
   };
 }
 

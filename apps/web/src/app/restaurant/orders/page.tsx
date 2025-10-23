@@ -71,7 +71,7 @@ function RestaurantOrdersContent() {
                   { productId: 'prod-1', quantity: 1, price: 12.99, name: 'Fresh Chicken Breast' },
                   { productId: 'prod-3', quantity: 1, price: 12.99, name: 'Fresh Tomatoes' }
                 ],
-                status: 'Pending',
+                status: 'Pending' as const,
                 createdAt: new Date().toISOString(),
               };
               
@@ -218,7 +218,7 @@ function RestaurantOrdersContent() {
                     {order.status === 'Processing' && (
                       <button className="text-red-600 hover:text-red-900">Cancel</button>
                     )}
-                    {order.status === 'In Transit' && (
+                    {order.status === 'Dispatched' && (
                       <button className="text-green-600 hover:text-green-900">Track</button>
                     )}
                     {order.status === 'Delivered' && (

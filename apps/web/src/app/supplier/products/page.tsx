@@ -381,3 +381,5 @@ function SupplierProductsContent() {
         entityId="fresh-foods"
       />
     </div>
+  );
+}

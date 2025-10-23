@@ -146,7 +146,7 @@ function SupplierOrdersContent() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">${orders.reduce((sum, o) => sum + o.amount, 0).toFixed(0)}</p>
+              <p className="text-2xl font-bold text-gray-900">${orders.reduce((sum, o) => sum + o.total, 0).toFixed(0)}</p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
