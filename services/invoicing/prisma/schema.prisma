@@ -177,3 +177,18 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
 }
+
+model InvoiceTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  content     String   // HTML template content
+  variables   String[] // Available template variables
+  isDefault   Boolean  @default(false)
+  active      Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("invoice_templates")
+}

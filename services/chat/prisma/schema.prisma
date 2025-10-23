@@ -1,3 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Core Organization Model (simplified for chat service)
+model Organization {
+  id          String   @id @default(cuid())
+  type        String   // RESTAURANT, SUPPLIER, ADMIN
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  chatThreads ChatThread[]
+  
+  @@map("organizations")
+}
+
 // Multi-Tenant Chat Models
 model ChatThread {
   id          String   @id @default(cuid())
