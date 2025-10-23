@@ -3,12 +3,16 @@ import { Injectable } from '@nestjs/common';
 import { verifyToken, getUserRoleFromToken, UnauthorizedError, createLogger } from '@supplify/utils';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { UserManagementService } from '../user-management/user-management.service';
 
 const logger = createLogger('auth-service');
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private userManagementService: UserManagementService,
+  ) {}
 
   async verifyAndProvision(token: string) {
     const issuer = process.env.COGNITO_ISSUER;
@@ -55,16 +59,12 @@ export class AuthService {
 
       if (!organization) {
         // Create organization for this tenant
-        organization = await this.prisma.organization.create({
-          data: {
-            id: tenantClientId,
-            type: orgType,
-            name: payload['custom:org_name'] || payload.orgName || `${role} Organization`,
-            email: payload.email,
-            ownerUserId: user.id,
-            tier: 'FREE',
-            status: 'ACTIVE',
-          },
+        organization = await this.userManagementService.createTenant({
+          clientId: tenantClientId,
+          orgType: orgType as 'RESTAURANT' | 'SUPPLIER',
+          name: payload['custom:org_name'] || payload.orgName || `${role} Organization`,
+          email: payload.email,
+          ownerUserId: user.id,
         });
 
         // Add user as owner of the organization

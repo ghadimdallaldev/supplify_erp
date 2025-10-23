@@ -1,91 +1,159 @@
-'use client';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { apolloClient } from '../lib/apollo-client';
+import { gql } from '@apollo/client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-
-export type UserRole = 'admin' | 'restaurant' | 'supplier';
-
-export interface User {
+interface User {
   id: string;
   email: string;
-  name: string;
-  role: UserRole;
-  orgId: string;
-  orgName: string;
+  role: string;
+  organizationId: string;
 }
 
-export function useAuth() {
+interface Organization {
+  id: string;
+  type: string;
+  name: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  organization: Organization | null;
+  clientId: string | null;
+  loading: boolean;
+  login: (token: string) => Promise<void>;
+  logout: () => void;
+  isAuthenticated: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const GET_ME_QUERY = gql`
+  query GetMe {
+    me
+  }
+`;
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [clientId, setClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check localStorage for user session
-    const savedUser = localStorage.getItem('supplify-user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      // Set the token in Apollo Client headers
+      apolloClient.setLink(
+        apolloClient.link.concat(
+          new ApolloLink((operation, forward) => {
+            operation.setContext({
+              headers: {
+                authorization: `Bearer ${token}`,
+              },
+            });
+            return forward(operation);
+          })
+        )
+      );
+      
+      // Fetch user data
+      fetchUserData();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('supplify-user', JSON.stringify(userData));
+  const fetchUserData = async () => {
+    try {
+      const result = await apolloClient.query({
+        query: GET_ME_QUERY,
+      });
+      
+      const userData = JSON.parse(result.data.me);
+      setUser(userData.user);
+      setOrganization(userData.organization);
+      setClientId(userData.clientId);
+    } catch (error) {
+      console.error('Failed to fetch user data:', error);
+      logout();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (token: string) => {
+    localStorage.setItem('auth_token', token);
+    
+    // Set the token in Apollo Client headers
+    apolloClient.setLink(
+      apolloClient.link.concat(
+        new ApolloLink((operation, forward) => {
+          operation.setContext({
+            headers: {
+              authorization: `Bearer ${token}`,
+            },
+          });
+          return forward(operation);
+        })
+      )
+    );
+    
+    await fetchUserData();
   };
 
   const logout = () => {
+    localStorage.removeItem('auth_token');
     setUser(null);
-    localStorage.removeItem('supplify-user');
+    setOrganization(null);
+    setClientId(null);
+    
+    // Clear Apollo Client cache
+    apolloClient.clearStore();
   };
 
-  const switchRole = (newRole: UserRole) => {
-    if (!user) return;
-    
-    const roleData = getRoleData(newRole);
-    const updatedUser = {
-      ...user,
-      role: newRole,
-      orgId: roleData.orgId,
-      orgName: roleData.orgName,
-      name: roleData.name,
-      email: roleData.email,
-    };
-    
-    login(updatedUser);
+  const value: AuthContextType = {
+    user,
+    organization,
+    clientId,
+    loading,
+    login,
+    logout,
+    isAuthenticated: !!user,
   };
 
-  return { user, loading, login, logout, switchRole };
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-function getRoleData(role: UserRole) {
-  const roleData = {
-    admin: {
-      id: 'admin-1',
-      email: 'admin@supplify.com',
-      name: 'Admin User',
-      orgId: 'platform',
-      orgName: 'Supplify Platform',
-    },
-    restaurant: {
-      id: 'restaurant-1',
-      email: 'manager@restaurant.com',
-      name: 'Restaurant Manager',
-      orgId: 'restaurant-1',
-      orgName: 'Golden Fork Restaurant',
-    },
-    supplier: {
-      id: 'supplier-1',
-      email: 'sales@freshfoods.com',
-      name: 'Sales Manager',
-      orgId: 'supplier-1',
-      orgName: 'Fresh Foods Supply',
-    },
-  };
-
-  return roleData[role];
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
 
-export const DEMO_USERS = {
-  admin: getRoleData('admin'),
-  restaurant: getRoleData('restaurant'),
-  supplier: getRoleData('supplier'),
-};
+// Hook to get client ID specifically
+export function useClientId(): string {
+  const { clientId } = useAuth();
+  if (!clientId) {
+    throw new Error('Client ID not available. User may not be authenticated.');
+  }
+  return clientId;
+}
+
+// Hook to check if user has specific role
+export function useRole(): string {
+  const { user } = useAuth();
+  return user?.role || 'GUEST';
+}
+
+// Hook to check if user is restaurant or supplier
+export function useUserType(): 'RESTAURANT' | 'SUPPLIER' | 'GUEST' {
+  const { user } = useAuth();
+  return user?.role === 'RESTAURANT' ? 'RESTAURANT' : 
+         user?.role === 'SUPPLIER' ? 'SUPPLIER' : 'GUEST';
+}

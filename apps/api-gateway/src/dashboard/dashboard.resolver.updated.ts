@@ -18,7 +18,6 @@ export class DashboardResolver {
   ) {}
 
   @Query(() => String)
-  @UseGuards(AuthGuard)
   async restaurantDashboardKpis(@ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
@@ -28,7 +27,6 @@ export class DashboardResolver {
   }
 
   @Query(() => String)
-  @UseGuards(AuthGuard)
   async recentOrders(@Args('limit', { nullable: true }) limit: number = 10, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     try {
@@ -46,7 +44,6 @@ export class DashboardResolver {
   }
 
   @Query(() => String)
-  @UseGuards(AuthGuard)
   async orders(@ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     try {
@@ -64,7 +61,6 @@ export class DashboardResolver {
   }
 
   @Query(() => String)
-  @UseGuards(AuthGuard)
   async inventorySummary(@ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
@@ -74,39 +70,36 @@ export class DashboardResolver {
   }
 
   @Query(() => String)
-  async recentInventoryActivity(@Args('hours', { nullable: true }) hours: number = 24) {
-    // TODO: Get restaurantId from context/auth
+  async recentInventoryActivity(@Args('hours', { nullable: true }) hours: number = 24, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
-      this.inventoryClient.send('inventory.activity', { restaurantId, hours }),
+      this.inventoryClient.send('inventory.activity', { restaurantId, clientId, hours }),
     );
     return JSON.stringify(result);
   }
 
   @Query(() => String)
-  async myLoyaltyWallets() {
-    // TODO: Get restaurantId from context/auth
+  async myLoyaltyWallets(@ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
-      this.loyaltyClient.send('loyalty.wallets', { restaurantId }),
+      this.loyaltyClient.send('loyalty.wallets', { restaurantId, clientId }),
     );
     return JSON.stringify(result);
   }
 
   @Query(() => String)
-  async loyaltyPrograms() {
+  async loyaltyPrograms(@ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const result = await firstValueFrom(
-      this.loyaltyClient.send('loyalty.programs', {}),
+      this.loyaltyClient.send('loyalty.programs', { clientId }),
     );
     return JSON.stringify(result);
   }
 
   @Query(() => String)
-  async restaurantSuppliers() {
-    // TODO: Get restaurantId from context/auth
+  async restaurantSuppliers(@ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
-      this.suppliersClient.send('suppliers.restaurant', { restaurantId }),
+      this.suppliersClient.send('suppliers.restaurant', { restaurantId, clientId }),
     );
     return JSON.stringify(result);
   }
@@ -116,52 +109,45 @@ export class DashboardResolver {
     @Args('supplierId') supplierId: string,
     @Args('points') points: number,
     @Args('orderId') orderId: string,
+    @ClientId() clientId: string,
+    @CurrentUser() authContext: AuthContext,
   ) {
-    // TODO: Get restaurantId from context/auth
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
       this.loyaltyClient.send('loyalty.redeem', {
         restaurantId,
+        clientId,
         supplierId,
         points,
         orderId,
       }),
     );
-    return result.success;
+    return result;
   }
 
   @Mutation(() => String)
-  async addSupplier(@Args('supplierId') supplierId: string) {
-    // TODO: Get restaurantId from context/auth
+  async addSupplier(@Args('supplierId') supplierId: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
-      this.suppliersClient.send('suppliers.add', { restaurantId, supplierId }),
+      this.suppliersClient.send('suppliers.add', { restaurantId, clientId, supplierId }),
     );
     return JSON.stringify(result);
   }
 
   @Mutation(() => String)
-  async pinSupplier(
-    @Args('supplierId') supplierId: string,
-    @Args('pinned') pinned: boolean,
-  ) {
-    // TODO: Get restaurantId from context/auth
+  async pinSupplier(@Args('supplierId') supplierId: string, @Args('pinned') pinned: boolean, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
-      this.suppliersClient.send('suppliers.pin', { restaurantId, supplierId, pinned }),
+      this.suppliersClient.send('suppliers.pin', { restaurantId, clientId, supplierId, pinned }),
     );
     return JSON.stringify(result);
   }
 
   @Mutation(() => String)
-  async featureSupplier(
-    @Args('supplierId') supplierId: string,
-    @Args('featured') featured: boolean,
-  ) {
-    // TODO: Get restaurantId from context/auth
+  async featureSupplier(@Args('supplierId') supplierId: string, @Args('featured') featured: boolean, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     const result = await firstValueFrom(
-      this.suppliersClient.send('suppliers.feature', { restaurantId, supplierId, featured }),
+      this.suppliersClient.send('suppliers.feature', { restaurantId, clientId, supplierId, featured }),
     );
     return JSON.stringify(result);
   }
@@ -170,36 +156,28 @@ export class DashboardResolver {
   async invoices(
     @Args('userId') userId: string,
     @Args('userRole') userRole: string,
-    @Args('status', { nullable: true }) status?: string,
+    @Args('status', { nullable: true }) status: string,
+    @ClientId() clientId: string,
+    @CurrentUser() authContext: AuthContext,
   ) {
-    try {
-      console.log('Dashboard resolver: Fetching invoices for', { userId, userRole, status });
-      const result = await firstValueFrom(
-        this.invoicingClient.send('invoices.find', { userId, userRole, status }),
-      );
-      console.log('Dashboard resolver: Invoice result', result);
-      return JSON.stringify(result);
-    } catch (error) {
-      console.error('Dashboard resolver: Error fetching invoices', error);
-      throw error;
-    }
+    const result = await firstValueFrom(
+      this.invoicingClient.send('invoices.find', { userId, userRole, status, clientId }),
+    );
+    return JSON.stringify(result);
   }
 
   @Query(() => String)
-  async invoiceStats(
-    @Args('userId') userId: string,
-    @Args('userRole') userRole: string,
-  ) {
+  async invoiceStats(@Args('userId') userId: string, @Args('userRole') userRole: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const result = await firstValueFrom(
-      this.invoicingClient.send('invoices.stats', { userId, userRole }),
+      this.invoicingClient.send('invoices.stats', { userId, userRole, clientId }),
     );
     return JSON.stringify(result);
   }
 
   @Mutation(() => String)
-  async createInvoice(@Args('input') input: any) {
+  async createInvoice(@Args('input') input: any, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const result = await firstValueFrom(
-      this.invoicingClient.send('invoices.create', input),
+      this.invoicingClient.send('invoices.create', { ...input, clientId }),
     );
     return JSON.stringify(result);
   }
@@ -208,27 +186,29 @@ export class DashboardResolver {
   async updateInvoiceStatus(
     @Args('invoiceId') invoiceId: string,
     @Args('status') status: string,
-    @Args('amount', { nullable: true }) amount?: number,
-    @Args('method', { nullable: true }) method?: string,
+    @Args('amount', { nullable: true }) amount: number,
+    @Args('method', { nullable: true }) method: string,
+    @ClientId() clientId: string,
+    @CurrentUser() authContext: AuthContext,
   ) {
     const result = await firstValueFrom(
-      this.invoicingClient.send('invoices.updateStatus', { invoiceId, status, amount, method }),
+      this.invoicingClient.send('invoices.update.status', { invoiceId, status, amount, method, clientId }),
     );
     return JSON.stringify(result);
   }
 
   @Mutation(() => String)
-  async generateInvoicePDF(@Args('invoiceId') invoiceId: string) {
+  async generateInvoicePDF(@Args('invoiceId') invoiceId: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const result = await firstValueFrom(
-      this.invoicingClient.send('invoices.generatePDF', { invoiceId }),
+      this.invoicingClient.send('invoices.generate.pdf', { invoiceId, clientId }),
     );
     return JSON.stringify(result);
   }
 
   @Query(() => String)
-  async featureFlags() {
+  async featureFlags(@ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const result = await firstValueFrom(
-      this.flagsClient.send('flags.get.all', {}),
+      this.flagsClient.send('flags.get.all', { clientId }),
     );
     return JSON.stringify(result);
   }
@@ -236,32 +216,31 @@ export class DashboardResolver {
   @Query(() => String)
   async evaluateFeatureFlag(
     @Args('flagKey') flagKey: string,
-    @Args('orgType', { nullable: true }) orgType?: string,
-    @Args('orgId', { nullable: true }) orgId?: string,
-    @Args('userId', { nullable: true }) userId?: string,
+    @Args('orgType', { nullable: true }) orgType: string,
+    @Args('orgId', { nullable: true }) orgId: string,
+    @Args('userId', { nullable: true }) userId: string,
+    @ClientId() clientId: string,
+    @CurrentUser() authContext: AuthContext,
   ) {
+    const context = {
+      orgType: orgType || authContext.organization.type,
+      orgId: orgId || authContext.organization.id,
+      userId: userId || authContext.user.id,
+      clientId,
+    };
     const result = await firstValueFrom(
-      this.flagsClient.send('flags.evaluate', {
-        flagKey,
-        context: {
-          env: 'dev', // TODO: Get from environment
-          orgType,
-          orgId,
-          userId,
-        },
-      }),
+      this.flagsClient.send('flags.evaluate', { flagKey, context }),
     );
     return JSON.stringify(result);
   }
 
   @Mutation(() => String)
-  async placeOrder(@Args('input') input: any) {
-    // TODO: Get restaurantId from context/auth
+  async placeOrder(@Args('input') input: any, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     try {
-      console.log('Dashboard resolver: Placing order for', { restaurantId, input });
+      console.log('Dashboard resolver: Placing order for', { restaurantId, clientId, input });
       const result = await firstValueFrom(
-        this.ordersClient.send('orders.place', { restaurantId, ...input }),
+        this.ordersClient.send('orders.place', { restaurantId, clientId, ...input }),
       );
       console.log('Dashboard resolver: Order placed result', result);
       return JSON.stringify(result);
@@ -273,9 +252,7 @@ export class DashboardResolver {
 
   // Multi-tenant order queries
   @Query(() => String)
-  async myOrders(@Args('filter', { nullable: true }) filter: any, @Args('pagination', { nullable: true }) pagination: any) {
-    // TODO: Get clientId from context/auth
-    const clientId = 'default-client-id';
+  async myOrders(@Args('filter', { nullable: true }) filter: any, @Args('pagination', { nullable: true }) pagination: any, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     try {
       console.log('Dashboard resolver: Fetching orders for', { clientId, filter, pagination });
       const result = await firstValueFrom(
@@ -290,9 +267,7 @@ export class DashboardResolver {
   }
 
   @Query(() => String)
-  async order(@Args('id') id: string) {
-    // TODO: Get clientId from context/auth
-    const clientId = 'default-client-id';
+  async order(@Args('id') id: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     try {
       console.log('Dashboard resolver: Fetching order by ID', { clientId, orderId: id });
       const result = await firstValueFrom(
@@ -308,9 +283,7 @@ export class DashboardResolver {
 
   // Multi-tenant order mutations
   @Mutation(() => String)
-  async placeOrderMultiTenant(@Args('input') input: any, @Args('idempotencyKey') idempotencyKey: string) {
-    // TODO: Get clientId and restaurantId from context/auth
-    const clientId = 'default-client-id';
+  async placeOrderMultiTenant(@Args('input') input: any, @Args('idempotencyKey') idempotencyKey: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     const restaurantId = authContext.user.organizationId;
     try {
       console.log('Dashboard resolver: Placing multi-tenant order', { clientId, restaurantId, input, idempotencyKey });
@@ -326,9 +299,7 @@ export class DashboardResolver {
   }
 
   @Mutation(() => String)
-  async supplierAcknowledge(@Args('orderId') orderId: string, @Args('idempotencyKey') idempotencyKey: string) {
-    // TODO: Get clientId from context/auth
-    const clientId = 'default-client-id';
+  async supplierAcknowledge(@Args('orderId') orderId: string, @Args('idempotencyKey') idempotencyKey: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     try {
       console.log('Dashboard resolver: Supplier acknowledging order', { clientId, orderId, idempotencyKey });
       const result = await firstValueFrom(
@@ -343,9 +314,7 @@ export class DashboardResolver {
   }
 
   @Mutation(() => String)
-  async supplierSetPreparing(@Args('orderId') orderId: string, @Args('note', { nullable: true }) note: string, @Args('idempotencyKey') idempotencyKey: string) {
-    // TODO: Get clientId from context/auth
-    const clientId = 'default-client-id';
+  async supplierSetPreparing(@Args('orderId') orderId: string, @Args('note', { nullable: true }) note: string, @Args('idempotencyKey') idempotencyKey: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     try {
       console.log('Dashboard resolver: Supplier set preparing', { clientId, orderId, note, idempotencyKey });
       const result = await firstValueFrom(
@@ -360,9 +329,7 @@ export class DashboardResolver {
   }
 
   @Mutation(() => String)
-  async supplierDispatch(@Args('orderId') orderId: string, @Args('carrier', { nullable: true }) carrier: string, @Args('driverName', { nullable: true }) driverName: string, @Args('driverPhone', { nullable: true }) driverPhone: string, @Args('etaAt', { nullable: true }) etaAt: string, @Args('idempotencyKey') idempotencyKey: string) {
-    // TODO: Get clientId from context/auth
-    const clientId = 'default-client-id';
+  async supplierDispatch(@Args('orderId') orderId: string, @Args('carrier', { nullable: true }) carrier: string, @Args('driverName', { nullable: true }) driverName: string, @Args('driverPhone', { nullable: true }) driverPhone: string, @Args('etaAt', { nullable: true }) etaAt: string, @Args('idempotencyKey') idempotencyKey: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     try {
       console.log('Dashboard resolver: Supplier dispatching order', { clientId, orderId, carrier, driverName, driverPhone, etaAt, idempotencyKey });
       const result = await firstValueFrom(
@@ -377,9 +344,7 @@ export class DashboardResolver {
   }
 
   @Mutation(() => String)
-  async supplierMarkDelivered(@Args('orderId') orderId: string, @Args('proofUrl', { nullable: true }) proofUrl: string, @Args('idempotencyKey') idempotencyKey: string) {
-    // TODO: Get clientId from context/auth
-    const clientId = 'default-client-id';
+  async supplierMarkDelivered(@Args('orderId') orderId: string, @Args('proofUrl', { nullable: true }) proofUrl: string, @Args('idempotencyKey') idempotencyKey: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     try {
       console.log('Dashboard resolver: Supplier marking order delivered', { clientId, orderId, proofUrl, idempotencyKey });
       const result = await firstValueFrom(
@@ -394,9 +359,7 @@ export class DashboardResolver {
   }
 
   @Mutation(() => String)
-  async cancelOrder(@Args('orderId') orderId: string, @Args('reason') reason: string, @Args('idempotencyKey') idempotencyKey: string) {
-    // TODO: Get clientId from context/auth
-    const clientId = 'default-client-id';
+  async cancelOrder(@Args('orderId') orderId: string, @Args('reason') reason: string, @Args('idempotencyKey') idempotencyKey: string, @ClientId() clientId: string, @CurrentUser() authContext: AuthContext) {
     try {
       console.log('Dashboard resolver: Cancelling order', { clientId, orderId, reason, idempotencyKey });
       const result = await firstValueFrom(
