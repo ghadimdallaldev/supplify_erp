@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import { OrdersService } from './orders.service';
+import { MultiTenantOrdersService } from './multi-tenant-orders.service';
 import { PlaceOrderDto, UpdateOrderStatusDto, SearchOrdersDto } from './dto';
 import { 
   SupplierAcknowledgeDto, 
@@ -18,7 +19,10 @@ import {
 @Controller('orders')
 @ApiBearerAuth()
 export class OrdersController {
-  constructor(private ordersService: OrdersService) {}
+  constructor(
+    private ordersService: OrdersService,
+    private multiTenantOrdersService: MultiTenantOrdersService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Place order from cart' })
@@ -171,6 +175,101 @@ export class OrdersController {
       deliveryAddress: data.deliveryAddress,
       notes: data.notes,
     });
+  }
+
+  // Multi-tenant endpoints
+  @Post('multi-tenant/place')
+  @ApiOperation({ summary: 'Place order with multi-tenant support' })
+  async placeOrderMultiTenant(@Body() dto: PlaceOrderDto) {
+    return this.multiTenantOrdersService.placeOrder(dto);
+  }
+
+  @Post('multi-tenant/:id/acknowledge')
+  @ApiOperation({ summary: 'Supplier acknowledge order (multi-tenant)' })
+  async supplierAcknowledgeMultiTenant(@Param('id') orderId: string, @Body() dto: SupplierAcknowledgeDto) {
+    dto.orderId = orderId;
+    return this.multiTenantOrdersService.supplierAcknowledge(dto);
+  }
+
+  @Post('multi-tenant/:id/preparing')
+  @ApiOperation({ summary: 'Supplier set preparing (multi-tenant)' })
+  async supplierSetPreparingMultiTenant(@Param('id') orderId: string, @Body() dto: SupplierSetPreparingDto) {
+    dto.orderId = orderId;
+    return this.multiTenantOrdersService.supplierSetPreparing(dto);
+  }
+
+  @Post('multi-tenant/:id/dispatch')
+  @ApiOperation({ summary: 'Supplier dispatch order (multi-tenant)' })
+  async supplierDispatchMultiTenant(@Param('id') orderId: string, @Body() dto: SupplierDispatchDto) {
+    dto.orderId = orderId;
+    return this.multiTenantOrdersService.supplierDispatch(dto);
+  }
+
+  @Post('multi-tenant/:id/delivered')
+  @ApiOperation({ summary: 'Supplier mark delivered (multi-tenant)' })
+  async supplierMarkDeliveredMultiTenant(@Param('id') orderId: string, @Body() dto: SupplierMarkDeliveredDto) {
+    dto.orderId = orderId;
+    return this.multiTenantOrdersService.supplierMarkDelivered(dto);
+  }
+
+  @Post('multi-tenant/:id/cancel')
+  @ApiOperation({ summary: 'Cancel order (multi-tenant)' })
+  async cancelOrderMultiTenant(@Param('id') orderId: string, @Body() dto: CancelOrderDto) {
+    dto.orderId = orderId;
+    return this.multiTenantOrdersService.cancelOrder(dto);
+  }
+
+  @Get('multi-tenant')
+  @ApiOperation({ summary: 'Get orders (multi-tenant)' })
+  async getOrdersMultiTenant(@Query('clientId') clientId: string, @Query() filter: any) {
+    return this.multiTenantOrdersService.getOrders(clientId, filter);
+  }
+
+  @Get('multi-tenant/:id')
+  @ApiOperation({ summary: 'Get order by ID (multi-tenant)' })
+  async getOrderMultiTenant(@Param('id') orderId: string, @Query('clientId') clientId: string) {
+    return this.multiTenantOrdersService.getOrder(clientId, orderId);
+  }
+
+  // Message patterns for multi-tenant operations
+  @MessagePattern('orders.multi-tenant.place')
+  async handlePlaceOrderMultiTenant(@Payload() data: PlaceOrderDto) {
+    return this.multiTenantOrdersService.placeOrder(data);
+  }
+
+  @MessagePattern('orders.multi-tenant.acknowledge')
+  async handleSupplierAcknowledgeMultiTenant(@Payload() data: SupplierAcknowledgeDto) {
+    return this.multiTenantOrdersService.supplierAcknowledge(data);
+  }
+
+  @MessagePattern('orders.multi-tenant.preparing')
+  async handleSupplierSetPreparingMultiTenant(@Payload() data: SupplierSetPreparingDto) {
+    return this.multiTenantOrdersService.supplierSetPreparing(data);
+  }
+
+  @MessagePattern('orders.multi-tenant.dispatch')
+  async handleSupplierDispatchMultiTenant(@Payload() data: SupplierDispatchDto) {
+    return this.multiTenantOrdersService.supplierDispatch(data);
+  }
+
+  @MessagePattern('orders.multi-tenant.delivered')
+  async handleSupplierMarkDeliveredMultiTenant(@Payload() data: SupplierMarkDeliveredDto) {
+    return this.multiTenantOrdersService.supplierMarkDelivered(data);
+  }
+
+  @MessagePattern('orders.multi-tenant.cancel')
+  async handleCancelOrderMultiTenant(@Payload() data: CancelOrderDto) {
+    return this.multiTenantOrdersService.cancelOrder(data);
+  }
+
+  @MessagePattern('orders.multi-tenant.get')
+  async handleGetOrdersMultiTenant(@Payload() data: { clientId: string; filter?: any }) {
+    return this.multiTenantOrdersService.getOrders(data.clientId, data.filter);
+  }
+
+  @MessagePattern('orders.multi-tenant.get-by-id')
+  async handleGetOrderMultiTenant(@Payload() data: { clientId: string; orderId: string }) {
+    return this.multiTenantOrdersService.getOrder(data.clientId, data.orderId);
   }
 }
 

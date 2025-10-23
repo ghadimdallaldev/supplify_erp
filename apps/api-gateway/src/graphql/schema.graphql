@@ -69,6 +69,10 @@ extend type Query {
   invoiceStats(userId: String!, userRole: String!): String!
   featureFlags: String!
   evaluateFeatureFlag(flagKey: String!, orgType: String, orgId: String, userId: String): String!
+  
+  # Multi-tenant order queries
+  myOrders(filter: OrderFilter, pagination: PageInput): OrderConnection!
+  order(id: ID!): Order!
 }
 
 extend type Mutation {
@@ -80,11 +84,112 @@ extend type Mutation {
   createInvoice(input: CreateInvoiceInput!): String!
   updateInvoiceStatus(invoiceId: ID!, status: String!, amount: Float, method: String): String!
   generateInvoicePDF(invoiceId: ID!): String!
+  
+  # Multi-tenant order mutations
+  placeOrderMultiTenant(input: PlaceOrderInput!, idempotencyKey: String!): [Order!]!
+  supplierAcknowledge(orderId: ID!, idempotencyKey: String!): Order!
+  supplierSetPreparing(orderId: ID!, note: String, idempotencyKey: String!): Order!
+  supplierDispatch(orderId: ID!, carrier: String, driverName: String, driverPhone: String, etaAt: String, idempotencyKey: String!): Order!
+  supplierMarkDelivered(orderId: ID!, proofUrl: String, idempotencyKey: String!): Order!
+  cancelOrder(orderId: ID!, reason: String!, idempotencyKey: String!): Order!
+}
+
+input CartItemInput {
+  supplierProductId: String!
+  restaurantItemId: String
+  qtyOrderedBase: Int!
+  uomBase: String!
+  unitPrice: Float!
+  notes: String
+}
+
+input DeliveryWindowInput {
+  startTime: String
+  endTime: String
+  date: String
+}
+
+input LoyaltyRedemptionInput {
+  supplierId: String!
+  points: Int!
 }
 
 input PlaceOrderInput {
+  items: [CartItemInput!]!
+  deliveryAddress: String!
+  deliveryWindow: DeliveryWindowInput
+  notes: String
+  loyaltyRedemptions: [LoyaltyRedemptionInput!]
+}
+
+input OrderFilter {
+  status: String
+  supplierId: String
+  restaurantId: String
+  dateFrom: String
+  dateTo: String
+}
+
+input PageInput {
+  page: Int = 1
+  limit: Int = 20
+}
+
+type OrderConnection {
+  nodes: [Order!]!
+  meta: PageMeta!
+}
+
+type PageMeta {
+  page: Int!
+  limit: Int!
+  total: Int!
+  totalPages: Int!
+}
+
+type Order {
+  id: ID!
+  clientId: String!
+  restaurantId: String!
+  supplierId: String!
+  status: String!
+  subtotal: Float!
+  discount: Float!
+  tax: Float!
+  shipping: Float!
+  totalNet: Float!
+  currency: String!
   deliveryAddress: String!
   notes: String
+  placedAt: String!
+  createdAt: String!
+  updatedAt: String!
+  items: [OrderItem!]!
+  events: [OrderEvent!]!
+}
+
+type OrderItem {
+  id: ID!
+  clientId: String!
+  orderId: String!
+  supplierProductId: String!
+  restaurantItemId: String
+  qtyOrderedBase: Int!
+  qtyDeliveredBase: Int!
+  uomBase: String!
+  unitPrice: Float!
+  lineTotal: Float!
+  meta: String
+  createdAt: String!
+}
+
+type OrderEvent {
+  id: ID!
+  clientId: String!
+  orderId: String!
+  type: String!
+  payload: String
+  createdAt: String!
 }
 
 input CreateInvoiceInput {

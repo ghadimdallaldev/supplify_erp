@@ -3,6 +3,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { MultiTenantOrdersService } from './multi-tenant-orders.service';
 import { EventsService } from './events.service';
 import { CartModule } from '../cart/cart.module';
 
@@ -24,8 +25,8 @@ import { CartModule } from '../cart/cart.module';
     ]),
   ],
   controllers: [OrdersController],
-  providers: [OrdersService, EventsService],
-  exports: [OrdersService],
+  providers: [OrdersService, MultiTenantOrdersService, EventsService],
+  exports: [OrdersService, MultiTenantOrdersService],
 })
 export class OrdersModule {}
 

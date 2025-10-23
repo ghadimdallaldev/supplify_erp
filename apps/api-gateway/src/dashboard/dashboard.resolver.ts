@@ -267,4 +267,143 @@ export class DashboardResolver {
       return JSON.stringify({ success: false, error: error.message });
     }
   }
+
+  // Multi-tenant order queries
+  @Query(() => String)
+  async myOrders(@Args('filter', { nullable: true }) filter: any, @Args('pagination', { nullable: true }) pagination: any) {
+    // TODO: Get clientId from context/auth
+    const clientId = 'default-client-id';
+    try {
+      console.log('Dashboard resolver: Fetching orders for', { clientId, filter, pagination });
+      const result = await firstValueFrom(
+        this.ordersClient.send('orders.multi-tenant.get', { clientId, filter }),
+      );
+      console.log('Dashboard resolver: Orders result', result);
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error('Dashboard resolver: Error fetching orders', error);
+      return JSON.stringify({ nodes: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } });
+    }
+  }
+
+  @Query(() => String)
+  async order(@Args('id') id: string) {
+    // TODO: Get clientId from context/auth
+    const clientId = 'default-client-id';
+    try {
+      console.log('Dashboard resolver: Fetching order by ID', { clientId, orderId: id });
+      const result = await firstValueFrom(
+        this.ordersClient.send('orders.multi-tenant.get-by-id', { clientId, orderId: id }),
+      );
+      console.log('Dashboard resolver: Order result', result);
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error('Dashboard resolver: Error fetching order', error);
+      return JSON.stringify({ error: error.message });
+    }
+  }
+
+  // Multi-tenant order mutations
+  @Mutation(() => String)
+  async placeOrderMultiTenant(@Args('input') input: any, @Args('idempotencyKey') idempotencyKey: string) {
+    // TODO: Get clientId and restaurantId from context/auth
+    const clientId = 'default-client-id';
+    const restaurantId = 'golden-fork';
+    try {
+      console.log('Dashboard resolver: Placing multi-tenant order', { clientId, restaurantId, input, idempotencyKey });
+      const result = await firstValueFrom(
+        this.ordersClient.send('orders.multi-tenant.place', { clientId, restaurantId, input, idempotencyKey }),
+      );
+      console.log('Dashboard resolver: Multi-tenant order placed result', result);
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error('Dashboard resolver: Error placing multi-tenant order', error);
+      return JSON.stringify({ success: false, error: error.message });
+    }
+  }
+
+  @Mutation(() => String)
+  async supplierAcknowledge(@Args('orderId') orderId: string, @Args('idempotencyKey') idempotencyKey: string) {
+    // TODO: Get clientId from context/auth
+    const clientId = 'default-client-id';
+    try {
+      console.log('Dashboard resolver: Supplier acknowledging order', { clientId, orderId, idempotencyKey });
+      const result = await firstValueFrom(
+        this.ordersClient.send('orders.multi-tenant.acknowledge', { clientId, orderId, idempotencyKey }),
+      );
+      console.log('Dashboard resolver: Order acknowledged result', result);
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error('Dashboard resolver: Error acknowledging order', error);
+      return JSON.stringify({ error: error.message });
+    }
+  }
+
+  @Mutation(() => String)
+  async supplierSetPreparing(@Args('orderId') orderId: string, @Args('note', { nullable: true }) note: string, @Args('idempotencyKey') idempotencyKey: string) {
+    // TODO: Get clientId from context/auth
+    const clientId = 'default-client-id';
+    try {
+      console.log('Dashboard resolver: Supplier set preparing', { clientId, orderId, note, idempotencyKey });
+      const result = await firstValueFrom(
+        this.ordersClient.send('orders.multi-tenant.preparing', { clientId, orderId, note, idempotencyKey }),
+      );
+      console.log('Dashboard resolver: Order set preparing result', result);
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error('Dashboard resolver: Error setting order preparing', error);
+      return JSON.stringify({ error: error.message });
+    }
+  }
+
+  @Mutation(() => String)
+  async supplierDispatch(@Args('orderId') orderId: string, @Args('carrier', { nullable: true }) carrier: string, @Args('driverName', { nullable: true }) driverName: string, @Args('driverPhone', { nullable: true }) driverPhone: string, @Args('etaAt', { nullable: true }) etaAt: string, @Args('idempotencyKey') idempotencyKey: string) {
+    // TODO: Get clientId from context/auth
+    const clientId = 'default-client-id';
+    try {
+      console.log('Dashboard resolver: Supplier dispatching order', { clientId, orderId, carrier, driverName, driverPhone, etaAt, idempotencyKey });
+      const result = await firstValueFrom(
+        this.ordersClient.send('orders.multi-tenant.dispatch', { clientId, orderId, carrier, driverName, driverPhone, etaAt, idempotencyKey }),
+      );
+      console.log('Dashboard resolver: Order dispatched result', result);
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error('Dashboard resolver: Error dispatching order', error);
+      return JSON.stringify({ error: error.message });
+    }
+  }
+
+  @Mutation(() => String)
+  async supplierMarkDelivered(@Args('orderId') orderId: string, @Args('proofUrl', { nullable: true }) proofUrl: string, @Args('idempotencyKey') idempotencyKey: string) {
+    // TODO: Get clientId from context/auth
+    const clientId = 'default-client-id';
+    try {
+      console.log('Dashboard resolver: Supplier marking order delivered', { clientId, orderId, proofUrl, idempotencyKey });
+      const result = await firstValueFrom(
+        this.ordersClient.send('orders.multi-tenant.delivered', { clientId, orderId, proofUrl, idempotencyKey }),
+      );
+      console.log('Dashboard resolver: Order delivered result', result);
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error('Dashboard resolver: Error marking order delivered', error);
+      return JSON.stringify({ error: error.message });
+    }
+  }
+
+  @Mutation(() => String)
+  async cancelOrder(@Args('orderId') orderId: string, @Args('reason') reason: string, @Args('idempotencyKey') idempotencyKey: string) {
+    // TODO: Get clientId from context/auth
+    const clientId = 'default-client-id';
+    try {
+      console.log('Dashboard resolver: Cancelling order', { clientId, orderId, reason, idempotencyKey });
+      const result = await firstValueFrom(
+        this.ordersClient.send('orders.multi-tenant.cancel', { clientId, orderId, reason, idempotencyKey }),
+      );
+      console.log('Dashboard resolver: Order cancelled result', result);
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error('Dashboard resolver: Error cancelling order', error);
+      return JSON.stringify({ error: error.message });
+    }
+  }
 }

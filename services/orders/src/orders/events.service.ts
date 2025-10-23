@@ -175,5 +175,168 @@ export class EventsService {
       logger.error(`Failed to emit order.delivered event: ${error}`);
     }
   }
+
+  // New multi-tenant events
+  async emitOrderPlaced(data: {
+    clientId: string;
+    orderId: string;
+    restaurantId: string;
+    supplierId: string;
+    total: number;
+  }) {
+    try {
+      this.eventsClient.emit(`tenant.${data.clientId}.orders.placed`, {
+        orderId: data.orderId,
+        restaurantId: data.restaurantId,
+        supplierId: data.supplierId,
+        total: data.total,
+        timestamp: new Date().toISOString(),
+      });
+      logger.info(`Emitted order.placed event for order: ${data.orderId}`);
+    } catch (error) {
+      logger.error(`Failed to emit order.placed event: ${error}`);
+    }
+  }
+
+  async emitOrderAcknowledged(data: {
+    clientId: string;
+    orderId: string;
+    restaurantId: string;
+    supplierId: string;
+  }) {
+    try {
+      this.eventsClient.emit(`tenant.${data.clientId}.orders.acknowledged`, {
+        orderId: data.orderId,
+        restaurantId: data.restaurantId,
+        supplierId: data.supplierId,
+        timestamp: new Date().toISOString(),
+      });
+      logger.info(`Emitted order.acknowledged event for order: ${data.orderId}`);
+    } catch (error) {
+      logger.error(`Failed to emit order.acknowledged event: ${error}`);
+    }
+  }
+
+  async emitOrderPreparing(data: {
+    clientId: string;
+    orderId: string;
+    restaurantId: string;
+    supplierId: string;
+    note?: string;
+  }) {
+    try {
+      this.eventsClient.emit(`tenant.${data.clientId}.orders.preparing`, {
+        orderId: data.orderId,
+        restaurantId: data.restaurantId,
+        supplierId: data.supplierId,
+        note: data.note,
+        timestamp: new Date().toISOString(),
+      });
+      logger.info(`Emitted order.preparing event for order: ${data.orderId}`);
+    } catch (error) {
+      logger.error(`Failed to emit order.preparing event: ${error}`);
+    }
+  }
+
+  async emitOrderDispatched(data: {
+    clientId: string;
+    orderId: string;
+    restaurantId: string;
+    supplierId: string;
+    carrier?: string;
+    driverName?: string;
+    driverPhone?: string;
+    etaAt?: string;
+  }) {
+    try {
+      this.eventsClient.emit(`tenant.${data.clientId}.orders.dispatched`, {
+        orderId: data.orderId,
+        restaurantId: data.restaurantId,
+        supplierId: data.supplierId,
+        carrier: data.carrier,
+        driverName: data.driverName,
+        driverPhone: data.driverPhone,
+        etaAt: data.etaAt,
+        timestamp: new Date().toISOString(),
+      });
+      logger.info(`Emitted order.dispatched event for order: ${data.orderId}`);
+    } catch (error) {
+      logger.error(`Failed to emit order.dispatched event: ${error}`);
+    }
+  }
+
+  async emitOrderCancelled(data: {
+    clientId: string;
+    orderId: string;
+    restaurantId: string;
+    supplierId: string;
+    reason: string;
+  }) {
+    try {
+      this.eventsClient.emit(`tenant.${data.clientId}.orders.cancelled`, {
+        orderId: data.orderId,
+        restaurantId: data.restaurantId,
+        supplierId: data.supplierId,
+        reason: data.reason,
+        timestamp: new Date().toISOString(),
+      });
+      logger.info(`Emitted order.cancelled event for order: ${data.orderId}`);
+    } catch (error) {
+      logger.error(`Failed to emit order.cancelled event: ${error}`);
+    }
+  }
+
+  // Enhanced order delivered event for inventory and loyalty integration
+  async emitOrderDeliveredEnhanced(data: {
+    clientId: string;
+    orderId: string;
+    restaurantId: string;
+    supplierId: string;
+    total: number;
+    items: any[];
+  }) {
+    try {
+      // Emit for inventory auto-receive
+      for (const item of data.items) {
+        this.eventsClient.emit(`tenant.${data.clientId}.inventory.receive`, {
+          idempotencyKey: `${data.orderId}-${item.id}-${Date.now()}`,
+          clientId: data.clientId,
+          orderId: data.orderId,
+          orderLineId: item.id,
+          supplierId: data.supplierId,
+          restaurantId: data.restaurantId,
+          supplierProductId: item.supplierProductId,
+          restaurantItemId: item.restaurantItemId,
+          qty: item.qtyDeliveredBase,
+          uom: item.uomBase,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Emit for loyalty points earning
+      this.eventsClient.emit(`tenant.${data.clientId}.loyalty.earn`, {
+        clientId: data.clientId,
+        orderId: data.orderId,
+        restaurantId: data.restaurantId,
+        supplierId: data.supplierId,
+        total: data.total,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Emit for invoice generation
+      this.eventsClient.emit(`tenant.${data.clientId}.invoices.generate`, {
+        clientId: data.clientId,
+        orderId: data.orderId,
+        restaurantId: data.restaurantId,
+        supplierId: data.supplierId,
+        total: data.total,
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.info(`Emitted enhanced order.delivered event for order: ${data.orderId}`);
+    } catch (error) {
+      logger.error(`Failed to emit enhanced order.delivered event: ${error}`);
+    }
+  }
 }
 

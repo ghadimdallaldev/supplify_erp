@@ -35,17 +35,19 @@ enum OrderEventType {
 
 model Cart {
   id           String     @id @default(cuid())
+  clientId     String     // Multi-tenant scope
   restaurantId String
   items        CartItem[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  @@index([restaurantId])
+  @@index([clientId, restaurantId])
   @@map("carts")
 }
 
 model CartItem {
   id         String  @id @default(cuid())
+  clientId   String  // Multi-tenant scope
   cartId     String
   productId  String
   supplierId String
@@ -55,13 +57,14 @@ model CartItem {
 
   cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
 
-  @@index([cartId])
+  @@index([clientId, cartId])
   @@index([productId])
   @@map("cart_items")
 }
 
 model Order {
   id              String       @id @default(cuid())
+  clientId        String       // Multi-tenant scope
   parentOrderId   String?      // if needed for multi-supplier split
   restaurantId    String
   supplierId      String
@@ -73,14 +76,14 @@ model Order {
   cancelReason    String?
   meta            Json?        // carrier info, driver details, etc.
   subtotal        Decimal      @db.Decimal(12, 2)
-  tax             Decimal      @db.Decimal(12, 2)
-  taxAmount       Decimal?     @db.Decimal(12, 2)
-  discountAmount  Decimal?     @db.Decimal(12, 2)
-  deliveryFee     Decimal      @db.Decimal(12, 2)
-  total           Decimal      @db.Decimal(12, 2)
+  discount        Decimal      @db.Decimal(12, 2) @default(0)   // loyalty or promo
+  tax             Decimal      @db.Decimal(12, 2) @default(0)
+  shipping        Decimal      @db.Decimal(12, 2) @default(0)
+  totalNet        Decimal      @db.Decimal(12, 2) @default(0)
   currency        String?      @default("USD")
   deliveryAddress String
   notes           String?
+  placedAt        DateTime     @default(now())
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   items           OrderItem[]
@@ -88,42 +91,42 @@ model Order {
   messages        OrderMessage[]
   invoices        Invoice[]
 
-  @@index([restaurantId, supplierId, status])
+  @@index([clientId, restaurantId, supplierId, status])
   @@index([status, ackBySlaAt])
   @@map("orders")
 }
 
 model OrderItem {
-  id          String  @id @default(cuid())
-  orderId     String
-  productId   String
-  productName String
-  qty         Int
-  quantity    Int?    // Alternative field name
-  unitPrice   Decimal @db.Decimal(12, 2)
-  subtotal    Decimal @db.Decimal(12, 2)
-  total       Decimal? @db.Decimal(12, 2) // Alternative field name
-  notes       String?
+  id             String  @id @default(cuid())
+  clientId       String  // Multi-tenant scope
+  orderId        String
+  supplierProductId String
+  restaurantItemId String?
+  qtyOrderedBase   Int
+  qtyDeliveredBase Int @default(0)
+  uomBase        String
+  unitPrice      Decimal @db.Decimal(12, 2)
+  lineTotal      Decimal @db.Decimal(12, 2)
+  meta           Json?
+  createdAt      DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@index([orderId])
-  @@index([productId])
+  @@index([clientId, orderId])
   @@map("order_items")
 }
 
 model OrderEvent {
-  id            String        @id @default(cuid())
-  orderId       String
-  actorType     String        // SYSTEM|SUPPLIER|RESTAURANT|ADMIN
-  actorId       String?
-  type          OrderEventType
-  payload       Json?    // additional event data
-  createdAt     DateTime @default(now())
+  id        String @id @default(cuid())
+  clientId  String // Multi-tenant scope
+  orderId   String
+  type      String   // PLACED|ACKNOWLEDGED|PREPARING|DISPATCHED|DELIVERED|CANCELLED|ETA_UPDATED|NOTE_ADDED
+  payload   Json?
+  createdAt DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@index([orderId, createdAt])
+  @@index([clientId, orderId, type])
   @@map("order_events")
 }
 
@@ -183,5 +186,20 @@ model InvoiceItem {
 
   @@index([invoiceId])
   @@map("invoice_items")
+}
+
+model IdempotencyKey {
+  id           String   @id @default(cuid())
+  clientId     String   // Multi-tenant scope
+  key          String   @unique
+  resourceType String   // order|order_event|inventory_update
+  resourceId   String?  // the ID of the created/updated resource
+  payload      Json?    // the original request payload
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime // TTL for cleanup
+
+  @@index([clientId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }
 

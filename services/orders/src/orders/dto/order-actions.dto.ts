@@ -1,89 +1,135 @@
-import { IsString, IsOptional, IsDateString, IsArray } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, IsNotEmpty, IsDateString } from 'class-validator';
 
 export class SupplierAcknowledgeDto {
-  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
+  clientId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
+  @IsString()
+  @IsNotEmpty()
   idempotencyKey: string;
 }
 
 export class SupplierSetPreparingDto {
-  @ApiPropertyOptional()
+  @IsString()
+  @IsNotEmpty()
+  clientId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
   @IsString()
   @IsOptional()
   note?: string;
 
-  @ApiPropertyOptional()
   @IsString()
-  @IsOptional()
-  idempotencyKey?: string;
+  @IsNotEmpty()
+  idempotencyKey: string;
 }
 
 export class SupplierDispatchDto {
-  @ApiPropertyOptional()
+  @IsString()
+  @IsNotEmpty()
+  clientId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
   @IsString()
   @IsOptional()
   carrier?: string;
 
-  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   driverName?: string;
 
-  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   driverPhone?: string;
 
-  @ApiPropertyOptional()
   @IsDateString()
   @IsOptional()
   etaAt?: string;
 
-  @ApiPropertyOptional()
   @IsString()
-  @IsOptional()
-  idempotencyKey?: string;
+  @IsNotEmpty()
+  idempotencyKey: string;
 }
 
 export class SupplierMarkDeliveredDto {
-  @ApiPropertyOptional()
+  @IsString()
+  @IsNotEmpty()
+  clientId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
   @IsString()
   @IsOptional()
   proofUrl?: string;
 
-  @ApiPropertyOptional()
   @IsString()
-  @IsOptional()
-  idempotencyKey?: string;
-}
-
-export class RestaurantConfirmDeliveryDto {
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  idempotencyKey?: string;
+  @IsNotEmpty()
+  idempotencyKey: string;
 }
 
 export class CancelOrderDto {
-  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
+  clientId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
+  @IsString()
+  @IsNotEmpty()
   reason: string;
 
-  @ApiPropertyOptional()
   @IsString()
-  @IsOptional()
-  idempotencyKey?: string;
+  @IsNotEmpty()
+  idempotencyKey: string;
+}
+
+export class RestaurantConfirmDeliveryDto {
+  @IsString()
+  @IsNotEmpty()
+  clientId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey: string;
 }
 
 export class PostOrderMessageDto {
-  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
+  clientId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
+  @IsString()
+  @IsNotEmpty()
   body: string;
 
-  @ApiPropertyOptional()
-  @IsArray()
-  @IsString({ each: true })
+  @IsString()
   @IsOptional()
-  attachments?: string[];
+  senderRole?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey: string;
 }
