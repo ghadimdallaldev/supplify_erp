@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, OrderEventType } from '@prisma/client';
 
 export interface CreateOrderDto {
   restaurantId: string;
@@ -46,7 +46,9 @@ export class OrdersService {
         status: OrderStatus.PENDING,
         total,
         subtotal,
+        tax: taxAmount,
         taxAmount,
+        deliveryFee: 0, // Default delivery fee
         currency: 'USD',
         notes: dto.notes,
         deliveryAddress: dto.deliveryAddress,
@@ -54,14 +56,16 @@ export class OrdersService {
           create: dto.items.map(item => ({
             productId: item.productId,
             productName: item.productName,
+            qty: item.quantity,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
+            subtotal: item.quantity * item.unitPrice,
             total: item.quantity * item.unitPrice,
           })),
         },
         events: {
           create: {
-            type: OrderStatus.PENDING,
+            type: OrderEventType.PENDING,
             actorType: 'SYSTEM',
             payload: { items: dto.items },
           },
@@ -311,11 +315,16 @@ export class OrdersService {
    */
   private validateStatusTransition(from: OrderStatus, to: OrderStatus) {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-      [OrderStatus.PROCESSING]: [OrderStatus.DISPATCHED, OrderStatus.CANCELLED],
+      [OrderStatus.PENDING]: [OrderStatus.PLACED, OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+      [OrderStatus.PLACED]: [OrderStatus.ACKNOWLEDGED, OrderStatus.CANCELLED],
+      [OrderStatus.PROCESSING]: [OrderStatus.ACKNOWLEDGED, OrderStatus.PREPARING, OrderStatus.DISPATCHED, OrderStatus.CANCELLED],
+      [OrderStatus.ACKNOWLEDGED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+      [OrderStatus.PREPARING]: [OrderStatus.DISPATCHED, OrderStatus.CANCELLED],
       [OrderStatus.DISPATCHED]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
       [OrderStatus.DELIVERED]: [], // Final state
       [OrderStatus.CANCELLED]: [], // Final state
+      [OrderStatus.ETA_UPDATED]: [OrderStatus.DISPATCHED, OrderStatus.DELIVERED],
+      [OrderStatus.NOTE_ADDED]: [OrderStatus.PENDING, OrderStatus.PLACED, OrderStatus.PROCESSING, OrderStatus.ACKNOWLEDGED, OrderStatus.PREPARING, OrderStatus.DISPATCHED],
     };
 
     if (!validTransitions[from]?.includes(to)) {

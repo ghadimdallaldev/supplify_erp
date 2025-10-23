@@ -7,6 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum OrderStatus {
+  PENDING
+  PLACED
+  PROCESSING
+  ACKNOWLEDGED
+  PREPARING
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+  ETA_UPDATED
+  NOTE_ADDED
+}
+
+enum OrderEventType {
+  PENDING
+  PLACED
+  PROCESSING
+  ACKNOWLEDGED
+  PREPARING
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+  ETA_UPDATED
+  NOTE_ADDED
+}
+
 model Cart {
   id           String     @id @default(cuid())
   restaurantId String
@@ -39,7 +65,7 @@ model Order {
   parentOrderId   String?      // if needed for multi-supplier split
   restaurantId    String
   supplierId      String
-  status          String       @default("PLACED") // PLACED|ACKNOWLEDGED|PREPARING|DISPATCHED|DELIVERED|CANCELLED
+  status          OrderStatus  @default(PENDING)
   etaAt           DateTime?
   ackBySlaAt      DateTime?    // acknowledgement deadline
   dispatchedAt    DateTime?
@@ -48,8 +74,11 @@ model Order {
   meta            Json?        // carrier info, driver details, etc.
   subtotal        Decimal      @db.Decimal(12, 2)
   tax             Decimal      @db.Decimal(12, 2)
+  taxAmount       Decimal?     @db.Decimal(12, 2)
+  discountAmount  Decimal?     @db.Decimal(12, 2)
   deliveryFee     Decimal      @db.Decimal(12, 2)
   total           Decimal      @db.Decimal(12, 2)
+  currency        String?      @default("USD")
   deliveryAddress String
   notes           String?
   createdAt       DateTime     @default(now())
@@ -57,6 +86,7 @@ model Order {
   items           OrderItem[]
   events          OrderEvent[]
   messages        OrderMessage[]
+  invoices        Invoice[]
 
   @@index([restaurantId, supplierId, status])
   @@index([status, ackBySlaAt])
@@ -69,8 +99,10 @@ model OrderItem {
   productId   String
   productName String
   qty         Int
+  quantity    Int?    // Alternative field name
   unitPrice   Decimal @db.Decimal(12, 2)
   subtotal    Decimal @db.Decimal(12, 2)
+  total       Decimal? @db.Decimal(12, 2) // Alternative field name
   notes       String?
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -81,11 +113,11 @@ model OrderItem {
 }
 
 model OrderEvent {
-  id            String   @id @default(cuid())
+  id            String        @id @default(cuid())
   orderId       String
-  actorType     String   // SYSTEM|SUPPLIER|RESTAURANT|ADMIN
+  actorType     String        // SYSTEM|SUPPLIER|RESTAURANT|ADMIN
   actorId       String?
-  type          String   // PLACED|ACKNOWLEDGED|PREPARING|DISPATCHED|DELIVERED|CANCELLED|ETA_UPDATED|NOTE_ADDED
+  type          OrderEventType
   payload       Json?    // additional event data
   createdAt     DateTime @default(now())
 
@@ -108,5 +140,48 @@ model OrderMessage {
 
   @@index([orderId, createdAt])
   @@map("order_messages")
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  orderId         String
+  restaurantId    String
+  supplierId      String
+  invoiceNumber   String   @unique
+  status          String   @default("DRAFT") // DRAFT|SENT|PAID|OVERDUE|CANCELLED
+  subtotal        Decimal  @db.Decimal(12, 2)
+  taxAmount       Decimal  @db.Decimal(12, 2)
+  discountAmount  Decimal  @db.Decimal(12, 2)
+  total           Decimal  @db.Decimal(12, 2)
+  currency        String   @default("USD")
+  issueDate       DateTime @default(now())
+  dueDate         DateTime?
+  paidAt          DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  items           InvoiceItem[]
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  productId   String
+  productName String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(12, 2)
+  total       Decimal @db.Decimal(12, 2)
+  notes       String?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
 }
 

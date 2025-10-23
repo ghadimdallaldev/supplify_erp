@@ -425,7 +425,7 @@ export class OrdersService {
       }
       logger.info(`Emitted ${eventType} events for order ${orderId} with ${order.items.length} lines`);
     } catch (error) {
-      logger.error(`Failed to emit order line events for order ${orderId}: ${error.message}`);
+      logger.error(`Failed to emit order line events for order ${orderId}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
