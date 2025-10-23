@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
       const errorText = await response.text();
       console.error('Inventory service error:', errorText);
       return NextResponse.json(
-        { error: 'Failed to create inventory adjustment' },
-        { status: response.status }
+        { error: 'Inventory service is not available. Please try again later.' },
+        { status: 503 }
       );
     }
 
@@ -49,6 +49,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating inventory adjustment:', error);
+    
+    // Handle connection errors gracefully
+    if (error instanceof TypeError && error.message.includes('fetch failed')) {
+      return NextResponse.json(
+        { error: 'Inventory service is not available. Please try again later.' },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Failed to create inventory adjustment' },
       { status: 500 }

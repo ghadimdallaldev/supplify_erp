@@ -12,6 +12,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { GraphQLModule } from './graphql/graphql.module';
 import { AutoSyncModule } from './auto-sync/auto-sync.module';
 import { BulkUploadModule } from './bulk-upload/bulk-upload.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { BulkUploadModule } from './bulk-upload/bulk-upload.module';
     GraphQLModule,
     AutoSyncModule,
     BulkUploadModule,
+    InventoryModule,
   ],
 })
 export class AppModule {}

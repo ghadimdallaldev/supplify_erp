@@ -7,37 +7,43 @@ export async function GET(
   try {
     const { restaurantId } = params;
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '10');
-    
-    // Try to call the real inventory service first
-    try {
-      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3005';
-      const response = await fetch(`${inventoryServiceUrl}/inventory/activity/${restaurantId}?limit=${limit}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+    const limit = searchParams.get('limit') || '10';
 
-      if (response.ok) {
-        const result = await response.json();
-        return NextResponse.json(result);
-      } else {
-        console.warn('Inventory service not available, falling back to local data');
-      }
-    } catch (serviceError) {
-      console.warn('Inventory service not available, falling back to local data:', serviceError);
+    // Call the real inventory service
+    const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3005';
+    
+    const response = await fetch(`${inventoryServiceUrl}/inventory/activity/${restaurantId}?limit=${limit}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Inventory service error:', errorText);
+      return NextResponse.json(
+        { error: 'Inventory service is not available. Please try again later.' },
+        { status: 503 }
+      );
     }
 
-    // Fallback: Use local data
-    const { inventoryDB } = await import('../../../../../lib/inventory-db');
-    const recentActivity = inventoryDB.getRecentActivity(restaurantId, limit);
+    const result = await response.json();
 
-    return NextResponse.json(recentActivity);
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Error fetching recent activity:', error);
+    console.error('Error fetching inventory activity:', error);
+    
+    // Handle connection errors gracefully
+    if (error instanceof TypeError && error.message.includes('fetch failed')) {
+      return NextResponse.json(
+        { error: 'Inventory service is not available. Please try again later.' },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to fetch recent activity' },
+      { error: 'Failed to fetch inventory activity' },
       { status: 500 }
     );
   }

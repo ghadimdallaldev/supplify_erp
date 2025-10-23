@@ -6,34 +6,40 @@ export async function GET(
 ) {
   try {
     const { restaurantId } = params;
-    
-    // Try to call the real inventory service first
-    try {
-      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3005';
-      const response = await fetch(`${inventoryServiceUrl}/inventory/summary/${restaurantId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
 
-      if (response.ok) {
-        const result = await response.json();
-        return NextResponse.json(result);
-      } else {
-        console.warn('Inventory service not available, falling back to local data');
-      }
-    } catch (serviceError) {
-      console.warn('Inventory service not available, falling back to local data:', serviceError);
+    // Call the real inventory service
+    const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3005';
+    
+    const response = await fetch(`${inventoryServiceUrl}/inventory/summary/${restaurantId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Inventory service error:', errorText);
+      return NextResponse.json(
+        { error: 'Inventory service is not available. Please try again later.' },
+        { status: 503 }
+      );
     }
 
-    // Fallback: Use local data
-    const { inventoryDB } = await import('../../../../../lib/inventory-db');
-    const inventorySummary = inventoryDB.getInventorySummary(restaurantId);
+    const result = await response.json();
 
-    return NextResponse.json(inventorySummary);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching inventory summary:', error);
+    
+    // Handle connection errors gracefully
+    if (error instanceof TypeError && error.message.includes('fetch failed')) {
+      return NextResponse.json(
+        { error: 'Inventory service is not available. Please try again later.' },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Failed to fetch inventory summary' },
       { status: 500 }

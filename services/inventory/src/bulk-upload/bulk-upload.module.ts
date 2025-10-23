@@ -2,8 +2,7 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { BulkUploadService } from './bulk-upload.service';
 import { BulkUploadController } from './bulk-upload.controller';
-import { PrismaService } from '../prisma/prisma.service';
-import { MovementsService } from '../movements/movements.service';
+import { MovementsModule } from '../movements/movements.module';
 
 @Module({
   imports: [
@@ -12,11 +11,10 @@ import { MovementsService } from '../movements/movements.service';
         fileSize: 10 * 1024 * 1024, // 10MB limit
       },
     }),
+    MovementsModule,
   ],
   providers: [
     BulkUploadService,
-    PrismaService,
-    MovementsService,
   ],
   controllers: [
     BulkUploadController,

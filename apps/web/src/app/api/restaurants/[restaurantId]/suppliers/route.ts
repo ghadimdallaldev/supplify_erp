@@ -19,7 +19,10 @@ export async function GET(
     });
 
     if (!response.ok) {
-      throw new Error(`Orders service error: ${response.status}`);
+      return NextResponse.json(
+        { error: 'Orders service is not available. Please try again later.' },
+        { status: 503 }
+      );
     }
 
     const orders = await response.json();
@@ -41,22 +44,10 @@ export async function GET(
           if (supplierResponse.ok) {
             return await supplierResponse.json();
           } else {
-            // Fallback to basic info if supplier service is not available
-            return {
-              id: supplierId,
-              name: `Supplier ${supplierId}`,
-              email: `${supplierId}@supplier.com`,
-              isFavorite: false,
-            };
+            throw new Error(`Supplier service error: ${supplierResponse.status}`);
           }
         } catch (error) {
-          // Fallback to basic info
-          return {
-            id: supplierId,
-            name: `Supplier ${supplierId}`,
-            email: `${supplierId}@supplier.com`,
-            isFavorite: false,
-          };
+          throw error;
         }
       })
     );
@@ -65,29 +56,12 @@ export async function GET(
   } catch (error: any) {
     console.error('Suppliers API error:', error);
     
-    // Return mock data when backend services are not available
+    // Handle connection errors gracefully
     if (error.code === 'ECONNREFUSED' || error.message?.includes('fetch failed')) {
-      console.log('Backend services not available, returning mock data');
-      return NextResponse.json([
-        {
-          id: 'supplier-1',
-          name: 'Fresh Produce Co.',
-          email: 'orders@freshproduce.com',
-          isFavorite: false,
-        },
-        {
-          id: 'supplier-2', 
-          name: 'Quality Meats Ltd.',
-          email: 'sales@qualitymeats.com',
-          isFavorite: true,
-        },
-        {
-          id: 'supplier-3',
-          name: 'Dairy Direct',
-          email: 'contact@dairydirect.com', 
-          isFavorite: false,
-        }
-      ]);
+      return NextResponse.json(
+        { error: 'Backend services are not available. Please try again later.' },
+        { status: 503 }
+      );
     }
     
     return NextResponse.json(

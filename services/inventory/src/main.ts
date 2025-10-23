@@ -23,19 +23,27 @@ async function bootstrap() {
 
   // Connect to RabbitMQ as microservice
   const rmqUrl = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: [rmqUrl],
-      queue: 'inventory_queue',
-      queueOptions: {
-        durable: true,
+  console.log(`🔗 Attempting to connect to RabbitMQ: ${rmqUrl}`);
+  
+  try {
+    app.connectMicroservice<MicroserviceOptions>({
+      transport: Transport.RMQ,
+      options: {
+        urls: [rmqUrl],
+        queue: 'inventory_queue',
+        queueOptions: {
+          durable: true,
+        },
+        prefetchCount: 1,
       },
-      prefetchCount: 1,
-    },
-  });
+    });
 
-  await app.startAllMicroservices();
+    await app.startAllMicroservices();
+    console.log(`✅ RabbitMQ microservice connected successfully`);
+  } catch (error) {
+    console.error(`❌ Failed to connect to RabbitMQ:`, error);
+    console.log(`⚠️  Continuing without RabbitMQ microservice...`);
+  }
   
   const port = process.env.PORT || 3005;
   await app.listen(port);
