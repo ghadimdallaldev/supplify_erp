@@ -1,0 +1,65 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['host.docker.internal:9464']
+        labels:
+          service: 'api-gateway'
+
+  - job_name: 'catalog-service'
+    static_configs:
+      - targets: ['host.docker.internal:9465']
+        labels:
+          service: 'catalog'
+
+  - job_name: 'orders-service'
+    static_configs:
+      - targets: ['host.docker.internal:9466']
+        labels:
+          service: 'orders'
+
+  - job_name: 'restaurants-service'
+    static_configs:
+      - targets: ['host.docker.internal:9467']
+        labels:
+          service: 'restaurants'
+
+  - job_name: 'suppliers-service'
+    static_configs:
+      - targets: ['host.docker.internal:9468']
+        labels:
+          service: 'suppliers'
+
+  - job_name: 'loyalty-service'
+    static_configs:
+      - targets: ['host.docker.internal:9469']
+        labels:
+          service: 'loyalty'
+
+  - job_name: 'notifications-service'
+    static_configs:
+      - targets: ['host.docker.internal:9470']
+        labels:
+          service: 'notifications'
+
+  - job_name: 'analytics-service'
+    static_configs:
+      - targets: ['host.docker.internal:9471']
+        labels:
+          service: 'analytics'
+
+  - job_name: 'recommendations-service'
+    static_configs:
+      - targets: ['host.docker.internal:9472']
+        labels:
+          service: 'recommendations'
+
+  - job_name: 'auth-proxy'
+    static_configs:
+      - targets: ['host.docker.internal:9473']
+        labels:
+          service: 'auth-proxy'
+

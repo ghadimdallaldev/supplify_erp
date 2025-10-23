@@ -1,0 +1,489 @@
+// Supplify Inventory Management Schema
+// PostgreSQL database with full auditability, FEFO, multi-UOM, batch tracking
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum StorageType {
+  DRY
+  CHILL
+  FREEZE
+  CHEMICAL
+}
+
+enum MovementType {
+  RECEIPT        // Receiving from supplier
+  ISSUE          // Consumption/usage
+  TRANSFER_OUT   // Transfer to another location
+  TRANSFER_IN    // Transfer from another location
+  WASTE          // Spoilage/overprep
+  RETURN         // Return to supplier
+  ADJUSTMENT     // Count variance or manual correction
+}
+
+enum BatchStatus {
+  OK
+  HOLD
+  QUARANTINE
+}
+
+enum CountType {
+  CYCLE
+  FULL
+}
+
+enum CountStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ValuationMethod {
+  FIFO
+  WAVG  // Weighted Average
+}
+
+// ============================================================================
+// CORE ENTITIES
+// ============================================================================
+
+// Restaurant Location (cached from restaurants service)
+model Location {
+  id            String   @id @default(uuid())
+  restaurantId  String
+  name          String
+  code          String?  // e.g., "KITCHEN", "DRY-STORE"
+  active        Boolean  @default(true)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  batches       Batch[]
+  parConfigs    ParConfig[]
+  counts        InventoryCount[]
+  ledgerEntries StockLedger[]
+  stockOnHand   StockOnHand[]
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId])
+  @@map("locations")
+}
+
+// Normalized catalog item for a restaurant
+model Item {
+  id               String       @id @default(uuid())
+  restaurantId     String
+  name             String
+  categoryId       String?
+  sku              String?      // Internal SKU
+  barcode          String?      // Primary barcode/GTIN
+  allergenFlags    String[]     // Array of allergen codes
+  storageType      StorageType
+  uomBase          String       // Base unit code (e.g., "g", "ml", "each")
+  uomDisplay       String?      // Display unit (e.g., "kg", "L", "case")
+  yieldPct         Float?       // Usable yield percentage
+  active           Boolean      @default(true)
+  
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  // Relations
+  supplierLinks    SupplierLink[]
+  batches          Batch[]
+  parConfigs       ParConfig[]
+  ledgerEntries    StockLedger[]
+  countLines       InventoryCountLine[]
+  recipeComponents RecipeComponent[]
+  stockOnHand      StockOnHand[]
+
+  @@unique([restaurantId, sku])
+  @@index([restaurantId])
+  @@index([barcode])
+  @@index([categoryId])
+  @@map("items")
+}
+
+// Unit of Measure definitions and conversions
+model Uom {
+  id          String   @id @default(uuid())
+  code        String   @unique  // e.g., "kg", "g", "case", "pack", "each"
+  name        String   // Display name
+  baseCode    String?  // Reference to base unit (null if this is base)
+  ratioToBase Float    @default(1.0)  // How many base units = 1 of this UOM
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("uoms")
+}
+
+// Link item to supplier products with vendor pack sizes
+model SupplierLink {
+  id                 String   @id @default(uuid())
+  itemId             String
+  supplierId         String   // From suppliers service
+  supplierProductId  String   // Supplier's product ID/SKU
+  vendorUom          String   // e.g., "case"
+  unitsPerVendorUom  Float    // e.g., 12 (each per case)
+  leadTimeDays       Int?
+  lastPrice          Float?   // Last purchase price
+  preferred          Boolean  @default(false)
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  item               Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, supplierId, supplierProductId])
+  @@index([itemId])
+  @@index([supplierId])
+  @@map("supplier_links")
+}
+
+// Immutable ledger of all stock movements
+model StockLedger {
+  id            String       @id @default(uuid())
+  itemId        String
+  restaurantId  String
+  locationId    String
+  batchId       String?
+  
+  movementType  MovementType
+  qtyBase       Float        // Quantity in base UOM (can be negative for issues)
+  uomBase       String       // Base unit code
+  unitCost      Float?       // Cost per base unit
+  extCost       Float?       // Extended cost (qtyBase * unitCost)
+  
+  refType       String?      // e.g., "PO", "RECIPE", "COUNT", "TRANSFER"
+  refId         String?      // ID of referenced entity
+  causedBy      String       // User ID who caused the movement
+  reason        String?      // Optional explanation
+  metadata      Json?        // Additional context (delivery note, photo URLs, etc.)
+  
+  idempotencyKey String?     // For preventing duplicate movements
+  timestamp     DateTime     @default(now())
+  
+  createdAt     DateTime     @default(now())
+
+  // Relations
+  item          Item         @relation(fields: [itemId], references: [id])
+  location      Location     @relation(fields: [locationId], references: [id])
+  batch         Batch?       @relation(fields: [batchId], references: [id])
+
+  @@unique([idempotencyKey])
+  @@index([itemId, locationId])
+  @@index([restaurantId])
+  @@index([timestamp])
+  @@index([movementType])
+  @@index([batchId])
+  @@map("stock_ledger")
+}
+
+// Batch/Lot tracking with expiry and FEFO
+model Batch {
+  id              String       @id @default(uuid())
+  itemId          String
+  locationId      String
+  
+  qtyOnHandBase   Float        // Current quantity in base UOM
+  expiryDate      DateTime?    // FEFO primary sort
+  lotCode         String?      // Supplier lot/batch code
+  supplierId      String?      // Which supplier this batch came from
+  lastUnitCost    Float        // Cost per base unit for this batch
+  
+  status          BatchStatus  @default(OK)
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  item            Item         @relation(fields: [itemId], references: [id])
+  location        Location     @relation(fields: [locationId], references: [id])
+  ledgerEntries   StockLedger[]
+
+  @@index([itemId, locationId])
+  @@index([expiryDate])
+  @@index([status])
+  @@map("batches")
+}
+
+// Materialized stock on hand per item+location (updated via triggers/jobs)
+model StockOnHand {
+  id              String   @id @default(uuid())
+  itemId          String
+  locationId      String
+  restaurantId    String
+  
+  qtyOnHandBase   Float    @default(0)  // Total physical quantity
+  qtyCommittedBase Float   @default(0)  // Reserved for orders/recipes
+  qtyAvailableBase Float   @default(0)  // On hand - committed
+  
+  lastCost        Float?   // Most recent unit cost
+  avgCost         Float?   // Weighted average cost
+  totalValue      Float?   // qtyOnHandBase * avgCost
+  
+  lastMovementAt  DateTime?
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  item            Item     @relation(fields: [itemId], references: [id])
+  location        Location @relation(fields: [locationId], references: [id])
+
+  @@unique([itemId, locationId])
+  @@index([restaurantId])
+  @@index([itemId])
+  @@map("stock_on_hand")
+}
+
+// Par levels and reorder points per item+location
+model ParConfig {
+  id            String   @id @default(uuid())
+  itemId        String
+  locationId    String
+  
+  minPar        Float    // Minimum par level
+  maxPar        Float    // Maximum par level
+  reorderPoint  Float    // Trigger for replenishment
+  reorderQty    Float    // Suggested order quantity
+  safetyStock   Float?   // Buffer stock
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  item          Item     @relation(fields: [itemId], references: [id])
+  location      Location @relation(fields: [locationId], references: [id])
+
+  @@unique([itemId, locationId])
+  @@index([itemId])
+  @@map("par_configs")
+}
+
+// ============================================================================
+// RECIPES / BOM
+// ============================================================================
+
+model Recipe {
+  id              String   @id @default(uuid())
+  restaurantId    String
+  name            String
+  description     String?
+  yieldUom        String   // Output unit (e.g., "portion", "kg")
+  yieldQty        Float    // How much this recipe produces
+  active          Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  components      RecipeComponent[]
+
+  @@index([restaurantId])
+  @@map("recipes")
+}
+
+model RecipeComponent {
+  id         String   @id @default(uuid())
+  recipeId   String
+  itemId     String
+  qtyBase    Float    // Quantity in base UOM
+  uomBase    String   // Base unit
+  wastePct   Float?   // Expected waste percentage
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  item       Item     @relation(fields: [itemId], references: [id])
+
+  @@index([recipeId])
+  @@index([itemId])
+  @@map("recipe_components")
+}
+
+// ============================================================================
+// INVENTORY COUNTS
+// ============================================================================
+
+model InventoryCount {
+  id              String       @id @default(uuid())
+  restaurantId    String
+  locationId      String
+  
+  countType       CountType
+  status          CountStatus  @default(SCHEDULED)
+  
+  scheduledFor    DateTime?
+  startedAt       DateTime?
+  closedAt        DateTime?
+  conductedBy     String?      // User ID
+  
+  notes           String?
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  location        Location     @relation(fields: [locationId], references: [id])
+  lines           InventoryCountLine[]
+
+  @@index([restaurantId])
+  @@index([locationId])
+  @@index([status])
+  @@map("inventory_counts")
+}
+
+model InventoryCountLine {
+  id                String         @id @default(uuid())
+  countId           String
+  itemId            String
+  
+  systemQtyBase     Float          // Expected quantity from system
+  countedQtyBase    Float?         // Actual counted quantity (null until counted)
+  varianceQtyBase   Float?         // Difference (counted - system)
+  varianceCost      Float?         // Financial impact of variance
+  
+  note              String?
+  countedBy         String?        // User ID
+  countedAt         DateTime?
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Relations
+  count             InventoryCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  item              Item           @relation(fields: [itemId], references: [id])
+
+  @@unique([countId, itemId])
+  @@index([countId])
+  @@map("inventory_count_lines")
+}
+
+// ============================================================================
+// VALUATION & REPORTING
+// ============================================================================
+
+model ValuationSnapshot {
+  id              String           @id @default(uuid())
+  restaurantId    String
+  atDate          DateTime
+  method          ValuationMethod
+  
+  totalValue      Float
+  details         Json             // Detailed breakdown by item/location
+  
+  createdAt       DateTime         @default(now())
+
+  @@index([restaurantId, atDate])
+  @@map("valuation_snapshots")
+}
+
+// ============================================================================
+// ALERTS & NOTIFICATIONS
+// ============================================================================
+
+model Alert {
+  id              String   @id @default(uuid())
+  restaurantId    String
+  alertType       String   // "LOW_STOCK", "NEAR_EXPIRY", "COUNT_OVERDUE", "EXCESS_WASTE"
+  severity        String   // "INFO", "WARNING", "CRITICAL"
+  
+  itemId          String?
+  locationId      String?
+  batchId         String?
+  
+  message         String
+  metadata        Json?
+  
+  acknowledged    Boolean  @default(false)
+  acknowledgedBy  String?
+  acknowledgedAt  DateTime?
+  
+  createdAt       DateTime @default(now())
+
+  @@index([restaurantId])
+  @@index([alertType])
+  @@index([acknowledged])
+  @@map("alerts")
+}
+
+// ============================================================================
+// AUTO-SYNC INVENTORY SYSTEM
+// ============================================================================
+
+model OrderLine {
+  id                String   @id @default(cuid())
+  orderId          String
+  supplierId       String
+  restaurantId     String
+  clientId         String   // tenant
+  supplierProductId String
+  restaurantItemId String?  // link to restaurant item catalog
+  qtyOrderedBase   Int
+  qtyDispatchedBase Int      @default(0)
+  qtyDeliveredBase Int       @default(0)
+  qtyRejectedBase  Int       @default(0) // damaged/returned on delivery
+  uomBase          String    // base uom for math
+  lastUnitPrice    Decimal
+  meta             Json?
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([restaurantId])
+  @@index([supplierId])
+  @@index([clientId])
+  @@map("order_lines")
+}
+
+model FulfillmentEvent {
+  id              String    @id @default(cuid())
+  orderId         String
+  orderLineId     String
+  clientId        String
+  type            String    // DISPATCHED|DELIVERED|RETURNED|CANCELLED
+  qtyBase         Int
+  uomBase         String
+  // batch/lot info if provided
+  expiryDate      DateTime?
+  lotCode         String?
+  // idempotency
+  idempotencyKey  String    @unique
+  payload         Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([orderId])
+  @@index([orderLineId])
+  @@index([clientId])
+  @@index([type])
+  @@map("fulfillment_events")
+}
+
+model OrganizationSettings {
+  id                        String   @id @default(cuid())
+  clientId                 String   @unique
+  inventoryAutoReceiveMode  String   @default("DELIVERED") // DISPATCHED|DELIVERED
+  defaultExpiryWindows     Json     // { CHILL: 7, DRY: 30, FREEZE: 30 }
+  inventoryAutoSyncEnabled Boolean  @default(true)
+  
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("organization_settings")
+}
+

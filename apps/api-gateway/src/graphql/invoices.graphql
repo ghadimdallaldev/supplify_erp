@@ -1,0 +1,62 @@
+type Invoice {
+  id: ID!
+  invoiceNumber: String!
+  orderId: ID!
+  restaurantId: ID!
+  supplierId: ID!
+  status: String!
+  issueDate: DateTime!
+  dueDate: DateTime!
+  subtotal: Float!
+  taxAmount: Float!
+  discountAmount: Float!
+  total: Float!
+  currency: String!
+  notes: String
+  pdfUrl: String
+  paidAt: DateTime
+  paidAmount: Float
+  paymentMethod: String
+  createdAt: DateTime!
+  items: [InvoiceItem!]!
+  payments: [InvoicePayment!]!
+}
+
+type InvoiceItem {
+  id: ID!
+  productId: ID!
+  sku: String!
+  description: String!
+  quantity: Float!
+  unitPrice: Float!
+  taxRate: Float!
+  total: Float!
+}
+
+type InvoicePayment {
+  id: ID!
+  amount: Float!
+  method: String!
+  reference: String
+  note: String
+  paidAt: DateTime!
+  recordedBy: ID!
+}
+
+input RecordPaymentInput {
+  amount: Float!
+  method: String!
+  reference: String
+  note: String
+}
+
+extend type Query {
+  myInvoices(status: String, limit: Int, offset: Int): [Invoice!]!
+  invoice(id: ID!): Invoice
+}
+
+extend type Mutation {
+  generateInvoicePDF(invoiceId: ID!): String!
+  recordInvoicePayment(invoiceId: ID!, input: RecordPaymentInput!): Invoice!
+}
+

@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  cognitoSub     String   @unique
+  email          String   @unique
+  firstName      String
+  lastName       String
+  role           String
+  organizationId String
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([cognitoSub])
+  @@index([email])
+  @@map("users")
+}
+

@@ -1,0 +1,23 @@
+{
+  "name": "@supplify/recommendations",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/core": "^10.3.0",
+    "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/microservices": "^10.3.0",
+    "@supplify/config": "workspace:*",
+    "@supplify/utils": "workspace:*",
+    "reflect-metadata": "^0.2.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.3.0",
+    "typescript": "^5.3.3"
+  }
+}
+

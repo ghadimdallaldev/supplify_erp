@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model FeatureFlag {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  name            String
+  description     String
+  enabledByDefault Boolean  @default(false)
+  dependencies    String[] @default([])
+  tags            String[] @default([])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rules           FlagRule[]
+  overrides       FlagOverride[]
+
+  @@map("feature_flags")
+}
+
+model FlagRule {
+  id            String   @id @default(cuid())
+  flagId        String
+  environment   String   @default("dev")
+  status        String   // OFF, ON, ROLLOUT
+  rolloutPct    Int      @default(0)
+  targetOrgType String?  // SUPPLIER, RESTAURANT, null for all
+  targetOrgIds  String[] @default([])
+  priority      Int      @default(0)
+  conditions    Json?    // Additional conditions
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  flag          FeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([flagId, environment])
+  @@index([environment, status])
+  @@map("flag_rules")
+}
+
+model FlagOverride {
+  id            String   @id @default(cuid())
+  flagId        String
+  environment   String   @default("dev")
+  orgType       String?  // SUPPLIER, RESTAURANT
+  orgId         String?
+  userId        String?
+  forcedStatus  String   // FORCE_ON, FORCE_OFF
+  note          String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  flag          FeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([flagId, environment])
+  @@index([orgId, orgType])
+  @@map("flag_overrides")
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // SUPPLIER, RESTAURANT
+  tier        String   @default("FREE") // FREE, BASIC, PRO, PREMIUM
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type, tier])
+  @@map("organizations")
+}

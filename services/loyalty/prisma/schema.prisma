@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PointsLedger {
+  id         String   @id @default(cuid())
+  entityId   String
+  entityType String
+  delta      Int
+  reason     String
+  orderId    String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityId])
+  @@index([entityType])
+  @@map("points_ledger")
+}
+

@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Supplier {
+  id            String      @id @default(cuid())
+  orgName       String
+  taxId         String
+  kycStatus     String      @default("PENDING")
+  billingPlan   String      @default("FREE")
+  promoCredits  Decimal     @default(0) @db.Decimal(12, 2)
+  logoKey       String?
+  description   String?
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  promotions    Promotion[]
+
+  @@map("suppliers")
+}
+
+model Promotion {
+  id          String   @id @default(cuid())
+  supplierId  String
+  type        String
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  budget      Decimal  @db.Decimal(12, 2)
+  spent       Decimal  @default(0) @db.Decimal(12, 2)
+  cpm         Decimal? @db.Decimal(8, 2)
+  cpc         Decimal? @db.Decimal(8, 2)
+  tags        String[] @db.Text
+  priority    Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([active])
+  @@map("promotions")
+}
+
