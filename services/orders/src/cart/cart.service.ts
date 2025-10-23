@@ -11,9 +11,9 @@ const logger = createLogger('cart-service');
 export class CartService {
   constructor(private prisma: PrismaService) {}
 
-  async getOrCreate(restaurantId: string) {
+  async getOrCreate(restaurantId: string, clientId: string) {
     let cart = await this.prisma.cart.findFirst({
-      where: { restaurantId },
+      where: { restaurantId, clientId },
       include: {
         items: true,
       },
@@ -22,20 +22,21 @@ export class CartService {
     if (!cart) {
       cart = await this.prisma.cart.create({
         data: {
+          clientId,
           restaurantId,
         },
         include: {
           items: true,
         },
       });
-      logger.info(`Cart created for restaurant: ${restaurantId}`);
+      logger.info(`Cart created for restaurant: ${restaurantId}, client: ${clientId}`);
     }
 
     return cart;
   }
 
-  async addItem(restaurantId: string, dto: AddToCartDto) {
-    const cart = await this.getOrCreate(restaurantId);
+  async addItem(restaurantId: string, dto: AddToCartDto, clientId: string) {
+    const cart = await this.getOrCreate(restaurantId, clientId);
 
     // Check if item already exists
     const existingItem = cart.items.find(

@@ -1,10 +1,10 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { AuthService } from '@supplify/auth-proxy';
+import { KeycloakAdapter } from '@supplify/auth-server';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private authService: AuthService) {}
+  constructor(private keycloakAdapter: KeycloakAdapter) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const gqlContext = GqlExecutionContext.create(context);
@@ -16,16 +16,25 @@ export class AuthGuard implements CanActivate {
     }
 
     try {
-      const authResult = await this.authService.verifyAndProvision(token);
+      const authContext = await this.keycloakAdapter.verifyBearer(token);
       
-      // Attach user context to request
-      req.user = authResult.user;
-      req.organization = authResult.organization;
-      req.clientId = authResult.organization?.id;
+      // Attach auth context to request
+      req.ctx = authContext;
+      req.user = {
+        id: authContext.userId,
+        email: authContext.email,
+        role: authContext.orgType,
+        organizationId: authContext.clientId,
+      };
+      req.organization = {
+        id: authContext.clientId,
+        type: authContext.orgType,
+      };
+      req.clientId = authContext.clientId;
       
       return true;
     } catch (error) {
-      throw new UnauthorizedException('Invalid authentication token');
+      throw new UnauthorizedException(`Authentication failed: ${error.message}`);
     }
   }
 

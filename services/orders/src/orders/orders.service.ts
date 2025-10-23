@@ -20,8 +20,8 @@ export class OrdersService {
     private eventsService: EventsService,
   ) {}
 
-  async placeOrder(restaurantId: string, dto: PlaceOrderDto) {
-    const cart = await this.cartService.getOrCreate(restaurantId);
+  async placeOrder(restaurantId: string, dto: PlaceOrderDto, clientId: string) {
+    const cart = await this.cartService.getOrCreate(restaurantId, clientId);
 
     if (cart.items.length === 0) {
       throw new BadRequestError('Cart is empty');
@@ -49,6 +49,7 @@ export class OrdersService {
 
       const order = await this.prisma.order.create({
         data: {
+          clientId,
           restaurantId,
           supplierId,
           status: 'PLACED',
@@ -61,6 +62,7 @@ export class OrdersService {
           notes: dto.notes,
           items: {
             create: items.map((item) => ({
+              clientId,
               productId: item.productId,
               productName: `Product ${item.productId}`, // Should fetch from catalog
               qty: item.qty,
@@ -71,6 +73,7 @@ export class OrdersService {
           },
           events: {
             create: {
+              clientId,
               actorType: 'SYSTEM',
               actorId: restaurantId,
               type: 'PLACED',

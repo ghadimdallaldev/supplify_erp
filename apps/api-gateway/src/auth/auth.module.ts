@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AuthResolver } from './auth.resolver';
 import { AuthGuard } from './auth.guard';
-import { AuthService } from '@supplify/auth-proxy';
+import { KeycloakAdapter } from '@supplify/auth-server';
 
 @Module({
-  providers: [AuthResolver, AuthGuard, AuthService],
-  exports: [AuthGuard, AuthService],
+  providers: [AuthResolver, AuthGuard, KeycloakAdapter],
+  exports: [AuthGuard, KeycloakAdapter],
 })
 export class AuthModule {}
 

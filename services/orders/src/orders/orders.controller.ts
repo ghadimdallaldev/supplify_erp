@@ -170,11 +170,11 @@ export class OrdersController {
   }
 
   @MessagePattern('orders.place')
-  async handlePlaceOrder(@Payload() data: { restaurantId: string; deliveryAddress: string; notes?: string }) {
+  async handlePlaceOrder(@Payload() data: { restaurantId: string; deliveryAddress: string; notes?: string; clientId: string }) {
     return this.ordersService.placeOrder(data.restaurantId, {
       deliveryAddress: data.deliveryAddress,
       notes: data.notes,
-    });
+    }, data.clientId);
   }
 
   // Multi-tenant endpoints
