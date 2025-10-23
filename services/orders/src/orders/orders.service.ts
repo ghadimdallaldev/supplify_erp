@@ -175,6 +175,63 @@ export class OrdersService {
     };
   }
 
+  async getDashboardKpis(restaurantId: string) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const [activeOrders, monthlySpendResult] = await Promise.all([
+      // Active orders count
+      this.prisma.order.count({
+        where: {
+          restaurantId,
+          status: {
+            in: ['PLACED', 'ACKNOWLEDGED', 'PREPARING', 'DISPATCHED'],
+          },
+        },
+      }),
+
+      // Monthly spend calculation
+      this.prisma.order.aggregate({
+        where: {
+          restaurantId,
+          status: 'DELIVERED',
+          deliveredAt: {
+            gte: startOfMonth,
+            lte: endOfMonth,
+          },
+        },
+        _sum: {
+          total: true,
+        },
+      }),
+    ]);
+
+    return {
+      activeOrders,
+      monthlySpend: Number(monthlySpendResult._sum.total || 0),
+    };
+  }
+
+  async getRecentOrders(restaurantId: string, limit: number = 10) {
+    const orders = await this.prisma.order.findMany({
+      where: { restaurantId },
+      include: {
+        items: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    return orders.map(order => ({
+      id: order.id,
+      supplierName: `Supplier ${order.supplierId}`, // TODO: Fetch actual supplier name
+      total: Number(order.total),
+      status: order.status,
+      createdAt: order.createdAt.toISOString(),
+    }));
+  }
+
   async updateStatus(id: string, dto: UpdateOrderStatusDto, actorId?: string, actorType: string = 'SYSTEM') {
     const order = await this.findOne(id);
 
@@ -209,6 +266,14 @@ export class OrdersService {
         updateData.deliveredAt = new Date();
         // Emit order line events for inventory sync
         await this.emitOrderLineEvents(id, 'DELIVERED', order.supplierId);
+        
+        // Emit loyalty points event
+        await this.eventsService.emitOrderDelivered({
+          orderId: id,
+          restaurantId: order.restaurantId,
+          supplierId: order.supplierId,
+          total: Number(order.total),
+        });
         
         // Trigger invoice creation when order is delivered
         try {

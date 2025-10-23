@@ -1,7 +1,10 @@
-import { useState, useEffect, ReactNode } from 'react';
+import { Injectable } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
+import React, { useState, useEffect } from 'react';
 
 export interface FlagContext {
-  env?: 'dev' | 'staging' | 'prod';
+  env: 'dev' | 'staging' | 'prod';
   orgType?: 'SUPPLIER' | 'RESTAURANT';
   orgId?: string;
   userId?: string;
@@ -14,220 +17,162 @@ export interface FlagEvaluationResult {
   rolloutBucket?: number;
 }
 
-/**
- * React hook for evaluating feature flags
- */
-export function useFlag(
-  flagKey: string, 
-  context: FlagContext = {},
-  fallback: boolean = false
-): { on: boolean; loading: boolean; error?: string } {
-  const [result, setResult] = useState({ on: fallback, loading: true, error: undefined });
-  
-  useEffect(() => {
-    const evaluateFlag = async () => {
-      try {
-        setResult(prev => ({ ...prev, loading: true, error: undefined }));
-        
-        const params = new URLSearchParams({
-          type: 'evaluate',
+@Injectable()
+export class FeatureFlagsService {
+  constructor(private flagsClient: ClientProxy) {}
+
+  /**
+   * Evaluate a single feature flag
+   */
+  async evaluateFlag(flagKey: string, context: FlagContext): Promise<FlagEvaluationResult> {
+    try {
+      const result = await firstValueFrom(
+        this.flagsClient.send('flags.evaluate', {
           flagKey,
-          environment: context.env || 'dev',
-        });
-        
-        if (context.orgType) params.append('orgType', context.orgType);
-        if (context.orgId) params.append('orgId', context.orgId);
-        if (context.userId) params.append('userId', context.userId);
-        
-        const response = await fetch(`/api/admin/feature-flags?${params.toString()}`);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to evaluate flag: ${response.statusText}`);
-        }
-        
-        const evaluation: FlagEvaluationResult = await response.json();
-        
-        setResult({
-          on: evaluation.on,
-          loading: false,
-          error: undefined,
-        });
-      } catch (error) {
-        console.error(`Error evaluating flag ${flagKey}:`, error);
-        setResult({
-          on: fallback,
-          loading: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    };
-    
-    evaluateFlag();
-  }, [flagKey, context.env, context.orgType, context.orgId, context.userId, fallback]);
-  
-  return result;
-}
-
-/**
- * Component that conditionally renders children based on feature flag
- */
-export interface FlagGateProps {
-  flagKey: string;
-  context?: FlagContext;
-  fallback?: boolean;
-  children: ReactNode;
-  fallbackChildren?: ReactNode;
-  loadingComponent?: ReactNode;
-}
-
-export function FlagGate({
-  flagKey,
-  context = {},
-  fallback = false,
-  children,
-  fallbackChildren = null,
-  loadingComponent = null,
-}: FlagGateProps) {
-  const { on, loading, error } = useFlag(flagKey, context, fallback);
-  
-  if (loading && loadingComponent) {
-    return <>{loadingComponent}</>;
+          context,
+        })
+      );
+      return result;
+    } catch (error) {
+      console.error(`Failed to evaluate flag ${flagKey}:`, error);
+      return { on: false, reason: 'evaluation_error' };
+    }
   }
-  
-  if (error) {
-    console.warn(`FlagGate error for ${flagKey}:`, error);
-    return fallback ? <>{children}</> : <>{fallbackChildren}</>;
+
+  /**
+   * Check if a feature flag is enabled
+   */
+  async isEnabled(flagKey: string, context: FlagContext): Promise<boolean> {
+    const result = await this.evaluateFlag(flagKey, context);
+    return result.on;
   }
-  
-  return on ? <>{children}</> : <>{fallbackChildren}</>;
+
+  /**
+   * Require a feature flag to be enabled, throw error if not
+   */
+  async requireFlag(flagKey: string, context: FlagContext): Promise<void> {
+    const result = await this.evaluateFlag(flagKey, context);
+    if (!result.on) {
+      const error = new Error(`Feature "${flagKey}" is not enabled`);
+      (error as any).code = 'FEATURE_FLAG_DISABLED';
+      (error as any).flagKey = flagKey;
+      (error as any).reason = result.reason;
+      throw error;
+    }
+  }
+
+  /**
+   * Get all feature flags for a context
+   */
+  async getAllFlags(context: FlagContext): Promise<any[]> {
+    try {
+      const flags = await firstValueFrom(
+        this.flagsClient.send('flags.get.all', {})
+      );
+      
+      // Evaluate each flag for the context
+      const evaluatedFlags = await Promise.all(
+        flags.map(async (flag: any) => {
+          const evaluation = await this.evaluateFlag(flag.key, context);
+          return {
+            ...flag,
+            status: evaluation.on ? 'ON' : 'OFF',
+            reason: evaluation.reason,
+            rolloutBucket: evaluation.rolloutBucket,
+          };
+        })
+      );
+      
+      return evaluatedFlags;
+    } catch (error) {
+      console.error('Failed to get all flags:', error);
+      return [];
+    }
+  }
 }
 
-/**
- * Hook for evaluating multiple flags at once
- */
-export function useFlags(
-  flagKeys: string[],
-  context: FlagContext = {},
-  fallbacks: Record<string, boolean> = {}
-): { flags: Record<string, boolean>; loading: boolean; errors: Record<string, string> } {
-  const [result, setResult] = useState({
-    flags: {} as Record<string, boolean>,
-    loading: true,
-    errors: {} as Record<string, string>,
-  });
-  
+// Frontend hook for React
+export function useFeatureFlags() {
+  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    const evaluateFlags = async () => {
+    async function loadFlags() {
       try {
-        setResult(prev => ({ ...prev, loading: true, errors: {} }));
-        
-        const evaluations = await Promise.allSettled(
-          flagKeys.map(async (flagKey) => {
-            const params = new URLSearchParams({
-              type: 'evaluate',
-              flagKey,
-              environment: context.env || 'dev',
-            });
-            
-            if (context.orgType) params.append('orgType', context.orgType);
-            if (context.orgId) params.append('orgId', context.orgId);
-            if (context.userId) params.append('userId', context.userId);
-            
-            const response = await fetch(`/api/admin/feature-flags?${params.toString()}`);
-            
-            if (!response.ok) {
-              throw new Error(`Failed to evaluate flag ${flagKey}: ${response.statusText}`);
-            }
-            
-            const evaluation: FlagEvaluationResult = await response.json();
-            return { flagKey, on: evaluation.on };
-          })
-        );
-        
-        const flags: Record<string, boolean> = {};
-        const errors: Record<string, string> = {};
-        
-        evaluations.forEach((result, index) => {
-          const flagKey = flagKeys[index];
-          
-          if (result.status === 'fulfilled') {
-            flags[flagKey] = result.value.on;
-          } else {
-            flags[flagKey] = fallbacks[flagKey] || false;
-            errors[flagKey] = result.reason?.message || 'Unknown error';
-          }
+        // This would be replaced with actual GraphQL query
+        const response = await fetch('/api/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `
+              query GetFeatureFlags {
+                featureFlags
+              }
+            `,
+          }),
         });
         
-        setResult({ flags, loading: false, errors });
+        const data = await response.json();
+        const flagsData = JSON.parse(data.data.featureFlags);
+        
+        const flagsMap: Record<string, boolean> = {};
+        flagsData.forEach((flag: any) => {
+          flagsMap[flag.key] = flag.status === 'ON';
+        });
+        
+        setFlags(flagsMap);
       } catch (error) {
-        console.error('Error evaluating flags:', error);
-        
-        const flags: Record<string, boolean> = {};
-        flagKeys.forEach(flagKey => {
-          flags[flagKey] = fallbacks[flagKey] || false;
-        });
-        
-        setResult({
-          flags,
-          loading: false,
-          errors: { general: error instanceof Error ? error.message : 'Unknown error' },
-        });
+        console.error('Failed to load feature flags:', error);
+      } finally {
+        setLoading(false);
       }
-    };
-    
-    evaluateFlags();
-  }, [flagKeys.join(','), context.env, context.orgType, context.orgId, context.userId]);
-  
-  return result;
+    }
+
+    loadFlags();
+  }, []);
+
+  return { flags, loading };
 }
 
-/**
- * Utility function to check if a flag is on (synchronous, uses cached result)
- */
-export function isFlagOnSync(
-  flagKey: string,
-  context: FlagContext = {},
-  fallback: boolean = false
-): boolean {
-  // This would typically use a cached result from a context provider
-  // For now, we'll return the fallback value
-  return fallback;
-}
+// React hook for evaluating a single flag
+export function useFeatureFlag(flagKey: string, context?: FlagContext) {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-/**
- * Context provider for flag evaluation results
- */
-export interface FlagProviderProps {
-  children: ReactNode;
-  context?: FlagContext;
-  flags?: string[];
-}
+  useEffect(() => {
+    async function evaluateFlag() {
+      try {
+        const response = await fetch('/api/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `
+              query EvaluateFeatureFlag($flagKey: String!, $orgType: String, $orgId: String, $userId: String) {
+                evaluateFeatureFlag(flagKey: $flagKey, orgType: $orgType, orgId: $orgId, userId: $userId)
+              }
+            `,
+            variables: {
+              flagKey,
+              orgType: context?.orgType,
+              orgId: context?.orgId,
+              userId: context?.userId,
+            },
+          }),
+        });
+        
+        const data = await response.json();
+        const result = JSON.parse(data.data.evaluateFeatureFlag);
+        setEnabled(result.on);
+      } catch (error) {
+        console.error(`Failed to evaluate flag ${flagKey}:`, error);
+        setEnabled(false);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-export function FlagProvider({ children, context = {}, flags = [] }: FlagProviderProps) {
-  const { flags: flagResults, loading } = useFlags(flags, context);
-  
-  return (
-    <FlagContext.Provider value={{ flags: flagResults, loading, context }}>
-      {children}
-    </FlagContext.Provider>
-  );
-}
+    evaluateFlag();
+  }, [flagKey, context?.orgType, context?.orgId, context?.userId]);
 
-// Create context for flag results
-import { createContext, useContext } from 'react';
-
-interface FlagContextValue {
-  flags: Record<string, boolean>;
-  loading: boolean;
-  context: FlagContext;
-}
-
-const FlagContext = createContext<FlagContextValue | null>(null);
-
-export function useFlagContext(): FlagContextValue {
-  const context = useContext(FlagContext);
-  if (!context) {
-    throw new Error('useFlagContext must be used within a FlagProvider');
-  }
-  return context;
+  return { enabled, loading };
 }

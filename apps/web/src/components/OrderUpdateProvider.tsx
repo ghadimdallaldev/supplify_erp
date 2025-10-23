@@ -62,21 +62,22 @@ export function OrderUpdateProvider({ children }: { children: ReactNode }) {
   };
 
   // Simulate real-time updates (in a real app, this would be WebSocket/GraphQL subscriptions)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Simulate order status updates
-      const pendingOrders = localOrders.filter(order => order.status === 'Pending');
-      if (pendingOrders.length > 0) {
-        const randomOrder = pendingOrders[Math.floor(Math.random() * pendingOrders.length)];
-        const statuses = ['Processing', 'Dispatched', 'Delivered'];
-        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)] as Order['status'];
-        
-        updateOrder(randomOrder.id, { status: randomStatus });
-      }
-    }, 10000); // Update every 10 seconds for demo
+  // DISABLED: Automatic status progression for demo purposes
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     // Simulate order status updates
+  //     const pendingOrders = localOrders.filter(order => order.status === 'Pending');
+  //     if (pendingOrders.length > 0) {
+  //       const randomOrder = pendingOrders[Math.floor(Math.random() * pendingOrders.length)];
+  //       const statuses = ['Processing', 'Dispatched', 'Delivered'];
+  //       const randomStatus = statuses[Math.floor(Math.random() * statuses.length)] as Order['status'];
+  //       
+  //       updateOrder(randomOrder.id, { status: randomStatus });
+  //     }
+  //   }, 10000); // Update every 10 seconds for demo
 
-    return () => clearInterval(interval);
-  }, [localOrders]);
+  //   return () => clearInterval(interval);
+  // }, [localOrders]);
 
   return (
     <OrderUpdateContext.Provider value={{

@@ -8,6 +8,9 @@ import { SponsoredBadge } from '../../../components/SponsoredBadge';
 import { usePromoSuiteGate } from '../../../hooks/usePromoSuiteFlag';
 import { usePromoSuiteTracking } from '../../../hooks/usePromoSuiteTracking';
 import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { gql } from '@apollo/client';
+import { apolloClient } from '../../../lib/apollo-client';
 
 interface Supplier {
   id: string;
@@ -20,7 +23,27 @@ interface Supplier {
   campaignId?: string;
   sponsoredRank?: number;
   priorityScore?: number;
+  pinned?: boolean;
+  featured?: boolean;
 }
+
+const RESTAURANT_SUPPLIERS_QUERY = gql`
+  query GetRestaurantSuppliers {
+    restaurantSuppliers
+  }
+`;
+
+const PIN_SUPPLIER_MUTATION = gql`
+  mutation PinSupplier($supplierId: ID!, $pinned: Boolean!) {
+    pinSupplier(supplierId: $supplierId, pinned: $pinned)
+  }
+`;
+
+const FEATURE_SUPPLIER_MUTATION = gql`
+  mutation FeatureSupplier($supplierId: ID!, $featured: Boolean!) {
+    featureSupplier(supplierId: $supplierId, featured: $featured)
+  }
+`;
 
 interface PromoSuiteDiscount {
   productId: string;
@@ -55,81 +78,49 @@ function RestaurantSuppliersContent() {
   const { user } = useAuthContext();
   const { isEnabled: isPromoSuiteEnabled } = usePromoSuiteGate();
   const { logImpression, logClick } = usePromoSuiteTracking({ campaignId: 'default', enabled: false });
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const queryClient = useQueryClient();
+
+  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
+    queryKey: ['restaurant-suppliers'],
+    queryFn: async () => {
+      const result = await apolloClient.query({
+        query: RESTAURANT_SUPPLIERS_QUERY,
+      });
+      return JSON.parse(result.data.restaurantSuppliers);
+    },
+  });
+
+  const pinSupplierMutation = useMutation({
+    mutationFn: async ({ supplierId, pinned }: { supplierId: string; pinned: boolean }) => {
+      const result = await apolloClient.mutate({
+        mutation: PIN_SUPPLIER_MUTATION,
+        variables: { supplierId, pinned },
+      });
+      return JSON.parse(result.data.pinSupplier);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['restaurant-suppliers'] });
+    },
+  });
+
+  const featureSupplierMutation = useMutation({
+    mutationFn: async ({ supplierId, featured }: { supplierId: string; featured: boolean }) => {
+      const result = await apolloClient.mutate({
+        mutation: FEATURE_SUPPLIER_MUTATION,
+        variables: { supplierId, featured },
+      });
+      return JSON.parse(result.data.featureSupplier);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['restaurant-suppliers'] });
+    },
+  });
+
+  // Mock PromoSuite data for now
   const [discounts, setDiscounts] = useState<PromoSuiteDiscount[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<PromoSuiteFeaturedProduct[]>([]);
 
   useEffect(() => {
-    // Mock data - replace with actual API calls
-    const mockSuppliers: Supplier[] = [
-      { 
-        id: 'fresh-foods', 
-        name: 'Fresh Foods Supply', 
-        category: 'Produce, Dairy', 
-        rating: 4.8, 
-        orders: 120, 
-        spent: 12500,
-        isSponsored: true,
-        campaignId: 'cmp_sponsored_1',
-        sponsoredRank: 1,
-        priorityScore: 1.2
-      },
-      { 
-        id: 'premium-meats', 
-        name: 'Premium Meats Co.', 
-        category: 'Meat, Poultry', 
-        rating: 4.9, 
-        orders: 85, 
-        spent: 18500 
-      },
-      { 
-        id: 'organic-greens', 
-        name: 'Organic Greens Ltd.', 
-        category: 'Organic Produce', 
-        rating: 4.7, 
-        orders: 95, 
-        spent: 4200,
-        isSponsored: true,
-        campaignId: 'cmp_sponsored_2',
-        sponsoredRank: 2,
-        priorityScore: 1.1
-      },
-      { 
-        id: 'gourmet-seafood', 
-        name: 'Gourmet Seafood Inc.', 
-        category: 'Seafood', 
-        rating: 4.6, 
-        orders: 60, 
-        spent: 9800 
-      },
-      { 
-        id: 'bakery-delights', 
-        name: 'Bakery Delights', 
-        category: 'Baked Goods', 
-        rating: 4.5, 
-        orders: 110, 
-        spent: 7200 
-      },
-    ];
-
-    // Apply PromoSuite blending if enabled
-    if (isPromoSuiteEnabled) {
-      // Sort sponsored suppliers to top, then organic
-      const sortedSuppliers = mockSuppliers.sort((a, b) => {
-        if (a.isSponsored && !b.isSponsored) return -1;
-        if (!a.isSponsored && b.isSponsored) return 1;
-        if (a.isSponsored && b.isSponsored) {
-          return (a.sponsoredRank || 0) - (b.sponsoredRank || 0);
-        }
-        return b.rating - a.rating; // Organic sorting by rating
-      });
-      setSuppliers(sortedSuppliers);
-    } else {
-      // Regular sorting by rating
-      setSuppliers(mockSuppliers.sort((a, b) => b.rating - a.rating));
-    }
-
-    // Mock PromoSuite data
     if (isPromoSuiteEnabled) {
       const mockDiscounts: PromoSuiteDiscount[] = [
         {
@@ -160,6 +151,8 @@ function RestaurantSuppliersContent() {
     }
   }, [isPromoSuiteEnabled]);
 
+  const suppliers = suppliersData || [];
+
   const handleSupplierClick = (supplier: Supplier) => {
     if (supplier.isSponsored && supplier.campaignId) {
       logClick();
@@ -172,17 +165,38 @@ function RestaurantSuppliersContent() {
     }
   };
 
+  if (suppliersLoading) {
+    return (
+      <div className="container mx-auto p-8">
+        <h1 className="text-3xl font-bold mb-6">Your Suppliers</h1>
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded mb-4 w-1/4"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Your Suppliers</h1>
-        {isPromoSuiteEnabled && (
-          <div className="text-sm text-gray-600">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              PromoSuite Active
-            </span>
-          </div>
-        )}
+        <div className="flex items-center space-x-4">
+          <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            + Add Supplier
+          </button>
+          {isPromoSuiteEnabled && (
+            <div className="text-sm text-gray-600">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                PromoSuite Active
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
@@ -253,24 +267,54 @@ function RestaurantSuppliersContent() {
                   ${supplier.spent.toLocaleString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <Link 
-                    href={`/restaurant/chat?supplier=${supplier.id}`} 
-                    className="text-blue-600 hover:text-blue-900 mr-4 relative"
-                  >
-                    Chat
-                    {user && getUnreadCount(supplier.id, user.orgId) > 0 && (
-                      <span className="absolute -top-2 -right-4 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
-                        {getUnreadCount(supplier.id, user.orgId)}
-                      </span>
-                    )}
-                  </Link>
-                  <Link 
-                    href={`/restaurant/suppliers/${supplier.id}`} 
-                    className="text-indigo-600 hover:text-indigo-900"
-                    onClick={() => handleSupplierClick(supplier)}
-                  >
-                    Browse Products
-                  </Link>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => pinSupplierMutation.mutate({ 
+                        supplierId: supplier.id, 
+                        pinned: !supplier.pinned 
+                      })}
+                      className={`text-sm px-2 py-1 rounded ${
+                        supplier.pinned 
+                          ? 'bg-yellow-100 text-yellow-800' 
+                          : 'bg-gray-100 text-gray-600 hover:bg-yellow-50'
+                      }`}
+                      disabled={pinSupplierMutation.isPending}
+                    >
+                      📌 {supplier.pinned ? 'Pinned' : 'Pin'}
+                    </button>
+                    <button
+                      onClick={() => featureSupplierMutation.mutate({ 
+                        supplierId: supplier.id, 
+                        featured: !supplier.featured 
+                      })}
+                      className={`text-sm px-2 py-1 rounded ${
+                        supplier.featured 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : 'bg-gray-100 text-gray-600 hover:bg-blue-50'
+                      }`}
+                      disabled={featureSupplierMutation.isPending}
+                    >
+                      ⭐ {supplier.featured ? 'Featured' : 'Feature'}
+                    </button>
+                    <Link 
+                      href={`/restaurant/chat?supplier=${supplier.id}`} 
+                      className="text-blue-600 hover:text-blue-900 relative"
+                    >
+                      Chat
+                      {user && getUnreadCount(supplier.id, user.orgId) > 0 && (
+                        <span className="absolute -top-2 -right-4 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                          {getUnreadCount(supplier.id, user.orgId)}
+                        </span>
+                      )}
+                    </Link>
+                    <Link 
+                      href={`/restaurant/suppliers/${supplier.id}`} 
+                      className="text-indigo-600 hover:text-indigo-900"
+                      onClick={() => handleSupplierClick(supplier)}
+                    >
+                      Browse Products
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

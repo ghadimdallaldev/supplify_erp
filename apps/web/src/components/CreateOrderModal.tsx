@@ -5,6 +5,15 @@ import { ShoppingCart, Star, Package, Plus, Minus, X, Search, Filter, Heart } fr
 import { useOrderStore, Order } from '../hooks/useOrderStore';
 import { ButtonAction } from './ButtonAction';
 import { FriendSupplierModal } from './FriendSupplierModal';
+import { useMutation } from '@tanstack/react-query';
+import { gql } from '@apollo/client';
+import { apolloClient } from '../lib/apollo-client';
+
+const PLACE_ORDER_MUTATION = gql`
+  mutation PlaceOrder($input: PlaceOrderInput!) {
+    placeOrder(input: $input)
+  }
+`;
 
 interface Product {
   id: string;
@@ -138,6 +147,25 @@ export function CreateOrderModal({ isOpen, onClose, supplierId: initialSupplierI
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  const placeOrderMutation = useMutation({
+    mutationFn: async (input: { deliveryAddress: string; notes?: string }) => {
+      const result = await apolloClient.mutate({
+        mutation: PLACE_ORDER_MUTATION,
+        variables: { input },
+      });
+      return JSON.parse(result.data.placeOrder);
+    },
+    onSuccess: (result) => {
+      console.log('Order placed successfully:', result);
+      alert('Order placed successfully!');
+      onClose();
+    },
+    onError: (error) => {
+      console.error('Error placing order:', error);
+      alert('Error placing order: ' + error.message);
+    },
+  });
+
   const createOrder = () => {
     if (cart.length === 0) {
       alert('Please add items to your cart before creating an order');
@@ -149,40 +177,11 @@ export function CreateOrderModal({ isOpen, onClose, supplierId: initialSupplierI
       return;
     }
 
-    const order: Order = {
-      id: `ORD-${Date.now()}`,
-      supplierId: selectedSupplier,
-      supplier: mockSuppliers[selectedSupplier as keyof typeof mockSuppliers]?.name,
-      restaurantId: 'golden-fork', // In a real app, this would come from auth context
-      restaurant: 'Golden Fork Restaurant', // In a real app, this would come from auth context
-      items: cart.reduce((sum, item) => sum + item.quantity, 0), // Total item count
-      total: getTotalAmount(), // Total amount for display
-      deliveryDate,
-      notes,
-      orderItems: cart.map(item => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.price,
-        name: item.name,
-      })),
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
-    };
-
-    // Add order to shared store (this will notify suppliers)
-    const createdOrder = addOrder(order);
-    
-    // Notify parent component
-    onOrderCreated(createdOrder);
-    
-    // Close modal and reset form
-    onClose();
-    setCart([]);
-    setDeliveryDate('');
-    setNotes('');
-    
-    // Show success message
-    alert(`Order ${order.id} created successfully! Supplier has been notified.`);
+    // Place order via GraphQL API
+    placeOrderMutation.mutate({
+      deliveryAddress: `Delivery Address for ${deliveryDate}`,
+      notes: notes,
+    });
   };
 
   if (!isOpen) return null;
@@ -426,11 +425,11 @@ export function CreateOrderModal({ isOpen, onClose, supplierId: initialSupplierI
                 confirmDescription="This will place the order with the selected supplier."
                 successMessage="Order created successfully!"
                 errorMessage="Failed to create order. Please try again."
-                disabled={cart.length === 0 || !deliveryDate}
+                disabled={cart.length === 0 || !deliveryDate || placeOrderMutation.isPending}
                 data-testid="btn-create-order"
                 className="px-4 py-2"
               >
-                Create Order
+                {placeOrderMutation.isPending ? 'Creating Order...' : 'Create Order'}
               </ButtonAction>
             </div>
           </div>

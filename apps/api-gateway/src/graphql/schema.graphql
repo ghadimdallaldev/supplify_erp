@@ -1,0 +1,97 @@
+type DashboardKpis {
+  activeOrders: Int!
+  monthlySpend: Float!
+  lowStockCount: Int!
+  loyaltyPoints: Int!
+}
+
+type OrderSummary {
+  id: ID!
+  supplierName: String!
+  total: Float!
+  status: String!
+  createdAt: String!
+}
+
+type InventorySummary {
+  totalItems: Int!
+  totalValue: Float!
+  lowStock: Int!
+  outOfStock: Int!
+}
+
+type InventoryActivity {
+  itemId: ID!
+  change: Int!
+  reason: String!
+  at: String!
+  orderId: ID
+}
+
+type LoyaltyWalletDTO {
+  supplierId: ID!
+  supplierName: String!
+  points: Int!
+  redeemRate: Float!
+  earnRate: Float!
+}
+
+type LoyaltyProgram {
+  id: ID!
+  supplierId: ID!
+  name: String!
+  active: Boolean!
+  earnRate: Float!
+  redeemRate: Float!
+  minRedeem: Int!
+}
+
+type RestaurantSupplier {
+  id: ID!
+  restaurantId: ID!
+  supplierId: ID!
+  supplierName: String!
+  pinned: Boolean!
+  featured: Boolean!
+  createdAt: String!
+}
+
+extend type Query {
+  restaurantDashboardKpis: String!
+  recentOrders(limit: Int = 10): String!
+  orders: String!
+  inventorySummary: String!
+  recentInventoryActivity(hours: Int = 24): String!
+  myLoyaltyWallets: String!
+  loyaltyPrograms: String!
+  restaurantSuppliers: String!
+  invoices(userId: String!, userRole: String!, status: String): String!
+  invoiceStats(userId: String!, userRole: String!): String!
+  featureFlags: String!
+  evaluateFeatureFlag(flagKey: String!, orgType: String, orgId: String, userId: String): String!
+}
+
+extend type Mutation {
+  placeOrder(input: PlaceOrderInput!): String!
+  redeemLoyaltyPoints(supplierId: ID!, points: Int!, orderId: ID!): Boolean!
+  addSupplier(supplierId: ID!): String!
+  pinSupplier(supplierId: ID!, pinned: Boolean!): String!
+  featureSupplier(supplierId: ID!, featured: Boolean!): String!
+  createInvoice(input: CreateInvoiceInput!): String!
+  updateInvoiceStatus(invoiceId: ID!, status: String!, amount: Float, method: String): String!
+  generateInvoicePDF(invoiceId: ID!): String!
+}
+
+input PlaceOrderInput {
+  deliveryAddress: String!
+  notes: String
+}
+
+input CreateInvoiceInput {
+  orderId: String!
+  restaurantId: String!
+  supplierId: String!
+  issueDate: String
+  dueDate: String
+  notes: String
+}

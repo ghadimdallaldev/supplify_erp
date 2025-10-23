@@ -1,11 +1,15 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
-import { EventPattern } from '@nestjs/microservices';
+import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 import { LOYALTY_TIERS } from '@supplify/config';
 import { PrismaService } from './prisma.service';
+import { LoyaltyService } from './loyalty.service';
 
 @Controller('loyalty')
 export class LoyaltyController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private loyaltyService: LoyaltyService,
+  ) {}
 
   @Get('balance/:entityId')
   async getBalance(@Body() body: { entityId: string }) {
@@ -33,14 +37,29 @@ export class LoyaltyController {
   }
 
   @EventPattern('order.delivered')
-  async handleOrderDelivered(data: { orderId: string; restaurantId: string; total: number }) {
-    const points = Math.floor(data.total / 10); // 1 point per $10
-    await this.accruePoints({
-      entityId: data.restaurantId,
-      points,
-      reason: 'Order delivered',
-      orderId: data.orderId,
-    });
+  async handleOrderDelivered(data: { orderId: string; restaurantId: string; supplierId: string; total: number }) {
+    await this.loyaltyService.earnPoints(data.supplierId, data.restaurantId, data.orderId, data.total);
+  }
+
+  @MessagePattern('loyalty.wallets')
+  async getLoyaltyWallets(@Payload() data: { restaurantId: string }) {
+    return this.loyaltyService.getLoyaltyWallets(data.restaurantId);
+  }
+
+  @MessagePattern('loyalty.programs')
+  async getLoyaltyPrograms() {
+    return this.loyaltyService.getLoyaltyPrograms();
+  }
+
+  @MessagePattern('loyalty.redeem')
+  async redeemLoyaltyPoints(@Payload() data: { restaurantId: string; supplierId: string; points: number; orderId: string }) {
+    return this.loyaltyService.redeemPoints(data.supplierId, data.restaurantId, data.orderId, data.points);
+  }
+
+  @MessagePattern('loyalty.total')
+  async getTotalLoyaltyPoints(@Payload() data: { restaurantId: string }) {
+    const total = await this.loyaltyService.getTotalLoyaltyPoints(data.restaurantId);
+    return { total };
   }
 
   private calculateTier(points: number): 'BRONZE' | 'SILVER' | 'GOLD' {

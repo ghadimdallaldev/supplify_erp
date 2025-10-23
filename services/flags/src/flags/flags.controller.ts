@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { FlagsService } from './flags.service';
 import { CreateFlagDto, UpdateFlagDto, CreateRuleDto, CreateOverrideDto } from './dto/flags.dto';
 
@@ -142,5 +143,24 @@ export class FlagsController {
   async seedInitialData() {
     await this.flagsService.seedInitialData();
     return { message: 'Initial data seeded successfully' };
+  }
+
+  // RabbitMQ Message Patterns
+  @MessagePattern('flags.get.all')
+  async handleGetAllFlags(@Payload() data: any) {
+    return this.flagsService.getAllFlags();
+  }
+
+  @MessagePattern('flags.evaluate')
+  async handleEvaluateFlag(@Payload() data: { flagKey: string; context: any }) {
+    return this.flagsService.evaluateFlag(
+      data.flagKey,
+      data.context.env || 'dev',
+      {
+        orgType: data.context.orgType,
+        orgId: data.context.orgId,
+        userId: data.context.userId,
+      }
+    );
   }
 }

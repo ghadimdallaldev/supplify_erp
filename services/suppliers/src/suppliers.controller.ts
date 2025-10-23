@@ -1,30 +1,33 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
-import { PrismaService } from './prisma.service';
+import { Controller } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import { SuppliersService } from './suppliers.service';
 
-@ApiTags('suppliers')
 @Controller('suppliers')
 export class SuppliersController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private suppliersService: SuppliersService) {}
 
-  @Get()
-  async findAll() {
-    return this.prisma.supplier.findMany({ include: { promotions: true } });
+  @MessagePattern('suppliers.restaurant')
+  async getRestaurantSuppliers(@Payload() data: { restaurantId: string }) {
+    return this.suppliersService.getRestaurantSuppliers(data.restaurantId);
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.prisma.supplier.findUnique({
-      where: { id },
-      include: { promotions: true },
-    });
+  @MessagePattern('suppliers.add')
+  async addSupplier(@Payload() data: { restaurantId: string; supplierId: string }) {
+    return this.suppliersService.addSupplier(data.restaurantId, data.supplierId);
   }
 
-  @Get(':id/promotions')
-  async getPromotions(@Param('id') id: string) {
-    return this.prisma.promotion.findMany({
-      where: { supplierId: id, active: true },
-    });
+  @MessagePattern('suppliers.pin')
+  async pinSupplier(@Payload() data: { restaurantId: string; supplierId: string; pinned: boolean }) {
+    return this.suppliersService.pinSupplier(data.restaurantId, data.supplierId, data.pinned);
+  }
+
+  @MessagePattern('suppliers.feature')
+  async featureSupplier(@Payload() data: { restaurantId: string; supplierId: string; featured: boolean }) {
+    return this.suppliersService.featureSupplier(data.restaurantId, data.supplierId, data.featured);
+  }
+
+  @MessagePattern('suppliers.all')
+  async getAllSuppliers() {
+    return this.suppliersService.getAllSuppliers();
   }
 }
-

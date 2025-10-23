@@ -93,9 +93,18 @@ export class OrderInventoryService {
       return sum + (soh.totalValue || 0);
     }, 0);
 
+    // Count low stock and out of stock items
+    const lowStock = stockOnHand.filter(soh => 
+      soh.item.reorderPoint && soh.qtyOnHandBase <= soh.item.reorderPoint
+    ).length;
+    
+    const outOfStock = stockOnHand.filter(soh => soh.qtyOnHandBase <= 0).length;
+
     return {
       totalItems: stockOnHand.length,
       totalValue,
+      lowStock,
+      outOfStock,
       items: stockOnHand.map(soh => ({
         id: soh.itemId,
         name: soh.item.name,
@@ -107,5 +116,32 @@ export class OrderInventoryService {
         location: soh.location.name,
       })),
     };
+  }
+
+  /**
+   * Get recent inventory activity
+   */
+  async getRecentInventoryActivity(restaurantId: string, hours: number = 24) {
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    
+    const movements = await this.prisma.movement.findMany({
+      where: {
+        item: { restaurantId },
+        createdAt: { gte: since },
+      },
+      include: {
+        item: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return movements.map(movement => ({
+      itemId: movement.itemId,
+      change: movement.type === 'RECEIVE' ? movement.qtyBase : -movement.qtyBase,
+      reason: movement.reason,
+      at: movement.createdAt.toISOString(),
+      orderId: movement.refType === 'ORDER' ? movement.refId : undefined,
+    }));
   }
 }

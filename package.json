@@ -22,7 +22,12 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+    "test:integration": "pnpm -r test:integration",
+    "test:e2e": "pnpm -r test:e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "ci:check-mock-data": "node scripts/check-mock-data.js",
+    "ci:lighthouse": "npm run build && npm run ci:check-mock-data",
+    "ci:all": "npm run ci:check-mock-data && npm run test && npm run typecheck && npm run lint"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

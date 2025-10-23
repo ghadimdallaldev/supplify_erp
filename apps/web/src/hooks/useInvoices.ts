@@ -1,14 +1,39 @@
 'use client';
 
 import { useCallback } from 'react';
-import { 
-  fetchInvoices, 
-  fetchInvoiceStats, 
-  createInvoice, 
-  updateInvoiceStatus, 
-  generateInvoicePDF 
-} from '../lib/mockInvoiceApi';
+import { apolloClient } from '../lib/apollo-client';
+import { gql } from '@apollo/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+const INVOICES_QUERY = gql`
+  query GetInvoices($userId: String!, $userRole: String!, $status: String) {
+    invoices(userId: $userId, userRole: $userRole, status: $status)
+  }
+`;
+
+const INVOICE_STATS_QUERY = gql`
+  query GetInvoiceStats($userId: String!, $userRole: String!) {
+    invoiceStats(userId: $userId, userRole: $userRole)
+  }
+`;
+
+const CREATE_INVOICE_MUTATION = gql`
+  mutation CreateInvoice($input: CreateInvoiceInput!) {
+    createInvoice(input: $input)
+  }
+`;
+
+const UPDATE_INVOICE_STATUS_MUTATION = gql`
+  mutation UpdateInvoiceStatus($invoiceId: ID!, $status: String!, $amount: Float, $method: String) {
+    updateInvoiceStatus(invoiceId: $invoiceId, status: $status, amount: $amount, method: $method)
+  }
+`;
+
+const GENERATE_INVOICE_PDF_MUTATION = gql`
+  mutation GenerateInvoicePDF($invoiceId: ID!) {
+    generateInvoicePDF(invoiceId: $invoiceId)
+  }
+`;
 
 export interface Invoice {
   id: string;
@@ -78,8 +103,23 @@ export function useInvoices(userId: string, userRole: 'restaurant' | 'supplier',
   const { data: invoices, isLoading, error } = useQuery({
     queryKey: ['invoices', userId, userRole, filters],
     queryFn: async () => {
-      const result = await fetchInvoices(userId, userRole, filters);
-      return result.invoices;
+      try {
+        console.log('Fetching invoices with variables:', { userId, userRole, status: filters?.status });
+        const result = await apolloClient.query({
+          query: INVOICES_QUERY,
+          variables: {
+            userId,
+            userRole,
+            status: filters?.status,
+          },
+        });
+        console.log('Invoice query result:', result);
+        return JSON.parse(result.data.invoices);
+      } catch (err) {
+        console.error('Error fetching invoices:', err);
+        // Return empty array as fallback instead of throwing
+        return { invoices: [], total: 0 };
+      }
     },
     staleTime: 30000, // 30 seconds
   });
@@ -87,14 +127,28 @@ export function useInvoices(userId: string, userRole: 'restaurant' | 'supplier',
   const { data: stats } = useQuery({
     queryKey: ['invoice-stats', userId, userRole],
     queryFn: async () => {
-      return fetchInvoiceStats(userId, userRole);
+      try {
+        const result = await apolloClient.query({
+          query: INVOICE_STATS_QUERY,
+          variables: { userId, userRole },
+        });
+        return JSON.parse(result.data.invoiceStats);
+      } catch (err) {
+        console.error('Error fetching invoice stats:', err);
+        // Return default stats as fallback
+        return { total: 0, paid: 0, pending: 0, overdue: 0, totalValue: 0 };
+      }
     },
     staleTime: 60000, // 1 minute
   });
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: CreateInvoiceRequest) => {
-      return createInvoice(data);
+      const result = await apolloClient.mutate({
+        mutation: CREATE_INVOICE_MUTATION,
+        variables: { input: data },
+      });
+      return JSON.parse(result.data.createInvoice);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', userId, userRole] });
@@ -109,7 +163,11 @@ export function useInvoices(userId: string, userRole: 'restaurant' | 'supplier',
       amount?: number;
       method?: string;
     }) => {
-      return updateInvoiceStatus(invoiceId, status, amount, method);
+      const result = await apolloClient.mutate({
+        mutation: UPDATE_INVOICE_STATUS_MUTATION,
+        variables: { invoiceId, status, amount, method },
+      });
+      return JSON.parse(result.data.updateInvoiceStatus);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', userId, userRole] });
@@ -119,7 +177,11 @@ export function useInvoices(userId: string, userRole: 'restaurant' | 'supplier',
 
   const generatePDFMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
-      return generateInvoicePDF(invoiceId);
+      const result = await apolloClient.mutate({
+        mutation: GENERATE_INVOICE_PDF_MUTATION,
+        variables: { invoiceId },
+      });
+      return JSON.parse(result.data.generateInvoicePDF);
     },
   });
 
@@ -136,7 +198,7 @@ export function useInvoices(userId: string, userRole: 'restaurant' | 'supplier',
   }, [generatePDFMutation]);
 
   return {
-    invoices: invoices || [],
+    invoices: invoices?.invoices || [],
     stats: stats || { total: 0, paid: 0, pending: 0, overdue: 0, totalValue: 0 },
     isLoading,
     error,
@@ -153,7 +215,11 @@ export function useInvoiceStats(userId: string, userRole: 'restaurant' | 'suppli
   const { data: stats, isLoading, error } = useQuery({
     queryKey: ['invoice-stats', userId, userRole],
     queryFn: async () => {
-      return fetchInvoiceStats(userId, userRole);
+      const result = await apolloClient.query({
+        query: INVOICE_STATS_QUERY,
+        variables: { userId, userRole },
+      });
+      return JSON.parse(result.data.invoiceStats);
     },
     staleTime: 60000, // 1 minute
   });

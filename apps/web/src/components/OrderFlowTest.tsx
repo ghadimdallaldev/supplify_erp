@@ -39,20 +39,21 @@ export function OrderFlowTest() {
     const order = pendingOrders[0];
     
     // Simulate the complete order flow
-    setTimeout(() => {
-      updateOrderStatus(order.id, 'Processing');
-      alert(`Order ${order.id} acknowledged by supplier!`);
-    }, 1000);
+    // DISABLED: Automatic status progression for demo purposes
+    // setTimeout(() => {
+    //   updateOrderStatus(order.id, 'Processing');
+    //   alert(`Order ${order.id} acknowledged by supplier!`);
+    // }, 1000);
 
-    setTimeout(() => {
-      updateOrderStatus(order.id, 'Dispatched');
-      alert(`Order ${order.id} dispatched!`);
-    }, 2000);
+    // setTimeout(() => {
+    //   updateOrderStatus(order.id, 'Dispatched');
+    //   alert(`Order ${order.id} dispatched!`);
+    // }, 2000);
 
-    setTimeout(() => {
-      updateOrderStatus(order.id, 'Delivered');
-      alert(`Order ${order.id} delivered! Order flow complete.`);
-    }, 3000);
+    // setTimeout(() => {
+    //   updateOrderStatus(order.id, 'Delivered');
+    //   alert(`Order ${order.id} delivered! Order flow complete.`);
+    // }, 3000);
   };
 
   return (

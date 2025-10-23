@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, Inject } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
+import { Reflector } from '@nestjs/core';
 
 export interface FlagContext {
   env: 'dev' | 'staging' | 'prod';
@@ -15,216 +17,173 @@ export interface FlagEvaluationResult {
   rolloutBucket?: number;
 }
 
-/**
- * Server-side feature flag utilities
- */
 @Injectable()
-export class FlagsServerService {
-  private readonly logger = new Logger(FlagsServerService.name);
+export class FeatureFlagsService {
+  constructor(private flagsClient: ClientProxy) {}
 
-  constructor(
-    @Inject('FLAGS_SERVICE') private flagsClient: ClientProxy,
-  ) {}
+  /**
+   * Evaluate a single feature flag
+   */
+  async evaluateFlag(flagKey: string, context: FlagContext): Promise<FlagEvaluationResult> {
+    try {
+      const result = await firstValueFrom(
+        this.flagsClient.send('flags.evaluate', {
+          flagKey,
+          context,
+        })
+      );
+      return result;
+    } catch (error) {
+      console.error(`Failed to evaluate flag ${flagKey}:`, error);
+      return { on: false, reason: 'evaluation_error' };
+    }
+  }
 
   /**
    * Check if a feature flag is enabled
    */
-  async isFlagOn(flagKey: string, context: FlagContext): Promise<boolean> {
-    try {
-      const result = await this.flagsClient
-        .send('flags.evaluate', { flagKey, context })
-        .toPromise();
-      
-      return result?.on || false;
-    } catch (error) {
-      this.logger.warn(`Failed to evaluate flag ${flagKey}:`, error);
-      return false;
-    }
+  async isEnabled(flagKey: string, context: FlagContext): Promise<boolean> {
+    const result = await this.evaluateFlag(flagKey, context);
+    return result.on;
   }
 
   /**
    * Require a feature flag to be enabled, throw error if not
    */
   async requireFlag(flagKey: string, context: FlagContext): Promise<void> {
-    const isOn = await this.isFlagOn(flagKey, context);
-    
-    if (!isOn) {
+    const result = await this.evaluateFlag(flagKey, context);
+    if (!result.on) {
       const error = new Error(`Feature "${flagKey}" is not enabled`);
       (error as any).code = 'FEATURE_FLAG_DISABLED';
       (error as any).flagKey = flagKey;
+      (error as any).reason = result.reason;
       throw error;
     }
   }
 
   /**
-   * Evaluate multiple flags at once
+   * Get all feature flags for a context
    */
-  async evaluateFlags(
-    flagKeys: string[],
-    context: FlagContext
-  ): Promise<Record<string, boolean>> {
+  async getAllFlags(context: FlagContext): Promise<any[]> {
     try {
-      const results = await Promise.allSettled(
-        flagKeys.map(async (flagKey) => {
-          const result = await this.isFlagOn(flagKey, context);
-          return { flagKey, on: result };
+      const flags = await firstValueFrom(
+        this.flagsClient.send('flags.get.all', {})
+      );
+      
+      // Evaluate each flag for the context
+      const evaluatedFlags = await Promise.all(
+        flags.map(async (flag: any) => {
+          const evaluation = await this.evaluateFlag(flag.key, context);
+          return {
+            ...flag,
+            status: evaluation.on ? 'ON' : 'OFF',
+            reason: evaluation.reason,
+            rolloutBucket: evaluation.rolloutBucket,
+          };
         })
       );
-
-      const flags: Record<string, boolean> = {};
       
-      results.forEach((result, index) => {
-        const flagKey = flagKeys[index];
-        
-        if (result.status === 'fulfilled') {
-          flags[flagKey] = result.value.on;
-        } else {
-          flags[flagKey] = false;
-          this.logger.warn(`Failed to evaluate flag ${flagKey}:`, result.reason);
-        }
-      });
-
-      return flags;
+      return evaluatedFlags;
     } catch (error) {
-      this.logger.error('Error evaluating multiple flags:', error);
-      
-      // Return all flags as false on error
-      const flags: Record<string, boolean> = {};
-      flagKeys.forEach(flagKey => {
-        flags[flagKey] = false;
-      });
-      
-      return flags;
-    }
-  }
-
-  /**
-   * Get detailed evaluation result for a flag
-   */
-  async evaluateFlag(
-    flagKey: string,
-    context: FlagContext
-  ): Promise<FlagEvaluationResult> {
-    try {
-      const result = await this.flagsClient
-        .send('flags.evaluate', { flagKey, context })
-        .toPromise();
-      
-      return result || { on: false, reason: 'evaluation_failed' };
-    } catch (error) {
-      this.logger.warn(`Failed to evaluate flag ${flagKey}:`, error);
-      return { on: false, reason: 'evaluation_error' };
-    }
-  }
-
-  /**
-   * Invalidate flag cache
-   */
-  async invalidateFlagCache(flagKey: string, env?: string): Promise<void> {
-    try {
-      await this.flagsClient
-        .send('flags.invalidate_cache', { flagKey, env })
-        .toPromise();
-    } catch (error) {
-      this.logger.warn(`Failed to invalidate cache for flag ${flagKey}:`, error);
+      console.error('Failed to get all flags:', error);
+      return [];
     }
   }
 }
 
-/**
- * Decorator for requiring a feature flag
- */
-export function RequireFlag(flagKey: string) {
-  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+// Decorator for requiring feature flags
+export const RequireFeatureFlag = (flagKey: string) => {
+  return (target: any, propertyName: string, descriptor: PropertyDescriptor) => {
     const method = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
-      const flagsService = this.flagsService || this.flagsServerService;
-      
+      const flagsService = this.featureFlagsService;
       if (!flagsService) {
-        throw new Error('FlagsService not available');
+        throw new Error('FeatureFlagsService not injected');
       }
 
-      // Extract context from request (this is service-specific)
-      const context = this.extractFlagContext?.(args[0]) || {
-        env: 'dev',
-        orgType: undefined,
-        orgId: undefined,
-        userId: undefined,
+      // Extract context from request or arguments
+      const context: FlagContext = {
+        env: process.env.NODE_ENV === 'production' ? 'prod' : 'dev',
+        // TODO: Extract orgType, orgId, userId from request context
       };
 
       await flagsService.requireFlag(flagKey, context);
-      
       return method.apply(this, args);
     };
 
     return descriptor;
   };
-}
+};
 
-/**
- * Utility function for extracting flag context from request
- */
-export function extractFlagContextFromRequest(req: any): FlagContext {
-  const headers = req.headers || {};
-  
-  return {
-    env: (headers['x-environment'] as any) || 'dev',
-    orgType: headers['x-org-type'] as any,
-    orgId: headers['x-org-id'],
-    userId: headers['x-user-id'],
-  };
-}
+// Guard for protecting routes based on feature flags
+@Injectable()
+export class FeatureFlagGuard implements CanActivate {
+  constructor(
+    private reflector: Reflector,
+    private flagsService: FeatureFlagsService,
+  ) {}
 
-/**
- * Utility function for extracting flag context from GraphQL context
- */
-export function extractFlagContextFromGraphQL(context: any): FlagContext {
-  const user = context.user || {};
-  const headers = context.req?.headers || {};
-  
-  return {
-    env: (headers['x-environment'] as any) || 'dev',
-    orgType: user.orgType || headers['x-org-type'],
-    orgId: user.orgId || headers['x-org-id'],
-    userId: user.id || headers['x-user-id'],
-  };
-}
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const requiredFlags = this.reflector.get<string[]>('featureFlags', context.getHandler());
+    
+    if (!requiredFlags || requiredFlags.length === 0) {
+      return true;
+    }
 
-/**
- * Middleware for adding flag context to requests
- */
-export function flagContextMiddleware(req: any, res: any, next: any) {
-  req.flagContext = extractFlagContextFromRequest(req);
-  next();
-}
+    const request = context.switchToHttp().getRequest();
+    
+    // Extract context from request
+    const flagContext: FlagContext = {
+      env: process.env.NODE_ENV === 'production' ? 'prod' : 'dev',
+      orgType: request.user?.orgType,
+      orgId: request.user?.orgId,
+      userId: request.user?.id,
+    };
 
-/**
- * GraphQL guard for feature flags
- */
-export function FlagGuard(flagKey: string) {
-  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
-    const method = descriptor.value;
-
-    descriptor.value = async function (...args: any[]) {
-      const context = args[1]; // GraphQL context is usually the second argument
-      const flagsService = this.flagsService || this.flagsServerService;
-      
-      if (!flagsService) {
-        throw new Error('FlagsService not available');
+    // Check all required flags
+    for (const flagKey of requiredFlags) {
+      const isEnabled = await this.flagsService.isEnabled(flagKey, flagContext);
+      if (!isEnabled) {
+        return false;
       }
+    }
 
-      const flagContext = extractFlagContextFromGraphQL(context);
-      await flagsService.requireFlag(flagKey, flagContext);
-      
-      return method.apply(this, args);
-    };
-
-    return descriptor;
-  };
+    return true;
+  }
 }
 
-// Export types and utilities
-export * from './types';
-export * from './decorators';
-export * from './guards';
+// Decorator for marking routes that require feature flags
+export const RequireFlags = (...flags: string[]) => {
+  return (target: any, propertyName: string, descriptor: PropertyDescriptor) => {
+    Reflect.defineMetadata('featureFlags', flags, descriptor.value);
+    return descriptor;
+  };
+};
+
+// Middleware for adding feature flag context to requests
+export const FeatureFlagMiddleware = (flagsService: FeatureFlagsService) => {
+  return async (req: any, res: any, next: any) => {
+    try {
+      const context: FlagContext = {
+        env: process.env.NODE_ENV === 'production' ? 'prod' : 'dev',
+        orgType: req.user?.orgType,
+        orgId: req.user?.orgId,
+        userId: req.user?.id,
+      };
+
+      // Add feature flags to request object
+      req.featureFlags = await flagsService.getAllFlags(context);
+      req.featureFlagContext = context;
+      
+      next();
+    } catch (error) {
+      console.error('Feature flag middleware error:', error);
+      req.featureFlags = [];
+      req.featureFlagContext = {
+        env: 'dev',
+      };
+      next();
+    }
+  };
+};

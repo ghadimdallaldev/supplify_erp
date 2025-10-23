@@ -154,5 +154,23 @@ export class OrdersController {
   async handleSearchOrders(@Payload() data: SearchOrdersDto) {
     return this.ordersService.search(data);
   }
+
+  @MessagePattern('orders.dashboard.kpis')
+  async handleDashboardKpis(@Payload() data: { restaurantId: string }) {
+    return this.ordersService.getDashboardKpis(data.restaurantId);
+  }
+
+  @MessagePattern('orders.recent')
+  async handleRecentOrders(@Payload() data: { restaurantId: string; limit?: number }) {
+    return this.ordersService.getRecentOrders(data.restaurantId, data.limit);
+  }
+
+  @MessagePattern('orders.place')
+  async handlePlaceOrder(@Payload() data: { restaurantId: string; deliveryAddress: string; notes?: string }) {
+    return this.ordersService.placeOrder(data.restaurantId, {
+      deliveryAddress: data.deliveryAddress,
+      notes: data.notes,
+    });
+  }
 }
 

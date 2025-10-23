@@ -110,6 +110,38 @@ async function seedFlags() {
       enabledByDefault: false,
       dependencies: ['apiAccess'],
     },
+    {
+      key: 'orders_realtime',
+      name: 'Real-time Orders',
+      description: 'Order acknowledgments, preparing, dispatch, delivered timeline + notifications',
+      enabledByDefault: true,
+      dependencies: ['catalog'],
+      tags: ['orders', 'realtime'],
+    },
+    {
+      key: 'chat_enabled',
+      name: 'Order Chat System',
+      description: 'Order-scoped chat/messaging between restaurants and suppliers',
+      enabledByDefault: true,
+      dependencies: ['orders_realtime'],
+      tags: ['chat', 'communication'],
+    },
+    {
+      key: 'invoicing',
+      name: 'Invoicing System',
+      description: 'Invoice generation, tracking, and payment processing',
+      enabledByDefault: true,
+      dependencies: ['orders_realtime'],
+      tags: ['invoicing', 'payments'],
+    },
+    {
+      key: 'suppliers_management',
+      name: 'Suppliers Management',
+      description: 'Add, pin, feature suppliers functionality',
+      enabledByDefault: true,
+      dependencies: [],
+      tags: ['suppliers', 'management'],
+    },
   ];
 
   const createdFlags = [];

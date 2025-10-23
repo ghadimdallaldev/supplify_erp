@@ -99,4 +99,37 @@ export class InvoicesController {
   async handleGetSupplierInvoices(@Payload() data: { supplierId: string; filters?: any }) {
     return this.invoicesService.getSupplierInvoices(data.supplierId, data.filters);
   }
+
+  @MessagePattern('invoices.find')
+  async handleGetInvoices(@Payload() data: { userId: string; userRole: string; status?: string }) {
+    if (data.userRole === 'restaurant') {
+      return this.invoicesService.getRestaurantInvoices(data.userId, { status });
+    } else if (data.userRole === 'supplier') {
+      return this.invoicesService.getSupplierInvoices(data.userId, { status });
+    }
+    throw new Error('Invalid user role');
+  }
+
+  @MessagePattern('invoices.stats')
+  async handleGetInvoiceStats(@Payload() data: { userId: string; userRole: string }) {
+    if (data.userRole === 'restaurant') {
+      return this.invoicesService.getInvoiceStats(data.userId);
+    } else if (data.userRole === 'supplier market') {
+      return this.invoicesService.getInvoiceStats(undefined, data.userId);
+    }
+    throw new Error('Invalid user role');
+  }
+
+  @MessagePattern('invoices.update.status')
+  async handleUpdateInvoiceStatus(@Payload() data: { invoiceId: string; status: string; amount?: number; method?: string }) {
+    return this.invoicesService.updateStatus(data.invoiceId, data.status, {
+      amount: data.amount,
+      method: data.method,
+    });
+  }
+
+  @MessagePattern('invoices.generate.pdf')
+  async handleGeneratePDF(@Payload() data: { invoiceId: string }) {
+    return this.invoicesService.generatePDF(data.invoiceId);
+  }
 }

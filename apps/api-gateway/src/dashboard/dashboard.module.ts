@@ -1,36 +1,10 @@
 import { Module } from '@nestjs/common';
-import { GraphQLModule } from '@nestjs/graphql';
-import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-
-import { ProductsModule } from './products/products.module';
-import { OrdersModule } from './orders/orders.module';
-import { AuthModule } from './auth/auth.module';
-import { SubscriptionsModule } from './subscriptions/subscriptions.module';
-import { DashboardModule } from './dashboard/dashboard.module';
+import { DashboardResolver } from './dashboard.resolver';
 
 @Module({
   imports: [
-    GraphQLModule.forRoot<ApolloDriverConfig>({
-      driver: ApolloDriver,
-      autoSchemaFile: true,
-      playground: true,
-      context: ({ req }) => ({ req }),
-      subscriptions: {
-        'graphql-ws': true,
-        'subscriptions-transport-ws': true,
-      },
-    }),
     ClientsModule.register([
-      {
-        name: 'CATALOG_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: [process.env.RABBITMQ_URL || 'amqp://supplify:supplify_dev_password@localhost:5672'],
-          queue: 'catalog_queue',
-          queueOptions: { durable: true },
-        },
-      },
       {
         name: 'ORDERS_SERVICE',
         transport: Transport.RMQ,
@@ -86,12 +60,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
         },
       },
     ]),
-    AuthModule,
-    ProductsModule,
-    OrdersModule,
-    SubscriptionsModule,
-    DashboardModule,
   ],
+  providers: [DashboardResolver],
+  exports: [DashboardResolver],
 })
-export class AppModule {}
-
+export class DashboardModule {}

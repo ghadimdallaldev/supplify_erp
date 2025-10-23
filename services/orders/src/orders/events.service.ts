@@ -156,5 +156,24 @@ export class EventsService {
       logger.error(`Failed to emit orders.line.delivered event: ${error}`);
     }
   }
+
+  async emitOrderDelivered(data: {
+    orderId: string;
+    restaurantId: string;
+    supplierId: string;
+    total: number;
+  }) {
+    try {
+      await this.eventBus.emit('order.delivered', {
+        orderId: data.orderId,
+        restaurantId: data.restaurantId,
+        supplierId: data.supplierId,
+        total: data.total,
+      });
+      logger.info(`Emitted order.delivered event for order: ${data.orderId}`);
+    } catch (error) {
+      logger.error(`Failed to emit order.delivered event: ${error}`);
+    }
+  }
 }
 
