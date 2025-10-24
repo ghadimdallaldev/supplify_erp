@@ -37,8 +37,8 @@ function Stop-Port {
     
     try {
         $processes = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess
-        if ($processes) {
-            Write-Warning "Found processes on port $Port, killing..."
+    if ($processes) {
+        Write-Warning "Found processes on port $Port, killing..."
             foreach ($pid in $processes) {
                 if ($pid -ne 0) {
                     Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
@@ -149,12 +149,17 @@ function Invoke-KeycloakSeeding {
     }
     
     # Run seeding script
-    if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-        pnpm exec ts-node scripts/keycloak-seed.ts
-    } elseif (Get-Command yarn -ErrorAction SilentlyContinue) {
-        yarn exec ts-node scripts/keycloak-seed.ts
+    Push-Location scripts
+    try {
+        if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+            pnpm exec node keycloak-seed.js
+        } elseif (Get-Command yarn -ErrorAction SilentlyContinue) {
+            yarn exec node keycloak-seed.js
     } else {
-        npx ts-node scripts/keycloak-seed.ts
+            node keycloak-seed.js
+        }
+    } finally {
+        Pop-Location
     }
     
     Write-Success "Keycloak seeded successfully"
@@ -195,9 +200,9 @@ function Start-Service {
     Push-Location $Directory
     try {
         # Start in background
-        if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+            if (Get-Command pnpm -ErrorAction SilentlyContinue) {
             Start-Process -FilePath "pnpm" -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}.log" -WindowStyle Hidden
-        } elseif (Get-Command yarn -ErrorAction SilentlyContinue) {
+            } elseif (Get-Command yarn -ErrorAction SilentlyContinue) {
             Start-Process -FilePath "yarn" -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}.log" -WindowStyle Hidden
         } else {
             Start-Process -FilePath "npm" -ArgumentList "run", $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}.log" -WindowStyle Hidden
@@ -306,8 +311,8 @@ function Main {
     try {
         $response = Invoke-WebRequest -Uri "http://localhost:3000" -TimeoutSec 5 -ErrorAction SilentlyContinue
         if ($response.StatusCode -eq 200) {
-            Write-Success "✅ Web App is running on http://localhost:3000"
-        } else {
+        Write-Success "✅ Web App is running on http://localhost:3000"
+    } else {
             Write-Error "❌ Web App failed to start"
         }
     } catch {
@@ -319,8 +324,8 @@ function Main {
         try {
             $response = Invoke-WebRequest -Uri "http://localhost:4000" -TimeoutSec 5 -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
-                Write-Success "✅ API Gateway is running on http://localhost:4000"
-            } else {
+            Write-Success "✅ API Gateway is running on http://localhost:4000"
+        } else {
                 Write-Warning "⚠️ API Gateway may not be running"
             }
         } catch {

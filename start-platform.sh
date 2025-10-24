@@ -143,13 +143,15 @@ seed_keycloak() {
         fi
         
         # Run seeding script
+        cd scripts
         if command_exists pnpm; then
-            pnpm exec ts-node scripts/keycloak-seed.ts
+            pnpm exec node keycloak-seed.js
         elif command_exists yarn; then
-            yarn exec ts-node scripts/keycloak-seed.ts
+            yarn exec node keycloak-seed.js
         else
-            npx ts-node scripts/keycloak-seed.ts
+            node keycloak-seed.js
         fi
+        cd ..
         
         print_success "Keycloak seeded successfully"
     fi
