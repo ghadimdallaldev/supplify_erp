@@ -5,7 +5,7 @@
 
 set -e
 
-echo "🛑 Stopping Supplify Platform..."
+echo "🛑 Stopping Supplify Platform with Keycloak..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -90,6 +90,31 @@ kill_port() {
     fi
 }
 
+# Function to stop Keycloak
+stop_keycloak() {
+    print_status "Stopping Keycloak authentication service..."
+    
+    if [ -d "infra/keycloak" ]; then
+        cd infra/keycloak
+        
+        if command -v docker-compose >/dev/null 2>&1; then
+            if docker-compose ps | grep -q "keycloak.*Up"; then
+                print_status "Stopping Keycloak containers..."
+                docker-compose down
+                print_success "Keycloak stopped successfully"
+            else
+                print_success "Keycloak was not running"
+            fi
+        else
+            print_warning "Docker Compose not found, skipping Keycloak stop"
+        fi
+        
+        cd ../..
+    else
+        print_warning "Keycloak directory not found"
+    fi
+}
+
 # Function to kill all Node.js processes
 kill_node_processes() {
     print_status "Stopping all Node.js processes..."
@@ -130,20 +155,25 @@ main() {
     print_status "Step 2: Stopping services by port..."
     kill_port 3000 "Web App"
     kill_port 4000 "API Gateway"
+    kill_port 8080 "Keycloak"
+    
+    # Stop Keycloak
+    print_status "Step 3: Stopping Keycloak..."
+    stop_keycloak
     
     # Kill any remaining Node.js processes
-    print_status "Step 3: Cleaning up remaining processes..."
+    print_status "Step 4: Cleaning up remaining processes..."
     kill_node_processes
     
     # Clean up log files
-    print_status "Step 4: Cleaning up log files..."
+    print_status "Step 5: Cleaning up log files..."
     if [ -d "logs" ]; then
         rm -f logs/*.pid
         print_success "PID files cleaned up"
     fi
     
     print_success "=== Supplify Platform Stopped Successfully ==="
-    print_status "All services have been stopped and processes cleaned up"
+    print_status "All services including Keycloak have been stopped"
 }
 
 # Run main function

@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Supplify Platform Startup Script
-# This script kills old processes, cleans up, and starts all services
+# This script kills old processes, cleans up, and starts all services including Keycloak
 
 set -e
 
-echo "🚀 Starting Supplify Platform..."
+echo "🚀 Starting Supplify Platform with Keycloak Authentication..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -62,6 +62,96 @@ kill_port() {
         else
             print_success "Port $port is free"
         fi
+    fi
+}
+
+# Function to check Docker
+check_docker() {
+    if ! command_exists docker; then
+        print_error "Docker is not installed. Please install Docker first."
+        print_status "Visit: https://docs.docker.com/get-docker/"
+        exit 1
+    fi
+    
+    if ! command_exists docker-compose; then
+        print_error "Docker Compose is not installed. Please install Docker Compose first."
+        print_status "Visit: https://docs.docker.com/compose/install/"
+        exit 1
+    fi
+    
+    print_success "Docker and Docker Compose are available"
+}
+
+# Function to start Keycloak
+start_keycloak() {
+    print_status "Starting Keycloak authentication service..."
+    
+    cd infra/keycloak
+    
+    # Check if Keycloak is already running
+    if docker-compose ps | grep -q "keycloak.*Up"; then
+        print_success "Keycloak is already running"
+    else
+        print_status "Starting Keycloak containers..."
+        docker-compose up -d
+        
+        # Wait for Keycloak to be ready
+        print_status "Waiting for Keycloak to be ready..."
+        local max_attempts=30
+        local attempt=0
+        
+        while [ $attempt -lt $max_attempts ]; do
+            if curl -s http://localhost:8080/health/ready >/dev/null 2>&1; then
+                print_success "Keycloak is ready!"
+                break
+            fi
+            
+            attempt=$((attempt + 1))
+            print_status "Waiting for Keycloak... (attempt $attempt/$max_attempts)"
+            sleep 5
+        done
+        
+        if [ $attempt -eq $max_attempts ]; then
+            print_error "Keycloak failed to start within expected time"
+            return 1
+        fi
+    fi
+    
+    cd ../..
+}
+
+# Function to seed Keycloak
+seed_keycloak() {
+    print_status "Seeding Keycloak with Supplify configuration..."
+    
+    # Check if seeding is needed
+    if curl -s "http://localhost:8080/realms/Supplify" >/dev/null 2>&1; then
+        print_success "Supplify realm already exists"
+    else
+        print_status "Running Keycloak seeding script..."
+        
+        # Install dependencies if needed
+        if [ ! -d "node_modules" ]; then
+            print_status "Installing dependencies for Keycloak seeding..."
+            if command_exists pnpm; then
+                pnpm install
+            elif command_exists yarn; then
+                yarn install
+            else
+                npm install
+            fi
+        fi
+        
+        # Run seeding script
+        if command_exists pnpm; then
+            pnpm exec ts-node scripts/keycloak-seed.ts
+        elif command_exists yarn; then
+            yarn exec ts-node scripts/keycloak-seed.ts
+        else
+            npx ts-node scripts/keycloak-seed.ts
+        fi
+        
+        print_success "Keycloak seeded successfully"
     fi
 }
 
@@ -169,6 +259,7 @@ main() {
     kill_node_processes
     kill_port 3000 "Web App"
     kill_port 4000 "API Gateway"
+    kill_port 8080 "Keycloak"
     kill_port 5432 "PostgreSQL"
     kill_port 6379 "Redis"
     kill_port 5672 "RabbitMQ"
@@ -189,6 +280,9 @@ main() {
         exit 1
     fi
     
+    # Check Docker for Keycloak
+    check_docker
+    
     print_success "Required tools are available"
     
     # Install dependencies
@@ -196,8 +290,16 @@ main() {
     install_deps "apps/web" "Web App"
     install_deps "apps/api-gateway" "API Gateway"
     
+    # Start Keycloak
+    print_status "Step 4: Starting Keycloak authentication service..."
+    start_keycloak
+    
+    # Seed Keycloak
+    print_status "Step 5: Configuring Keycloak..."
+    seed_keycloak
+    
     # Start services
-    print_status "Step 4: Starting services..."
+    print_status "Step 6: Starting application services..."
     
     # Start Web App
     start_service "apps/web" "web" 3000 "dev"
@@ -208,18 +310,27 @@ main() {
     fi
     
     # Wait for services to start
-    print_status "Step 5: Waiting for services to initialize..."
+    print_status "Step 7: Waiting for services to initialize..."
     sleep 5
     
     # Check if services are running
-    print_status "Step 6: Verifying services..."
+    print_status "Step 8: Verifying services..."
     
+    # Check Keycloak
+    if curl -s http://localhost:8080/health/ready >/dev/null 2>&1; then
+        print_success "✅ Keycloak is running on http://localhost:8080"
+    else
+        print_error "❌ Keycloak failed to start"
+    fi
+    
+    # Check Web App
     if netstat -an | grep -q ":3000.*LISTENING" 2>/dev/null || lsof -i:3000 >/dev/null 2>&1; then
         print_success "✅ Web App is running on http://localhost:3000"
     else
         print_error "❌ Web App failed to start"
     fi
     
+    # Check API Gateway
     if [ -d "apps/api-gateway" ]; then
         if netstat -an | grep -q ":4000.*LISTENING" 2>/dev/null || lsof -i:4000 >/dev/null 2>&1; then
             print_success "✅ API Gateway is running on http://localhost:4000"
@@ -229,11 +340,20 @@ main() {
     fi
     
     print_success "=== Supplify Platform Started Successfully ==="
+    print_status "🔐 Keycloak Admin: http://localhost:8080 (admin/admin_password)"
     print_status "🌐 Web App: http://localhost:3000"
     print_status "📊 Admin Dashboard: http://localhost:3000/admin/dashboard"
     print_status "📝 Test Data Manager: http://localhost:3000/admin/test-data"
     print_status "📋 Logs: ./logs/"
     
+    print_status ""
+    print_status "🔑 Authentication Setup:"
+    print_status "   - Keycloak handles all authentication and authorization"
+    print_status "   - Users register via Keycloak self-service"
+    print_status "   - Admin approval required for access"
+    print_status "   - Multi-tenant with client ID scoping"
+    
+    print_status ""
     print_status "To stop all services, run: ./stop-platform.sh"
 }
 
