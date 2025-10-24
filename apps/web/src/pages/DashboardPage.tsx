@@ -1,5 +1,5 @@
 import { useGetDashboardStatsQuery } from '../services/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Package, ShoppingCart, Users, Building2, DollarSign, TrendingUp } from 'lucide-react'
 
 export function DashboardPage() {

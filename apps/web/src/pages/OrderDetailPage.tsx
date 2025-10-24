@@ -1,8 +1,8 @@
 import { useParams } from 'react-router-dom'
 import { useGetOrderQuery } from '../services/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Badge } from './ui/badge'
-import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
 import { ArrowLeft, Calendar, DollarSign, Package } from 'lucide-react'
 import { Link } from 'react-router-dom'
 

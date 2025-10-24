@@ -26,53 +26,53 @@ const router = createBrowserRouter([
     ),
     children: [
       {
-        path: '/',
+        index: true,
         element: <DashboardPage />,
       },
       {
-        path: '/app',
+        path: 'app',
         element: <DashboardPage />,
       },
       {
-        path: '/app/dashboard',
+        path: 'app/dashboard',
         element: <DashboardPage />,
       },
       {
-        path: '/app/products',
+        path: 'app/products',
         element: <ProductsPage />,
       },
       {
-        path: '/app/products/:id',
+        path: 'app/products/:id',
         element: <ProductDetailPage />,
       },
       {
-        path: '/app/orders',
+        path: 'app/orders',
         element: <OrdersPage />,
       },
       {
-        path: '/app/orders/:id',
+        path: 'app/orders/:id',
         element: <OrderDetailPage />,
       },
       {
-        path: '/app/cart',
+        path: 'app/cart',
         element: <CartPage />,
       },
       {
-        path: '/app/suppliers',
+        path: 'app/suppliers',
         element: <SuppliersPage />,
       },
       {
-        path: '/app/restaurants',
+        path: 'app/restaurants',
         element: <RestaurantsPage />,
       },
       {
-        path: '/app/settings',
+        path: 'app/settings',
         element: <SettingsPage />,
       },
     ],
   },
 ])
 
-export function App() {
+export default function App() {
   return <RouterProvider router={router} />
 }

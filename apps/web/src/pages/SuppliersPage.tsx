@@ -1,6 +1,6 @@
 import { useGetSuppliersQuery } from '../services/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Badge } from './ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import { Building2, Mail, Phone, MapPin } from 'lucide-react'
 
 export function SuppliersPage() {

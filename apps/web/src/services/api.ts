@@ -1,4 +1,35 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import type {
+  User,
+  Product,
+  CreateProductRequest,
+  UpdateProductRequest,
+  ProductFilters,
+  ProductsResponse,
+  Order,
+  CreateOrderRequest,
+  UpdateOrderRequest,
+  OrderFilters,
+  OrdersResponse,
+  Supplier,
+  SupplierFilters,
+  SuppliersResponse,
+  Restaurant,
+  RestaurantFilters,
+  RestaurantsResponse,
+  Price,
+  CreatePriceRequest,
+  Inventory,
+  UpdateInventoryRequest,
+  DashboardStats,
+  AuditLog,
+  AuditLogFilters,
+  AuditLogsResponse,
+  PresignedUrlRequest,
+  PresignedUrlResponse,
+  AttachFileRequest,
+  Attachment,
+} from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 

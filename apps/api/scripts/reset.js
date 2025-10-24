@@ -1,5 +1,5 @@
-import { pool, query } from './src/lib/db.js';
-import { logger } from './src/lib/logger.js';
+import { pool, query } from '../src/lib/db.js';
+import { logger } from '../src/lib/logger.js';
 
 async function resetDatabase() {
   try {
