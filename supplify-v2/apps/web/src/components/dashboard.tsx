@@ -3,7 +3,8 @@
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from 'react-query';
 import { apiClient } from '@/lib/api';
-import { Package, ShoppingCart, TrendingUp, Users } from 'lucide-react';
+import { Package, ShoppingCart, TrendingUp, Users, Settings } from 'lucide-react';
+import Link from 'next/link';
 
 export function Dashboard() {
   const { user, logout } = useAuth();
@@ -20,15 +21,24 @@ export function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Supplify</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
               <p className="text-gray-600">Welcome back, {user?.user?.name || 'User'}</p>
             </div>
-            <button
-              onClick={logout}
-              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-            >
-              Logout
-            </button>
+            <div className="flex items-center space-x-4">
+              <Link
+                href="/settings"
+                className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 flex items-center"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Link>
+              <button
+                onClick={logout}
+                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>

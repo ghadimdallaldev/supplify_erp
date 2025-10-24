@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { Providers } from '@/components/providers'
+import { Navigation } from '@/components/navigation'
 
 export const metadata: Metadata = {
   title: 'Supplify v2',
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
         <Providers>
+          <Navigation />
           {children}
         </Providers>
       </body>
