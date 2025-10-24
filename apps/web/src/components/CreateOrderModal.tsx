@@ -153,7 +153,7 @@ export function CreateOrderModal({ isOpen, onClose, supplierId: initialSupplierI
         mutation: PLACE_ORDER_MUTATION,
         variables: { input },
       });
-      return JSON.parse(result.data.placeOrder);
+      return JSON.parse((result.data as any).placeOrder);
     },
     onSuccess: (result) => {
       console.log('Order placed successfully:', result);

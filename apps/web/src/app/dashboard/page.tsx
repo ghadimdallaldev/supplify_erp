@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { gql } from '@apollo/client';
-import { apolloClient } from '../lib/apollo-client';
+import { apolloClient } from '../../lib/apollo-client';
 
 const DASHBOARD_KPIS_QUERY = gql`
   query GetDashboardKpis {
@@ -35,8 +35,9 @@ export default function Dashboard() {
       const result = await apolloClient.query({
         query: DASHBOARD_KPIS_QUERY,
       });
-      return JSON.parse(result.data.restaurantDashboardKpis);
+      return JSON.parse((result.data as any).restaurantDashboardKpis);
     },
+    enabled: typeof window !== 'undefined', // Only run on client side
   });
 
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
@@ -46,8 +47,9 @@ export default function Dashboard() {
         query: RECENT_ORDERS_QUERY,
         variables: { limit: 10 },
       });
-      return JSON.parse(result.data.recentOrders);
+      return JSON.parse((result.data as any).recentOrders);
     },
+    enabled: typeof window !== 'undefined', // Only run on client side
   });
 
   const { data: inventoryData, isLoading: inventoryLoading } = useQuery({
@@ -56,8 +58,9 @@ export default function Dashboard() {
       const result = await apolloClient.query({
         query: INVENTORY_SUMMARY_QUERY,
       });
-      return JSON.parse(result.data.inventorySummary);
+      return JSON.parse((result.data as any).inventorySummary);
     },
+    enabled: typeof window !== 'undefined', // Only run on client side
   });
 
   const { data: loyaltyData, isLoading: loyaltyLoading } = useQuery({
@@ -66,8 +69,9 @@ export default function Dashboard() {
       const result = await apolloClient.query({
         query: LOYALTY_WALLETS_QUERY,
       });
-      return JSON.parse(result.data.myLoyaltyWallets);
+      return JSON.parse((result.data as any).myLoyaltyWallets);
     },
+    enabled: typeof window !== 'undefined', // Only run on client side
   });
 
   const totalLoyaltyPoints = loyaltyData?.reduce((sum: number, wallet: any) => sum + wallet.points, 0) || 0;

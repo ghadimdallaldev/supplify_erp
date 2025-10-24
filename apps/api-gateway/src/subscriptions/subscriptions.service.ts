@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { Subject } from 'rxjs';
+import { filter } from 'rxjs/operators';
 
 @Injectable()
 export class SubscriptionsService {
@@ -22,17 +23,17 @@ export class SubscriptionsService {
 
   // Order updated subscription
   getOrderUpdatedStream(orderId: string) {
-    return this.orderUpdatedSubject.asObservable().filter(event => event.orderId === orderId);
+    return this.orderUpdatedSubject.asObservable().pipe(filter(event => event.orderId === orderId));
   }
 
   // Order event subscription
   getOrderEventStream(orderId: string) {
-    return this.orderEventSubject.asObservable().filter(event => event.orderId === orderId);
+    return this.orderEventSubject.asObservable().pipe(filter(event => event.orderId === orderId));
   }
 
   // Order message subscription
   getOrderMessageStream(orderId: string) {
-    return this.orderMessageSubject.asObservable().filter(event => event.orderId === orderId);
+    return this.orderMessageSubject.asObservable().pipe(filter(event => event.orderId === orderId));
   }
 
   // Methods to emit events (called by event handlers)

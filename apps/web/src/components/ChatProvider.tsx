@@ -68,7 +68,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    loadSuppliers();
+    // Only run on client side
+    if (typeof window !== 'undefined') {
+      loadSuppliers();
+    }
   }, []);
 
   // Initialize WebSocket connection

@@ -84,7 +84,7 @@ export class InvoicesService {
     const invoiceNumber = await this.generateInvoiceNumber();
 
     // Calculate totals
-    const subtotal = order.items.reduce((sum, item) => sum + (item.qty * item.unitPrice), 0);
+    const subtotal = order.items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
     const taxAmount = subtotal * 0.1; // 10% tax
     const total = subtotal + taxAmount;
 
@@ -109,10 +109,10 @@ export class InvoicesService {
             productId: item.productId,
             productName: item.productName,
             sku: `SKU-${item.productId}`,
-            quantity: item.qty,
+            quantity: Number(item.quantity),
             unitPrice: item.unitPrice,
             taxRate: 0.1,
-            total: item.qty * item.unitPrice,
+            total: Number(item.quantity) * Number(item.unitPrice),
           })),
         },
       },

@@ -23,8 +23,17 @@ export declare const LOYALTY_TIERS: {
         readonly name: "Gold";
     };
 };
-export declare const ORDER_STATUSES: readonly ["DRAFT", "SUBMITTED", "CONFIRMED", "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED", "INVOICED", "CANCELLED"];
+export declare const ORDER_STATUSES: readonly ["PLACED", "ACKNOWLEDGED", "PREPARING", "DISPATCHED", "DELIVERED", "CANCELLED"];
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export declare const USER_ROLES: readonly ["RESTAURANT", "SUPPLIER", "ADMIN"];
 export type UserRole = (typeof USER_ROLES)[number];
+export declare const SLA_CONFIG: {
+    readonly ACKNOWLEDGEMENT_TIMEOUT: 30;
+    readonly PREPARATION_TIMEOUT: 120;
+    readonly DISPATCH_TIMEOUT: 240;
+};
+export declare const ORDER_EVENT_TYPES: readonly ["PLACED", "ACKNOWLEDGED", "PREPARING", "DISPATCHED", "DELIVERED", "CANCELLED", "ETA_UPDATED", "NOTE_ADDED"];
+export type OrderEventType = (typeof ORDER_EVENT_TYPES)[number];
+export declare const ACTOR_TYPES: readonly ["SYSTEM", "SUPPLIER", "RESTAURANT", "ADMIN"];
+export type ActorType = (typeof ACTOR_TYPES)[number];
 //# sourceMappingURL=constants.d.ts.map

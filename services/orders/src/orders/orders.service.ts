@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, OrderStatus, OrderEventType } from '@prisma/client';
 
 import { NotFoundError, BadRequestError, createLogger } from '@supplify/utils';
-import type { OrderStatus } from '@supplify/config';
+import type { OrderStatus as ConfigOrderStatus } from '@supplify/config';
 import { ORDER_STATUSES, SLA_CONFIG, ORDER_EVENT_TYPES, ACTOR_TYPES } from '@supplify/config';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -52,7 +52,7 @@ export class OrdersService {
           clientId,
           restaurantId,
           supplierId,
-          status: 'PLACED',
+          status: OrderStatus.PLACED,
           ackBySlaAt: new Date(Date.now() + SLA_CONFIG.ACKNOWLEDGEMENT_TIMEOUT * 60 * 1000), // Set SLA deadline
           subtotal,
           tax,
@@ -76,7 +76,7 @@ export class OrdersService {
               clientId,
               actorType: 'SYSTEM',
               actorId: restaurantId,
-              type: 'PLACED',
+              type: OrderEventType.PLACED,
               payload: { 
                 restaurantId, 
                 supplierId, 
@@ -189,7 +189,7 @@ export class OrdersService {
         where: {
           restaurantId,
           status: {
-            in: ['PLACED', 'ACKNOWLEDGED', 'PREPARING', 'DISPATCHED'],
+            in: [OrderStatus.PLACED, OrderStatus.ACKNOWLEDGED, OrderStatus.PREPARING, OrderStatus.DISPATCHED],
           },
         },
       }),
@@ -256,10 +256,10 @@ export class OrdersService {
 
     // Set timestamps based on status
     switch (dto.status) {
-      case 'ACKNOWLEDGED':
+      case OrderStatus.ACKNOWLEDGED:
         updateData.ackBySlaAt = null; // Clear SLA deadline
         break;
-      case 'DISPATCHED':
+      case OrderStatus.DISPATCHED:
         updateData.dispatchedAt = new Date();
         if (dto.etaAt) {
           updateData.etaAt = new Date(dto.etaAt);
@@ -315,7 +315,7 @@ export class OrdersService {
     const existingEvent = await this.prisma.orderEvent.findFirst({
       where: { 
         orderId, 
-        type: 'ACKNOWLEDGED',
+        type: OrderEventType.ACKNOWLEDGED,
         payload: { path: ['idempotencyKey'], equals: idempotencyKey }
       }
     });
@@ -325,14 +325,14 @@ export class OrdersService {
     }
 
     return this.updateStatus(orderId, { 
-      status: 'ACKNOWLEDGED',
+      status: OrderStatus.ACKNOWLEDGED,
       payload: { idempotencyKey, supplierId }
     }, supplierId, 'SUPPLIER');
   }
 
   async supplierSetPreparing(orderId: string, supplierId: string, note?: string, idempotencyKey?: string) {
     return this.updateStatus(orderId, { 
-      status: 'PREPARING',
+      status: OrderStatus.PREPARING,
       notes: note,
       payload: { idempotencyKey, supplierId }
     }, supplierId, 'SUPPLIER');
@@ -340,7 +340,7 @@ export class OrdersService {
 
   async supplierDispatch(orderId: string, supplierId: string, carrier?: string, driverName?: string, driverPhone?: string, etaAt?: Date, idempotencyKey?: string) {
     const order = await this.updateStatus(orderId, { 
-      status: 'DISPATCHED',
+      status: OrderStatus.DISPATCHED,
       etaAt: etaAt ? etaAt.toISOString() : undefined,
       payload: { 
         idempotencyKey, 
@@ -352,7 +352,7 @@ export class OrdersService {
     }, supplierId, 'SUPPLIER');
 
     // Emit order line events for inventory sync
-    await this.emitOrderLineEvents(orderId, 'DISPATCHED', supplierId, idempotencyKey);
+    await this.emitOrderLineEvents(orderId, OrderStatus.DISPATCHED, supplierId, idempotencyKey);
 
     return order;
   }
@@ -386,7 +386,7 @@ export class OrdersService {
         orderId,
         actorType: 'RESTAURANT',
         actorId: restaurantId,
-        type: 'NOTE_ADDED',
+        type: OrderEventType.NOTE_ADDED,
         payload: { 
           idempotencyKey, 
           restaurantId, 
@@ -441,7 +441,7 @@ export class OrdersService {
     const now = new Date();
     return this.prisma.order.findMany({
       where: {
-        status: 'PLACED',
+        status: OrderStatus.PLACED,
         ackBySlaAt: {
           lt: now,
         },
@@ -455,7 +455,7 @@ export class OrdersService {
   }
 
   // Helper method to emit order line events for inventory sync
-  private async emitOrderLineEvents(orderId: string, eventType: 'DISPATCHED' | 'DELIVERED', supplierId: string, idempotencyKey?: string) {
+  private async emitOrderLineEvents(orderId: string, eventType: OrderStatus.DISPATCHED | OrderStatus.DELIVERED, supplierId: string, idempotencyKey?: string) {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -485,9 +485,9 @@ export class OrdersService {
           idempotencyKey: `${eventIdempotencyKey}-${item.id}`,
         };
 
-        if (eventType === 'DISPATCHED') {
+        if (eventType === OrderStatus.DISPATCHED) {
           await this.eventsService.emitOrderLineDispatched(orderLineEvent);
-        } else if (eventType === 'DELIVERED') {
+        } else if (eventType === OrderStatus.DELIVERED) {
           await this.eventsService.emitOrderLineDelivered(orderLineEvent);
         }
       }
@@ -518,12 +518,16 @@ export class OrdersService {
 
   private validateStatusTransition(from: OrderStatus, to: OrderStatus) {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      PLACED: ['ACKNOWLEDGED', 'CANCELLED'],
-      ACKNOWLEDGED: ['PREPARING', 'CANCELLED'],
-      PREPARING: ['DISPATCHED', 'CANCELLED'],
-      DISPATCHED: ['DELIVERED', 'CANCELLED'],
+      PENDING: [OrderStatus.PLACED, OrderStatus.CANCELLED],
+      PROCESSING: [OrderStatus.ACKNOWLEDGED, OrderStatus.CANCELLED],
+      PLACED: [OrderStatus.ACKNOWLEDGED, OrderStatus.CANCELLED],
+      ACKNOWLEDGED: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+      PREPARING: [OrderStatus.DISPATCHED, OrderStatus.CANCELLED],
+      DISPATCHED: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
       DELIVERED: [], // Final state
       CANCELLED: [], // Final state
+      ETA_UPDATED: [],
+      NOTE_ADDED: [],
     };
 
     if (!validTransitions[from]?.includes(to)) {

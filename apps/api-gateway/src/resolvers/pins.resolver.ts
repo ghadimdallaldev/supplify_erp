@@ -89,8 +89,8 @@ export class PinsResolver {
           node: {
             ...product,
             isPinned: true,
-            pinNote: pinData.note,
-            pinSortIndex: pinData.sortIndex,
+            pinNote: (pinData as any).note,
+            pinSortIndex: (pinData as any).sortIndex,
           },
         });
       } else {

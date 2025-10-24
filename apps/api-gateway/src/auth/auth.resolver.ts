@@ -1,13 +1,13 @@
 import { Resolver, Query, Context } from '@nestjs/graphql';
 
-import { UnauthorizedError } from '@supplify/utils';
+// import { UnauthorizedError } from '@supplify/utils';
 
 @Resolver()
 export class AuthResolver {
   @Query(() => String)
   async me(@Context() context: { req: { user?: { id: string } } }) {
     if (!context.req.user) {
-      throw new UnauthorizedError('Not authenticated');
+      throw new Error('Not authenticated');
     }
     return JSON.stringify(context.req.user);
   }

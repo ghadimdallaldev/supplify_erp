@@ -201,11 +201,14 @@ function Start-Service {
     try {
         # Start in background
         if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-            Start-Process -FilePath "pnpm" -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
+            $pnpmPath = (Get-Command pnpm).Source
+            Start-Process -FilePath $pnpmPath -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
         } elseif (Get-Command yarn -ErrorAction SilentlyContinue) {
-            Start-Process -FilePath "yarn" -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
+            $yarnPath = (Get-Command yarn).Source
+            Start-Process -FilePath $yarnPath -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
         } else {
-            Start-Process -FilePath "npm" -ArgumentList "run", $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
+            $npmPath = (Get-Command npm).Source
+            Start-Process -FilePath $npmPath -ArgumentList "run", $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
         }
         
         Write-Success "$Name started successfully"

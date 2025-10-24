@@ -55,7 +55,7 @@ export class InvoicingService {
     if (!invoice) throw new Error('Invoice not found');
 
     const template = await this.prisma.invoiceTemplate.findFirst({
-      where: { supplierId: invoice.supplierId, isDefault: true },
+      where: { isDefault: true },
     });
 
     const pdfUrl = await this.pdfService.generateInvoicePDF(invoice, template);

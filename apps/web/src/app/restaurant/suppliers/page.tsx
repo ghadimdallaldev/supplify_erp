@@ -86,7 +86,7 @@ function RestaurantSuppliersContent() {
       const result = await apolloClient.query({
         query: RESTAURANT_SUPPLIERS_QUERY,
       });
-      return JSON.parse(result.data.restaurantSuppliers);
+      return JSON.parse((result.data as any).restaurantSuppliers);
     },
   });
 
@@ -96,7 +96,7 @@ function RestaurantSuppliersContent() {
         mutation: PIN_SUPPLIER_MUTATION,
         variables: { supplierId, pinned },
       });
-      return JSON.parse(result.data.pinSupplier);
+      return JSON.parse((result.data as any).pinSupplier);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurant-suppliers'] });
@@ -109,7 +109,7 @@ function RestaurantSuppliersContent() {
         mutation: FEATURE_SUPPLIER_MUTATION,
         variables: { supplierId, featured },
       });
-      return JSON.parse(result.data.featureSupplier);
+      return JSON.parse((result.data as any).featureSupplier);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurant-suppliers'] });

@@ -103,9 +103,9 @@ export class InvoicesController {
   @MessagePattern('invoices.find')
   async handleGetInvoices(@Payload() data: { userId: string; userRole: string; status?: string }) {
     if (data.userRole === 'restaurant') {
-      return this.invoicesService.getRestaurantInvoices(data.userId, { status });
+      return this.invoicesService.getRestaurantInvoices(data.userId, { status: data.status });
     } else if (data.userRole === 'supplier') {
-      return this.invoicesService.getSupplierInvoices(data.userId, { status });
+      return this.invoicesService.getSupplierInvoices(data.userId, { status: data.status });
     }
     throw new Error('Invalid user role');
   }

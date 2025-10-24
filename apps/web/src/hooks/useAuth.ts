@@ -1,6 +1,7 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { apolloClient } from '../lib/apollo-client';
+import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { ApolloLink } from '@apollo/client';
 import { gql } from '@apollo/client';
+import { apolloClient } from '../lib/apollo-client';
 
 interface User {
   id: string;
@@ -25,7 +26,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const WebAuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const GET_ME_QUERY = gql`
   query GetMe {
@@ -69,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         query: GET_ME_QUERY,
       });
       
-      const userData = JSON.parse(result.data.me);
+      const userData = JSON.parse((result.data as any).me);
       setUser(userData.user);
       setOrganization(userData.organization);
       setClientId(userData.clientId);
@@ -122,14 +123,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <WebAuthContext.Provider value={value}>
       {children}
-    </AuthContext.Provider>
+    </WebAuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context = useContext(WebAuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

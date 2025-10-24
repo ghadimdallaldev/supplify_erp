@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { AuthAdapter } from '../interfaces/auth.interface';
@@ -8,10 +8,10 @@ export const TENANT_REQUIRED_KEY = 'tenantRequired';
 export const TENANT_SCOPE_KEY = 'tenantScope';
 export const REQUIRE_FLAG_KEY = 'requireFlag';
 
-export const Roles = (roles: string[]) => Reflector.createDecorator<string[]>(ROLES_KEY);
-export const TenantRequired = () => Reflector.createDecorator<boolean>(TENANT_REQUIRED_KEY);
-export const TenantScope = (scope: 'SUPPLIER' | 'RESTAURANT' | 'ANY') => Reflector.createDecorator<string>(TENANT_SCOPE_KEY);
-export const RequireFlag = (flagKey: string) => Reflector.createDecorator<string>(REQUIRE_FLAG_KEY);
+export const Roles = (roles: string[]) => SetMetadata(ROLES_KEY, roles);
+export const TenantRequired = () => SetMetadata(TENANT_REQUIRED_KEY, true);
+export const TenantScope = (scope: 'SUPPLIER' | 'RESTAURANT' | 'ANY') => SetMetadata(TENANT_SCOPE_KEY, scope);
+export const RequireFlag = (flagKey: string) => SetMetadata(REQUIRE_FLAG_KEY, flagKey);
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -82,7 +82,7 @@ export class AuthGuard implements CanActivate {
 
       return true;
     } catch (error) {
-      throw new UnauthorizedException(`Authentication failed: ${error.message}`);
+      throw new UnauthorizedException(`Authentication failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

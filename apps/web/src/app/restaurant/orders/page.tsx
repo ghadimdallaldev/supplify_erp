@@ -43,7 +43,7 @@ function RestaurantOrdersContent() {
       const result = await apolloClient.query({
         query: ORDERS_QUERY,
       });
-      return JSON.parse(result.data.orders);
+      return JSON.parse((result.data as any).orders);
     },
   });
 
@@ -53,7 +53,7 @@ function RestaurantOrdersContent() {
       const result = await apolloClient.query({
         query: DASHBOARD_KPIS_QUERY,
       });
-      return JSON.parse(result.data.restaurantDashboardKpis);
+      return JSON.parse((result.data as any).restaurantDashboardKpis);
     },
   });
 

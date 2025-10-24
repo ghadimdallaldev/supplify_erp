@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
-import { KcAdminClient } from '@keycloak/keycloak-admin-client';
+import KcAdminClient from '@keycloak/keycloak-admin-client';
 import { AuthAdapter, AuthContext, UserProfile, JwtPayload } from '../interfaces/auth.interface';
 
 @Injectable()
@@ -88,7 +88,7 @@ export class KeycloakAdapter implements AuthAdapter {
       return authContext;
     } catch (error) {
       this.logger.error('❌ Token verification failed:', error);
-      throw new Error(`Invalid token: ${error.message}`);
+      throw new Error(`Invalid token: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -96,6 +96,10 @@ export class KeycloakAdapter implements AuthAdapter {
     try {
       const user = await this.kcAdminClient.users.findOne({ id });
       
+      if (!user) {
+        throw new Error('User not found');
+      }
+
       return {
         id: user.id!,
         email: user.email!,
@@ -108,7 +112,7 @@ export class KeycloakAdapter implements AuthAdapter {
       };
     } catch (error) {
       this.logger.error(`❌ Failed to get user ${id}:`, error);
-      throw new Error(`User not found: ${error.message}`);
+      throw new Error(`User not found: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -121,7 +125,7 @@ export class KeycloakAdapter implements AuthAdapter {
       this.logger.log(`✅ Updated attributes for user ${id}`);
     } catch (error) {
       this.logger.error(`❌ Failed to update attributes for user ${id}:`, error);
-      throw new Error(`Failed to update user attributes: ${error.message}`);
+      throw new Error(`Failed to update user attributes: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -133,13 +137,16 @@ export class KeycloakAdapter implements AuthAdapter {
 
       await this.kcAdminClient.users.addRealmRoleMappings({
         id: userId,
-        roles: realmRoles,
+        roles: realmRoles.filter((role): role is NonNullable<typeof role> => Boolean(role && role.id)).map(role => ({
+          id: role.id!,
+          name: role.name || '',
+        })),
       });
 
       this.logger.log(`✅ Assigned roles ${roles.join(', ')} to user ${userId}`);
     } catch (error) {
       this.logger.error(`❌ Failed to assign roles to user ${userId}:`, error);
-      throw new Error(`Failed to assign roles: ${error.message}`);
+      throw new Error(`Failed to assign roles: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -151,13 +158,16 @@ export class KeycloakAdapter implements AuthAdapter {
 
       await this.kcAdminClient.users.delRealmRoleMappings({
         id: userId,
-        roles: realmRoles,
+        roles: realmRoles.filter((role): role is NonNullable<typeof role> => Boolean(role && role.id)).map(role => ({
+          id: role.id!,
+          name: role.name || '',
+        })),
       });
 
       this.logger.log(`✅ Removed roles ${roles.join(', ')} from user ${userId}`);
     } catch (error) {
       this.logger.error(`❌ Failed to remove roles from user ${userId}:`, error);
-      throw new Error(`Failed to remove roles: ${error.message}`);
+      throw new Error(`Failed to remove roles: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -191,7 +201,7 @@ export class KeycloakAdapter implements AuthAdapter {
       return id!;
     } catch (error) {
       this.logger.error(`❌ Failed to create user ${userData.email}:`, error);
-      throw new Error(`Failed to create user: ${error.message}`);
+      throw new Error(`Failed to create user: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -212,7 +222,7 @@ export class KeycloakAdapter implements AuthAdapter {
       this.logger.log(`✅ Updated user ${id}`);
     } catch (error) {
       this.logger.error(`❌ Failed to update user ${id}:`, error);
-      throw new Error(`Failed to update user: ${error.message}`);
+      throw new Error(`Failed to update user: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -222,22 +232,27 @@ export class KeycloakAdapter implements AuthAdapter {
       this.logger.log(`✅ Deleted user ${id}`);
     } catch (error) {
       this.logger.error(`❌ Failed to delete user ${id}:`, error);
-      throw new Error(`Failed to delete user: ${error.message}`);
+      throw new Error(`Failed to delete user: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   async getServiceToken(): Promise<string> {
     try {
-      const tokenSet = await this.kcAdminClient.auth({
+      await this.kcAdminClient.auth({
         grantType: 'client_credentials',
         clientId: process.env.KEYCLOAK_GATEWAY_CLIENT_ID || 'supplify-gateway',
         clientSecret: process.env.KEYCLOAK_GATEWAY_CLIENT_SECRET || 'gateway-client-secret',
       });
 
-      return tokenSet.access_token!;
+      // Get the token from the client
+      const token = await this.kcAdminClient.getAccessToken();
+      if (!token) {
+        throw new Error('Failed to get access token');
+      }
+      return token;
     } catch (error) {
       this.logger.error('❌ Failed to get service token:', error);
-      throw new Error(`Failed to get service token: ${error.message}`);
+      throw new Error(`Failed to get service token: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -247,7 +262,7 @@ export class KeycloakAdapter implements AuthAdapter {
       this.logger.log(`✅ Invalidated sessions for user ${userId}`);
     } catch (error) {
       this.logger.error(`❌ Failed to invalidate sessions for user ${userId}:`, error);
-      throw new Error(`Failed to invalidate user sessions: ${error.message}`);
+      throw new Error(`Failed to invalidate user sessions: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
