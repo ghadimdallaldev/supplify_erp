@@ -22,10 +22,10 @@ router.get('/login', async (req, res) => {
     
     const authUrl = await getAuthorizationUrl(redirectUri, state);
     
-    logger.info('Redirecting to Keycloak for authentication');
+    req.logger.info('Redirecting to Keycloak for authentication');
     res.redirect(authUrl);
   } catch (error) {
-    logger.error('Login error:', error);
+    req.logger.error('Login error:', error);
     res.status(500).json({
       ok: false,
       data: null,

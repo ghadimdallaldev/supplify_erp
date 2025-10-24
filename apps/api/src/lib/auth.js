@@ -2,32 +2,53 @@ import { jwtVerify, SignJWT } from 'jose';
 import { config } from '../config/env.js';
 import { logger } from './logger.js';
 
-const KEYCLOAK_BASE_URL = config.KEYCLOAK_BASE_URL;
-const KEYCLOAK_REALM = config.KEYCLOAK_REALM;
-const KEYCLOAK_CLIENT_ID = config.KEYCLOAK_CLIENT_ID;
-const KEYCLOAK_CLIENT_SECRET = config.KEYCLOAK_CLIENT_SECRET;
-
-// Keycloak endpoints
-const WELL_KNOWN_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid_configuration`;
-const TOKEN_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`;
-const USERINFO_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo`;
-
 let keycloakConfig = null;
 
+// Get Keycloak configuration values
+function getKeycloakValues() {
+  return {
+    KEYCLOAK_BASE_URL: config.KEYCLOAK_BASE_URL,
+    KEYCLOAK_REALM: config.KEYCLOAK_REALM,
+    KEYCLOAK_CLIENT_ID: config.KEYCLOAK_CLIENT_ID,
+    KEYCLOAK_CLIENT_SECRET: config.KEYCLOAK_CLIENT_SECRET
+  };
+}
+
 // Fetch Keycloak configuration
-async function getKeycloakConfig() {
+export async function getKeycloakConfig() {
   if (keycloakConfig) {
+    logger.info('Using cached Keycloak config');
     return keycloakConfig;
   }
 
+  const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM } = getKeycloakValues();
+  const WELL_KNOWN_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid_configuration`;
+  
+  logger.info('Attempting to fetch Keycloak config from:', WELL_KNOWN_URL);
+  
   try {
     const response = await fetch(WELL_KNOWN_URL);
     keycloakConfig = await response.json();
-    logger.info('Keycloak configuration loaded');
+    logger.info('Keycloak configuration loaded from well-known endpoint');
     return keycloakConfig;
   } catch (error) {
-    logger.error('Failed to load Keycloak configuration:', error);
-    throw new Error('Keycloak configuration unavailable');
+    logger.warn('Failed to load Keycloak configuration from well-known endpoint, using manual configuration');
+    logger.warn('Error details:', error.message);
+    
+    // Fallback: construct configuration manually
+    keycloakConfig = {
+      authorization_endpoint: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth`,
+      token_endpoint: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`,
+      userinfo_endpoint: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo`,
+      jwks_uri: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs`,
+      revocation_endpoint: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/logout`,
+      issuer: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}`
+    };
+    
+    logger.info('Fallback config created:', keycloakConfig);
+    
+    logger.info('Keycloak configuration constructed manually');
+    return keycloakConfig;
   }
 }
 
@@ -189,7 +210,10 @@ export async function revokeToken(token) {
 
 // Generate authorization URL
 export async function getAuthorizationUrl(redirectUri, state) {
-  const config = await getKeycloakConfig();
+  const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID } = getKeycloakValues();
+  
+  // Construct authorization endpoint directly
+  const authorizationEndpoint = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth`;
   
   const params = new URLSearchParams({
     response_type: 'code',
@@ -199,5 +223,5 @@ export async function getAuthorizationUrl(redirectUri, state) {
     state,
   });
 
-  return `${config.authorization_endpoint}?${params.toString()}`;
+  return `${authorizationEndpoint}?${params.toString()}`;
 }
