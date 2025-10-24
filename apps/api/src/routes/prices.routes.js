@@ -1,0 +1,252 @@
+import express from 'express';
+import { requireAuth, requireRole } from '../lib/rbac.js';
+import { query } from '../lib/db.js';
+import { logger } from '../lib/logger.js';
+import { ValidationError } from '../middlewares/errorHandler.js';
+import { z } from 'zod';
+
+const router = express.Router();
+
+// Validation schemas
+const priceCreateSchema = z.object({
+  productId: z.string().uuid(),
+  currency: z.string().min(3).max(3),
+  amount: z.number().positive(),
+  minQty: z.number().positive().default(1),
+  validFrom: z.string().datetime().optional(),
+  validTo: z.string().datetime().optional(),
+});
+
+const priceUpdateSchema = z.object({
+  currency: z.string().min(3).max(3).optional(),
+  amount: z.number().positive().optional(),
+  minQty: z.number().positive().optional(),
+  validFrom: z.string().datetime().optional(),
+  validTo: z.string().datetime().optional(),
+});
+
+// Get prices for a product
+router.get('/product/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    
+    const { rows } = await query(`
+      SELECT p.*, pr.name as product_name, pr.sku
+      FROM price p
+      JOIN product pr ON pr.id = p.product_id
+      WHERE p.product_id = $1
+      ORDER BY p.valid_from DESC
+    `, [productId]);
+    
+    res.json({
+      ok: true,
+      data: { prices: rows },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get prices error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get prices',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Create price (supplier or admin only)
+router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const priceData = priceCreateSchema.parse(req.body);
+    
+    // Verify product ownership for suppliers
+    if (req.userData.role === 'SUPPLIER') {
+      const { rows: products } = await query(`
+        SELECT p.*, s.contact_email 
+        FROM product p 
+        JOIN supplier s ON s.id = p.supplier_id 
+        WHERE p.id = $1
+      `, [priceData.productId]);
+      
+      if (products.length === 0) {
+        throw new ValidationError('Product not found');
+      }
+      
+      if (products[0].contact_email !== req.userData.email) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied. You can only set prices for your own products',
+          },
+          requestId: req.requestId,
+        });
+      }
+    }
+    
+    const { rows } = await query(`
+      INSERT INTO price (product_id, currency, amount, min_qty, valid_from, valid_to)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [
+      priceData.productId,
+      priceData.currency,
+      priceData.amount,
+      priceData.minQty,
+      priceData.validFrom || new Date(),
+      priceData.validTo,
+    ]);
+    
+    logger.info('Price created', { 
+      priceId: rows[0].id, 
+      productId: priceData.productId,
+      actor: req.userData.id 
+    });
+    
+    res.status(201).json({
+      ok: true,
+      data: { price: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid price data',
+          details: error.errors,
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    logger.error('Create price error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to create price',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Update price
+router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = priceUpdateSchema.parse(req.body);
+    
+    // Check ownership for suppliers
+    if (req.userData.role === 'SUPPLIER') {
+      const { rows: prices } = await query(`
+        SELECT p.*, s.contact_email 
+        FROM price p 
+        JOIN product pr ON pr.id = p.product_id
+        JOIN supplier s ON s.id = pr.supplier_id 
+        WHERE p.id = $1
+      `, [id]);
+      
+      if (prices.length === 0) {
+        throw new ValidationError('Price not found');
+      }
+      
+      if (prices[0].contact_email !== req.userData.email) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied. You can only update prices for your own products',
+          },
+          requestId: req.requestId,
+        });
+      }
+    }
+    
+    // Build update query
+    const updateFields = [];
+    const updateValues = [];
+    let paramIndex = 1;
+    
+    Object.entries(updateData).forEach(([key, value]) => {
+      if (value !== undefined) {
+        const dbField = key === 'minQty' ? 'min_qty' : 
+                        key === 'validFrom' ? 'valid_from' :
+                        key === 'validTo' ? 'valid_to' : key;
+        updateFields.push(`${dbField} = $${paramIndex}`);
+        updateValues.push(value);
+        paramIndex++;
+      }
+    });
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'No fields to update',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    updateValues.push(id);
+    
+    const { rows } = await query(`
+      UPDATE price 
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `, updateValues);
+    
+    logger.info('Price updated', { 
+      priceId: rows[0].id, 
+      actor: req.userData.id 
+    });
+    
+    res.json({
+      ok: true,
+      data: { price: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid update data',
+          details: error.errors,
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    logger.error('Update price error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to update price',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+export { router as pricesRoutes };

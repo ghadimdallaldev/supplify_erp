@@ -1,0 +1,31 @@
+{
+  "name": "supplify-v2",
+  "version": "2.0.0",
+  "description": "Supplify v2 - Restaurant & F&B Supplier Marketplace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @supplify/api dev\" \"pnpm --filter @supplify/web dev\"",
+    "build": "pnpm --filter @supplify/api build && pnpm --filter @supplify/web build",
+    "lint": "pnpm --filter @supplify/api lint && pnpm --filter @supplify/web lint",
+    "test": "pnpm --filter @supplify/api test && pnpm --filter @supplify/web test",
+    "db:migrate": "pnpm --filter @supplify/api db:migrate",
+    "db:seed": "pnpm --filter @supplify/api db:seed",
+    "db:reset": "pnpm --filter @supplify/api db:reset",
+    "openapi:gen": "pnpm --filter @supplify/api openapi:gen",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "concurrently": "^8.2.2",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
