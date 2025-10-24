@@ -200,12 +200,12 @@ function Start-Service {
     Push-Location $Directory
     try {
         # Start in background
-            if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-            Start-Process -FilePath "pnpm" -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}.log" -WindowStyle Hidden
-            } elseif (Get-Command yarn -ErrorAction SilentlyContinue) {
-            Start-Process -FilePath "yarn" -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}.log" -WindowStyle Hidden
+        if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+            Start-Process -FilePath "pnpm" -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
+        } elseif (Get-Command yarn -ErrorAction SilentlyContinue) {
+            Start-Process -FilePath "yarn" -ArgumentList $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
         } else {
-            Start-Process -FilePath "npm" -ArgumentList "run", $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}.log" -WindowStyle Hidden
+            Start-Process -FilePath "npm" -ArgumentList "run", $Command -RedirectStandardOutput "../../logs/${Name}.log" -RedirectStandardError "../../logs/${Name}-error.log" -WindowStyle Hidden
         }
         
         Write-Success "$Name started successfully"
@@ -298,12 +298,12 @@ function Main {
         try {
             $response = Invoke-WebRequest -Uri "http://localhost:8080/health/ready" -TimeoutSec 5 -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
-                Write-Success "✅ Keycloak is running on http://localhost:8080"
+                Write-Success "Keycloak is running on http://localhost:8080"
             } else {
-                Write-Error "❌ Keycloak failed to start"
+                Write-Error "Keycloak failed to start"
             }
         } catch {
-            Write-Error "❌ Keycloak failed to start"
+            Write-Error "Keycloak failed to start"
         }
     }
     
@@ -311,12 +311,12 @@ function Main {
     try {
         $response = Invoke-WebRequest -Uri "http://localhost:3000" -TimeoutSec 5 -ErrorAction SilentlyContinue
         if ($response.StatusCode -eq 200) {
-        Write-Success "✅ Web App is running on http://localhost:3000"
-    } else {
-            Write-Error "❌ Web App failed to start"
+            Write-Success "Web App is running on http://localhost:3000"
+        } else {
+            Write-Error "Web App failed to start"
         }
     } catch {
-        Write-Error "❌ Web App failed to start"
+        Write-Error "Web App failed to start"
     }
     
     # Check API Gateway
@@ -324,26 +324,26 @@ function Main {
         try {
             $response = Invoke-WebRequest -Uri "http://localhost:4000" -TimeoutSec 5 -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
-            Write-Success "✅ API Gateway is running on http://localhost:4000"
-        } else {
-                Write-Warning "⚠️ API Gateway may not be running"
+                Write-Success "API Gateway is running on http://localhost:4000"
+            } else {
+                Write-Warning "API Gateway may not be running"
             }
         } catch {
-            Write-Warning "⚠️ API Gateway may not be running"
+            Write-Warning "API Gateway may not be running"
         }
     }
     
     Write-Success "=== Supplify Platform Started Successfully ==="
     if (-not $SkipKeycloak) {
-        Write-Status "🔐 Keycloak Admin: http://localhost:8080 (admin/admin_password)"
+        Write-Status "Keycloak Admin: http://localhost:8080 (admin/admin_password)"
     }
-    Write-Status "🌐 Web App: http://localhost:3000"
-    Write-Status "📊 Admin Dashboard: http://localhost:3000/admin/dashboard"
-    Write-Status "📝 Test Data Manager: http://localhost:3000/admin/test-data"
-    Write-Status "📋 Logs: ./logs/"
+    Write-Status "Web App: http://localhost:3000"
+    Write-Status "Admin Dashboard: http://localhost:3000/admin/dashboard"
+    Write-Status "Test Data Manager: http://localhost:3000/admin/test-data"
+    Write-Status "Logs: ./logs/"
     
     Write-Status ""
-    Write-Status "🔑 Authentication Setup:"
+    Write-Status "Authentication Setup:"
     Write-Status "   - Keycloak handles all authentication and authorization"
     Write-Status "   - Users register via Keycloak self-service"
     Write-Status "   - Admin approval required for access"
