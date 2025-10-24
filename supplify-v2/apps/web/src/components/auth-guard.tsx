@@ -7,7 +7,7 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
-  const { loading, authenticated } = useAuth();
+  const { loading, authenticated, keycloak, user } = useAuth();
 
   if (loading) {
     return (
@@ -20,7 +20,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  if (!authenticated) {
+  if (!authenticated || !keycloak) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -30,12 +30,34 @@ export function AuthGuard({ children }: AuthGuardProps) {
           <p className="text-gray-600 mb-4">
             Please log in to access Supplify.
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
-          >
-            Retry Login
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 mr-2"
+            >
+              Retry Login
+            </button>
+            <button
+              onClick={() => {
+                if (keycloak) {
+                  keycloak.login();
+                } else {
+                  window.location.reload();
+                }
+              }}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              Login with Keycloak
+            </button>
+          </div>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 p-4 bg-gray-100 rounded-md text-left text-sm">
+              <p><strong>Debug Info:</strong></p>
+              <p>Authenticated: {authenticated ? 'Yes' : 'No'}</p>
+              <p>Keycloak: {keycloak ? 'Available' : 'Not available'}</p>
+              <p>User: {user ? 'Loaded' : 'Not loaded'}</p>
+            </div>
+          )}
         </div>
       </div>
     );

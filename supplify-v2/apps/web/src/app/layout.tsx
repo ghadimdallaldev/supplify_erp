@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Providers } from '@/components/providers'
 import { Navigation } from '@/components/navigation'
+import { ApiStatus } from '@/components/api-status'
 
 export const metadata: Metadata = {
   title: 'Supplify v2',
@@ -19,6 +20,7 @@ export default function RootLayout({
         <Providers>
           <Navigation />
           {children}
+          <ApiStatus />
         </Providers>
       </body>
     </html>

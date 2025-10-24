@@ -42,6 +42,23 @@ export const useAuth = (): AuthContext => {
           }
         } catch (error) {
           console.error('Failed to get user info:', error);
+          // Don't fail authentication if API call fails
+          // Set basic user info from Keycloak token
+          if (keycloak.tokenParsed) {
+            setUser({
+              user: {
+                keycloakId: keycloak.tokenParsed.sub,
+                email: keycloak.tokenParsed.email,
+                name: keycloak.tokenParsed.preferred_username || keycloak.tokenParsed.name,
+                roles: keycloak.tokenParsed.realm_access?.roles || []
+              },
+              organization: {
+                clientId: keycloak.tokenParsed.client_id,
+                type: keycloak.tokenParsed.org_type || 'restaurant',
+                tier: keycloak.tokenParsed.tier || 'basic'
+              }
+            });
+          }
         }
 
         setLoading(false);
