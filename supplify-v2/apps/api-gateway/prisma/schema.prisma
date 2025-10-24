@@ -1,0 +1,271 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Core multi-tenant models
+model Organization {
+  id        String   @id @default(cuid())
+  clientId  String   @unique
+  name      String
+  type      String   // restaurant, supplier, admin
+  tier      String   @default("basic") // basic, premium, enterprise
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users             User[]
+  suppliers         Supplier[]
+  products          Product[]
+  orders            Order[]
+  inventoryActivity InventoryActivity[]
+  loyaltyWallets    LoyaltyWallet[]
+  loyaltyTransactions LoyaltyTransaction[]
+  invoices          Invoice[]
+  featureFlags      FeatureFlag[]
+
+  @@map("organizations")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  keycloakId String  @unique
+  clientId  String
+  email     String?
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization        Organization @relation(fields: [clientId], references: [clientId])
+  loyaltyWallets      LoyaltyWallet[]
+  loyaltyTransactions LoyaltyTransaction[]
+  featureFlags        FeatureFlag[]
+
+  @@map("users")
+}
+
+// Supplier management
+model Supplier {
+  id        String   @id @default(cuid())
+  clientId  String
+  name      String
+  email     String
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [clientId], references: [clientId])
+  products     Product[]
+  orders       Order[]
+
+  @@map("suppliers")
+}
+
+// Product catalog
+model Product {
+  id          String   @id @default(cuid())
+  clientId    String
+  supplierId  String?
+  name        String
+  description String?
+  category    String?
+  unit        String   // kg, piece, liter, etc.
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  organization      Organization      @relation(fields: [clientId], references: [clientId])
+  supplier          Supplier?         @relation(fields: [supplierId], references: [id])
+  orderLines        OrderLine[]
+  inventoryActivity InventoryActivity[]
+
+  @@map("products")
+}
+
+// Order management
+model Order {
+  id           String      @id @default(cuid())
+  clientId     String
+  supplierId   String
+  status       OrderStatus @default(PENDING)
+  totalAmount  Decimal     @db.Decimal(10, 2)
+  notes        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [clientId], references: [clientId])
+  supplier     Supplier     @relation(fields: [supplierId], references: [id])
+  lines        OrderLine[]
+  invoices     Invoice[]
+
+  @@map("orders")
+}
+
+model OrderLine {
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String
+  productName String
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  totalPrice  Decimal @db.Decimal(10, 2)
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_lines")
+}
+
+enum OrderStatus {
+  PENDING
+  ACKNOWLEDGED
+  PREPARING
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+// Inventory management
+model InventoryActivity {
+  id           String                   @id @default(cuid())
+  clientId     String
+  productId    String
+  type         InventoryActivityType
+  quantity     Decimal                  @db.Decimal(10, 3)
+  referenceId  String?                  // orderId, etc.
+  notes        String?
+  createdAt    DateTime                 @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [clientId], references: [clientId])
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@map("inventory_activities")
+}
+
+enum InventoryActivityType {
+  DELIVERY
+  ADJUSTMENT
+  TRANSFER
+  WASTE
+}
+
+// Feature flags
+model FeatureFlag {
+  id        String           @id @default(cuid())
+  key       String
+  enabled   Boolean          @default(false)
+  scope     FeatureFlagScope @default(GLOBAL)
+  clientId  String?
+  userId    String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Relations
+  organization Organization? @relation(fields: [clientId], references: [clientId])
+  user         User?         @relation(fields: [userId], references: [id])
+
+  @@unique([key, scope, clientId, userId])
+  @@map("feature_flags")
+}
+
+enum FeatureFlagScope {
+  GLOBAL
+  TENANT
+  USER
+}
+
+// Loyalty system
+model LoyaltyWallet {
+  clientId        String
+  userId          String
+  totalPoints     Int      @default(0)
+  availablePoints Int      @default(0)
+  lastUpdated     DateTime @default(now())
+
+  // Relations
+  organization    Organization      @relation(fields: [clientId], references: [clientId])
+  user            User              @relation(fields: [userId], references: [id])
+  transactions    LoyaltyTransaction[]
+
+  @@id([clientId, userId])
+  @@map("loyalty_wallets")
+}
+
+model LoyaltyTransaction {
+  id           String                 @id @default(cuid())
+  clientId     String
+  userId       String
+  type         LoyaltyTransactionType
+  points       Int
+  referenceId  String?
+  description  String
+  createdAt    DateTime               @default(now())
+
+  // Relations
+  organization Organization    @relation(fields: [clientId], references: [clientId])
+  user         User            @relation(fields: [userId], references: [id])
+  wallet       LoyaltyWallet   @relation(fields: [clientId, userId], references: [clientId, userId])
+
+  @@map("loyalty_transactions")
+}
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+  ADJUSTMENT
+}
+
+// Invoicing
+model Invoice {
+  id        String      @id @default(cuid())
+  clientId  String
+  orderId   String
+  amount    Decimal     @db.Decimal(10, 2)
+  status    InvoiceStatus @default(PENDING)
+  dueDate   DateTime
+  paidAt    DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [clientId], references: [clientId])
+  order        Order        @relation(fields: [orderId], references: [id])
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+// Idempotency tracking for order operations
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  operation String
+  clientId  String
+  result    Json?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@map("idempotency_keys")
+}
