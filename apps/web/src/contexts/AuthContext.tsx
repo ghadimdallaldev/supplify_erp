@@ -52,10 +52,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     (window as any).keycloak = kc;
 
     kc.init({ 
-      onLoad: 'login-required',
+      onLoad: 'check-sso',
       checkLoginIframe: false,
       pkceMethod: 'S256',
-      redirectUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+      redirectUri: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/keycloak` : 'http://localhost:3000/auth/callback/keycloak',
+      silentCheckSsoRedirectUri: typeof window !== 'undefined' ? `${window.location.origin}/silent-check-sso.html` : 'http://localhost:3000/silent-check-sso.html'
     })
       .then(auth => {
         setKeycloak(kc);

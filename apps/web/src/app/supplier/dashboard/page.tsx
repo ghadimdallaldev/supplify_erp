@@ -1,11 +1,8 @@
 'use client';
 
-import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import Link from 'next/link';
-import { useChat } from '../../../components/ChatProvider';
-import { useAuthContext } from '../../auth-provider';
+import { useAuthContext } from '../../../contexts/AuthContext';
 import { useState, useEffect } from 'react';
-import { chatService } from '@/lib/chat-service';
 
 interface RestaurantClient {
   id: string;
@@ -18,52 +15,58 @@ interface RestaurantClient {
 }
 
 export default function SupplierDashboard() {
-  return (
-    <ProtectedRoute requiredRole="supplier" roleName="Supplier">
-      <SupplierDashboardContent />
-    </ProtectedRoute>
-  );
-}
-
-function SupplierDashboardContent() {
-  const { onlineStatus } = useChat();
-  const { user } = useAuthContext();
+  const { authenticated, user, loading } = useAuthContext();
   const [clients, setClients] = useState<RestaurantClient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingClients, setLoadingClients] = useState(true);
+
+  // Check if user has supplier role
+  const hasSupplierRole = user?.realm_access?.roles?.includes('supplier') || false;
 
   useEffect(() => {
-    if (user?.role === 'supplier') {
+    if (authenticated && hasSupplierRole) {
       loadClients();
     }
-  }, [user]);
+  }, [authenticated, hasSupplierRole]);
 
   const loadClients = () => {
     try {
-      // Get threads for this supplier to find their restaurant clients
-      const threads = chatService.getThreadsForUser(user?.id || '', 'supplier');
-      
-      const clientData: RestaurantClient[] = threads.map(thread => {
-        // Get restaurant user data
-        const restaurantData = JSON.parse(localStorage.getItem(`supplify-user-${thread.restaurantId}`) || '{}');
-        
-        return {
-          id: thread.restaurantId,
-          name: thread.restaurantName,
-          tier: restaurantData.tier || 'Basic',
-          spent: Math.floor(Math.random() * 15000) + 2000, // Random spent amount
-          orders: Math.floor(Math.random() * 50) + 10, // Random order count
-          lastOrderDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          unreadCount: thread.unreadCount,
-        };
-      });
+      // Mock data for now - replace with real API calls
+      const mockClients: RestaurantClient[] = [
+        {
+          id: 'restaurant-1',
+          name: 'Golden Fork Restaurant',
+          tier: 'Premium',
+          spent: 12500,
+          orders: 45,
+          lastOrderDate: '2024-01-15',
+          unreadCount: 2,
+        },
+        {
+          id: 'restaurant-2',
+          name: 'Blue Moon Cafe',
+          tier: 'Pro',
+          spent: 8500,
+          orders: 32,
+          lastOrderDate: '2024-01-12',
+          unreadCount: 0,
+        },
+        {
+          id: 'restaurant-3',
+          name: 'Sunset Bistro',
+          tier: 'Basic',
+          spent: 4200,
+          orders: 18,
+          lastOrderDate: '2024-01-10',
+          unreadCount: 1,
+        },
+      ];
 
-      setClients(clientData);
+      setClients(mockClients);
     } catch (error) {
       console.error('Error loading clients:', error);
-      // Fallback to empty array if no data
       setClients([]);
     } finally {
-      setLoading(false);
+      setLoadingClients(false);
     }
   };
 
@@ -77,6 +80,30 @@ function SupplierDashboardContent() {
   };
 
   if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-600 rounded-lg mx-auto mb-4 animate-pulse"></div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Supplify</h1>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authenticated || !hasSupplierRole) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-600 rounded-lg mx-auto mb-4"></div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access the supplier dashboard.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadingClients) {
     return (
       <div className="container mx-auto p-8">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -166,11 +193,7 @@ function SupplierDashboardContent() {
             <tbody className="bg-white divide-y divide-gray-200">
               {clients.map((client) => (
                 <tr key={client.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center">
-                    <span className={`relative flex h-3 w-3 mr-2 ${onlineStatus[client.id] ? '' : 'opacity-0'}`}>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {client.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

@@ -11,8 +11,14 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!loading && !redirected) {
+      // Handle OAuth callback - if we have URL parameters, let Keycloak handle them
+      if (typeof window !== 'undefined' && window.location.search.includes('code=')) {
+        // This is an OAuth callback, let Keycloak handle it
+        return;
+      }
+
       if (!authenticated) {
-        // Only redirect to login if we're not already there
+        // Only redirect to login if we're not already there and not in a callback
         if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
           setRedirected(true);
           router.push('/login');

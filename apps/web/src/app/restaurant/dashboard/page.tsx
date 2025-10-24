@@ -1,13 +1,38 @@
 'use client';
 
-import { ProtectedRoute } from '../../../components/ProtectedRoute';
+import { useAuthContext } from '../../../contexts/AuthContext';
 
 export default function RestaurantDashboard() {
-  return (
-    <ProtectedRoute requiredRole="restaurant" roleName="Restaurant">
-      <RestaurantDashboardContent />
-    </ProtectedRoute>
-  );
+  const { authenticated, user, loading } = useAuthContext();
+
+  // Check if user has restaurant role
+  const hasRestaurantRole = user?.realm_access?.roles?.includes('restaurant') || false;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-600 rounded-lg mx-auto mb-4 animate-pulse"></div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Supplify</h1>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authenticated || !hasRestaurantRole) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-600 rounded-lg mx-auto mb-4"></div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access the restaurant dashboard.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <RestaurantDashboardContent />;
 }
 
 function RestaurantDashboardContent() {
