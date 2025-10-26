@@ -1,23 +1,48 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Input } from '../components/ui/input'
 import { Package, MapPin, CheckCircle, AlertCircle, Truck, ClipboardList } from 'lucide-react'
+import { useGetOrdersQuery } from '../services/api'
+import { Link } from 'react-router-dom'
 
 export function FulfillmentPage() {
   const [activeTab, setActiveTab] = useState('waves')
+  
+  // Fetch all orders to find shipped ones
+  const { data: ordersData } = useGetOrdersQuery({
+    limit: 1000,
+    offset: 0,
+  })
 
-  // Mock data
+  // Extract shipped orders for fulfillment
+  const shippedOrders = useMemo(() => {
+    if (!ordersData?.orders) return []
+    
+    return ordersData.orders
+      .filter(order => 
+        order.status === 'SHIPPED' || 
+        order.status === 'ACKNOWLEDGED' || 
+        order.status === 'PROCESSING'
+      )
+      .map(order => ({
+        id: order.id,
+        orderNumber: order.id.slice(0, 8).toUpperCase(),
+        restaurantName: order.restaurant_name || 'Restaurant',
+        status: order.status,
+        totalAmount: order.total_amount || 0,
+        itemCount: order.items?.length || 0,
+        placedAt: order.placed_at || order.created_at,
+        order: order,
+      }))
+  }, [ordersData])
+
+  // Mock data for demo
   const waves = [
-    { id: '1', waveNumber: 'W-2024-001', scheduledDate: '2024-12-28', status: 'PICKING', orderCount: 12 },
-    { id: '2', waveNumber: 'W-2024-002', scheduledDate: '2024-12-29', status: 'PENDING', orderCount: 8 },
-  ]
-
-  const pickLists = [
-    { id: '1', orderNumber: 'ORD-123', status: 'IN_PROGRESS', assignedTo: 'John Picker', itemsCount: 15 },
-    { id: '2', orderNumber: 'ORD-124', status: 'COMPLETED', assignedTo: 'Jane Picker', itemsCount: 8 },
+    { id: '1', waveNumber: 'W-2024-001', scheduledDate: '2024-12-28', status: 'PICKING', orderCount: shippedOrders.length || 0 },
+    { id: '2', waveNumber: 'W-2024-002', scheduledDate: '2024-12-29', status: 'PENDING', orderCount: 0 },
   ]
 
   const routes = [
@@ -101,27 +126,47 @@ export function FulfillmentPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {pickLists.map((list) => (
-                  <div key={list.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold">{list.orderNumber}</h4>
-                          <Badge variant={list.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                            {list.status}
-                          </Badge>
+              {shippedOrders.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No orders ready for picking. Orders will appear here when they reach SHIPPED status.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {shippedOrders.map((order) => (
+                    <div key={order.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Link to={`/app/orders/${order.id}`}>
+                              <h4 className="font-semibold hover:text-primary cursor-pointer">
+                                #{order.orderNumber}
+                              </h4>
+                            </Link>
+                            <Badge variant={
+                              order.status === 'SHIPPED' ? 'default' : 
+                              order.status === 'PROCESSING' ? 'secondary' : 
+                              'outline'
+                            }>
+                              {order.status}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-gray-600 space-y-1">
+                            <p>Restaurant: {order.restaurantName}</p>
+                            <p>Items: {order.itemCount} | Total: ${order.totalAmount.toFixed(2)}</p>
+                            <p>Placed: {new Date(order.placedAt).toLocaleDateString()}</p>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <p>Assigned to: {list.assignedTo}</p>
-                          <p>Items: {list.itemsCount}</p>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link to={`/app/orders/${order.id}`}>View Details</Link>
+                          </Button>
+                          <Button variant="outline" size="sm">View Mobile</Button>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm">View Mobile</Button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -181,24 +226,36 @@ export function FulfillmentPage() {
               <CardDescription>Real-time delivery status and proof of delivery</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold">ORD-123</h4>
-                      <div className="text-sm text-gray-600 space-y-1 mt-1">
-                        <p>Status: Out for Delivery</p>
-                        <p>Driver: Mike Driver</p>
-                        <p>ETA: 2:30 PM</p>
+              {shippedOrders.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No deliveries currently in transit
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {shippedOrders.filter(o => o.status === 'SHIPPED').map((order) => (
+                    <div key={order.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Link to={`/app/orders/${order.id}`}>
+                            <h4 className="font-semibold hover:text-primary cursor-pointer">
+                              Order #{order.orderNumber}
+                            </h4>
+                          </Link>
+                          <div className="text-sm text-gray-600 space-y-1 mt-1">
+                            <p>Restaurant: {order.restaurantName}</p>
+                            <p>Items: {order.itemCount} | Total: ${order.totalAmount.toFixed(2)}</p>
+                            <p>Status: {order.status}</p>
+                          </div>
+                        </div>
+                        <Badge variant="default" className="flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Shipped
+                        </Badge>
                       </div>
                     </div>
-                    <Badge variant="default">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      In Transit
-                    </Badge>
-                  </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
