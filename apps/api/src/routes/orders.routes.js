@@ -17,7 +17,7 @@ const orderCreateSchema = z.object({
 });
 
 const orderUpdateSchema = z.object({
-  status: z.enum(['DRAFT', 'PLACED', 'CONFIRMED', 'FULFILLING', 'COMPLETED', 'CANCELLED']).optional(),
+  status: z.enum(['DRAFT', 'PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELLED']).optional(),
   notes: z.string().optional(),
 });
 
@@ -27,6 +27,105 @@ const orderListSchema = z.object({
   limit: z.string().transform(val => parseInt(val, 10)).default('20'),
   offset: z.string().transform(val => parseInt(val, 10)).default('0'),
 });
+
+// Helper function to handle order delivery and update restaurant inventory
+async function handleOrderDelivery(orderId, userData, res) {
+  try {
+    const result = await withTransaction(async (client) => {
+      // Update order status
+      const { rows: orders } = await client.query(`
+        UPDATE customer_order 
+        SET status = 'DELIVERED', delivered_at = now(), updated_at = now()
+        WHERE id = $1
+        RETURNING *
+      `, [orderId]);
+      
+      if (orders.length === 0) {
+        throw new NotFoundError('Order not found');
+      }
+      
+      const order = orders[0];
+      
+      // Get order items
+      const { rows: orderItems } = await client.query(`
+        SELECT oi.*, p.supplier_id
+        FROM order_item oi
+        JOIN product p ON p.id = oi.product_id
+        WHERE oi.order_id = $1
+      `, [orderId]);
+      
+      // Verify supplier owns all items in this order
+      const { rows: suppliers } = await client.query(
+        'SELECT id FROM supplier WHERE contact_email = $1',
+        [userData.email]
+      );
+      
+      if (suppliers.length === 0) {
+        throw new ValidationError('Supplier not found');
+      }
+      
+      const supplierId = suppliers[0].id;
+      
+      // Check all items belong to this supplier
+      for (const item of orderItems) {
+        if (item.supplier_id !== supplierId) {
+          throw new ValidationError('Order contains items from other suppliers');
+        }
+      }
+      
+      // Update restaurant inventory for each item
+      for (const item of orderItems) {
+        // Check if restaurant inventory exists for this product
+        const { rows: restaurantInventory } = await client.query(`
+          SELECT * FROM restaurant_inventory 
+          WHERE restaurant_id = $1 AND product_id = $2
+        `, [order.restaurant_id, item.product_id]);
+        
+        if (restaurantInventory.length > 0) {
+          // Update existing inventory
+          await client.query(`
+            UPDATE restaurant_inventory 
+            SET quantity = quantity + $1, updated_at = now()
+            WHERE restaurant_id = $2 AND product_id = $3
+          `, [item.quantity, order.restaurant_id, item.product_id]);
+        } else {
+          // Create new inventory record
+          await client.query(`
+            INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
+            VALUES ($1, $2, $3, now())
+          `, [order.restaurant_id, item.product_id, item.quantity]);
+        }
+      }
+      
+      logger.info('Order delivered and restaurant inventory updated', { 
+        orderId: order.id,
+        restaurantId: order.restaurant_id,
+        itemCount: orderItems.length,
+        actor: userData.id 
+      });
+      
+      return order;
+    });
+    
+    res.json({
+      ok: true,
+      data: { order: result },
+      error: null,
+      requestId: res.locals.requestId,
+    });
+  } catch (error) {
+    logger.error('Handle order delivery error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to deliver order',
+      },
+      requestId: res.locals.requestId,
+    });
+  }
+}
 
 // List orders (role-aware)
 router.get('/', requireAuth, async (req, res) => {
@@ -475,20 +574,25 @@ router.patch('/:id', requireAuth, async (req, res) => {
           requestId: req.requestId,
         });
       }
-    } else if (req.userData.role === 'SUPPLIER') {
-      // Suppliers can confirm and fulfill orders
-      if (updateData.status && !['CONFIRMED', 'FULFILLING', 'COMPLETED'].includes(updateData.status)) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Suppliers can only confirm, fulfill, or complete orders',
-          },
-          requestId: req.requestId,
-        });
-      }
-    }
+         } else if (req.userData.role === 'SUPPLIER') {
+       // Suppliers can acknowledge, process, ship, and deliver orders
+       if (updateData.status && !['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED'].includes(updateData.status)) {
+         return res.status(403).json({
+           ok: false,
+           data: null,
+           error: {
+             name: 'FORBIDDEN',
+             message: 'Suppliers can only acknowledge, process, ship, or deliver orders',
+           },
+           requestId: req.requestId,
+         });
+       }
+       
+       // If delivering, update restaurant inventory
+       if (updateData.status === 'DELIVERED') {
+         return await handleOrderDelivery(id, req.userData, res);
+       }
+     }
     
     // Build update query
     const updateFields = [];
