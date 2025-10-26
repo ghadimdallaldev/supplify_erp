@@ -8,16 +8,19 @@ import {
   Users,
   Building2,
   Settings,
-  FileText,
   MessageSquare,
+  ShoppingBag,
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
   { name: 'Products', href: '/app/products', icon: Package },
   { name: 'Orders', href: '/app/orders', icon: ShoppingCart },
-  { name: 'Cart', href: '/app/cart', icon: FileText },
   { name: 'Chat', href: '/app/chat', icon: MessageSquare },
+]
+
+const restaurantNavigation = [
+  { name: 'Cart', href: '/app/cart', icon: ShoppingBag },
 ]
 
 const adminNavigation = [
@@ -31,12 +34,19 @@ export function Sidebar() {
 
   const isAdmin = user?.role === 'ADMIN'
   const isSupplier = user?.role === 'SUPPLIER'
+  const isRestaurant = user?.role === 'RESTAURANT'
   
-  // Suppliers see "Restaurants" link, Admins see both "Suppliers" and "Restaurants"
+  // Build navigation based on role
   let allNavigation = [...navigation]
-  if (isAdmin) {
+  
+  if (isRestaurant) {
+    // Restaurants see Cart
+    allNavigation = [...navigation, ...restaurantNavigation]
+  } else if (isAdmin) {
+    // Admins see Suppliers and Restaurants
     allNavigation = [...navigation, ...adminNavigation]
   } else if (isSupplier) {
+    // Suppliers see Restaurants
     allNavigation = [...navigation, { name: 'Restaurants', href: '/app/restaurants', icon: Users }]
   }
 
