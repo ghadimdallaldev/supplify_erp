@@ -61,7 +61,15 @@ export function SettingsPage() {
               <p className="text-sm text-gray-600">
                 Your account is secured through Keycloak authentication.
               </p>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080';
+                  const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'Supplify';
+                  window.open(`${keycloakUrl}/realms/${realm}/account`, '_blank');
+                }}
+              >
                 Change Password
               </Button>
             </div>

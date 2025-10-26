@@ -7,7 +7,7 @@ import { logger } from '../src/lib/logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const MIGRATIONS_DIR = join(__dirname, 'db', 'migrations');
+const MIGRATIONS_DIR = join(__dirname, '..', 'db', 'migrations');
 
 async function runMigrations() {
   try {

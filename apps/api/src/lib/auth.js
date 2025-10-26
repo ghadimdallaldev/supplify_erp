@@ -1,6 +1,7 @@
-import { jwtVerify, SignJWT } from 'jose';
+import { jwtVerify, SignJWT, createRemoteJWKSet } from 'jose';
 import { config } from '../config/env.js';
 import { logger } from './logger.js';
+import axios from 'axios';
 
 let keycloakConfig = null;
 
@@ -27,8 +28,8 @@ export async function getKeycloakConfig() {
   logger.info('Attempting to fetch Keycloak config from:', WELL_KNOWN_URL);
   
   try {
-    const response = await fetch(WELL_KNOWN_URL);
-    keycloakConfig = await response.json();
+    const response = await axios.get(WELL_KNOWN_URL);
+    keycloakConfig = response.data;
     logger.info('Keycloak configuration loaded from well-known endpoint');
     return keycloakConfig;
   } catch (error) {
@@ -56,6 +57,14 @@ export async function getKeycloakConfig() {
 export async function exchangeCodeForTokens(code, redirectUri) {
   try {
     const config = await getKeycloakConfig();
+    const { KEYCLOAK_CLIENT_ID, KEYCLOAK_CLIENT_SECRET } = getKeycloakValues();
+    
+    logger.info('Exchanging code for tokens', { 
+      code: code.substring(0, 10) + '...', 
+      redirectUri,
+      clientId: KEYCLOAK_CLIENT_ID,
+      tokenEndpoint: config.token_endpoint
+    });
     
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -65,26 +74,29 @@ export async function exchangeCodeForTokens(code, redirectUri) {
       redirect_uri: redirectUri,
     });
 
-    const response = await fetch(config.token_endpoint, {
-      method: 'POST',
+    const response = await axios.post(config.token_endpoint, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: params,
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      logger.error('Token exchange failed:', error);
-      throw new Error('Token exchange failed');
-    }
+    logger.info('Token exchange response status:', response.status);
 
-    const tokens = await response.json();
+    const tokens = response.data;
     logger.info('Tokens exchanged successfully');
     return tokens;
   } catch (error) {
-    logger.error('Error exchanging code for tokens:', error);
-    throw error;
+    if (error.response) {
+      logger.error('Token exchange failed:', { 
+        status: error.response.status, 
+        statusText: error.response.statusText,
+        error: error.response.data 
+      });
+      throw new Error(`Token exchange failed: ${error.response.status} ${error.response.statusText}`);
+    } else {
+      logger.error('Error exchanging code for tokens:', error.message);
+      throw error;
+    }
   }
 }
 
@@ -92,6 +104,7 @@ export async function exchangeCodeForTokens(code, redirectUri) {
 export async function refreshAccessToken(refreshToken) {
   try {
     const config = await getKeycloakConfig();
+    const { KEYCLOAK_CLIENT_ID, KEYCLOAK_CLIENT_SECRET } = getKeycloakValues();
     
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
@@ -100,24 +113,17 @@ export async function refreshAccessToken(refreshToken) {
       refresh_token: refreshToken,
     });
 
-    const response = await fetch(config.token_endpoint, {
-      method: 'POST',
+    const response = await axios.post(config.token_endpoint, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: params,
     });
 
-    if (!response.ok) {
-      logger.warn('Token refresh failed');
-      return null;
-    }
-
-    const tokens = await response.json();
+    const tokens = response.data;
     logger.info('Token refreshed successfully');
     return tokens;
   } catch (error) {
-    logger.error('Error refreshing token:', error);
+    logger.error('Error refreshing token:', error.message);
     return null;
   }
 }
@@ -126,37 +132,84 @@ export async function refreshAccessToken(refreshToken) {
 export async function verifyToken(token) {
   try {
     const config = await getKeycloakConfig();
+    const { KEYCLOAK_CLIENT_ID } = getKeycloakValues();
     
-    // Get the public key from Keycloak
-    const jwksResponse = await fetch(config.jwks_uri);
-    const jwks = await jwksResponse.json();
+    logger.info('Verifying token with:', {
+      issuer: config.issuer,
+      audience: KEYCLOAK_CLIENT_ID,
+      tokenPrefix: token.substring(0, 20) + '...'
+    });
     
-    // Find the key that matches the token's kid
-    const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString());
-    const key = jwks.keys.find(k => k.kid === header.kid);
+    // Decode the token manually to extract payload
+    const parts = token.split('.');
+    const headerPart = parts[0];
+    const payloadPart = parts[1];
+    const signaturePart = parts[2];
     
-    if (!key) {
-      throw new Error('Key not found');
+    const header = JSON.parse(Buffer.from(headerPart, 'base64url').toString());
+    const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString());
+    
+    logger.info('Token decoded successfully:', {
+      alg: header.alg,
+      kid: header.kid,
+      azp: payload.azp,
+      sub: payload.sub
+    });
+    
+    // Verify the signature using jose
+    const JWKS = createRemoteJWKSet(new URL(config.jwks_uri));
+    
+    // Verify signature only (skip audience check by using a catch)
+    try {
+      await jwtVerify(token, JWKS, {
+        issuer: config.issuer,
+        audience: KEYCLOAK_CLIENT_ID,
+      });
+    } catch (error) {
+      // If it's just the missing 'aud' claim, we'll proceed with manual check
+      if (error.message && error.message.includes('missing required "aud" claim')) {
+        logger.info('Token missing aud claim, verifying signature only');
+        
+        // Verify signature without audience
+        await jwtVerify(token, JWKS, {
+          issuer: config.issuer,
+        });
+        
+        // Manual audience check
+        if (payload.azp && payload.azp !== KEYCLOAK_CLIENT_ID) {
+          throw new Error(`Token audience mismatch. Expected: ${KEYCLOAK_CLIENT_ID}, Got: ${payload.azp}`);
+        }
+        
+        logger.info('Token verification successful (signature verified, manual aud check)');
+        return payload;
+      }
+      throw error;
     }
-
-    // Import the key
-    const publicKey = await crypto.subtle.importKey(
-      'jwk',
-      key,
-      { name: 'RS256', hash: 'SHA-256' },
-      false,
-      ['verify']
-    );
-
-    // Verify the token
-    const { payload } = await jwtVerify(token, publicKey, {
+    
+    // If we get here, standard verification worked
+    const { payload: verifiedPayload } = await jwtVerify(token, JWKS, {
       issuer: config.issuer,
       audience: KEYCLOAK_CLIENT_ID,
     });
-
-    return payload;
+    
+    logger.info('Token verification successful');
+    return verifiedPayload;
   } catch (error) {
-    logger.error('Token verification failed:', error);
+    const errorMessage = error?.message || 'Unknown error';
+    const errorName = error?.name || 'Unknown';
+    const errorCode = error?.code || 'Unknown';
+    
+    console.error('=== TOKEN VERIFICATION ERROR ===');
+    console.error('Message:', errorMessage);
+    console.error('Name:', errorName);
+    console.error('Code:', errorCode);
+    console.error('Full error:', error);
+    console.error('================================');
+    
+    logger.error('Token verification failed:', errorMessage);
+    logger.error('Error name:', errorName);
+    logger.error('Error code:', errorCode);
+    logger.error('Full error object:', error);
     throw new Error('Invalid token');
   }
 }
@@ -164,20 +217,18 @@ export async function verifyToken(token) {
 // Get user info from Keycloak
 export async function getUserInfo(accessToken) {
   try {
-    const response = await fetch(USERINFO_URL, {
+    const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM } = getKeycloakValues();
+    const USERINFO_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo`;
+    
+    const response = await axios.get(USERINFO_URL, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
       },
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to get user info');
-    }
-
-    const userInfo = await response.json();
-    return userInfo;
+    return response.data;
   } catch (error) {
-    logger.error('Error getting user info:', error);
+    logger.error('Error getting user info:', error.message);
     throw error;
   }
 }
@@ -193,15 +244,13 @@ export async function revokeToken(token) {
       token,
     });
 
-    const response = await fetch(config.revocation_endpoint, {
-      method: 'POST',
+    const response = await axios.post(config.revocation_endpoint, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: params,
     });
 
-    return response.ok;
+    return response.status === 200;
   } catch (error) {
     logger.error('Error revoking token:', error);
     return false;

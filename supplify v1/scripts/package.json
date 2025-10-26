@@ -1,9 +1,0 @@
-{
-  "name": "keycloak-seeding",
-  "version": "1.0.0",
-  "description": "Keycloak seeding script for Supplify",
-  "main": "keycloak-seed.js",
-  "dependencies": {
-    "@keycloak/keycloak-admin-client": "^26.4.2"
-  }
-}

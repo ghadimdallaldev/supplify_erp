@@ -59,10 +59,21 @@ export async function upsertUser(userInfo, roles = []) {
     const { sub, email, given_name, family_name } = userInfo;
     const displayName = `${given_name || ''} ${family_name || ''}`.trim() || email;
     
+    logger.info('Upserting user:', { sub, email, displayName, roles, rolesType: typeof roles, rolesIsArray: Array.isArray(roles) });
+    
     // Determine role from Keycloak roles
     let role = 'RESTAURANT'; // default
-    if (roles.includes('admin')) role = 'ADMIN';
-    else if (roles.includes('supplier')) role = 'SUPPLIER';
+    if (roles.includes('admin')) {
+      role = 'ADMIN';
+      logger.info('Role determined as ADMIN');
+    } else if (roles.includes('supplier')) {
+      role = 'SUPPLIER';
+      logger.info('Role determined as SUPPLIER');
+    } else {
+      logger.info('Role determined as RESTAURANT (default)');
+    }
+
+    logger.info('Final user data:', { sub, email, displayName, role });
 
     const result = await query(`
       INSERT INTO app_user (keycloak_sub, email, display_name, role)
@@ -76,9 +87,12 @@ export async function upsertUser(userInfo, roles = []) {
       RETURNING *
     `, [sub, email, displayName, role]);
 
+    logger.info('User upserted successfully:', result.rows[0]);
     return result.rows[0];
   } catch (error) {
     logger.error('Error upserting user:', error);
+    logger.error('User info:', userInfo);
+    logger.error('Roles:', roles);
     throw error;
   }
 }
@@ -123,10 +137,13 @@ export async function requireAuth(req, res, next) {
       req.userData = user;
       next();
     } catch (error) {
+      logger.error('Token verification failed, attempting refresh:', error.message);
+      
       // Token is invalid or expired, try to refresh
       const refreshToken = extractRefreshTokenFromCookie(req);
       
       if (!refreshToken) {
+        logger.error('No refresh token available');
         clearAuthCookies(res);
         return res.status(401).json({
           ok: false,
@@ -140,9 +157,11 @@ export async function requireAuth(req, res, next) {
       }
 
       // Attempt to refresh the token
+      logger.info('Attempting to refresh token...');
       const newTokens = await refreshAccessToken(refreshToken);
       
       if (!newTokens) {
+        logger.error('Token refresh returned null');
         clearAuthCookies(res);
         return res.status(401).json({
           ok: false,
@@ -154,6 +173,8 @@ export async function requireAuth(req, res, next) {
           requestId: req.requestId,
         });
       }
+      
+      logger.info('Token refresh successful, verifying new token...');
 
       // Set new cookies
       setAuthCookies(res, newTokens.access_token, newTokens.refresh_token);

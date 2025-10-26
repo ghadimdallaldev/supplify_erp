@@ -33,16 +33,34 @@ import type {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
-export const api = createApi({
-  reducerPath: 'api',
-  baseQuery: fetchBaseQuery({
+// Custom baseQuery to unwrap API response envelope
+const baseQueryWithUnwrap = async (args, api, extraOptions) => {
+  const result = await fetchBaseQuery({
     baseUrl: API_URL,
     credentials: 'include',
     prepareHeaders: (headers) => {
       // CSRF token will be handled by the server
       return headers
     },
-  }),
+  })(args, api, extraOptions);
+  
+  // Unwrap the API response envelope { ok: true/false, data: ..., error: ... }
+  if (result.data && typeof result.data === 'object' && 'ok' in result.data) {
+    if (result.data.ok) {
+      // Return the actual data
+      return { ...result, data: result.data.data };
+    } else {
+      // Return an error
+      return { ...result, error: { status: 'CUSTOM_ERROR', data: result.data.error } };
+    }
+  }
+  
+  return result;
+};
+
+export const api = createApi({
+  reducerPath: 'api',
+  baseQuery: baseQueryWithUnwrap,
   tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory'],
   endpoints: (builder) => ({
     // Auth endpoints
