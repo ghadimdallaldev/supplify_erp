@@ -18,6 +18,7 @@ import { restaurantsRoutes } from './routes/restaurants.routes.js';
 import { ordersRoutes } from './routes/orders.routes.js';
 import { filesRoutes } from './routes/files.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
+import { chatRoutes } from './routes/chat.routes.js';
 
 const app = express();
 
@@ -106,6 +107,7 @@ app.use('/api/restaurants', restaurantsRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/chat', chatRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

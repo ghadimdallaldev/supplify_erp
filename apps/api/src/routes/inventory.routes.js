@@ -2,7 +2,7 @@ import express from 'express';
 import { requireAuth, requireRole } from '../lib/rbac.js';
 import { query } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
-import { ValidationError } from '../middlewares/errorHandler.js';
+import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -12,16 +12,84 @@ const inventoryUpdateSchema = z.object({
   availableQty: z.number().min(0),
 });
 
+const adjustmentSchema = z.object({
+  adjustmentType: z.enum(['IN', 'OUT']),
+  quantity: z.number().positive(),
+  reason: z.string().min(1),
+  notes: z.string().optional(),
+  warehouseId: z.string().uuid().optional(),
+});
+
+const warehouseSchema = z.object({
+  name: z.string().min(1),
+  code: z.string().optional(),
+  address: z.object({
+    street: z.string().optional(),
+    city: z.string().optional(),
+    region: z.string().optional(),
+    country: z.string().optional(),
+  }).optional(),
+});
+
+const inventorySettingsSchema = z.object({
+  moq: z.number().positive().default(1),
+  orderMultiple: z.number().positive().default(1),
+  leadTimeDays: z.number().int().min(0).default(0),
+  deliveryWindows: z.array(z.object({
+    day: z.string(),
+    startTime: z.string(),
+    endTime: z.string(),
+  })).optional(),
+  lowStockThreshold: z.number().default(10),
+  backorderAllowed: z.boolean().default(false),
+  backorderEtaDays: z.number().int().min(0).optional(),
+});
+
+// Helper: Check if user owns the product
+async function checkProductOwnership(productId, userEmail) {
+  const { rows } = await query(`
+    SELECT p.*, s.contact_email 
+    FROM product p 
+    JOIN supplier s ON s.id = p.supplier_id 
+    WHERE p.id = $1
+  `, [productId]);
+  
+  if (rows.length === 0) {
+    throw new NotFoundError('Product not found');
+  }
+  
+  if (rows[0].contact_email !== userEmail) {
+    throw new ValidationError('You can only manage inventory for your own products');
+  }
+  
+  return rows[0];
+}
+
 // Get inventory for a product
-router.get('/product/:productId', async (req, res) => {
+router.get('/product/:productId', requireAuth, async (req, res) => {
   try {
     const { productId } = req.params;
     
     const { rows } = await query(`
-      SELECT i.*, p.name as product_name, p.sku, s.name as supplier_name
+      SELECT 
+        i.*, 
+        p.name as product_name, 
+        p.sku, 
+        s.name as supplier_name,
+        pis.moq,
+        pis.order_multiple,
+        pis.lead_time_days,
+        pis.delivery_windows,
+        pis.low_stock_threshold,
+        pis.backorder_allowed,
+        pis.backorder_eta_days,
+        w.name as warehouse_name,
+        w.code as warehouse_code
       FROM inventory i
       JOIN product p ON p.id = i.product_id
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
+      LEFT JOIN warehouse w ON w.id = i.warehouse_id
       WHERE i.product_id = $1
     `, [productId]);
     
@@ -57,7 +125,7 @@ router.get('/product/:productId', async (req, res) => {
   }
 });
 
-// Update inventory (supplier or admin only)
+// Update inventory (direct update without adjustment log)
 router.patch('/product/:productId', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
     const { productId } = req.params;
@@ -65,28 +133,7 @@ router.patch('/product/:productId', requireAuth, requireRole(['SUPPLIER', 'ADMIN
     
     // Verify product ownership for suppliers
     if (req.userData.role === 'SUPPLIER') {
-      const { rows: products } = await query(`
-        SELECT p.*, s.contact_email 
-        FROM product p 
-        JOIN supplier s ON s.id = p.supplier_id 
-        WHERE p.id = $1
-      `, [productId]);
-      
-      if (products.length === 0) {
-        throw new ValidationError('Product not found');
-      }
-      
-      if (products[0].contact_email !== req.userData.email) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only update inventory for your own products',
-          },
-          requestId: req.requestId,
-        });
-      }
+      await checkProductOwnership(productId, req.userData.email);
     }
     
     // Update or insert inventory
@@ -133,6 +180,361 @@ router.patch('/product/:productId', requireAuth, requireRole(['SUPPLIER', 'ADMIN
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to update inventory',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Create inventory adjustment (with reason tracking)
+router.post('/product/:productId/adjustment', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const adjustmentData = adjustmentSchema.parse(req.body);
+    
+    // Verify product ownership for suppliers
+    if (req.userData.role === 'SUPPLIER') {
+      await checkProductOwnership(productId, req.userData.email);
+    }
+    
+    // Start transaction
+    await query('BEGIN');
+    
+    try {
+      // Get current inventory
+      const { rows: inventory } = await query(
+        'SELECT * FROM inventory WHERE product_id = $1',
+        [productId]
+      );
+      
+      if (inventory.length === 0) {
+        throw new NotFoundError('Inventory not found for this product');
+      }
+      
+      const currentQty = parseFloat(inventory[0].available_qty);
+      const adjustment = adjustmentData.adjustmentType === 'IN' 
+        ? adjustmentData.quantity 
+        : -adjustmentData.quantity;
+      const newQty = Math.max(0, currentQty + adjustment);
+      
+      // Update inventory
+      const { rows: updatedInventory } = await query(`
+        UPDATE inventory 
+        SET available_qty = $1, updated_at = now()
+        WHERE product_id = $2
+        RETURNING *
+      `, [newQty, productId]);
+      
+      // Create adjustment record
+      const { rows: adjustmentRecord } = await query(`
+        INSERT INTO inventory_adjustment (
+          product_id, warehouse_id, adjustment_type, quantity, reason, notes, actor_sub
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+      `, [
+        productId,
+        adjustmentData.warehouseId || null,
+        adjustmentData.adjustmentType,
+        adjustmentData.quantity,
+        adjustmentData.reason,
+        adjustmentData.notes || null,
+        req.userSub,
+      ]);
+      
+      // Check and create low stock alert
+      const { rows: settings } = await query(
+        'SELECT low_stock_threshold FROM product_inventory_settings WHERE product_id = $1',
+        [productId]
+      );
+      
+      if (settings.length > 0 && newQty < settings[0].low_stock_threshold) {
+        await query(`
+          INSERT INTO inventory_alert (product_id, warehouse_id, alert_type, threshold_value, current_value)
+          VALUES ($1, $2, 'LOW_STOCK', $3, $4)
+          ON CONFLICT DO NOTHING
+        `, [
+          productId,
+          adjustmentData.warehouseId || null,
+          settings[0].low_stock_threshold,
+          newQty
+        ]);
+      }
+      
+      await query('COMMIT');
+      
+      logger.info('Inventory adjustment created', { 
+        productId, 
+        adjustmentType: adjustmentData.adjustmentType,
+        quantity: adjustmentData.quantity,
+        newQty,
+        actor: req.userData.id 
+      });
+      
+      res.status(201).json({
+        ok: true,
+        data: { 
+          inventory: updatedInventory[0],
+          adjustment: adjustmentRecord[0]
+        },
+        error: null,
+        requestId: req.requestId,
+      });
+    } catch (error) {
+      await query('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid adjustment data',
+          details: error.errors,
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    logger.error('Create adjustment error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to create adjustment',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get adjustment history for a product
+router.get('/product/:productId/adjustments', requireAuth, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    
+    const { rows } = await query(`
+      SELECT 
+        ia.*,
+        p.name as product_name,
+        p.sku,
+        w.name as warehouse_name
+      FROM inventory_adjustment ia
+      JOIN product p ON p.id = ia.product_id
+      LEFT JOIN warehouse w ON w.id = ia.warehouse_id
+      WHERE ia.product_id = $1
+      ORDER BY ia.created_at DESC
+      LIMIT 100
+    `, [productId]);
+    
+    res.json({
+      ok: true,
+      data: { adjustments: rows },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get adjustments error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get adjustments',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Manage product inventory settings
+router.patch('/product/:productId/settings', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const settings = inventorySettingsSchema.parse(req.body);
+    
+    // Verify product ownership for suppliers
+    if (req.userData.role === 'SUPPLIER') {
+      await checkProductOwnership(productId, req.userData.email);
+    }
+    
+    const { rows } = await query(`
+      INSERT INTO product_inventory_settings (
+        product_id, moq, order_multiple, lead_time_days, delivery_windows,
+        low_stock_threshold, backorder_allowed, backorder_eta_days, updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+      ON CONFLICT (product_id)
+      DO UPDATE SET
+        moq = EXCLUDED.moq,
+        order_multiple = EXCLUDED.order_multiple,
+        lead_time_days = EXCLUDED.lead_time_days,
+        delivery_windows = EXCLUDED.delivery_windows,
+        low_stock_threshold = EXCLUDED.low_stock_threshold,
+        backorder_allowed = EXCLUDED.backorder_allowed,
+        backorder_eta_days = EXCLUDED.backorder_eta_days,
+        updated_at = now()
+      RETURNING *
+    `, [
+      productId,
+      settings.moq,
+      settings.orderMultiple,
+      settings.leadTimeDays,
+      settings.deliveryWindows ? JSON.stringify(settings.deliveryWindows) : null,
+      settings.lowStockThreshold,
+      settings.backorderAllowed,
+      settings.backorderEtaDays || null,
+    ]);
+    
+    logger.info('Inventory settings updated', { 
+      productId, 
+      actor: req.userData.id 
+    });
+    
+    res.json({
+      ok: true,
+      data: { settings: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid settings data',
+          details: error.errors,
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    logger.error('Update settings error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to update settings',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get active inventory alerts for supplier
+router.get('/alerts', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    let alertsQuery = `
+      SELECT 
+        ia.*,
+        p.name as product_name,
+        p.sku,
+        p.supplier_id,
+        s.contact_email,
+        w.name as warehouse_name
+      FROM inventory_alert ia
+      JOIN product p ON p.id = ia.product_id
+      JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN warehouse w ON w.id = ia.warehouse_id
+      WHERE ia.is_acknowledged = false
+    `;
+    
+    const queryParams = [];
+    
+    // For suppliers, only show their own products
+    if (req.userData.role === 'SUPPLIER') {
+      alertsQuery += ` AND s.contact_email = $1`;
+      queryParams.push(req.userData.email);
+    }
+    
+    alertsQuery += ` ORDER BY ia.created_at DESC LIMIT 50`;
+    
+    const { rows } = await query(alertsQuery, queryParams);
+    
+    res.json({
+      ok: true,
+      data: { alerts: rows },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get alerts error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get alerts',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Acknowledge an alert
+router.patch('/alerts/:alertId/acknowledge', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const { alertId } = req.params;
+    
+    // Verify ownership for suppliers
+    if (req.userData.role === 'SUPPLIER') {
+      const { rows: alerts } = await query(`
+        SELECT ia.*, s.contact_email
+        FROM inventory_alert ia
+        JOIN product p ON p.id = ia.product_id
+        JOIN supplier s ON s.id = p.supplier_id
+        WHERE ia.id = $1
+      `, [alertId]);
+      
+      if (alerts.length === 0) {
+        throw new NotFoundError('Alert not found');
+      }
+      
+      if (alerts[0].contact_email !== req.userData.email) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        });
+      }
+    }
+    
+    const { rows } = await query(`
+      UPDATE inventory_alert
+      SET is_acknowledged = true,
+          acknowledged_at = now(),
+          acknowledged_by = $1
+      WHERE id = $2
+      RETURNING *
+    `, [req.userSub, alertId]);
+    
+    if (rows.length === 0) {
+      throw new NotFoundError('Alert not found');
+    }
+    
+    res.json({
+      ok: true,
+      data: { alert: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Acknowledge alert error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to acknowledge alert',
       },
       requestId: req.requestId,
     });
