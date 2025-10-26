@@ -9,6 +9,7 @@ import { OrdersPage } from './pages/OrdersPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
 import { SuppliersPage } from './pages/SuppliersPage'
 import { RestaurantsPage } from './pages/RestaurantsPage'
+import { RestaurantDetailPage } from './pages/RestaurantDetailPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { CartPage } from './pages/CartPage'
 
@@ -64,6 +65,10 @@ const router = createBrowserRouter([
       {
         path: 'app/restaurants',
         element: <RestaurantsPage />,
+      },
+      {
+        path: 'app/restaurants/:id',
+        element: <RestaurantDetailPage />,
       },
       {
         path: 'app/settings',
