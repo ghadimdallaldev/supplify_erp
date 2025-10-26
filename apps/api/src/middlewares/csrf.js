@@ -17,6 +17,11 @@ export function csrfProtection(req, res, next) {
     return next();
   }
 
+  // Skip CSRF for API routes (handled by session cookies)
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+
   // Generate CSRF token if not exists
   if (!req.session.csrfToken) {
     req.session.csrfToken = randomBytes(32).toString('hex');
@@ -24,23 +29,6 @@ export function csrfProtection(req, res, next) {
 
   // Add CSRF token to response locals
   res.locals.csrfToken = req.session.csrfToken;
-
-  // For API requests, check CSRF token in header
-  if (req.path.startsWith('/api/')) {
-    const csrfToken = req.headers['x-csrf-token'];
-    
-    if (!csrfToken || csrfToken !== req.session.csrfToken) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Invalid CSRF token',
-        },
-        requestId: req.requestId,
-      });
-    }
-  }
 
   next();
 }
