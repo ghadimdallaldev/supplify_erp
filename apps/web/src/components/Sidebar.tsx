@@ -10,6 +10,7 @@ import {
   Settings,
   MessageSquare,
   ShoppingBag,
+  Truck,
 } from 'lucide-react'
 
 const navigation = [
@@ -46,8 +47,11 @@ export function Sidebar() {
     // Admins see Suppliers and Restaurants
     allNavigation = [...navigation, ...adminNavigation]
   } else if (isSupplier) {
-    // Suppliers see Restaurants
-    allNavigation = [...navigation, { name: 'Restaurants', href: '/app/restaurants', icon: Users }]
+    // Suppliers see Restaurants and Fulfillment
+    allNavigation = [...navigation, 
+      { name: 'Restaurants', href: '/app/restaurants', icon: Users },
+      { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck }
+    ]
   }
 
   return (

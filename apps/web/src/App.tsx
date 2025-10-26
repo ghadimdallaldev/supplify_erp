@@ -13,6 +13,7 @@ import { RestaurantDetailPage } from './pages/RestaurantDetailPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { CartPage } from './pages/CartPage'
 import { ChatPage } from './pages/ChatPage'
+import { FulfillmentPage } from './pages/FulfillmentPage'
 
 const router = createBrowserRouter([
   {
@@ -78,6 +79,10 @@ const router = createBrowserRouter([
       {
         path: 'app/chat',
         element: <ChatPage />,
+      },
+      {
+        path: 'app/fulfillment',
+        element: <FulfillmentPage />,
       },
     ],
   },
