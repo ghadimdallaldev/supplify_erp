@@ -79,7 +79,7 @@ router.get('/', requireAuth, async (req, res) => {
         });
       }
       
-      whereConditions.push(`oi.supplier_id = $${paramIndex}`);
+      whereConditions.push(`p.supplier_id = $${paramIndex}`);
       queryParams.push(suppliers[0].id);
       paramIndex++;
     }
@@ -94,7 +94,7 @@ router.get('/', requireAuth, async (req, res) => {
     
     // Supplier filter (for admin)
     if (params.supplier && req.userData.role === 'ADMIN') {
-      whereConditions.push(`oi.supplier_id = $${paramIndex}`);
+      whereConditions.push(`p.supplier_id = $${paramIndex}`);
       queryParams.push(params.supplier);
       paramIndex++;
     }
@@ -111,6 +111,7 @@ router.get('/', requireAuth, async (req, res) => {
       FROM customer_order o
       JOIN restaurant r ON r.id = o.restaurant_id
       LEFT JOIN order_item oi ON oi.order_id = o.id
+      LEFT JOIN product p ON p.id = oi.product_id
       ${whereClause}
       ORDER BY o.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -125,6 +126,7 @@ router.get('/', requireAuth, async (req, res) => {
       SELECT COUNT(DISTINCT o.id) as total
       FROM customer_order o
       LEFT JOIN order_item oi ON oi.order_id = o.id
+      LEFT JOIN product p ON p.id = oi.product_id
       ${whereClause}
     `;
     
