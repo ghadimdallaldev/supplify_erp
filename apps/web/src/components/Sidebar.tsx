@@ -11,6 +11,7 @@ import {
   MessageSquare,
   ShoppingBag,
   Truck,
+  Warehouse,
 } from 'lucide-react'
 
 const navigation = [
@@ -47,9 +48,10 @@ export function Sidebar() {
     // Admins see Suppliers and Restaurants
     allNavigation = [...navigation, ...adminNavigation]
   } else if (isSupplier) {
-    // Suppliers see Restaurants and Fulfillment
+    // Suppliers see Restaurants, Inventory, and Fulfillment
     allNavigation = [...navigation, 
       { name: 'Restaurants', href: '/app/restaurants', icon: Users },
+      { name: 'Inventory', href: '/app/inventory', icon: Warehouse },
       { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck }
     ]
   }
