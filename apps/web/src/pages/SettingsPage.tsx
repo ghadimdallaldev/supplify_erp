@@ -2,9 +2,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button'
 import { User, Mail, Shield, Bell } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
+import { SupplierSettingsPage } from './SupplierSettingsPage'
 
 export function SettingsPage() {
   const { user } = useAppSelector((state) => state.auth)
+
+  // Show supplier-specific settings for suppliers
+  if (user?.role === 'SUPPLIER') {
+    return <SupplierSettingsPage />
+  }
 
   return (
     <div className="space-y-6">
