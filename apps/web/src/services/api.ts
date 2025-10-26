@@ -217,6 +217,16 @@ export const api = createApi({
       }),
       invalidatesTags: ['Product'],
     }),
+
+    // Chat endpoints
+    getConversations: builder.query<any, void>({
+      query: () => '/api/chat/conversations',
+      providesTags: ['Product'],
+    }),
+    getMessages: builder.query<any, { conversationId: string }>({
+      query: ({ conversationId }) => `/api/chat/conversations/${conversationId}/messages`,
+      providesTags: ['Product'],
+    }),
   }),
 })
 
@@ -243,4 +253,6 @@ export const {
   useGetAuditLogsQuery,
   useGeneratePresignedUrlMutation,
   useAttachFileToProductMutation,
+  useGetConversationsQuery,
+  useGetMessagesQuery,
 } = api

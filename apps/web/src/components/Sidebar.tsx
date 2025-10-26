@@ -9,6 +9,7 @@ import {
   Building2,
   Settings,
   FileText,
+  MessageSquare,
 } from 'lucide-react'
 
 const navigation = [
@@ -16,6 +17,7 @@ const navigation = [
   { name: 'Products', href: '/app/products', icon: Package },
   { name: 'Orders', href: '/app/orders', icon: ShoppingCart },
   { name: 'Cart', href: '/app/cart', icon: FileText },
+  { name: 'Chat', href: '/app/chat', icon: MessageSquare },
 ]
 
 const adminNavigation = [
