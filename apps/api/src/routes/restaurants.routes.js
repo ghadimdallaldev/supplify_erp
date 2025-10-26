@@ -31,14 +31,63 @@ const restaurantListSchema = z.object({
   offset: z.string().transform(val => parseInt(val, 10)).default('0'),
 });
 
-// List restaurants (admin only)
-router.get('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+// List restaurants (admin sees all, suppliers see only their customer restaurants)
+router.get('/', requireAuth, async (req, res) => {
   try {
     const params = restaurantListSchema.parse(req.query);
     
     const whereConditions = [];
     const queryParams = [];
     let paramIndex = 1;
+    
+    // Role-based filtering
+    if (req.userData.role === 'SUPPLIER') {
+      // Suppliers see only restaurants that have ordered from them
+      const { rows: suppliers } = await query(
+        'SELECT id FROM supplier WHERE contact_email = $1',
+        [req.userData.email]
+      );
+      
+      if (suppliers.length === 0) {
+        // Return empty list if supplier record not found
+        return res.json({
+          ok: true,
+          data: {
+            restaurants: [],
+            pagination: {
+              total: 0,
+              limit: params.limit,
+              offset: params.offset,
+            },
+          },
+          error: null,
+          requestId: req.requestId,
+        });
+      }
+      
+      whereConditions.push(`
+        id IN (
+          SELECT DISTINCT o.restaurant_id 
+          FROM customer_order o
+          JOIN order_item oi ON oi.order_id = o.id
+          WHERE oi.supplier_id = $${paramIndex}
+        )
+      `);
+      queryParams.push(suppliers[0].id);
+      paramIndex++;
+    } else if (req.userData.role !== 'ADMIN') {
+      // Other roles (RESTAURANT) have no access
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Access denied',
+        },
+        requestId: req.requestId,
+      });
+    }
+    // Admin sees all (no additional filter)
     
     // Text search
     if (params.q) {
