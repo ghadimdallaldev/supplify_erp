@@ -27,6 +27,59 @@ export function RestaurantsPage() {
     offset: 0,
   })
 
+  // Supplier view: Show restaurants that purchased from this supplier
+  const restaurantsWithOrders = useMemo(() => {
+    if (!ordersData?.orders || !restaurantsData?.restaurants) return []
+    
+    // Get unique restaurant IDs from orders
+    const restaurantIds = new Set(
+      ordersData.orders
+        .filter(order => order.restaurant_id)
+        .map(order => order.restaurant_id)
+    )
+    
+    // Get restaurant details and order statistics
+    return Array.from(restaurantIds).map(restaurantId => {
+      const restaurant = restaurantsData.restaurants.find(r => r.id === restaurantId)
+      if (!restaurant) return null
+      
+      const restaurantOrders = ordersData.orders.filter(
+        order => order.restaurant_id === restaurantId
+      )
+      
+      const totalOrders = restaurantOrders.length
+      const totalSpent = restaurantOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
+      const latestOrder = restaurantOrders.sort((a, b) => 
+        new Date(b.placed_at || b.created_at).getTime() - new Date(a.placed_at || a.created_at).getTime()
+      )[0]
+      
+      // Get most purchased products
+      const productCount = new Map()
+      restaurantOrders.forEach(order => {
+        order.items?.forEach((item: any) => {
+          productCount.set(item.product_id, (productCount.get(item.product_id) || 0) + item.quantity)
+        })
+      })
+      
+      const mostPurchasedProduct = Array.from(productCount.entries())
+        .sort((a, b) => b[1] - a[1])[0]
+      
+      return {
+        ...restaurant,
+        totalOrders,
+        totalSpent,
+        latestOrder,
+        mostPurchasedProduct,
+      }
+    }).filter(Boolean)
+  }, [ordersData, restaurantsData])
+
+  // Filter by search
+  const filteredRestaurants = restaurantsWithOrders.filter(restaurant =>
+    restaurant?.name?.toLowerCase().includes(search.toLowerCase()) ||
+    restaurant?.contact_email?.toLowerCase().includes(search.toLowerCase())
+  )
+
   // If user is not a supplier, show all restaurants
   if (!isSupplier) {
     if (isLoading) {
@@ -110,59 +163,6 @@ export function RestaurantsPage() {
       </div>
     )
   }
-
-  // Supplier view: Show restaurants that purchased from this supplier
-  const restaurantsWithOrders = useMemo(() => {
-    if (!ordersData?.orders || !restaurantsData?.restaurants) return []
-    
-    // Get unique restaurant IDs from orders
-    const restaurantIds = new Set(
-      ordersData.orders
-        .filter(order => order.restaurant_id)
-        .map(order => order.restaurant_id)
-    )
-    
-    // Get restaurant details and order statistics
-    return Array.from(restaurantIds).map(restaurantId => {
-      const restaurant = restaurantsData.restaurants.find(r => r.id === restaurantId)
-      if (!restaurant) return null
-      
-      const restaurantOrders = ordersData.orders.filter(
-        order => order.restaurant_id === restaurantId
-      )
-      
-      const totalOrders = restaurantOrders.length
-      const totalSpent = restaurantOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
-      const latestOrder = restaurantOrders.sort((a, b) => 
-        new Date(b.placed_at || b.created_at).getTime() - new Date(a.placed_at || a.created_at).getTime()
-      )[0]
-      
-      // Get most purchased products
-      const productCount = new Map()
-      restaurantOrders.forEach(order => {
-        order.items?.forEach((item: any) => {
-          productCount.set(item.product_id, (productCount.get(item.product_id) || 0) + item.quantity)
-        })
-      })
-      
-      const mostPurchasedProduct = Array.from(productCount.entries())
-        .sort((a, b) => b[1] - a[1])[0]
-      
-      return {
-        ...restaurant,
-        totalOrders,
-        totalSpent,
-        latestOrder,
-        mostPurchasedProduct,
-      }
-    }).filter(Boolean)
-  }, [ordersData, restaurantsData])
-
-  // Filter by search
-  const filteredRestaurants = restaurantsWithOrders.filter(restaurant =>
-    restaurant?.name?.toLowerCase().includes(search.toLowerCase()) ||
-    restaurant?.contact_email?.toLowerCase().includes(search.toLowerCase())
-  )
 
   if (isLoading) {
     return (
