@@ -28,7 +28,15 @@ export function Sidebar() {
   const { user } = useAppSelector((state) => state.auth)
 
   const isAdmin = user?.role === 'ADMIN'
-  const allNavigation = isAdmin ? [...navigation, ...adminNavigation] : navigation
+  const isSupplier = user?.role === 'SUPPLIER'
+  
+  // Suppliers see "Restaurants" link, Admins see both "Suppliers" and "Restaurants"
+  let allNavigation = [...navigation]
+  if (isAdmin) {
+    allNavigation = [...navigation, ...adminNavigation]
+  } else if (isSupplier) {
+    allNavigation = [...navigation, { name: 'Restaurants', href: '/app/restaurants', icon: Users }]
+  }
 
   return (
     <div className="w-64 bg-white shadow-sm border-r">
