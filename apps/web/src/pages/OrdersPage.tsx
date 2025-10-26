@@ -110,9 +110,14 @@ export function OrdersPage() {
   }
 
   if (error) {
+    const errorMessage = (error as any)?.data?.error?.message || 'Failed to load orders'
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Failed to load orders</p>
+        <p className="text-red-600 text-lg font-semibold mb-2">Failed to load orders</p>
+        <p className="text-gray-600 text-sm">{errorMessage}</p>
+        <Button onClick={() => refetch()} className="mt-4">
+          Try Again
+        </Button>
       </div>
     )
   }

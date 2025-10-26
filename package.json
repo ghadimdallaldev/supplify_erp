@@ -1,7 +1,7 @@
 {
-  "name": "supplify-v2",
-  "version": "2.0.0",
-  "description": "Supplify v2 - Restaurant & F&B Supplier Marketplace",
+  "name": "supplify",
+  "version": "1.0.0",
+  "description": "Supplify - Restaurant & F&B Supplier Marketplace",
   "private": true,
   "type": "module",
   "scripts": {

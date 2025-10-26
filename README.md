@@ -1,4 +1,4 @@
-# Supplify v2
+# Supplify
 
 A modern restaurant & F&B supplier marketplace built with React, Node.js, and PostgreSQL.
 
