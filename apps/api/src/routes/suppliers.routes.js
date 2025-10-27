@@ -54,37 +54,29 @@ router.get('/', async (req, res) => {
       paramIndex++;
     }
     
-    // For restaurants, exclude blocklisted suppliers
-    let isFollowedSql = 'false as is_followed';
-    let paramIndexForFollow = paramIndex;
+    // Handle restaurant-specific filtering
+    let restaurantId = null;
     
     if (req.userData?.role === 'RESTAURANT' && req.userData.id) {
+      restaurantId = req.userData.id;
+      
+      // Exclude blocklisted suppliers
       whereConditions.push(`
         NOT EXISTS (
           SELECT 1 FROM supplier_blocklist sb
           WHERE sb.supplier_id = s.id AND sb.restaurant_id = $${paramIndex}
         )
       `);
-      queryParams.push(req.userData.id);
+      queryParams.push(restaurantId);
       paramIndex++;
-      
-      // Add follow check separately
-      paramIndexForFollow = paramIndex;
-      queryParams.push(req.userData.id);
-      paramIndex++;
-      
-      isFollowedSql = `EXISTS (
-        SELECT 1 FROM supplier_follow sf
-        WHERE sf.supplier_id = s.id 
-          AND sf.restaurant_id = $${paramIndexForFollow}
-      ) as is_followed`;
     }
     
     const whereClause = whereConditions.length > 0 
       ? `WHERE ${whereConditions.join(' AND ')}`
       : '';
     
-    const sql = `
+    // Build the SELECT with proper type handling
+    let sql = `
       SELECT 
         s.*,
         COALESCE(
@@ -97,12 +89,28 @@ router.get('/', async (req, res) => {
            WHERE p.supplier_id = s.id 
              AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)), 
           0
-        ) as avg_price,
-        ${isFollowedSql}
+        ) as avg_price
+    `;
+    
+    // Add follow status check for restaurants
+    if (restaurantId) {
+      sql += `,
+        EXISTS (
+          SELECT 1 FROM supplier_follow sf
+          WHERE sf.supplier_id = s.id 
+            AND sf.restaurant_id = $${paramIndex}
+        ) as is_followed`;
+      queryParams.push(restaurantId);
+      paramIndex++;
+    } else {
+      sql += `, false as is_followed`;
+    }
+    
+    sql += `
       FROM supplier s
       ${whereClause}
       ORDER BY s.created_at DESC
-      LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
     queryParams.push(params.limit, params.offset);
