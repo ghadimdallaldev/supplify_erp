@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
-import { FileText, DollarSign, Clock, CheckCircle, XCircle, Search, Filter, Download } from 'lucide-react'
+import { FileText, DollarSign, Clock, CheckCircle, XCircle, Search, Filter, Download, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   Dialog,
@@ -12,52 +12,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
+import { useAppSelector } from '../hooks/redux'
+import { useGetRestaurantInvoicesQuery, useGetRestaurantInvoiceQuery, useMarkInvoicePaidMutation } from '../services/api'
 
 export function InvoicesPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
+  
+  const { user } = useAppSelector((state) => state.auth)
+  const isRestaurant = user?.role === 'RESTAURANT'
+  
+  // Fetch invoices from database
+  const { data: invoicesData, isLoading, refetch } = useGetRestaurantInvoicesQuery({})
+  const { data: invoiceDetail, isLoading: isLoadingDetail } = useGetRestaurantInvoiceQuery(
+    selectedInvoice?.id || '',
+    { skip: !selectedInvoice?.id }
+  )
+  const [markPaid] = useMarkInvoicePaidMutation()
 
-  // Mock data - will be replaced with actual API calls
-  const invoices = [
-    {
-      id: '1',
-      invoice_number: 'INV-2024-10-001',
-      restaurant_name: 'Cafe Delight',
-      invoice_date: '2024-10-01',
-      due_date: '2024-10-31',
-      total_amount: 1250.00,
-      paid_amount: 0,
-      balance_due: 1250.00,
-      status: 'ISSUED',
-      currency: 'USD',
-    },
-    {
-      id: '2',
-      invoice_number: 'INV-2024-09-045',
-      restaurant_name: 'Burger Palace',
-      invoice_date: '2024-09-15',
-      due_date: '2024-10-15',
-      total_amount: 850.00,
-      paid_amount: 300.00,
-      balance_due: 550.00,
-      status: 'PARTIALLY_PAID',
-      currency: 'USD',
-    },
-    {
-      id: '3',
-      invoice_number: 'INV-2024-09-038',
-      restaurant_name: 'Fine Dining Restaurant',
-      invoice_date: '2024-09-10',
-      due_date: '2024-10-10',
-      total_amount: 2100.00,
-      paid_amount: 2100.00,
-      balance_due: 0,
-      status: 'PAID',
-      currency: 'USD',
-    },
-  ]
+  const invoices = invoicesData?.invoices || []
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -82,17 +57,48 @@ export function InvoicesPage() {
   }
 
   const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
-                         invoice.restaurant_name.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = invoice.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
+                         invoice.supplier_name?.toLowerCase().includes(search.toLowerCase()) ||
+                         invoice.restaurant_name?.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === 'ALL' || invoice.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
   const stats = {
     total: invoices.length,
-    unpaid: invoices.filter(i => i.status !== 'PAID').length,
-    overdue: invoices.filter(i => i.status === 'OVERDUE').length,
-    totalAmount: invoices.reduce((sum, i) => sum + i.total_amount, 0),
+    unpaid: invoices.filter(i => i.status !== 'PAID' && i.status !== 'VOID').length,
+    overdue: invoices.filter(i => i.status === 'OVERDUE' || (i.days_overdue && i.days_overdue > 0)).length,
+    totalAmount: invoices.reduce((sum, i) => sum + parseFloat(i.total_amount || 0), 0),
+  }
+
+  const handleRecordPayment = async () => {
+    if (!selectedInvoice) return
+    
+    try {
+      await markPaid({
+        invoiceId: selectedInvoice.id,
+        data: {
+          paymentDate: new Date().toISOString().split('T')[0],
+          paymentMethod: 'BANK_TRANSFER',
+          notes: 'Payment recorded',
+        }
+      }).unwrap()
+      
+      toast.success('Payment recorded successfully!')
+      setShowInvoiceDetail(false)
+      setSelectedInvoice(null)
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to record payment')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -203,10 +209,10 @@ export function InvoicesPage() {
                         <span className="ml-1">{invoice.status}</span>
                       </Badge>
                     </div>
-                    <p className="text-sm text-gray-600">{invoice.restaurant_name}</p>
+                    <p className="text-sm text-gray-600">{isRestaurant ? invoice.supplier_name : invoice.restaurant_name}</p>
                     <div className="flex gap-4 text-xs text-gray-500 mt-2">
-                      <span>Invoice Date: {invoice.invoice_date}</span>
-                      <span>Due Date: {invoice.due_date}</span>
+                      <span>Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
+                      <span>Due Date: {new Date(invoice.due_date).toLocaleDateString()}</span>
                       {invoice.order_id && (
                         <>
                           <span className="border-l pl-3">Order ID: {invoice.order_id.slice(0, 8)}...</span>
@@ -223,12 +229,12 @@ export function InvoicesPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-semibold">${invoice.total_amount.toFixed(2)}</p>
+                    <p className="text-lg font-semibold">${parseFloat(invoice.total_amount || 0).toFixed(2)}</p>
                     <p className="text-sm text-gray-600">
-                      Balance: ${invoice.balance_due.toFixed(2)}
+                      Balance: ${parseFloat(invoice.balance_due || 0).toFixed(2)}
                     </p>
                     <p className="text-xs text-green-600">
-                      Paid: ${invoice.paid_amount.toFixed(2)}
+                      Paid: ${parseFloat(invoice.total_paid || 0).toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -264,109 +270,119 @@ export function InvoicesPage() {
             </DialogDescription>
           </DialogHeader>
           
-          {selectedInvoice && (
+            {selectedInvoice && (
             <div className="space-y-6">
-              {/* Invoice Header */}
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold mb-2">Bill To:</h3>
-                  <p>{selectedInvoice.restaurant_name}</p>
-                  <p className="text-sm text-gray-600">123 Restaurant St</p>
-                  <p className="text-sm text-gray-600">City, State 12345</p>
+              {isLoadingDetail ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
-                <div className="text-right">
-                  <div className="mb-4">
-                    <p className="text-sm text-gray-600">Invoice Date</p>
-                    <p className="font-semibold">{selectedInvoice.invoice_date}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Due Date</p>
-                    <p className="font-semibold">{selectedInvoice.due_date}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Items */}
-              <div>
-                <h3 className="font-semibold mb-4">Items</h3>
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left py-2 px-3 text-sm font-medium">Description</th>
-                      <th className="text-right py-2 px-3 text-sm font-medium">Qty</th>
-                      <th className="text-right py-2 px-3 text-sm font-medium">Price</th>
-                      <th className="text-right py-2 px-3 text-sm font-medium">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="py-3 px-3">Fresh Tomatoes</td>
-                      <td className="py-3 px-3 text-right">50 kg</td>
-                      <td className="py-3 px-3 text-right">$10.00</td>
-                      <td className="py-3 px-3 text-right">$500.00</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3 px-3">Fresh Lettuce</td>
-                      <td className="py-3 px-3 text-right">30 kg</td>
-                      <td className="py-3 px-3 text-right">$8.00</td>
-                      <td className="py-3 px-3 text-right">$240.00</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Totals */}
-              <div className="ml-auto w-64">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal</span>
-                    <span>$740.00</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Tax (10%)</span>
-                    <span>$74.00</span>
-                  </div>
-                  <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
-                    <span>Total</span>
-                    <span>${selectedInvoice.total_amount.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment History */}
-              <div>
-                <h3 className="font-semibold mb-4">Payment History</h3>
-                <div className="space-y-2">
-                  {selectedInvoice.paid_amount > 0 ? (
-                    <>
-                      <div className="border rounded p-3">
-                        <div className="flex justify-between">
-                          <div>
-                            <p className="font-medium">Bank Transfer</p>
-                            <p className="text-sm text-gray-600">2024-10-20</p>
-                          </div>
-                          <span className="text-green-600">${selectedInvoice.paid_amount.toFixed(2)}</span>
-                        </div>
+              ) : invoiceDetail?.invoice ? (
+                <>
+                  {/* Invoice Header */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="font-semibold mb-2">{isRestaurant ? 'Bill From:' : 'Bill To:'}</h3>
+                      <p>{isRestaurant ? invoiceDetail.invoice.supplier_name : invoiceDetail.invoice.restaurant_name}</p>
+                      {invoiceDetail.invoice.supplier_address && (
+                        <p className="text-sm text-gray-600">{invoiceDetail.invoice.supplier_address}</p>
+                      )}
+                      {invoiceDetail.invoice.supplier_phone && (
+                        <p className="text-sm text-gray-600">{invoiceDetail.invoice.supplier_phone}</p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-600">Invoice Date</p>
+                        <p className="font-semibold">{new Date(invoiceDetail.invoice.invoice_date).toLocaleDateString()}</p>
                       </div>
-                      {selectedInvoice.balance_due > 0 && (
-                        <div className="border rounded p-3 bg-orange-50">
-                          <div className="flex justify-between">
-                            <div>
-                              <p className="font-medium">Outstanding Balance</p>
-                              <p className="text-sm text-gray-600">Due {selectedInvoice.due_date}</p>
+                      <div>
+                        <p className="text-sm text-gray-600">Due Date</p>
+                        <p className="font-semibold">{new Date(invoiceDetail.invoice.due_date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Items */}
+                  <div>
+                    <h3 className="font-semibold mb-4">Items</h3>
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left py-2 px-3 text-sm font-medium">Description</th>
+                          <th className="text-right py-2 px-3 text-sm font-medium">Qty</th>
+                          <th className="text-right py-2 px-3 text-sm font-medium">Price</th>
+                          <th className="text-right py-2 px-3 text-sm font-medium">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoiceDetail.lineItems?.map((item: any) => (
+                          <tr key={item.id} className="border-b">
+                            <td className="py-3 px-3">{item.description}</td>
+                            <td className="py-3 px-3 text-right">{item.quantity}</td>
+                            <td className="py-3 px-3 text-right">${parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                            <td className="py-3 px-3 text-right">${parseFloat(item.line_total || 0).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Totals */}
+                  <div className="ml-auto w-64">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Subtotal</span>
+                        <span>${parseFloat(invoiceDetail.invoice.subtotal || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Tax</span>
+                        <span>${parseFloat(invoiceDetail.invoice.tax_amount || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
+                        <span>Total</span>
+                        <span>${parseFloat(invoiceDetail.invoice.total_amount || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment History */}
+                  <div>
+                    <h3 className="font-semibold mb-4">Payment History</h3>
+                    <div className="space-y-2">
+                      {invoiceDetail.payments && invoiceDetail.payments.length > 0 ? (
+                        <>
+                          {invoiceDetail.payments.map((payment: any) => (
+                            <div key={payment.id} className="border rounded p-3">
+                              <div className="flex justify-between">
+                                <div>
+                                  <p className="font-medium">{payment.payment_method}</p>
+                                  <p className="text-sm text-gray-600">{new Date(payment.payment_date).toLocaleDateString()}</p>
+                                </div>
+                                <span className="text-green-600">${parseFloat(payment.payment_amount || 0).toFixed(2)}</span>
+                              </div>
                             </div>
-                            <span className="text-red-600">${selectedInvoice.balance_due.toFixed(2)}</span>
-                          </div>
+                          ))}
+                          {parseFloat(invoiceDetail.invoice.balance_due || 0) > 0 && (
+                            <div className="border rounded p-3 bg-orange-50">
+                              <div className="flex justify-between">
+                                <div>
+                                  <p className="font-medium">Outstanding Balance</p>
+                                  <p className="text-sm text-gray-600">Due {new Date(invoiceDetail.invoice.due_date).toLocaleDateString()}</p>
+                                </div>
+                                <span className="text-red-600">${parseFloat(invoiceDetail.invoice.balance_due || 0).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="border rounded p-3 bg-yellow-50">
+                          <p className="text-gray-600">No payments recorded</p>
                         </div>
                       )}
-                    </>
-                  ) : (
-                    <div className="border rounded p-3 bg-yellow-50">
-                      <p className="text-gray-600">No payments recorded</p>
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
+                </>
+              ) : null}
             </div>
           )}
 
@@ -375,7 +391,7 @@ export function InvoicesPage() {
               Close
             </Button>
             {selectedInvoice?.balance_due > 0 && (
-              <Button>Record Payment</Button>
+              <Button onClick={handleRecordPayment}>Record Payment</Button>
             )}
           </DialogFooter>
         </DialogContent>
