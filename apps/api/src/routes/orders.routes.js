@@ -859,13 +859,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const updateData = orderUpdateSchema.parse(req.body);
     
-    // Get order with supplier info from order items
+    // Get order
     const { rows: orders } = await query(`
-      SELECT DISTINCT o.*, oi.supplier_id
-      FROM customer_order o
-      JOIN order_item oi ON oi.order_id = o.id
-      WHERE o.id = $1
-      LIMIT 1
+      SELECT * FROM customer_order WHERE id = $1
     `, [id]);
     
     if (orders.length === 0) {
@@ -873,6 +869,16 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
     
     const order = orders[0];
+    
+    // Get supplier_id from order items (first item's supplier)
+    const { rows: firstItem } = await query(`
+      SELECT supplier_id FROM order_item WHERE order_id = $1 LIMIT 1
+    `, [id]);
+    
+    const supplier_id = firstItem.length > 0 ? firstItem[0].supplier_id : null;
+    
+    // Add supplier_id to order object for notification logic
+    order.supplier_id = supplier_id;
     
     // Check permissions based on role and status transition
     if (req.userData.role === 'RESTAURANT') {
