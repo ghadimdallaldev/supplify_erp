@@ -143,18 +143,23 @@ router.get('/', async (req, res) => {
     
     queryParams.push(params.limit, params.offset);
     
-    logger.info('Supplier query', { 
+    logger.info('Supplier query built', { 
       whereClause,
+      sql: sql.substring(0, 200) + '...',
       queryParams: queryParams.slice(0, -2) // Hide limit/offset
     });
     
     const { rows } = await query(sql, queryParams);
     
-    logger.info('Supplier query result', { 
-      count: rows.length,
-      totalSuppliers: rows.length,
-      suppliers: rows.map(s => s.name)
+    // Log each supplier separately to ensure they show up
+    rows.forEach((supplier, idx) => {
+      logger.info(`Supplier ${idx + 1}`, { 
+        id: supplier.id,
+        name: supplier.name,
+        email: supplier.contact_email
+      });
     });
+    logger.info('Supplier query complete', { total: rows.length });
     
     // Get total count
     const countSql = `SELECT COUNT(*) as total FROM supplier s ${whereClause}`;
