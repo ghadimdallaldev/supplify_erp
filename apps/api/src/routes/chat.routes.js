@@ -10,7 +10,6 @@ const router = express.Router();
 // Validation schemas
 const createConversationSchema = z.object({
   supplierId: z.string().uuid(),
-  restaurantId: z.string().uuid(),
 });
 
 const sendMessageSchema = z.object({
@@ -171,7 +170,10 @@ router.get('/conversations', requireAuth, async (req, res) => {
 // Get or create conversation
 router.post('/conversations', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT']), async (req, res) => {
   try {
-    const { supplierId, restaurantId } = createConversationSchema.parse(req.body);
+    const { supplierId } = createConversationSchema.parse(req.body);
+    
+    let resolvedSupplierId = supplierId;
+    let resolvedRestaurantId;
     
     // Verify that the user has permission to create this conversation
     if (req.userData.role === 'SUPPLIER') {
@@ -191,10 +193,23 @@ router.post('/conversations', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT'
           requestId: req.requestId,
         });
       }
+      
+      // For suppliers, they need to specify which restaurant to talk to
+      // But this endpoint is typically called by restaurants to talk to suppliers
+      // So we don't need to handle supplier creating conversations here
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_SUPPORTED',
+          message: 'Suppliers cannot create conversations this way',
+        },
+        requestId: req.requestId,
+      });
     } else if (req.userData.role === 'RESTAURANT') {
       const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1 AND id = $2',
-        [req.userData.email, restaurantId]
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
       );
       
       if (restaurants.length === 0) {
@@ -203,19 +218,53 @@ router.post('/conversations', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT'
           data: null,
           error: {
             name: 'FORBIDDEN',
-            message: 'You can only create conversations as yourself',
+            message: 'Restaurant not found',
           },
           requestId: req.requestId,
         });
       }
+      
+      // For restaurants, validate that they're trying to create a conversation with a valid supplier
+      const { rows: suppliers } = await query(
+        'SELECT id FROM supplier WHERE id = $1',
+        [supplierId]
+      );
+      
+      if (suppliers.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Supplier not found',
+          },
+          requestId: req.requestId,
+        });
+      }
+      
+      // Use the resolved restaurant ID
+      resolvedRestaurantId = restaurants[0].id;
+      resolvedSupplierId = supplierId;
+      
+      const conversation = await getOrCreateConversation(resolvedSupplierId, resolvedRestaurantId);
+      
+      res.status(201).json({
+        ok: true,
+        data: { conversation },
+        error: null,
+        requestId: req.requestId,
+      });
+      return;
     }
     
-    const conversation = await getOrCreateConversation(supplierId, restaurantId);
-    
-    res.status(201).json({
-      ok: true,
-      data: { conversation },
-      error: null,
+    // If we get here, the role is not supported
+    res.status(403).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'NOT_SUPPORTED',
+        message: 'Role not supported',
+      },
       requestId: req.requestId,
     });
   } catch (error) {

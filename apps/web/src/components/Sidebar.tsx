@@ -15,6 +15,7 @@ import {
   FileText,
   List,
   Package2,
+  PackageCheck,
 } from 'lucide-react'
 
 const navigation = [
@@ -29,6 +30,7 @@ const restaurantNavigation = [
   { name: 'Cart', href: '/app/cart', icon: ShoppingBag },
   { name: 'Suppliers', href: '/app/suppliers', icon: Building2 },
   { name: 'Inventory', href: '/app/restaurant-inventory', icon: Package2 },
+  { name: 'Receiving', href: '/app/receiving', icon: PackageCheck },
 ]
 
 const adminNavigation = [

@@ -46,25 +46,22 @@ export function SupplierDetailPage() {
   const supplier = data.supplier
 
   const handleSendMessage = async () => {
-    if (!user || !id || !restaurantsData?.restaurants) return
+    if (!user || !id) {
+      toast.error('User or supplier ID missing')
+      return
+    }
     
     try {
-      // Get restaurant ID from restaurants list
-      const restaurant = restaurantsData.restaurants[0]
-      if (!restaurant) {
-        toast.error('Restaurant not found')
-        return
-      }
-      
       // Create or get conversation
+      // The backend will automatically get the restaurant ID based on the logged-in user's email
       const result = await createConversation({
         supplierId: id,
-        restaurantId: restaurant.id,
       }).unwrap()
       
       toast.success('Opening conversation...')
-      navigate('/app/chat')
+      navigate(`/app/chat?conversation=${result.conversation.id}`)
     } catch (error: any) {
+      console.error('Create conversation error:', error)
       toast.error(error?.data?.error?.message || 'Failed to start conversation')
     }
   }

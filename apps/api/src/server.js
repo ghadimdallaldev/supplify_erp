@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -11,6 +12,7 @@ import { pool } from './lib/db.js';
 import { requestContext } from './middlewares/requestContext.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { csrfProtection } from './middlewares/csrf.js';
+import { initializeSocket } from './lib/socket.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { productsRoutes } from './routes/products.routes.js';
 import { pricesRoutes } from './routes/prices.routes.js';
@@ -27,6 +29,7 @@ import { paymentsRoutes } from './routes/payments.routes.js';
 import { quickListsRoutes } from './routes/quick-lists.routes.js';
 import { restaurantInventoryRoutes } from './routes/restaurant-inventory.routes.js';
 import { restaurantOnboardingRoutes } from './routes/restaurant-onboarding.routes.js';
+import { receivingRoutes } from './routes/receiving.routes.js';
 
 const app = express();
 
@@ -130,6 +133,7 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/quick-lists', quickListsRoutes);
 app.use('/api/restaurant-inventory', restaurantInventoryRoutes);
 app.use('/api/restaurant-onboarding', restaurantOnboardingRoutes);
+app.use('/api/receiving', receivingRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -149,7 +153,12 @@ app.use(errorHandler);
 
 // Start server
 const PORT = config.PORT || 4000;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+initializeSocket(server);
+
+server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${config.NODE_ENV}`);
   logger.info(`Web origin: ${config.WEB_ORIGIN}`);

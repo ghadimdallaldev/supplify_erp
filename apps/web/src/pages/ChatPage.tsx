@@ -1,16 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { io } from 'socket.io-client'
 import { useGetConversationsQuery, useGetMessagesQuery, useSendMessageMutation } from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { useAppSelector } from '../hooks/redux'
-import { MessageSquare, Send, Clock } from 'lucide-react'
+import { MessageSquare, Send, Clock, Building2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { Link } from 'react-router-dom'
 
 export function ChatPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const socketRef = useRef<any>(null)
 
   const { data: conversationsData, isLoading: conversationsLoading, refetch: refetchConversations } = useGetConversationsQuery()
 
@@ -21,17 +27,76 @@ export function ChatPage() {
 
   const [sendMessage, { isLoading: isSendingMessage }] = useSendMessageMutation()
 
+  // Initialize socket
+  useEffect(() => {
+    if (!socketRef.current) {
+      socketRef.current = io('http://localhost:4000', {
+        transports: ['websocket', 'polling'],
+        withCredentials: true,
+      })
+
+      socketRef.current.on('connect', () => {
+        console.log('Socket connected')
+      })
+
+      socketRef.current.on('disconnect', () => {
+        console.log('Socket disconnected')
+      })
+
+      socketRef.current.on('new_message', (data: any) => {
+        console.log('New message received:', data)
+        // Refetch messages to show the new message
+        refetchMessages()
+      })
+    }
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect()
+        socketRef.current = null
+      }
+    }
+  }, [])
+
+  // Auto-select conversation from URL params
+  useEffect(() => {
+    const conversationId = searchParams.get('conversation')
+    if (conversationId) {
+      setSelectedConversation(conversationId)
+    }
+  }, [searchParams])
+
+  // Join conversation when selected
+  useEffect(() => {
+    if (selectedConversation && socketRef.current) {
+      socketRef.current.emit('join_conversation', selectedConversation)
+      
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.emit('leave_conversation', selectedConversation)
+        }
+      }
+    }
+  }, [selectedConversation])
+
   const handleSendMessage = async () => {
-    if (!message.trim() || !selectedConversation) return
+    if (!message.trim() || !selectedConversation || !socketRef.current) return
     
     try {
+      // Save message to database
       await sendMessage({
         conversationId: selectedConversation,
         content: message.trim(),
       }).unwrap()
       
+      // Emit socket event for real-time broadcasting
+      socketRef.current.emit('send_message', {
+        conversationId: selectedConversation,
+        content: message.trim(),
+        senderId: user?.id,
+      })
+      
       setMessage('')
-      refetchMessages()
       refetchConversations()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to send message')
@@ -40,6 +105,16 @@ export function ChatPage() {
 
   const conversations = conversationsData?.conversations || []
   const messages = messagesData?.messages || []
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Chat Page Debug:', {
+      conversationsCount: conversations.length,
+      conversations,
+      selectedConversation,
+      messagesCount: messages.length,
+    })
+  }, [conversations, selectedConversation, messages])
 
   if (conversationsLoading) {
     return (
@@ -65,10 +140,19 @@ export function ChatPage() {
           <CardContent className="p-0">
             <div className="divide-y max-h-[calc(100vh-14rem)] overflow-y-auto">
               {conversations.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground space-y-2">
-                  <p>No conversations yet</p>
+                <div className="p-4 text-center text-sm text-muted-foreground space-y-3">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />
+                  <p className="font-medium">No conversations yet</p>
                   {user?.role === 'RESTAURANT' && (
-                    <p className="text-xs">Browse suppliers and click "Message" to start chatting</p>
+                    <>
+                      <p className="text-xs">Browse suppliers and click "Message" to start chatting</p>
+                      <Link to="/app/suppliers">
+                        <Button variant="outline" size="sm" className="mt-2">
+                          <Building2 className="h-4 w-4 mr-2" />
+                          Browse Suppliers
+                        </Button>
+                      </Link>
+                    </>
                   )}
                 </div>
               ) : (

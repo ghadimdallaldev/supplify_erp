@@ -21,6 +21,7 @@ import { SupplierSettingsPage } from './pages/SupplierSettingsPage'
 import { QuickListsPage } from './pages/QuickListsPage'
 import { RestaurantInventoryPage } from './pages/RestaurantInventoryPage'
 import { RestaurantOnboardingPage } from './pages/RestaurantOnboardingPage'
+import { ReceivingPage } from './pages/ReceivingPage'
 
 const router = createBrowserRouter([
   {
@@ -78,6 +79,10 @@ const router = createBrowserRouter([
       {
         path: 'app/onboarding',
         element: <RestaurantOnboardingPage />,
+      },
+      {
+        path: 'app/receiving',
+        element: <ReceivingPage />,
       },
       {
         path: 'app/suppliers',

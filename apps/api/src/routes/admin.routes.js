@@ -122,8 +122,8 @@ router.get('/audit', requireAuth, requireRole(['ADMIN']), async (req, res) => {
 
 // Get dashboard statistics (role-aware)
 router.get('/dashboard', requireAuth, async (req, res) => {
+  const userRole = req.userData.role;
   try {
-    const userRole = req.userData.role;
     let stats = {};
     
     if (userRole === 'ADMIN') {
@@ -213,22 +213,26 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         const restaurantId = restaurants[0].id;
         
         const [
+          { rows: totalProducts },
           { rows: totalOrders },
           { rows: pendingOrders },
           { rows: completedOrders },
           { rows: totalSpent },
         ] = await Promise.all([
+          query('SELECT COUNT(*) as count FROM product'),
           query('SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1', [restaurantId]),
           query("SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND status IN ('PLACED', 'CONFIRMED', 'FULFILLING')", [restaurantId]),
           query("SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND status = 'COMPLETED'", [restaurantId]),
-          query("SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE restaurant_id = $1 AND status = 'COMPLETED'", [restaurantId]),
+          query("SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE restaurant_id = $1", [restaurantId]),
         ]);
         
         stats = {
+          totalProducts: parseInt(totalProducts[0].count),
           totalOrders: parseInt(totalOrders[0].count),
           pendingOrders: parseInt(pendingOrders[0].count),
           completedOrders: parseInt(completedOrders[0].count),
           totalSpent: parseFloat(totalSpent[0].total),
+          totalRevenue: parseFloat(totalSpent[0].total), // Alias for frontend compatibility
         };
       }
     }
@@ -240,13 +244,19 @@ router.get('/dashboard', requireAuth, async (req, res) => {
       requestId: req.requestId,
     });
   } catch (error) {
-    logger.error('Get dashboard stats error:', error);
+    logger.error({ 
+      message: 'Get dashboard stats error',
+      error: error.message,
+      stack: error.stack,
+      userRole
+    });
     res.status(500).json({
       ok: false,
       data: null,
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to get dashboard statistics',
+        details: error.message,
       },
       requestId: req.requestId,
     });

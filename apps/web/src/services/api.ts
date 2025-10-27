@@ -61,7 +61,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap,
-  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat'],
+  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving'],
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
@@ -270,7 +270,7 @@ export const api = createApi({
       query: ({ conversationId }) => `/api/chat/conversations/${conversationId}/messages`,
       providesTags: ['Chat'],
     }),
-    createConversation: builder.mutation<any, { supplierId: string; restaurantId: string }>({
+    createConversation: builder.mutation<any, { supplierId: string }>({
       query: (body) => ({
         url: '/api/chat/conversations',
         method: 'POST',
@@ -314,6 +314,23 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['RestaurantInventory'],
+    }),
+    // Receiving endpoints
+    getPendingOrdersForReceiving: builder.query<any, void>({
+      query: () => '/api/receiving/pending-orders',
+      providesTags: ['Receiving'],
+    }),
+    getReceivingHistory: builder.query<any, void>({
+      query: () => '/api/receiving/history',
+      providesTags: ['Receiving'],
+    }),
+    createReceivingReport: builder.mutation<any, any>({
+      query: (body) => ({
+        url: '/api/receiving/receive',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Receiving', 'RestaurantInventory'],
     }),
 
     // Quick Lists endpoints
@@ -409,4 +426,7 @@ export const {
   useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
   useAdjustRestaurantInventoryMutation,
+  useGetPendingOrdersForReceivingQuery,
+  useGetReceivingHistoryQuery,
+  useCreateReceivingReportMutation,
 } = api

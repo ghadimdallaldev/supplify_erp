@@ -305,6 +305,57 @@ router.get('/', requireAuth, async (req, res) => {
     
     const { rows } = await query(sql, queryParams);
     
+    // Get items for each order
+    const orderIds = rows.map(order => order.id);
+    let items = [];
+    if (orderIds.length > 0) {
+      try {
+        logger.info({ 
+          message: 'Fetching items for orders',
+          orderIds,
+          count: orderIds.length 
+        });
+        
+        const { rows: itemsRows } = await query(`
+          SELECT 
+            oi.*,
+            p.name as product_name,
+            p.sku as product_sku
+          FROM order_item oi
+          JOIN product p ON p.id = oi.product_id
+          WHERE oi.order_id = ANY($1)
+        `, [orderIds]);
+        
+        items = itemsRows;
+        logger.info({ 
+          message: 'Fetched order items',
+          count: items.length 
+        });
+      } catch (itemError) {
+        logger.error({ 
+          message: 'Failed to fetch order items',
+          error: itemError.message,
+          stack: itemError.stack 
+        });
+        // Continue without items if query fails
+      }
+    }
+    
+    // Group items by order_id
+    const itemsByOrder = {};
+    items.forEach(item => {
+      if (!itemsByOrder[item.order_id]) {
+        itemsByOrder[item.order_id] = [];
+      }
+      itemsByOrder[item.order_id].push(item);
+    });
+    
+    // Attach items to each order
+    const ordersWithItems = rows.map(order => ({
+      ...order,
+      items: itemsByOrder[order.id] || []
+    }));
+    
     // Get total count for pagination
     const countSql = `
       SELECT COUNT(DISTINCT o.id) as total
@@ -320,7 +371,7 @@ router.get('/', requireAuth, async (req, res) => {
     res.json({
       ok: true,
       data: {
-        orders: rows,
+        orders: ordersWithItems,
         pagination: {
           total: parseInt(countRows[0].total),
           limit: params.limit,
@@ -344,13 +395,18 @@ router.get('/', requireAuth, async (req, res) => {
       });
     }
     
-    logger.error('List orders error:', error);
+    logger.error({ 
+      message: 'List orders error',
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({
       ok: false,
       data: null,
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to list orders',
+        details: error.message,
       },
       requestId: req.requestId,
     });
