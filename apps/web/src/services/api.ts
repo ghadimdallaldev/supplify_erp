@@ -62,7 +62,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap,
-  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance'],
+  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification'],
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
@@ -444,6 +444,41 @@ export const api = createApi({
       query: () => '/api/restaurant-finance/overdue',
       providesTags: ['RestaurantFinance'],
     }),
+
+    // Notification endpoints
+    getNotifications: builder.query<any, any>({
+      query: (params) => ({
+        url: '/api/notifications',
+        params,
+      }),
+      providesTags: ['Notification'],
+    }),
+    getNotificationPreferences: builder.query<any, void>({
+      query: () => '/api/notifications/preferences',
+      providesTags: ['Notification'],
+    }),
+    updateNotificationPreferences: builder.mutation<any, any>({
+      query: (data) => ({
+        url: '/api/notifications/preferences',
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['Notification'],
+    }),
+    markNotificationRead: builder.mutation<any, string>({
+      query: (id) => ({
+        url: `/api/notifications/${id}/read`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Notification'],
+    }),
+    markAllNotificationsRead: builder.mutation<any, void>({
+      query: () => ({
+        url: '/api/notifications/read-all',
+        method: 'POST',
+      }),
+      invalidatesTags: ['Notification'],
+    }),
   }),
 })
 
@@ -501,4 +536,9 @@ export const {
   useGetSupplierStatementQuery,
   useGetRestaurantExpensesQuery,
   useGetOverdueInvoicesQuery,
+  useGetNotificationsQuery,
+  useGetNotificationPreferencesQuery,
+  useUpdateNotificationPreferencesMutation,
+  useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation,
 } = api
