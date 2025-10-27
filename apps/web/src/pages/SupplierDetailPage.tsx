@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import { useGetSupplierQuery } from '../services/api'
+import { useGetSupplierQuery, useGetProductsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -14,6 +14,13 @@ export function SupplierDetailPage() {
   const isRestaurant = user?.role === 'RESTAURANT'
   
   const { data, isLoading, error } = useGetSupplierQuery(id!)
+  
+  // Fetch products for this supplier
+  const { data: productsData, isLoading: isLoadingProducts } = useGetProductsQuery({
+    supplier: id,
+    limit: 50,
+    offset: 0,
+  })
 
   if (isLoading) {
     return (
@@ -131,7 +138,7 @@ export function SupplierDetailPage() {
           <Button asChild>
             <Link to={`/app/products?supplier=${supplier.id}`}>
               <Package className="h-4 w-4 mr-2" />
-              View Products
+              View All Products
             </Link>
           </Button>
           <Button variant="outline" asChild>
@@ -142,6 +149,58 @@ export function SupplierDetailPage() {
           </Button>
         </div>
       )}
+
+      {/* Products List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Package className="h-5 w-5" />
+            <span>Products ({productsData?.products.length || 0})</span>
+          </CardTitle>
+          <CardDescription>
+            Browse products from this supplier
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingProducts ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : productsData?.products.length === 0 ? (
+            <div className="text-center py-12">
+              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No products available from this supplier</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {productsData?.products.slice(0, 6).map((product: any) => (
+                <div key={product.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-medium">{product.name}</h4>
+                    {product.category && (
+                      <Badge variant="secondary">{product.category}</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{product.sku}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">
+                      ${product.current_price ? parseFloat(product.current_price).toFixed(2) : 'N/A'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Stock: {product.available_qty || 0}
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" className="w-full mt-3" asChild>
+                    <Link to={`/app/products/${product.id}`}>
+                      View Details
+                    </Link>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
