@@ -22,6 +22,7 @@ import {
 export function ProductsPage() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState('')
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -57,10 +58,26 @@ export function ProductsPage() {
   // Fetch warehouses for warehouse selection
   const { data: warehousesData } = useGetWarehousesQuery()
   
+  // Get unique suppliers from products
+  const supplierMap = new Map()
+  data?.products?.forEach(p => {
+    if (p.supplier_name && p.supplier_email) {
+      supplierMap.set(p.supplier_email, { name: p.supplier_name, email: p.supplier_email })
+    }
+  })
+  const uniqueSuppliers = Array.from(supplierMap.values())
+  
   // Filter products to show only supplier's products if user is a supplier
-  const filteredProducts = isSupplier 
+  let filteredProducts = isSupplier 
     ? data?.products.filter(p => p.supplier_email === user?.email)
-    : data?.products
+    : data?.products || []
+  
+  // Apply supplier filter for restaurants
+  if (!isSupplier && supplierFilter) {
+    filteredProducts = filteredProducts.filter(p => 
+      p.supplier_name?.toLowerCase().includes(supplierFilter.toLowerCase())
+    )
+  }
 
   const handleAddToCart = (product: any) => {
     dispatch(addItem({
@@ -342,29 +359,64 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
         </div>
       </div>
 
-      <div className="flex space-x-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search products..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
+      <div className="flex flex-col gap-4">
+        <div className="flex space-x-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search products..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
+          {!isSupplier && (
+            <div className="w-56">
+              <select
+                value={supplierFilter}
+                onChange={(e) => setSupplierFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
+              >
+                <option value="">All Suppliers</option>
+                {uniqueSuppliers.map((supplier: any) => (
+                  <option key={supplier.email} value={supplier.name}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">All Categories</option>
+            <option value="Vegetables">Vegetables</option>
+            <option value="Meat">Meat</option>
+            <option value="Grains">Grains</option>
+            <option value="Oils">Oils</option>
+          </select>
         </div>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="">All Categories</option>
-          <option value="Vegetables">Vegetables</option>
-          <option value="Meat">Meat</option>
-          <option value="Grains">Grains</option>
-          <option value="Oils">Oils</option>
-        </select>
+        
+        {/* Filter Summary */}
+        {(supplierFilter || category) && !isSupplier && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-gray-600">Filtered by:</span>
+            {supplierFilter && (
+              <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => setSupplierFilter('')}>
+                Supplier: {supplierFilter}
+              </Badge>
+            )}
+            {category && (
+              <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => setCategory('')}>
+                Category: {category}
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
