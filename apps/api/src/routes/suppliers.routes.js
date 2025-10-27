@@ -73,24 +73,36 @@ router.get('/', async (req, res) => {
     const sql = `
       SELECT 
         s.*,
-        COALESCE(COUNT(DISTINCT p.id), 0) as product_count,
-        COALESCE(AVG(pr.amount), 0) as avg_price,
-        EXISTS (
+        COALESCE(
+          (SELECT COUNT(DISTINCT p.id) FROM product p WHERE p.supplier_id = s.id), 
+          0
+        ) as product_count,
+        COALESCE(
+          (SELECT AVG(pr.amount) FROM product p 
+           JOIN price pr ON pr.product_id = p.id 
+           WHERE p.supplier_id = s.id 
+             AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)), 
+          0
+        ) as avg_price,
+        ${req.userData?.role === 'RESTAURANT' && req.userData.id 
+          ? `EXISTS (
           SELECT 1 FROM supplier_follow sf
           WHERE sf.supplier_id = s.id 
             AND sf.restaurant_id = $${paramIndex}
-        ) as is_followed
+        ) as is_followed` 
+          : 'false as is_followed'}
       FROM supplier s
-      LEFT JOIN product p ON p.supplier_id = s.id
-      LEFT JOIN price pr ON pr.product_id = p.id 
-        AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
       ${whereClause}
-      GROUP BY s.id
       ORDER BY s.created_at DESC
       LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
     `;
     
-    queryParams.push(req.userData?.id || null, params.limit, params.offset);
+    if (req.userData?.role === 'RESTAURANT' && req.userData.id) {
+      queryParams.push(req.userData.id);
+      paramIndex++;
+    }
+    
+    queryParams.push(params.limit, params.offset);
     
     const { rows } = await query(sql, queryParams);
     
@@ -126,13 +138,18 @@ router.get('/', async (req, res) => {
       });
     }
     
-    logger.error('List suppliers error:', error);
+    logger.error({ 
+      message: 'List suppliers error',
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({
       ok: false,
       data: null,
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to list suppliers',
+        details: error.message,
       },
       requestId: req.requestId,
     });
