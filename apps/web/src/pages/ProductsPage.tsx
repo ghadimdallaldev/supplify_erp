@@ -462,18 +462,24 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   <p className="text-sm text-gray-600">{product.supplier_name || 'N/A'}</p>
                 </td>
                 <td className="px-4 py-4">
-                  <p className="font-semibold">
-                    ${product.current_price?.toFixed(2) || 'N/A'}
-                  </p>
-                  {product.unit && (
-                    <p className="text-xs text-gray-500">per {product.unit}</p>
+                  {product.current_price ? (
+                    <>
+                      <p className="font-semibold">
+                        ${parseFloat(product.current_price).toFixed(2)}
+                      </p>
+                      {product.unit && (
+                        <p className="text-xs text-gray-500">per {product.unit}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-400">N/A</p>
                   )}
                 </td>
                 <td className="px-4 py-4">
                   <p className={`text-sm font-medium ${
-                    (product.available_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
+                    parseFloat(product.available_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {product.available_qty || 0} {product.unit || 'units'}
+                    {parseFloat(product.available_qty || 0).toFixed(2)} {product.unit || 'units'}
                   </p>
                 </td>
                 <td className="px-4 py-4">

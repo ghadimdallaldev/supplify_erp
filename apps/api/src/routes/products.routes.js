@@ -76,15 +76,21 @@ router.get('/', async (req, res) => {
         s.name as supplier_name,
         s.slug as supplier_slug,
         s.contact_email as supplier_email,
-        i.available_qty,
+        COALESCE(SUM(i.available_qty), 0) as available_qty,
         pr.amount as current_price,
-        pr.currency
+        pr.currency,
+        p.unit
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN inventory i ON i.product_id = p.id
-      LEFT JOIN price pr ON pr.product_id = p.id 
-        AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+      LEFT JOIN (
+        SELECT DISTINCT ON (product_id) product_id, amount, currency
+        FROM price
+        WHERE valid_to IS NULL OR now() BETWEEN valid_from AND valid_to
+        ORDER BY product_id, created_at DESC
+      ) pr ON pr.product_id = p.id
       ${whereClause}
+      GROUP BY p.id, p.sku, p.name, p.name_ar, p.description, p.description_ar, p.brand, p.category, p.image_url, p.unit, p.supplier_id, p.created_at, p.updated_at, s.name, s.slug, s.contact_email, pr.amount, pr.currency
       ORDER BY p.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
