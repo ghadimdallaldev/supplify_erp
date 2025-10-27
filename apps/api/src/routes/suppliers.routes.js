@@ -57,6 +57,12 @@ router.get('/', async (req, res) => {
     // Handle restaurant-specific filtering
     let restaurantId = null;
     
+    logger.info('Supplier list request', { 
+      hasUserData: !!req.userData,
+      role: req.userData?.role,
+      email: req.userData?.email 
+    });
+    
     if (req.userData?.role === 'RESTAURANT') {
       try {
         // Get restaurant ID from database using email
@@ -64,6 +70,11 @@ router.get('/', async (req, res) => {
           'SELECT id FROM restaurant WHERE contact_email = $1',
           [req.userData.email]
         );
+        
+        logger.info('Restaurant lookup result', { 
+          found: restaurants.length,
+          restaurantId: restaurants[0]?.id 
+        });
         
         if (restaurants.length > 0) {
           restaurantId = restaurants[0].id;
@@ -131,7 +142,17 @@ router.get('/', async (req, res) => {
     
     queryParams.push(params.limit, params.offset);
     
+    logger.info('Supplier query', { 
+      whereClause,
+      queryParams: queryParams.slice(0, -2) // Hide limit/offset
+    });
+    
     const { rows } = await query(sql, queryParams);
+    
+    logger.info('Supplier query result', { 
+      count: rows.length,
+      firstSupplier: rows[0]?.name 
+    });
     
     // Get total count
     const countSql = `SELECT COUNT(*) as total FROM supplier s ${whereClause}`;
