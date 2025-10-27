@@ -28,6 +28,78 @@ const orderListSchema = z.object({
   offset: z.string().transform(val => parseInt(val, 10)).default('0'),
 });
 
+// Helper function to create invoice from delivered order
+async function createInvoiceFromOrder(order, orderItems, supplierId, client) {
+  try {
+    // Check if invoice already exists for this order
+    const { rows: existingInvoices } = await client.query(`
+      SELECT id FROM invoice WHERE order_id = $1
+    `, [order.id]);
+    
+    if (existingInvoices.length > 0) {
+      logger.info('Invoice already exists for order', { orderId: order.id });
+      return null;
+    }
+    
+    // Generate invoice number
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+    
+    // Calculate due date (30 days from delivery)
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+    
+    // Calculate total amount
+    let totalAmount = 0;
+    for (const item of orderItems) {
+      const lineTotal = parseFloat(item.unit_price) * parseFloat(item.quantity);
+      totalAmount += lineTotal;
+    }
+    
+    // Create invoice
+    const { rows: invoices } = await client.query(`
+      INSERT INTO invoice (
+        supplier_id, restaurant_id, order_id, invoice_number,
+        issue_date, due_date, status, total_amount, amount_due,
+        currency, tax_amount, discount_amount, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, 'ISSUED', $7, $7, 'USD', 0, 0, NULL)
+      RETURNING *
+    `, [supplierId, order.restaurant_id, order.id, invoiceNumber, new Date(), dueDate, totalAmount]);
+    
+    const invoice = invoices[0];
+    
+    // Create invoice line items
+    for (const item of orderItems) {
+      const lineTotal = parseFloat(item.unit_price) * parseFloat(item.quantity);
+      
+      await client.query(`
+        INSERT INTO invoice_line_item (
+          invoice_id, product_id, description, quantity, unit_price, line_total
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        invoice.id,
+        item.product_id,
+        item.notes || `Product ordered`,
+        item.quantity,
+        item.unit_price,
+        lineTotal
+      ]);
+    }
+    
+    logger.info('Invoice created from order', {
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoice_number,
+      orderId: order.id,
+      totalAmount
+    });
+    
+    return invoice;
+  } catch (error) {
+    logger.error('Error creating invoice from order', { error: error.message, orderId: order.id });
+    // Don't throw - invoice creation is non-critical
+    return null;
+  }
+}
+
 // Helper function to handle order delivery and update restaurant inventory
 async function handleOrderDelivery(orderId, userData, res) {
   try {
@@ -48,7 +120,7 @@ async function handleOrderDelivery(orderId, userData, res) {
       
       // Get order items
       const { rows: orderItems } = await client.query(`
-        SELECT oi.*, p.supplier_id
+        SELECT oi.*, p.supplier_id, p.name as product_name
         FROM order_item oi
         JOIN product p ON p.id = oi.product_id
         WHERE oi.order_id = $1
@@ -96,6 +168,9 @@ async function handleOrderDelivery(orderId, userData, res) {
           `, [order.restaurant_id, item.product_id, item.quantity]);
         }
       }
+      
+      // Create invoice from delivered order
+      const invoice = await createInvoiceFromOrder(order, orderItems, supplierId, client);
       
       logger.info('Order delivered and restaurant inventory updated', { 
         orderId: order.id,

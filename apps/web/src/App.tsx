@@ -15,6 +15,8 @@ import { CartPage } from './pages/CartPage'
 import { ChatPage } from './pages/ChatPage'
 import { FulfillmentPage } from './pages/FulfillmentPage'
 import { InventoryPage } from './pages/InventoryPage'
+import { InvoicesPage } from './pages/InvoicesPage'
+import { SupplierSettingsPage } from './pages/SupplierSettingsPage'
 
 const router = createBrowserRouter([
   {
@@ -88,6 +90,14 @@ const router = createBrowserRouter([
       {
         path: 'app/inventory',
         element: <InventoryPage />,
+      },
+      {
+        path: 'app/invoices',
+        element: <InvoicesPage />,
+      },
+      {
+        path: 'app/supplier-settings',
+        element: <SupplierSettingsPage />,
       },
     ],
   },
