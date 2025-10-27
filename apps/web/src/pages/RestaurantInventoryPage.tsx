@@ -28,20 +28,25 @@ export function RestaurantInventoryPage() {
   const [supplierFilter, setSupplierFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [showAdjustDialog, setShowAdjustDialog] = useState(false)
+  const [showAddProductDialog, setShowAddProductDialog] = useState(false)
+  const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false)
   const [adjustingItem, setAdjustingItem] = useState<any>(null)
   const [adjustQuantity, setAdjustQuantity] = useState('')
   const [adjustReason, setAdjustReason] = useState('')
   const [adjustType, setAdjustType] = useState<'ADD' | 'SUBTRACT'>('SUBTRACT')
   const [pinnedItems, setPinnedItems] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState('inventory')
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [addQuantity, setAddQuantity] = useState('')
+  const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
 
   const { data, isLoading, error } = useGetRestaurantInventoryQuery()
   const { data: historyData, isLoading: isLoadingHistory } = useGetRestaurantInventoryHistoryQuery({ limit: 50 })
   const [addInventory] = useAddRestaurantInventoryMutation()
   const [adjustInventory] = useAdjustRestaurantInventoryMutation()
 
-  const inventory = data?.data?.inventory || []
-  const history = historyData?.data?.history || []
+  const inventory = data?.inventory || []
+  const history = historyData?.history || []
 
   const handlePinToggle = (productId: string) => {
     const newPinned = new Set(pinnedItems)
@@ -213,9 +218,21 @@ export function RestaurantInventoryPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        <p className="text-gray-600 mt-2">Track your stock levels and manage inventory</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
+          <p className="text-gray-600 mt-2">Track your stock levels and manage inventory</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowBulkUploadDialog(true)} variant="outline">
+            <Upload className="h-4 w-4 mr-2" />
+            Bulk Upload
+          </Button>
+          <Button onClick={() => setShowAddProductDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -423,6 +440,19 @@ export function RestaurantInventoryPage() {
                             <Badge variant="outline" className="text-xs">
                               Suggested
                             </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs"
+                              onClick={() => {
+                                toast.success('Adding to cart...', {
+                                  duration: 2000,
+                                })
+                                // TODO: Navigate to products page with search pre-filled
+                              }}
+                            >
+                              Order
+                            </Button>
                           </div>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -600,6 +630,142 @@ export function RestaurantInventoryPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add Product Dialog */}
+      <Dialog open={showAddProductDialog} onOpenChange={setShowAddProductDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Product to Inventory</DialogTitle>
+            <DialogDescription>
+              Manually add a product to your inventory
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="product">Select Product</Label>
+              <p className="text-sm text-gray-500 mb-2">
+                This feature requires API integration with product search
+              </p>
+              <Input
+                id="product"
+                placeholder="Start typing product name or SKU..."
+                value={selectedProductId}
+                onChange={(e) => setSelectedProductId(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="quantity">Initial Quantity</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="0"
+                step="0.01"
+                value={addQuantity}
+                onChange={(e) => setAddQuantity(e.target.value)}
+                placeholder="Enter quantity"
+              />
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Tip:</strong> You can also add products by receiving orders 
+                or importing from a CSV file.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowAddProductDialog(false)
+              setSelectedProductId('')
+              setAddQuantity('')
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                toast.info('Manual product addition coming soon')
+                setShowAddProductDialog(false)
+              }}
+              disabled={!selectedProductId || !addQuantity}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Upload Dialog */}
+      <Dialog open={showBulkUploadDialog} onOpenChange={setShowBulkUploadDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Bulk Upload Inventory</DialogTitle>
+            <DialogDescription>
+              Import inventory items from a CSV or Excel file
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="file">Upload File</Label>
+              <Input
+                id="file"
+                type="file"
+                accept=".csv,.xlsx"
+                onChange={(e) => setBulkUploadFile(e.target.files?.[0] || null)}
+              />
+              <p className="text-sm text-gray-500 mt-2">
+                Accepted formats: CSV, Excel (.xlsx)
+              </p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <p className="text-sm text-blue-800">
+                <strong>CSV Format Example:</strong>
+                <br />
+                Product SKU,Quantity,Notes
+                <br />
+                TOM-001,50,Weekly supply
+                <br />
+                LET-001,30,Fresh produce
+              </p>
+            </div>
+
+            {bulkUploadFile && (
+              <div className="border rounded-md p-3 bg-gray-50">
+                <p className="text-sm font-medium text-gray-700">
+                  Selected: {bulkUploadFile.name}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Size: {(bulkUploadFile.size / 1024).toFixed(2)} KB
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowBulkUploadDialog(false)
+              setBulkUploadFile(null)
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                toast.success('Bulk upload feature coming soon')
+                setShowBulkUploadDialog(false)
+              }}
+              disabled={!bulkUploadFile}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

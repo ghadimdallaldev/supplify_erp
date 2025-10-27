@@ -199,14 +199,14 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
 
       // Update restaurant inventory if item is accepted and has quantity
       if (item.quality_status === 'ACCEPTED' && parseFloat(item.received_quantity || 0) > 0) {
-        const { rows: existingInventory } = await query(`
+        const { rows: existingInventory } = await client.query(`
           SELECT * FROM restaurant_inventory 
           WHERE restaurant_id = $1 AND product_id = $2
         `, [restaurantId, item.productId]);
 
         if (existingInventory.length > 0) {
           // Update existing inventory
-          await query(`
+          await client.query(`
             UPDATE restaurant_inventory 
             SET quantity = quantity + $1,
                 last_restocked_at = now(),
@@ -215,7 +215,7 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
           `, [item.received_quantity, existingInventory[0].id]);
         } else {
           // Create new inventory entry
-          await query(`
+          await client.query(`
             INSERT INTO restaurant_inventory (
               restaurant_id, product_id, quantity, last_restocked_at
             )
@@ -224,7 +224,7 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         }
 
         // Add inventory movement log
-        await query(`
+        await client.query(`
           INSERT INTO inventory_movement_log (
             restaurant_id, product_id, type, quantity, reason, reference_id, reference_type
           )
