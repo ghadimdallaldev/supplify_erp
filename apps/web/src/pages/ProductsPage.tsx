@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetProductsQuery, useCreateProductMutation, useGeneratePresignedUrlMutation, useGetWarehousesQuery } from '../services/api'
+import { useGetProductsQuery, useCreateProductMutation, useGeneratePresignedUrlMutation, useGetWarehousesQuery, useGetSuppliersQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -67,14 +67,15 @@ export function ProductsPage() {
     skip: !isSupplier // Skip if not a supplier
   })
   
-  // Get unique suppliers from products
-  const supplierMap = new Map()
-  data?.products?.forEach(p => {
-    if (p.supplier_name && p.supplier_email) {
-      supplierMap.set(p.supplier_email, { name: p.supplier_name, email: p.supplier_email })
-    }
+  // Fetch all suppliers for restaurants (for filter dropdown)
+  const { data: suppliersData } = useGetSuppliersQuery({ limit: 100 }, {
+    skip: isSupplier // Skip if supplier
   })
-  const uniqueSuppliers = Array.from(supplierMap.values())
+  
+  // Use API suppliers if available, otherwise fall back to unique suppliers from products
+  const uniqueSuppliers = isSupplier
+    ? []  // Suppliers don't need supplier filter
+    : (suppliersData?.suppliers?.map(s => ({ name: s.name, email: s.contact_email })) || [])
   
   // Filter products to show only supplier's products if user is a supplier
   let filteredProducts = isSupplier 
