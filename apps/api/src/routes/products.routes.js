@@ -38,15 +38,17 @@ router.get('/', async (req, res) => {
     
     // Check if user is a restaurant to show custom pricing
     let restaurantId = null;
-    if (req.headers.authorization && req.userData) {
-      try {
-        const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [req.userData.email]);
+    try {
+      // Only check if there's auth token
+      if (req.user && req.user.email) {
+        const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [req.user.email]);
         if (rows.length > 0) {
           restaurantId = rows[0].id;
         }
-      } catch (e) {
-        // Not a restaurant, continue with standard pricing
       }
+    } catch (e) {
+      // Not authenticated or not a restaurant, continue with standard pricing
+      restaurantId = null;
     }
     
     const whereConditions = [];

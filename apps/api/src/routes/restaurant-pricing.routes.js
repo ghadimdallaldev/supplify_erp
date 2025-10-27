@@ -13,30 +13,23 @@ const createPricingSchema = z.object({
   productId: z.string().uuid(),
   price: z.number().positive(),
   currency: z.string().default('USD'),
-  pricingTierId: z.string().uuid().optional(),
   contractDiscountPercentage: z.number().min(0).max(100).optional(),
   contractStartDate: z.string().optional(),
   contractEndDate: z.string().optional(),
-  pricingType: z.enum(['CONTRACT', 'VOLUME', 'RELATIONSHIP', 'CUSTOM']).default('CONTRACT'),
+  agreementType: z.enum(['VOLUME', 'RELATIONSHIP', 'CUSTOM', 'SPECIAL']).default('CUSTOM'),
+  minOrderQuantity: z.number().nonnegative().optional(),
   notes: z.string().optional(),
 });
 
 const updatePricingSchema = z.object({
   price: z.number().positive().optional(),
-  pricingTierId: z.string().uuid().optional(),
   contractDiscountPercentage: z.number().min(0).max(100).optional(),
   contractStartDate: z.string().optional(),
   contractEndDate: z.string().optional(),
-  pricingType: z.enum(['CONTRACT', 'VOLUME', 'RELATIONSHIP', 'CUSTOM']).optional(),
+  agreementType: z.enum(['VOLUME', 'RELATIONSHIP', 'CUSTOM', 'SPECIAL']).optional(),
+  minOrderQuantity: z.number().nonnegative().optional(),
   isActive: z.boolean().optional(),
   notes: z.string().optional(),
-});
-
-const createPricingTierSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  minOrderValue: z.number().nonnegative().optional(),
-  discountPercentage: z.number().min(0).max(100).optional(),
 });
 
 // SUPPLIER ENDPOINTS - Manage restaurant-specific pricing
