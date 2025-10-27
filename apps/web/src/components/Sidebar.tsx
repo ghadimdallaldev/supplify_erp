@@ -27,6 +27,7 @@ const navigation = [
 const restaurantNavigation = [
   { name: 'Quick Lists', href: '/app/quick-lists', icon: List },
   { name: 'Cart', href: '/app/cart', icon: ShoppingBag },
+  { name: 'Suppliers', href: '/app/suppliers', icon: Building2 },
   { name: 'Inventory', href: '/app/restaurant-inventory', icon: Package2 },
 ]
 
