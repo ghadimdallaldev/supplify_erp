@@ -288,6 +288,21 @@ export const api = createApi({
       }),
       invalidatesTags: ['QuickList'],
     }),
+    addItemToQuickList: builder.mutation<any, { quickListId: string; body: any }>({
+      query: ({ quickListId, body }) => ({
+        url: `/api/quick-lists/${quickListId}/items`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['QuickList'],
+    }),
+    removeItemFromQuickList: builder.mutation<any, { quickListId: string; itemId: string }>({
+      query: ({ quickListId, itemId }) => ({
+        url: `/api/quick-lists/${quickListId}/items/${itemId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['QuickList'],
+    }),
   }),
 })
 
@@ -324,4 +339,6 @@ export const {
   useCreateQuickListMutation,
   useUpdateQuickListMutation,
   useDeleteQuickListMutation,
+  useAddItemToQuickListMutation,
+  useRemoveItemFromQuickListMutation,
 } = api

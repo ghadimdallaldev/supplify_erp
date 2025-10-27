@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetQuickListsQuery, useCreateQuickListMutation, useDeleteQuickListMutation, useGetProductsQuery } from '../services/api'
+import { useGetQuickListsQuery, useCreateQuickListMutation, useDeleteQuickListMutation, useGetProductsQuery, useAddItemToQuickListMutation } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -31,6 +31,7 @@ export function QuickListsPage() {
   const { data: productsData } = useGetProductsQuery({ limit: 1000 })
   const [createQuickList] = useCreateQuickListMutation()
   const [deleteQuickList] = useDeleteQuickListMutation()
+  const [addItemToQuickList] = useAddItemToQuickListMutation()
 
   const handleCreateList = async () => {
     if (!newListName.trim()) {
@@ -59,12 +60,24 @@ export function QuickListsPage() {
     setShowProductDialog(true)
   }
 
-  const handleAddProductToList = (product: any) => {
+  const handleAddProductToList = async (product: any) => {
     if (!selectedListId) return
     
-    // TODO: Implement API call to add product to list
-    toast.success(`Added ${product.name} to list!`)
-    // After implementation, refresh list and close dialog
+    try {
+      await addItemToQuickList({
+        quickListId: selectedListId,
+        body: {
+          productId: product.id,
+          supplierId: product.supplier_id,
+          quantity: 1,
+          notes: ''
+        }
+      }).unwrap()
+      toast.success(`Added ${product.name} to list!`)
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to add product')
+    }
   }
 
   const filteredProducts = productsData?.products?.filter((product: any) =>
