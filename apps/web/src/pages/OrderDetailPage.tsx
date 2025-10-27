@@ -303,7 +303,7 @@ export function OrderDetailPage() {
                             <span className="font-medium">Quantity:</span> {item.quantity}
                           </div>
                           <div>
-                            <span className="font-medium">Unit Price:</span> ${item.unit_price?.toFixed(2) || '0.00'}
+                            <span className="font-medium">Unit Price:</span> ${formatPrice(item.unit_price)}
                           </div>
                           {item.supplier_name && (
                             <div>
@@ -319,10 +319,10 @@ export function OrderDetailPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold text-primary">
-                          ${item.line_total?.toFixed(2) || '0.00'}
+                          ${formatPrice(item.line_total)}
                         </p>
                         <p className="text-sm text-gray-600">
-                          {item.quantity} × ${item.unit_price?.toFixed(2) || '0.00'}
+                          {item.quantity} × ${formatPrice(item.unit_price)}
                         </p>
                       </div>
                     </div>
@@ -508,8 +508,8 @@ export function OrderDetailPage() {
                             <td className="py-3 px-3 text-sm">{item.product_name}</td>
                             <td className="py-3 px-3 text-sm text-gray-600">{item.product_sku}</td>
                             <td className="py-3 px-3 text-sm text-right">{item.quantity}</td>
-                            <td className="py-3 px-3 text-sm text-right">${item.unit_price?.toFixed(2) || '0.00'}</td>
-                            <td className="py-3 px-3 text-sm text-right font-medium">${item.line_total?.toFixed(2) || '0.00'}</td>
+                            <td className="py-3 px-3 text-sm text-right">${formatPrice(item.unit_price)}</td>
+                            <td className="py-3 px-3 text-sm text-right font-medium">${formatPrice(item.line_total)}</td>
                           </tr>
                         ))}
                       </tbody>

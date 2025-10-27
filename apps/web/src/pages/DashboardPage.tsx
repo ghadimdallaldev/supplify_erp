@@ -24,111 +24,74 @@ export function DashboardPage() {
 
   // Debug: Show what we have
   console.log('Dashboard stats:', stats)
+  console.log('Dashboard isLoading:', isLoading)
+  console.log('Dashboard error:', error)
+  console.log('Dashboard data keys:', stats ? Object.keys(stats) : 'no stats')
 
-  const statCards: any[] = []
+  // Always show default cards, then add stats if available
+  const statCards: any[] = [
+    {
+      title: 'All Products',
+      value: stats?.totalProducts ?? 0,
+      icon: Package,
+      description: 'Products available',
+    },
+    {
+      title: 'My Orders',
+      value: stats?.totalOrders ?? 0,
+      icon: ShoppingCart,
+      description: 'Orders placed',
+    },
+    {
+      title: 'Pending Orders',
+      value: stats?.pendingOrders ?? 0,
+      icon: TrendingUp,
+      description: 'Orders in progress',
+    },
+    {
+      title: 'Completed Orders',
+      value: stats?.completedOrders ?? 0,
+      icon: Package,
+      description: 'Orders completed',
+    }
+  ]
   
-  // If no stats from API, show default cards
-  if (!stats || Object.keys(stats).length === 0) {
-    statCards.push(
-      {
-        title: 'Total Products',
-        value: 0,
-        icon: Package,
-        description: 'Products in catalog',
-      },
-      {
-        title: 'Total Orders',
-        value: 0,
-        icon: ShoppingCart,
-        description: 'Orders placed',
-      },
-      {
-        title: 'Pending Orders',
-        value: 0,
-        icon: TrendingUp,
-        description: 'Orders in progress',
-      },
-      {
-        title: 'Completed Orders',
-        value: 0,
-        icon: Package,
-        description: 'Orders completed',
-      }
-    )
-  } else {
-    // Add stats based on what's available from API
-    if (stats?.totalProducts !== undefined) {
-      statCards.push({
-        title: 'Total Products',
-        value: stats.totalProducts,
-        icon: Package,
-        description: 'Products in catalog',
-      })
-    }
-    
-    if (stats?.totalOrders !== undefined) {
-      statCards.push({
-        title: 'Total Orders',
-        value: stats.totalOrders,
-        icon: ShoppingCart,
-        description: 'Orders placed',
-      })
-    }
-    
-    if (stats?.pendingOrders !== undefined) {
-      statCards.push({
-        title: 'Pending Orders',
-        value: stats.pendingOrders,
-        icon: TrendingUp,
-        description: 'Orders in progress',
-      })
-    }
-    
-    if (stats?.completedOrders !== undefined) {
-      statCards.push({
-        title: 'Completed Orders',
-        value: stats.completedOrders,
-        icon: Package,
-        description: 'Orders completed',
-      })
-    }
-    
-    // Add role-specific cards (admin)
-    if (stats?.totalSuppliers !== undefined) {
-      statCards.push({
-        title: 'Total Suppliers',
-        value: stats.totalSuppliers,
-        icon: Building2,
-        description: 'Active suppliers',
-      })
-    }
+  // Add Total Spent for restaurants
+  if (stats?.totalSpent !== undefined && stats.totalSpent > 0) {
+    statCards.push({
+      title: 'Total Spent',
+      value: `$${stats.totalSpent.toFixed(2)}`,
+      icon: DollarSign,
+      description: 'Amount spent',
+    })
+  }
+  
+  // Add role-specific cards if present
+  if (stats?.totalSuppliers !== undefined) {
+    statCards.push({
+      title: 'Total Suppliers',
+      value: stats.totalSuppliers,
+      icon: Building2,
+      description: 'Active suppliers',
+    })
+  }
 
-    if (stats?.totalRestaurants !== undefined) {
-      statCards.push({
-        title: 'Total Restaurants',
-        value: stats.totalRestaurants,
-        icon: Users,
-        description: 'Active restaurants',
-      })
-    }
+  if (stats?.totalRestaurants !== undefined) {
+    statCards.push({
+      title: 'Total Restaurants',
+      value: stats.totalRestaurants,
+      icon: Users,
+      description: 'Active restaurants',
+    })
+  }
 
-    if (stats?.totalRevenue !== undefined) {
-      statCards.push({
-        title: 'Total Revenue',
-        value: `$${stats.totalRevenue.toLocaleString()}`,
-        icon: DollarSign,
-        description: 'Platform revenue',
-      })
-    }
-
-    if (stats?.totalSpent !== undefined) {
-      statCards.push({
-        title: 'Total Spent',
-        value: `$${stats.totalSpent.toLocaleString()}`,
-        icon: DollarSign,
-        description: 'Amount spent',
-      })
-    }
+  if (stats?.totalRevenue !== undefined && stats.totalRevenue !== stats.totalSpent) {
+    statCards.push({
+      title: 'Total Revenue',
+      value: `$${stats.totalRevenue.toLocaleString()}`,
+      icon: DollarSign,
+      description: 'Platform revenue',
+    })
   }
 
   return (

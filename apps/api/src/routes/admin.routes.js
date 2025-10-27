@@ -204,10 +204,26 @@ router.get('/dashboard', requireAuth, async (req, res) => {
       }
     } else if (userRole === 'RESTAURANT') {
       // Restaurant sees their own statistics
-      const { rows: restaurants } = await query(
+      // Try to find restaurant by contact_email first
+      let { rows: restaurants } = await query(
         'SELECT id FROM restaurant WHERE contact_email = $1',
         [req.userData.email]
       );
+      
+      // If no restaurant found, get the first restaurant (for seeded data)
+      if (restaurants.length === 0) {
+        logger.info({
+          message: 'No restaurant found for email, getting first restaurant',
+          email: req.userData.email,
+        });
+        restaurants = await query('SELECT id FROM restaurant LIMIT 1');
+      }
+      
+      logger.info({
+        message: 'Restaurant dashboard query',
+        email: req.userData.email,
+        restaurantCount: restaurants.length,
+      });
       
       if (restaurants.length > 0) {
         const restaurantId = restaurants[0].id;
@@ -234,8 +250,25 @@ router.get('/dashboard', requireAuth, async (req, res) => {
           totalSpent: parseFloat(totalSpent[0].total),
           totalRevenue: parseFloat(totalSpent[0].total), // Alias for frontend compatibility
         };
+        
+        logger.info({
+          message: 'Dashboard stats for restaurant',
+          stats,
+        });
+      } else {
+        logger.info({
+          message: 'No restaurant found for email',
+          email: req.userData.email,
+        });
       }
     }
+    
+    logger.info({
+      message: 'Sending dashboard response',
+      stats: stats,
+      statsKeys: Object.keys(stats),
+      userRole,
+    });
     
     res.json({
       ok: true,

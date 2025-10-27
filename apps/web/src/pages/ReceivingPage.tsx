@@ -126,7 +126,7 @@ export function ReceivingPage() {
                             <p className="font-medium">{item.product_name}</p>
                             <p className="text-sm text-muted-foreground">{item.sku} • Qty: {item.ordered_quantity} {item.unit}</p>
                           </div>
-                          <p className="font-medium">${(item.unit_price || 0).toFixed(2)}</p>
+                          <p className="font-medium">${typeof item.unit_price === 'number' ? item.unit_price.toFixed(2) : parseFloat(item.unit_price || 0).toFixed(2)}</p>
                         </div>
                       ))}
                     </div>

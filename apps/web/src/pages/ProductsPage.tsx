@@ -5,7 +5,8 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { Label } from '../components/ui/label'
-import { Package, Search, Plus, Upload, Download } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
+import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
 import { addItem } from '../features/cart/cartSlice'
@@ -25,10 +26,16 @@ export function ProductsPage() {
   const [supplierFilter, setSupplierFilter] = useState('')
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [showInventoryAdjustment, setShowInventoryAdjustment] = useState(false)
+  const [selectedProductForAdjustment, setSelectedProductForAdjustment] = useState<any>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [uploadPreview, setUploadPreview] = useState<any[]>([])
   const [productImage, setProductImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [adjustmentType, setAdjustmentType] = useState<'ADD' | 'REMOVE'>('ADD')
+  const [adjustmentQuantity, setAdjustmentQuantity] = useState('')
+  const [adjustmentReason, setAdjustmentReason] = useState('')
+  const [adjustmentNotes, setAdjustmentNotes] = useState('')
   const [productForm, setProductForm] = useState({
     name: '',
     sku: '',
@@ -495,16 +502,28 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                       </Button>
                     )}
                     {isSupplier && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          // TODO: Implement edit product
-                          toast.info('Edit product functionality coming soon')
-                        }}
-                      >
-                        Edit
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedProductForAdjustment(product)
+                            setShowInventoryAdjustment(true)
+                          }}
+                        >
+                          <TrendingUp className="h-4 w-4 mr-1" />
+                          Adjust Stock
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            toast.info('Edit product functionality coming soon')
+                          }}
+                        >
+                          Edit
+                        </Button>
+                      </>
                     )}
                     <Button variant="outline" size="sm" asChild>
                       <Link to={`/app/products/${product.id}`}>
@@ -786,6 +805,126 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               disabled={!uploadedFile || uploadPreview.length === 0 || isCreating}
             >
               {isCreating ? 'Uploading...' : 'Upload Products'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inventory Adjustment Dialog */}
+      <Dialog open={showInventoryAdjustment} onOpenChange={setShowInventoryAdjustment}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Adjust Stock</DialogTitle>
+            <DialogDescription>
+              {adjustmentType === 'ADD' ? 'Add' : 'Remove'} stock for {selectedProductForAdjustment?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label>Adjustment Type</Label>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  type="button"
+                  variant={adjustmentType === 'ADD' ? 'default' : 'outline'}
+                  onClick={() => setAdjustmentType('ADD')}
+                  className="flex-1"
+                >
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Add Stock
+                </Button>
+                <Button
+                  type="button"
+                  variant={adjustmentType === 'REMOVE' ? 'default' : 'outline'}
+                  onClick={() => setAdjustmentType('REMOVE')}
+                  className="flex-1"
+                >
+                  <TrendingDown className="h-4 w-4 mr-2" />
+                  Remove Stock
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="0"
+                step="0.01"
+                value={adjustmentQuantity}
+                onChange={(e) => setAdjustmentQuantity(e.target.value)}
+                placeholder="Enter quantity"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="reason">Reason</Label>
+              <select
+                id="reason"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                value={adjustmentReason}
+                onChange={(e) => setAdjustmentReason(e.target.value)}
+              >
+                <option value="">Select a reason</option>
+                <option value="STOCK_TAKE">Stock Take / Count</option>
+                <option value="DAMAGE">Damage / Spoilage</option>
+                <option value="RETURN">Return</option>
+                <option value="ADJUSTMENT">Manual Adjustment</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <textarea
+                id="notes"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                rows={3}
+                value={adjustmentNotes}
+                onChange={(e) => setAdjustmentNotes(e.target.value)}
+                placeholder="Additional notes (optional)"
+              />
+            </div>
+
+            {selectedProductForAdjustment && (
+              <div className="bg-gray-50 p-4 rounded-md">
+                <p className="text-sm font-medium text-gray-700">Current Stock</p>
+                <p className="text-lg font-semibold text-green-600">
+                  {parseFloat(selectedProductForAdjustment.available_qty || 0).toFixed(2)} {selectedProductForAdjustment.unit || 'units'}
+                </p>
+                {adjustmentQuantity && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    New Stock: {(parseFloat(selectedProductForAdjustment.available_qty || 0) + (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity)).toFixed(2)} {selectedProductForAdjustment.unit || 'units'}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowInventoryAdjustment(false)
+              setSelectedProductForAdjustment(null)
+              setAdjustmentQuantity('')
+              setAdjustmentReason('')
+              setAdjustmentNotes('')
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                toast.success(`Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`)
+                setShowInventoryAdjustment(false)
+                setSelectedProductForAdjustment(null)
+                setAdjustmentQuantity('')
+                setAdjustmentReason('')
+                setAdjustmentNotes('')
+                // TODO: Implement API call to update inventory
+              }}
+              disabled={!adjustmentQuantity || !adjustmentReason}
+            >
+              {adjustmentType === 'ADD' ? 'Add' : 'Remove'} Stock
             </Button>
           </DialogFooter>
         </DialogContent>

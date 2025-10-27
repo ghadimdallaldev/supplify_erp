@@ -56,10 +56,10 @@ export function Sidebar() {
     // Admins see Suppliers and Restaurants
     allNavigation = [...navigation, ...adminNavigation]
   } else if (isSupplier) {
-    // Suppliers see Restaurants, Inventory, Fulfillment, and Invoices
+    // Suppliers see Restaurants, Products (with inventory), Fulfillment, and Invoices
     allNavigation = [...navigation, 
       { name: 'Restaurants', href: '/app/restaurants', icon: Users },
-      { name: 'Inventory', href: '/app/inventory', icon: Warehouse },
+      { name: 'Products', href: '/app/products', icon: Warehouse },
       { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck },
       { name: 'Invoices', href: '/app/invoices', icon: FileText }
     ]
