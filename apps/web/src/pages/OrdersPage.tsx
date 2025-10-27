@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetOrdersQuery, useUpdateOrderMutation, useCreateManualOrderMutation, useGetRestaurantsQuery } from '../services/api'
+import { useGetOrdersQuery, useUpdateOrderMutation, useCreateManualOrderMutation, useGetRestaurantsQuery, useGetProductsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -32,9 +32,11 @@ export function OrdersPage() {
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState('all')
   const [showManualOrderDialog, setShowManualOrderDialog] = useState(false)
+  const [showProductSelection, setShowProductSelection] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState('')
   const [orderNotes, setOrderNotes] = useState('')
-  const [manualOrderItems, setManualOrderItems] = useState<Array<{ productId: string; quantity: number; notes?: string }>>([])
+  const [productSearch, setProductSearch] = useState('')
+  const [manualOrderItems, setManualOrderItems] = useState<Array<{ productId: string; quantity: number; notes?: string; productName?: string; price?: number }>>([])
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
   
@@ -45,8 +47,74 @@ export function OrdersPage() {
   })
   
   const { data: restaurantsData } = useGetRestaurantsQuery()
+  const { data: productsData } = useGetProductsQuery({ limit: 1000 })
   const [updateOrder] = useUpdateOrderMutation()
   const [createManualOrder, { isLoading: isCreatingManualOrder }] = useCreateManualOrderMutation()
+
+  const handleAddProductToOrder = (product: any) => {
+    const existingItem = manualOrderItems.find(item => item.productId === product.id)
+    if (existingItem) {
+      setManualOrderItems(manualOrderItems.map(item =>
+        item.productId === product.id
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ))
+    } else {
+      setManualOrderItems([...manualOrderItems, {
+        productId: product.id,
+        quantity: 1,
+        productName: product.name,
+        price: product.price
+      }])
+    }
+  }
+
+  const handleUpdateQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      setManualOrderItems(manualOrderItems.filter(item => item.productId !== productId))
+    } else {
+      setManualOrderItems(manualOrderItems.map(item =>
+        item.productId === productId
+          ? { ...item, quantity }
+          : item
+      ))
+    }
+  }
+
+  const handleCreateOrder = async () => {
+    if (!selectedRestaurant) {
+      toast.error('Please select a restaurant')
+      return
+    }
+
+    if (manualOrderItems.length === 0) {
+      toast.error('Please add at least one product to the order')
+      return
+    }
+
+    try {
+      await createManualOrder({
+        restaurant_id: selectedRestaurant,
+        items: manualOrderItems,
+        notes: orderNotes
+      }).unwrap()
+      
+      toast.success('Order created successfully!')
+      setShowManualOrderDialog(false)
+      setShowProductSelection(false)
+      setSelectedRestaurant('')
+      setOrderNotes('')
+      setManualOrderItems([])
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to create order')
+    }
+  }
+
+  const filteredProducts = productsData?.products?.filter((product: any) =>
+    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    product.sku?.toLowerCase().includes(productSearch.toLowerCase())
+  )
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -368,12 +436,50 @@ export function OrdersPage() {
                 />
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> Product selection will be available in the next step.
-                  For now, use the existing order interface to create a complete order.
-                </p>
-              </div>
+              {/* Products in Order */}
+              {manualOrderItems.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Products in Order</Label>
+                  <div className="border rounded-md divide-y">
+                    {manualOrderItems.map((item) => (
+                      <div key={item.productId} className="flex items-center justify-between p-3">
+                        <div className="flex-1">
+                          <p className="font-medium">{item.productName}</p>
+                          <p className="text-sm text-gray-600">${item.price?.toFixed(2)} each</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
+                          >
+                            -
+                          </Button>
+                          <span className="w-12 text-center">{item.quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Products Button */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowProductSelection(true)}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Products
+              </Button>
             </div>
 
             <DialogFooter>
@@ -383,33 +489,14 @@ export function OrdersPage() {
                   setShowManualOrderDialog(false)
                   setSelectedRestaurant('')
                   setOrderNotes('')
+                  setManualOrderItems([])
                 }}
               >
                 Cancel
               </Button>
               <Button
-                disabled={!selectedRestaurant || isCreatingManualOrder}
-                onClick={async () => {
-                  if (!selectedRestaurant) {
-                    toast.error('Please select a restaurant')
-                    return
-                  }
-
-                  // For now, show a message that this feature is coming soon
-                  toast.success('Manual order creation is coming soon! Use the existing order flow for now.')
-                  setShowManualOrderDialog(false)
-                  
-                  // TODO: Implement full order creation with product selection
-                  // const order = await createManualOrder({
-                  //   restaurant_id: selectedRestaurant,
-                  //   items: manualOrderItems,
-                  //   notes: orderNotes
-                  // }).unwrap()
-                  
-                  // toast.success('Order created successfully!')
-                  // setShowManualOrderDialog(false)
-                  // refetch()
-                }}
+                disabled={!selectedRestaurant || manualOrderItems.length === 0 || isCreatingManualOrder}
+                onClick={handleCreateOrder}
               >
                 {isCreatingManualOrder ? 'Creating...' : 'Create Order'}
               </Button>
@@ -417,6 +504,71 @@ export function OrdersPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Product Selection Dialog */}
+      <Dialog open={showProductSelection} onOpenChange={setShowProductSelection}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select Products</DialogTitle>
+            <DialogDescription>
+              Search and add products to the order
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search products..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Product List */}
+            <div className="border rounded-md max-h-96 overflow-y-auto divide-y">
+              {filteredProducts?.map((product: any) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between p-4 hover:bg-gray-50"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium">{product.name}</p>
+                    <p className="text-sm text-gray-600">{product.sku}</p>
+                    <p className="text-sm font-semibold text-green-600">
+                      ${product.price?.toFixed(2)} / {product.unit}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      handleAddProductToOrder(product)
+                      toast.success(`Added ${product.name} to order`)
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              ))}
+
+              {(!filteredProducts || filteredProducts.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  No products found
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowProductSelection(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
