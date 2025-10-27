@@ -24,6 +24,7 @@ import { adminRoutes } from './routes/admin.routes.js';
 import { chatRoutes } from './routes/chat.routes.js';
 import { invoicesRoutes } from './routes/invoices.routes.js';
 import { paymentsRoutes } from './routes/payments.routes.js';
+import { quickListsRoutes } from './routes/quick-lists.routes.js';
 
 const app = express();
 
@@ -124,6 +125,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/invoices', invoicesRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/quick-lists', quickListsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
