@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
 import { 
   Building2,
   Users,
@@ -13,7 +14,9 @@ import {
   Settings,
   FileText,
   Phone,
-  Mail
+  Mail,
+  Plus,
+  Trash2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -27,6 +30,57 @@ export function RestaurantOnboardingPage() {
   const [taxId, setTaxId] = useState('')
   const [vatNumber, setVatNumber] = useState('')
   const [deliveryInstructions, setDeliveryInstructions] = useState('')
+  
+  // Team state
+  const [showAddMemberDialog, setShowAddMemberDialog] = useState(false)
+  const [showAddBranchDialog, setShowAddBranchDialog] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [branches, setBranches] = useState<any[]>([])
+  const [newMember, setNewMember] = useState({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
+  const [newBranch, setNewBranch] = useState({ name: '', phone: '', address: '', deliveryInstructions: '' })
+  
+  // Notification state
+  const [notifications, setNotifications] = useState({
+    email: true,
+    sms: false,
+    push: true,
+    orderUpdates: true,
+    newMessages: true,
+    invoiceReminders: true,
+    lowStock: false
+  })
+
+  const handleAddMember = () => {
+    if (!newMember.name || !newMember.email) {
+      toast.error('Please fill in name and email')
+      return
+    }
+    
+    setTeamMembers([...teamMembers, { ...newMember, id: Date.now() }])
+    setNewMember({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
+    setShowAddMemberDialog(false)
+    toast.success('Team member added!')
+  }
+
+  const handleAddBranch = () => {
+    if (!newBranch.name) {
+      toast.error('Please fill in branch name')
+      return
+    }
+    
+    setBranches([...branches, { ...newBranch, id: Date.now() }])
+    setNewBranch({ name: '', phone: '', address: '', deliveryInstructions: '' })
+    setShowAddBranchDialog(false)
+    toast.success('Branch added!')
+  }
+
+  const handleSaveNotifications = () => {
+    toast.success('Notification preferences saved!')
+  }
+
+  const handleToggleNotification = (key: string) => {
+    setNotifications({ ...notifications, [key]: !notifications[key as keyof typeof notifications] })
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -131,15 +185,42 @@ export function RestaurantOnboardingPage() {
                   <CardTitle>Team Members</CardTitle>
                   <CardDescription>Manage your team contacts</CardDescription>
                 </div>
-                <Button>Add Member</Button>
+                <Button onClick={() => setShowAddMemberDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Member
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No team members added yet</p>
-                <p className="text-sm text-gray-500 mt-2">Add contacts for owner, manager, purchasing, finance, and kitchen</p>
-              </div>
+              {teamMembers.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">No team members added yet</p>
+                  <p className="text-sm text-gray-500 mt-2">Add contacts for owner, manager, purchasing, finance, and kitchen</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {teamMembers.map((member) => (
+                    <div key={member.id} className="flex items-center justify-between border rounded-lg p-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{member.name}</p>
+                          {member.isPrimary && <Badge variant="default">Primary</Badge>}
+                          <Badge variant="outline" className="capitalize">{member.role}</Badge>
+                        </div>
+                        <p className="text-sm text-gray-600">{member.email}</p>
+                        {member.phone && <p className="text-sm text-gray-600">{member.phone}</p>}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => {
+                        setTeamMembers(teamMembers.filter(m => m.id !== member.id))
+                        toast.success('Member removed')
+                      }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -153,15 +234,38 @@ export function RestaurantOnboardingPage() {
                   <CardTitle>Branches</CardTitle>
                   <CardDescription>Manage your restaurant branches</CardDescription>
                 </div>
-                <Button>Add Branch</Button>
+                <Button onClick={() => setShowAddBranchDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Branch
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No branches added yet</p>
-                <p className="text-sm text-gray-500 mt-2">Add multiple locations for your restaurant</p>
-              </div>
+              {branches.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">No branches added yet</p>
+                  <p className="text-sm text-gray-500 mt-2">Add multiple locations for your restaurant</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {branches.map((branch) => (
+                    <div key={branch.id} className="flex items-center justify-between border rounded-lg p-4">
+                      <div className="flex-1">
+                        <p className="font-medium">{branch.name}</p>
+                        {branch.phone && <p className="text-sm text-gray-600">{branch.phone}</p>}
+                        {branch.address && <p className="text-sm text-gray-600">{branch.address}</p>}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => {
+                        setBranches(branches.filter(b => b.id !== branch.id))
+                        toast.success('Branch removed')
+                      }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -217,16 +321,31 @@ export function RestaurantOnboardingPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <Label className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked className="h-4 w-4" />
+                <Label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={notifications.email}
+                    onChange={() => handleToggleNotification('email')}
+                    className="h-4 w-4" 
+                  />
                   <span>Email Notifications</span>
                 </Label>
-                <Label className="flex items-center gap-2">
-                  <input type="checkbox" className="h-4 w-4" />
+                <Label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={notifications.sms}
+                    onChange={() => handleToggleNotification('sms')}
+                    className="h-4 w-4" 
+                  />
                   <span>SMS Notifications</span>
                 </Label>
-                <Label className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked className="h-4 w-4" />
+                <Label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={notifications.push}
+                    onChange={() => handleToggleNotification('push')}
+                    className="h-4 w-4" 
+                  />
                   <span>Push Notifications</span>
                 </Label>
               </div>
@@ -234,32 +353,196 @@ export function RestaurantOnboardingPage() {
               <div className="border-t pt-6">
                 <h4 className="font-semibold mb-4">Notification Types</h4>
                 <div className="space-y-3">
-                  <Label className="flex items-center gap-2">
-                    <input type="checkbox" defaultChecked className="h-4 w-4" />
+                  <Label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.orderUpdates}
+                      onChange={() => handleToggleNotification('orderUpdates')}
+                      className="h-4 w-4" 
+                    />
                     <span>Order Updates</span>
                   </Label>
-                  <Label className="flex items-center gap-2">
-                    <input type="checkbox" defaultChecked className="h-4 w-4" />
+                  <Label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.newMessages}
+                      onChange={() => handleToggleNotification('newMessages')}
+                      className="h-4 w-4" 
+                    />
                     <span>New Messages from Suppliers</span>
                   </Label>
-                  <Label className="flex items-center gap-2">
-                    <input type="checkbox" defaultChecked className="h-4 w-4" />
+                  <Label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.invoiceReminders}
+                      onChange={() => handleToggleNotification('invoiceReminders')}
+                      className="h-4 w-4" 
+                    />
                     <span>Invoice Due Reminders</span>
                   </Label>
-                  <Label className="flex items-center gap-2">
-                    <input type="checkbox" className="h-4 w-4" />
+                  <Label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.lowStock}
+                      onChange={() => handleToggleNotification('lowStock')}
+                      className="h-4 w-4" 
+                    />
                     <span>Low Stock Alerts</span>
                   </Label>
                 </div>
               </div>
 
-              <Button onClick={() => toast.success('Notification preferences saved!')}>
+              <Button onClick={handleSaveNotifications}>
                 Save Preferences
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add Team Member Dialog */}
+      <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Team Member</DialogTitle>
+            <DialogDescription>
+              Add a contact to your restaurant team
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="memberName">Name *</Label>
+              <Input
+                id="memberName"
+                placeholder="Enter name"
+                value={newMember.name}
+                onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="memberEmail">Email *</Label>
+              <Input
+                id="memberEmail"
+                type="email"
+                placeholder="Enter email"
+                value={newMember.email}
+                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="memberPhone">Phone</Label>
+              <Input
+                id="memberPhone"
+                placeholder="Enter phone"
+                value={newMember.phone}
+                onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="memberRole">Role</Label>
+              <select
+                id="memberRole"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={newMember.role}
+                onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
+              >
+                <option value="owner">Owner</option>
+                <option value="manager">Manager</option>
+                <option value="purchasing">Purchasing</option>
+                <option value="finance">Finance</option>
+                <option value="kitchen">Kitchen</option>
+              </select>
+            </div>
+
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newMember.isPrimary}
+                onChange={(e) => setNewMember({ ...newMember, isPrimary: e.target.checked })}
+                className="h-4 w-4"
+              />
+              <span>Set as primary contact</span>
+            </Label>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddMember}>
+              Add Member
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Branch Dialog */}
+      <Dialog open={showAddBranchDialog} onOpenChange={setShowAddBranchDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Branch</DialogTitle>
+            <DialogDescription>
+              Add a new branch location
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="branchName">Branch Name *</Label>
+              <Input
+                id="branchName"
+                placeholder="e.g., Downtown Branch"
+                value={newBranch.name}
+                onChange={(e) => setNewBranch({ ...newBranch, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="branchPhone">Phone</Label>
+              <Input
+                id="branchPhone"
+                placeholder="Enter phone"
+                value={newBranch.phone}
+                onChange={(e) => setNewBranch({ ...newBranch, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="branchAddress">Address</Label>
+              <Input
+                id="branchAddress"
+                placeholder="Enter address"
+                value={newBranch.address}
+                onChange={(e) => setNewBranch({ ...newBranch, address: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="branchDeliveryInstructions">Delivery Instructions</Label>
+              <Textarea
+                id="branchDeliveryInstructions"
+                placeholder="Special instructions for deliveries..."
+                rows={3}
+                value={newBranch.deliveryInstructions}
+                onChange={(e) => setNewBranch({ ...newBranch, deliveryInstructions: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddBranchDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddBranch}>
+              Add Branch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
