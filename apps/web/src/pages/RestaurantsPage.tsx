@@ -256,7 +256,7 @@ export function RestaurantsPage() {
                 <div className="text-center">
                   <div className="flex items-center justify-center space-x-1 text-gray-600">
                     <DollarSign className="h-4 w-4" />
-                    <span className="text-2xl font-bold">${restaurant.totalSpent.toFixed(0)}</span>
+                    <span className="text-2xl font-bold">${typeof restaurant.totalSpent === 'number' ? restaurant.totalSpent.toFixed(0) : '0'}</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">Total Spent</p>
                 </div>
