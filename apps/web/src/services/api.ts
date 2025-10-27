@@ -292,6 +292,13 @@ export const api = createApi({
       query: () => '/api/restaurant-inventory',
       providesTags: ['RestaurantInventory'],
     }),
+    getRestaurantInventoryHistory: builder.query<any, { limit?: number }>({
+      query: (params) => ({
+        url: '/api/restaurant-inventory/history',
+        params,
+      }),
+      providesTags: ['RestaurantInventory'],
+    }),
     addRestaurantInventory: builder.mutation<any, { productId: string; quantity: number; reason?: string }>({
       query: (body) => ({
         url: '/api/restaurant-inventory/add',
@@ -399,6 +406,7 @@ export const {
   useAddItemToQuickListMutation,
   useRemoveItemFromQuickListMutation,
   useGetRestaurantInventoryQuery,
+  useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
   useAdjustRestaurantInventoryMutation,
 } = api

@@ -26,6 +26,16 @@ import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import toast from 'react-hot-toast'
 
+const formatPrice = (price: any): string => {
+  if (typeof price === 'number' && !isNaN(price)) {
+    return price.toFixed(2)
+  }
+  if (typeof price === 'string' && !isNaN(parseFloat(price))) {
+    return parseFloat(price).toFixed(2)
+  }
+  return '0.00'
+}
+
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAppSelector((state) => state.auth)
@@ -227,7 +237,7 @@ export function OrderDetailPage() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
-                    <span>${order.total_amount?.toFixed(2) || '0.00'}</span>
+                    <span>${formatPrice(order.total_amount)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Shipping</span>
@@ -240,7 +250,7 @@ export function OrderDetailPage() {
                   <div className="border-t pt-4">
                     <div className="flex items-center justify-between font-semibold text-lg">
                       <span>Total</span>
-                      <span>${order.total_amount?.toFixed(2) || '0.00'}</span>
+                      <span>${formatPrice(order.total_amount)}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -512,7 +522,7 @@ export function OrderDetailPage() {
                       <p className="text-sm text-gray-600">Thank you for your business!</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-lg">Total: ${order.total_amount?.toFixed(2) || '0.00'}</p>
+                      <p className="font-bold text-lg">Total: ${formatPrice(order.total_amount)}</p>
                     </div>
                   </div>
                 </div>

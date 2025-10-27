@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGetOrdersQuery, useUpdateOrderMutation, useCreateManualOrderMutation, useGetRestaurantsQuery, useGetProductsQuery } from '../services/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -41,7 +41,7 @@ export function OrdersPage() {
     offset: 0,
   })
   
-  const { data: restaurantsData } = useGetRestaurantsQuery()
+  const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
   const { data: productsData } = useGetProductsQuery({ limit: 1000 })
   const [updateOrder] = useUpdateOrderMutation()
   const [createManualOrder, { isLoading: isCreatingManualOrder }] = useCreateManualOrderMutation()
@@ -290,16 +290,20 @@ export function OrdersPage() {
                           <Badge variant="destructive">Action Required</Badge>
                         )}
                       </div>
-                      <CardDescription className="space-y-1">
+                      <div className="text-sm text-gray-600 space-y-1">
                         <div>Restaurant: {order.restaurant_name}</div>
                         <div>
                           Placed: {new Date(order.placed_at || order.created_at).toLocaleString()}
                         </div>
-                      </CardDescription>
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-primary">
-                        ${order.total_amount?.toFixed(2) || '0.00'}
+                        {typeof order.total_amount === 'number' && !isNaN(order.total_amount)
+                          ? `$${order.total_amount.toFixed(2)}`
+                          : typeof order.total_amount === 'string' && !isNaN(parseFloat(order.total_amount))
+                          ? `$${parseFloat(order.total_amount).toFixed(2)}`
+                          : '$0.00'}
                       </div>
                       <div className="text-sm text-gray-600">
                         {order.items?.length || 0} items

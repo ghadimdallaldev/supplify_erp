@@ -41,10 +41,12 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         p.unit as product_unit,
         p.supplier_id,
         s.name as supplier_name,
-        COALESCE(ri.low_stock_threshold, 0) as low_stock_threshold
+        COALESCE(ri.low_stock_threshold, 0) as low_stock_threshold,
+        b.name as branch_name
       FROM restaurant_inventory ri
       JOIN product p ON p.id = ri.product_id
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN branch b ON b.id = ri.branch_id
       WHERE ri.restaurant_id = $1
       ORDER BY p.name
     `, [restaurantId]);
@@ -74,7 +76,59 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
   }
 });
 
-// Get inventory history for a product
+// Get all inventory movement history
+router.get('/history', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+
+    const restaurantId = restaurants[0].id;
+    const { limit = '100' } = req.query;
+
+    const { rows } = await query(`
+      SELECT 
+        iml.*,
+        p.name as product_name,
+        p.sku as product_sku
+      FROM inventory_movement_log iml
+      JOIN product p ON p.id = iml.product_id
+      WHERE iml.restaurant_id = $1
+      ORDER BY iml.created_at DESC
+      LIMIT $2
+    `, [restaurantId, limit]);
+
+    res.json({
+      ok: true,
+      data: { history: rows },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error({ 
+      message: 'Get inventory history error',
+      error: error.message,
+      stack: error.stack 
+    });
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get inventory history',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get inventory history for a specific product
 router.get('/history/:productId', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const { productId } = req.params;

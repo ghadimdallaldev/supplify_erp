@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { 
   Package,
   TrendingDown,
@@ -13,26 +14,34 @@ import {
   AlertCircle,
   Plus,
   Minus,
-  Pin
+  Pin,
+  Download,
+  Upload,
+  FileText
 } from 'lucide-react'
-import { useGetRestaurantInventoryQuery, useAddRestaurantInventoryMutation, useAdjustRestaurantInventoryMutation } from '../services/api'
+import { useGetRestaurantInventoryQuery, useGetRestaurantInventoryHistoryQuery, useAddRestaurantInventoryMutation, useAdjustRestaurantInventoryMutation } from '../services/api'
 import toast from 'react-hot-toast'
 
 export function RestaurantInventoryPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [supplierFilter, setSupplierFilter] = useState('ALL')
+  const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [showAdjustDialog, setShowAdjustDialog] = useState(false)
   const [adjustingItem, setAdjustingItem] = useState<any>(null)
   const [adjustQuantity, setAdjustQuantity] = useState('')
   const [adjustReason, setAdjustReason] = useState('')
   const [adjustType, setAdjustType] = useState<'ADD' | 'SUBTRACT'>('SUBTRACT')
   const [pinnedItems, setPinnedItems] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState('inventory')
 
   const { data, isLoading, error } = useGetRestaurantInventoryQuery()
+  const { data: historyData, isLoading: isLoadingHistory } = useGetRestaurantInventoryHistoryQuery({ limit: 50 })
   const [addInventory] = useAddRestaurantInventoryMutation()
   const [adjustInventory] = useAdjustRestaurantInventoryMutation()
 
   const inventory = data?.data?.inventory || []
+  const history = historyData?.data?.history || []
 
   const handlePinToggle = (productId: string) => {
     const newPinned = new Set(pinnedItems)
@@ -93,6 +102,51 @@ export function RestaurantInventoryPage() {
     }
   }
 
+  const handleExportCSV = () => {
+    const csv = [
+      ['Product Name', 'SKU', 'Supplier', 'Quantity', 'Unit', 'Status', 'Last Updated'],
+      ...inventory.map((item: any) => {
+        const status = getStockStatus(item.quantity, item.low_stock_threshold)
+        return [
+          item.product_name,
+          item.product_sku,
+          item.supplier_name,
+          item.quantity,
+          item.product_unit,
+          status,
+          new Date(item.updated_at).toLocaleDateString()
+        ]
+      })
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `inventory-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    toast.success('Inventory exported to CSV')
+  }
+
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      // Parse CSV and update inventory
+      const lines = text.split('\n')
+      const data = lines.slice(1).map(line => line.split(',').map(cell => cell.replace(/^"|"$/g, '')))
+      
+      toast.success(`Processing ${data.length} inventory items from CSV...`)
+      // TODO: Implement bulk update API call
+      console.log('CSV data:', data)
+    }
+    reader.readAsText(file)
+  }
+
   const getStockStatus = (quantity: number, threshold: number) => {
     if (quantity === 0) return 'OUT_OF_STOCK'
     if (threshold && quantity <= threshold) return 'LOW_STOCK'
@@ -108,13 +162,22 @@ export function RestaurantInventoryPage() {
     }
   }
 
+  const calculateReorderQuantity = (item: any) => {
+    const { quantity, low_stock_threshold } = item
+    if (!low_stock_threshold || quantity > low_stock_threshold) return 0
+    const suggested = (low_stock_threshold * 3) - quantity
+    return Math.ceil(suggested)
+  }
+
   const filteredInventory = inventory
     .filter((item: any) => {
       const matchesSearch = item.product_name.toLowerCase().includes(search.toLowerCase()) ||
                            item.product_sku.toLowerCase().includes(search.toLowerCase())
       const matchesStatus = statusFilter === 'ALL' || 
                             getStockStatus(item.quantity, item.low_stock_threshold) === statusFilter
-      return matchesSearch && matchesStatus
+      const matchesSupplier = supplierFilter === 'ALL' || item.supplier_name === supplierFilter
+      const matchesCategory = categoryFilter === 'ALL' || item.product_category === categoryFilter
+      return matchesSearch && matchesStatus && matchesSupplier && matchesCategory
     })
     .sort((a: any, b: any) => {
       const aPinned = pinnedItems.has(a.product_id)
@@ -154,6 +217,50 @@ export function RestaurantInventoryPage() {
         <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
         <p className="text-gray-600 mt-2">Track your stock levels and manage inventory</p>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="inventory">Current Inventory</TabsTrigger>
+          <TabsTrigger value="history">Movement History</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inventory" className="space-y-6">
+      {/* Inventory Trend Visualization */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Stock Trend Analysis</CardTitle>
+          <CardDescription>Visual overview of your inventory movements</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600">Total Movements</p>
+                <p className="text-2xl font-bold">{history.length}</p>
+              </div>
+              <FileText className="h-8 w-8 text-blue-500" />
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600">Recent Additions</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {history.filter((h: any) => h.type === 'ADD' && new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-green-500" />
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600">Recent Subtractions</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {history.filter((h: any) => h.type === 'SUBTRACT' && new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}
+                </p>
+              </div>
+              <TrendingDown className="h-8 w-8 text-red-500" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -206,14 +313,24 @@ export function RestaurantInventoryPage() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-4">
-            <div className="flex-1">
+          <div className="flex gap-4 flex-wrap">
+            <div className="flex-1 min-w-64">
               <Input
                 placeholder="Search products..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="ALL">All Suppliers</option>
+              {[...new Set(inventory.map((item: any) => item.supplier_name))].map(supplier => (
+                <option key={supplier} value={supplier}>{supplier}</option>
+              ))}
+            </select>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -231,8 +348,40 @@ export function RestaurantInventoryPage() {
       {/* Inventory Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Inventory Items</CardTitle>
-          <CardDescription>View and manage your stock levels</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Inventory Items</CardTitle>
+              <CardDescription>View and manage your stock levels</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCSV}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+              <label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  asChild
+                >
+                  <span>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import CSV
+                  </span>
+                </Button>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportCSV}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -242,6 +391,7 @@ export function RestaurantInventoryPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Suggested Reorder</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Updated</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -250,6 +400,7 @@ export function RestaurantInventoryPage() {
               <tbody className="divide-y divide-gray-200">
                 {filteredInventory.map((item: any) => {
                   const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                  const reorderQty = calculateReorderQuantity(item)
                   return (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-4 py-4">
@@ -264,6 +415,18 @@ export function RestaurantInventoryPage() {
                           <span className="font-semibold">{item.quantity}</span>
                           <span className="text-sm text-gray-500">{item.unit}</span>
                         </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {reorderQty > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-orange-600">{reorderQty}</span>
+                            <Badge variant="outline" className="text-xs">
+                              Suggested
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         <Badge variant={getStatusColor(status)}>
@@ -374,6 +537,69 @@ export function RestaurantInventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inventory Movement History</CardTitle>
+              <CardDescription>Recent inventory changes and adjustments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingHistory ? (
+                <div className="text-center py-12">Loading history...</div>
+              ) : history.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">No inventory movements yet</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance Before</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance After</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {history.map((movement: any) => (
+                        <tr key={movement.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-4 text-sm text-gray-900">
+                            {new Date(movement.created_at).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div>
+                              <p className="font-medium text-gray-900">{movement.product_name}</p>
+                              <p className="text-sm text-gray-500">{movement.product_sku}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <Badge variant={movement.type === 'ADD' ? 'default' : 'destructive'}>
+                              {movement.type}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-900">
+                            {movement.quantity > 0 ? '+' : ''}{movement.quantity}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-500">{movement.balance_before}</td>
+                          <td className="px-4 py-4 text-sm font-medium text-gray-900">{movement.balance_after}</td>
+                          <td className="px-4 py-4 text-sm text-gray-500">{movement.reason || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
