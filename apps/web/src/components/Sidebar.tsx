@@ -14,6 +14,7 @@ import {
   Warehouse,
   FileText,
   List,
+  Inventory,
 } from 'lucide-react'
 
 const navigation = [
@@ -26,6 +27,7 @@ const navigation = [
 const restaurantNavigation = [
   { name: 'Quick Lists', href: '/app/quick-lists', icon: List },
   { name: 'Cart', href: '/app/cart', icon: ShoppingBag },
+  { name: 'Inventory', href: '/app/restaurant-inventory', icon: Inventory },
 ]
 
 const adminNavigation = [
