@@ -57,18 +57,26 @@ router.get('/', async (req, res) => {
     // Handle restaurant-specific filtering
     let restaurantId = null;
     
-    if (req.userData?.role === 'RESTAURANT' && req.userData.id) {
-      restaurantId = req.userData.id;
+    if (req.userData?.role === 'RESTAURANT') {
+      // Get restaurant ID from database using email
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      );
       
-      // Exclude blocklisted suppliers
-      whereConditions.push(`
-        NOT EXISTS (
-          SELECT 1 FROM supplier_blocklist sb
-          WHERE sb.supplier_id = s.id AND sb.restaurant_id = $${paramIndex}
-        )
-      `);
-      queryParams.push(restaurantId);
-      paramIndex++;
+      if (restaurants.length > 0) {
+        restaurantId = restaurants[0].id;
+        
+        // Exclude blocklisted suppliers
+        whereConditions.push(`
+          NOT EXISTS (
+            SELECT 1 FROM supplier_blocklist sb
+            WHERE sb.supplier_id = s.id AND sb.restaurant_id = $${paramIndex}
+          )
+        `);
+        queryParams.push(restaurantId);
+        paramIndex++;
+      }
     }
     
     const whereClause = whereConditions.length > 0 
