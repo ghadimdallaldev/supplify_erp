@@ -36,6 +36,29 @@ Supplify provides a comprehensive restaurant procurement and inventory managemen
    - Message history
    - Real-time communication
 
+6. **Quick Lists** ✅
+   - Create lists for recurring orders
+   - Add products to lists
+   - One-click "Order Now" adds all items to cart
+   - Schedule recurring orders (daily/weekly/monthly)
+   - View list items with prices
+
+7. **Receiving & Quality Control** ✅
+   - Dedicated receiving screen
+   - Match deliveries with orders
+   - Quality status tracking
+   - Auto-update restaurant inventory
+   - Receiving history
+
+8. **Restaurant Inventory** ✅
+   - Track received stock
+   - Low stock alerts
+   - Multi-unit support
+   - Movement history
+   - CSV import/export
+   - Stock adjustments
+   - Pin items to top
+
 ---
 
 ## 📋 TO IMPLEMENT (Detailed Breakdown)
