@@ -390,11 +390,66 @@ router.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Get followed suppliers (restaurant only)
+router.get('/followed', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    // Get restaurant ID from email
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+    
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+    
+    const restaurantId = restaurants[0].id;
+    
+    const { rows } = await query(`
+      SELECT 
+        s.*,
+        sf.created_at as followed_at
+      FROM supplier s
+      JOIN supplier_follow sf ON sf.supplier_id = s.id
+      WHERE sf.restaurant_id = $1
+      ORDER BY sf.created_at DESC
+    `, [restaurantId]);
+    
+    res.json({
+      ok: true,
+      data: { suppliers: rows },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get followed suppliers error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get followed suppliers',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
 // Follow/Unfollow supplier (restaurant only)
 router.post('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
   try {
     const { id } = req.params;
-    const restaurantId = req.userData.id;
+    // Get restaurant ID from email
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+    
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+    
+    const restaurantId = restaurants[0].id;
     
     // Check if already followed
     const { rows: existing } = await query(
@@ -444,7 +499,18 @@ router.post('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req,
 router.delete('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
   try {
     const { id } = req.params;
-    const restaurantId = req.userData.id;
+    
+    // Get restaurant ID from email
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+    
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+    
+    const restaurantId = restaurants[0].id;
     
     await query(
       'DELETE FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2',

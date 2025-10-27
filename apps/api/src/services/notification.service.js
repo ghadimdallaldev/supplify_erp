@@ -6,30 +6,29 @@ import { logger } from '../lib/logger.js';
  * Handles sending notifications via email, SMS, push, and in-app
  */
 
-// Channel implementations (stubs for now)
+// Email service implementation
 const emailService = {
   async send(email, subject, html, text) {
-    logger.info('Email sent', { to: email, subject });
+    logger.info('📧 Email sent', { to: email, subject });
     // TODO: Integrate with SendGrid, SES, or similar
+    console.log(`EMAIL: To: ${email}, Subject: ${subject}`);
+    if (text) console.log(`Body: ${text}`);
     return true;
   }
 };
 
+// SMS service implementation
 const smsService = {
   async send(phone, message) {
-    logger.info('SMS sent', { to: phone, message });
+    logger.info('📱 SMS sent', { to: phone, message });
     // TODO: Integrate with Twilio, Nexmo, or similar
+    console.log(`SMS: To: ${phone}, Message: ${message}`);
     return true;
   }
 };
 
-const pushService = {
-  async send(fcmToken, apnsToken, title, body, data) {
-    logger.info('Push sent', { title, body });
-    // TODO: Integrate with FCM/APNS
-    return true;
-  }
-};
+// Push notifications disabled for now
+// const pushService = { ... }
 
 /**
  * Get or create notification preferences for a user
@@ -90,11 +89,11 @@ export async function sendNotification({
     const prefs = await getUserPreferences(userId, userType);
     const contact = await getUserContactInfo(userId, userType);
 
-    // Determine which channels to send to
+    // Determine which channels to send to (push disabled for now)
     const channels = {
       email: prefs.email_enabled && contact?.email,
       sms: prefs.sms_enabled && contact?.phone,
-      push: prefs.push_enabled && (contact?.fcm_token || contact?.apns_token),
+      push: false, // Disabled for now
       inApp: prefs.in_app_enabled,
     };
 
@@ -155,14 +154,15 @@ export async function sendNotification({
       }
     }
 
-    if (channels.push && (contact?.fcm_token || contact?.apns_token)) {
-      try {
-        await pushService.send(contact.fcm_token, contact.apns_token, title, message, metadata);
-        results.push = true;
-      } catch (error) {
-        logger.error('Push send failed', { error: error.message });
-      }
-    }
+    // Push notifications disabled for now
+    // if (channels.push && (contact?.fcm_token || contact?.apns_token)) {
+    //   try {
+    //     await pushService.send(contact.fcm_token, contact.apns_token, title, message, metadata);
+    //     results.push = true;
+    //   } catch (error) {
+    //     logger.error('Push send failed', { error: error.message });
+    //   }
+    // }
 
     // Update notification log with actual send results
     await query(`
