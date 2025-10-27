@@ -86,12 +86,14 @@ router.get('/', async (req, res) => {
         FROM inventory
         GROUP BY product_id
       ) inv ON inv.product_id = p.id
-      LEFT JOIN (
-        SELECT DISTINCT ON (product_id) product_id, amount, currency
+      LEFT JOIN LATERAL (
+        SELECT amount, currency
         FROM price
-        WHERE valid_to IS NULL OR now() BETWEEN valid_from AND valid_to
-        ORDER BY product_id, valid_from DESC
-      ) pr ON pr.product_id = p.id
+        WHERE price.product_id = p.id
+          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
+        ORDER BY valid_from DESC
+        LIMIT 1
+      ) pr ON true
       ${whereClause}
       ORDER BY p.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
