@@ -34,25 +34,27 @@ const smsService = {
  * Get or create notification preferences for a user
  */
 export async function getUserPreferences(userId, userType) {
-  const { rows } = await query(`
-    SELECT * FROM notification_preferences
-    WHERE user_id = $1 AND user_type = $2
-  `, [userId, userType]);
-
-  if (rows.length > 0) {
-    return rows[0];
-  }
-
-  // Create default preferences
-  const { rows: [prefs] } = await query(`
-    INSERT INTO notification_preferences (
-      user_id, user_type, 
-      email_enabled, sms_enabled, push_enabled, in_app_enabled
-    ) VALUES ($1, $2, true, false, true, true)
-    RETURNING *
-  `, [userId, userType]);
-
-  return prefs;
+  // For now, return default preferences (preferences will be stored in contact_info table)
+  return {
+    email_enabled: true,
+    sms_enabled: true,
+    push_enabled: false,
+    in_app_enabled: true,
+    notify_order_new: true,
+    notify_order_acknowledged: true,
+    notify_order_processing: true,
+    notify_order_shipped: true,
+    notify_order_delivered: true,
+    notify_order_cancelled: true,
+    notify_message_received: true,
+    notify_invoice_issued: true,
+    notify_invoice_overdue: true,
+    notify_payment_received: true,
+    notify_low_stock: true,
+    notify_out_of_stock: true,
+    notify_system_updates: true,
+    notify_promotions: true,
+  };
 }
 
 /**
@@ -67,7 +69,12 @@ export async function getUserContactInfo(userId, userType) {
     WHERE ${idColumn} = $1
   `, [userId]);
 
-  return rows[0] || null;
+  return rows[0] || {
+    email: null,
+    phone: null,
+    email_verified: false,
+    phone_verified: false,
+  };
 }
 
 /**
@@ -99,7 +106,9 @@ export async function sendNotification({
 
     // Check if this notification type is enabled
     const notificationKey = `notify_${notificationCategory.toLowerCase()}`;
-    if (!prefs[notificationKey]) {
+    // If the preference key doesn't exist, default to true (send notification)
+    const shouldSend = prefs[notificationKey] !== undefined ? prefs[notificationKey] : true;
+    if (!shouldSend) {
       logger.info('Notification skipped due to user preference', { userId, notificationCategory });
       return null;
     }
@@ -119,13 +128,13 @@ export async function sendNotification({
       notificationCategory,
       title,
       message,
-      referenceId,
-      referenceType,
+      referenceId || null,
+      referenceType || null,
       metadata ? JSON.stringify(metadata) : null,
-      channels.email,
-      channels.sms,
-      channels.push,
-      channels.inApp,
+      !!channels.email, // Convert to boolean
+      !!channels.sms,   // Convert to boolean
+      !!channels.push,  // Convert to boolean
+      !!channels.inApp, // Convert to boolean
     ]);
 
     // Send via enabled channels
@@ -238,17 +247,29 @@ export async function getUserNotifications(userId, userType, { limit = 50, offse
  */
 
 export async function notifyOrderStatusChange(order, status) {
-  const userId = status === 'PLACED' || status === 'CANCELLED' ? order.supplier_id : order.restaurant_id;
-  const userType = status === 'PLACED' || status === 'CANCELLED' ? 'SUPPLIER' : 'RESTAURANT';
+  // Determine who to notify
+  let userId, userType;
   
+  if (status === 'PLACED' || status === 'CANCELLED') {
+    // Notify supplier for new orders and cancellations
+    userId = order.supplier_id;
+    userType = 'SUPPLIER';
+  } else {
+    // All other statuses (ACKNOWLEDGED, PROCESSING, SHIPPED, DELIVERED) notify restaurant
+    userId = order.restaurant_id;
+    userType = 'RESTAURANT';
+  }
+
   const messages = {
     PLACED: {
       title: 'New Order Received',
-      message: `Order #${order.id.slice(0, 8)} has been placed for $${order.total_amount}`,
+      message: order.restaurant_name 
+        ? `New order from ${order.restaurant_name} - Order #${order.id.slice(0, 8)} for $${order.total_amount}`
+        : `New order #${order.id.slice(0, 8)} for $${order.total_amount}`,
     },
     ACKNOWLEDGED: {
       title: 'Order Acknowledged',
-      message: `Your order #${order.id.slice(0, 8)} has been acknowledged by ${order.supplier_name}`,
+      message: `Your order #${order.id.slice(0, 8)} has been acknowledged by ${order.supplier_name || 'supplier'}`,
     },
     PROCESSING: {
       title: 'Order Processing',
@@ -264,7 +285,9 @@ export async function notifyOrderStatusChange(order, status) {
     },
     CANCELLED: {
       title: 'Order Cancelled',
-      message: `Order #${order.id.slice(0, 8)} has been cancelled`,
+      message: order.restaurant_name
+        ? `Order #${order.id.slice(0, 8)} from ${order.restaurant_name} has been cancelled`
+        : `Order #${order.id.slice(0, 8)} has been cancelled`,
     },
   };
 
@@ -285,6 +308,7 @@ export async function notifyOrderStatusChange(order, status) {
 }
 
 export async function notifyInvoiceIssued(invoice) {
+  // Notify restaurant
   return sendNotification({
     userId: invoice.restaurant_id,
     userType: 'RESTAURANT',
@@ -296,6 +320,24 @@ export async function notifyInvoiceIssued(invoice) {
     referenceType: 'INVOICE',
     metadata: { invoice_number: invoice.invoice_number, total_amount: invoice.total_amount },
   });
+}
+
+export async function notifyPaymentReceived(payment) {
+  // Notify supplier when payment is received
+  // Note: payment object should contain invoice with supplier_id
+  if (payment.invoice?.supplier_id) {
+    return sendNotification({
+      userId: payment.invoice.supplier_id,
+      userType: 'SUPPLIER',
+      notificationType: 'PAYMENT',
+      notificationCategory: 'payment_received',
+      title: 'Payment Received',
+      message: `Payment of $${payment.payment_amount} received for invoice ${payment.invoice_number || payment.invoice_id.slice(0, 8)}`,
+      referenceId: payment.invoice_id,
+      referenceType: 'INVOICE',
+      metadata: { payment_id: payment.id, amount: payment.payment_amount },
+    });
+  }
 }
 
 export async function notifyLowStock(product, currentStock, threshold) {

@@ -948,7 +948,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     // Send notification if status changed
     if (updateData.status && updateData.status !== order.status) {
       try {
-        // Get restaurant info for notification
+        // Get restaurant and supplier info
         const { rows: restaurantInfo } = await query(`
           SELECT id, name FROM restaurant WHERE id = $1
         `, [rows[0].restaurant_id]);
@@ -957,13 +957,36 @@ router.patch('/:id', requireAuth, async (req, res) => {
           SELECT id, name FROM supplier WHERE id = $1
         `, [rows[0].supplier_id]);
         
-        await notifyOrderStatusChange({
-          id: rows[0].id,
-          total_amount: rows[0].total_amount,
-          restaurant_id: rows[0].restaurant_id,
-          supplier_id: rows[0].supplier_id,
-          supplier_name: supplierInfo[0]?.name || 'Supplier',
-        }, updateData.status);
+        // Notify both parties based on status
+        if (updateData.status === 'PLACED') {
+          // New order - notify supplier
+          await notifyOrderStatusChange({
+            id: rows[0].id,
+            total_amount: rows[0].total_amount,
+            restaurant_id: rows[0].restaurant_id,
+            restaurant_name: restaurantInfo[0]?.name || 'Restaurant',
+            supplier_id: rows[0].supplier_id,
+          }, updateData.status);
+        } else if (updateData.status === 'CANCELLED') {
+          // Cancelled - notify supplier
+          await notifyOrderStatusChange({
+            id: rows[0].id,
+            total_amount: rows[0].total_amount,
+            restaurant_id: rows[0].restaurant_id,
+            restaurant_name: restaurantInfo[0]?.name || 'Restaurant',
+            supplier_id: rows[0].supplier_id,
+            supplier_name: supplierInfo[0]?.name || 'Supplier',
+          }, updateData.status);
+        } else {
+          // All other status changes - notify restaurant
+          await notifyOrderStatusChange({
+            id: rows[0].id,
+            total_amount: rows[0].total_amount,
+            restaurant_id: rows[0].restaurant_id,
+            supplier_id: rows[0].supplier_id,
+            supplier_name: supplierInfo[0]?.name || 'Supplier',
+          }, updateData.status);
+        }
       } catch (notifError) {
         // Don't fail the order update if notification fails
         logger.error('Failed to send notification', { error: notifError.message });

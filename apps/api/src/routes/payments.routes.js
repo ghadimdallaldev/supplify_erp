@@ -4,6 +4,7 @@ import { query } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
+import { notifyPaymentReceived } from '../services/notification.service.js';
 
 const router = express.Router();
 
@@ -80,6 +81,19 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       amount: paymentData.payment_amount,
       actor: req.userData.id 
     });
+    
+    // Send notification to supplier about payment received
+    try {
+      await notifyPaymentReceived({
+        id: rows[0].id,
+        payment_amount: paymentData.payment_amount,
+        invoice_id: paymentData.invoice_id,
+        invoice: invoice,
+      });
+    } catch (notifError) {
+      // Don't fail payment recording if notification fails
+      logger.error('Failed to send payment notification', { error: notifError.message });
+    }
     
     res.status(201).json({
       ok: true,
