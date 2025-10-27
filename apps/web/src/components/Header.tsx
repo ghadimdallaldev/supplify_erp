@@ -32,16 +32,6 @@ export function Header() {
       toast.error('Logout failed')
     }
   }
-  
-  // Show toast when new notifications arrive
-  const latestNotification = notifications[0]
-  if (latestNotification && !latestNotification.is_read) {
-    toast.success(latestNotification.title, {
-      description: latestNotification.message,
-      duration: 4000,
-    })
-    // Mark as read (would trigger API call in production)
-  }
 
   return (
     <header className="bg-white shadow-sm border-b">
