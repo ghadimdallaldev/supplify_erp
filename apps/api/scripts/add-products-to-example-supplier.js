@@ -78,6 +78,25 @@ async function seedProducts() {
       `, [rows[0].id, price]);
       
       console.log(`   💰 Price: $${price}`);
+      
+      // Add inventory to warehouse
+      const { rows: warehouses } = await pool.query(`
+        SELECT id FROM warehouse WHERE supplier_id = $1
+      `, [supplierId]);
+      
+      if (warehouses.length > 0) {
+        const warehouseId = warehouses[0].id;
+        const quantity = Math.floor(Math.random() * 1000) + 100; // Random quantity between 100-1000
+        
+        await pool.query(`
+          INSERT INTO inventory (warehouse_id, product_id, available_qty, reserved_qty)
+          VALUES ($1, $2, $3, 0)
+          ON CONFLICT (warehouse_id, product_id) 
+          DO UPDATE SET available_qty = EXCLUDED.available_qty
+        `, [warehouseId, rows[0].id, quantity]);
+        
+        console.log(`   📦 Stock: ${quantity} kg in warehouse`);
+      }
     }
     
     console.log(`\n✅ Successfully seeded ${products.length} products for Example Supplier!`);
