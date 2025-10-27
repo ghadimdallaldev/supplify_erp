@@ -152,14 +152,10 @@ router.get('/', async (req, res) => {
     const { rows } = await query(sql, queryParams);
     
     // Log each supplier separately to ensure they show up
+    logger.info(`Found ${rows.length} suppliers:`);
     rows.forEach((supplier, idx) => {
-      logger.info(`Supplier ${idx + 1}`, { 
-        id: supplier.id,
-        name: supplier.name,
-        email: supplier.contact_email
-      });
+      logger.info(`${idx + 1}. ${supplier.name} (${supplier.contact_email})`);
     });
-    logger.info('Supplier query complete', { total: rows.length });
     
     // Get total count
     const countSql = `SELECT COUNT(*) as total FROM supplier s ${whereClause}`;
