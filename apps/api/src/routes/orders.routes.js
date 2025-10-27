@@ -633,6 +633,23 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
       actor: req.userData.id 
     });
     
+    // Send notification to supplier about new order
+    try {
+      // Get supplier ID from first order item
+      const firstSupplierId = result.items[0]?.supplier_id;
+      if (firstSupplierId) {
+        await notifyOrderStatusChange({
+          id: result.id,
+          total_amount: result.total_amount,
+          restaurant_id: result.restaurant_id,
+          supplier_id: firstSupplierId,
+        }, 'PLACED');
+      }
+    } catch (notifError) {
+      // Don't fail order creation if notification fails
+      logger.error('Failed to send order notification', { error: notifError.message });
+    }
+    
     res.status(201).json({
       ok: true,
       data: { order: result },
