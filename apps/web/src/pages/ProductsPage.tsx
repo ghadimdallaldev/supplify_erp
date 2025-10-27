@@ -421,76 +421,96 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredProducts?.map((product) => (
-          <Card key={product.id} className="overflow-hidden">
-            <div className="aspect-square bg-gray-100 flex items-center justify-center">
-              {product.image_url ? (
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Package className="h-12 w-12 text-gray-400" />
-              )}
-            </div>
-            <CardHeader>
-              <CardTitle className="text-lg">{product.name}</CardTitle>
-              <CardDescription>
-                {product.description || 'No description available'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">SKU: {product.sku}</p>
-                  <p className="text-sm text-gray-600">Supplier: {product.supplier_name}</p>
-                </div>
-                <Badge variant="secondary">{product.category}</Badge>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-lg font-semibold">
+      <div className="border rounded-lg overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Product</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Supplier</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Price</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stock</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {filteredProducts?.map((product) => (
+              <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-6 w-6 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{product.name}</p>
+                      <p className="text-sm text-gray-500 truncate">{product.sku}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-4">
+                  <Badge variant="secondary">{product.category || 'N/A'}</Badge>
+                </td>
+                <td className="px-4 py-4">
+                  <p className="text-sm text-gray-600">{product.supplier_name || 'N/A'}</p>
+                </td>
+                <td className="px-4 py-4">
+                  <p className="font-semibold">
                     ${product.current_price?.toFixed(2) || 'N/A'}
                   </p>
-                  <p className="text-sm text-gray-600">
-                    Stock: {product.available_qty || 0} {product.unit || 'units'}
+                  {product.unit && (
+                    <p className="text-xs text-gray-500">per {product.unit}</p>
+                  )}
+                </td>
+                <td className="px-4 py-4">
+                  <p className={`text-sm font-medium ${
+                    (product.available_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {product.available_qty || 0} {product.unit || 'units'}
                   </p>
-                </div>
-                {!isSupplier && (
-                  <Button
-                    size="sm"
-                    onClick={() => handleAddToCart(product)}
-                    disabled={!product.available_qty || product.available_qty <= 0}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add to Cart
-                  </Button>
-                )}
-                {isSupplier && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      // TODO: Implement edit product
-                      toast.info('Edit product functionality coming soon')
-                    }}
-                  >
-                    Edit Product
-                  </Button>
-                )}
-              </div>
-              
-              <Button variant="outline" size="sm" asChild className="w-full">
-                <Link to={`/app/products/${product.id}`}>
-                  View Details
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-2">
+                    {!isSupplier && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddToCart(product)}
+                        disabled={!product.available_qty || product.available_qty <= 0}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add to Cart
+                      </Button>
+                    )}
+                    {isSupplier && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          // TODO: Implement edit product
+                          toast.info('Edit product functionality coming soon')
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/app/products/${product.id}`}>
+                        View
+                      </Link>
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {filteredProducts?.length === 0 && (
