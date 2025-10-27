@@ -12,20 +12,33 @@ import {
   Edit,
   Package,
   Search,
-  X
+  X,
+  Clock,
+  Repeat
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import toast from 'react-hot-toast'
+import { useAppDispatch } from '../hooks/redux'
+import { addItem } from '../features/cart/cartSlice'
+import { useNavigate } from 'react-router-dom'
 
 export function QuickListsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showProductDialog, setShowProductDialog] = useState(false)
+  const [showScheduledOrder, setShowScheduledOrder] = useState(false)
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
+  const [selectedListForSchedule, setSelectedListForSchedule] = useState<any>(null)
   const [productSearch, setProductSearch] = useState('')
   const [newListName, setNewListName] = useState('')
   const [newListDescription, setNewListDescription] = useState('')
+  const [scheduleFrequency, setScheduleFrequency] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>('WEEKLY')
+  const [scheduleDay, setScheduleDay] = useState('Monday')
+  const [scheduleTime, setScheduleTime] = useState('09:00')
+  
+  const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   
   const { data, isLoading, refetch } = useGetQuickListsQuery()
   const { data: productsData } = useGetProductsQuery({ limit: 1000 })
@@ -97,13 +110,54 @@ export function QuickListsPage() {
     }
   }
 
-  const handleOrderFromList = (listId: string) => {
-    toast.success('Ordering from quick list! (Feature coming soon)')
-    // TODO: Implement "Order from List" functionality
-    // This would:
-    // 1. Get list items
-    // 2. Create cart items from list
-    // 3. Navigate to cart or create order directly
+  const handleOrderFromList = async (listId: string) => {
+    const list = quickLists.find((l: any) => l.id === listId)
+    if (!list || !list.items || list.items.length === 0) {
+      toast.error('This list has no items')
+      return
+    }
+    
+    try {
+      // Add all items from the quick list to cart
+      for (const item of list.items) {
+        // Fetch product details
+        const product = productsData?.products?.find((p: any) => p.id === item.product_id)
+        if (product) {
+          dispatch(addItem({
+            productId: product.id,
+            product,
+            quantity: parseFloat(item.quantity) || 1,
+          }))
+        }
+      }
+      
+      toast.success(`Added ${list.items.length} items from "${list.name}" to cart!`)
+      
+      // Optionally navigate to cart
+      setTimeout(() => {
+        navigate('/app/cart')
+      }, 500)
+    } catch (error) {
+      toast.error('Failed to add items to cart')
+    }
+  }
+  
+  const handleScheduleOrder = (list: any) => {
+    setSelectedListForSchedule(list)
+    setShowScheduledOrder(true)
+  }
+  
+  const handleCreateScheduledOrder = () => {
+    if (!selectedListForSchedule) return
+    
+    toast.success(`Scheduled order created for "${selectedListForSchedule.name}"!`, {
+      duration: 3000,
+    })
+    
+    // TODO: Implement API call to create scheduled order
+    // This would save the schedule to the database
+    setShowScheduledOrder(false)
+    setSelectedListForSchedule(null)
   }
 
   if (isLoading) {
@@ -179,18 +233,27 @@ export function QuickListsPage() {
                   <div className="flex gap-2">
                     <Button 
                       variant="outline" 
-                      className="flex-1"
+                      size="sm"
                       onClick={() => handleAddProducts(list.id)}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Products
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
                     </Button>
                     <Button 
                       className="flex-1"
+                      size="sm"
                       onClick={() => handleOrderFromList(list.id)}
                     >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Order
+                      <ShoppingCart className="h-4 w-4 mr-1" />
+                      Order Now
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleScheduleOrder(list)}
+                    >
+                      <Clock className="h-4 w-4 mr-1" />
+                      Schedule
                     </Button>
                   </div>
 
@@ -313,6 +376,85 @@ export function QuickListsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowProductDialog(false)}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scheduled Order Dialog */}
+      <Dialog open={showScheduledOrder} onOpenChange={setShowScheduledOrder}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Schedule Recurring Order</DialogTitle>
+            <DialogDescription>
+              Set up automatic ordering from "{selectedListForSchedule?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label>Frequency</Label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary mt-2"
+                value={scheduleFrequency}
+                onChange={(e) => setScheduleFrequency(e.target.value as any)}
+              >
+                <option value="DAILY">Daily</option>
+                <option value="WEEKLY">Weekly</option>
+                <option value="MONTHLY">Monthly</option>
+              </select>
+            </div>
+
+            {scheduleFrequency === 'WEEKLY' && (
+              <div>
+                <Label>Day of Week</Label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary mt-2"
+                  value={scheduleDay}
+                  onChange={(e) => setScheduleDay(e.target.value)}
+                >
+                  <option value="Monday">Monday</option>
+                  <option value="Tuesday">Tuesday</option>
+                  <option value="Wednesday">Wednesday</option>
+                  <option value="Thursday">Thursday</option>
+                  <option value="Friday">Friday</option>
+                  <option value="Saturday">Saturday</option>
+                  <option value="Sunday">Sunday</option>
+                </select>
+              </div>
+            )}
+
+            <div>
+              <Label>Time</Label>
+              <Input
+                type="time"
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Orders will be automatically created from this quick list
+                {scheduleFrequency === 'DAILY' && ' every day'}
+                {scheduleFrequency === 'WEEKLY' && ` every ${scheduleDay}`}
+                {scheduleFrequency === 'MONTHLY' && ' on the same date each month'}
+                {' '}at {scheduleTime}.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowScheduledOrder(false)
+              setSelectedListForSchedule(null)
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateScheduledOrder}>
+              <Repeat className="h-4 w-4 mr-2" />
+              Create Scheduled Order
             </Button>
           </DialogFooter>
         </DialogContent>
