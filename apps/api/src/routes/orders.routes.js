@@ -859,11 +859,14 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const updateData = orderUpdateSchema.parse(req.body);
     
-    // Get order
-    const { rows: orders } = await query(
-      'SELECT * FROM customer_order WHERE id = $1',
-      [id]
-    );
+    // Get order with supplier info from order items
+    const { rows: orders } = await query(`
+      SELECT DISTINCT o.*, oi.supplier_id
+      FROM customer_order o
+      JOIN order_item oi ON oi.order_id = o.id
+      WHERE o.id = $1
+      LIMIT 1
+    `, [id]);
     
     if (orders.length === 0) {
       throw new NotFoundError('Order not found');
