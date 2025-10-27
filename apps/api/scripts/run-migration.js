@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { config } from '../src/config/env.js';
@@ -7,14 +7,40 @@ import { query } from '../src/lib/db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const migrationFile = join(__dirname, '../db/migrations/0008_add_reserved_qty.sql');
-const sql = readFileSync(migrationFile, 'utf8');
-
-async function runMigration() {
+async function runAllMigrations() {
   try {
-    console.log('Running migration: 0008_add_reserved_qty.sql');
-    await query(sql);
-    console.log('Migration completed successfully');
+    // Get all migration files
+    const migrationsDir = join(__dirname, '../db/migrations');
+    const files = readdirSync(migrationsDir)
+      .filter(f => f.endsWith('.sql'))
+      .sort();
+
+    for (const file of files) {
+      // Check if migration was already applied
+      const { rows } = await query(
+        "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE migration = $1)",
+        [file]
+      );
+
+      if (rows[0].exists) {
+        console.log(`Skipping ${file} (already applied)`);
+        continue;
+      }
+
+      console.log(`Running migration: ${file}`);
+      const sql = readFileSync(join(migrationsDir, file), 'utf8');
+      await query(sql);
+
+      // Record migration
+      await query(
+        "INSERT INTO schema_migrations (migration) VALUES ($1)",
+        [file]
+      );
+
+      console.log(`✓ ${file} completed`);
+    }
+
+    console.log('All migrations completed successfully');
     process.exit(0);
   } catch (error) {
     console.error('Migration failed:', error);
@@ -22,5 +48,5 @@ async function runMigration() {
   }
 }
 
-runMigration();
+runAllMigrations();
 
