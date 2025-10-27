@@ -60,7 +60,8 @@ router.get('/', async (req, res) => {
     logger.info('Supplier list request', { 
       hasUserData: !!req.userData,
       role: req.userData?.role,
-      email: req.userData?.email 
+      email: req.userData?.email,
+      query: req.query
     });
     
     if (req.userData?.role === 'RESTAURANT') {
@@ -151,7 +152,8 @@ router.get('/', async (req, res) => {
     
     logger.info('Supplier query result', { 
       count: rows.length,
-      firstSupplier: rows[0]?.name 
+      totalSuppliers: rows.length,
+      suppliers: rows.map(s => s.name)
     });
     
     // Get total count
