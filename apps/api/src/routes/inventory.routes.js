@@ -14,6 +14,7 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res
       SELECT 
         i.product_id as id,
         i.product_id,
+        i.warehouse_id,
         i.available_qty,
         i.reserved_qty,
         i.updated_at,
@@ -22,11 +23,12 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res
         p.supplier_id,
         s.name as supplier_name,
         0 as low_stock_threshold,
-        NULL as warehouse_name,
-        NULL as warehouse_code
+        w.name as warehouse_name,
+        w.code as warehouse_code
       FROM inventory i
       JOIN product p ON p.id = i.product_id
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN warehouse w ON w.id = i.warehouse_id
     `;
     
     const queryParams = [];

@@ -38,10 +38,15 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res
     const warehousesWithInventory = await Promise.all(rows.map(async (warehouse) => {
       const inventoryQuery = `
         SELECT 
-          i.*,
           i.product_id as id,
+          i.product_id,
+          i.warehouse_id,
+          i.available_qty,
+          i.reserved_qty,
+          i.updated_at,
           p.name as product_name,
-          p.sku
+          p.sku,
+          0 as low_stock_threshold
         FROM inventory i
         JOIN product p ON p.id = i.product_id
         WHERE i.warehouse_id = $1
