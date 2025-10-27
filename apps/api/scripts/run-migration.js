@@ -9,6 +9,21 @@ const __dirname = dirname(__filename);
 
 async function runAllMigrations() {
   try {
+    // Create schema_migrations table if it doesn't exist
+    console.log('Ensuring schema_migrations table exists...');
+    await query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        id SERIAL PRIMARY KEY,
+        migration TEXT NOT NULL UNIQUE,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+    
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_schema_migrations_migration ON schema_migrations(migration)
+    `);
+    console.log('✓ schema_migrations table ready');
+
     // Get all migration files
     const migrationsDir = join(__dirname, '../db/migrations');
     const files = readdirSync(migrationsDir)
@@ -29,7 +44,16 @@ async function runAllMigrations() {
 
       console.log(`Running migration: ${file}`);
       const sql = readFileSync(join(migrationsDir, file), 'utf8');
-      await query(sql);
+      // Wrap in try-catch to handle existing tables
+      try {
+        await query(sql);
+      } catch (error) {
+        if (error.code === '42P07') { // table already exists
+          console.log(`  Table already exists, skipping...`);
+        } else {
+          throw error;
+        }
+      }
 
       // Record migration
       await query(
