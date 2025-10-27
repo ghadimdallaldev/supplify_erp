@@ -31,8 +31,8 @@ const supplierListSchema = z.object({
   offset: z.string().transform(val => parseInt(val, 10)).default('0'),
 });
 
-// List suppliers (admin only)
-router.get('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+// List suppliers - publicly available with filters for restaurants
+router.get('/', async (req, res) => {
   try {
     const params = supplierListSchema.parse(req.query);
     
@@ -42,15 +42,27 @@ router.get('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
     
     // Text search
     if (params.q) {
-      whereConditions.push(`LOWER(name) LIKE $${paramIndex}`);
+      whereConditions.push(`LOWER(s.name) LIKE $${paramIndex}`);
       queryParams.push(`%${params.q.toLowerCase()}%`);
       paramIndex++;
     }
     
     // City filter
     if (params.city) {
-      whereConditions.push(`address_json->>'city' = $${paramIndex}`);
+      whereConditions.push(`s.address_json->>'city' = $${paramIndex}`);
       queryParams.push(params.city);
+      paramIndex++;
+    }
+    
+    // For restaurants, exclude blocklisted suppliers
+    if (req.userData?.role === 'RESTAURANT' && req.userData.id) {
+      whereConditions.push(`
+        NOT EXISTS (
+          SELECT 1 FROM supplier_blocklist sb
+          WHERE sb.supplier_id = s.id AND sb.restaurant_id = $${paramIndex}
+        )
+      `);
+      queryParams.push(req.userData.id);
       paramIndex++;
     }
     
@@ -59,18 +71,31 @@ router.get('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
       : '';
     
     const sql = `
-      SELECT * FROM supplier
+      SELECT 
+        s.*,
+        COALESCE(COUNT(DISTINCT p.id), 0) as product_count,
+        COALESCE(AVG(pr.amount), 0) as avg_price,
+        EXISTS (
+          SELECT 1 FROM supplier_follow sf
+          WHERE sf.supplier_id = s.id 
+            AND sf.restaurant_id = $${paramIndex}
+        ) as is_followed
+      FROM supplier s
+      LEFT JOIN product p ON p.supplier_id = s.id
+      LEFT JOIN price pr ON pr.product_id = p.id 
+        AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
       ${whereClause}
-      ORDER BY created_at DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+      LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
     `;
     
-    queryParams.push(params.limit, params.offset);
+    queryParams.push(req.userData?.id || null, params.limit, params.offset);
     
     const { rows } = await query(sql, queryParams);
     
     // Get total count
-    const countSql = `SELECT COUNT(*) as total FROM supplier ${whereClause}`;
+    const countSql = `SELECT COUNT(*) as total FROM supplier s ${whereClause}`;
     const countParams = queryParams.slice(0, -2);
     const { rows: countRows } = await query(countSql, countParams);
     
@@ -331,6 +356,173 @@ router.patch('/:id', requireAuth, async (req, res) => {
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to update supplier',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Follow/Unfollow supplier (restaurant only)
+router.post('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const restaurantId = req.userData.id;
+    
+    // Check if already followed
+    const { rows: existing } = await query(
+      'SELECT * FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2',
+      [id, restaurantId]
+    );
+    
+    if (existing.length > 0) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Supplier is already being followed',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    await query(
+      'INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)',
+      [id, restaurantId]
+    );
+    
+    logger.info('Supplier followed', { supplierId: id, restaurantId });
+    
+    res.json({
+      ok: true,
+      data: { message: 'Supplier followed successfully' },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Follow supplier error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to follow supplier',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+router.delete('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const restaurantId = req.userData.id;
+    
+    await query(
+      'DELETE FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2',
+      [id, restaurantId]
+    );
+    
+    logger.info('Supplier unfollowed', { supplierId: id, restaurantId });
+    
+    res.json({
+      ok: true,
+      data: { message: 'Supplier unfollowed successfully' },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Unfollow supplier error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to unfollow supplier',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Block/Unblock supplier (restaurant only)
+router.post('/:id/block', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const restaurantId = req.userData.id;
+    const { reason } = req.body;
+    
+    // Check if already blocked
+    const { rows: existing } = await query(
+      'SELECT * FROM supplier_blocklist WHERE supplier_id = $1 AND restaurant_id = $2',
+      [id, restaurantId]
+    );
+    
+    if (existing.length > 0) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Supplier is already blocked',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    await query(
+      'INSERT INTO supplier_blocklist (supplier_id, restaurant_id, reason) VALUES ($1, $2, $3)',
+      [id, restaurantId, reason || null]
+    );
+    
+    logger.info('Supplier blocked', { supplierId: id, restaurantId, reason });
+    
+    res.json({
+      ok: true,
+      data: { message: 'Supplier blocked successfully' },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Block supplier error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to block supplier',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+router.delete('/:id/block', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const restaurantId = req.userData.id;
+    
+    await query(
+      'DELETE FROM supplier_blocklist WHERE supplier_id = $1 AND restaurant_id = $2',
+      [id, restaurantId]
+    );
+    
+    logger.info('Supplier unblocked', { supplierId: id, restaurantId });
+    
+    res.json({
+      ok: true,
+      data: { message: 'Supplier unblocked successfully' },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Unblock supplier error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to unblock supplier',
       },
       requestId: req.requestId,
     });
