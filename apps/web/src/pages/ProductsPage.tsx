@@ -55,8 +55,10 @@ export function ProductsPage() {
     offset: 0,
   })
   
-  // Fetch warehouses for warehouse selection
-  const { data: warehousesData } = useGetWarehousesQuery()
+  // Fetch warehouses only for suppliers (warehouse selection in product creation)
+  const { data: warehousesData } = useGetWarehousesQuery(undefined, {
+    skip: !isSupplier // Skip if not a supplier
+  })
   
   // Get unique suppliers from products
   const supplierMap = new Map()
