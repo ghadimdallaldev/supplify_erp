@@ -136,9 +136,48 @@ Display Warehouse Cards
 
 ### **4. ORDER MANAGEMENT FLOW**
 
-#### A. Order Receipt
+#### A. Manual Order Creation (NEW!)
 ```
-Restaurant places order
+Supplier clicks "Create Order" button
+    ↓
+Manual Order Dialog opens
+    ↓
+Step 1: Select Restaurant
+    - Dropdown shows all restaurants
+    - Select restaurant from list
+    - Enter optional notes
+    ↓
+Step 2: Add Products
+    - Click "Add Products" button
+    - Product Selection Dialog opens
+    - Search products by name/SKU
+    - Click "Add" for each product
+    - Products added to order
+    ↓
+Step 3: Review Order Items
+    - View product list in order
+    - Adjust quantities with +/- buttons
+    - Remove items by setting quantity to 0
+    - See subtotals and line totals
+    ↓
+Step 4: Create Order
+    - Click "Create Order" button
+    ↓
+[API Call] POST /api/orders/manual
+    - Validate restaurant exists
+    - Validate products belong to supplier
+    - Check inventory availability
+    - Reserve inventory (available → reserved)
+    - Create order with status PLACED
+    ↓
+Order appears in Orders Inbox
+    ↓
+Success notification displayed
+```
+
+#### B. Order Receipt
+```
+Restaurant places order (OR Supplier creates manual order)
     ↓
 Order appears in Orders Inbox (status: PLACED)
     ↓
@@ -150,7 +189,7 @@ Supplier sees tabbed interface:
   - Completed
 ```
 
-#### B. Order Processing
+#### C. Order Processing
 ```
 Click Order Card
     ↓
@@ -170,9 +209,9 @@ Supplier takes actions:
   - "Mark as Delivered" → Status: DELIVERED
 ```
 
-#### C. Order Status Transitions
+#### D. Order Status Transitions
 ```
-PLACED (restaurant creates)
+PLACED (restaurant creates OR supplier manually creates)
     ↓
 ACKNOWLEDGED (supplier accepts)
     ↓
@@ -187,6 +226,8 @@ DELIVERED (confirmation)
   2. Invoice auto-created
   3. Notification sent
 ```
+
+**Note:** Manual orders created by suppliers follow the same status workflow as restaurant-placed orders. Inventory is reserved when the order is created, preventing overselling.
 
 ---
 
@@ -899,14 +940,20 @@ Settings → Configure
 2. ✅ Inventory Management
 3. ✅ Warehouse Management
 4. ✅ Order Management
-5. ✅ Order → Invoice Auto-Creation
-6. ✅ Invoice Display & Tracking
-7. ✅ Payment Recording
-8. ✅ Chat System
-9. ✅ Supplier Settings
-10. ✅ Image Upload (S3/MinIO)
-11. ✅ Unit Selection
-12. ✅ CSV/Excel Upload
+5. ✅ **Manual Order Creation** (NEW!)
+   - Phone order support
+   - Chat order support
+   - Product selection dialog
+   - Inventory reservation
+   - Order creation with status PLACED
+6. ✅ Order → Invoice Auto-Creation
+7. ✅ Invoice Display & Tracking
+8. ✅ Payment Recording
+9. ✅ Chat System
+10. ✅ Supplier Settings
+11. ✅ Image Upload (S3/MinIO)
+12. ✅ Unit Selection
+13. ✅ CSV/Excel Upload
 
 ### Partially Implemented 🔄:
 1. 🔄 Fulfillment (UI only, needs API)
