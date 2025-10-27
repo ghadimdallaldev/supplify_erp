@@ -235,6 +235,14 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         actor: req.userData.id 
       });
       
+      // Send notification to restaurant
+      try {
+        await notifyInvoiceIssued(invoice[0]);
+      } catch (notifError) {
+        // Don't fail invoice creation if notification fails
+        logger.error('Failed to send invoice notification', { error: notifError.message });
+      }
+      
       res.status(201).json({
         ok: true,
         data: { invoice: invoice[0] },
