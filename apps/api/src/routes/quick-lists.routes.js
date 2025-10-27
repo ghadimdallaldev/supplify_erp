@@ -22,6 +22,15 @@ const createQuickListSchema = z.object({
 const updateQuickListSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  supplierId: z.string().uuid().optional(),
+});
+
+const scheduleQuickListSchema = z.object({
+  frequency: z.enum(['DAILY', 'WEEKLY', 'WEEKLY_3X', 'BIWEEKLY', 'MONTHLY']),
+  daysOfWeek: z.array(z.string()).optional(), // ['MONDAY', 'WEDNESDAY', 'FRIDAY']
+  preferredTime: z.string().optional(), // HH:MM format
+  autoCreateOrder: z.boolean().default(true),
+  nextExecutionDate: z.string().optional(), // YYYY-MM-DD
 });
 
 const addItemSchema = z.object({
@@ -559,6 +568,229 @@ router.delete('/:id/items/:itemId', requireAuth, requireRole(['RESTAURANT', 'ADM
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to remove item from quick list',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Schedule a quick list for recurring orders
+router.post('/:id/schedule', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const scheduleData = scheduleQuickListSchema.parse(req.body);
+
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+
+    const restaurantId = restaurants[0].id;
+
+    // Verify quick list belongs to restaurant
+    const { rows: lists } = await query(`
+      SELECT * FROM quick_list WHERE id = $1 AND restaurant_id = $2
+    `, [id, restaurantId]);
+
+    if (lists.length === 0) {
+      throw new NotFoundError('Quick list not found');
+    }
+
+    // Calculate next execution date if not provided
+    let nextExecutionDate = scheduleData.nextExecutionDate;
+    if (!nextExecutionDate) {
+      const today = new Date();
+      switch (scheduleData.frequency) {
+        case 'DAILY':
+          today.setDate(today.getDate() + 1);
+          nextExecutionDate = today.toISOString().split('T')[0];
+          break;
+        case 'WEEKLY':
+          today.setDate(today.getDate() + 7);
+          nextExecutionDate = today.toISOString().split('T')[0];
+          break;
+        case 'WEEKLY_3X':
+          // 3 times per week - find the next scheduled day within the week
+          const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+          const currentDay = today.getDay();
+          const scheduledDays = scheduleData.daysOfWeek || [];
+          
+          // Find the next scheduled day
+          for (let i = 1; i <= 7; i++) {
+            const nextDay = (currentDay + i) % 7;
+            const nextDayName = dayNames[nextDay];
+            if (scheduledDays.includes(nextDayName)) {
+              today.setDate(today.getDate() + i);
+              nextExecutionDate = today.toISOString().split('T')[0];
+              break;
+            }
+          }
+          
+          // If no day found, default to next week
+          if (!nextExecutionDate) {
+            today.setDate(today.getDate() + 7);
+            nextExecutionDate = today.toISOString().split('T')[0];
+          }
+          break;
+        case 'BIWEEKLY':
+          today.setDate(today.getDate() + 14);
+          nextExecutionDate = today.toISOString().split('T')[0];
+          break;
+        case 'MONTHLY':
+          today.setMonth(today.getMonth() + 1);
+          nextExecutionDate = today.toISOString().split('T')[0];
+          break;
+      }
+    }
+
+    // Update quick list with schedule
+    const { rows } = await query(`
+      UPDATE quick_list
+      SET 
+        is_scheduled = true,
+        frequency = $1,
+        days_of_week = $2,
+        preferred_time = $3,
+        auto_create_order = $4,
+        next_execution_date = $5,
+        status = 'ACTIVE',
+        updated_at = now()
+      WHERE id = $6 AND restaurant_id = $7
+      RETURNING *
+    `, [
+      scheduleData.frequency,
+      scheduleData.daysOfWeek ? JSON.stringify(scheduleData.daysOfWeek) : null,
+      scheduleData.preferredTime || null,
+      scheduleData.autoCreateOrder,
+      nextExecutionDate,
+      id,
+      restaurantId,
+    ]);
+
+    logger.info('Quick list scheduled', {
+      quickListId: id,
+      frequency: scheduleData.frequency,
+      actor: req.userData.id,
+    });
+
+    res.json({
+      ok: true,
+      data: { quickList: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      });
+    }
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid schedule data',
+          details: error.errors,
+        },
+        requestId: req.requestId,
+      });
+    }
+
+    logger.error({
+      message: 'Schedule quick list error',
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to schedule quick list',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Unschedule a quick list
+router.delete('/:id/schedule', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+
+    const restaurantId = restaurants[0].id;
+
+    const { rows } = await query(`
+      UPDATE quick_list
+      SET 
+        is_scheduled = false,
+        frequency = NULL,
+        days_of_week = NULL,
+        preferred_time = NULL,
+        next_execution_date = NULL,
+        status = 'PAUSED',
+        updated_at = now()
+      WHERE id = $1 AND restaurant_id = $2
+      RETURNING *
+    `, [id, restaurantId]);
+
+    if (rows.length === 0) {
+      throw new NotFoundError('Quick list not found');
+    }
+
+    logger.info('Quick list unscheduled', {
+      quickListId: id,
+      actor: req.userData.id,
+    });
+
+    res.json({
+      ok: true,
+      data: { quickList: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      });
+    }
+
+    logger.error({
+      message: 'Unschedule quick list error',
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to unschedule quick list',
         details: error.message,
       },
       requestId: req.requestId,

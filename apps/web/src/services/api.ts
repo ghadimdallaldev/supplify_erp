@@ -29,6 +29,7 @@ import type {
   PresignedUrlResponse,
   AttachFileRequest,
   Attachment,
+  ReorderSuggestionsResponse,
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -61,7 +62,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap,
-  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving'],
+  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance'],
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
@@ -320,6 +321,10 @@ export const api = createApi({
       }),
       invalidatesTags: ['RestaurantInventory'],
     }),
+    getReorderSuggestions: builder.query<ReorderSuggestionsResponse, void>({
+      query: () => '/api/restaurant-inventory/reorder-suggestions',
+      providesTags: ['RestaurantInventory'],
+    }),
     // Receiving endpoints
     getPendingOrdersForReceiving: builder.query<any, void>({
       query: () => '/api/receiving/pending-orders',
@@ -385,6 +390,60 @@ export const api = createApi({
       }),
       invalidatesTags: ['QuickList'],
     }),
+    scheduleQuickList: builder.mutation<any, { quickListId: string; body: any }>({
+      query: ({ quickListId, body }) => ({
+        url: `/api/quick-lists/${quickListId}/schedule`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['QuickList'],
+    }),
+    unscheduleQuickList: builder.mutation<any, string>({
+      query: (quickListId) => ({
+        url: `/api/quick-lists/${quickListId}/schedule`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['QuickList'],
+    }),
+
+    // Restaurant Finance endpoints
+    getRestaurantInvoices: builder.query<any, any>({
+      query: (params) => ({
+        url: '/api/restaurant-finance/invoices',
+        params,
+      }),
+      providesTags: ['RestaurantFinance'],
+    }),
+    getRestaurantInvoice: builder.query<any, string>({
+      query: (id) => `/api/restaurant-finance/invoices/${id}`,
+      providesTags: (result, error, id) => [{ type: 'RestaurantFinance', id }],
+    }),
+    markInvoicePaid: builder.mutation<any, { invoiceId: string; data: any }>({
+      query: ({ invoiceId, data }) => ({
+        url: `/api/restaurant-finance/invoices/${invoiceId}/pay`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (result, error, { invoiceId }) => [{ type: 'RestaurantFinance', id: invoiceId }, 'RestaurantFinance'],
+    }),
+    getSupplierStatement: builder.query<any, { supplierId: string; params?: any }>({
+      query: ({ supplierId, params }) => ({
+        url: `/api/restaurant-finance/suppliers/${supplierId}/statement`,
+        params,
+      }),
+      providesTags: ['RestaurantFinance'],
+    }),
+    getRestaurantExpenses: builder.query<any, any>({
+      query: (params) => ({
+        url: '/api/restaurant-finance/expenses',
+        params,
+      }),
+      providesTags: ['RestaurantFinance'],
+    }),
+    getOverdueInvoices: builder.query<any, void>({
+      query: () => '/api/restaurant-finance/overdue',
+      providesTags: ['RestaurantFinance'],
+    }),
   }),
 })
 
@@ -427,6 +486,8 @@ export const {
   useDeleteQuickListMutation,
   useAddItemToQuickListMutation,
   useRemoveItemFromQuickListMutation,
+  useScheduleQuickListMutation,
+  useUnscheduleQuickListMutation,
   useGetRestaurantInventoryQuery,
   useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
@@ -434,4 +495,10 @@ export const {
   useGetPendingOrdersForReceivingQuery,
   useGetReceivingHistoryQuery,
   useCreateReceivingReportMutation,
+  useGetRestaurantInvoicesQuery,
+  useGetRestaurantInvoiceQuery,
+  useMarkInvoicePaidMutation,
+  useGetSupplierStatementQuery,
+  useGetRestaurantExpensesQuery,
+  useGetOverdueInvoicesQuery,
 } = api

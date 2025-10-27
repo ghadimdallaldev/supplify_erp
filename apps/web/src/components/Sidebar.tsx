@@ -31,6 +31,7 @@ const restaurantNavigation = [
   { name: 'Suppliers', href: '/app/suppliers', icon: Building2 },
   { name: 'Inventory', href: '/app/restaurant-inventory', icon: Package2 },
   { name: 'Receiving', href: '/app/receiving', icon: PackageCheck },
+  { name: 'Invoices', href: '/app/invoices', icon: FileText },
 ]
 
 const adminNavigation = [

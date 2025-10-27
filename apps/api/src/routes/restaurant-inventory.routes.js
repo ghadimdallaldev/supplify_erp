@@ -12,6 +12,8 @@ const adjustInventorySchema = z.object({
   adjustmentType: z.enum(['WASTAGE', 'SPOILAGE', 'COUNT_CORRECTION', 'OTHER']),
   quantity: z.number().positive(),
   reason: z.string().optional(),
+  unitCost: z.number().optional(),
+  wasteCategory: z.enum(['OVER_PRODUCTION', 'SPOILAGE', 'BREAKAGE', 'EXPIRED', 'OVERPORTIONING', 'OTHER']).optional(),
 });
 
 const updateInventorySchema = z.object({
@@ -33,6 +35,7 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
 
     const restaurantId = restaurants[0].id;
 
+    // Main inventory query with smart reorder calculation
     const { rows } = await query(`
       SELECT 
         ri.*,
@@ -42,13 +45,58 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         p.supplier_id,
         s.name as supplier_name,
         COALESCE(ri.low_stock_threshold, 0) as low_stock_threshold,
-        b.name as branch_name
+        b.name as branch_name,
+        -- Calculate average daily usage from movement logs (last 30 days)
+        COALESCE((
+          SELECT AVG(ABS(iml.quantity))
+          FROM inventory_movement_log iml
+          WHERE iml.restaurant_id = ri.restaurant_id 
+            AND iml.product_id = ri.product_id
+            AND iml.type = 'SUBTRACT'
+            AND iml.created_at >= NOW() - INTERVAL '30 days'
+        ), 0) as avg_daily_usage,
+        -- Calculate days of stock remaining
+        CASE 
+          WHEN COALESCE((
+            SELECT AVG(ABS(iml.quantity))
+            FROM inventory_movement_log iml
+            WHERE iml.restaurant_id = ri.restaurant_id 
+              AND iml.product_id = ri.product_id
+              AND iml.type = 'SUBTRACT'
+              AND iml.created_at >= NOW() - INTERVAL '30 days'
+          ), 0) > 0 
+          THEN ROUND(ri.quantity / NULLIF((
+            SELECT AVG(ABS(iml.quantity))
+            FROM inventory_movement_log iml
+            WHERE iml.restaurant_id = ri.restaurant_id 
+              AND iml.product_id = ri.product_id
+              AND iml.type = 'SUBTRACT'
+              AND iml.created_at >= NOW() - INTERVAL '30 days'
+          ), 0))
+          ELSE NULL
+        END as days_of_stock,
+        -- Smart reorder quantity based on usage and lead time
+        CASE 
+          WHEN ri.quantity <= COALESCE(ri.low_stock_threshold, 0) THEN
+            GREATEST(
+              COALESCE((
+                SELECT AVG(ABS(iml.quantity))
+                FROM inventory_movement_log iml
+                WHERE iml.restaurant_id = ri.restaurant_id 
+                  AND iml.product_id = ri.product_id
+                  AND iml.type = 'SUBTRACT'
+                  AND iml.created_at >= NOW() - INTERVAL '30 days'
+              ), ri.low_stock_threshold * 2) * 21, -- 3 weeks supply
+              ri.low_stock_threshold * 2 - ri.quantity -- Minimum to reach threshold x2
+            )
+          ELSE NULL
+        END as suggested_reorder_qty
       FROM restaurant_inventory ri
       JOIN product p ON p.id = ri.product_id
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN branch b ON b.id = ri.branch_id
       WHERE ri.restaurant_id = $1
-      ORDER BY p.name
+      ORDER BY ri.updated_at DESC, ri.created_at DESC
     `, [restaurantId]);
 
     res.json({
@@ -210,15 +258,21 @@ router.post('/adjust', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
       const balanceBefore = Number(inventory[0].quantity);
       const balanceAfter = Math.max(0, balanceBefore - adjustmentData.quantity);
 
+      // Calculate unit cost and total cost if provided
+      const unitCost = adjustmentData.unitCost || null;
+      const totalCost = unitCost ? unitCost * adjustmentData.quantity : null;
+
       // Create adjustment record
       const { rows: [adjustment] } = await client.query(`
         INSERT INTO inventory_adjustment (
-          restaurant_id, product_id, adjustment_type, quantity, reason, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          restaurant_id, product_id, adjustment_type, quantity, reason, 
+          unit_cost, total_cost, waste_category, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `, [
         restaurantId, productId, adjustmentData.adjustmentType, 
-        adjustmentData.quantity, adjustmentData.reason || null, req.userData.id
+        adjustmentData.quantity, adjustmentData.reason || null,
+        unitCost, totalCost, adjustmentData.wasteCategory || null, req.userData.id
       ]);
 
       // Update inventory
@@ -352,6 +406,457 @@ router.post('/add', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (re
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to add inventory',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+/**
+ * GET /api/restaurant-inventory/reorder-suggestions
+ * 
+ * Compute smart reorder suggestions for restaurant inventory based on:
+ * - Historical usage rates (1/3/7/10/30/60/90 days)
+ * - Average consumption between restocks
+ * - Usage trends and seasonality detection
+ * - Supplier lead times
+ * - Last order size and frequency
+ * 
+ * Returns items that need reordering with suggested quantities and urgency levels
+ */
+router.get('/reorder-suggestions', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+
+    const restaurantId = restaurants[0].id;
+
+    // Get inventory with comprehensive usage analysis
+    const { rows } = await query(`
+      WITH usage_stats AS (
+        -- Calculate usage rates for different time periods
+        SELECT 
+          iml.product_id,
+          iml.restaurant_id,
+          -- Last 1 day usage
+          COALESCE((
+            SELECT SUM(ABS(iml2.quantity))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'SUBTRACT'
+              AND iml2.created_at >= NOW() - INTERVAL '1 day'
+          ), 0) as usage_1day,
+          -- Last 3 days usage
+          COALESCE((
+            SELECT SUM(ABS(iml2.quantity))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'SUBTRACT'
+              AND iml2.created_at >= NOW() - INTERVAL '3 days'
+          ), 0) as usage_3day,
+          -- Last 7 days usage
+          COALESCE((
+            SELECT SUM(ABS(iml2.quantity))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'SUBTRACT'
+              AND iml2.created_at >= NOW() - INTERVAL '7 days'
+          ), 0) as usage_7day,
+          -- Last 10 days usage
+          COALESCE((
+            SELECT SUM(ABS(iml2.quantity))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'SUBTRACT'
+              AND iml2.created_at >= NOW() - INTERVAL '10 days'
+          ), 0) as usage_10day,
+          -- Last 30 days usage
+          COALESCE((
+            SELECT SUM(ABS(iml2.quantity))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'SUBTRACT'
+              AND iml2.created_at >= NOW() - INTERVAL '30 days'
+          ), 0) as usage_30day,
+          -- Last 60 days usage
+          COALESCE((
+            SELECT SUM(ABS(iml2.quantity))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'SUBTRACT'
+              AND iml2.created_at >= NOW() - INTERVAL '60 days'
+          ), 0) as usage_60day,
+          -- Last 90 days usage
+          COALESCE((
+            SELECT SUM(ABS(iml2.quantity))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'SUBTRACT'
+              AND iml2.created_at >= NOW() - INTERVAL '90 days'
+          ), 0) as usage_90day,
+          -- Average daily usage over last 30 days
+          COALESCE((
+            SELECT AVG(daily_usage)
+            FROM (
+              SELECT DATE(iml2.created_at) as usage_date, 
+                     SUM(ABS(iml2.quantity)) as daily_usage
+              FROM inventory_movement_log iml2
+              WHERE iml2.restaurant_id = iml.restaurant_id 
+                AND iml2.product_id = iml.product_id
+                AND iml2.type = 'SUBTRACT'
+                AND iml2.created_at >= NOW() - INTERVAL '30 days'
+              GROUP BY DATE(iml2.created_at)
+            ) daily
+          ), 0) as avg_daily_usage_30day,
+          -- Calculate restock frequency (average days between ADD movements)
+          COALESCE((
+            SELECT AVG(days_diff)
+            FROM (
+              SELECT EXTRACT(DAY FROM (prev_date - next_date)) as days_diff
+              FROM (
+                SELECT created_at as prev_date,
+                       LAG(created_at) OVER (ORDER BY created_at) as next_date
+                FROM inventory_movement_log
+                WHERE restaurant_id = iml.restaurant_id 
+                  AND product_id = iml.product_id
+                  AND type = 'ADD'
+                  AND created_at >= NOW() - INTERVAL '90 days'
+              ) restock_sequence
+              WHERE next_date IS NOT NULL
+            ) diffs
+          ), 30) as avg_days_between_restocks,
+          -- Last order quantity (from most recent ADD movement)
+          (
+            SELECT iml2.quantity
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'ADD'
+            ORDER BY iml2.created_at DESC
+            LIMIT 1
+          ) as last_order_qty,
+          -- Days since last restock
+          COALESCE((
+            SELECT EXTRACT(DAY FROM NOW() - MAX(iml2.created_at))
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'ADD'
+          ), 999) as days_since_last_restock,
+          -- Count restocks in last 90 days
+          COALESCE((
+            SELECT COUNT(*)
+            FROM inventory_movement_log iml2
+            WHERE iml2.restaurant_id = iml.restaurant_id 
+              AND iml2.product_id = iml.product_id
+              AND iml2.type = 'ADD'
+              AND iml2.created_at >= NOW() - INTERVAL '90 days'
+          ), 0) as restock_count_90day,
+          -- Calculate usage trend (comparing recent vs older usage)
+          CASE 
+            WHEN COALESCE((
+              SELECT SUM(ABS(iml2.quantity))
+              FROM inventory_movement_log iml2
+              WHERE iml2.restaurant_id = iml.restaurant_id 
+                AND iml2.product_id = iml.product_id
+                AND iml2.type = 'SUBTRACT'
+                AND iml2.created_at >= NOW() - INTERVAL '15 days'
+            ), 0) > 0 AND COALESCE((
+              SELECT SUM(ABS(iml2.quantity))
+              FROM inventory_movement_log iml2
+              WHERE iml2.restaurant_id = iml.restaurant_id 
+                AND iml2.product_id = iml.product_id
+                AND iml2.type = 'SUBTRACT'
+                AND iml2.created_at >= NOW() - INTERVAL '30 days'
+                AND iml2.created_at < NOW() - INTERVAL '15 days'
+            ), 0) > 0
+            THEN (
+              COALESCE((
+                SELECT SUM(ABS(iml2.quantity))
+                FROM inventory_movement_log iml2
+                WHERE iml2.restaurant_id = iml.restaurant_id 
+                  AND iml2.product_id = iml.product_id
+                  AND iml2.type = 'SUBTRACT'
+                  AND iml2.created_at >= NOW() - INTERVAL '15 days'
+              ), 0) / 
+              COALESCE((
+                SELECT SUM(ABS(iml2.quantity))
+                FROM inventory_movement_log iml2
+                WHERE iml2.restaurant_id = iml.restaurant_id 
+                  AND iml2.product_id = iml.product_id
+                  AND iml2.type = 'SUBTRACT'
+                  AND iml2.created_at >= NOW() - INTERVAL '30 days'
+                  AND iml2.created_at < NOW() - INTERVAL '15 days'
+              ), 0)
+            ) - 1
+            ELSE 0
+          END as usage_trend
+        FROM inventory_movement_log iml
+        WHERE iml.restaurant_id = $1
+        GROUP BY iml.product_id, iml.restaurant_id
+      ),
+      order_stats AS (
+        -- Get historical order data
+        SELECT 
+          oi.product_id,
+          oi.order_id,
+          co.restaurant_id,
+          co.placed_at,
+          oi.quantity as order_qty,
+          ROW_NUMBER() OVER (PARTITION BY oi.product_id ORDER BY co.placed_at DESC) as rn
+        FROM order_item oi
+        JOIN customer_order co ON co.id = oi.order_id
+        WHERE co.restaurant_id = $1
+          AND co.placed_at IS NOT NULL
+      )
+      SELECT 
+        ri.id,
+        ri.restaurant_id,
+        ri.product_id,
+        ri.quantity as current_qty,
+        ri.low_stock_threshold,
+        ri.branch_id,
+        p.name as product_name,
+        p.sku as product_sku,
+        p.unit as product_unit,
+        s.name as supplier_name,
+        s.id as supplier_id,
+        pis.lead_time_days,
+        pis.moq,
+        pis.order_multiple,
+        b.name as branch_name,
+        COALESCE(us.usage_1day, 0) as usage_1day,
+        COALESCE(us.usage_3day, 0) as usage_3day,
+        COALESCE(us.usage_7day, 0) as usage_7day,
+        COALESCE(us.usage_10day, 0) as usage_10day,
+        COALESCE(us.usage_30day, 0) as usage_30day,
+        COALESCE(us.usage_60day, 0) as usage_60day,
+        COALESCE(us.usage_90day, 0) as usage_90day,
+        COALESCE(us.avg_daily_usage_30day, 0) as avg_daily_usage_30day,
+        COALESCE(us.avg_days_between_restocks, 30) as avg_days_between_restocks,
+        COALESCE(us.last_order_qty, 0) as last_order_qty,
+        COALESCE(us.days_since_last_restock, 0) as days_since_last_restock,
+        COALESCE(us.restock_count_90day, 0) as restock_count_90day,
+        COALESCE(us.usage_trend, 0) as usage_trend,
+        COALESCE(os.order_qty, 0) as last_order_item_qty,
+        -- Calculate days of stock remaining
+        CASE 
+          WHEN COALESCE(us.avg_daily_usage_30day, 0) > 0 
+          THEN ri.quantity / NULLIF(us.avg_daily_usage_30day, 0)
+          ELSE NULL
+        END as days_of_stock_remaining,
+        -- Smart reorder suggestion logic
+        CASE 
+          -- If already below low stock threshold, urgent reorder
+          WHEN ri.quantity <= COALESCE(ri.low_stock_threshold, 0) THEN
+            GREATEST(
+              us.avg_daily_usage_30day * (COALESCE(pis.lead_time_days, 7) + 14), -- Usage during lead time + 2 weeks buffer
+              us.last_order_qty,
+              pis.moq
+            )
+          -- If projected to run out soon (less than lead time + buffer)
+          WHEN COALESCE(us.avg_daily_usage_30day, 0) > 0 
+            AND ri.quantity / us.avg_daily_usage_30day < (COALESCE(pis.lead_time_days, 7) + 14) THEN
+            GREATEST(
+              us.avg_daily_usage_30day * (COALESCE(pis.lead_time_days, 7) + 14) - ri.quantity,
+              us.last_order_qty * 0.8,
+              pis.moq
+            )
+          ELSE NULL
+        END as suggested_reorder_qty,
+        -- Determine urgency level
+        CASE 
+          WHEN ri.quantity <= COALESCE(ri.low_stock_threshold, 0) THEN 'URGENT'
+          WHEN COALESCE(us.avg_daily_usage_30day, 0) > 0 
+            AND ri.quantity / us.avg_daily_usage_30day < (COALESCE(pis.lead_time_days, 7) + 7) THEN 'HIGH'
+          WHEN COALESCE(us.avg_daily_usage_30day, 0) > 0 
+            AND ri.quantity / us.avg_daily_usage_30day < (COALESCE(pis.lead_time_days, 7) + 21) THEN 'MEDIUM'
+          ELSE 'LOW'
+        END as urgency_level,
+        -- Calculate confidence score based on data availability
+        LEAST(100, 
+          CASE WHEN us.usage_30day > 0 THEN 30 ELSE 0 END +
+          CASE WHEN us.usage_60day > 0 THEN 30 ELSE 0 END +
+          CASE WHEN us.restock_count_90day >= 2 THEN 20 ELSE 0 END +
+          CASE WHEN us.last_order_qty > 0 THEN 20 ELSE 0 END
+        ) as confidence_score
+      FROM restaurant_inventory ri
+      JOIN product p ON p.id = ri.product_id
+      JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
+      LEFT JOIN branch b ON b.id = ri.branch_id
+      LEFT JOIN usage_stats us ON us.product_id = ri.product_id AND us.restaurant_id = ri.restaurant_id
+      LEFT JOIN order_stats os ON os.product_id = ri.product_id AND os.rn = 1
+      WHERE ri.restaurant_id = $1
+        AND ri.quantity < COALESCE(ri.low_stock_threshold * 3, 999999) -- Only show items that might need reordering
+      ORDER BY 
+        CASE 
+          WHEN ri.quantity <= COALESCE(ri.low_stock_threshold, 0) THEN 1
+          WHEN COALESCE(us.avg_daily_usage_30day, 0) > 0 
+            AND ri.quantity / us.avg_daily_usage_30day < (COALESCE(pis.lead_time_days, 7) + 14) THEN 2
+          ELSE 3
+        END,
+        ri.quantity ASC
+    `, [restaurantId]);
+
+    res.json({
+      ok: true,
+      data: { suggestions: rows },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error({ 
+      message: 'Get reorder suggestions error',
+      error: error.message,
+      stack: error.stack 
+    });
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get reorder suggestions',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get waste analytics for the restaurant
+router.get('/waste-analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { period = '30' } = req.query; // Default to last 30 days
+    
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+
+    const restaurantId = restaurants[0].id;
+
+    // Get waste analytics
+    const { rows: analytics } = await query(`
+      SELECT 
+        p.id as product_id,
+        p.name as product_name,
+        p.sku as product_sku,
+        p.unit as product_unit,
+        s.name as supplier_name,
+        COUNT(ia.id) as waste_incidents,
+        SUM(CASE WHEN ia.adjustment_type = 'WASTAGE' THEN ia.quantity ELSE 0 END) as total_wastage,
+        SUM(CASE WHEN ia.adjustment_type = 'SPOILAGE' THEN ia.quantity ELSE 0 END) as total_spoilage,
+        SUM(ia.quantity) as total_waste_qty,
+        COALESCE(SUM(ia.total_cost), 
+          SUM(ia.unit_cost * ia.quantity)) as total_waste_cost,
+        COALESCE(
+          (SUM(CASE WHEN ia.adjustment_type = 'WASTAGE' THEN ia.total_cost ELSE 0 END) +
+           SUM(ia.unit_cost * CASE WHEN ia.adjustment_type = 'WASTAGE' THEN ia.quantity ELSE 0 END)),
+          0
+        ) as wastage_cost,
+        COALESCE(
+          (SUM(CASE WHEN ia.adjustment_type = 'SPOILAGE' THEN ia.total_cost ELSE 0 END) +
+           SUM(ia.unit_cost * CASE WHEN ia.adjustment_type = 'SPOILAGE' THEN ia.quantity ELSE 0 END)),
+          0
+        ) as spoilage_cost,
+        -- Average waste per incident
+        COALESCE(AVG(ia.quantity), 0) as avg_waste_per_incident,
+        -- Category breakdown
+        jsonb_object_agg(
+          ia.waste_category,
+          COALESCE(ia.quantity, 0)
+        ) FILTER (WHERE ia.waste_category IS NOT NULL) as category_breakdown,
+        -- First and last incident
+        MIN(ia.created_at) as first_incident,
+        MAX(ia.created_at) as last_incident,
+        -- Current stock
+        ri.quantity as current_stock
+      FROM inventory_adjustment ia
+      JOIN product p ON p.id = ia.product_id
+      JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN restaurant_inventory ri ON ri.restaurant_id = ia.restaurant_id 
+        AND ri.product_id = ia.product_id
+      WHERE ia.restaurant_id = $1
+        AND ia.adjustment_type IN ('WASTAGE', 'SPOILAGE')
+        AND ia.created_at >= NOW() - INTERVAL '${period} days'
+      GROUP BY p.id, p.name, p.sku, p.unit, s.name, ri.quantity
+      HAVING SUM(ia.quantity) > 0
+      ORDER BY total_waste_cost DESC NULLS LAST, total_waste_qty DESC
+      LIMIT 50
+    `, [restaurantId]);
+
+    // Get summary totals
+    const { rows: summary } = await query(`
+      SELECT 
+        COUNT(*) as total_incidents,
+        SUM(quantity) as total_waste_qty,
+        COALESCE(SUM(total_cost), SUM(unit_cost * quantity)) as total_waste_cost,
+        COUNT(DISTINCT product_id) as products_affected,
+        SUM(CASE WHEN adjustment_type = 'WASTAGE' THEN quantity ELSE 0 END) as total_wastage_qty,
+        SUM(CASE WHEN adjustment_type = 'SPOILAGE' THEN quantity ELSE 0 END) as total_spoilage_qty
+      FROM inventory_adjustment
+      WHERE restaurant_id = $1
+        AND adjustment_type IN ('WASTAGE', 'SPOILAGE')
+        AND created_at >= NOW() - INTERVAL '${period} days'
+    `, [restaurantId]);
+
+    // Get waste trend (last 7 days daily breakdown)
+    const { rows: trend } = await query(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as incidents,
+        SUM(quantity) as waste_qty,
+        COALESCE(SUM(total_cost), SUM(unit_cost * quantity)) as waste_cost
+      FROM inventory_adjustment
+      WHERE restaurant_id = $1
+        AND adjustment_type IN ('WASTAGE', 'SPOILAGE')
+        AND created_at >= NOW() - INTERVAL '7 days'
+      GROUP BY DATE(created_at)
+      ORDER BY DATE(created_at) ASC
+    `, [restaurantId]);
+
+    res.json({
+      ok: true,
+      data: { 
+        analytics,
+        summary: summary[0] || {},
+        trend,
+        period: parseInt(period)
+      },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error({
+      message: 'Get waste analytics error',
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get waste analytics',
         details: error.message,
       },
       requestId: req.requestId,

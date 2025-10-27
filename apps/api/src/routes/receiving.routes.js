@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireAuth, requireRole } from '../lib/rbac.js';
-import { query } from '../lib/db.js';
+import { query, withTransaction } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { NotFoundError } from '../middlewares/errorHandler.js';
 
@@ -107,7 +107,7 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
   try {
     const { orderId, lineItems, deliveryNotes, qualityScore, qualityNotes, receivedBy } = req.body;
 
-    // Get restaurant ID
+    // Get restaurant ID first
     const { rows: restaurants } = await query(
       'SELECT id FROM restaurant WHERE contact_email = $1',
       [req.userData.email]
@@ -138,7 +138,7 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
 
     const order = orders[0];
     
-    // Get supplier_id from the first order_item (all items in an order should be from the same supplier)
+    // Get supplier_id from the first order_item
     const { rows: items } = await query(`
       SELECT DISTINCT supplier_id FROM order_item WHERE order_id = $1 LIMIT 1
     `, [orderId]);
@@ -161,81 +161,86 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
       status = 'PARTIAL';
     }
 
-    // Create receiving report
-    const { rows: reports } = await query(`
-      INSERT INTO receiving_report (
-        order_id, restaurant_id, supplier_id, received_by,
-        total_items_ordered, total_items_received,
-        total_expected_cost, total_actual_cost,
-        quality_score, quality_notes, delivery_notes, status
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING *
-    `, [
-      orderId, restaurantId, supplierId, receivedBy || req.userData.id,
-      totalItemsOrdered, totalItemsReceived,
-      totalExpectedCost, totalActualCost,
-      qualityScore, qualityNotes, deliveryNotes, status
-    ]);
-
-    const report = reports[0];
-
-    // Create receiving line items
-    for (const item of lineItems) {
-      await query(`
-        INSERT INTO receiving_line_item (
-          receiving_report_id, product_id, order_item_id,
-          product_name, product_sku, ordered_quantity, received_quantity,
-          unit, expected_unit_price, actual_unit_price,
-          quality_status, notes
+    // Execute within transaction
+    const result = await withTransaction(async (client) => {
+      // Create receiving report
+      const { rows: reports } = await client.query(`
+        INSERT INTO receiving_report (
+          order_id, restaurant_id, supplier_id, received_by,
+          total_items_ordered, total_items_received,
+          total_expected_cost, total_actual_cost,
+          quality_score, quality_notes, delivery_notes, status
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING *
       `, [
-        report.id, item.productId, item.orderItemId,
-        item.product_name, item.sku, item.ordered_quantity, item.received_quantity,
-        item.unit || 'unit', item.expected_unit_price, item.actual_unit_price || item.expected_unit_price,
-        item.quality_status, item.notes || ''
+        orderId, restaurantId, supplierId, receivedBy || req.userData.id,
+        totalItemsOrdered, totalItemsReceived,
+        totalExpectedCost, totalActualCost,
+        qualityScore, qualityNotes, deliveryNotes, status
       ]);
 
-      // Update restaurant inventory if item is accepted and has quantity
-      if (item.quality_status === 'ACCEPTED' && parseFloat(item.received_quantity || 0) > 0) {
-        const { rows: existingInventory } = await client.query(`
-          SELECT * FROM restaurant_inventory 
-          WHERE restaurant_id = $1 AND product_id = $2
-        `, [restaurantId, item.productId]);
+      const report = reports[0];
 
-        if (existingInventory.length > 0) {
-          // Update existing inventory
-          await client.query(`
-            UPDATE restaurant_inventory 
-            SET quantity = quantity + $1,
-                last_restocked_at = now(),
-                updated_at = now()
-            WHERE id = $2
-          `, [item.received_quantity, existingInventory[0].id]);
-        } else {
-          // Create new inventory entry
-          await client.query(`
-            INSERT INTO restaurant_inventory (
-              restaurant_id, product_id, quantity, last_restocked_at
-            )
-            VALUES ($1, $2, $3, now())
-          `, [restaurantId, item.productId, item.received_quantity]);
-        }
-
-        // Add inventory movement log
+      // Create receiving line items
+      for (const item of lineItems) {
         await client.query(`
-          INSERT INTO inventory_movement_log (
-            restaurant_id, product_id, type, quantity, reason, reference_id, reference_type
+          INSERT INTO receiving_line_item (
+            receiving_report_id, product_id, order_item_id,
+            product_name, product_sku, ordered_quantity, received_quantity,
+            unit, expected_unit_price, actual_unit_price,
+            quality_status, notes
           )
-          VALUES ($1, $2, 'RECEIVED', $3, $4, $5, 'ORDER')
-        `, [restaurantId, item.productId, item.received_quantity, 'Order received', orderId]);
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `, [
+          report.id, item.productId, item.orderItemId,
+          item.product_name, item.sku, item.ordered_quantity, item.received_quantity,
+          item.unit || 'unit', item.expected_unit_price, item.actual_unit_price || item.expected_unit_price,
+          item.quality_status, item.notes || ''
+        ]);
+
+        // Update restaurant inventory if item is accepted and has quantity
+        if (item.quality_status === 'ACCEPTED' && parseFloat(item.received_quantity || 0) > 0) {
+          const { rows: existingInventory } = await client.query(`
+            SELECT * FROM restaurant_inventory 
+            WHERE restaurant_id = $1 AND product_id = $2
+          `, [restaurantId, item.productId]);
+
+          if (existingInventory.length > 0) {
+            // Update existing inventory
+            await client.query(`
+              UPDATE restaurant_inventory 
+              SET quantity = quantity + $1,
+                  last_restocked_at = now(),
+                  updated_at = now()
+              WHERE id = $2
+            `, [item.received_quantity, existingInventory[0].id]);
+          } else {
+            // Create new inventory entry
+            await client.query(`
+              INSERT INTO restaurant_inventory (
+                restaurant_id, product_id, quantity, last_restocked_at
+              )
+              VALUES ($1, $2, $3, now())
+            `, [restaurantId, item.productId, item.received_quantity]);
+          }
+
+          // Add inventory movement log
+          await client.query(`
+            INSERT INTO inventory_movement_log (
+              restaurant_id, product_id, type, quantity, reason, reference_id, reference_type
+            )
+            VALUES ($1, $2, 'RECEIVED', $3, $4, $5, 'RECEIVING_REPORT')
+          `, [restaurantId, item.productId, item.received_quantity, 'Order received', report.id]);
+        }
       }
-    }
+
+      return report;
+    });
 
     res.status(201).json({
       ok: true,
-      data: { report },
+      data: { report: result },
       error: null,
       requestId: req.requestId,
     });

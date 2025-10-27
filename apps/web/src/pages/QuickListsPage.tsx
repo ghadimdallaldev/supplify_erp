@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetQuickListsQuery, useCreateQuickListMutation, useDeleteQuickListMutation, useGetProductsQuery, useAddItemToQuickListMutation } from '../services/api'
+import { useGetQuickListsQuery, useCreateQuickListMutation, useDeleteQuickListMutation, useGetProductsQuery, useAddItemToQuickListMutation, useScheduleQuickListMutation } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -33,9 +33,10 @@ export function QuickListsPage() {
   const [productSearch, setProductSearch] = useState('')
   const [newListName, setNewListName] = useState('')
   const [newListDescription, setNewListDescription] = useState('')
-  const [scheduleFrequency, setScheduleFrequency] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>('WEEKLY')
-  const [scheduleDay, setScheduleDay] = useState('Monday')
+  const [scheduleFrequency, setScheduleFrequency] = useState<'DAILY' | 'WEEKLY' | 'WEEKLY_3X' | 'BIWEEKLY' | 'MONTHLY'>('WEEKLY')
+  const [scheduleDays, setScheduleDays] = useState<string[]>(['MONDAY', 'WEDNESDAY', 'FRIDAY'])
   const [scheduleTime, setScheduleTime] = useState('09:00')
+  const [autoCreateOrder, setAutoCreateOrder] = useState(true)
   
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
@@ -45,6 +46,7 @@ export function QuickListsPage() {
   const [createQuickList] = useCreateQuickListMutation()
   const [deleteQuickList] = useDeleteQuickListMutation()
   const [addItemToQuickList] = useAddItemToQuickListMutation()
+  const [scheduleQuickList] = useScheduleQuickListMutation()
 
   const handleCreateList = async () => {
     if (!newListName.trim()) {
@@ -147,18 +149,48 @@ export function QuickListsPage() {
     setShowScheduledOrder(true)
   }
   
-  const handleCreateScheduledOrder = () => {
+  const handleCreateScheduledOrder = async () => {
     if (!selectedListForSchedule) return
     
-    toast.success(`Scheduled order created for "${selectedListForSchedule.name}"!`, {
-      duration: 3000,
-    })
-    
-    // TODO: Implement API call to create scheduled order
-    // This would save the schedule to the database
-    setShowScheduledOrder(false)
-    setSelectedListForSchedule(null)
+    try {
+      await scheduleQuickList({
+        quickListId: selectedListForSchedule.id,
+        body: {
+          frequency: scheduleFrequency,
+          daysOfWeek: (scheduleFrequency === 'WEEKLY' || scheduleFrequency === 'WEEKLY_3X' || scheduleFrequency === 'BIWEEKLY') ? scheduleDays : undefined,
+          preferredTime: scheduleTime,
+          autoCreateOrder,
+        }
+      }).unwrap()
+      
+      toast.success(`Scheduled "${selectedListForSchedule.name}" successfully!`, {
+        duration: 3000,
+      })
+      
+      setShowScheduledOrder(false)
+      setSelectedListForSchedule(null)
+      setScheduleFrequency('WEEKLY')
+      setScheduleDays(['MONDAY']) // Reset to single day for weekly
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to schedule order')
+    }
   }
+
+  const toggleScheduleDay = (day: string) => {
+    if (scheduleDays.includes(day)) {
+      setScheduleDays(scheduleDays.filter(d => d !== day))
+    } else {
+      // For WEEKLY (once per week), only allow one day
+      if (scheduleFrequency === 'WEEKLY') {
+        setScheduleDays([day])
+      } else {
+        setScheduleDays([...scheduleDays, day])
+      }
+    }
+  }
+
+  const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
 
   if (isLoading) {
     return (
@@ -400,32 +432,54 @@ export function QuickListsPage() {
                 onChange={(e) => setScheduleFrequency(e.target.value as any)}
               >
                 <option value="DAILY">Daily</option>
-                <option value="WEEKLY">Weekly</option>
+                <option value="WEEKLY">Once per week</option>
+                <option value="WEEKLY_3X">Three times per week</option>
+                <option value="BIWEEKLY">Biweekly (Every 2 weeks)</option>
                 <option value="MONTHLY">Monthly</option>
               </select>
             </div>
 
-            {scheduleFrequency === 'WEEKLY' && (
+            {(scheduleFrequency === 'WEEKLY' || scheduleFrequency === 'WEEKLY_3X' || scheduleFrequency === 'BIWEEKLY') && (
               <div>
-                <Label>Day of Week</Label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary mt-2"
-                  value={scheduleDay}
-                  onChange={(e) => setScheduleDay(e.target.value)}
-                >
-                  <option value="Monday">Monday</option>
-                  <option value="Tuesday">Tuesday</option>
-                  <option value="Wednesday">Wednesday</option>
-                  <option value="Thursday">Thursday</option>
-                  <option value="Friday">Friday</option>
-                  <option value="Saturday">Saturday</option>
-                  <option value="Sunday">Sunday</option>
-                </select>
+                <Label>
+                  {scheduleFrequency === 'WEEKLY' 
+                    ? 'Select One Day' 
+                    : `Days of Week (${scheduleDays.length} selected)`}
+                </Label>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {daysOfWeek.map((day) => (
+                    <label
+                      key={day}
+                      className={`flex items-center p-2 border rounded-md cursor-pointer transition-colors ${
+                        scheduleDays.includes(day)
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-white border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type={scheduleFrequency === 'WEEKLY' ? 'radio' : 'checkbox'}
+                        name={scheduleFrequency === 'WEEKLY' ? 'weeklyDay' : undefined}
+                        checked={scheduleDays.includes(day)}
+                        onChange={() => toggleScheduleDay(day)}
+                        className="sr-only"
+                      />
+                      <span className="text-sm">
+                        {day.charAt(0) + day.slice(1).toLowerCase()}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {scheduleDays.length === 0 && (
+                  <p className="text-sm text-red-600 mt-1">Please select at least one day</p>
+                )}
+                {scheduleFrequency === 'WEEKLY' && scheduleDays.length > 0 && (
+                  <p className="text-sm text-gray-500 mt-1">Selecting a different day will replace the current selection</p>
+                )}
               </div>
             )}
 
             <div>
-              <Label>Time</Label>
+              <Label>Preferred Time</Label>
               <Input
                 type="time"
                 value={scheduleTime}
@@ -434,11 +488,26 @@ export function QuickListsPage() {
               />
             </div>
 
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="autoCreate"
+                checked={autoCreateOrder}
+                onChange={(e) => setAutoCreateOrder(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="autoCreate" className="cursor-pointer">
+                Automatically create orders
+              </Label>
+            </div>
+
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Orders will be automatically created from this quick list
+                <strong>Note:</strong> Orders will be {autoCreateOrder ? 'automatically created' : 'reminders sent'} for "{selectedListForSchedule?.name}"
                 {scheduleFrequency === 'DAILY' && ' every day'}
-                {scheduleFrequency === 'WEEKLY' && ` every ${scheduleDay}`}
+                {scheduleFrequency === 'WEEKLY' && ` every week on ${scheduleDays.join(', ')}`}
+                {scheduleFrequency === 'WEEKLY_3X' && ` 3 times per week on ${scheduleDays.join(', ')}`}
+                {scheduleFrequency === 'BIWEEKLY' && ` every 2 weeks on ${scheduleDays.join(', ')}`}
                 {scheduleFrequency === 'MONTHLY' && ' on the same date each month'}
                 {' '}at {scheduleTime}.
               </p>
@@ -452,9 +521,12 @@ export function QuickListsPage() {
             }}>
               Cancel
             </Button>
-            <Button onClick={handleCreateScheduledOrder}>
+            <Button 
+              onClick={handleCreateScheduledOrder}
+              disabled={(scheduleFrequency === 'WEEKLY' || scheduleFrequency === 'WEEKLY_3X' || scheduleFrequency === 'BIWEEKLY') && scheduleDays.length === 0}
+            >
               <Repeat className="h-4 w-4 mr-2" />
-              Create Scheduled Order
+              Schedule Recurring Order
             </Button>
           </DialogFooter>
         </DialogContent>

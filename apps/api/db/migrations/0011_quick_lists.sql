@@ -5,8 +5,18 @@
 CREATE TABLE IF NOT EXISTS quick_list (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
+  supplier_id UUID REFERENCES supplier(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
+  -- Scheduling fields (optional - for recurring orders)
+  is_scheduled BOOLEAN NOT NULL DEFAULT false,
+  frequency TEXT CHECK (frequency IN ('DAILY', 'WEEKLY', 'WEEKLY_3X', 'BIWEEKLY', 'MONTHLY')),
+  days_of_week JSONB, -- Array of day names ["MONDAY", "WEDNESDAY", "FRIDAY"]
+  preferred_time TIME, -- Preferred delivery time
+  next_execution_date DATE,
+  last_execution_date DATE,
+  status TEXT CHECK (status IN ('ACTIVE', 'PAUSED')) DEFAULT 'ACTIVE',
+  auto_create_order BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
