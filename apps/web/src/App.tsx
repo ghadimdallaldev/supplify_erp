@@ -17,6 +17,7 @@ import { FulfillmentPage } from './pages/FulfillmentPage'
 import { InventoryPage } from './pages/InventoryPage'
 import { InvoicesPage } from './pages/InvoicesPage'
 import { SupplierSettingsPage } from './pages/SupplierSettingsPage'
+import { QuickListsPage } from './pages/QuickListsPage'
 
 const router = createBrowserRouter([
   {
@@ -62,6 +63,10 @@ const router = createBrowserRouter([
       {
         path: 'app/cart',
         element: <CartPage />,
+      },
+      {
+        path: 'app/quick-lists',
+        element: <QuickListsPage />,
       },
       {
         path: 'app/suppliers',

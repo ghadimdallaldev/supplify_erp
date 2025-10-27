@@ -255,6 +255,39 @@ export const api = createApi({
       query: ({ conversationId }) => `/api/chat/conversations/${conversationId}/messages`,
       providesTags: ['Product'],
     }),
+
+    // Quick Lists endpoints
+    getQuickLists: builder.query<any, void>({
+      query: () => '/api/quick-lists',
+      providesTags: ['QuickList'],
+    }),
+    getQuickList: builder.query<any, string>({
+      query: (id) => `/api/quick-lists/${id}`,
+      providesTags: (result, error, id) => [{ type: 'QuickList', id }],
+    }),
+    createQuickList: builder.mutation<any, any>({
+      query: (body) => ({
+        url: '/api/quick-lists',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['QuickList'],
+    }),
+    updateQuickList: builder.mutation<any, { id: string; data: any }>({
+      query: ({ id, data }) => ({
+        url: `/api/quick-lists/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: 'QuickList', id }],
+    }),
+    deleteQuickList: builder.mutation<any, string>({
+      query: (id) => ({
+        url: `/api/quick-lists/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['QuickList'],
+    }),
   }),
 })
 
@@ -286,4 +319,9 @@ export const {
   useAttachFileToProductMutation,
   useGetConversationsQuery,
   useGetMessagesQuery,
+  useGetQuickListsQuery,
+  useGetQuickListQuery,
+  useCreateQuickListMutation,
+  useUpdateQuickListMutation,
+  useDeleteQuickListMutation,
 } = api
