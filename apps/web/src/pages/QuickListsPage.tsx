@@ -168,7 +168,7 @@ export function QuickListsPage() {
     )
   }
 
-  const quickLists = data?.data?.quickLists || []
+  const quickLists = data?.quickLists || []
 
   return (
     <div className="space-y-6 p-6">

@@ -16,7 +16,7 @@ const createQuickListSchema = z.object({
     supplierId: z.string().uuid(),
     quantity: z.number().positive(),
     notes: z.string().optional(),
-  })).min(1),
+  })).optional().default([]),
 });
 
 const updateQuickListSchema = z.object({
@@ -56,9 +56,34 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
       ORDER BY ql.created_at DESC
     `, [restaurantId]);
 
+    // Fetch items for each list
+    const quickListsWithItems = await Promise.all(rows.map(async (list) => {
+      const { rows: items } = await query(`
+        SELECT 
+          qli.*,
+          p.name as product_name,
+          p.sku as product_sku,
+          p.unit as product_unit,
+          pr.amount as product_price,
+          s.name as supplier_name
+        FROM quick_list_item qli
+        JOIN product p ON p.id = qli.product_id
+        JOIN supplier s ON s.id = qli.supplier_id
+        LEFT JOIN price pr ON pr.product_id = p.id 
+          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+        WHERE qli.quick_list_id = $1
+        ORDER BY p.name
+      `, [list.id]);
+
+      return {
+        ...list,
+        items
+      };
+    }));
+
     res.json({
       ok: true,
-      data: { quickLists: rows },
+      data: { quickLists: quickListsWithItems },
       error: null,
       requestId: req.requestId,
     });
@@ -182,7 +207,8 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
 
       // Create items
       const items = [];
-      for (const item of data.items) {
+      const itemsToCreate = data.items || [];
+      for (const item of itemsToCreate) {
         // Verify product belongs to supplier
         const { rows: products } = await client.query(`
           SELECT id FROM product WHERE id = $1 AND supplier_id = $2
