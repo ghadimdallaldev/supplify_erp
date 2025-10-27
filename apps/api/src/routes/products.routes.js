@@ -269,9 +269,9 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       // Create inventory if initial stock provided
       if (req.body.initialStock !== undefined && req.body.initialStock !== null) {
         await query(`
-          INSERT INTO inventory (product_id, available_qty, reserved_qty, on_order_qty)
-          VALUES ($1, $2, 0, 0)
-        `, [product.id, req.body.initialStock]);
+          INSERT INTO inventory (product_id, warehouse_id, available_qty, reserved_qty, on_order_qty)
+          VALUES ($1, $2, $3, 0, 0)
+        `, [product.id, req.body.warehouse_id || null, req.body.initialStock]);
       }
       
       await query('COMMIT');

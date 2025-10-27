@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetProductsQuery, useCreateProductMutation, useGeneratePresignedUrlMutation } from '../services/api'
+import { useGetProductsQuery, useCreateProductMutation, useGeneratePresignedUrlMutation, useGetWarehousesQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -37,6 +37,7 @@ export function ProductsPage() {
     price: '',
     initialStock: '',
     image_url: '',
+    warehouse_id: '',
   })
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
@@ -52,6 +53,9 @@ export function ProductsPage() {
     limit: 20,
     offset: 0,
   })
+  
+  // Fetch warehouses for warehouse selection
+  const { data: warehousesData } = useGetWarehousesQuery()
   
   // Filter products to show only supplier's products if user is a supplier
   const filteredProducts = isSupplier 
@@ -139,6 +143,7 @@ export function ProductsPage() {
         price: parseFloat(productForm.price),
         initialStock: parseFloat(productForm.initialStock),
         image_url: imageUrl || undefined,
+        warehouse_id: productForm.warehouse_id || undefined,
       }).unwrap()
       toast.success('Product created successfully')
       setShowAddProduct(false)
@@ -151,6 +156,7 @@ export function ProductsPage() {
         price: '',
         initialStock: '',
         image_url: '',
+        warehouse_id: '',
       })
       setProductImage(null)
       setImagePreview(null)
@@ -547,6 +553,22 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 value={productForm.initialStock}
                 onChange={(e) => setProductForm({ ...productForm, initialStock: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse">Warehouse (Optional)</Label>
+              <select
+                id="warehouse"
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
+                value={productForm.warehouse_id}
+                onChange={(e) => setProductForm({ ...productForm, warehouse_id: e.target.value })}
+              >
+                <option value="">Select a warehouse (optional)</option>
+                {warehousesData?.warehouses?.map((warehouse: any) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="productImage">Product Image</Label>

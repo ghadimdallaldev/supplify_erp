@@ -45,6 +45,9 @@ export interface CreateProductRequest {
   image_url?: string
   unit?: string
   supplier_id?: string
+  warehouse_id?: string
+  price?: number
+  initialStock?: number
 }
 
 export interface UpdateProductRequest {
