@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { useGetOrdersQuery, useUpdateOrderMutation } from '../services/api'
+import { useGetOrdersQuery, useUpdateOrderMutation, useCreateManualOrderMutation, useGetRestaurantsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import { Label } from '../components/ui/label'
 import { 
   ShoppingCart, 
   Calendar, 
@@ -16,7 +18,9 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Filter
+  Filter,
+  Plus,
+  X
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
@@ -27,6 +31,10 @@ export function OrdersPage() {
   const [customer, setCustomer] = useState('')
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState('all')
+  const [showManualOrderDialog, setShowManualOrderDialog] = useState(false)
+  const [selectedRestaurant, setSelectedRestaurant] = useState('')
+  const [orderNotes, setOrderNotes] = useState('')
+  const [manualOrderItems, setManualOrderItems] = useState<Array<{ productId: string; quantity: number; notes?: string }>>([])
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
   
@@ -36,7 +44,9 @@ export function OrdersPage() {
     offset: 0,
   })
   
+  const { data: restaurantsData } = useGetRestaurantsQuery()
   const [updateOrder] = useUpdateOrderMutation()
+  const [createManualOrder, { isLoading: isCreatingManualOrder }] = useCreateManualOrderMutation()
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -124,13 +134,21 @@ export function OrdersPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Orders Inbox</h1>
-        <p className="text-gray-600 mt-2">
-          {isSupplier 
-            ? 'Manage inbound orders from restaurants' 
-            : 'Track your orders and their status'}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Orders Inbox</h1>
+          <p className="text-gray-600 mt-2">
+            {isSupplier 
+              ? 'Manage inbound orders from restaurants' 
+              : 'Track your orders and their status'}
+          </p>
+        </div>
+        {isSupplier && (
+          <Button onClick={() => setShowManualOrderDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Order
+          </Button>
+        )}
       </div>
 
       {/* Filters and Search */}
@@ -306,6 +324,99 @@ export function OrdersPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Manual Order Creation Dialog */}
+      {isSupplier && (
+        <Dialog open={showManualOrderDialog} onOpenChange={setShowManualOrderDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Create Manual Order</DialogTitle>
+              <DialogDescription>
+                Create an order for a restaurant (for phone calls, chat orders, etc.)
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Restaurant Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="restaurant">Restaurant *</Label>
+                <select
+                  id="restaurant"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={selectedRestaurant}
+                  onChange={(e) => setSelectedRestaurant(e.target.value)}
+                >
+                  <option value="">Select a restaurant</option>
+                  {restaurantsData?.restaurants?.map((restaurant: any) => (
+                    <option key={restaurant.id} value={restaurant.id}>
+                      {restaurant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Order Notes */}
+              <div className="space-y-2">
+                <Label htmlFor="orderNotes">Order Notes</Label>
+                <textarea
+                  id="orderNotes"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Additional notes for this order..."
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Product selection will be available in the next step.
+                  For now, use the existing order interface to create a complete order.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowManualOrderDialog(false)
+                  setSelectedRestaurant('')
+                  setOrderNotes('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!selectedRestaurant || isCreatingManualOrder}
+                onClick={async () => {
+                  if (!selectedRestaurant) {
+                    toast.error('Please select a restaurant')
+                    return
+                  }
+
+                  // For now, show a message that this feature is coming soon
+                  toast.success('Manual order creation is coming soon! Use the existing order flow for now.')
+                  setShowManualOrderDialog(false)
+                  
+                  // TODO: Implement full order creation with product selection
+                  // const order = await createManualOrder({
+                  //   restaurant_id: selectedRestaurant,
+                  //   items: manualOrderItems,
+                  //   notes: orderNotes
+                  // }).unwrap()
+                  
+                  // toast.success('Order created successfully!')
+                  // setShowManualOrderDialog(false)
+                  // refetch()
+                }}
+              >
+                {isCreatingManualOrder ? 'Creating...' : 'Create Order'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

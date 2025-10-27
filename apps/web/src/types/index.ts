@@ -118,6 +118,16 @@ export interface CreateOrderRequest {
   }[]
 }
 
+export interface CreateManualOrderRequest {
+  restaurant_id: string
+  items: {
+    productId: string
+    quantity: number
+    notes?: string
+  }[]
+  notes?: string
+}
+
 export interface UpdateOrderRequest {
   status?: 'DRAFT' | 'PLACED' | 'CONFIRMED' | 'FULFILLING' | 'COMPLETED' | 'CANCELLED'
   notes?: string

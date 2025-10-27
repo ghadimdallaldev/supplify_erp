@@ -16,6 +16,16 @@ const orderCreateSchema = z.object({
   })).min(1),
 });
 
+const supplierOrderCreateSchema = z.object({
+  restaurant_id: z.string().uuid(),
+  items: z.array(z.object({
+    productId: z.string().uuid(),
+    quantity: z.number().positive(),
+    notes: z.string().optional(),
+  })).min(1),
+  notes: z.string().optional(),
+});
+
 const orderUpdateSchema = z.object({
   status: z.enum(['DRAFT', 'PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELLED']).optional(),
   notes: z.string().optional(),
@@ -587,6 +597,176 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
     }
     
     logger.error('Create order error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to create order',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Create order manually by supplier (for phone orders, chat orders, etc.)
+router.post('/manual', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const orderData = supplierOrderCreateSchema.parse(req.body);
+    
+    // Get supplier ID
+    const { rows: suppliers } = await query(
+      'SELECT id FROM supplier WHERE contact_email = $1',
+      [req.userData.email]
+    );
+    
+    if (suppliers.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Supplier record not found for user',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    const supplierId = suppliers[0].id;
+    
+    // Verify restaurant exists
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE id = $1',
+      [orderData.restaurant_id]
+    );
+    
+    if (restaurants.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Restaurant not found',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    // Create order with transaction
+    const result = await withTransaction(async (client) => {
+      // Create order with status PLACED
+      const { rows: [order] } = await client.query(`
+        INSERT INTO customer_order (restaurant_id, currency, status, notes)
+        VALUES ($1, 'USD', 'PLACED', $2)
+        RETURNING *
+      `, [orderData.restaurant_id, orderData.notes || null]);
+      
+      let totalAmount = 0;
+      const orderItems = [];
+      
+      // Process each item
+      for (const item of orderData.items) {
+        // Get product and current price
+        const { rows: products } = await client.query(`
+          SELECT p.*, pr.amount as current_price, pr.currency
+          FROM product p
+          LEFT JOIN price pr ON pr.product_id = p.id 
+            AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+          WHERE p.id = $1 AND p.supplier_id = $2
+        `, [item.productId, supplierId]);
+        
+        if (products.length === 0) {
+          throw new ValidationError(`Product ${item.productId} not found or doesn't belong to supplier`);
+        }
+        
+        const product = products[0];
+        
+        if (!product.current_price) {
+          throw new ValidationError(`No valid price found for product ${product.sku}`);
+        }
+        
+        // Check inventory
+        const { rows: inventory } = await client.query(
+          'SELECT available_qty FROM inventory WHERE product_id = $1 FOR UPDATE',
+          [item.productId]
+        );
+        
+        if (inventory.length === 0 || Number(inventory[0].available_qty) < item.quantity) {
+          throw new ValidationError(`Insufficient inventory for product ${product.sku}`);
+        }
+        
+        // Calculate line total
+        const unitPrice = Number(product.current_price);
+        const lineTotal = unitPrice * item.quantity;
+        totalAmount += lineTotal;
+        
+        // Create order item
+        const { rows: [orderItem] } = await client.query(`
+          INSERT INTO order_item (
+            order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING *
+        `, [
+          order.id,
+          item.productId,
+          supplierId,
+          item.quantity,
+          unitPrice,
+          lineTotal,
+          item.notes,
+        ]);
+        
+        orderItems.push(orderItem);
+        
+        // Reserve inventory (decrease available, increase reserved)
+        await client.query(`
+          UPDATE inventory 
+          SET available_qty = available_qty - $1,
+              reserved_qty = reserved_qty + $1,
+              updated_at = now()
+          WHERE product_id = $2
+        `, [item.quantity, item.productId]);
+      }
+      
+      // Update order total
+      await client.query(`
+        UPDATE customer_order 
+        SET total_amount = $1, placed_at = now()
+        WHERE id = $2
+      `, [totalAmount, order.id]);
+      
+      return { ...order, total_amount: totalAmount, items: orderItems };
+    });
+    
+    logger.info('Manual order created by supplier', { 
+      orderId: result.id, 
+      restaurantId: result.restaurant_id,
+      totalAmount: result.total_amount,
+      itemCount: result.items.length,
+      actor: req.userData.id 
+    });
+    
+    res.status(201).json({
+      ok: true,
+      data: { order: result },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid order data',
+          details: error.errors,
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    logger.error('Create manual order error:', error);
     res.status(500).json({
       ok: false,
       data: null,

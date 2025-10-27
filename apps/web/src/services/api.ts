@@ -135,6 +135,14 @@ export const api = createApi({
       }),
       invalidatesTags: ['Order'],
     }),
+    createManualOrder: builder.mutation<Order, CreateManualOrderRequest>({
+      query: (body) => ({
+        url: '/api/orders/manual',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Order'],
+    }),
     updateOrder: builder.mutation<Order, { id: string; data: UpdateOrderRequest }>({
       query: ({ id, data }) => ({
         url: `/api/orders/${id}`,
@@ -260,6 +268,7 @@ export const {
   useGetOrdersQuery,
   useGetOrderQuery,
   useCreateOrderMutation,
+  useCreateManualOrderMutation,
   useUpdateOrderMutation,
   useGetSuppliersQuery,
   useGetSupplierQuery,
