@@ -59,7 +59,7 @@ router.get('/invoices', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         CASE 
           WHEN i.status NOT IN ('PAID', 'VOID') 
             AND i.due_date < CURRENT_DATE 
-          THEN EXTRACT(DAY FROM (CURRENT_DATE - i.due_date))
+          THEN CURRENT_DATE - i.due_date
           ELSE 0
         END as days_overdue
       FROM invoice i
@@ -518,7 +518,7 @@ router.get('/overdue', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
         s.name as supplier_name,
         s.contact_email as supplier_email,
         o.id as order_id,
-        EXTRACT(DAY FROM (CURRENT_DATE - i.due_date)) as days_overdue,
+        CURRENT_DATE - i.due_date as days_overdue,
         i.total_amount - i.paid_amount as amount_due
       FROM invoice i
       JOIN supplier s ON s.id = i.supplier_id
