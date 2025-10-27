@@ -9,18 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '../components/ui/label'
 import { 
   ShoppingCart, 
-  Calendar, 
-  DollarSign, 
   Search,
   Package,
   Truck,
   FileText,
-  AlertCircle,
   CheckCircle,
   Clock,
   Filter,
   Plus,
-  X
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
@@ -28,7 +24,6 @@ import toast from 'react-hot-toast'
 
 export function OrdersPage() {
   const [status, setStatus] = useState('')
-  const [customer, setCustomer] = useState('')
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState('all')
   const [showManualOrderDialog, setShowManualOrderDialog] = useState(false)
@@ -211,12 +206,22 @@ export function OrdersPage() {
               : 'Track your orders and their status'}
           </p>
         </div>
-        {isSupplier && (
-          <Button onClick={() => setShowManualOrderDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Order
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {isSupplier && (
+            <Button onClick={() => setShowManualOrderDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Order
+            </Button>
+          )}
+          {!isSupplier && (
+            <Button asChild>
+              <Link to="/app/cart">
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Order
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters and Search */}
