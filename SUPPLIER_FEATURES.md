@@ -15,9 +15,467 @@ Supplify provides comprehensive supplier management features for F&B suppliers t
 5. **Restaurants** - View customer restaurants
 6. **Inventory** - Inventory and warehouse management
 7. **Fulfillment** - Logistics and delivery operations
-8. **Settings** - Account and profile settings
+8. **Invoices** - Billing and payment management
+9. **Settings** - Account and profile settings
 
 ---
+
+## 🔄 SYSTEM FLOWS
+
+### **1. ORDER-TO-INVOICE FLOW** (New!)
+
+```
+Order PLACED (by Restaurant)
+    ↓
+[Supplier receives notification]
+    ↓
+Order ACKNOWLEDGED (Supplier)
+    ↓
+Order PROCESSING (Supplier)
+    ↓
+Order SHIPPED (Supplier)
+    ↓
+Order DELIVERED (Supplier)
+    ↓
+[AUTO-INVOICE CREATED] ← Invoice Status: ISSUED
+    - Invoice number generated (INV-YYYY-MM-XXXXXX)
+    - Total calculated from order items
+    - Due date set (30 days from delivery)
+    - Status: ISSUED
+    ↓
+[Payment Received] → Invoice Status: PARTIALLY_PAID
+    ↓
+[Full Payment] → Invoice Status: PAID
+```
+
+**Key Integration Points:**
+- Order items automatically become invoice line items
+- Invoice links to original order (order_id)
+- Invoice shows order status badge
+- Restaurant inventory updated on delivery
+- Invoice can be voided (status → VOID)
+
+---
+
+### **2. PRODUCT CREATION FLOW**
+
+```
+Navigate to Products → Click "Add Product"
+    ↓
+Fill Form:
+  - Name, SKU, Description
+  - Category (dropdown)
+  - Unit (kg, pack, etc.)
+  - Price (USD)
+  - Initial Stock
+  - **Warehouse (optional)** → Select warehouse
+  - **Image Upload** → Upload via S3/MinIO
+    ↓
+Click "Create Product"
+    ↓
+[Validation Checks]
+    - SKU unique
+    - Name, SKU required
+    - Image size < 5MB
+    - Image type valid (jpg, png, webp)
+    ↓
+[API Call] POST /api/products
+    - Create product record
+    - Create price record
+    - Create inventory record (with warehouse_id)
+    - Upload image to S3/MinIO
+    ↓
+[Cache Invalidation] → Refresh product list
+    ↓
+Product appears in list
+```
+
+---
+
+### **3. INVENTORY MANAGEMENT FLOW**
+
+#### A. View Inventory
+```
+Navigate to Inventory
+    ↓
+[API Call] GET /api/inventory
+    - Join inventory with products
+    - Join with warehouses
+    - Calculate: on_hand = available + reserved
+    - Filter by supplier
+    ↓
+Display Summary Cards:
+  - Total Products
+  - Total Reserved
+  - Low Stock Items
+  - Available Stock
+    ↓
+Display Inventory Table
+  - Product-centric view
+  - Shows warehouse if assigned
+  - On Hand, Reserved, Available
+```
+
+#### B. Warehouse View
+```
+Click "View All Warehouses"
+    ↓
+[API Call] GET /api/warehouses
+    - Get all warehouses for supplier
+    - Aggregate inventory per warehouse
+    ↓
+Display Warehouse Cards
+  - Warehouse name and code
+  - Product count
+  - Total available
+  - Total reserved
+  - Expandable product list
+```
+
+---
+
+### **4. ORDER MANAGEMENT FLOW**
+
+#### A. Order Receipt
+```
+Restaurant places order
+    ↓
+Order appears in Orders Inbox (status: PLACED)
+    ↓
+Supplier sees tabbed interface:
+  - All Orders
+  - New (Needs Action) - NEW PLACED orders
+  - Processing
+  - Shipped
+  - Completed
+```
+
+#### B. Order Processing
+```
+Click Order Card
+    ↓
+Order Detail Page opens
+    ↓
+[Tabs Available]
+  1. Order Details - Basic info
+  2. Items - Product list
+  3. Picking Notes (Supplier Only)
+  4. Delivery Info (Supplier Only)
+  5. Packing Slip (Supplier Only)
+    ↓
+Supplier takes actions:
+  - "Acknowledge" → Status: ACKNOWLEDGED
+  - "Start Processing" → Status: PROCESSING
+  - "Mark as Shipped" → Status: SHIPPED
+  - "Mark as Delivered" → Status: DELIVERED
+```
+
+#### C. Order Status Transitions
+```
+PLACED (restaurant creates)
+    ↓
+ACKNOWLEDGED (supplier accepts)
+    ↓
+PROCESSING (supplier picking/packing)
+    ↓
+SHIPPED (supplier ships)
+    ↓
+DELIVERED (confirmation)
+    ↓
+[Auto-triggers]
+  1. Restaurant inventory updated
+  2. Invoice auto-created
+  3. Notification sent
+```
+
+---
+
+### **5. CHAT & COMMUNICATION FLOW**
+
+```
+Navigate to Chat
+    ↓
+[API Call] GET /api/chat/conversations
+    - Get all conversations for user
+    - Last message preview
+    - Unread count
+    ↓
+Conversation List Displays
+  - Restaurant/Supplier names
+  - Last message preview
+  - Timestamp
+  - Unread badge
+    ↓
+Click Conversation
+    ↓
+[API Call] GET /api/chat/conversations/:id/messages
+    - Load message history
+    - Paginated (50 per page)
+    ↓
+Message View Displays
+  - Messages chronologically
+  - Sender name/avatar
+  - Timestamp
+  - Attachments if any
+    ↓
+Type & Send Message
+    ↓
+[API Call] POST /api/chat/conversations/:id/messages
+    - Create message
+    - Link attachments if any
+    ↓
+Message appears in chat
+```
+
+---
+
+### **6. INVOICE MANAGEMENT FLOW**
+
+#### A. Auto-Invoice Creation (on Delivery)
+```
+Order DELIVERED
+    ↓
+[Backend Trigger] handleOrderDelivery()
+    ↓
+Check: invoice exists? → No
+    ↓
+Generate Invoice Number: INV-YYYY-MM-XXXXXX
+    ↓
+Create Invoice Record:
+  - supplier_id
+  - restaurant_id
+  - order_id (link to original order)
+  - invoice_number
+  - issue_date = now()
+  - due_date = now() + 30 days
+  - status = 'ISSUED'
+  - total_amount = sum(order items)
+  - amount_due = total_amount
+    ↓
+Create Invoice Line Items:
+  - Loop through order items
+  - Create line_item for each
+  - Copy: product_id, quantity, unit_price
+  - Calculate: line_total = quantity × unit_price
+    ↓
+Invoice created with status: ISSUED
+```
+
+#### B. Invoice Viewing
+```
+Navigate to Invoices
+    ↓
+[API Call] GET /api/invoices
+    - Get all invoices for supplier
+    - Join with restaurant
+    - Join with order
+    - Calculate total_paid
+    ↓
+Invoice List Displays
+  - Invoice number
+  - Restaurant name
+  - Order ID badge
+  - Order status badge
+  - Invoice date, due date
+  - Total amount
+  - Balance due
+  - Status (ISSUED, PARTIALLY_PAID, PAID, VOID)
+```
+
+#### C. Payment Recording
+```
+Click Invoice Card → View Details
+    ↓
+Invoice Detail Dialog Opens
+    ↓
+Click "Record Payment"
+    ↓
+Payment Dialog:
+  - Amount
+  - Method (Cash, Check, Bank Transfer, Stripe, Credit Card)
+  - Date
+  - Reference number
+  - Notes
+    ↓
+[API Call] POST /api/payments
+    - Create payment record
+    - Update invoice amount_due
+    - Update invoice status:
+      * amount_due = 0 → PAID
+      * amount_due < total → PARTIALLY_PAID
+    ↓
+Invoice status updated
+```
+
+#### D. Invoice Status Transitions
+```
+ISSUED (auto-created on delivery)
+    ↓
+PARTIALLY_PAID (payment < total)
+    ↓
+PAID (payment = total)
+    OR
+VOID (cancelled by supplier)
+```
+
+---
+
+### **7. WAREHOUSE MANAGEMENT FLOW**
+
+#### A. Add Warehouse
+```
+Navigate to Settings → Warehouses Tab
+    ↓
+Click "Add Warehouse"
+    ↓
+Warehouse Dialog:
+  - Name (required)
+  - Code (optional)
+  - Address
+  - Contact Info
+  - Storage Capacity
+    ↓
+[API Call] POST /api/warehouses
+    - Create warehouse record
+    ↓
+Warehouse appears in list
+```
+
+#### B. Assign Product to Warehouse
+```
+Create/Edit Product
+    ↓
+Warehouse Dropdown (optional)
+  - Select warehouse from list
+  - Or leave empty (default)
+    ↓
+Save Product
+    ↓
+Inventory created with warehouse_id
+    ↓
+Inventory shows warehouse in list
+```
+
+---
+
+### **8. PRODUCT BULK UPLOAD FLOW**
+
+```
+Navigate to Products
+    ↓
+Click "Upload Products CSV/Excel"
+    ↓
+Select File Dialog
+    ↓
+[File Validation]
+  - Check extension (.csv, .xlsx, .xls)
+  - Check file size
+  - Check format
+    ↓
+[Parse File] using papaparse
+    ↓
+Preview Table Displays
+  - Columns: Name, SKU, Description, Category, Unit, Price, Stock
+  - Show mapped data
+  - Errors highlighted
+    ↓
+Click "Import Products"
+    ↓
+[API Calls] POST /api/products (for each product)
+    ↓
+Batch Processing Results
+  - Success count
+  - Error count
+  - Error details
+    ↓
+Refresh product list
+```
+
+---
+
+### **9. SETTINGS & PROFILE FLOW**
+
+#### A. Supplier Settings Tabs
+```
+Navigate to Settings
+    ↓
+[Tabs Available]
+  1. Profile - Company info
+  2. Contacts - Team members
+  3. Business - Hours, policies
+  4. Warehouses - Locations
+  5. Delivery Zones - Service areas
+    ↓
+Edit Fields → Click "Save"
+    ↓
+[API Call] PATCH /api/suppliers/:id
+    ↓
+Settings updated
+```
+
+#### B. Contact Management
+```
+Navigate to Settings → Contacts Tab
+    ↓
+Click "Add Contact"
+    ↓
+Contact Dialog:
+  - Name, Email, Phone
+  - Role (Sales, Operations, etc.)
+  - Primary Contact checkbox
+    ↓
+[API Call] POST /api/suppliers/contacts
+    ↓
+Contact added to list
+    ↓
+OR Click "Upload CSV/Excel"
+    ↓
+Parse contacts from file
+    ↓
+Preview table
+    ↓
+Click "Import Contacts"
+    ↓
+Batch import contacts
+```
+
+---
+
+### **10. IMAGE UPLOAD FLOW**
+
+```
+Click "Upload Image" in product form
+    ↓
+File Selector Opens
+    ↓
+Select Image File
+    ↓
+[Client Validation]
+  - Check file type (jpg, png, webp)
+  - Check file size (< 5MB)
+    ↓
+Create Preview URL (URL.createObjectURL)
+    ↓
+Preview displays in form
+    ↓
+Click "Create Product"
+    ↓
+[API Call] POST /api/products/presigned-url
+    - Get presigned upload URL
+    ↓
+[PUT Request] Upload image to S3/MinIO
+    ↓
+Extract public URL from presigned response
+    ↓
+[API Call] POST /api/products
+    - Include image_url in payload
+    ↓
+Product created with image
+```
+
+---
+
+## 🎯 FEATURE CATEGORIES
 
 ## 1️⃣ PRODUCT MANAGEMENT
 
@@ -54,21 +512,6 @@ Supplify provides comprehensive supplier management features for F&B suppliers t
 - Product images with fallback
 - Direct navigation to product detail page
 
-#### ✅ Product Details
-- Full product information display
-- Product image gallery
-- SKU and category badges
-- Description section
-- Pricing information
-- Stock levels
-- Supplier information
-
-#### ✅ Product Editing
-- Update product details
-- Modify pricing
-- Update inventory levels
-- Change categories and units
-
 ### API Endpoints:
 - `GET /api/products` - List all products (supplier-filtered)
 - `GET /api/products/:id` - Get product details
@@ -98,582 +541,396 @@ Supplify provides comprehensive supplier management features for F&B suppliers t
   - Available quantity (green highlight)
   - Stock status (In Stock / Low Stock badges)
 - Action buttons:
-  - **Adjust** button - Record inventory adjustments
-  - **Settings** button - Configure MOQ, lead time, thresholds
+  - **Adjust** - Quantity adjustments (not implemented)
+  - **Settings** - Stock settings (not implemented)
 
 #### ✅ Warehouse View
-- **"View All Warehouses" button** - Toggle between product view and warehouse view
-- **Warehouse cards** display:
-  - Warehouse name and code
-  - Total products count
+- **"View All Warehouses"** button toggles between views
+- Warehouse-centric view
+- Displays:
+  - Warehouse card with name and code
+  - Product count per warehouse
   - Total available quantity
   - Total reserved quantity
-  - Nested table showing inventory per product in that warehouse
-- Loading states with spinner
-- Empty state message when no warehouses exist
-- Dynamic inventory calculations per warehouse
-
-#### ✅ Inventory Adjustment Dialog
-- Adjustment types:
-  - Add Stock
-  - Remove Stock
-  - Stock Take
-  - Damage
-  - Return
-- Quantity field with validation
-- Reason field (required)
-- Optional notes field
-- Confirmation before recording
-
-#### ✅ Inventory Settings Dialog
-- **MOQ (Minimum Order Quantity)** - Configure minimum order quantities
-- **Order Multiple** - Set order quantity multiples
-- **Lead Time** - Set delivery lead time in days
-- **Low Stock Threshold** - Configure reorder points
-- **Backorders Allowed** - Enable/disable backorders
-- Settings apply per product
-
-#### ✅ Real-Time Data
-- Inventory quantities update dynamically
-- Calculations: On Hand = Available + Reserved
-- Automatic low stock detection
-- Warehouse-specific inventory tracking
-- Reserved quantity tracking (for pending orders)
+  - Expandable product list within each warehouse
 
 ### API Endpoints:
-- `GET /api/inventory` - Get all inventory (warehouse-linked)
-- `GET /api/inventory/product/:productId` - Get specific product inventory
-- `PATCH /api/inventory/product/:productId` - Update inventory
-- `POST /api/inventory/product/:productId/adjustment` - Record adjustments
-- `GET /api/inventory/product/:productId/adjustments` - View adjustment history
-- `PATCH /api/inventory/product/:productId/settings` - Update inventory settings
-- `GET /api/inventory/alerts` - Get low stock alerts
-- `PATCH /api/inventory/alerts/:alertId/acknowledge` - Acknowledge alerts
-
-### Database Structure:
-- `inventory` table with `warehouse_id`, `available_qty`, `reserved_qty`
-- Links to `product` and `warehouse` tables
-- Automatic calculations for on-hand quantities
-- Stock status indicators
+- `GET /api/inventory` - Get inventory with warehouse info
+- `GET /api/warehouses` - Get warehouses with aggregated inventory
+- `POST /api/warehouses` - Create warehouse
+- `PATCH /api/warehouses/:id` - Update warehouse
 
 ---
 
-## 3️⃣ WAREHOUSE MANAGEMENT
-
-### Features Implemented:
-
-#### ✅ Warehouse Creation
-- **Main Warehouse** - Primary warehouse location
-- **Distribution Centers** - Additional warehouse locations
-- Warehouse details:
-  - Name (e.g., "Main Warehouse")
-  - Code (e.g., "WH-001")
-  - Address (street, city, state, zip, country)
-  - Main warehouse flag
-  - Active status
-
-#### ✅ Warehouse Display
-- List all warehouses for supplier
-- Show product count per warehouse
-- Display total available and reserved quantities
-- Warehouse-specific inventory breakdown
-- Nested product inventory tables
-
-#### ✅ Warehouse Inventory
-- View inventory by warehouse
-- Product-level details within each warehouse
-- Real-time quantity updates
-- Stock status indicators per warehouse
-
-### API Endpoints:
-- `GET /api/warehouses` - Get all warehouses with aggregated inventory
-- Inventory automatically linked to warehouses when created
-
-### Database Structure:
-- `warehouse` table with supplier_id foreign key
-- Inventory linked via `warehouse_id` foreign key
-- Support for multiple warehouses per supplier
-
----
-
-## 4️⃣ ORDER MANAGEMENT
+## 3️⃣ ORDER MANAGEMENT
 
 ### Features Implemented:
 
 #### ✅ Orders Inbox
-- **Tabbed Navigation**:
+- **Status Tabs**: Filter orders by status
   - All Orders
-  - New (Needs Action) - Orders requiring acknowledgment
-  - Processing - Orders being fulfilled
-  - Shipped - Orders in transit
-  - Completed - Delivered orders
-- **Search Functionality**:
-  - Search by order ID, customer name, or product
-- **Customer Filter**:
-  - Filter orders by specific restaurant/customer
-
-#### ✅ Order Display
-- **Order Cards** show:
+  - New (Needs Action) - NEW PLACED orders
+  - Processing
+  - Shipped
+  - Completed
+- **Search Bar**: Search by order ID or restaurant name
+- **Order Cards Display**:
   - Order ID
-  - Restaurant/Customer name
-  - Order placed date
+  - Restaurant name
+  - Placed date
   - Total amount
   - Item count
-  - Product preview
-  - Current status with color-coded badges
-
-#### ✅ Status Workflow
-- **Status Flow**: DRAFT → PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → DELIVERED → COMPLETED
-- **Action Buttons** based on status:
-  - "Acknowledge" - For new orders
-  - "Start Processing" - Begin fulfillment
-  - "Mark as Shipped" - Ship order
-  - "Mark as Delivered" - Complete delivery
-  - "Decline" - Cancel order
-- Real-time status updates
-- Toast notifications on status change
+  - Items preview
 
 #### ✅ Order Detail Page
 - **Tabbed Interface**:
-  - **Order Details** - General order information
-  - **Items** - Full product list with quantities
-  - **Picking Notes** - Internal picking information
-  - **Delivery Info** - Delivery instructions
-  - **Packing Slip** - Print-ready packing slip
+  1. **Order Details** - Basic info, status, timestamps, notes
+  2. **Items** - Full product list with quantities and prices
+  3. **Picking Notes** (Supplier Only) - SKU, location, lot, expiry, notes
+  4. **Delivery Info** (Supplier Only) - Time windows, access instructions
+  5. **Packing Slip** (Supplier Only) - Print-ready layout
 
-##### Order Details Tab:
-- Order ID and status
-- Creation and placement timestamps
-- Order notes
+#### ✅ Order Status Workflow
+- **Available Statuses**:
+  - `DRAFT` - Initial state
+  - `PLACED` - Restaurant submitted
+  - `ACKNOWLEDGED` - Supplier acknowledged
+  - `PROCESSING` - Being picked/packed
+  - `SHIPPED` - In transit
+  - `DELIVERED` - Received by restaurant
+  - `COMPLETED` - Finalized
+  - `CANCELLED` - Cancelled
 
-##### Items Tab:
-- Complete product list
-- Quantity per product
-- Unit price and line totals
-- SKU for each product
-- Supplier information
-- Mock location data (ready for real data integration)
-
-##### Picking Notes Tab (Supplier Only):
-- Product details for picking
-- Quantity and warehouse location
-- Lot and expiry information
-- Picking notes and special instructions
-- "Print Picking List" button
-
-##### Delivery Info Tab (Supplier Only):
-- Delivery time windows
-- Access instructions
-- Special delivery requirements
-- Delivery address
-
-##### Packing Slip Tab (Supplier Only):
-- Print-ready format
-- Order and ship-to information
-- Itemized product table
-- "Print" and "Download PDF" buttons
-
-#### ✅ Inventory Integration
-- **Automatic Inventory Updates**: When order is marked as DELIVERED
-  - Updates `restaurant_inventory` with delivered quantities
-  - Links delivered products to restaurant locations
-  - Creates/updates inventory records in restaurant tables
+#### ✅ Action Buttons (Supplier Only)
+- Status-specific actions:
+  - "Acknowledge" → `ACKNOWLEDGED`
+  - "Start Processing" → `PROCESSING`
+  - "Mark as Shipped" → `SHIPPED`
+  - "Mark as Delivered" → `DELIVERED` *(triggers auto-invoice)*
+  - "Decline" → `CANCELLED`
 
 ### API Endpoints:
-- `GET /api/orders` - List orders (supplier-filtered)
-- `GET /api/orders/:id` - Get order details
+- `GET /api/orders` - List orders (supplier-filtered by product ownership)
+- `GET /api/orders/:id` - Get order with items
 - `PATCH /api/orders/:id` - Update order status
-- `POST /api/orders` - Create order (for restaurants)
-- Order status updates trigger inventory updates on DELIVERED
 
-### Delivery Flow:
-1. Restaurant places order
-2. Supplier receives order (PLACED status)
-3. Supplier acknowledges (ACKNOWLEDGED)
-4. Supplier starts processing (PROCESSING)
-5. Supplier ships order (SHIPPED)
-6. Supplier marks as delivered (DELIVERED)
-7. **System automatically updates restaurant inventory**
-8. Order marked completed (COMPLETED)
+### Order Delivery Auto-T better
+When an order is marked as `DELIVERED`:
+1. Restaurant inventory updated (receive items)
+2. **Invoice auto-created** (invoice record and line items)
+3. Invoice status set to `ISSUED`
+4. Invoice due date set (30 days from delivery)
 
 ---
 
-## 5️⃣ CUSTOMER MANAGEMENT (RESTAURANTS)
+## 4️⃣ CHAT & COMMUNICATION
 
 ### Features Implemented:
 
-#### ✅ Restaurant List View
-- View all customer restaurants
-- Restaurant cards with:
-  - Restaurant name
-  - Contact information
-  - Location/city
-  - Status indicators
-  - Order count and relationship status
+#### ✅ Conversation List
+- View all conversations
+- Last message preview
+- Unread message count
+- Timestamp display
+- Click to open conversation
 
-#### ✅ Restaurant Detail Page
-- Restaurant profile information
-- Contact details
-- Order history with the supplier
-- Relationship status
-- Quick actions (pin restaurant, add notes)
+#### ✅ Message View
+- Message history display
+- Sender name and avatar
+- Timestamp for each message
+- Attachments support
+- Message input at bottom
 
-#### ✅ Restaurant Filtering
-- Search by restaurant name
-- Filter by status
-- Sort by relationship type
-- Activity indicators
-
-### API Endpoints:
-- `GET /api/restaurants` - List restaurants
-- `GET /api/restaurants/:id` - Get restaurant details
-
----
-
-## 6️⃣ CHAT & COMMUNICATION
-
-### Features Implemented:
-
-#### ✅ Chat Conversations
-- List of all conversations with restaurants
-- Conversation preview with:
-  - Restaurant name and avatar
-  - Last message preview
-  - Timestamp
-  - Unread message count badge
-- Direct navigation to conversation
-
-#### ✅ Chat Interface
-- Message thread display
-- Message input and send
-- Real-time updates
-- Attachment support (ready for implementation)
-- Read receipts and timestamps
-- Customer information sidebar
-
-#### ✅ Quick Replies (Suppliers Only)
-- Pre-configured quick reply templates
-- Fast response to common queries
-- Template management (view templates)
+#### ✅ Quick Actions
+- Send messages
+- View attachments
+- Mark as read
+- Link messages to orders (planned)
 
 ### API Endpoints:
 - `GET /api/chat/conversations` - List conversations
-- `POST /api/chat/conversations` - Start conversation
 - `GET /api/chat/conversations/:id/messages` - Get messages
 - `POST /api/chat/conversations/:id/messages` - Send message
-- `GET /api/chat/quick-replies` - Get quick replies (supplier only)
-- `POST /api/chat/quick-replies` - Create quick reply (supplier only)
-
-### Database:
-- `conversation` table with participants
-- `message` table with content and metadata
-- `message_attachment` table for files
-- `quick_reply_template` table for templates
 
 ---
 
-## 7️⃣ FULFILLMENT & LOGISTICS
+## 5️⃣ INVOICE MANAGEMENT (NEW!)
 
 ### Features Implemented:
 
-#### ✅ Fulfillment Page
-- **Tabbed Interface**:
-  - **Waves** - Delivery wave management
-  - **Pick Lists** - Picking lists for orders
-  - **Routes** - Delivery route planning
-  - **Delivery Tracking** - Track shipments
-  - **Exceptions** - Delivery exceptions handling
+#### ✅ Auto-Invoice Creation
+- **Triggered on Order Delivery**
+  - When order status → `DELIVERED`
+  - Invoice automatically created
+  - Line items copied from order items
+  - Total calculated from order
+  - Due date: 30 days from delivery
+  - Status: `ISSUED`
 
-#### ✅ Delivery Waves
-- Group orders by delivery schedule
-- Wave creation and management
-- Time window assignment
-- Route assignment
+#### ✅ Invoice Display
+- Invoice list with search and filters
+- Summary cards:
+  - Total Invoices
+  - Unpaid count
+  - Overdue count
+  - Total amount
+- Invoice cards show:
+  - Invoice number
+  - Restaurant name
+  - **Order ID badge**
+  - **Order status badge** (DELIVERED, SHIPPED, etc.)
+  - Invoice date & due date
+  - Total amount & balance due
+  - Status badge
 
-#### ✅ Pick Lists
-- Generate picking lists per order
-- Product details (SKU, lot, expiry)
-- Location information
-- Picking instructions
-- Print pick lists
-
-#### ✅ Routes
-- Delivery route creation
-- Route stops management
-- Driver assignment
-- Route optimization (ready for implementation)
-
-#### ✅ Delivery Tracking
-- Track order shipments
-- Status updates
-- Location tracking
-- ETA calculations
-
-#### ✅ Exceptions Handling
-- Manage delivery exceptions
-- Track failed deliveries
-- Reschedule deliveries
-- Update customers on delays
-
-### API Endpoints:
-- Fulfillment-related endpoints (ready for integration)
-- Route management endpoints
-- Pick list generation
-- Exception tracking
-
----
-
-## 8️⃣ SUPPLIER SETTINGS
-
-### Features Implemented:
-
-#### ✅ Tabbed Settings Interface
-- **Profile Tab** - Company information
-- **Contacts Tab** - Business contacts management
-- **Business Tab** - Business hours and policies
-- **Warehouses Tab** - Warehouse management
-- **Delivery Zones Tab** - Delivery coverage areas
-
-#### ✅ Profile Tab
-- Company Name
-- Legal Name
-- VAT Number
-- Trade License
-- Save functionality
-
-#### ✅ Contacts Tab
-- **Manual Contact Entry**:
-  - Name (required)
-  - Email (required)
-  - Phone (required)
-  - Role/Title
-  - Primary contact checkbox
-  - Edit and Remove buttons
-- **Bulk Contact Upload**:
-  - CSV/Excel upload
-  - Drag-and-drop interface
-  - File validation
-  - Data preview before upload
-  - Parsing with PapaParse library
-  - Column mapping (Name, Email, Phone, Role, Is Primary)
-  - Success/error feedback
-
-#### ✅ Business Tab
-- **Operating Hours**:
-  - Days of the week (Monday-Sunday)
-  - Time picker for each day
-  - "Closed" toggle per day
-- **Policies**:
-  - Minimum Order Value
-  - Payment Terms (e.g., Net 30)
-  - Return Policy
-- Save functionality
-
-#### ✅ Warehouses Tab
-- **Add Warehouse Dialog**:
-  - Warehouse Name (required)
-  - Warehouse Code (required)
-  - Street Address
-  - City
-  - Country
-  - Main warehouse checkbox
-  - Create and Cancel buttons
-- **Warehouse List**:
-  - Display existing warehouses
-  - Main warehouse badge
-  - Edit functionality
-
-#### ✅ Delivery Zones Tab
-- **Add Delivery Zone Dialog**:
-  - Zone Name
-  - Delivery Fee
-  - Minimum Order Amount
-  - Delivery Time (days)
-  - Map integration placeholder
-- **Zone List**:
-  - Display existing zones
-  - Fee and minimum order info
-  - Edit functionality
-
-### Database Structure:
-- Supplier profile fields
-- Contact management (multiple contacts per supplier)
-- Warehouse management
-- Delivery zone coverage
-- Business hours configuration
-
----
-
-## 9️⃣ AUTHENTICATION & AUTHORIZATION
-
-### Features Implemented:
-
-#### ✅ Keycloak OAuth2 Integration
-- Server-side OAuth flow
-- PKCE for security
-- HTTP-only cookies for token storage
-- Session management
-- Secure token refresh
-
-#### ✅ Role-Based Access Control (RBAC)
-- **Supplier Role**: Full access to supplier features
-- **Restaurant Role**: Customer-facing features
-- **Admin Role**: System administration
-
-#### ✅ Protected Routes
-- Authentication guard on all routes
-- Role-based route access
-- Redirect to login when unauthenticated
-- Session persistence
-
-#### ✅ User Profile
-- Display user information
-- Email and role display
-- Profile management
-
----
-
-## 🔟 DASHBOARD & ANALYTICS
-
-### Features Implemented:
-
-#### ✅ Supplier Dashboard
-- Business metrics overview
-- Quick stats cards
-- Recent activity
-- Key performance indicators
-- Order summary
-- Revenue tracking
-
-#### ✅ Analytics
-- Order trends
-- Revenue analytics
-- Product performance
-- Customer insights (ready for implementation)
-
----
-
-## 📊 DATA & INTEGRATION
-
-### Features Implemented:
-
-#### ✅ Real-Time Inventory Tracking
-- Live quantity updates
-- Reserved quantity tracking
-- Available quantity calculations
-- Low stock alerts
-- Warehouse-specific inventory
-
-#### ✅ Product-Warehouse Linking
-- Products can be assigned to warehouses
-- Optional warehouse assignment during creation
-- Inventory automatically linked to warehouse
-- View inventory by warehouse
-
-#### ✅ Order-Inventory Integration
-- Automatic inventory updates on delivery
-- Restaurant inventory management
-- Real-time stock adjustments
-- Order fulfillment tracking
-
----
-
-## 🚀 TECHNICAL IMPLEMENTATION DETAILS
-
-### Frontend Technologies:
-- **React 18** with TypeScript
-- **Vite** for build tooling
-- **Tailwind CSS** for styling
-- **shadcn/ui** for components
-- **RTK Query** for state management
-- **React Router** for navigation
-- **React Hook Form + Zod** for validation
-- **Lucide React** for icons
-- **PapaParse** for CSV parsing
-
-### Backend Technologies:
-- **Node.js** with Express
-- **PostgreSQL** database
-- **Keycloak** for authentication
-- **MinIO** for file storage
-- **Pino** for logging
-- **Zod** for validation
-
-### Database Tables:
-1. `supplier` - Supplier profiles
-2. `product` - Product catalog
-3. `price` - Product pricing
-4. `inventory` - Inventory with warehouse links
-5. `warehouse` - Warehouse management
-6. `customer_order` - Orders
-7. `order_item` - Order line items
-8. `conversation` - Chat conversations
-9. `message` - Chat messages
-10. `restaurant_inventory` - Restaurant stock
-11. And more...
-
-### API Response Format:
-```json
-{
-  "ok": true,
-  "data": { ... },
-  "error": null,
-  "requestId": "uuid"
-}
+#### ✅ Invoice Status Flow
+```
+ISSUED (auto-created)
+    ↓
+PARTIALLY_PAID (payment < total)
+    ↓
+PAID (payment = total)
+    OR
+VOID (cancelled)
 ```
 
+#### ✅ Payment Recording
+- Record payments from invoice detail view
+- Payment methods: Cash, Check, Bank Transfer, Stripe, Credit Card
+- Automatic invoice status update
+- Balance tracking
+
+#### ✅ Invoice Detail View
+- Bill To information
+- Invoice line items
+- Payment history
+- Outstanding balance
+- PDF export (planned)
+- Record payment button
+
+### API Endpoints:
+- `GET /api/invoices` - List invoices with order info
+- `GET /api/invoices/:id` - Get invoice details
+- `POST /api/invoices` - Create invoice (manual)
+- `POST /api/payments` - Record payment
+- `PATCH /api/invoices/:id` - Update invoice status
+
 ---
 
-## ✅ SUMMARY
+## 6️⃣ WAREHOUSE MANAGEMENT
 
-### Fully Implemented Features:
+### Features Implemented:
+
+#### ✅ Warehouse List
+- View all warehouses
+- Product count per warehouse
+- Total available & reserved quantities
+- Expandable product inventory
+
+#### ✅ Add Warehouse
+- Name and code
+- Address information
+- Storage capacity
+- Contact info
+
+#### ✅ Assign Products
+- Optional warehouse dropdown in product form
+- Link products to warehouses
+- Inventory tracked per warehouse
+
+### API Endpoints:
+- `GET /api/warehouses` - Get warehouses with inventory
+- `POST /api/warehouses` - Create warehouse
+- `PATCH /api/warehouses/:id` - Update warehouse
+
+---
+
+## 7️⃣ SUPPLIER SETTINGS
+
+### Features Implemented:
+
+#### ✅ Profile Tab
+- Company name
+- Contact information
+- Business registration
+- Tax information
+- Logo upload
+
+#### ✅ Contacts Tab
+- Add contacts manually
+- Bulk upload via CSV/Excel
+- Contact preview before import
+- Edit/remove contacts
+- Primary contact flag
+
+#### ✅ Business Tab
+- Business hours
+- Delivery policy
+- Return policy
+- Payment terms
+- Subscriptions
+
+#### ✅ Warehouses Tab (Duplicate from above)
+- Manage warehouse locations
+
+#### ✅ Delivery Zones Tab
+- Define service areas
+- Set delivery fees
+- Set minimum orders
+- Delivery windows
+
+### API Endpoints:
+- `GET /api/suppliers/:id/settings` - Get settings
+- `PATCH /api/suppliers/:id` - Update profile
+- `POST /api/suppliers/contacts` - Add contact
+- `POST /api/suppliers/contacts/bulk` - Bulk upload contacts
+
+---
+
+## 8️⃣ FULFILLMENT & LOGISTICS
+
+### Features Implemented:
+
+#### ✅ Fulfillment Dashboard
+- Tabbed interface:
+  1. Waves - Delivery waves
+  2. Pick Lists - Packing lists
+  3. Routes - Delivery routes
+  4. Delivery Tracking - Live tracking
+  5. Exceptions - Delivery issues
+
+#### ✅ Order Integration
+- View orders in fulfillment context
+- Track order status through fulfillment
+- Delivery scheduling
+- Route assignment
+
+### API Endpoints:
+- `GET /api/fulfillment/waves` - Get delivery waves
+- `GET /api/fulfillment/pick-lists` - Get pick lists
+- `GET /api/fulfillment/routes` - Get delivery routes
+- `GET /api/fulfillment/tracking` - Get tracking data
+
+---
+
+## 🔐 AUTHENTICATION & AUTHORIZATION
+
+### Supplier Role Access:
+- **Can Access**:
+  - Products (own only)
+  - Orders (own products only)
+  - Inventory (own only)
+  - Warehouses (own only)
+  - Invoices (own only)
+  - Fulfillment
+  - Settings
+  - Chat (with restaurants)
+
+- **Cannot Access**:
+  - Restaurant-specific features
+  - Admin-only areas
+  - Other suppliers' data
+
+---
+
+## 📊 KEY INTEGRATIONS
+
+### Order → Invoice Integration:
+1. **Order Delivered** → **Auto-Invoice Created**
+   - Invoice number: `INV-YYYY-MM-XXXXXX`
+   - Total = sum of order items
+   - Due date = 30 days from delivery
+   - Status = `ISSUED`
+2. **Invoice Shows Order Info**
+   - Order ID badge
+   - Order status badge
+   - Link to original order
+3. **Payment Recording**
+   - Updates invoice status
+   - Tracks balance due
+   - Links to order for reference
+
+### Inventory → Warehouse Integration:
+1. **Products Assigned to Warehouses**
+   - Optional warehouse_id on product creation
+   - Inventory tracked per warehouse
+2. **Warehouse View**
+   - Shows aggregated inventory per warehouse
+   - Product count per location
+   - Total stock per warehouse
+
+---
+
+## 🎨 USER EXPERIENCE
+
+### Navigation Flow:
+```
+Login → Dashboard
+    ↓
+Products → Create → Inventory
+    ↓
+Orders → Process → Deliver
+    ↓
+Invoice Auto-Created
+    ↓
+Invoices → View → Record Payment
+    ↓
+Chat → Communicate
+    ↓
+Fulfillment → Manage Logistics
+    ↓
+Settings → Configure
+```
+
+### Key UI Features:
+- **Tabbed Interfaces**: Efficient data organization
+- **Search & Filters**: Quick data access
+- **Status Badges**: Visual status indicators
+- **Summary Cards**: Quick metrics overview
+- **Modal Dialogs**: Focused task completion
+- **Responsive Design**: Works on all devices
+
+---
+
+## ✅ IMPLEMENTATION STATUS
+
+### Fully Implemented ✅:
 1. ✅ Product Management (single & bulk)
-2. ✅ Inventory Management (real-time tracking)
-3. ✅ Warehouse Management (multi-warehouse support)
-4. ✅ Order Management (full workflow)
-5. ✅ Customer (Restaurant) Management
-6. ✅ Chat & Communication
-7. ✅ Fulfillment & Logistics
-8. ✅ Supplier Settings (Profile, Contacts, Warehouses, Zones)
-9. ✅ Authentication & Authorization
-10. ✅ Dashboard & Analytics
+2. ✅ Inventory Management
+3. ✅ Warehouse Management
+4. ✅ Order Management
+5. ✅ Order → Invoice Auto-Creation
+6. ✅ Invoice Display & Tracking
+7. ✅ Payment Recording
+8. ✅ Chat System
+9. ✅ Supplier Settings
+10. ✅ Image Upload (S3/MinIO)
+11. ✅ Unit Selection
+12. ✅ CSV/Excel Upload
 
-### Feature Highlights:
-- **10/10 API Tests Passing** ✨
-- **Real-time inventory tracking** with warehouse support
-- **Bulk product upload** with CSV/Excel
-- **Bulk contact upload** for business contacts
-- **Complete order workflow** from placement to delivery
-- **Automated inventory updates** on order delivery
-- **Multi-warehouse support** with inventory per warehouse
-- **Role-based access control** throughout
-- **Chat system** for customer communication
-- **Print-ready picking notes** and packing slips
-
-### Test Coverage:
-- API endpoint tests: 10/10 passing
-- Health check: ✅
-- Products: ✅
-- Inventory: ✅
-- Warehouses: ✅
-- Orders: ✅
-- Chat: ✅
-- Authentication: ✅
+### Partially Implemented 🔄:
+1. 🔄 Fulfillment (UI only, needs API)
+2. 🔄 Delivery Zones (UI only, needs API)
+3. 🔄 PDF Export (planned)
+4. 🔄 Email Notifications (planned)
 
 ---
 
-## 📝 Next Steps (Optional Enhancements):
-1. PDF export for packing slips
-2. Advanced analytics dashboard
-3. Route optimization algorithms
-4. Real-time chat notifications
-5. Mobile app integration
-6. Advanced reporting and exports
-7. Integration with shipping providers
-8. Payment processing
-9. Advanced search and filtering
-10. Multi-language support
+## 🚀 NEXT STEPS
+
+### Recommended Enhancements:
+1. **PDF Generation**: Generate printable invoices
+2. **Email Automation**: Send invoices via email
+3. **Advanced Analytics**: Financial KPIs dashboard
+4. **Mobile App**: On-the-go order management
+5. **Stripe Integration**: Payment processing
+6. **Export**: CSV/PDF export for accounting
+7. **Notifications**: Real-time alerts
+8. **Multi-Currency**: Currency conversion
+9. **Recurring Orders**: Subscription billing
+10. **Advanced Reporting**: Custom reports
 
 ---
 
-**Status**: All core supplier features are fully implemented and functional! 🎉
+**Last Updated**: Current
+**Version**: 1.0.0
