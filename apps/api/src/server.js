@@ -26,6 +26,7 @@ import { invoicesRoutes } from './routes/invoices.routes.js';
 import { paymentsRoutes } from './routes/payments.routes.js';
 import { quickListsRoutes } from './routes/quick-lists.routes.js';
 import { restaurantInventoryRoutes } from './routes/restaurant-inventory.routes.js';
+import { restaurantOnboardingRoutes } from './routes/restaurant-onboarding.routes.js';
 
 const app = express();
 
@@ -128,6 +129,7 @@ app.use('/api/invoices', invoicesRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/quick-lists', quickListsRoutes);
 app.use('/api/restaurant-inventory', restaurantInventoryRoutes);
+app.use('/api/restaurant-onboarding', restaurantOnboardingRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

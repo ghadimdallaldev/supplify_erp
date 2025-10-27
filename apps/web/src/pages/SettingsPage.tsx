@@ -3,6 +3,7 @@ import { Button } from '../components/ui/button'
 import { User, Mail, Shield, Bell } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { SupplierSettingsPage } from './SupplierSettingsPage'
+import { RestaurantOnboardingPage } from './RestaurantOnboardingPage'
 
 export function SettingsPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -10,6 +11,11 @@ export function SettingsPage() {
   // Show supplier-specific settings for suppliers
   if (user?.role === 'SUPPLIER') {
     return <SupplierSettingsPage />
+  }
+
+  // Show restaurant onboarding for restaurants
+  if (user?.role === 'RESTAURANT') {
+    return <RestaurantOnboardingPage />
   }
 
   return (

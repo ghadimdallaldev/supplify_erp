@@ -19,6 +19,7 @@ import { InvoicesPage } from './pages/InvoicesPage'
 import { SupplierSettingsPage } from './pages/SupplierSettingsPage'
 import { QuickListsPage } from './pages/QuickListsPage'
 import { RestaurantInventoryPage } from './pages/RestaurantInventoryPage'
+import { RestaurantOnboardingPage } from './pages/RestaurantOnboardingPage'
 
 const router = createBrowserRouter([
   {
@@ -72,6 +73,10 @@ const router = createBrowserRouter([
       {
         path: 'app/restaurant-inventory',
         element: <RestaurantInventoryPage />,
+      },
+      {
+        path: 'app/onboarding',
+        element: <RestaurantOnboardingPage />,
       },
       {
         path: 'app/suppliers',
