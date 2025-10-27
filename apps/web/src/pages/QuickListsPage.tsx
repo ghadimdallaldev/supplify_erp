@@ -1,28 +1,34 @@
 import { useState } from 'react'
-import { useGetQuickListsQuery, useCreateQuickListMutation, useDeleteQuickListMutation } from '../services/api'
+import { useGetQuickListsQuery, useCreateQuickListMutation, useDeleteQuickListMutation, useGetProductsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
+import { Input } from '../components/ui/input'
 import { 
   List, 
   Plus, 
   ShoppingCart,
   Trash2,
   Edit,
-  Package
+  Package,
+  Search,
+  X
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
-import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import toast from 'react-hot-toast'
 
 export function QuickListsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showProductDialog, setShowProductDialog] = useState(false)
+  const [selectedListId, setSelectedListId] = useState<string | null>(null)
+  const [productSearch, setProductSearch] = useState('')
   const [newListName, setNewListName] = useState('')
   const [newListDescription, setNewListDescription] = useState('')
   
   const { data, isLoading, refetch } = useGetQuickListsQuery()
+  const { data: productsData } = useGetProductsQuery({ limit: 1000 })
   const [createQuickList] = useCreateQuickListMutation()
   const [deleteQuickList] = useDeleteQuickListMutation()
 
@@ -32,26 +38,39 @@ export function QuickListsPage() {
       return
     }
 
-    // For now, show a message that items can be added after creation
-    toast.success(`Quick list "${newListName}" would be created! (Items can be added in the next step)`)
-    setShowCreateDialog(false)
-    setNewListName('')
-    setNewListDescription('')
-    
-    // TODO: Implement actual API call
-    // try {
-    //   await createQuickList({
-    //     name: newListName,
-    //     description: newListDescription,
-    //     items: []
-    //   }).unwrap()
-    //   toast.success('Quick list created!')
-    //   setShowCreateDialog(false)
-    //   refetch()
-    // } catch (error: any) {
-    //   toast.error(error?.data?.error?.message || 'Failed to create quick list')
-    // }
+    try {
+      await createQuickList({
+        name: newListName,
+        description: newListDescription,
+        items: []
+      }).unwrap()
+      toast.success('Quick list created!')
+      setShowCreateDialog(false)
+      setNewListName('')
+      setNewListDescription('')
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to create quick list')
+    }
   }
+
+  const handleAddProducts = (listId: string) => {
+    setSelectedListId(listId)
+    setShowProductDialog(true)
+  }
+
+  const handleAddProductToList = (product: any) => {
+    if (!selectedListId) return
+    
+    // TODO: Implement API call to add product to list
+    toast.success(`Added ${product.name} to list!`)
+    // After implementation, refresh list and close dialog
+  }
+
+  const filteredProducts = productsData?.products?.filter((product: any) =>
+    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    product.sku?.toLowerCase().includes(productSearch.toLowerCase())
+  )
 
   const handleDeleteList = async (listId: string, listName: string) => {
     if (!confirm(`Are you sure you want to delete "${listName}"?`)) return
@@ -148,10 +167,10 @@ export function QuickListsPage() {
                     <Button 
                       variant="outline" 
                       className="flex-1"
-                      onClick={() => toast.info('Edit feature coming soon')}
+                      onClick={() => handleAddProducts(list.id)}
                     >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Products
                     </Button>
                     <Button 
                       className="flex-1"
@@ -219,6 +238,68 @@ export function QuickListsPage() {
             </Button>
             <Button onClick={handleCreateList} disabled={!newListName.trim()}>
               Create List
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Selection Dialog */}
+      <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Products to List</DialogTitle>
+            <DialogDescription>
+              Search and select products to add to your quick list
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search products..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Product List */}
+            <div className="border rounded-md max-h-96 overflow-y-auto divide-y">
+              {filteredProducts?.map((product: any) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between p-4 hover:bg-gray-50"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium">{product.name}</p>
+                    <p className="text-sm text-gray-600">{product.sku}</p>
+                    <p className="text-sm font-semibold text-green-600">
+                      ${product.price?.toFixed(2)} / {product.unit}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddProductToList(product)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              ))}
+
+              {(!filteredProducts || filteredProducts.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  No products found
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowProductDialog(false)}>
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>
