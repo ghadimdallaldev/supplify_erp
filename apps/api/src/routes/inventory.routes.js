@@ -7,6 +7,72 @@ import { z } from 'zod';
 
 const router = express.Router();
 
+// Get all inventory for current supplier
+router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    let inventoryQuery = `
+      SELECT 
+        i.product_id as id,
+        i.product_id,
+        i.available_qty,
+        i.reserved_qty,
+        i.updated_at,
+        p.name as product_name,
+        p.sku,
+        p.supplier_id,
+        s.name as supplier_name,
+        0 as low_stock_threshold,
+        NULL as warehouse_name,
+        NULL as warehouse_code
+      FROM inventory i
+      JOIN product p ON p.id = i.product_id
+      JOIN supplier s ON s.id = p.supplier_id
+    `;
+    
+    const queryParams = [];
+    
+    // For suppliers, only show their own products
+    if (req.userData.role === 'SUPPLIER') {
+      inventoryQuery += ` WHERE s.contact_email = $1`;
+      queryParams.push(req.userData.email);
+    }
+    
+    inventoryQuery += ` ORDER BY p.name`;
+    
+    logger.info('Executing inventory query', { queryParams });
+    const { rows } = await query(inventoryQuery, queryParams);
+    
+    // Format the data for frontend
+    const formattedInventory = rows.map(row => ({
+      ...row,
+      isLowStock: row.low_stock_threshold ? parseFloat(row.available_qty) < row.low_stock_threshold : false,
+    }));
+    
+    res.json({
+      ok: true,
+      data: { inventory: formattedInventory },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error({ 
+      message: 'Get inventory list error',
+      error: error.message,
+      stack: error.stack 
+    });
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get inventory list',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
 // Validation schemas
 const inventoryUpdateSchema = z.object({
   availableQty: z.number().min(0),

@@ -185,6 +185,10 @@ export const api = createApi({
     }),
 
     // Inventory endpoints
+    getInventoryList: builder.query<{ inventory: any[] }, void>({
+      query: () => '/api/inventory',
+      providesTags: ['Inventory'],
+    }),
     getInventory: builder.query<Inventory, string>({
       query: (productId) => `/api/inventory/product/${productId}`,
       providesTags: ['Inventory'],
@@ -196,6 +200,12 @@ export const api = createApi({
         body: data,
       }),
       invalidatesTags: ['Inventory'],
+    }),
+
+    // Warehouse endpoints
+    getWarehouses: builder.query<{ warehouses: any[] }, void>({
+      query: () => '/api/warehouses',
+      providesTags: ['Inventory'],
     }),
 
     // Admin endpoints
@@ -257,8 +267,10 @@ export const {
   useGetRestaurantQuery,
   useGetPricesQuery,
   useCreatePriceMutation,
+  useGetInventoryListQuery,
   useGetInventoryQuery,
   useUpdateInventoryMutation,
+  useGetWarehousesQuery,
   useGetDashboardStatsQuery,
   useGetAuditLogsQuery,
   useGeneratePresignedUrlMutation,
