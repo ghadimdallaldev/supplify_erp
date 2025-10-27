@@ -32,6 +32,7 @@ import { restaurantOnboardingRoutes } from './routes/restaurant-onboarding.route
 import { receivingRoutes } from './routes/receiving.routes.js';
 import { restaurantFinanceRoutes } from './routes/restaurant-finance.routes.js';
 import { restaurantPricingRoutes } from './routes/restaurant-pricing.routes.js';
+import { notificationsRoutes } from './routes/notifications.routes.js';
 
 const app = express();
 
@@ -138,6 +139,7 @@ app.use('/api/restaurant-onboarding', restaurantOnboardingRoutes);
 app.use('/api/receiving', receivingRoutes);
 app.use('/api/restaurant-finance', restaurantFinanceRoutes);
 app.use('/api/restaurant-pricing', restaurantPricingRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
