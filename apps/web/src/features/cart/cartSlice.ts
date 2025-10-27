@@ -5,12 +5,19 @@ interface CartState {
   items: CartItem[]
   groups: CartGroup[]
   total: number
+  drafts: Array<{
+    id: string
+    name: string
+    items: CartItem[]
+    createdAt: string
+  }>
 }
 
 const initialState: CartState = {
   items: [],
   groups: [],
   total: 0,
+  drafts: [],
 }
 
 const cartSlice = createSlice({
@@ -50,6 +57,25 @@ const cartSlice = createSlice({
       state.groups = []
       state.total = 0
     },
+    saveDraft: (state, action: PayloadAction<{ name: string }>) => {
+      const draft = {
+        id: Date.now().toString(),
+        name: action.payload.name,
+        items: state.items,
+        createdAt: new Date().toISOString(),
+      }
+      state.drafts.push(draft)
+    },
+    loadDraft: (state, action: PayloadAction<string>) => {
+      const draft = state.drafts.find(d => d.id === action.payload)
+      if (draft) {
+        state.items = draft.items
+        cartSlice.caseReducers.updateGroups(state)
+      }
+    },
+    deleteDraft: (state, action: PayloadAction<string>) => {
+      state.drafts = state.drafts.filter(d => d.id !== action.payload)
+    },
     updateGroups: (state) => {
       // Group items by supplier
       const supplierMap = new Map<string, CartGroup>()
@@ -82,5 +108,5 @@ const cartSlice = createSlice({
   },
 })
 
-export const { addItem, removeItem, updateQuantity, clearCart } = cartSlice.actions
+export const { addItem, removeItem, updateQuantity, clearCart, saveDraft, loadDraft, deleteDraft } = cartSlice.actions
 export default cartSlice.reducer
