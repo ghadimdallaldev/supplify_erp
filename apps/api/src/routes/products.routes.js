@@ -90,7 +90,7 @@ router.get('/', async (req, res) => {
         SELECT DISTINCT ON (product_id) product_id, amount, currency
         FROM price
         WHERE valid_to IS NULL OR now() BETWEEN valid_from AND valid_to
-        ORDER BY product_id, created_at DESC
+        ORDER BY product_id, valid_from DESC
       ) pr ON pr.product_id = p.id
       ${whereClause}
       ORDER BY p.created_at DESC
