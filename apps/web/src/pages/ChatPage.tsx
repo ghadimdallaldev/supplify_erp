@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetConversationsQuery, useGetMessagesQuery } from '../services/api'
+import { useGetConversationsQuery, useGetMessagesQuery, useSendMessageMutation } from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -12,19 +12,30 @@ export function ChatPage() {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
   const [message, setMessage] = useState('')
 
-  const { data: conversationsData, isLoading: conversationsLoading } = useGetConversationsQuery()
+  const { data: conversationsData, isLoading: conversationsLoading, refetch: refetchConversations } = useGetConversationsQuery()
 
-  const { data: messagesData, isLoading: messagesLoading } = useGetMessagesQuery(
+  const { data: messagesData, isLoading: messagesLoading, refetch: refetchMessages } = useGetMessagesQuery(
     { conversationId: selectedConversation! },
     { skip: !selectedConversation }
   )
 
-  const handleSendMessage = () => {
+  const [sendMessage, { isLoading: isSendingMessage }] = useSendMessageMutation()
+
+  const handleSendMessage = async () => {
     if (!message.trim() || !selectedConversation) return
     
-    // TODO: Implement send message mutation
-    toast.success('Message sent!')
-    setMessage('')
+    try {
+      await sendMessage({
+        conversationId: selectedConversation,
+        content: message.trim(),
+      }).unwrap()
+      
+      setMessage('')
+      refetchMessages()
+      refetchConversations()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to send message')
+    }
   }
 
   const conversations = conversationsData?.conversations || []
@@ -44,16 +55,21 @@ export function ChatPage() {
         {/* Conversations List */}
         <Card className="w-80 flex-shrink-0">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              Conversations
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Conversations
+              </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y max-h-[calc(100vh-14rem)] overflow-y-auto">
               {conversations.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  No conversations yet
+                <div className="p-4 text-center text-sm text-muted-foreground space-y-2">
+                  <p>No conversations yet</p>
+                  {user?.role === 'RESTAURANT' && (
+                    <p className="text-xs">Browse suppliers and click "Message" to start chatting</p>
+                  )}
                 </div>
               ) : (
                 conversations.map((conv: any) => (
@@ -138,11 +154,12 @@ export function ChatPage() {
                     <Input
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      onKeyPress={(e) => e.key === 'Enter' && !isSendingMessage && handleSendMessage()}
                       placeholder="Type a message..."
                       className="flex-1"
+                      disabled={isSendingMessage}
                     />
-                    <Button onClick={handleSendMessage} disabled={!message.trim()}>
+                    <Button onClick={handleSendMessage} disabled={!message.trim() || isSendingMessage}>
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>

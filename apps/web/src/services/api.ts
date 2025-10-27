@@ -61,7 +61,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap,
-  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory'],
+  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat'],
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
@@ -164,6 +164,20 @@ export const api = createApi({
       query: (id) => `/api/suppliers/${id}`,
       providesTags: (result, error, id) => [{ type: 'Supplier', id }],
     }),
+    followSupplier: builder.mutation<any, string>({
+      query: (id) => ({
+        url: `/api/suppliers/${id}/follow`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
+    unfollowSupplier: builder.mutation<any, string>({
+      query: (id) => ({
+        url: `/api/suppliers/${id}/follow`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
 
     // Restaurant endpoints
     getRestaurants: builder.query<RestaurantsResponse, RestaurantFilters>({
@@ -217,9 +231,10 @@ export const api = createApi({
     }),
 
     // Admin endpoints
-    getDashboardStats: builder.query<DashboardStats, void>({
+    getDashboardStats: builder.query<any, void>({
       query: () => '/api/admin/dashboard',
       providesTags: ['User'],
+      transformResponse: (response: any) => response.data?.stats || {},
     }),
     getAuditLogs: builder.query<AuditLogsResponse, AuditLogFilters>({
       query: (params) => ({
@@ -249,11 +264,49 @@ export const api = createApi({
     // Chat endpoints
     getConversations: builder.query<any, void>({
       query: () => '/api/chat/conversations',
-      providesTags: ['Product'],
+      providesTags: ['Chat'],
     }),
     getMessages: builder.query<any, { conversationId: string }>({
       query: ({ conversationId }) => `/api/chat/conversations/${conversationId}/messages`,
-      providesTags: ['Product'],
+      providesTags: ['Chat'],
+    }),
+    createConversation: builder.mutation<any, { supplierId: string; restaurantId: string }>({
+      query: (body) => ({
+        url: '/api/chat/conversations',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+    sendMessage: builder.mutation<any, { conversationId: string; content: string; messageType?: string; orderId?: string }>({
+      query: ({ conversationId, ...body }) => ({
+        url: `/api/chat/conversations/${conversationId}/messages`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+
+    // Restaurant Inventory endpoints
+    getRestaurantInventory: builder.query<any, void>({
+      query: () => '/api/restaurant-inventory',
+      providesTags: ['RestaurantInventory'],
+    }),
+    addRestaurantInventory: builder.mutation<any, { productId: string; quantity: number; reason?: string }>({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/add',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
+    adjustRestaurantInventory: builder.mutation<any, { productId: string; adjustmentType: 'WASTAGE' | 'SPOILAGE' | 'COUNT_CORRECTION' | 'OTHER'; quantity: number; reason?: string }>({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/adjust',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
     }),
 
     // Quick Lists endpoints
@@ -320,6 +373,8 @@ export const {
   useUpdateOrderMutation,
   useGetSuppliersQuery,
   useGetSupplierQuery,
+  useFollowSupplierMutation,
+  useUnfollowSupplierMutation,
   useGetRestaurantsQuery,
   useGetRestaurantQuery,
   useGetPricesQuery,
@@ -334,6 +389,8 @@ export const {
   useAttachFileToProductMutation,
   useGetConversationsQuery,
   useGetMessagesQuery,
+  useCreateConversationMutation,
+  useSendMessageMutation,
   useGetQuickListsQuery,
   useGetQuickListQuery,
   useCreateQuickListMutation,
@@ -341,4 +398,7 @@ export const {
   useDeleteQuickListMutation,
   useAddItemToQuickListMutation,
   useRemoveItemFromQuickListMutation,
+  useGetRestaurantInventoryQuery,
+  useAddRestaurantInventoryMutation,
+  useAdjustRestaurantInventoryMutation,
 } = api

@@ -1,5 +1,5 @@
-import { useParams } from 'react-router-dom'
-import { useGetSupplierQuery, useGetProductsQuery } from '../services/api'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useGetSupplierQuery, useGetProductsQuery, useCreateConversationMutation, useGetRestaurantsQuery, useFollowSupplierMutation, useUnfollowSupplierMutation } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -10,10 +10,15 @@ import toast from 'react-hot-toast'
 
 export function SupplierDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const isRestaurant = user?.role === 'RESTAURANT'
   
   const { data, isLoading, error } = useGetSupplierQuery(id!)
+  const { data: restaurantsData } = useGetRestaurantsQuery()
+  const [createConversation, { isLoading: isCreatingConversation }] = useCreateConversationMutation()
+  const [followSupplier, { isLoading: isFollowing }] = useFollowSupplierMutation()
+  const [unfollowSupplier, { isLoading: isUnfollowing }] = useUnfollowSupplierMutation()
   
   // Fetch products for this supplier
   const { data: productsData, isLoading: isLoadingProducts } = useGetProductsQuery({
@@ -40,6 +45,48 @@ export function SupplierDetailPage() {
 
   const supplier = data.supplier
 
+  const handleSendMessage = async () => {
+    if (!user || !id || !restaurantsData?.restaurants) return
+    
+    try {
+      // Get restaurant ID from restaurants list
+      const restaurant = restaurantsData.restaurants[0]
+      if (!restaurant) {
+        toast.error('Restaurant not found')
+        return
+      }
+      
+      // Create or get conversation
+      const result = await createConversation({
+        supplierId: id,
+        restaurantId: restaurant.id,
+      }).unwrap()
+      
+      toast.success('Opening conversation...')
+      navigate('/app/chat')
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to start conversation')
+    }
+  }
+
+  const handleFollowToggle = async () => {
+    if (!id) return
+    
+    const isFollowed = supplier.is_followed
+    
+    try {
+      if (isFollowed) {
+        await unfollowSupplier(id).unwrap()
+        toast.success('Supplier unfollowed')
+      } else {
+        await followSupplier(id).unwrap()
+        toast.success('Supplier followed')
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to update follow status')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -50,13 +97,21 @@ export function SupplierDetailPage() {
         <div className="flex space-x-2">
           {isRestaurant && (
             <>
-              <Button variant="outline">
-                <Heart className="h-4 w-4 mr-2" />
-                Follow
+              <Button 
+                variant={supplier.is_followed ? "default" : "outline"}
+                onClick={handleFollowToggle}
+                disabled={isFollowing || isUnfollowing}
+              >
+                <Heart className={`h-4 w-4 mr-2 ${supplier.is_followed ? 'fill-current' : ''}`} />
+                {supplier.is_followed ? 'Following' : 'Follow'}
               </Button>
-              <Button variant="outline">
+              <Button 
+                variant="outline"
+                onClick={handleSendMessage}
+                disabled={isCreatingConversation}
+              >
                 <MessageSquare className="h-4 w-4 mr-2" />
-                Message
+                {isCreatingConversation ? 'Opening...' : 'Message'}
               </Button>
             </>
           )}

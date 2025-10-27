@@ -187,7 +187,7 @@ export function CartPage() {
                       <h4 className="font-medium">{item.product.name}</h4>
                       <p className="text-sm text-gray-600">SKU: {item.product.sku}</p>
                       <p className="text-sm text-gray-600">
-                        ${item.product.current_price?.toFixed(2) || 'N/A'} per {item.product.unit || 'unit'}
+                        ${typeof item.product.current_price === 'number' ? item.product.current_price.toFixed(2) : item.product.current_price || 'N/A'} per {item.product.unit || 'unit'}
                       </p>
                     </div>
                     
@@ -212,7 +212,7 @@ export function CartPage() {
                     
                     <div className="text-right">
                       <p className="font-medium">
-                        ${((item.product.current_price || 0) * item.quantity).toFixed(2)}
+                        ${(typeof item.product.current_price === 'number' ? item.product.current_price : parseFloat(item.product.current_price) || 0) * item.quantity}
                       </p>
                     </div>
                     
