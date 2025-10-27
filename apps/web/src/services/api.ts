@@ -94,7 +94,17 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Product'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          // Manually invalidate and refetch all product lists
+          dispatch(
+            api.util.invalidateTags(['Product'])
+          )
+        } catch {
+          // Error handling
+        }
+      },
     }),
     updateProduct: builder.mutation<Product, { id: string; data: UpdateProductRequest }>({
       query: ({ id, data }) => ({
@@ -102,7 +112,7 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'Product', id }],
+      invalidatesTags: (result, error, { id }) => [{ type: 'Product', id }, 'Product'],
     }),
 
     // Order endpoints

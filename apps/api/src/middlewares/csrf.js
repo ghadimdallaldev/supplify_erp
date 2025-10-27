@@ -2,13 +2,13 @@ import { randomBytes } from 'crypto';
 
 // CSRF protection middleware
 export function csrfProtection(req, res, next) {
-  // Skip CSRF for GET, HEAD, OPTIONS requests
-  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+  // Skip CSRF for auth endpoints (handled by Keycloak)
+  if (req.path.startsWith('/auth/')) {
     return next();
   }
 
-  // Skip CSRF for auth endpoints (handled by Keycloak)
-  if (req.path.startsWith('/auth/')) {
+  // Skip CSRF for GET, HEAD, OPTIONS requests
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
   }
 

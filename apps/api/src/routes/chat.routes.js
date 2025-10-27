@@ -91,11 +91,12 @@ router.get('/conversations', requireAuth, async (req, res) => {
           cp.last_read_at,
           s.name as supplier_name,
           r.name as restaurant_name,
-          r.contact_email as restaurant_email
+          r.contact_email as restaurant_email,
+          (SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_preview
         FROM conversation c
         JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
-        JOIN supplier s ON s.id = c.supplier_id
-        JOIN restaurant r ON r.id = c.restaurant_id
+        LEFT JOIN supplier s ON s.id = c.supplier_id
+        LEFT JOIN restaurant r ON r.id = c.restaurant_id
         WHERE c.supplier_id = $1
         ORDER BY c.last_message_at DESC NULLS LAST
       `;
@@ -123,11 +124,12 @@ router.get('/conversations', requireAuth, async (req, res) => {
           cp.last_read_at,
           s.name as supplier_name,
           s.contact_email as supplier_email,
-          r.name as restaurant_name
+          r.name as restaurant_name,
+          (SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_preview
         FROM conversation c
         JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
-        JOIN supplier s ON s.id = c.supplier_id
-        JOIN restaurant r ON r.id = c.restaurant_id
+        LEFT JOIN supplier s ON s.id = c.supplier_id
+        LEFT JOIN restaurant r ON r.id = c.restaurant_id
         WHERE c.restaurant_id = $1
         ORDER BY c.last_message_at DESC NULLS LAST
       `;

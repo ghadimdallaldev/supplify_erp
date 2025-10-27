@@ -4,8 +4,10 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import { config } from './config/env.js';
 import { logger } from './lib/logger.js';
+import { pool } from './lib/db.js';
 import { requestContext } from './middlewares/requestContext.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { csrfProtection } from './middlewares/csrf.js';
@@ -69,15 +71,23 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Session configuration
+const isProduction = config.NODE_ENV === 'production';
+let sessionStore;
+
+// Use memory store for now to fix session persistence
+sessionStore = null;
+logger.info('Using memory session store');
+
 app.use(session({
+  store: sessionStore,
   secret: config.SESSION_SECRET,
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true, // Save sessions even if they are new and unmodified
   cookie: {
-    secure: config.NODE_ENV === 'production',
+    secure: isProduction,
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax',
+    sameSite: 'lax', // Use 'lax' for development with localhost
   },
 }));
 

@@ -75,6 +75,7 @@ router.get('/', async (req, res) => {
         p.*,
         s.name as supplier_name,
         s.slug as supplier_slug,
+        s.contact_email as supplier_email,
         i.available_qty,
         pr.amount as current_price,
         pr.currency
@@ -153,6 +154,7 @@ router.get('/:id', async (req, res) => {
         p.*,
         s.name as supplier_name,
         s.slug as supplier_slug,
+        s.contact_email as supplier_email,
         i.available_qty,
         pr.amount as current_price,
         pr.currency
@@ -230,37 +232,66 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       throw new ValidationError('supplier_id is required');
     }
     
-    const { rows } = await query(`
-      INSERT INTO product (
-        supplier_id, sku, name, name_ar, description, description_ar,
-        brand, category, image_url, unit
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *
-    `, [
-      supplierId,
-      productData.sku,
-      productData.name,
-      productData.name_ar,
-      productData.description,
-      productData.description_ar,
-      productData.brand,
-      productData.category,
-      productData.image_url,
-      productData.unit,
-    ]);
+    // Use transaction to create product, price, and inventory together
+    await query('BEGIN');
     
-    logger.info('Product created', { 
-      productId: rows[0].id, 
-      sku: rows[0].sku,
-      actor: req.userData.id 
-    });
-    
-    res.status(201).json({
-      ok: true,
-      data: { product: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    });
+    try {
+      // Create product
+      const { rows } = await query(`
+        INSERT INTO product (
+          supplier_id, sku, name, name_ar, description, description_ar,
+          brand, category, image_url, unit
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `, [
+        supplierId,
+        productData.sku,
+        productData.name,
+        productData.name_ar,
+        productData.description,
+        productData.description_ar,
+        productData.brand,
+        productData.category,
+        productData.image_url,
+        productData.unit,
+      ]);
+      
+      const product = rows[0];
+      
+      // Create price if provided
+      if (req.body.price !== undefined && req.body.price !== null) {
+        await query(`
+          INSERT INTO price (product_id, amount, currency, valid_from)
+          VALUES ($1, $2, 'USD', now())
+        `, [product.id, req.body.price]);
+      }
+      
+      // Create inventory if initial stock provided
+      if (req.body.initialStock !== undefined && req.body.initialStock !== null) {
+        await query(`
+          INSERT INTO inventory (product_id, available_qty, reserved_qty, on_order_qty)
+          VALUES ($1, $2, 0, 0)
+        `, [product.id, req.body.initialStock]);
+      }
+      
+      await query('COMMIT');
+      
+      logger.info('Product created with price and inventory', { 
+        productId: product.id, 
+        sku: product.sku,
+        actor: req.userData.id 
+      });
+      
+      res.status(201).json({
+        ok: true,
+        data: { product },
+        error: null,
+        requestId: req.requestId,
+      });
+    } catch (error) {
+      await query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({

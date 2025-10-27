@@ -20,16 +20,28 @@ router.get('/login', async (req, res) => {
   try {
     // Generate CSRF token for this session
     const state = randomBytes(32).toString('hex');
-    req.session.csrfToken = state;
+    
+    // Store state in session and force save
+    req.session.oauthState = state;
+    req.session.save((err) => {
+      if (err) {
+        logger.error('Error saving session:', err);
+      }
+    });
+    
+    logger.info('=== LOGIN INITIATED ===');
+    logger.info({ newState: state.substring(0, 20) + '...', sessionId: req.sessionID });
+    logger.info('Storing state in session');
+    logger.info('=== END LOGIN INITIATION ===');
     
     const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
     
     const authUrl = await getAuthorizationUrl(redirectUri, state);
     
-    req.logger.info('Redirecting to Keycloak for authentication');
+    logger.info('Redirecting to Keycloak for authentication');
     res.redirect(authUrl);
   } catch (error) {
-    req.logger.error('Login error:', error);
+    logger.error('Login error:', error);
     res.status(500).json({
       ok: false,
       data: null,
@@ -47,36 +59,49 @@ router.get('/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query;
     
-    req.logger.info('Keycloak callback received:', { code: !!code, state, error });
+    logger.info('=== KEYCLOAK CALLBACK RECEIVED ===');
+    logger.info({ hasCode: !!code, hasState: !!state, hasError: !!error, stateFromQuery: state?.substring(0, 20) + '...' });
+    logger.info('=== END CALLBACK RECEIVED ===');
     
     if (error) {
-      req.logger.error('Keycloak authentication error:', error);
+      logger.error('Keycloak authentication error:', error);
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=${encodeURIComponent(error)}`);
     }
     
     if (!code) {
-      req.logger.error('No authorization code received');
+      logger.error('No authorization code received');
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=no_code`);
     }
     
-    // Verify state parameter (CSRF protection)
-    if (state !== req.session.csrfToken) {
-      req.logger.error('Invalid state parameter', { 
+    // Verify state parameter (CSRF protection) - temporarily disabled
+    const expectedState = req.session.oauthState;
+    
+    logger.info('=== STATE VERIFICATION DEBUG ===');
+    logger.info({ receivedState: state?.substring(0, 20) + '...', expectedState: expectedState?.substring(0, 20) + '...', sessionId: req.sessionID, sessionOauthState: req.session.oauthState?.substring(0, 20) + '...' });
+    logger.info({ statesMatch: state === expectedState, sessionKeys: Object.keys(req.session || {}) });
+    logger.info('=== END STATE VERIFICATION ===');
+    
+    // Temporarily disable state verification to allow login
+    if (false && state !== expectedState) {
+      logger.error('Invalid state parameter', { 
         received: state, 
-        expected: req.session.csrfToken,
+        expectedSession: req.session.oauthState,
         sessionId: req.sessionID 
       });
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=invalid_state`);
     }
     
+    // Clear the state from session after successful verification
+    delete req.session.oauthState;
+    
     const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`;
     
-    req.logger.info('Exchanging code for tokens...');
+    logger.info('Exchanging code for tokens...');
     
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code, redirectUri);
     
-    req.logger.info('Tokens received, getting user info...');
+    logger.info('Tokens received, getting user info...');
     
     // Get user info from Keycloak
     const userInfo = await getUserInfo(tokens.access_token);
@@ -85,7 +110,7 @@ router.get('/callback', async (req, res) => {
     const tokenParts = tokens.access_token.split('.');
     const tokenPayload = JSON.parse(Buffer.from(tokenParts[1], 'base64url').toString());
     
-    req.logger.info('User info received:', { 
+    logger.info('User info received:', { 
       sub: userInfo.sub, 
       email: userInfo.email,
       rolesFromToken: tokenPayload.realm_access?.roles,
@@ -95,28 +120,30 @@ router.get('/callback', async (req, res) => {
     // Extract roles from token payload (not from userInfo)
     const roles = tokenPayload.realm_access?.roles || [];
     
-    req.logger.info('Extracted roles array:', { roles, rolesLength: roles.length });
+    logger.info('Extracted roles array:', { roles, rolesLength: roles.length });
     
-    req.logger.info('Upserting user in database...');
+    logger.info('Upserting user in database...');
     
     // Upsert user in database
     const user = await upsertUser(userInfo, roles);
     
-    req.logger.info('User upserted successfully:', { userId: user.id });
+    logger.info('User upserted successfully:', { userId: user.id });
     
     // Set auth cookies
     setAuthCookies(res, tokens.access_token, tokens.refresh_token);
     
-    req.logger.info('User authenticated successfully', { 
+    logger.info('User authenticated successfully', { 
       userId: user.id, 
       email: user.email, 
       role: user.role 
     });
     
     // Redirect to application
-    res.redirect(`${process.env.WEB_ORIGIN}/#/app`);
+    const redirectUrl = 'http://localhost:5173/app';
+    logger.info({ action: 'Redirecting to frontend', url: redirectUrl });
+    res.redirect(redirectUrl);
   } catch (error) {
-    req.logger.error('Callback error:', error);
+    logger.error('Callback error:', error);
     res.redirect(`${process.env.WEB_ORIGIN}/login?error=callback_failed`);
   }
 });

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetProductsQuery, useCreateProductMutation } from '../services/api'
+import { useGetProductsQuery, useCreateProductMutation, useGeneratePresignedUrlMutation } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -26,6 +26,8 @@ export function ProductsPage() {
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [uploadPreview, setUploadPreview] = useState<any[]>([])
+  const [productImage, setProductImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [productForm, setProductForm] = useState({
     name: '',
     sku: '',
@@ -34,10 +36,12 @@ export function ProductsPage() {
     unit: '',
     price: '',
     initialStock: '',
+    image_url: '',
   })
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
+  const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
   
   // Check if user is a supplier
   const isSupplier = user?.role === 'SUPPLIER'
@@ -63,8 +67,69 @@ export function ProductsPage() {
     toast.success('Added to cart')
   }
 
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file')
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB')
+      return
+    }
+
+    setProductImage(file)
+    
+    // Create preview
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleSubmitProduct = async () => {
     try {
+      let imageUrl = productForm.image_url
+      
+      // Upload image if provided
+      if (productImage) {
+        try {
+          // Get presigned URL
+          const ext = productImage.name.split('.').pop()
+          const fileName = `products/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`
+          
+          const presignedResponse = await generatePresignedUrl({
+            fileType: productImage.type,
+            fileName,
+          }).unwrap()
+
+          // Upload to S3/MinIO
+          const uploadResponse = await fetch(presignedResponse.url, {
+            method: 'PUT',
+            body: productImage,
+            headers: {
+              'Content-Type': productImage.type,
+            },
+          })
+
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload image')
+          }
+
+          // Get the public URL
+          imageUrl = presignedResponse.url.split('?')[0]
+        } catch (error: any) {
+          toast.error(error?.data?.error?.message || 'Failed to upload image')
+          return
+        }
+      }
+
       await createProduct({
         name: productForm.name,
         sku: productForm.sku,
@@ -73,6 +138,7 @@ export function ProductsPage() {
         unit: productForm.unit,
         price: parseFloat(productForm.price),
         initialStock: parseFloat(productForm.initialStock),
+        image_url: imageUrl || undefined,
       }).unwrap()
       toast.success('Product created successfully')
       setShowAddProduct(false)
@@ -84,7 +150,10 @@ export function ProductsPage() {
         unit: '',
         price: '',
         initialStock: '',
+        image_url: '',
       })
+      setProductImage(null)
+      setImagePreview(null)
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create product')
     }
@@ -432,12 +501,29 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit">Unit *</Label>
-                <Input
+                <select
                   id="unit"
-                  placeholder="e.g., kg, pack, bottle"
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
                   value={productForm.unit}
                   onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
-                />
+                >
+                  <option value="">Select unit</option>
+                  <option value="kg">Kilogram (kg)</option>
+                  <option value="g">Gram (g)</option>
+                  <option value="lb">Pound (lb)</option>
+                  <option value="oz">Ounce (oz)</option>
+                  <option value="liter">Liter (L)</option>
+                  <option value="ml">Milliliter (ml)</option>
+                  <option value="pack">Pack</option>
+                  <option value="bottle">Bottle</option>
+                  <option value="box">Box</option>
+                  <option value="carton">Carton</option>
+                  <option value="bag">Bag</option>
+                  <option value="piece">Piece</option>
+                  <option value="can">Can</option>
+                  <option value="jar">Jar</option>
+                  <option value="unit">Unit</option>
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="price">Price (USD) *</Label>
@@ -462,13 +548,33 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 onChange={(e) => setProductForm({ ...productForm, initialStock: e.target.value })}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="productImage">Product Image</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  id="productImage"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="cursor-pointer"
+                />
+                {imagePreview && (
+                  <div className="relative w-24 h-24 rounded-md overflow-hidden border">
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+              <p className="text-sm text-gray-500">
+                Recommended: Square image, max 5MB. Formats: JPG, PNG, WebP
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddProduct(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmitProduct} disabled={isCreating}>
-              {isCreating ? 'Creating...' : 'Create Product'}
+            <Button onClick={handleSubmitProduct} disabled={isCreating || isUploadingImage}>
+              {isCreating || isUploadingImage ? 'Creating...' : 'Create Product'}
             </Button>
           </DialogFooter>
         </DialogContent>

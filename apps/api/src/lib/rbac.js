@@ -16,19 +16,22 @@ export function extractRefreshTokenFromCookie(req) {
 export function setAuthCookies(res, accessToken, refreshToken) {
   const isProduction = process.env.NODE_ENV === 'production';
   
+  // In development, use 'lax' for sameSite (works with http://localhost)
+  const sameSite = 'lax';
+  
   // Access token cookie (short-lived)
   res.cookie('access_token', accessToken, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
+    secure: isProduction, // Must match sameSite requirements
+    sameSite,
     maxAge: 5 * 60 * 1000, // 5 minutes
   });
 
   // Refresh token cookie (longer-lived)
   res.cookie('refresh_token', refreshToken, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
+    secure: isProduction, // Must match sameSite requirements
+    sameSite,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 }

@@ -12,17 +12,9 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
-  const handleLogin = async () => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      // Redirect to server login endpoint
-      window.location.href = `${import.meta.env.VITE_API_URL}/auth/login`
-    } catch (err) {
-      setError('Login failed. Please try again.')
-      setIsLoading(false)
-    }
+  const handleLogin = () => {
+    // Redirect to server login endpoint
+    window.location.href = 'http://localhost:4000/auth/login'
   }
 
   return (

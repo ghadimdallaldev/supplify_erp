@@ -52,18 +52,23 @@ export function errorHandler(err, req, res, next) {
     message = 'Referenced resource does not exist';
   }
 
-  // Send error response
-  res.status(statusCode).json({
-    ok: false,
-    data: null,
-    error: {
-      name: errorName,
-      message: isDevelopment ? err.message : message,
-      ...(isDevelopment && { stack: err.stack }),
-      ...(err.details && { details: err.details }),
-    },
-    requestId,
-  });
+  // Send error response only if headers haven't been sent
+  if (!res.headersSent) {
+    res.status(statusCode).json({
+      ok: false,
+      data: null,
+      error: {
+        name: errorName,
+        message: isDevelopment ? err.message : message,
+        ...(isDevelopment && { stack: err.stack }),
+        ...(err.details && { details: err.details }),
+      },
+      requestId,
+    });
+  } else {
+    // If headers already sent, just log the error
+    logger.error('Headers already sent, cannot send error response');
+  }
 }
 
 // Custom error classes
