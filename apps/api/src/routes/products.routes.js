@@ -36,21 +36,6 @@ router.get('/', async (req, res) => {
   try {
     const params = productListSchema.parse(req.query);
     
-    // Check if user is a restaurant to show custom pricing
-    let restaurantId = null;
-    try {
-      // Only check if there's auth token
-      if (req.user && req.user.email) {
-        const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [req.user.email]);
-        if (rows.length > 0) {
-          restaurantId = rows[0].id;
-        }
-      }
-    } catch (e) {
-      // Not authenticated or not a restaurant, continue with standard pricing
-      restaurantId = null;
-    }
-    
     const whereConditions = [];
     const queryParams = [];
     let paramIndex = 1;
@@ -85,29 +70,6 @@ router.get('/', async (req, res) => {
       ? `WHERE ${whereConditions.join(' AND ')}`
       : '';
     
-    // Build restaurant pricing join if restaurant is viewing
-    let restaurantPricingJoin = '';
-    if (restaurantId) {
-      // Note: We'll use a separate parameter for restaurant_id in the pricing join
-      // This is safe because restaurantId comes from authenticated user lookup
-      const pricingParamIndex = queryParams.length + 1;
-      queryParams.push(restaurantId);
-      restaurantPricingJoin = `
-      LEFT JOIN LATERAL (
-        SELECT id, price, currency, contract_discount_percentage
-        FROM restaurant_pricing
-        WHERE restaurant_pricing.product_id = p.id
-          AND restaurant_pricing.restaurant_id = $${pricingParamIndex}
-          AND restaurant_pricing.is_active = true
-          AND (restaurant_pricing.contract_end_date IS NULL OR restaurant_pricing.contract_end_date >= CURRENT_DATE)
-          AND (restaurant_pricing.contract_start_date IS NULL OR restaurant_pricing.contract_start_date <= CURRENT_DATE)
-        LIMIT 1
-      ) rp ON true`;
-    } else {
-      restaurantPricingJoin = 'LEFT JOIN NULL::restaurant_pricing AS rp ON false';
-    }
-    
-    // Include restaurant-specific pricing if restaurant is viewing
     const sql = `
       SELECT 
         p.*,
@@ -115,13 +77,8 @@ router.get('/', async (req, res) => {
         s.slug as supplier_slug,
         s.contact_email as supplier_email,
         COALESCE(inv.total_available, 0) as available_qty,
-        -- Use restaurant-specific price if available, otherwise standard price
-        COALESCE(rp.price, pr.amount) as current_price,
-        rp.price as contract_price,
-        pr.amount as standard_price,
-        COALESCE(rp.currency, pr.currency) as currency,
-        rp.contract_discount_percentage,
-        CASE WHEN rp.id IS NOT NULL THEN true ELSE false END as has_contract_pricing
+        pr.amount as current_price,
+        pr.currency
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN (
@@ -137,7 +94,6 @@ router.get('/', async (req, res) => {
         ORDER BY valid_from DESC
         LIMIT 1
       ) pr ON true
-      ${restaurantPricingJoin}
       ${whereClause}
       ORDER BY p.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
