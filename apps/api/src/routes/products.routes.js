@@ -139,13 +139,18 @@ router.get('/', async (req, res) => {
       });
     }
     
-    logger.error('List products error:', error);
+    logger.error({ 
+      message: 'List products error',
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({
       ok: false,
       data: null,
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to list products',
+        details: error.message,
       },
       requestId: req.requestId,
     });
