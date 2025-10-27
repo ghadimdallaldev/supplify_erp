@@ -55,6 +55,9 @@ router.get('/', async (req, res) => {
     }
     
     // For restaurants, exclude blocklisted suppliers
+    let isFollowedSql = 'false as is_followed';
+    let paramIndexForFollow = paramIndex;
+    
     if (req.userData?.role === 'RESTAURANT' && req.userData.id) {
       whereConditions.push(`
         NOT EXISTS (
@@ -64,6 +67,17 @@ router.get('/', async (req, res) => {
       `);
       queryParams.push(req.userData.id);
       paramIndex++;
+      
+      // Add follow check separately
+      paramIndexForFollow = paramIndex;
+      queryParams.push(req.userData.id);
+      paramIndex++;
+      
+      isFollowedSql = `EXISTS (
+        SELECT 1 FROM supplier_follow sf
+        WHERE sf.supplier_id = s.id 
+          AND sf.restaurant_id = $${paramIndexForFollow}
+      ) as is_followed`;
     }
     
     const whereClause = whereConditions.length > 0 
@@ -84,23 +98,12 @@ router.get('/', async (req, res) => {
              AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)), 
           0
         ) as avg_price,
-        ${req.userData?.role === 'RESTAURANT' && req.userData.id 
-          ? `EXISTS (
-          SELECT 1 FROM supplier_follow sf
-          WHERE sf.supplier_id = s.id 
-            AND sf.restaurant_id = $${paramIndex}
-        ) as is_followed` 
-          : 'false as is_followed'}
+        ${isFollowedSql}
       FROM supplier s
       ${whereClause}
       ORDER BY s.created_at DESC
       LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
     `;
-    
-    if (req.userData?.role === 'RESTAURANT' && req.userData.id) {
-      queryParams.push(req.userData.id);
-      paramIndex++;
-    }
     
     queryParams.push(params.limit, params.offset);
     
