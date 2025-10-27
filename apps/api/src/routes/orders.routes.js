@@ -4,6 +4,7 @@ import { query, withTransaction } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
+import { notifyOrderStatusChange } from '../services/notification.service.js';
 
 const router = express.Router();
 
@@ -943,6 +944,31 @@ router.patch('/:id', requireAuth, async (req, res) => {
       status: rows[0].status,
       actor: req.userData.id 
     });
+    
+    // Send notification if status changed
+    if (updateData.status && updateData.status !== order.status) {
+      try {
+        // Get restaurant info for notification
+        const { rows: restaurantInfo } = await query(`
+          SELECT id, name FROM restaurant WHERE id = $1
+        `, [rows[0].restaurant_id]);
+        
+        const { rows: supplierInfo } = await query(`
+          SELECT id, name FROM supplier WHERE id = $1
+        `, [rows[0].supplier_id]);
+        
+        await notifyOrderStatusChange({
+          id: rows[0].id,
+          total_amount: rows[0].total_amount,
+          restaurant_id: rows[0].restaurant_id,
+          supplier_id: rows[0].supplier_id,
+          supplier_name: supplierInfo[0]?.name || 'Supplier',
+        }, updateData.status);
+      } catch (notifError) {
+        // Don't fail the order update if notification fails
+        logger.error('Failed to send notification', { error: notifError.message });
+      }
+    }
     
     res.json({
       ok: true,

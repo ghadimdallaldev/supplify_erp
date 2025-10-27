@@ -4,6 +4,7 @@ import { query } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
+import { notifyInvoiceIssued } from '../services/notification.service.js';
 
 const router = express.Router();
 
