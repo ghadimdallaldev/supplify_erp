@@ -118,7 +118,7 @@ async function handleOrderDelivery(orderId, userData, res) {
       // Update order status
       const { rows: orders } = await client.query(`
         UPDATE customer_order 
-        SET status = 'COMPLETED', delivered_at = now(), updated_at = now()
+        SET status = 'COMPLETED', updated_at = now()
         WHERE id = $1
         RETURNING *
       `, [orderId]);
