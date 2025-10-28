@@ -963,13 +963,14 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
     
     updateFields.push(`updated_at = now()`);
+    
+    // Now add the WHERE clause with the order id
     updateValues.push(id);
-    paramIndex++; // Increment for the WHERE clause
     
     const { rows } = await query(`
       UPDATE customer_order 
       SET ${updateFields.join(', ')}
-      WHERE id = $${paramIndex}
+      WHERE id = $${updateValues.length}
       RETURNING *
     `, updateValues);
     
