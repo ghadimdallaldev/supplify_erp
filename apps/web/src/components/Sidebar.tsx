@@ -16,6 +16,7 @@ import {
   List,
   Package2,
   PackageCheck,
+  Shield,
 } from 'lucide-react'
 
 const navigation = [
@@ -35,6 +36,7 @@ const restaurantNavigation = [
 ]
 
 const adminNavigation = [
+  { name: 'Admin Dashboard', href: '/app/admin', icon: Shield },
   { name: 'Suppliers', href: '/app/suppliers', icon: Building2 },
   { name: 'Restaurants', href: '/app/restaurants', icon: Users },
 ]

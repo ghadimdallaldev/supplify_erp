@@ -22,6 +22,7 @@ import { QuickListsPage } from './pages/QuickListsPage'
 import { RestaurantInventoryPage } from './pages/RestaurantInventoryPage'
 import { RestaurantOnboardingPage } from './pages/RestaurantOnboardingPage'
 import { ReceivingPage } from './pages/ReceivingPage'
+import { AdminDashboardPage } from './pages/AdminDashboardPage'
 
 const router = createBrowserRouter([
   {
@@ -123,6 +124,10 @@ const router = createBrowserRouter([
       {
         path: 'app/supplier-settings',
         element: <SupplierSettingsPage />,
+      },
+      {
+        path: 'app/admin',
+        element: <AdminDashboardPage />,
       },
     ],
   },
