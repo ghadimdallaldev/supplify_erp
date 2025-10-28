@@ -857,8 +857,14 @@ router.post('/manual', requireAuth, requireRole(['SUPPLIER']), async (req, res) 
 router.patch('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    logger.info('Order update request', { id, body: req.body });
-    const updateData = orderUpdateSchema.parse(req.body);
+    logger.info('Order update request', { id, body: req.body, contentType: req.headers['content-type'] });
+    let updateData;
+    try {
+      updateData = orderUpdateSchema.parse(req.body);
+    } catch (validationError) {
+      logger.error('Validation error', { error: validationError.message, body: req.body, errors: validationError.errors });
+      throw validationError;
+    }
     
     // Get order
     const { rows: orders } = await query(`
