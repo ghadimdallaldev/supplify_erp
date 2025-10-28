@@ -957,6 +957,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     
     updateFields.push(`updated_at = now()`);
     updateValues.push(id);
+    paramIndex++; // Increment for the WHERE clause
     
     const { rows } = await query(`
       UPDATE customer_order 
