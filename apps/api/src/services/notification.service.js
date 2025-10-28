@@ -315,6 +315,10 @@ export async function notifyOrderStatusChange(order, status) {
       title: 'Order Delivered',
       message: `Your order #${order.id.slice(0, 8)} has been delivered`,
     },
+    COMPLETED: {
+      title: 'Order Completed',
+      message: `Your order #${order.id.slice(0, 8)} has been completed and delivered by ${order.supplier_name || 'supplier'}`,
+    },
     CANCELLED: {
       title: 'Order Cancelled',
       message: order.restaurant_name
