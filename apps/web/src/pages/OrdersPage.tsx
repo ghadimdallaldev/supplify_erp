@@ -151,7 +151,7 @@ export function OrdersPage() {
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
-      await updateOrder({ id: orderId, status: newStatus }).unwrap()
+      await updateOrder({ id: orderId, data: { status: newStatus } }).unwrap()
       toast.success(`Order status updated to ${newStatus}`)
       refetch()
     } catch (error: any) {
