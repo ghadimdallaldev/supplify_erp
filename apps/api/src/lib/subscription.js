@@ -168,6 +168,37 @@ export async function incrementUsage(tenantId, tenantType, meterType, increment 
 }
 
 /**
+ * Check usage with 80% warning threshold
+ * @param {string} tenantId - Tenant ID
+ * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
+ * @param {string} meterType - Type of meter
+ * @returns {Promise<{current: number, limit: number|null, isUnlimited: boolean, isOverLimit: boolean, isWarning: boolean, usagePercent: number}>}
+ */
+export async function checkUsageWithWarning(tenantId, tenantType, meterType) {
+  try {
+    const result = await checkLimit(tenantId, tenantType, meterType);
+    const usagePercent = result.limit ? (result.current / result.limit) * 100 : 0;
+    const isWarning = usagePercent >= 80 && usagePercent < 100;
+    
+    return {
+      ...result,
+      isWarning,
+      usagePercent
+    };
+  } catch (error) {
+    logger.error('Check usage with warning error:', error);
+    return {
+      current: 0,
+      limit: 0,
+      isUnlimited: false,
+      isOverLimit: true,
+      isWarning: false,
+      usagePercent: 0
+    };
+  }
+}
+
+/**
  * Decrement usage meter (e.g., when deleting)
  * @param {string} tenantId - Tenant ID
  * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
