@@ -437,3 +437,81 @@ export interface ReorderSuggestion {
 export interface ReorderSuggestionsResponse {
   suggestions: ReorderSuggestion[]
 }
+
+// Admin Dashboard types
+export interface SubscriptionPlan {
+  id: string
+  name: string
+  description?: string
+  price_per_month: number
+  price_per_year?: number
+  limits: Record<string, any>
+  features: string[]
+  trial_days: number
+  is_active: boolean
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Subscription {
+  id: string
+  tenant_id: string
+  tenant_type: 'SUPPLIER' | 'RESTAURANT'
+  plan_id: string
+  plan_name: string
+  status: 'TRIALING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED' | 'PAST_DUE'
+  trial_ends_at?: string
+  current_period_start?: string
+  current_period_end?: string
+  billing_cycle?: 'MONTHLY' | 'YEARLY'
+  next_billing_date?: string
+  cancelled_at?: string
+  cancel_reason?: string
+  created_at: string
+  updated_at: string
+  tenant_name?: string
+  tenant_email?: string
+  price_per_month?: number
+  price_per_year?: number
+  plan_limits?: Record<string, any>
+  plan_features?: string[]
+}
+
+export interface FeatureFlag {
+  id: string
+  feature_key: string
+  feature_name: string
+  description?: string
+  is_enabled_globally: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface FeatureFlagOverride {
+  id: string
+  tenant_id: string
+  tenant_type: 'SUPPLIER' | 'RESTAURANT'
+  feature_flag_id: string
+  feature_key: string
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+  feature_name?: string
+  is_enabled_globally?: boolean
+}
+
+export interface UsageMeter {
+  id: string
+  tenant_id: string
+  tenant_type: 'SUPPLIER' | 'RESTAURANT'
+  meter_type: string
+  current_value: number
+  period_type: 'DAILY' | 'MONTHLY' | 'Billing Cycle'
+  period_start_date?: string
+  period_end_date?: string
+  limit_value?: number
+  is_over_limit: boolean
+  last_updated: string
+  created_at: string
+}

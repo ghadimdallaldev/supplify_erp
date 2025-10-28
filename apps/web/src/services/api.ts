@@ -30,6 +30,11 @@ import type {
   AttachFileRequest,
   Attachment,
   ReorderSuggestionsResponse,
+  SubscriptionPlan,
+  Subscription,
+  FeatureFlag,
+  FeatureFlagOverride,
+  UsageMeter,
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -62,7 +67,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap,
-  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification'],
+  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification', 'Admin'],
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
@@ -479,6 +484,96 @@ export const api = createApi({
       }),
       invalidatesTags: ['Notification'],
     }),
+
+    // Admin Dashboard endpoints
+    getAdminOverview: builder.query<any, void>({
+      query: () => '/api/admin-dashboard/overview',
+      providesTags: ['Admin'],
+    }),
+    getAdminPlans: builder.query<{ plans: SubscriptionPlan[] }, void>({
+      query: () => '/api/admin-dashboard/plans',
+      providesTags: ['Admin'],
+    }),
+    createAdminPlan: builder.mutation<SubscriptionPlan, any>({
+      query: (body) => ({
+        url: '/api/admin-dashboard/plans',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    updateAdminPlan: builder.mutation<SubscriptionPlan, { id: string; data: any }>({
+      query: ({ id, data }) => ({
+        url: `/api/admin-dashboard/plans/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    getAdminSubscriptions: builder.query<{ subscriptions: Subscription[] }, any>({
+      query: (params) => ({
+        url: '/api/admin-dashboard/subscriptions',
+        params,
+      }),
+      providesTags: ['Admin'],
+    }),
+    updateAdminSubscription: builder.mutation<Subscription, { id: string; data: any }>({
+      query: ({ id, data }) => ({
+        url: `/api/admin-dashboard/subscriptions/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    getAdminFeatureFlags: builder.query<{ flags: FeatureFlag[] }, void>({
+      query: () => '/api/admin-dashboard/feature-flags',
+      providesTags: ['Admin'],
+    }),
+    updateAdminFeatureFlag: builder.mutation<FeatureFlag, { key: string; data: any }>({
+      query: ({ key, data }) => ({
+        url: `/api/admin-dashboard/feature-flags/${key}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    getTenantFeatureFlags: builder.query<{ overrides: FeatureFlagOverride[] }, { tenantId: string; tenantType: string }>({
+      query: ({ tenantId, tenantType }) => ({
+        url: `/api/admin-dashboard/tenants/${tenantId}/feature-flags`,
+        params: { tenantType },
+      }),
+      providesTags: ['Admin'],
+    }),
+    setTenantFeatureFlag: builder.mutation<FeatureFlagOverride, any>({
+      query: ({ tenantId, ...body }) => ({
+        url: `/api/admin-dashboard/tenants/${tenantId}/feature-flags`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    deleteTenantFeatureFlag: builder.mutation<any, { tenantId: string; featureKey: string; tenantType: string }>({
+      query: ({ tenantId, featureKey, tenantType }) => ({
+        url: `/api/admin-dashboard/tenants/${tenantId}/feature-flags/${featureKey}`,
+        method: 'DELETE',
+        params: { tenantType },
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    getTenantUsage: builder.query<{ usage: UsageMeter[]; period: string }, { tenantId: string; tenantType: string; period?: string }>({
+      query: ({ tenantId, tenantType, period }) => ({
+        url: `/api/admin-dashboard/usage/${tenantId}`,
+        params: { tenantType, period },
+      }),
+      providesTags: ['Admin'],
+    }),
+    getAdminAuditLogs: builder.query<{ logs: any[]; limit: number; offset: number }, any>({
+      query: (params) => ({
+        url: '/api/admin-dashboard/audit-logs',
+        params,
+      }),
+      providesTags: ['Admin'],
+    }),
   }),
 })
 
@@ -541,4 +636,17 @@ export const {
   useUpdateNotificationPreferencesMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
+  useGetAdminOverviewQuery,
+  useGetAdminPlansQuery,
+  useCreateAdminPlanMutation,
+  useUpdateAdminPlanMutation,
+  useGetAdminSubscriptionsQuery,
+  useUpdateAdminSubscriptionMutation,
+  useGetAdminFeatureFlagsQuery,
+  useUpdateAdminFeatureFlagMutation,
+  useGetTenantFeatureFlagsQuery,
+  useSetTenantFeatureFlagMutation,
+  useDeleteTenantFeatureFlagMutation,
+  useGetTenantUsageQuery,
+  useGetAdminAuditLogsQuery,
 } = api
