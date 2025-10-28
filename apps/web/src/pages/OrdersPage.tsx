@@ -115,9 +115,11 @@ export function OrdersPage() {
     switch (status) {
       case 'PLACED':
         return 'default'
-      case 'CONFIRMED':
+      case 'ACKNOWLEDGED':
         return 'secondary'
-      case 'FULFILLING':
+      case 'PROCESSING':
+        return 'default'
+      case 'SHIPPED':
         return 'default'
       case 'COMPLETED':
         return 'default'
@@ -130,10 +132,12 @@ export function OrdersPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'CONFIRMED':
+      case 'ACKNOWLEDGED':
         return <CheckCircle className="h-4 w-4" />
-      case 'FULFILLING':
+      case 'PROCESSING':
         return <Package className="h-4 w-4" />
+      case 'SHIPPED':
+        return <Truck className="h-4 w-4" />
       case 'COMPLETED':
         return <CheckCircle className="h-4 w-4" />
       default:
@@ -159,7 +163,7 @@ export function OrdersPage() {
     
     const matchesStatus = activeTab === 'all' || 
       (activeTab === 'new' && order.status === 'PLACED') ||
-      (activeTab === 'processing' && ['CONFIRMED', 'FULFILLING'].includes(order.status)) ||
+      (activeTab === 'processing' && ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)) ||
       (activeTab === 'completed' && order.status === 'COMPLETED')
     
     return matchesSearch && matchesStatus
@@ -236,8 +240,9 @@ export function OrdersPage() {
               >
                 <option value="">All Statuses</option>
                 <option value="PLACED">Placed</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="FULFILLING">Fulfilling</option>
+                <option value="ACKNOWLEDGED">Acknowledged</option>
+                <option value="PROCESSING">Processing</option>
+                <option value="SHIPPED">Shipped</option>
                 <option value="COMPLETED">Completed</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
@@ -325,9 +330,9 @@ export function OrdersPage() {
                         <>
                           <Button 
                             size="sm"
-                            onClick={() => handleStatusUpdate(order.id, 'CONFIRMED')}
+                            onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
                           >
-                            Confirm Order
+                            Acknowledge
                           </Button>
                           <Button 
                             size="sm" 
@@ -338,15 +343,23 @@ export function OrdersPage() {
                           </Button>
                         </>
                       )}
-                      {isSupplier && order.status === 'CONFIRMED' && (
+                      {isSupplier && order.status === 'ACKNOWLEDGED' && (
                         <Button 
                           size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'FULFILLING')}
+                          onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
                         >
-                          Start Fulfilling
+                          Start Processing
                         </Button>
                       )}
-                      {isSupplier && order.status === 'FULFILLING' && (
+                      {isSupplier && order.status === 'PROCESSING' && (
+                        <Button 
+                          size="sm"
+                          onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
+                        >
+                          Mark as Shipped
+                        </Button>
+                      )}
+                      {isSupplier && order.status === 'SHIPPED' && (
                         <Button 
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'COMPLETED')}

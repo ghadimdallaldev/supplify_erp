@@ -28,7 +28,7 @@ const supplierOrderCreateSchema = z.object({
 });
 
 const orderUpdateSchema = z.object({
-  status: z.enum(['DRAFT', 'PLACED', 'CONFIRMED', 'FULFILLING', 'COMPLETED', 'CANCELLED']).optional(),
+  status: z.enum(['DRAFT', 'PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED']).optional(),
   notes: z.string().optional(),
 });
 
@@ -115,7 +115,7 @@ async function createInvoiceFromOrder(order, orderItems, supplierId, client) {
 async function handleOrderDelivery(orderId, userData, res) {
   try {
     const result = await withTransaction(async (client) => {
-      // Update order status
+      // Update order status to COMPLETED (not FULFILLING)
       const { rows: orders } = await client.query(`
         UPDATE customer_order 
         SET status = 'COMPLETED', updated_at = now()
@@ -195,6 +195,7 @@ async function handleOrderDelivery(orderId, userData, res) {
     
     // Send notification to restaurant about completed order
     try {
+      console.log('📨 Sending notification for completed order:', result.order.id);
       const { rows: restaurantInfo } = await query(`
         SELECT id, name FROM restaurant WHERE id = $1
       `, [result.order.restaurant_id]);
@@ -203,6 +204,13 @@ async function handleOrderDelivery(orderId, userData, res) {
         SELECT id, name FROM supplier WHERE id = $1
       `, [result.supplierId]);
       
+      console.log('📨 Notification params:', {
+        order_id: result.order.id,
+        restaurant_id: result.order.restaurant_id,
+        supplier_id: result.supplierId,
+        status: 'COMPLETED'
+      });
+      
       await notifyOrderStatusChange({
         id: result.order.id,
         total_amount: result.order.total_amount,
@@ -210,7 +218,11 @@ async function handleOrderDelivery(orderId, userData, res) {
         supplier_id: result.supplierId,
         supplier_name: supplierInfo[0]?.name || 'Supplier',
       }, 'COMPLETED');
+      
+      console.log('✅ Notification sent successfully');
     } catch (notifError) {
+      console.error('❌ Failed to send completion notification:', notifError.message);
+      console.error('Stack:', notifError.stack);
       logger.error('Failed to send completion notification', { error: notifError.message });
     }
     
@@ -945,8 +957,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
         });
       }
          } else if (req.userData.role === 'SUPPLIER') {
-       // Suppliers can confirm and fulfill orders
-       if (updateData.status && !['CONFIRMED', 'FULFILLING', 'COMPLETED'].includes(updateData.status)) {
+       // Suppliers can acknowledge, process, ship, and complete orders
+       if (updateData.status && !['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED'].includes(updateData.status)) {
          return res.status(403).json({
            ok: false,
            data: null,

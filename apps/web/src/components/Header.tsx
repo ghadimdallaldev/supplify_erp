@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
-import { useLogoutMutation, useGetNotificationsQuery } from '../services/api'
+import { useLogoutMutation, useGetNotificationsQuery, useMarkAllNotificationsReadMutation } from '../services/api'
 import { Button } from './ui/button'
 import { LogOut, User, Bell, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Badge } from './ui/badge'
+import { useNavigate } from 'react-router-dom'
 
 export function Header() {
   const { user } = useAppSelector((state) => state.auth)
   const [logout] = useLogoutMutation()
   const [showNotifications, setShowNotifications] = useState(false)
+  const navigate = useNavigate()
+  const [markAllAsRead] = useMarkAllNotificationsReadMutation()
   
   // Fetch notifications
   const { data: notificationsData, refetch: refetchNotifications } = useGetNotificationsQuery(
@@ -66,16 +69,33 @@ export function Header() {
               {/* Notifications Dropdown */}
               {showNotifications && (
                 <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
-                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold">Notifications</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowNotifications(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+               <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                 <h3 className="font-semibold">Notifications</h3>
+                 <div className="flex gap-2">
+                   {unreadCount > 0 && (
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={async () => {
+                         try {
+                           await markAllAsRead().unwrap();
+                         } catch (error) {
+                           console.error('Failed to mark all as read:', error);
+                         }
+                       }}
+                     >
+                       Mark all as read
+                     </Button>
+                   )}
+                   <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => setShowNotifications(false)}
+                   >
+                     <X className="h-4 w-4" />
+                   </Button>
+                 </div>
+               </div>
                   
                   <div className="divide-y">
                     {notifications.length === 0 ? (
@@ -87,6 +107,12 @@ export function Header() {
                         <div
                           key={notification.id}
                           className={`p-4 hover:bg-gray-50 cursor-pointer ${!notification.is_read ? 'bg-blue-50' : ''}`}
+                          onClick={() => {
+                            if (notification.reference_type === 'ORDER' && notification.reference_id) {
+                              navigate(`/app/orders/${notification.reference_id}`);
+                              setShowNotifications(false);
+                            }
+                          }}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
