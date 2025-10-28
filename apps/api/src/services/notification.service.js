@@ -61,12 +61,18 @@ export async function getUserPreferences(userId, userType) {
  * Get user contact information
  */
 export async function getUserContactInfo(userId, userType) {
+  // userId is the Keycloak user ID from app_user table
+  // We need to get the supplier_id or restaurant_id from app_user email
   let tableName = userType === 'SUPPLIER' ? 'supplier_contact_info' : 'restaurant_contact_info';
+  let idTable = userType === 'SUPPLIER' ? 'supplier' : 'restaurant';
   let idColumn = userType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id';
 
   const { rows } = await query(`
-    SELECT * FROM ${tableName}
-    WHERE ${idColumn} = $1
+    SELECT ci.* 
+    FROM ${tableName} ci
+    JOIN ${idTable} s ON s.id = ci.${idColumn}
+    JOIN app_user u ON u.email = s.contact_email
+    WHERE u.id = $1
   `, [userId]);
 
   return rows[0] || {
@@ -252,12 +258,38 @@ export async function notifyOrderStatusChange(order, status) {
   
   if (status === 'PLACED' || status === 'CANCELLED') {
     // Notify supplier for new orders and cancellations
-    userId = order.supplier_id;
-    userType = 'SUPPLIER';
+    // Get supplier's Keycloak user ID from contact_email
+    const { rows: suppliers } = await query(`
+      SELECT s.id as supplier_id, u.id as user_id 
+      FROM supplier s
+      JOIN app_user u ON u.email = s.contact_email
+      WHERE s.id = $1
+    `, [order.supplier_id]);
+    
+    if (suppliers.length > 0 && suppliers[0].user_id) {
+      userId = suppliers[0].user_id;
+      userType = 'SUPPLIER';
+    } else {
+      logger.warn('No user_id found for supplier', { supplier_id: order.supplier_id });
+      return null;
+    }
   } else {
     // All other statuses (ACKNOWLEDGED, PROCESSING, SHIPPED, DELIVERED) notify restaurant
-    userId = order.restaurant_id;
-    userType = 'RESTAURANT';
+    // Get restaurant's Keycloak user ID from contact_email
+    const { rows: restaurants } = await query(`
+      SELECT r.id as restaurant_id, u.id as user_id 
+      FROM restaurant r
+      JOIN app_user u ON u.email = r.contact_email
+      WHERE r.id = $1
+    `, [order.restaurant_id]);
+    
+    if (restaurants.length > 0 && restaurants[0].user_id) {
+      userId = restaurants[0].user_id;
+      userType = 'RESTAURANT';
+    } else {
+      logger.warn('No user_id found for restaurant', { restaurant_id: order.restaurant_id });
+      return null;
+    }
   }
 
   const messages = {
