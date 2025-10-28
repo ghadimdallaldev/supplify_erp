@@ -24,7 +24,7 @@ export function setAuthCookies(res, accessToken, refreshToken) {
     httpOnly: true,
     secure: isProduction, // Must match sameSite requirements
     sameSite,
-    maxAge: 5 * 60 * 1000, // 5 minutes
+    maxAge: 60 * 60 * 1000, // 1 hour (increased from 5 minutes)
   });
 
   // Refresh token cookie (longer-lived)
