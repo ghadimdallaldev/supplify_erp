@@ -862,6 +862,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
     try {
       updateData = orderUpdateSchema.parse(req.body);
     } catch (validationError) {
+      console.error('❌ Validation error:', validationError.errors);
+      console.error('Body:', req.body);
       logger.error('Validation error', { error: validationError.message, body: req.body, errors: validationError.errors });
       throw validationError;
     }
