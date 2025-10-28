@@ -974,6 +974,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
     // Send notification if status changed
     if (updateData.status && updateData.status !== order.status) {
       try {
+        // Get supplier_id from order items (order.supplier_id was set earlier in the function)
+        const supplierIdForNotification = order.supplier_id;
+        
         // Get restaurant and supplier info
         const { rows: restaurantInfo } = await query(`
           SELECT id, name FROM restaurant WHERE id = $1
@@ -981,7 +984,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
         
         const { rows: supplierInfo } = await query(`
           SELECT id, name FROM supplier WHERE id = $1
-        `, [rows[0].supplier_id]);
+        `, [supplierIdForNotification]);
         
         // Notify both parties based on status
         if (updateData.status === 'PLACED') {
@@ -991,7 +994,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
             total_amount: rows[0].total_amount,
             restaurant_id: rows[0].restaurant_id,
             restaurant_name: restaurantInfo[0]?.name || 'Restaurant',
-            supplier_id: rows[0].supplier_id,
+            supplier_id: supplierIdForNotification,
           }, updateData.status);
         } else if (updateData.status === 'CANCELLED') {
           // Cancelled - notify supplier
@@ -1000,7 +1003,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
             total_amount: rows[0].total_amount,
             restaurant_id: rows[0].restaurant_id,
             restaurant_name: restaurantInfo[0]?.name || 'Restaurant',
-            supplier_id: rows[0].supplier_id,
+            supplier_id: supplierIdForNotification,
             supplier_name: supplierInfo[0]?.name || 'Supplier',
           }, updateData.status);
         } else {
@@ -1009,7 +1012,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
             id: rows[0].id,
             total_amount: rows[0].total_amount,
             restaurant_id: rows[0].restaurant_id,
-            supplier_id: rows[0].supplier_id,
+            supplier_id: supplierIdForNotification,
             supplier_name: supplierInfo[0]?.name || 'Supplier',
           }, updateData.status);
         }
