@@ -115,14 +115,9 @@ export function OrdersPage() {
     switch (status) {
       case 'PLACED':
         return 'default'
-      case 'ACKNOWLEDGED':
+      case 'CONFIRMED':
         return 'secondary'
-      case 'PROCESSING':
-        return 'default'
-      case 'SHIPPED':
-      case 'DISPATCHED':
-        return 'default'
-      case 'DELIVERED':
+      case 'FULFILLING':
         return 'default'
       case 'COMPLETED':
         return 'default'
@@ -135,14 +130,11 @@ export function OrdersPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'ACKNOWLEDGED':
+      case 'CONFIRMED':
         return <CheckCircle className="h-4 w-4" />
-      case 'PROCESSING':
+      case 'FULFILLING':
         return <Package className="h-4 w-4" />
-      case 'SHIPPED':
-      case 'DISPATCHED':
-        return <Truck className="h-4 w-4" />
-      case 'DELIVERED':
+      case 'COMPLETED':
         return <CheckCircle className="h-4 w-4" />
       default:
         return <Clock className="h-4 w-4" />
@@ -167,9 +159,8 @@ export function OrdersPage() {
     
     const matchesStatus = activeTab === 'all' || 
       (activeTab === 'new' && order.status === 'PLACED') ||
-      (activeTab === 'processing' && ['ACKNOWLEDGED', 'PROCESSING'].includes(order.status)) ||
-      (activeTab === 'shipped' && ['SHIPPED', 'DISPATCHED'].includes(order.status)) ||
-      (activeTab === 'completed' && order.status === 'DELIVERED')
+      (activeTab === 'processing' && ['CONFIRMED', 'FULFILLING'].includes(order.status)) ||
+      (activeTab === 'completed' && order.status === 'COMPLETED')
     
     return matchesSearch && matchesStatus
   })
@@ -245,10 +236,8 @@ export function OrdersPage() {
               >
                 <option value="">All Statuses</option>
                 <option value="PLACED">Placed</option>
-                <option value="ACKNOWLEDGED">Acknowledged</option>
-                <option value="PROCESSING">Processing</option>
-                <option value="SHIPPED">Shipped</option>
-                <option value="DELIVERED">Delivered</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="FULFILLING">Fulfilling</option>
                 <option value="COMPLETED">Completed</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
@@ -336,9 +325,9 @@ export function OrdersPage() {
                         <>
                           <Button 
                             size="sm"
-                            onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
+                            onClick={() => handleStatusUpdate(order.id, 'CONFIRMED')}
                           >
-                            Acknowledge
+                            Confirm Order
                           </Button>
                           <Button 
                             size="sm" 
@@ -349,29 +338,20 @@ export function OrdersPage() {
                           </Button>
                         </>
                       )}
-                      {isSupplier && order.status === 'ACKNOWLEDGED' && (
+                      {isSupplier && order.status === 'CONFIRMED' && (
                         <Button 
                           size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
+                          onClick={() => handleStatusUpdate(order.id, 'FULFILLING')}
                         >
-                          Start Processing
+                          Start Fulfilling
                         </Button>
                       )}
-                      {isSupplier && order.status === 'PROCESSING' && (
+                      {isSupplier && order.status === 'FULFILLING' && (
                         <Button 
                           size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
+                          onClick={() => handleStatusUpdate(order.id, 'COMPLETED')}
                         >
-                          Mark as Shipped
-                        </Button>
-                      )}
-                      {isSupplier && order.status === 'SHIPPED' && (
-                        <Button 
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
-                        >
-                          Mark as Delivered
+                          Complete Order
                         </Button>
                       )}
                       <Button variant="outline" size="sm" asChild>
