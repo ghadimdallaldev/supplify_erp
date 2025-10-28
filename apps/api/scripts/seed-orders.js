@@ -48,7 +48,7 @@ async function seedOrders() {
     });
 
     // Create 10 orders with different statuses
-    const statuses = ['PLACED', 'CONFIRMED', 'FULFILLING', 'COMPLETED', 'CANCELLED'];
+    const statuses = ['PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
     const numOrdersPerSupplier = 5;
     
     for (let i = 0; i < numOrdersPerSupplier; i++) {

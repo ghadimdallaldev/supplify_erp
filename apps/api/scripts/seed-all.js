@@ -109,7 +109,7 @@ async function seedAll() {
     // Create 10 orders with different statuses
     logger.info('Creating orders...');
     
-    const statuses = ['PLACED', 'CONFIRMED', 'FULFILLING', 'COMPLETED', 'CANCELLED'];
+    const statuses = ['PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
     const numOrders = 10;
     
     // Reset balance fields

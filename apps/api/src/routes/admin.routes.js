@@ -141,7 +141,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         query('SELECT COUNT(*) as count FROM restaurant'),
         query('SELECT COUNT(*) as count FROM product'),
         query('SELECT COUNT(*) as count FROM customer_order'),
-        query("SELECT COUNT(*) as count FROM customer_order WHERE status IN ('PLACED', 'CONFIRMED', 'FULFILLING')"),
+        query("SELECT COUNT(*) as count FROM customer_order WHERE status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')"),
         query("SELECT COUNT(*) as count FROM customer_order WHERE status = 'COMPLETED'"),
         query("SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE status = 'COMPLETED'"),
       ]);
@@ -178,7 +178,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
             SELECT COUNT(DISTINCT oi.order_id) as count 
             FROM order_item oi 
             JOIN customer_order o ON o.id = oi.order_id 
-            WHERE oi.supplier_id = $1 AND o.status IN ('PLACED', 'CONFIRMED', 'FULFILLING')
+            WHERE oi.supplier_id = $1 AND o.status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
           `, [supplierId]),
           query(`
             SELECT COUNT(DISTINCT oi.order_id) as count 
@@ -237,7 +237,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         ] = await Promise.all([
           query('SELECT COUNT(*) as count FROM product'),
           query('SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1', [restaurantId]),
-          query("SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND status IN ('PLACED', 'CONFIRMED', 'FULFILLING')", [restaurantId]),
+          query("SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')", [restaurantId]),
           query("SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND status = 'COMPLETED'", [restaurantId]),
           query("SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE restaurant_id = $1", [restaurantId]),
         ]);

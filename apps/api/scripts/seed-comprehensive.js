@@ -122,7 +122,7 @@ async function seedDatabase() {
     
     for (let i = 0; i < 3; i++) {
       const restaurant = restaurants[i];
-      const orderStatus = ['PLACED', 'CONFIRMED', 'FULFILLING'][i];
+      const orderStatus = ['PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'][i];
       const { rows: orderRows } = await pool.query(`
         INSERT INTO customer_order (restaurant_id, status, total_amount, placed_at)
         VALUES ($1, $2, $3, now() - INTERVAL '${i} days')
