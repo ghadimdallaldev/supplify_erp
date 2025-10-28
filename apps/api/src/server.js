@@ -35,6 +35,8 @@ import { restaurantPricingRoutes } from './routes/restaurant-pricing.routes.js';
 import { notificationsRoutes } from './routes/notifications.routes.js';
 import { subscriptionsRoutes } from './routes/subscriptions.routes.js';
 import adminDashboardRoutes from './routes/admin-dashboard.routes.js';
+import branchesRoutes from './routes/branches.routes.js';
+import warehousesRoutes from './routes/warehouses.routes.js';
 
 const app = express();
 
@@ -144,6 +146,8 @@ app.use('/api/restaurant-pricing', restaurantPricingRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
 app.use('/api/admin-dashboard', adminDashboardRoutes);
+app.use('/api/branches', branchesRoutes);
+app.use('/api/warehouses', warehousesRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
