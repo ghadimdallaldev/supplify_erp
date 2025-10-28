@@ -465,5 +465,285 @@ router.patch('/subscriptions/:id', requireAuth, requireRole(['ADMIN']), async (r
   }
 });
 
+// ========================================
+// FEATURE FLAGS MANAGEMENT
+// ========================================
+router.get('/feature-flags', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { rows: flags } = await query(`
+      SELECT * FROM feature_flag
+      ORDER BY feature_name
+    `);
+
+    res.json({
+      ok: true,
+      data: { flags },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get feature flags error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get feature flags' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+const toggleFlagSchema = z.object({
+  isEnabledGlobally: z.boolean().optional(),
+});
+
+router.patch('/feature-flags/:key', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { key } = req.params;
+    const updateData = toggleFlagSchema.parse(req.body);
+
+    const { rows: existing } = await query('SELECT * FROM feature_flag WHERE feature_key = $1', [key]);
+    if (existing.length === 0) {
+      res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Feature flag not found' },
+        requestId: req.requestId,
+      });
+      return;
+    }
+
+    const { rows: [updated] } = await query(`
+      UPDATE feature_flag
+      SET is_enabled_globally = $1, updated_at = now()
+      WHERE feature_key = $2
+      RETURNING *
+    `, [updateData.isEnabledGlobally, key]);
+
+    await logAudit(req, 'feature_flag.toggled', `Toggled ${key} to ${updateData.isEnabledGlobally}`, 'feature_flag', key, existing[0], updated);
+
+    res.json({
+      ok: true,
+      data: { flag: updated },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Toggle feature flag error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to toggle feature flag' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// ========================================
+// TENANT FEATURE FLAG OVERRIDES
+// ========================================
+router.get('/tenants/:tenantId/feature-flags', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { tenantType } = req.query;
+
+    const { rows: overrides } = await query(`
+      SELECT fo.*, ff.feature_name, ff.is_enabled_globally
+      FROM feature_flag_override fo
+      JOIN feature_flag ff ON ff.id = fo.feature_flag_id
+      WHERE fo.tenant_id = $1 AND fo.tenant_type = $2
+    `, [tenantId, tenantType]);
+
+    res.json({
+      ok: true,
+      data: { overrides },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get tenant feature flags error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get tenant feature flags' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+const setTenantFlagSchema = z.object({
+  tenantId: z.string().uuid(),
+  tenantType: z.enum(['SUPPLIER', 'RESTAURANT']),
+  featureKey: z.string(),
+  isEnabled: z.boolean(),
+});
+
+router.post('/tenants/:tenantId/feature-flags', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { tenantType, featureKey, isEnabled } = setTenantFlagSchema.parse(req.body);
+
+    // Get feature flag ID
+    const { rows: flags } = await query('SELECT id FROM feature_flag WHERE feature_key = $1', [featureKey]);
+    if (flags.length === 0) {
+      res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Feature flag not found' },
+        requestId: req.requestId,
+      });
+      return;
+    }
+
+    const flagId = flags[0].id;
+
+    const { rows: [override] } = await query(`
+      INSERT INTO feature_flag_override (tenant_id, tenant_type, feature_flag_id, feature_key, is_enabled)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (tenant_id, tenant_type, feature_key)
+      DO UPDATE SET is_enabled = EXCLUDED.is_enabled, updated_at = now()
+      RETURNING *
+    `, [tenantId, tenantType, flagId, featureKey, isEnabled]);
+
+    await logAudit(req, 'feature_flag.override', `Set ${featureKey} = ${isEnabled} for tenant ${tenantId}`, 'feature_flag_override', override.id, null, override);
+
+    res.json({
+      ok: true,
+      data: { override },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Set tenant feature flag error:', error);
+    if (error instanceof ZodError) {
+      res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid data', details: error.errors },
+        requestId: req.requestId,
+      });
+    } else {
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to set tenant feature flag' },
+        requestId: req.requestId,
+      });
+    }
+  }
+});
+
+router.delete('/tenants/:tenantId/feature-flags/:featureKey', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { tenantId, featureKey } = req.params;
+    const { tenantType } = req.query;
+
+    const { rows: deleted } = await query(`
+      DELETE FROM feature_flag_override
+      WHERE tenant_id = $1 AND tenant_type = $2 AND feature_key = $3
+      RETURNING *
+    `, [tenantId, tenantType, featureKey]);
+
+    await logAudit(req, 'feature_flag.override_deleted', `Removed override for ${featureKey}`, 'feature_flag_override', deleted[0]?.id, deleted[0], null);
+
+    res.json({
+      ok: true,
+      data: { deleted: deleted[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Delete tenant feature flag error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to delete tenant feature flag' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// ========================================
+// USAGE & QUOTAS
+// ========================================
+router.get('/usage/:tenantId', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { tenantType, period } = req.query;
+
+    const periodStart = period || 'monthly';
+    
+    const { rows: usage } = await query(`
+      SELECT * FROM usage_meter
+      WHERE tenant_id = $1 AND tenant_type = $2
+        AND period_type = $3
+      ORDER BY meter_type
+    `, [tenantId, tenantType, periodStart]);
+
+    res.json({
+      ok: true,
+      data: { usage, period: periodStart },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get usage error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get usage' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// ========================================
+// AUDIT LOGS
+// ========================================
+router.get('/audit-logs', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { limit = 50, offset = 0, tenantId, actionType } = req.query;
+
+    let whereClause = '';
+    const params = [];
+    let paramIndex = 1;
+
+    if (tenantId) {
+      whereClause += ` WHERE target_tenant_id = $${paramIndex++}`;
+      params.push(tenantId);
+    }
+
+    if (actionType) {
+      if (whereClause) whereClause += ' AND';
+      else whereClause = ' WHERE';
+      whereClause += ` action_type = $${paramIndex++}`;
+      params.push(actionType);
+    }
+
+    params.push(limit, offset);
+
+    const { rows: logs } = await query(`
+      SELECT * FROM admin_audit_log
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `, params);
+
+    res.json({
+      ok: true,
+      data: { logs, limit: parseInt(limit), offset: parseInt(offset) },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get audit logs error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get audit logs' },
+      requestId: req.requestId,
+    });
+  }
+});
+
 export default router;
 
