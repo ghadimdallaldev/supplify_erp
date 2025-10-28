@@ -1050,13 +1050,19 @@ router.patch('/:id', requireAuth, async (req, res) => {
       });
     }
     
-    logger.error('Update order error:', error);
+    logger.error('Update order error:', {
+      message: error.message,
+      stack: error.stack,
+      details: error.details,
+      code: error.code,
+    });
     res.status(500).json({
       ok: false,
       data: null,
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to update order',
+        details: error.message,
       },
       requestId: req.requestId,
     });
