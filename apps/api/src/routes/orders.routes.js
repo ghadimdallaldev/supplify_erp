@@ -857,6 +857,7 @@ router.post('/manual', requireAuth, requireRole(['SUPPLIER']), async (req, res) 
 router.patch('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    logger.info('Order update request', { id, body: req.body });
     const updateData = orderUpdateSchema.parse(req.body);
     
     // Get order
