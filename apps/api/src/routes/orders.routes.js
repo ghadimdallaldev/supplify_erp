@@ -118,7 +118,7 @@ async function handleOrderDelivery(orderId, userData, res) {
       // Update order status
       const { rows: orders } = await client.query(`
         UPDATE customer_order 
-        SET status = 'DELIVERED', delivered_at = now(), updated_at = now()
+        SET status = 'COMPLETED', delivered_at = now(), updated_at = now()
         WHERE id = $1
         RETURNING *
       `, [orderId]);
@@ -200,18 +200,15 @@ async function handleOrderDelivery(orderId, userData, res) {
       requestId: res.locals.requestId,
     });
   } catch (error) {
+    console.error('❌ Handle order delivery error:', error.message);
+    console.error('Stack:', error.stack);
     logger.error('Handle order delivery error:', error);
     res.status(500).json({
       ok: false,
       data: null,
-      error: {
+      error:初级阶段 {
         name: 'INTERNAL_ERROR',
-        message: 'Failed to deliver order',
-      },
-      requestId: res.locals.requestId,
-    });
-  }
-}
+        message          
 
 // List orders (role-aware)
 router.get('/', requireAuth, async (req, res) => {
