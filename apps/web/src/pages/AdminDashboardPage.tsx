@@ -19,7 +19,7 @@ import {
 } from '@/services/api';
 import { Loader2, Plus, Edit, Trash2, Users, Building2, DollarSign, TrendingUp } from 'lucide-react';
 
-export default function AdminDashboardPage() {
+export function AdminDashboardPage() {
   const [selectedTab, setSelectedTab] = useState('overview');
   const { data: overview, isLoading: overviewLoading } = useGetAdminOverviewQuery();
   const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery();
