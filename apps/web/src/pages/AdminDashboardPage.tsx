@@ -567,7 +567,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           <Package className="h-4 w-4 text-blue-600" />
                         </div>
                         <p className="text-2xl font-bold text-gray-900">
-                          {suppliersData?.suppliers?.reduce((sum, s) => sum + (s.product_count || 0), 0) || 0}
+                          {suppliersData?.suppliers?.reduce((sum, s) => sum + parseInt(s.product_count || 0), 0) || 0}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">Across all suppliers</p>
                       </div>
@@ -591,7 +591,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <p className="text-2xl font-bold text-gray-900">
                           {suppliersData?.suppliers?.filter(s => {
                             const limit = s.plan_name === 'Free' ? 50 : s.plan_name === 'Bronze' ? 1000 : 10000;
-                            return (s.product_count || 0) > limit;
+                            return parseInt(s.product_count || 0) > limit;
                           }).length || 0}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">Suppliers over product limit</p>
@@ -608,18 +608,19 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     <div className="space-y-2">
                       {suppliersData?.suppliers?.slice(0, 10).map((supplier: any) => {
                         const limit = supplier.plan_name === 'Free' ? 50 : supplier.plan_name === 'Bronze' ? 1000 : 10000;
-                        const usage = (supplier.product_count || 0) / limit * 100;
+                        const productCount = parseInt(supplier.product_count || 0);
+                        const usage = productCount / limit * 100;
                         return (
                           <div key={supplier.id} className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span className="font-medium">{supplier.name}</span>
-                              <span className={supplier.product_count > limit ? 'text-red-600' : ''}>
-                                {supplier.product_count || 0} / {limit}
+                              <span className={productCount > limit ? 'text-red-600' : ''}>
+                                {productCount} / {limit}
                               </span>
                             </div>
                             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                               <div 
-                                className={`h-full ${supplier.product_count > limit ? 'bg-red-500' : 'bg-blue-500'}`}
+                                className={`h-full ${productCount > limit ? 'bg-red-500' : 'bg-blue-500'}`}
                                 style={{ width: `${Math.min(usage, 100)}%` }}
                               />
                             </div>
@@ -648,7 +649,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           <TrendingUp className="h-4 w-4 text-blue-600" />
                         </div>
                         <p className="text-2xl font-bold text-gray-900">
-                          {restaurantsData?.restaurants?.reduce((sum, r) => sum + (r.orders_last_30d || 0), 0) || 0}
+                          {restaurantsData?.restaurants?.reduce((sum, r) => sum + parseInt(r.orders_last_30d || 0), 0) || 0}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">Total orders last 30 days</p>
                       </div>
