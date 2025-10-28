@@ -84,7 +84,7 @@ export interface ProductsResponse {
 export interface Order {
   id: string
   restaurant_id: string
-  status: 'DRAFT' | 'PLACED' | 'CONFIRMED' | 'FULFILLING' | 'COMPLETED' | 'CANCELLED'
+  status: 'DRAFT' | 'PLACED' | 'ACKNOWLEDGED' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
   total_amount: number
   currency: string
   placed_at?: string
@@ -116,6 +116,7 @@ export interface CreateOrderRequest {
     quantity: number
     notes?: string
   }[]
+  status?: 'DRAFT' | 'PLACED'
 }
 
 export interface CreateManualOrderRequest {
@@ -129,7 +130,7 @@ export interface CreateManualOrderRequest {
 }
 
 export interface UpdateOrderRequest {
-  status?: 'DRAFT' | 'PLACED' | 'CONFIRMED' | 'FULFILLING' | 'COMPLETED' | 'CANCELLED'
+  status?: 'DRAFT' | 'PLACED' | 'ACKNOWLEDGED' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
   notes?: string
 }
 

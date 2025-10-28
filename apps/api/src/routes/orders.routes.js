@@ -15,6 +15,7 @@ const orderCreateSchema = z.object({
     quantity: z.number().positive(),
     notes: z.string().optional(),
   })).min(1),
+  status: z.enum(['DRAFT', 'PLACED']).default('PLACED'),
 });
 
 const supplierOrderCreateSchema = z.object({
@@ -578,12 +579,15 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
     
     // Create order with transaction
     const result = await withTransaction(async (client) => {
+      // Determine status (allow DRAFT or PLACED)
+      const orderStatus = orderData.status || 'PLACED';
+      
       // Create order
       const { rows: [order] } = await client.query(`
         INSERT INTO customer_order (restaurant_id, currency, status)
-        VALUES ($1, 'USD', 'PLACED')
+        VALUES ($1, 'USD', $2)
         RETURNING *
-      `, [restaurantId]);
+      `, [restaurantId, orderStatus]);
       
       let totalAmount = 0;
       const orderItems = [];
@@ -650,12 +654,21 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
         `, [item.quantity, item.productId]);
       }
       
-      // Update order total
-      await client.query(`
-        UPDATE customer_order 
-        SET total_amount = $1, placed_at = now()
-        WHERE id = $2
-      `, [totalAmount, order.id]);
+      // Update order total and placed_at (only if status is PLACED)
+      if (orderStatus === 'PLACED') {
+        await client.query(`
+          UPDATE customer_order 
+          SET total_amount = $1, placed_at = now()
+          WHERE id = $2
+        `, [totalAmount, order.id]);
+      } else {
+        // For DRAFT orders, just update total_amount
+        await client.query(`
+          UPDATE customer_order 
+          SET total_amount = $1
+          WHERE id = $2
+        `, [totalAmount, order.id]);
+      }
       
       return { ...order, total_amount: totalAmount, items: orderItems };
     });
@@ -668,21 +681,23 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
       actor: req.userData.id 
     });
     
-    // Send notification to supplier about new order
-    try {
-      // Get supplier ID from first order item
-      const firstSupplierId = result.items[0]?.supplier_id;
-      if (firstSupplierId) {
-        await notifyOrderStatusChange({
-          id: result.id,
-          total_amount: result.total_amount,
-          restaurant_id: result.restaurant_id,
-          supplier_id: firstSupplierId,
-        }, 'PLACED');
+    // Send notification to supplier about new order (only if PLACED, not DRAFT)
+    if (result.status === 'PLACED') {
+      try {
+        // Get supplier ID from first order item
+        const firstSupplierId = result.items[0]?.supplier_id;
+        if (firstSupplierId) {
+          await notifyOrderStatusChange({
+            id: result.id,
+            total_amount: result.total_amount,
+            restaurant_id: result.restaurant_id,
+            supplier_id: firstSupplierId,
+          }, 'PLACED');
+        }
+      } catch (notifError) {
+        // Don't fail order creation if notification fails
+        logger.error('Failed to send order notification', { error: notifError.message });
       }
-    } catch (notifError) {
-      // Don't fail order creation if notification fails
-      logger.error('Failed to send order notification', { error: notifError.message });
     }
     
     res.status(201).json({
@@ -1103,6 +1118,75 @@ router.patch('/:id', requireAuth, async (req, res) => {
         name: 'INTERNAL_ERROR',
         message: 'Failed to update order',
         details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get packing slip (PDF)
+router.get('/:id/packing-slip', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get order with items
+    const { rows: orders } = await query(`
+      SELECT o.*, r.name as restaurant_name, r.contact_email, r.phone,
+        r.address_json as restaurant_address
+      FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
+      WHERE o.id = $1
+    `, [id]);
+    
+    if (orders.length === 0) {
+      throw new NotFoundError('Order not found');
+    }
+    
+    // Get order items
+    const { rows: items } = await query(`
+      SELECT oi.*, p.name as product_name, p.sku as product_sku, p.unit,
+        s.name as supplier_name
+      FROM order_item oi
+      JOIN product p ON p.id = oi.product_id
+      JOIN supplier s ON s.id = oi.supplier_id
+      WHERE oi.order_id = $1
+      ORDER BY s.name, p.name
+    `, [id]);
+    
+    const order = orders[0];
+    
+    // Return JSON for now (PDF generation can be added later)
+    res.json({
+      ok: true,
+      data: {
+        order,
+        items,
+        packingSlip: {
+          orderNumber: order.id.substring(0, 8).toUpperCase(),
+          restaurantName: order.restaurant_name,
+          restaurantAddress: order.restaurant_address,
+          orderDate: order.placed_at || order.created_at,
+          items: items.map(item => ({
+            sku: item.product_sku,
+            name: item.product_name,
+            quantity: item.quantity,
+            unit: item.unit,
+          })),
+          totalAmount: order.total_amount,
+          currency: order.currency,
+        }
+      },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get packing slip error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get packing slip',
       },
       requestId: req.requestId,
     });
