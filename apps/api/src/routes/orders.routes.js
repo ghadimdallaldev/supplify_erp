@@ -206,9 +206,14 @@ async function handleOrderDelivery(orderId, userData, res) {
     res.status(500).json({
       ok: false,
       data: null,
-      error:初级阶段 {
+      error: {
         name: 'INTERNAL_ERROR',
-        message          
+        message: 'Failed to deliver order',
+      },
+      requestId: res.locals.requestId,
+    });
+  }
+}
 
 // List orders (role-aware)
 router.get('/', requireAuth, async (req, res) => {
