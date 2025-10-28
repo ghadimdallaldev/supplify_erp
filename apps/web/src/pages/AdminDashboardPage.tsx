@@ -90,13 +90,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         <TabsList className={initialTab === 'suppliers' || initialTab === 'restaurants' ? 'grid w-full grid-cols-3' : 'grid w-full grid-cols-7'}>
           {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
             <>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="plans">Plans</TabsTrigger>
-              <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-              <TabsTrigger value="tenants">Tenants</TabsTrigger>
-              <TabsTrigger value="feature-flags">Feature Flags</TabsTrigger>
-              <TabsTrigger value="usage">Usage</TabsTrigger>
-              <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="plans">Plans</TabsTrigger>
+          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+          <TabsTrigger value="tenants">Tenants</TabsTrigger>
+          <TabsTrigger value="feature-flags">Feature Flags</TabsTrigger>
+          <TabsTrigger value="usage">Usage</TabsTrigger>
+          <TabsTrigger value="audit">Audit Logs</TabsTrigger>
             </>
           )}
           
@@ -492,7 +492,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   </CardContent>
                 </Card>
                 )}
-              </div>
+          </div>
             );
           })()}
         </TabsContent>
@@ -699,7 +699,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           </div>
                         );
                       })}
-                    </div>
+          </div>
                   </CardContent>
                 </Card>
               </>

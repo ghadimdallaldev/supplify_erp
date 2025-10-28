@@ -1,90 +1,54 @@
-# Admin Dashboard Status & Implementation Plan
+# Admin Dashboard System
 
-## ✅ What's Already Working
+## Overview
+Complete subscription-based admin dashboard system with separate views for suppliers and restaurants.
 
-### Backend (Real Data - Not Dummy)
-1. **Feature Flags** ✅
-   - Backend: `/api/admin-dashboard/feature-flags` 
-   - Database: `feature_flag` table with seeded data
-   - Data seeded in migration `0022_subscription_system.sql`
-   - Can toggle global flags
-   - Can set tenant-specific overrides
+## Features
 
-2. **Usage Tracking** ✅
-   - Backend: Implemented via `usage_meter` table
-   - Tracked automatically when creating products/orders
-   - Initialized for all existing tenants via `initialize-subscriptions.js`
-   - Real-time tracking is working
+### Admin Dashboard (`/app/admin`)
+Full admin panel with all features:
+- **Overview**: Platform metrics (MRR, ARR, tenants, subscriptions)
+- **Plans**: Manage subscription plans
+- **Subscriptions**: All tenant subscriptions
+- **Tenants**: Supplier & Restaurant directories
+- **Feature Flags**: Global & per-tenant feature toggles
+- **Usage**: Usage metrics and quotas
+- **Audit Logs**: Admin action history
 
-3. **Audit Logs** ✅
-   - Backend: `/api/admin-dashboard/audit-logs`
-   - Table: `admin_audit_log` (was referencing wrong table, now fixed)
-   - Logs are created when:
-     - Plans are updated
-     - Subscriptions are modified
-     - Feature flags are toggled
-     - Overrides are set
+### Supplier Admin (`/app/admin/suppliers`)
+Supplier-focused management:
+- **Directory**: Supplier table (products, warehouses, revenue, subscription status)
+- **Usage & Quotas**: Product usage metrics, over-limit tracking
+- **Audit Logs**: Supplier-specific admin actions
 
-### Backend Endpoints Added
-- ✅ `/api/admin-dashboard/tenants/suppliers` - Get all suppliers with details
-- ✅ `/api/admin-dashboard/tenants/restaurants` - Get all restaurants with details
-- ✅ `/api/admin-dashboard/tenants/suppliers/:id/usage` - Get supplier usage
-- ✅ `/api/admin-dashboard/tenants/restaurants/:id/usage` - Get restaurant usage
+### Restaurant Admin (`/app/admin/restaurants`)
+Restaurant-focused management:
+- **Directory**: Restaurant table (orders, spending, subscription status)
+- **Usage & Quotas**: Order metrics, spending analytics
+- **Audit Logs**: Restaurant-specific admin actions
 
-### Frontend API Hooks Added
-- ✅ `useGetAdminSuppliersQuery`
-- ✅ `useGetAdminRestaurantsQuery`
-- ✅ `useGetSupplierUsageQuery`
-- ✅ `useGetRestaurantUsageQuery`
+## Technical Details
 
-## ❌ What Needs Building
+### Navigation
+- Custom sidebar for admins showing only: Admin Dashboard, Supplier Admin, Restaurant Admin, Settings
+- Directory tab opens by default on supplier/restaurant admin pages
 
-### 1. Tenant Management Tab (Coming Soon placeholder)
-Replace with full tenant directory showing:
-- All suppliers with: name, plan, status, warehouses, products, last order, MRR
-- All restaurants with: name, plan, status, branches, last order, monthly spend
-- Actions: change plan, suspend/resume, view details
+### Data Loading
+- Proper error handling with user-friendly messages
+- Loading states with spinners
+- Empty state messages
+- Debug logging for troubleshooting
 
-### 2. Supplier Admin Sub-Dashboard
-- Overview with active suppliers, plan mix, over-limit count, open invoices
-- Directory table with supplier details
-- Usage & Quotas (per-supplier meters)
-- Catalog QA (missing images, UOM conflicts, inactive SKUs)
-- Fulfillment Health (OTIF %, defect rate, disputes)
-- Billing (invoices, payments, dunning)
-- Feature Flags (effective flags, overrides)
-- Audit (supplier-scoped actions)
+### Bug Fixes
+- Fixed string concatenation issue in metrics (now uses `parseInt()`)
+- Simplified SQL queries to prevent JOIN errors
+- JSX syntax fixes with proper fragment wrapping
 
-### 3. Restaurant Admin Sub-Dashboard
-- Overview with active restaurants, plan mix, waste %, orders/day, overdue invoices
-- Directory table with restaurant details
-- Usage & Quotas (products tracked, orders/day, chats/day)
-- Spend & Invoices
-- Ops Health (receiving timeliness, dispute rate, approval queue)
-- Feature Access (effective flags, upgrade prompts)
-- Audit (restaurant-scoped actions)
+## Usage
 
-## 📝 Current Admin Dashboard Structure
+Admins can now efficiently manage:
+1. **Suppliers**: Track product counts, warehouses, revenue, subscriptions
+2. **Restaurants**: Monitor orders, spending, subscription status
+3. **Overall Platform**: View aggregated metrics and manage plans
 
-```typescript
-// Current tabs in AdminDashboardPage:
-- Overview ✅ (working with real data)
-- Plans ✅ (working with real data)
-- Subscriptions ✅ (working with real data)
-- Tenants ❌ (placeholder - needs full implementation)
-- Feature Flags ✅ (working with real data)
-- Usage ❌ (placeholder - needs implementation)
-- Audit Logs ✅ (working with real data from admin_audit_log table)
-```
-
-## 🎯 Next Steps
-
-The backend infrastructure is **100% real and working**. What needs to be built is:
-
-1. **Frontend** for Tenant Management tab
-2. **Frontend** for Usage & Quotas tab
-3. **Supplier Admin** sub-dashboard as a separate page
-4. **Restaurant Admin** sub-dashboard as a separate page
-
-All data endpoints are ready - just need UI!
-
+All data is real-time from the PostgreSQL database with proper subscription enforcement.
