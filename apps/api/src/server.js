@@ -33,6 +33,7 @@ import { receivingRoutes } from './routes/receiving.routes.js';
 import { restaurantFinanceRoutes } from './routes/restaurant-finance.routes.js';
 import { restaurantPricingRoutes } from './routes/restaurant-pricing.routes.js';
 import { notificationsRoutes } from './routes/notifications.routes.js';
+import adminDashboardRoutes from './routes/admin-dashboard.routes.js';
 
 const app = express();
 
@@ -140,6 +141,7 @@ app.use('/api/receiving', receivingRoutes);
 app.use('/api/restaurant-finance', restaurantFinanceRoutes);
 app.use('/api/restaurant-pricing', restaurantPricingRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/admin-dashboard', adminDashboardRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
