@@ -1050,6 +1050,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
       });
     }
     
+    console.error('❌ Update order error:', error.message);
+    console.error('Stack:', error.stack);
     logger.error('Update order error:', {
       message: error.message,
       stack: error.stack,

@@ -49,9 +49,10 @@ export async function query(text, params = []) {
     return result;
   } catch (error) {
     const duration = Date.now() - start;
+    console.error('❌ Query failed:', error.message);
+    console.error('Query:', text.substring(0, 200));
+    console.error('Error details:', error);
     logger.error('Query failed', { 
-      text: text.substring(0, 200), 
-      duration: `${duration}ms`,
       error: error.message,
       details: error,
       params: params || []
