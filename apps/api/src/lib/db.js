@@ -50,9 +50,11 @@ export async function query(text, params = []) {
   } catch (error) {
     const duration = Date.now() - start;
     logger.error('Query failed', { 
-      text: text.substring(0, 100) + '...', 
+      text: text.substring(0, 200), 
       duration: `${duration}ms`,
-      error: error.message 
+      error: error.message,
+      details: error,
+      params: params || []
     });
     throw error;
   }
