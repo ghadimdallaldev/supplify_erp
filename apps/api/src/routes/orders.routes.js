@@ -3,6 +3,7 @@ import { requireAuth, requireRole, requireOwnership } from '../lib/rbac.js';
 import { query, withTransaction } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js';
+import { checkLimit, incrementUsage } from '../lib/subscription.js';
 import { z } from 'zod';
 import { notifyOrderStatusChange } from '../services/notification.service.js';
 
@@ -576,6 +577,27 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
     }
     
     const restaurantId = restaurants[0].id;
+
+    // Check plan limits for restaurants before creating order
+    if (orderData.status === 'PLACED') {
+      const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day');
+      if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'LIMIT_EXCEEDED',
+            message: `You have reached your daily order limit (${limitCheck.limit})`,
+            details: {
+              current: limitCheck.current,
+              limit: limitCheck.limit,
+              meterType: 'orders_per_day'
+            }
+          },
+          requestId: req.requestId,
+        });
+      }
+    }
     
     // Create order with transaction
     const result = await withTransaction(async (client) => {
@@ -697,6 +719,13 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
       } catch (notifError) {
         // Don't fail order creation if notification fails
         logger.error('Failed to send order notification', { error: notifError.message });
+      }
+
+      // Track usage for order creation
+      try {
+        await incrementUsage(restaurantId, 'RESTAURANT', 'orders_per_day', 1);
+      } catch (usageError) {
+        logger.error('Failed to track order usage', { error: usageError.message });
       }
     }
     

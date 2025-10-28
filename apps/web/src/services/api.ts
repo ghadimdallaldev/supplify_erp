@@ -67,7 +67,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap,
-  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification', 'Admin'],
+  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification', 'Subscription', 'Admin'],
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
@@ -485,6 +485,20 @@ export const api = createApi({
       invalidatesTags: ['Notification'],
     }),
 
+    // Subscription endpoints
+    getCurrentSubscription: builder.query<{ subscription: Subscription }, void>({
+      query: () => '/api/subscriptions/current',
+      providesTags: ['Subscription'],
+    }),
+    getSubscriptionUsage: builder.query<UsageMeter & { meterType: string }, string>({
+      query: (meterType) => `/api/subscriptions/usage/${meterType}`,
+      providesTags: ['Subscription'],
+    }),
+    checkFeature: builder.query<{ featureKey: string; isEnabled: boolean }, string>({
+      query: (featureKey) => `/api/subscriptions/features/${featureKey}`,
+      providesTags: ['Subscription'],
+    }),
+
     // Admin Dashboard endpoints
     getAdminOverview: builder.query<any, void>({
       query: () => '/api/admin-dashboard/overview',
@@ -574,6 +588,22 @@ export const api = createApi({
       }),
       providesTags: ['Admin'],
     }),
+    getAdminSuppliers: builder.query<{ suppliers: any[] }, void>({
+      query: () => '/api/admin-dashboard/tenants/suppliers',
+      providesTags: ['Admin'],
+    }),
+    getAdminRestaurants: builder.query<{ restaurants: any[] }, void>({
+      query: () => '/api/admin-dashboard/tenants/restaurants',
+      providesTags: ['Admin'],
+    }),
+    getSupplierUsage: builder.query<{ usage: UsageMeter[] }, string>({
+      query: (id) => `/api/admin-dashboard/tenants/suppliers/${id}/usage`,
+      providesTags: ['Admin'],
+    }),
+    getRestaurantUsage: builder.query<{ usage: UsageMeter[] }, string>({
+      query: (id) => `/api/admin-dashboard/tenants/restaurants/${id}/usage`,
+      providesTags: ['Admin'],
+    }),
   }),
 })
 
@@ -636,6 +666,9 @@ export const {
   useUpdateNotificationPreferencesMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
+  useGetCurrentSubscriptionQuery,
+  useGetSubscriptionUsageQuery,
+  useCheckFeatureQuery,
   useGetAdminOverviewQuery,
   useGetAdminPlansQuery,
   useCreateAdminPlanMutation,
@@ -647,6 +680,10 @@ export const {
   useGetTenantFeatureFlagsQuery,
   useSetTenantFeatureFlagMutation,
   useDeleteTenantFeatureFlagMutation,
-  useGetTenantUsageQuery,
-  useGetAdminAuditLogsQuery,
+    useGetTenantUsageQuery,
+    useGetAdminAuditLogsQuery,
+    useGetAdminSuppliersQuery,
+    useGetAdminRestaurantsQuery,
+    useGetSupplierUsageQuery,
+    useGetRestaurantUsageQuery,
 } = api

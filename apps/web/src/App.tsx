@@ -129,6 +129,14 @@ const router = createBrowserRouter([
         path: 'app/admin',
         element: <AdminDashboardPage />,
       },
+      {
+        path: 'app/admin/suppliers',
+        element: <AdminDashboardPage initialTab="suppliers" />,
+      },
+      {
+        path: 'app/admin/restaurants',
+        element: <AdminDashboardPage initialTab="restaurants" />,
+      },
     ],
   },
 ])

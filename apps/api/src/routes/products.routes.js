@@ -3,6 +3,7 @@ import { requireAuth, requireRole, requireOwnership } from '../lib/rbac.js';
 import { query, withTransaction } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js';
+import { checkLimit, incrementUsage } from '../lib/subscription.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -241,6 +242,25 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       }
       
       supplierId = suppliers[0].id;
+
+      // Check plan limits for suppliers
+      const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'products');
+      if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'LIMIT_EXCEEDED',
+            message: `You have reached your plan limit for products (${limitCheck.limit})`,
+            details: {
+              current: limitCheck.current,
+              limit: limitCheck.limit,
+              meterType: 'products'
+            }
+          },
+          requestId: req.requestId,
+        });
+      }
     }
     
     if (!supplierId) {
@@ -290,6 +310,11 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       }
       
       await query('COMMIT');
+      
+      // Track usage for supplier
+      if (req.userData.role === 'SUPPLIER' && supplierId) {
+        await incrementUsage(supplierId, 'SUPPLIER', 'products', 1);
+      }
       
       logger.info('Product created with price and inventory', { 
         productId: product.id, 

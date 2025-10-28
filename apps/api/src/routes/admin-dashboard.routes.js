@@ -356,12 +356,15 @@ router.get('/subscriptions', requireAuth, requireRole(['ADMIN']), async (req, re
     const { rows: subscriptions } = await query(`
       SELECT s.*,
         sp.price_per_month, sp.price_per_year, sp.limits as plan_limits, sp.features as plan_features,
-        COALESCE(t.name, t.contact_email) as tenant_name, t.email as tenant_email
+        COALESCE(
+          CASE WHEN s.tenant_type = 'SUPPLIER' THEN su.name ELSE NULL END,
+          CASE WHEN s.tenant_type = 'RESTAURANT' THEN r.name ELSE NULL END
+        ) as tenant_name,
+        COALESCE(su.contact_email, r.contact_email) as tenant_email
       FROM subscription s
       JOIN subscription_plan sp ON sp.id = s.plan_id
       LEFT JOIN supplier su ON (s.tenant_id = su.id AND s.tenant_type = 'SUPPLIER')
       LEFT JOIN restaurant r ON (s.tenant_id = r.id AND s.tenant_type = 'RESTAURANT')
-      LEFT JOIN app_user t ON ((t.keycloak_sub = su.contact_email AND s.tenant_type = 'SUPPLIER') OR (t.keycloak_sub = r.contact_email AND s.tenant_type = 'RESTAURANT'))
       ${whereClause}
       ORDER BY s.created_at DESC
     `, params);
@@ -740,6 +743,134 @@ router.get('/audit-logs', requireAuth, requireRole(['ADMIN']), async (req, res) 
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get audit logs' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// ========================================
+// TENANT MANAGEMENT
+// ========================================
+
+// Get suppliers with detailed info
+router.get('/tenants/suppliers', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { rows: suppliers } = await query(`
+      SELECT 
+        s.*,
+        sub.status as subscription_status,
+        sub.plan_name,
+        sub.id as subscription_id,
+        (SELECT COUNT(*) FROM product WHERE supplier_id = s.id) as product_count,
+        (SELECT COUNT(*) FROM warehouse WHERE supplier_id = s.id AND is_active = true) as warehouse_count,
+        0 as total_revenue
+      FROM supplier s
+      LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
+      ORDER BY s.name
+    `);
+
+    res.json({
+      ok: true,
+      data: { suppliers },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get suppliers error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get suppliers' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get restaurants with detailed info
+router.get('/tenants/restaurants', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { rows: restaurants } = await query(`
+      SELECT 
+        r.*,
+        sub.status as subscription_status,
+        sub.plan_name,
+        sub.id as subscription_id,
+        (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as order_count,
+        (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND status = 'COMPLETED') as total_spent,
+        (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id AND placed_at >= NOW() - INTERVAL '30 days') as orders_last_30d
+      FROM restaurant r
+      LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
+      ORDER BY r.name
+    `);
+
+    res.json({
+      ok: true,
+      data: { restaurants },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get restaurants error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurants' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get supplier usage details
+router.get('/tenants/suppliers/:id/usage', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { rows: usage } = await query(`
+      SELECT * FROM usage_meter
+      WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER'
+      ORDER BY meter_type, period_start_date DESC
+    `, [id]);
+
+    res.json({
+      ok: true,
+      data: { usage },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get supplier usage error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get supplier usage' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get restaurant usage details
+router.get('/tenants/restaurants/:id/usage', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { rows: usage } = await query(`
+      SELECT * FROM usage_meter
+      WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT'
+      ORDER BY meter_type, period_start_date DESC
+    `, [id]);
+
+    res.json({
+      ok: true,
+      data: { usage },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get restaurant usage error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurant usage' },
       requestId: req.requestId,
     });
   }

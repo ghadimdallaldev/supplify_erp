@@ -37,8 +37,8 @@ const restaurantNavigation = [
 
 const adminNavigation = [
   { name: 'Admin Dashboard', href: '/app/admin', icon: Shield },
-  { name: 'Suppliers', href: '/app/suppliers', icon: Building2 },
-  { name: 'Restaurants', href: '/app/restaurants', icon: Users },
+  { name: 'Supplier Admin', href: '/app/admin/suppliers', icon: Building2 },
+  { name: 'Restaurant Admin', href: '/app/admin/restaurants', icon: Users },
 ]
 
 export function Sidebar() {
@@ -50,14 +50,14 @@ export function Sidebar() {
   const isRestaurant = user?.role === 'RESTAURANT'
   
   // Build navigation based on role
-  let allNavigation = [...navigation]
+  let allNavigation: any[] = []
   
   if (isRestaurant) {
-    // Restaurants see Cart
+    // Restaurants see base navigation + restaurant features
     allNavigation = [...navigation, ...restaurantNavigation]
   } else if (isAdmin) {
-    // Admins see Suppliers and Restaurants
-    allNavigation = [...navigation, ...adminNavigation]
+    // Admins ONLY see Admin Dashboard (no Dashboard, Products, Orders, Chat)
+    allNavigation = [...adminNavigation]
   } else if (isSupplier) {
     // Suppliers see Restaurants, Fulfillment, and Invoices (Products already in base nav)
     allNavigation = [...navigation, 

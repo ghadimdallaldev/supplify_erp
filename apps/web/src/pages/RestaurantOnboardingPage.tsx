@@ -19,6 +19,7 @@ import {
   Trash2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { SubscriptionInfo } from '../components/SubscriptionInfo'
 
 export function RestaurantOnboardingPage() {
   const [activeTab, setActiveTab] = useState('profile')
@@ -272,44 +273,7 @@ export function RestaurantOnboardingPage() {
 
         {/* Subscription Tab */}
         <TabsContent value="subscription">
-          <Card>
-            <CardHeader>
-              <CardTitle>Subscription & Billing</CardTitle>
-              <CardDescription>Manage your plan and billing</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="font-semibold text-lg">Current Plan</h3>
-                      <p className="text-sm text-gray-600">Free Tier</p>
-                    </div>
-                    <Badge variant="secondary">ACTIVE</Badge>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Renewal Date</span>
-                      <span className="font-medium">N/A</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Monthly Limit</span>
-                      <span className="font-medium">Unlimited</span>
-                    </div>
-                  </div>
-
-                  <Button className="mt-4 w-full">Upgrade Plan</Button>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <p className="text-sm text-blue-800">
-                    💡 <strong>Upgrade</strong> to unlock advanced features like unlimited quick lists, priority support, and analytics
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <SubscriptionInfo />
         </TabsContent>
 
         {/* Notifications Tab */}

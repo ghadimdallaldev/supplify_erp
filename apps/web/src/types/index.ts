@@ -441,12 +441,14 @@ export interface ReorderSuggestionsResponse {
 // Admin Dashboard types
 export interface SubscriptionPlan {
   id: string
+  code: string // free, bronze, gold, platinum
   name: string
   description?: string
   price_per_month: number
   price_per_year?: number
-  limits: Record<string, any>
-  features: string[]
+  type: 'restaurant_only' | 'supplier_only' | 'restaurant_and_supplier'
+  limits: Record<string, any> // JSONB object with limit keys
+  features: Record<string, any> // JSONB object with feature capabilities
   trial_days: number
   is_active: boolean
   display_order: number

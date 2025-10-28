@@ -65,7 +65,7 @@ router.get('/audit', requireAuth, requireRole(['ADMIN']), async (req, res) => {
       : '';
     
     const sql = `
-      SELECT * FROM audit_log
+      SELECT * FROM admin_audit_log
       ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -76,7 +76,7 @@ router.get('/audit', requireAuth, requireRole(['ADMIN']), async (req, res) => {
     const { rows } = await query(sql, queryParams);
     
     // Get total count
-    const countSql = `SELECT COUNT(*) as total FROM audit_log ${whereClause}`;
+    const countSql = `SELECT COUNT(*) as total FROM admin_audit_log ${whereClause}`;
     const countParams = queryParams.slice(0, -2);
     const { rows: countRows } = await query(countSql, countParams);
     

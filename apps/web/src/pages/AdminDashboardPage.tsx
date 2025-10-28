@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -16,16 +16,39 @@ import {
   useUpdateAdminPlanMutation,
   useUpdateAdminSubscriptionMutation,
   useCreateAdminPlanMutation,
+  useGetAdminSuppliersQuery,
+  useGetAdminRestaurantsQuery,
 } from '@/services/api';
-import { Loader2, Plus, Edit, Trash2, Users, Building2, DollarSign, TrendingUp } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users, Building2, DollarSign, TrendingUp, AlertCircle, Package } from 'lucide-react';
 
-export function AdminDashboardPage() {
-  const [selectedTab, setSelectedTab] = useState('overview');
+interface AdminDashboardPageProps {
+  initialTab?: string;
+}
+
+export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPageProps) {
+  // Default to 'tenants' tab for supplier/restaurant admin views, otherwise use initialTab
+  const defaultTab = initialTab === 'suppliers' || initialTab === 'restaurants' ? 'tenants' : initialTab;
+  const [selectedTab, setSelectedTab] = useState(defaultTab);
   const { data: overview, isLoading: overviewLoading } = useGetAdminOverviewQuery();
   const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery();
   const { data: subscriptionsData, isLoading: subscriptionsLoading } = useGetAdminSubscriptionsQuery({});
   const { data: featureFlagsData, isLoading: flagsLoading } = useGetAdminFeatureFlagsQuery();
   const { data: auditLogsData, isLoading: auditLoading } = useGetAdminAuditLogsQuery({});
+  
+  // Load tenant data
+  const { data: suppliersData, isLoading: suppliersLoading, error: suppliersError } = useGetAdminSuppliersQuery();
+  const { data: restaurantsData, isLoading: restaurantsLoading, error: restaurantsError } = useGetAdminRestaurantsQuery();
+  
+  // Debug: Log data to console
+  console.log('AdminDashboard Debug:', {
+    initialTab,
+    suppliersData,
+    restaurantsData,
+    suppliersLoading,
+    restaurantsLoading,
+    suppliersError,
+    restaurantsError
+  });
 
   const [createPlan] = useCreateAdminPlanMutation();
   const [updatePlan] = useUpdateAdminPlanMutation();
@@ -64,14 +87,28 @@ export function AdminDashboardPage() {
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="plans">Plans</TabsTrigger>
-          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-          <TabsTrigger value="tenants">Tenants</TabsTrigger>
-          <TabsTrigger value="feature-flags">Feature Flags</TabsTrigger>
-          <TabsTrigger value="usage">Usage</TabsTrigger>
-          <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+        <TabsList className={initialTab === 'suppliers' || initialTab === 'restaurants' ? 'grid w-full grid-cols-3' : 'grid w-full grid-cols-7'}>
+          {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
+            <>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="plans">Plans</TabsTrigger>
+              <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+              <TabsTrigger value="tenants">Tenants</TabsTrigger>
+              <TabsTrigger value="feature-flags">Feature Flags</TabsTrigger>
+              <TabsTrigger value="usage">Usage</TabsTrigger>
+              <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+            </>
+          )}
+          
+          {(initialTab === 'suppliers' || initialTab === 'restaurants') && (
+            <>
+              <TabsTrigger value={initialTab === 'suppliers' ? 'tenants' : 'tenants'}>
+                Directory
+              </TabsTrigger>
+              <TabsTrigger value="usage">Usage & Quotas</TabsTrigger>
+              <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+            </>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -215,9 +252,19 @@ export function AdminDashboardPage() {
                   <div className="space-y-2 mb-4">
                     <p className="text-sm font-semibold text-gray-700">Features:</p>
                     <div className="flex flex-wrap gap-1">
-                      {plan.features.map((feature) => (
-                        <Badge key={feature} variant="outline">{feature}</Badge>
-                      ))}
+                      {plan.features && typeof plan.features === 'object' ? (
+                        Object.entries(plan.features).map(([key, value]) => {
+                          // Skip if value is false or empty
+                          if (!value || value === false) return null;
+                          return (
+                            <Badge key={key} variant={value ? 'default' : 'secondary'}>
+                              {key.replace(/_/g, ' ')}
+                            </Badge>
+                          );
+                        }).filter(Boolean)
+                      ) : (
+                        <span className="text-sm text-gray-500">No features defined</span>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-2 mt-4">
@@ -296,11 +343,158 @@ export function AdminDashboardPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="tenants">
-          <div className="text-center py-12">
-            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">Tenant management coming soon...</p>
+        <TabsContent value="tenants" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {initialTab === 'suppliers' ? 'Supplier Management' : initialTab === 'restaurants' ? 'Restaurant Management' : 'Tenant Management'}
+            </h2>
           </div>
+
+          {(() => {
+            // Show only suppliers or restaurants based on initialTab
+            const showSuppliersOnly = initialTab === 'suppliers';
+            const showRestaurantsOnly = initialTab === 'restaurants';
+            
+            return (
+              <div className="space-y-6">
+                {/* Suppliers Section - Show if not restaurant-only view */}
+                {!showRestaurantsOnly && (
+                  <Card>
+                  <CardHeader>
+                    <h3 className="text-xl font-bold text-gray-900">Suppliers</h3>
+                    <p className="text-sm text-gray-600">Manage supplier tenants and subscriptions</p>
+                  </CardHeader>
+                  <CardContent>
+                    {suppliersError ? (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded">
+                        <p className="text-red-800">Error loading suppliers. Check console for details.</p>
+                      </div>
+                    ) : suppliersLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      </div>
+                    ) : !suppliersData?.suppliers || suppliersData.suppliers.length === 0 ? (
+                      <p className="text-center py-8 text-gray-500">No suppliers found</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Supplier</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Plan</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Products</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Warehouses</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Revenue</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {suppliersData.suppliers.map((supplier: any) => (
+                              <tr key={supplier.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                <td className="py-3 px-4">
+                                  <div>
+                                    <p className="font-medium text-gray-900">{supplier.name}</p>
+                                    <p className="text-sm text-gray-500">{supplier.contact_email}</p>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge variant="outline">{supplier.plan_name || 'Free'}</Badge>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge variant={supplier.subscription_status === 'ACTIVE' ? 'default' : 'secondary'}>
+                                    {supplier.subscription_status || 'NONE'}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-4 text-gray-600">{supplier.product_count || 0}</td>
+                                <td className="py-3 px-4 text-gray-600">{supplier.warehouse_count || 0}</td>
+                                <td className="py-3 px-4 text-gray-600">
+                                  ${parseFloat(supplier.total_revenue || 0).toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Button size="sm" variant="outline">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                )}
+
+                {/* Restaurants Section - Show if not supplier-only view */}
+                {!showSuppliersOnly && (
+                  <Card>
+                  <CardHeader>
+                    <h3 className="text-xl font-bold text-gray-900">Restaurants</h3>
+                    <p className="text-sm text-gray-600">Manage restaurant tenants and subscriptions</p>
+                  </CardHeader>
+                  <CardContent>
+                    {restaurantsError ? (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded">
+                        <p className="text-red-800">Error loading restaurants. Check console for details.</p>
+                      </div>
+                    ) : restaurantsLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      </div>
+                    ) : !restaurantsData?.restaurants || restaurantsData.restaurants.length === 0 ? (
+                      <p className="text-center py-8 text-gray-500">No restaurants found</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Restaurant</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Plan</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Orders (30d)</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Total Spent</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-900">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {restaurantsData.restaurants.map((restaurant: any) => (
+                              <tr key={restaurant.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                <td className="py-3 px-4">
+                                  <div>
+                                    <p className="font-medium text-gray-900">{restaurant.name}</p>
+                                    <p className="text-sm text-gray-500">{restaurant.contact_email}</p>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge variant="outline">{restaurant.plan_name || 'Free'}</Badge>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge variant={restaurant.subscription_status === 'ACTIVE' ? 'default' : 'secondary'}>
+                                    {restaurant.subscription_status || 'NONE'}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-4 text-gray-600">{restaurant.orders_last_30d || 0}</td>
+                                <td className="py-3 px-4 text-gray-600">
+                                  ${parseFloat(restaurant.total_spent || 0).toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Button size="sm" variant="outline">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                )}
+              </div>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="feature-flags" className="space-y-6">
@@ -349,11 +543,166 @@ export function AdminDashboardPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="usage">
-          <div className="text-center py-12">
-            <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">Usage and quotas tracking coming soon...</p>
+        <TabsContent value="usage" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {initialTab === 'suppliers' ? 'Supplier Usage & Quotas' : initialTab === 'restaurants' ? 'Restaurant Usage & Quotas' : 'Usage & Quotas'}
+            </h2>
+            <p className="text-sm text-gray-600">Monitor tenant resource usage against plan limits</p>
           </div>
+
+          {/* Supplier-specific Usage View */}
+          {initialTab === 'suppliers' && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-xl font-bold text-gray-900">Supplier Usage Overview</h3>
+                    <p className="text-sm text-gray-600">Product and warehouse usage across all suppliers</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-gray-600">Total Products</span>
+                          <Package className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {suppliersData?.suppliers?.reduce((sum, s) => sum + (s.product_count || 0), 0) || 0}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Across all suppliers</p>
+                      </div>
+
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-gray-600">Active Suppliers</span>
+                          <Building2 className="h-4 w-4 text-green-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {suppliersData?.suppliers?.length || 0}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">With active subscriptions</p>
+                      </div>
+
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-gray-600">Over Limit</span>
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {suppliersData?.suppliers?.filter(s => {
+                            const limit = s.plan_name === 'Free' ? 50 : s.plan_name === 'Bronze' ? 1000 : 10000;
+                            return (s.product_count || 0) > limit;
+                          }).length || 0}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Suppliers over product limit</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-xl font-bold text-gray-900">Products by Supplier</h3>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {suppliersData?.suppliers?.slice(0, 10).map((supplier: any) => {
+                        const limit = supplier.plan_name === 'Free' ? 50 : supplier.plan_name === 'Bronze' ? 1000 : 10000;
+                        const usage = (supplier.product_count || 0) / limit * 100;
+                        return (
+                          <div key={supplier.id} className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium">{supplier.name}</span>
+                              <span className={supplier.product_count > limit ? 'text-red-600' : ''}>
+                                {supplier.product_count || 0} / {limit}
+                              </span>
+                            </div>
+                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full ${supplier.product_count > limit ? 'bg-red-500' : 'bg-blue-500'}`}
+                                style={{ width: `${Math.min(usage, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+          )}
+
+          {/* Restaurant-specific Usage View */}
+          {initialTab === 'restaurants' && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-xl font-bold text-gray-900">Restaurant Usage Overview</h3>
+                    <p className="text-sm text-gray-600">Orders and spending across all restaurants</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-gray-600">30-Day Orders</span>
+                          <TrendingUp className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {restaurantsData?.restaurants?.reduce((sum, r) => sum + (r.orders_last_30d || 0), 0) || 0}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Total orders last 30 days</p>
+                      </div>
+
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-gray-600">Active Restaurants</span>
+                          <Users className="h-4 w-4 text-green-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {restaurantsData?.restaurants?.length || 0}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">With active subscriptions</p>
+                      </div>
+
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-gray-600">Total Spent (30d)</span>
+                          <DollarSign className="h-4 w-4 text-green-600" />
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900">
+                          ${restaurantsData?.restaurants?.reduce((sum, r) => sum + parseFloat(r.total_spent || 0), 0).toFixed(2) || '0.00'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Across all restaurants</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-xl font-bold text-gray-900">Orders by Restaurant</h3>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {restaurantsData?.restaurants?.slice(0, 10).map((restaurant: any) => {
+                        const dailyLimit = restaurant.plan_name === 'Free' ? 10 : restaurant.plan_name === 'Bronze' ? 100 : restaurant.plan_name === 'Gold' ? 500 : -1;
+                        return (
+                          <div key={restaurant.id} className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium">{restaurant.name}</span>
+                              <span>{restaurant.orders_last_30d || 0} orders</span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Daily limit: {dailyLimit === -1 ? 'Unlimited' : `${dailyLimit}/day`}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+          )}
         </TabsContent>
 
         <TabsContent value="audit">
@@ -390,3 +739,5 @@ export function AdminDashboardPage() {
     </div>
   );
 }
+
+
