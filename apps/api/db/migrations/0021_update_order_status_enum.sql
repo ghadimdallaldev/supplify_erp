@@ -7,7 +7,7 @@ ALTER TABLE customer_order ALTER COLUMN status TYPE TEXT USING status::TEXT;
 -- Step 2: Update existing values to new statuses
 UPDATE customer_order SET status = 'COMPLETED' WHERE status = 'FULFILLING';
 UPDATE customer_order SET status = 'ACKNOWLEDGED' WHERE status = 'CONFIRMED';
-UPDATE customer_order SET status = 'PROCESSING' WHERE status = 'PLACED'; -- You may want to keep PLACED or decide based on your logic
+-- Keep PLACED as is, don't change to PROCESSING
 
 -- Step 3: Drop old enum and create new one
 DROP TYPE IF EXISTS order_status;
