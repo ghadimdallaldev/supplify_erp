@@ -10,7 +10,34 @@ import { logger } from '../lib/logger.js';
 const emailService = {
   async send(email, subject, html, text) {
     logger.info('📧 Email sent', { to: email, subject });
-    // TODO: Integrate with SendGrid, SES, or similar
+    
+    // Check if SendGrid is configured
+    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL) {
+      try {
+        // Import SendGrid dynamically (only if installed)
+        const sgMail = await import('@sendgrid/mail').catch(() => null);
+        
+        if (sgMail) {
+          sgMail.default.setApiKey(process.env.SENDGRID_API_KEY);
+          
+          const msg = {
+            to: email,
+            from: process.env.SENDGRID_FROM_EMAIL,
+            subject: subject,
+            text: text,
+            html: html,
+          };
+          
+          await sgMail.default.send(msg);
+          logger.info('Email sent via SendGrid', { to: email });
+          return true;
+        }
+      } catch (error) {
+        logger.error('SendGrid error:', error);
+      }
+    }
+    
+    // Fallback: Log to console
     console.log(`EMAIL: To: ${email}, Subject: ${subject}`);
     if (text) console.log(`Body: ${text}`);
     return true;
@@ -21,7 +48,34 @@ const emailService = {
 const smsService = {
   async send(phone, message) {
     logger.info('📱 SMS sent', { to: phone, message });
-    // TODO: Integrate with Twilio, Nexmo, or similar
+    
+    // Check if Twilio is configured
+    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+      try {
+        // Import Twilio dynamically (only if installed)
+        const twilio = await import('twilio').catch(() => null);
+        
+        if (twilio) {
+          const client = twilio.default(
+            process.env.TWILIO_ACCOUNT_SID,
+            process.env.TWILIO_AUTH_TOKEN
+          );
+          
+          await client.messages.create({
+            body: message,
+            to: phone,
+            from: process.env.TWILIO_PHONE_NUMBER,
+          });
+          
+          logger.info('SMS sent via Twilio', { to: phone });
+          return true;
+        }
+      } catch (error) {
+        logger.error('Twilio error:', error);
+      }
+    }
+    
+    // Fallback: Log to console
     console.log(`SMS: To: ${phone}, Message: ${message}`);
     return true;
   }
