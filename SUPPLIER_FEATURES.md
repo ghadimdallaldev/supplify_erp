@@ -31,16 +31,24 @@ Order PLACED (by Restaurant)
     ↓
 Order ACKNOWLEDGED (Supplier)
     ↓
+[Restaurant receives notification]
+    ↓
 Order PROCESSING (Supplier)
+    ↓
+[Restaurant receives notification]
     ↓
 Order SHIPPED (Supplier)
     ↓
-Order DELIVERED (Supplier)
+[Restaurant receives notification]
+    ↓
+Order COMPLETED (Supplier)
+    ↓
+[Restaurant receives notification]
     ↓
 [AUTO-INVOICE CREATED] ← Invoice Status: ISSUED
     - Invoice number generated (INV-YYYY-MM-XXXXXX)
     - Total calculated from order items
-    - Due date set (30 days from delivery)
+    - Due date set (30 days from completion)
     - Status: ISSUED
     ↓
 [Payment Received] → Invoice Status: PARTIALLY_PAID
@@ -272,9 +280,9 @@ Message appears in chat
 
 ### **6. INVOICE MANAGEMENT FLOW**
 
-#### A. Auto-Invoice Creation (on Delivery)
+#### A. Auto-Invoice Creation (on Completion)
 ```
-Order DELIVERED
+Order COMPLETED
     ↓
 [Backend Trigger] handleOrderDelivery()
     ↓
@@ -633,21 +641,20 @@ Product created with image
 
 #### ✅ Order Status Workflow
 - **Available Statuses**:
-  - `DRAFT` - Initial state
-  - `PLACED` - Restaurant submitted
-  - `ACKNOWLEDGED` - Supplier acknowledged
+  - `DRAFT` - Draft order (not yet placed)
+  - `PLACED` - Order submitted by restaurant
+  - `ACKNOWLEDGED` - Supplier acknowledged order
   - `PROCESSING` - Being picked/packed
-  - `SHIPPED` - In transit
-  - `DELIVERED` - Received by restaurant
-  - `COMPLETED` - Finalized
-  - `CANCELLED` - Cancelled
+  - `SHIPPED` - In transit to restaurant
+  - `COMPLETED` - Order finalized and delivered
+  - `CANCELLED` - Order cancelled
 
 #### ✅ Action Buttons (Supplier Only)
 - Status-specific actions:
   - "Acknowledge" → `ACKNOWLEDGED`
   - "Start Processing" → `PROCESSING`
   - "Mark as Shipped" → `SHIPPED`
-  - "Mark as Delivered" → `DELIVERED` *(triggers auto-invoice)*
+  - "Complete Order" → `COMPLETED` *(triggers auto-invoice)*
   - "Decline" → `CANCELLED`
 
 ### API Endpoints:
@@ -655,12 +662,13 @@ Product created with image
 - `GET /api/orders/:id` - Get order with items
 - `PATCH /api/orders/:id` - Update order status
 
-### Order Delivery Auto-T better
-When an order is marked as `DELIVERED`:
+### Order Completion Auto-Trigger
+When an order is marked as `COMPLETED`:
 1. Restaurant inventory updated (receive items)
 2. **Invoice auto-created** (invoice record and line items)
 3. Invoice status set to `ISSUED`
-4. Invoice due date set (30 days from delivery)
+4. Invoice due date set (30 days from completion)
+5. **Notifications sent** to both restaurant and supplier
 
 ---
 
@@ -700,8 +708,8 @@ When an order is marked as `DELIVERED`:
 ### Features Implemented:
 
 #### ✅ Auto-Invoice Creation
-- **Triggered on Order Delivery**
-  - When order status → `DELIVERED`
+- **Triggered on Order Completion**
+  - When order status → `COMPLETED`
   - Invoice automatically created
   - Line items copied from order items
   - Total calculated from order
@@ -737,9 +745,10 @@ VOID (cancelled)
 
 #### ✅ Payment Recording
 - Record payments from invoice detail view
-- Payment methods: Cash, Check, Bank Transfer, Stripe, Credit Card
+- Payment methods: Cash, Check, Bank Transfer, Credit Card, ACH, Other
 - Automatic invoice status update
 - Balance tracking
+- **Notifications sent** to supplier when payment recorded
 
 #### ✅ Invoice Detail View
 - Bill To information
@@ -748,6 +757,16 @@ VOID (cancelled)
 - Outstanding balance
 - PDF export (planned)
 - Record payment button
+
+#### ✅ Notifications & Alerts
+- **In-app notifications** for:
+  - New orders received
+  - Order status changes (ACKNOWLEDGED, PROCESSING, SHIPPED, COMPLETED)
+  - Payments received
+  - Invoice issued
+- **Notification Bell**: View all notifications, mark as read, navigate to orders
+- **Notification preferences**: Control what notifications to receive
+- **Notification logging**: All notifications stored in database
 
 ### API Endpoints:
 - `GET /api/invoices` - List invoices with order info
@@ -956,18 +975,23 @@ Settings → Configure
 13. ✅ CSV/Excel Upload
 
 ### Partially Implemented 🔄:
-1. 🔄 Fulfillment (UI only, needs backend API integration)
-2. 🔄 Delivery Zones (UI only, needs backend API integration)
-3. 🔄 PDF Export (planned)
-4. 🔄 Email Notifications (planned)
-5. 🔄 Real-time Order Updates (WebSocket planned)
+1. ✅ Notifications System (in-app implemented, email/SMS planned)
+2. 🔄 Fulfillment (UI only, needs backend API integration)
+3. 🔄 Delivery Zones (UI only, needs backend API integration)
+4. 🔄 PDF Export (packing slip JSON returned, PDF generation planned)
+5. 🔄 Email Notifications (SendGrid integration ready, requires API keys)
+6. 🔄 SMS Notifications (Twilio integration ready, requires API keys)
+7. 🔄 Real-time Order Updates (WebSocket planned)
 
 ### Key Implementation Highlights:
 - ✅ **Real-Time Database**: All features query live database - NO mock data
 - ✅ **Manual Order Creation**: Suppliers can create orders on behalf of restaurants
-- ✅ **Auto-Invoice Creation**: Invoices auto-generated when orders delivered
+- ✅ **Auto-Invoice Creation**: Invoices auto-generated when orders completed
 - ✅ **Warehouse Integration**: Products assigned to specific warehouses
 - ✅ **Inventory Reservation**: Reserve inventory when orders placed
+- ✅ **Notification System**: In-app notifications with bell icon and preferences
+- ✅ **Order Status Workflow**: DRAFT → PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → COMPLETED
+- ✅ **Session Timeout**: Extended to 1 hour (from 5 minutes)
 
 ---
 
@@ -987,7 +1011,14 @@ Settings → Configure
 
 ---
 
-**Last Updated**: Current Date
-**Version**: 2.0.0
+**Last Updated**: October 28, 2025
+**Version**: 2.1.0
 **Status**: Production Ready
 **Real-Time Data**: All features use live database queries - NO mock data
+
+**Latest Changes**:
+- Order status workflow updated: PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → COMPLETED
+- Notification system integrated with in-app bell
+- Session timeout extended to 1 hour
+- Database migration: order status enum updated
+- Competed order now triggers auto-invoice and notifications

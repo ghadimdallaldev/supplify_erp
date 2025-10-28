@@ -701,9 +701,11 @@ Display History:
 
 #### ✅ Order Tracking
 - View order status
-- Status transitions: PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → DELIVERED
+- Status transitions: PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → COMPLETED
 - View order details
 - Order items with prices
+- **Draft Orders**: Create orders as DRAFT before placing
+- **Packing Slip**: Download packing slip data (JSON format, PDF planned)
 
 ---
 
@@ -819,6 +821,9 @@ Display History:
 13. ✅ **Expense Analytics** (by supplier, category, trends)
 14. ✅ **Supplier Statements**
 15. ✅ **Real-Time Database** (NO mock data, ALL data from DB)
+16. ✅ **Draft Orders** - Create orders as drafts before placing
+17. ✅ **Notifications System** - In-app notifications with bell icon
+18. ✅ **Extended Session Timeout** - 1 hour session (was 5 minutes)
 
 ### Partially Implemented 🔄:
 1. 🔄 Supplier Discovery (needs follow/block functionality)
@@ -851,6 +856,12 @@ Display History:
 
 ---
 
-**Last Updated**: Current Date
-**Version**: 2.0.0
+**Last Updated**: October 28, 2025
+**Version**: 2.1.0
 **Status**: Production Ready
+**Latest Changes**:
+- Order status workflow: ACKNOWLEDGED → PROCESSING → SHIPPED → COMPLETED
+- Draft order functionality
+- Notification system with bell icon
+- Session timeout extended to 1 hour
+- Database migration: order status enum updated
