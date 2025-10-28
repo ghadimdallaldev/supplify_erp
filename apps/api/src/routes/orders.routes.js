@@ -190,12 +190,33 @@ async function handleOrderDelivery(orderId, userData, res) {
         actor: userData.id 
       });
       
-      return order;
+      return { order, supplierId };
     });
+    
+    // Send notification to restaurant about completed order
+    try {
+      const { rows: restaurantInfo } = await query(`
+        SELECT id, name FROM restaurant WHERE id = $1
+      `, [result.order.restaurant_id]);
+      
+      const { rows: supplierInfo } = await query(`
+        SELECT id, name FROM supplier WHERE id = $1
+      `, [result.supplierId]);
+      
+      await notifyOrderStatusChange({
+        id: result.order.id,
+        total_amount: result.order.total_amount,
+        restaurant_id: result.order.restaurant_id,
+        supplier_id: result.supplierId,
+        supplier_name: supplierInfo[0]?.name || 'Supplier',
+      }, 'COMPLETED');
+    } catch (notifError) {
+      logger.error('Failed to send completion notification', { error: notifError.message });
+    }
     
     res.json({
       ok: true,
-      data: { order: result },
+      data: { order: result.order },
       error: null,
       requestId: res.locals.requestId,
     });
