@@ -28,7 +28,7 @@ const supplierOrderCreateSchema = z.object({
 });
 
 const orderUpdateSchema = z.object({
-  status: z.enum(['DRAFT', 'PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELLED']).optional(),
+  status: z.enum(['DRAFT', 'PLACED', 'CONFIRMED', 'FULFILLING', 'COMPLETED', 'CANCELLED']).optional(),
   notes: z.string().optional(),
 });
 
@@ -920,21 +920,21 @@ router.patch('/:id', requireAuth, async (req, res) => {
         });
       }
          } else if (req.userData.role === 'SUPPLIER') {
-       // Suppliers can acknowledge, process, ship, and deliver orders
-       if (updateData.status && !['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED'].includes(updateData.status)) {
+       // Suppliers can confirm and fulfill orders
+       if (updateData.status && !['CONFIRMED', 'FULFILLING', 'COMPLETED'].includes(updateData.status)) {
          return res.status(403).json({
            ok: false,
            data: null,
-           error: {
-             name: 'FORBIDDEN',
-             message: 'Suppliers can only acknowledge, process, ship, or deliver orders',
-           },
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Suppliers can only confirm, fulfill, or complete orders',
+          },
            requestId: req.requestId,
          });
        }
        
-       // If delivering, update restaurant inventory
-       if (updateData.status === 'DELIVERED') {
+       // If completing, update restaurant inventory
+       if (updateData.status === 'COMPLETED') {
          return await handleOrderDelivery(id, req.userData, res);
        }
      }
