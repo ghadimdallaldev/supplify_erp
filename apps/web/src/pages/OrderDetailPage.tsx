@@ -73,29 +73,22 @@ export function OrderDetailPage() {
     if (!id || isUpdating) return // Prevent multiple clicks
     
     try {
-      setIsUpdating(true)
+      setIsUpdating(true) // Set immediately - button will be replaced by disabled button
       await updateOrder({ id, data: { status: newStatus } }).unwrap()
       toast.success(`Order status updated to ${newStatus}`)
       
       // Refetch to get updated data
       const refetchResult = await refetch()
       
-      // For COMPLETED status, verify the order is actually completed before clearing updating state
+      // For COMPLETED status, keep button disabled (component will show disabled "Completed" button)
+      // Don't clear isUpdating immediately - let component re-render with new order.status
       if (newStatus === 'COMPLETED') {
         if (refetchResult.data?.status === 'COMPLETED') {
-          // Order is confirmed as COMPLETED, clear updating state
-          setIsUpdating(false)
-        } else {
-          // Status not updated yet, wait and retry
-          setTimeout(async () => {
-            const retryRefetch = await refetch()
-            if (retryRefetch.data?.status === 'COMPLETED') {
-              setIsUpdating(false)
-            } else {
-              // Still not updated, clear anyway after delay (button will be hidden once status changes)
-              setTimeout(() => setIsUpdating(false), 2000)
-            }
-          }, 500)
+          // Order confirmed as COMPLETED - component will show disabled "Completed" button
+          // Clear isUpdating after a delay to allow component to re-render
+          setTimeout(() => {
+            setIsUpdating(false)
+          }, 1000)
         }
       } else {
         // For other statuses, clear immediately

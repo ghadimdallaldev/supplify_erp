@@ -157,10 +157,18 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [
-        { type: 'Order', id },
-        'Order', // Also invalidate all orders list
-      ],
+      invalidatesTags: (result, error, { id, data }) => {
+        const tags = [
+          { type: 'Order', id },
+          'Order', // Also invalidate all orders list
+        ]
+        // If status changed to COMPLETED, also invalidate receiving queries
+        // so restaurant's pending orders list updates immediately
+        if (data?.status === 'COMPLETED') {
+          tags.push('Receiving')
+        }
+        return tags
+      },
     }),
 
     // Supplier endpoints

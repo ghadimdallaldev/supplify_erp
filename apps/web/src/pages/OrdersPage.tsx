@@ -154,31 +154,23 @@ export function OrdersPage() {
     if (updatingOrderId === orderId) return // Prevent multiple clicks
     
     try {
-      setUpdatingOrderId(orderId)
+      setUpdatingOrderId(orderId) // Set immediately - button will be replaced by disabled button
       await updateOrder({ id: orderId, data: { status: newStatus } }).unwrap()
       toast.success(`Order status updated to ${newStatus}`)
       
       // Refetch to get updated data
       const refetchResult = await refetch()
       
-      // For COMPLETED status, verify the order is actually completed before clearing updating state
+      // For COMPLETED status, keep button disabled permanently (it will be replaced by disabled "Completed" button)
+      // Don't clear updatingOrderId - let the component re-render with new order.status to show the correct button
       if (newStatus === 'COMPLETED') {
         const updatedOrder = refetchResult.data?.orders?.find((o: any) => o.id === orderId)
         if (updatedOrder?.status === 'COMPLETED') {
-          // Order is confirmed as COMPLETED, clear updating state
-          setUpdatingOrderId(null)
-        } else {
-          // Status not updated yet, wait and retry
-          setTimeout(async () => {
-            const retryRefetch = await refetch()
-            const retryOrder = retryRefetch.data?.orders?.find((o: any) => o.id === orderId)
-            if (retryOrder?.status === 'COMPLETED') {
-              setUpdatingOrderId(null)
-            } else {
-              // Still not updated, clear anyway after delay (button will be hidden once status changes)
-              setTimeout(() => setUpdatingOrderId(null), 2000)
-            }
-          }, 500)
+          // Order confirmed as COMPLETED - component will show disabled "Completed" button
+          // Clear updatingOrderId after a delay to allow component to re-render
+          setTimeout(() => {
+            setUpdatingOrderId(null)
+          }, 1000)
         }
       } else {
         // For other statuses, clear immediately
