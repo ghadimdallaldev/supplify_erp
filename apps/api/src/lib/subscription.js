@@ -168,14 +168,15 @@ export async function checkLimit(tenantId, tenantType, meterType) {
       isOverLimit: effectiveLimit !== null && current >= effectiveLimit,
       effectiveLimit
     };
-  } catch (error) {
+    } catch (error) {
     logger.error('Check limit error:', error);
+    // On error, return safe defaults that don't block users
     return {
       current: 0,
-      limit: 0,
-      isUnlimited: false,
-      isOverLimit: true, // Fail safe
-      effectiveLimit: 0
+      limit: null,
+      isUnlimited: true,
+      isOverLimit: false,
+      effectiveLimit: null
     };
   }
 }
@@ -189,15 +190,26 @@ export async function checkLimit(tenantId, tenantType, meterType) {
  */
 export async function incrementUsage(tenantId, tenantType, meterType, increment = 1) {
   try {
+    // Get subscription to fetch limit value
+    const subscription = await getTenantSubscription(tenantId, tenantType);
+    const limitValue = subscription?.limits?.[meterType];
+    const effectiveLimit = limitValue === -1 ? null : (limitValue ? parseInt(limitValue) : null);
+    
     await query(`
-      INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date)
-      VALUES ($1, $2, $3, $4, 'DAILY', CURRENT_DATE)
+      INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date, limit_value)
+      VALUES ($1, $2, $3, $4, 'DAILY', CURRENT_DATE, $5)
       ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date)
       DO UPDATE SET 
         current_value = usage_meter.current_value + $4,
         last_updated = now(),
-        is_over_limit = usage_meter.current_value + $4 >= COALESCE(usage_meter.limit_value, 0)
-    `, [tenantId, tenantType, meterType, increment]);
+        limit_value = COALESCE(usage_meter.limit_value, $5),
+        is_over_limit = CASE 
+          WHEN $5 IS NULL THEN false
+          ELSE (usage_meter.current_value + $4) >= $5
+        END
+    `, [tenantId, tenantType, meterType, increment, effectiveLimit]);
+    
+    logger.info('Usage incremented', { tenantId, tenantType, meterType, increment, newValue: 'N/A' });
   } catch (error) {
     logger.error('Increment usage error:', error);
     // Don't throw - usage tracking shouldn't fail operations
