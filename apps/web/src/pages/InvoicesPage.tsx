@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
-import { FileText, DollarSign, Clock, CheckCircle, XCircle, Search, Filter, Download, Loader2 } from 'lucide-react'
+import { 
+  FileText, DollarSign, Clock, CheckCircle, XCircle, Search, Filter, Download, 
+  Loader2, TrendingUp, TrendingDown, Calendar, CreditCard, Building2, AlertTriangle,
+  Plus, ArrowRightLeft, Receipt
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   Dialog,
@@ -12,33 +16,79 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
+import {
+  Select,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Textarea } from '../components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { useAppSelector } from '../hooks/redux'
-import { useGetRestaurantInvoicesQuery, useGetRestaurantInvoiceQuery, useMarkInvoicePaidMutation } from '../services/api'
+import { 
+  useGetRestaurantInvoicesQuery, 
+  useGetRestaurantInvoiceQuery, 
+  useMarkInvoicePaidMutation,
+  useGetInvoiceCreditsQuery,
+  useGetInvoiceAnalyticsQuery,
+  useGetOverdueInvoicesQuery,
+} from '../services/api'
+import { Link } from 'react-router-dom'
 
 export function InvoicesPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [supplierFilter, setSupplierFilter] = useState('ALL')
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'credit'>('full')
+  
+  // Payment form state
+  const [paymentAmount, setPaymentAmount] = useState<number>(0)
+  const [creditAmount, setCreditAmount] = useState<number>(0)
+  const [selectedCreditNoteId, setSelectedCreditNoteId] = useState<string>('')
+  const [paymentMethod, setPaymentMethod] = useState<string>('BANK_TRANSFER')
+  const [paymentReference, setPaymentReference] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [paymentNotes, setPaymentNotes] = useState('')
+  const [paidByHQ, setPaidByHQ] = useState(false)
+  const [hqNotes, setHqNotes] = useState('')
   
   const { user } = useAppSelector((state) => state.auth)
   const isRestaurant = user?.role === 'RESTAURANT'
   
   // Fetch invoices from database
   const { data: invoicesData, isLoading, refetch } = useGetRestaurantInvoicesQuery({})
-  const { data: invoiceDetail, isLoading: isLoadingDetail } = useGetRestaurantInvoiceQuery(
+  const { data: invoiceDetail, isLoading: isLoadingDetail, refetch: refetchDetail } = useGetRestaurantInvoiceQuery(
     selectedInvoice?.id || '',
     { skip: !selectedInvoice?.id }
   )
-  const [markPaid] = useMarkInvoicePaidMutation()
+  const { data: creditsData } = useGetInvoiceCreditsQuery(
+    selectedInvoice?.id || '',
+    { skip: !selectedInvoice?.id || paymentMode !== 'credit' }
+  )
+  const { data: analyticsData } = useGetInvoiceAnalyticsQuery({ period: 30 })
+  const { data: overdueData } = useGetOverdueInvoicesQuery()
+  const [markPaid, { isLoading: isProcessingPayment }] = useMarkInvoicePaidMutation()
 
   const invoices = invoicesData?.invoices || []
+  const analytics = analyticsData?.analytics || {}
+  const overdueInvoices = overdueData?.invoices || []
+  const creditNotes = creditsData?.creditNotes || []
+
+  // Calculate remaining balance for selected invoice
+  const remainingBalance = selectedInvoice 
+    ? parseFloat(selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0)
+    : 0
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ISSUED': return 'default'
       case 'PARTIALLY_PAID': return 'secondary'
-      case 'PAID': return 'success'
+      case 'PAID': return 'default'
       case 'OVERDUE': return 'destructive'
       case 'VOID': return 'outline'
       default: return 'secondary'
@@ -58,36 +108,88 @@ export function InvoicesPage() {
 
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = invoice.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
-                         invoice.supplier_name?.toLowerCase().includes(search.toLowerCase()) ||
-                         invoice.restaurant_name?.toLowerCase().includes(search.toLowerCase())
+                         invoice.supplier_name?.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === 'ALL' || invoice.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesSupplier = supplierFilter === 'ALL' || invoice.supplier_id === supplierFilter
+    return matchesSearch && matchesStatus && matchesSupplier
   })
+
+  // Get unique suppliers for filter
+  const suppliers = Array.from(new Set(invoices.map((inv: any) => ({ id: inv.supplier_id, name: inv.supplier_name }))))
+    .filter((s: any) => s.id && s.name)
 
   const stats = {
     total: invoices.length,
-    unpaid: invoices.filter(i => i.status !== 'PAID' && i.status !== 'VOID').length,
-    overdue: invoices.filter(i => i.status === 'OVERDUE' || (i.days_overdue && i.days_overdue > 0)).length,
-    totalAmount: invoices.reduce((sum, i) => sum + parseFloat(i.total_amount || 0), 0),
+    unpaid: invoices.filter((i: any) => i.status !== 'PAID' && i.status !== 'VOID').length,
+    overdue: invoices.filter((i: any) => i.status === 'OVERDUE' || (i.days_overdue && i.days_overdue > 0)).length,
+    totalAmount: invoices.reduce((sum: number, i: any) => sum + parseFloat(i.total_amount || 0), 0),
+    totalOutstanding: invoices
+      .filter((i: any) => i.status !== 'PAID' && i.status !== 'VOID')
+      .reduce((sum: number, i: any) => sum + parseFloat(i.balance_due || i.total_amount || 0), 0),
+    totalPaid: invoices
+      .filter((i: any) => i.status === 'PAID')
+      .reduce((sum: number, i: any) => sum + parseFloat(i.total_amount || 0), 0),
+  }
+
+  const handleOpenPaymentDialog = (invoice: any) => {
+    setSelectedInvoice(invoice)
+    setShowPaymentDialog(true)
+    setPaymentMode('full')
+    setPaymentAmount(remainingBalance)
+    setCreditAmount(0)
+    setSelectedCreditNoteId('')
+    setPaymentMethod('BANK_TRANSFER')
+    setPaymentReference('')
+    setBankName('')
+    setPaymentNotes('')
+    setPaidByHQ(false)
+    setHqNotes('')
   }
 
   const handleRecordPayment = async () => {
     if (!selectedInvoice) return
     
+    let finalPaymentAmount = paymentAmount
+    if (paymentMode === 'full') {
+      finalPaymentAmount = remainingBalance
+    } else if (paymentMode === 'partial' && paymentAmount <= 0) {
+      toast.error('Please enter a valid payment amount')
+      return
+    }
+
+    if (paymentMode === 'credit' && creditAmount <= 0) {
+      toast.error('Please select and apply a credit note')
+      return
+    }
+
+    if ((finalPaymentAmount + creditAmount) > remainingBalance) {
+      toast.error('Total payment amount exceeds remaining balance')
+      return
+    }
+    
     try {
       await markPaid({
         invoiceId: selectedInvoice.id,
         data: {
+          paymentAmount: finalPaymentAmount > 0 ? finalPaymentAmount : undefined, // undefined = full payment
           paymentDate: new Date().toISOString().split('T')[0],
-          paymentMethod: 'BANK_TRANSFER',
-          notes: 'Payment recorded',
+          paymentMethod: paymentMethod as any,
+          paymentReference: paymentReference || undefined,
+          bankName: bankName || undefined,
+          notes: paymentNotes || undefined,
+          creditAmount: creditAmount > 0 ? creditAmount : undefined,
+          creditNoteId: selectedCreditNoteId || undefined,
+          paidByHQ: paidByHQ,
+          hqNotes: hqNotes || undefined,
         }
       }).unwrap()
       
       toast.success('Payment recorded successfully!')
+      setShowPaymentDialog(false)
       setShowInvoiceDetail(false)
       setSelectedInvoice(null)
       refetch()
+      refetchDetail()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to record payment')
     }
@@ -105,58 +207,138 @@ export function InvoicesPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-          <p className="text-gray-600 mt-2">Manage billing and payments</p>
+          <h1 className="text-3xl font-bold text-gray-900">Invoice Dashboard</h1>
+          <p className="text-gray-600 mt-2">Manage billing, payments, and financial analytics</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => refetch()}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Comprehensive Analytics Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Invoices</p>
                 <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {analytics.issued_count || 0} issued • {analytics.partial_count || 0} partial
+                </p>
               </div>
-              <FileText className="h-8 w-8 text-blue-500" />
+              <FileText className="h-10 w-10 text-blue-500" />
             </div>
           </CardContent>
         </Card>
+        
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Unpaid</p>
-                <p className="text-2xl font-bold">{stats.unpaid}</p>
+                <p className="text-sm text-gray-600">Outstanding</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  ${stats.totalOutstanding.toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.unpaid} unpaid invoices
+                </p>
               </div>
-              <Clock className="h-8 w-8 text-orange-500" />
+              <Clock className="h-10 w-10 text-orange-500" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        
+        <Card className={stats.overdue > 0 ? 'border-red-300' : ''}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Overdue</p>
-                <p className="text-2xl font-bold">{stats.overdue}</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {stats.overdue}
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  {overdueData?.summary?.totalOverdue 
+                    ? `$${parseFloat(overdueData.summary.totalOverdue).toFixed(2)}`
+                    : 'All current'
+                  }
+                </p>
               </div>
-              <XCircle className="h-8 w-8 text-red-500" />
+              <AlertTriangle className="h-10 w-10 text-red-500" />
             </div>
           </CardContent>
         </Card>
+        
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Amount</p>
-                <p className="text-2xl font-bold">${stats.totalAmount.toFixed(2)}</p>
+                <p className="text-sm text-gray-600">Total Paid</p>
+                <p className="text-2xl font-bold text-green-600">
+                  ${stats.totalPaid.toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {analytics.paid_count || 0} paid invoices
+                </p>
               </div>
-              <DollarSign className="h-8 w-8 text-green-500" />
+              <CheckCircle className="h-10 w-10 text-green-500" />
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Quick Stats Row */}
+      {analyticsData && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Avg Days to Pay</p>
+                  <p className="text-xl font-semibold">
+                    {analytics.avg_days_to_pay 
+                      ? `${parseInt(analytics.avg_days_to_pay)} days`
+                      : 'N/A'
+                    }
+                  </p>
+                </div>
+                <Calendar className="h-8 w-8 text-gray-400" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Paid (30d)</p>
+                  <p className="text-xl font-semibold text-green-600">
+                    ${parseFloat(analytics.total_paid_amount || 0).toFixed(2)}
+                  </p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Outstanding (30d)</p>
+                  <p className="text-xl font-semibold text-orange-600">
+                    ${parseFloat(analytics.total_outstanding || 0).toFixed(2)}
+                  </p>
+                </div>
+                <TrendingDown className="h-8 w-8 text-orange-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Filters */}
       <Card>
@@ -174,72 +356,106 @@ export function InvoicesPage() {
                   className="border-none outline-none"
                 />
               </div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-1 border rounded-md"
-              >
-                <option value="ALL">All Status</option>
-                <option value="ISSUED">Issued</option>
-                <option value="PARTIALLY_PAID">Partially Paid</option>
-                <option value="PAID">Paid</option>
-                <option value="OVERDUE">Overdue</option>
-                <option value="VOID">Void</option>
-              </select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]" placeholder="Status">
+                  <SelectItem value="ALL">All Status</SelectItem>
+                  <SelectItem value="ISSUED">Issued</SelectItem>
+                  <SelectItem value="PARTIALLY_PAID">Partially Paid</SelectItem>
+                  <SelectItem value="PAID">Paid</SelectItem>
+                  <SelectItem value="OVERDUE">Overdue</SelectItem>
+                  <SelectItem value="VOID">Void</SelectItem>
+                </SelectTrigger>
+              </Select>
+              {suppliers.length > 0 && (
+                <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                  <SelectTrigger className="w-[200px]" placeholder="Supplier">
+                    <SelectItem value="ALL">All Suppliers</SelectItem>
+                    {suppliers.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredInvoices.map((invoice) => (
-              <div
-                key={invoice.id}
-                className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => {
-                  setSelectedInvoice(invoice)
-                  setShowInvoiceDetail(true)
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold">{invoice.invoice_number}</h3>
-                      <Badge variant={getStatusColor(invoice.status)}>
-                        {getStatusIcon(invoice.status)}
-                        <span className="ml-1">{invoice.status}</span>
-                      </Badge>
+            {filteredInvoices.map((invoice: any) => {
+              const remaining = parseFloat(invoice.balance_due || invoice.total_amount || 0) - parseFloat(invoice.total_paid || 0)
+              const isOverdue = invoice.days_overdue > 0 || (invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0)
+              
+              return (
+                <div
+                  key={invoice.id}
+                  className={`border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
+                    isOverdue ? 'border-red-200 bg-red-50' : ''
+                  }`}
+                  onClick={() => {
+                    setSelectedInvoice(invoice)
+                    setShowInvoiceDetail(true)
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold">{invoice.invoice_number}</h3>
+                        <Badge variant={getStatusColor(invoice.status)}>
+                          {getStatusIcon(invoice.status)}
+                          <span className="ml-1">{invoice.status}</span>
+                        </Badge>
+                        {isOverdue && (
+                          <Badge variant="destructive">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            {invoice.days_overdue || 0} days overdue
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 font-medium">{invoice.supplier_name}</p>
+                      <div className="flex gap-4 text-xs text-gray-500 mt-2">
+                        <span>Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
+                        <span>Due Date: {new Date(invoice.due_date).toLocaleDateString()}</span>
+                        {invoice.order_id && (
+                          <Link 
+                            to={`/app/orders/${invoice.order_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <Receipt className="h-3 w-3" />
+                            Order #{invoice.order_id.slice(0, 8)}
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600">{isRestaurant ? invoice.supplier_name : invoice.restaurant_name}</p>
-                    <div className="flex gap-4 text-xs text-gray-500 mt-2">
-                      <span>Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
-                      <span>Due Date: {new Date(invoice.due_date).toLocaleDateString()}</span>
-                      {invoice.order_id && (
-                        <>
-                          <span className="border-l pl-3">Order ID: {invoice.order_id.slice(0, 8)}...</span>
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            invoice.order_status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
-                            invoice.order_status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' :
-                            invoice.order_status === 'PROCESSING' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {invoice.order_status}
-                          </span>
-                        </>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold">${parseFloat(invoice.total_amount || 0).toFixed(2)}</p>
+                      <p className={`text-sm ${remaining > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}`}>
+                        Balance: ${remaining.toFixed(2)}
+                      </p>
+                      {parseFloat(invoice.total_paid || 0) > 0 && (
+                        <p className="text-xs text-green-600">
+                          Paid: ${parseFloat(invoice.total_paid || 0).toFixed(2)}
+                        </p>
+                      )}
+                      {remaining > 0 && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="mt-2"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenPaymentDialog(invoice)
+                          }}
+                        >
+                          <CreditCard className="h-3 w-3 mr-1" />
+                          Pay
+                        </Button>
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold">${parseFloat(invoice.total_amount || 0).toFixed(2)}</p>
-                    <p className="text-sm text-gray-600">
-                      Balance: ${parseFloat(invoice.balance_due || 0).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-green-600">
-                      Paid: ${parseFloat(invoice.total_paid || 0).toFixed(2)}
-                    </p>
-                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
 
             {filteredInvoices.length === 0 && (
               <div className="text-center py-12">
@@ -254,7 +470,7 @@ export function InvoicesPage() {
 
       {/* Invoice Detail Dialog */}
       <Dialog open={showInvoiceDetail} onOpenChange={setShowInvoiceDetail}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>Invoice {selectedInvoice?.invoice_number}</span>
@@ -263,136 +479,689 @@ export function InvoicesPage() {
                   <Download className="h-4 w-4 mr-2" />
                   PDF
                 </Button>
+                {selectedInvoice && parseFloat(selectedInvoice.balance_due || selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0) > 0 && (
+                  <Button 
+                    size="sm"
+                    onClick={() => {
+                      setShowInvoiceDetail(false)
+                      handleOpenPaymentDialog(selectedInvoice)
+                    }}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Make Payment
+                  </Button>
+                )}
               </div>
             </DialogTitle>
             <DialogDescription>
-              Invoice details and payment information
+              Comprehensive invoice details, payment history, and order information
             </DialogDescription>
           </DialogHeader>
           
-            {selectedInvoice && (
-            <div className="space-y-6">
-              {isLoadingDetail ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : invoiceDetail?.invoice ? (
-                <>
-                  {/* Invoice Header */}
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <h3 className="font-semibold mb-2">{isRestaurant ? 'Bill From:' : 'Bill To:'}</h3>
-                      <p>{isRestaurant ? invoiceDetail.invoice.supplier_name : invoiceDetail.invoice.restaurant_name}</p>
-                      {invoiceDetail.invoice.supplier_address && (
-                        <p className="text-sm text-gray-600">{invoiceDetail.invoice.supplier_address}</p>
-                      )}
-                      {invoiceDetail.invoice.supplier_phone && (
-                        <p className="text-sm text-gray-600">{invoiceDetail.invoice.supplier_phone}</p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-600">Invoice Date</p>
-                        <p className="font-semibold">{new Date(invoiceDetail.invoice.invoice_date).toLocaleDateString()}</p>
-                      </div>
+          {selectedInvoice && (
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList>
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="payments">Payment History</TabsTrigger>
+                <TabsTrigger value="order">Related Order</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="details" className="space-y-6">
+                {isLoadingDetail ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : invoiceDetail?.invoice ? (
+                  <>
+                    {/* Invoice Header */}
+                    <div className="grid grid-cols-2 gap-6 border-b pb-6">
                       <div>
-                        <p className="text-sm text-gray-600">Due Date</p>
-                        <p className="font-semibold">{new Date(invoiceDetail.invoice.due_date).toLocaleDateString()}</p>
+                        <h3 className="font-semibold mb-2">Bill From:</h3>
+                        <p className="font-medium">{invoiceDetail.invoice.supplier_name}</p>
+                        {invoiceDetail.invoice.supplier_address && (
+                          <p className="text-sm text-gray-600 mt-1">{invoiceDetail.invoice.supplier_address}</p>
+                        )}
+                        {invoiceDetail.invoice.supplier_phone && (
+                          <p className="text-sm text-gray-600">{invoiceDetail.invoice.supplier_phone}</p>
+                        )}
+                        {invoiceDetail.invoice.supplier_email && (
+                          <p className="text-sm text-gray-600">{invoiceDetail.invoice.supplier_email}</p>
+                        )}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Items */}
-                  <div>
-                    <h3 className="font-semibold mb-4">Items</h3>
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left py-2 px-3 text-sm font-medium">Description</th>
-                          <th className="text-right py-2 px-3 text-sm font-medium">Qty</th>
-                          <th className="text-right py-2 px-3 text-sm font-medium">Price</th>
-                          <th className="text-right py-2 px-3 text-sm font-medium">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoiceDetail.lineItems?.map((item: any) => (
-                          <tr key={item.id} className="border-b">
-                            <td className="py-3 px-3">{item.description}</td>
-                            <td className="py-3 px-3 text-right">{item.quantity}</td>
-                            <td className="py-3 px-3 text-right">${parseFloat(item.unit_price || 0).toFixed(2)}</td>
-                            <td className="py-3 px-3 text-right">${parseFloat(item.line_total || 0).toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Totals */}
-                  <div className="ml-auto w-64">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Subtotal</span>
-                        <span>${parseFloat(invoiceDetail.invoice.subtotal || 0).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Tax</span>
-                        <span>${parseFloat(invoiceDetail.invoice.tax_amount || 0).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
-                        <span>Total</span>
-                        <span>${parseFloat(invoiceDetail.invoice.total_amount || 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment History */}
-                  <div>
-                    <h3 className="font-semibold mb-4">Payment History</h3>
-                    <div className="space-y-2">
-                      {invoiceDetail.payments && invoiceDetail.payments.length > 0 ? (
-                        <>
-                          {invoiceDetail.payments.map((payment: any) => (
-                            <div key={payment.id} className="border rounded p-3">
-                              <div className="flex justify-between">
-                                <div>
-                                  <p className="font-medium">{payment.payment_method}</p>
-                                  <p className="text-sm text-gray-600">{new Date(payment.payment_date).toLocaleDateString()}</p>
-                                </div>
-                                <span className="text-green-600">${parseFloat(payment.payment_amount || 0).toFixed(2)}</span>
-                              </div>
-                            </div>
-                          ))}
-                          {parseFloat(invoiceDetail.invoice.balance_due || 0) > 0 && (
-                            <div className="border rounded p-3 bg-orange-50">
-                              <div className="flex justify-between">
-                                <div>
-                                  <p className="font-medium">Outstanding Balance</p>
-                                  <p className="text-sm text-gray-600">Due {new Date(invoiceDetail.invoice.due_date).toLocaleDateString()}</p>
-                                </div>
-                                <span className="text-red-600">${parseFloat(invoiceDetail.invoice.balance_due || 0).toFixed(2)}</span>
-                              </div>
+                      <div className="text-right">
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm text-gray-600">Invoice Date</p>
+                            <p className="font-semibold">{new Date(invoiceDetail.invoice.invoice_date).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Due Date</p>
+                            <p className={`font-semibold ${
+                              new Date(invoiceDetail.invoice.due_date) < new Date() && remainingBalance > 0
+                                ? 'text-red-600'
+                                : ''
+                            }`}>
+                              {new Date(invoiceDetail.invoice.due_date).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {invoiceDetail.invoice.order_id && (
+                            <div>
+                              <p className="text-sm text-gray-600">Order</p>
+                              <Link 
+                                to={`/app/orders/${invoiceDetail.invoice.order_id}`}
+                                className="font-semibold text-blue-600 hover:underline"
+                              >
+                                #{invoiceDetail.invoice.order_id.slice(0, 8)}
+                              </Link>
                             </div>
                           )}
-                        </>
-                      ) : (
-                        <div className="border rounded p-3 bg-yellow-50">
-                          <p className="text-gray-600">No payments recorded</p>
                         </div>
-                      )}
+                      </div>
                     </div>
+
+                    {/* Items Table */}
+                    <div>
+                      <h3 className="font-semibold mb-4">Line Items</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="text-left py-3 px-4 text-sm font-medium">Product</th>
+                              <th className="text-left py-3 px-4 text-sm font-medium">SKU</th>
+                              <th className="text-right py-3 px-4 text-sm font-medium">Quantity</th>
+                              <th className="text-right py-3 px-4 text-sm font-medium">Unit Price</th>
+                              <th className="text-right py-3 px-4 text-sm font-medium">Tax</th>
+                              <th className="text-right py-3 px-4 text-sm font-medium">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {invoiceDetail.lineItems?.map((item: any) => (
+                              <tr key={item.id} className="border-b hover:bg-gray-50">
+                                <td className="py-3 px-4">{item.description}</td>
+                                <td className="py-3 px-4 text-sm text-gray-600">{item.sku || 'N/A'}</td>
+                                <td className="py-3 px-4 text-right">{item.quantity}</td>
+                                <td className="py-3 px-4 text-right">${parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                                <td className="py-3 px-4 text-right">
+                                  {parseFloat(item.tax_amount || 0) > 0 && (
+                                    <span className="text-xs text-gray-500">
+                                      ${parseFloat(item.tax_amount || 0).toFixed(2)}
+                                      {item.tax_rate && ` (${item.tax_rate}%)`}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-right font-medium">
+                                  ${parseFloat(item.line_total || 0).toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Totals */}
+                    <div className="ml-auto w-80">
+                      <div className="space-y-2 border rounded-lg p-4 bg-gray-50">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Subtotal</span>
+                          <span>${parseFloat(invoiceDetail.invoice.subtotal || 0).toFixed(2)}</span>
+                        </div>
+                        {parseFloat(invoiceDetail.invoice.tax_amount || 0) > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">
+                              Tax {invoiceDetail.invoice.tax_rate ? `(${invoiceDetail.invoice.tax_rate}%)` : ''}
+                            </span>
+                            <span>${parseFloat(invoiceDetail.invoice.tax_amount || 0).toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
+                          <span>Total</span>
+                          <span>${parseFloat(invoiceDetail.invoice.total_amount || 0).toFixed(2)}</span>
+                        </div>
+                        {parseFloat(invoiceDetail.invoice.total_paid || 0) > 0 && (
+                          <div className="flex justify-between text-green-600 border-t pt-2 mt-2">
+                            <span>Paid</span>
+                            <span>-${parseFloat(invoiceDetail.invoice.total_paid || 0).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {remainingBalance > 0 && (
+                          <div className="flex justify-between font-semibold text-lg text-red-600 border-t pt-2 mt-2">
+                            <span>Balance Due</span>
+                            <span>${remainingBalance.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {remainingBalance === 0 && (
+                          <div className="flex justify-between font-semibold text-lg text-green-600 border-t pt-2 mt-2">
+                            <span>Status</span>
+                            <span>Fully Paid</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {invoiceDetail.invoice.notes && (
+                      <div className="border rounded-lg p-4 bg-blue-50">
+                        <p className="text-sm font-medium text-blue-900 mb-1">Notes</p>
+                        <p className="text-sm text-blue-800">{invoiceDetail.invoice.notes}</p>
+                      </div>
+                    )}
+                  </>
+                ) : null}
+              </TabsContent>
+              
+              <TabsContent value="payments" className="space-y-4">
+                <h3 className="font-semibold">Payment History</h3>
+                {invoiceDetail?.payments && invoiceDetail.payments.length > 0 ? (
+                  <div className="space-y-3">
+                    {invoiceDetail.payments.map((payment: any) => (
+                      <Card key={payment.id}>
+                        <CardContent className="pt-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{payment.payment_method}</p>
+                              <p className="text-sm text-gray-600">
+                                {new Date(payment.payment_date).toLocaleDateString()} • 
+                                {payment.payment_number && ` ${payment.payment_number}`}
+                              </p>
+                              {payment.payment_reference && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Reference: {payment.payment_reference}
+                                </p>
+                              )}
+                              {payment.notes && (
+                                <p className="text-xs text-gray-500 mt-1">{payment.notes}</p>
+                              )}
+                              {payment.bank_name && (
+                                <p className="text-xs text-gray-500">Bank: {payment.bank_name}</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-semibold text-green-600">
+                                ${parseFloat(payment.payment_amount || 0).toFixed(2)}
+                              </p>
+                              <Badge variant="outline" className="mt-1">
+                                {payment.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    {remainingBalance > 0 && (
+                      <div className="border-2 border-orange-300 rounded-lg p-4 bg-orange-50">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium text-orange-900">Outstanding Balance</p>
+                            <p className="text-sm text-orange-700">
+                              Due {new Date(selectedInvoice.due_date).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-red-600">
+                              ${remainingBalance.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </>
-              ) : null}
-            </div>
+                ) : (
+                  <div className="border rounded-lg p-8 text-center bg-gray-50">
+                    <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600">No payments recorded yet</p>
+                    {remainingBalance > 0 && (
+                      <Button 
+                        className="mt-4"
+                        onClick={() => {
+                          setShowInvoiceDetail(false)
+                          handleOpenPaymentDialog(selectedInvoice)
+                        }}
+                      >
+                        Record Payment
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="order" className="space-y-4">
+                {invoiceDetail?.invoice?.order_id ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold">Related Order</h3>
+                      <Link to={`/app/orders/${invoiceDetail.invoice.order_id}`}>
+                        <Button variant="outline" size="sm">
+                          View Order
+                          <ArrowRightLeft className="h-4 w-4 ml-2" />
+                        </Button>
+                      </Link>
+                    </div>
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Order ID</span>
+                            <span className="font-medium">{invoiceDetail.invoice.order_id}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Order Status</span>
+                            <Badge variant="outline">{invoiceDetail.invoice.order_status || 'N/A'}</Badge>
+                          </div>
+                          {invoiceDetail.invoice.order_placed_at && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Placed</span>
+                              <span>{new Date(invoiceDetail.invoice.order_placed_at).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No related order</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInvoiceDetail(false)}>
               Close
             </Button>
-            {selectedInvoice?.balance_due > 0 && (
-              <Button onClick={handleRecordPayment}>Record Payment</Button>
-            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Enhanced Payment Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              Record full payment, partial payment, or apply credit notes
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedInvoice && (
+            <div className="space-y-6">
+              {/* Payment Summary */}
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="pt-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-blue-900">Invoice {selectedInvoice.invoice_number}</p>
+                      <p className="text-sm text-blue-700">Due {new Date(selectedInvoice.due_date).toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-blue-600">Remaining Balance</p>
+                      <p className="text-2xl font-bold text-blue-900">${remainingBalance.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Payment Mode Selection */}
+              <div>
+                <Label className="mb-2 block">Payment Type</Label>
+                <Tabs value={paymentMode} onValueChange={(v) => setPaymentMode(v as any)}>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="full">Full Payment</TabsTrigger>
+                    <TabsTrigger value="partial">Partial Payment</TabsTrigger>
+                    <TabsTrigger value="credit">Apply Credit</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              {/* Full Payment Mode */}
+              {paymentMode === 'full' && (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm text-green-800">
+                      <CheckCircle className="h-4 w-4 inline mr-2" />
+                      Paying full remaining balance: <strong>${remainingBalance.toFixed(2)}</strong>
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Payment Method *</Label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger>
+                          <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                          <SelectItem value="CASH">Cash</SelectItem>
+                          <SelectItem value="CHECK">Check</SelectItem>
+                          <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
+                          <SelectItem value="ACH">ACH</SelectItem>
+                          <SelectItem value="STRIPE">Stripe</SelectItem>
+                          <SelectItem value="OTHER">Other</SelectItem>
+                        </SelectTrigger>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label>Payment Date *</Label>
+                      <Input
+                        type="date"
+                        value={new Date().toISOString().split('T')[0]}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Payment Reference</Label>
+                    <Input
+                      placeholder="Transaction ID, check number, etc."
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                    />
+                  </div>
+
+                  {(paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'ACH') && (
+                    <div>
+                      <Label>Bank Name</Label>
+                      <Input
+                        placeholder="Bank name"
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <Label>Notes</Label>
+                    <Textarea
+                      placeholder="Payment notes..."
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Partial Payment Mode */}
+              {paymentMode === 'partial' && (
+                <div className="space-y-4">
+                  <div>
+                    <Label>Payment Amount *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max={remainingBalance}
+                      placeholder={`Max: $${remainingBalance.toFixed(2)}`}
+                      value={paymentAmount || ''}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value)
+                        if (!isNaN(val) && val > 0) {
+                          setPaymentAmount(Math.min(val, remainingBalance))
+                        } else {
+                          setPaymentAmount(0)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Remaining after payment: ${(remainingBalance - paymentAmount).toFixed(2)}
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Payment Method *</Label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger>
+                          <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                          <SelectItem value="CASH">Cash</SelectItem>
+                          <SelectItem value="CHECK">Check</SelectItem>
+                          <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
+                          <SelectItem value="ACH">ACH</SelectItem>
+                          <SelectItem value="STRIPE">Stripe</SelectItem>
+                          <SelectItem value="OTHER">Other</SelectItem>
+                        </SelectTrigger>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label>Payment Date *</Label>
+                      <Input
+                        type="date"
+                        value={new Date().toISOString().split('T')[0]}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Payment Reference</Label>
+                    <Input
+                      placeholder="Transaction ID, check number, etc."
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                    />
+                  </div>
+
+                  {(paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'ACH') && (
+                    <div>
+                      <Label>Bank Name</Label>
+                      <Input
+                        placeholder="Bank name"
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <Label>Notes</Label>
+                    <Textarea
+                      placeholder="Payment notes..."
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Credit Option in Partial Payment */}
+                  {creditsData && creditNotes.length > 0 && (
+                    <div className="border rounded-lg p-4 bg-gray-50">
+                      <Label className="mb-2 block">Apply Credit Note (Optional)</Label>
+                      <Select value={selectedCreditNoteId} onValueChange={setSelectedCreditNoteId}>
+                        <SelectTrigger placeholder="Select credit note...">
+                          {creditNotes.map((cn: any) => (
+                            <SelectItem key={cn.id} value={cn.id}>
+                              {cn.credit_note_number} - ${parseFloat(cn.remaining_amount || 0).toFixed(2)} available
+                            </SelectItem>
+                          ))}
+                        </SelectTrigger>
+                      </Select>
+                      {selectedCreditNoteId && (
+                        <div className="mt-3">
+                          <Label>Credit Amount</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0}
+                            placeholder="Amount to apply"
+                            value={creditAmount || ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value)
+                              const maxCredit = creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0
+                              if (!isNaN(val) && val > 0) {
+                                setCreditAmount(Math.min(val, maxCredit, remainingBalance - paymentAmount))
+                              } else {
+                                setCreditAmount(0)
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Credit Only Mode */}
+              {paymentMode === 'credit' && (
+                <div className="space-y-4">
+                  {creditsData && creditNotes.length > 0 ? (
+                    <>
+                      <div>
+                        <Label>Select Credit Note *</Label>
+                        <Select value={selectedCreditNoteId} onValueChange={(value) => {
+                          setSelectedCreditNoteId(value)
+                          const creditNote = creditNotes.find((cn: any) => cn.id === value)
+                          if (creditNote) {
+                            setCreditAmount(Math.min(parseFloat(creditNote.remaining_amount || 0), remainingBalance))
+                          }
+                        }}>
+                          <SelectTrigger placeholder="Select credit note...">
+                            {creditNotes.map((cn: any) => (
+                              <SelectItem key={cn.id} value={cn.id}>
+                                {cn.credit_note_number} - ${parseFloat(cn.remaining_amount || 0).toFixed(2)} available
+                                {cn.reason && ` (${cn.reason})`}
+                              </SelectItem>
+                            ))}
+                          </SelectTrigger>
+                        </Select>
+                      </div>
+
+                      {selectedCreditNoteId && (
+                        <div>
+                          <Label>Credit Amount to Apply *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            max={creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0}
+                            placeholder="Amount to apply"
+                            value={creditAmount || ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value)
+                              const maxCredit = creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0
+                              if (!isNaN(val) && val > 0) {
+                                setCreditAmount(Math.min(val, maxCredit, remainingBalance))
+                              } else {
+                                setCreditAmount(0)
+                              }
+                            }}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Available: ${parseFloat(creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0).toFixed(2)}
+                          </p>
+                        </div>
+                      )}
+
+                      <div>
+                        <Label>Payment Date</Label>
+                        <Input
+                          type="date"
+                          value={new Date().toISOString().split('T')[0]}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Notes</Label>
+                        <Textarea
+                          placeholder="Credit application notes..."
+                          value={paymentNotes}
+                          onChange={(e) => setPaymentNotes(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="border rounded-lg p-8 text-center bg-gray-50">
+                      <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-gray-600 mb-2">No available credit notes</p>
+                      <p className="text-xs text-gray-500">You can switch to full or partial payment instead</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* HQ Payment Option (for all modes) */}
+              <div className="border-t pt-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="paidByHQ"
+                    checked={paidByHQ}
+                    onChange={(e) => setPaidByHQ(e.target.checked)}
+                    className="rounded"
+                  />
+                  <Label htmlFor="paidByHQ" className="cursor-pointer">
+                    Paid by HQ / Corporate
+                  </Label>
+                </div>
+                {paidByHQ && (
+                  <div className="mt-2">
+                    <Label>HQ Payment Notes</Label>
+                    <Textarea
+                      placeholder="HQ payment details, approval reference, etc."
+                      value={hqNotes}
+                      onChange={(e) => setHqNotes(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Summary */}
+              {(paymentAmount > 0 || creditAmount > 0) && (
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="pt-4">
+                    <div className="space-y-2">
+                      {paymentAmount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Cash Payment</span>
+                          <span className="font-medium">${paymentAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {creditAmount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Credit Applied</span>
+                          <span className="font-medium text-green-700">${creditAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                        <span>Total Payment</span>
+                        <span className="text-green-700">${(paymentAmount + creditAmount).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm border-t pt-2">
+                        <span>New Balance</span>
+                        <span className={remainingBalance - paymentAmount - creditAmount > 0 ? 'text-orange-600' : 'text-green-600'}>
+                          ${(remainingBalance - paymentAmount - creditAmount).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRecordPayment}
+              disabled={isProcessingPayment || (paymentMode === 'credit' && creditAmount <= 0) || (paymentMode === 'partial' && paymentAmount <= 0)}
+            >
+              {isProcessingPayment ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Record Payment
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

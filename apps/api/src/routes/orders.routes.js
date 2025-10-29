@@ -54,55 +54,166 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
       return null;
     }
     
-    // Generate invoice number
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+    // Get comprehensive supplier data (name, address, etc.)
+    const { rows: suppliers } = await client.query(`
+      SELECT s.* FROM supplier s WHERE s.id = $1
+    `, [supplierId]);
     
-    // Calculate due date (30 days from delivery)
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 30);
-    
-    // Calculate total amount
-    let totalAmount = 0;
-    for (const item of orderItems) {
-      const lineTotal = parseFloat(item.unit_price) * parseFloat(item.quantity);
-      totalAmount += lineTotal;
+    if (suppliers.length === 0) {
+      logger.error('Supplier not found for invoice creation', { supplierId });
+      return null;
     }
     
-    // Create invoice
+    // Get tax configuration for supplier (if available)
+    const { rows: taxConfigs } = await client.query(`
+      SELECT tax_rate, tax_type, tax_name
+      FROM tax_config
+      WHERE supplier_id = $1 AND is_active = true
+        AND effective_from <= CURRENT_DATE
+        AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+      ORDER BY effective_from DESC
+      LIMIT 1
+    `, [supplierId]);
+    
+    const taxConfig = taxConfigs.length > 0 ? taxConfigs[0] : { tax_rate: 0, tax_type: 'SALES_TAX', tax_name: 'Tax' };
+    const taxRate = parseFloat(taxConfig.tax_rate || 0);
+    
+    // Generate invoice number using supplier-specific sequence or default
+    let invoiceNumber;
+    try {
+      const year = new Date().getFullYear();
+      const month = new Date().getMonth() + 1;
+      
+      // Try to use invoice sequence table if available
+      const { rows: sequences } = await client.query(`
+        INSERT INTO invoice_sequence (supplier_id, year, month, current_number, next_number)
+        VALUES ($1, $2, $3, 0, 1)
+        ON CONFLICT (supplier_id, year, month) 
+        DO UPDATE SET next_number = invoice_sequence.next_number + 1
+        RETURNING next_number, prefix, format
+      `, [supplierId, year, month]);
+      
+      if (sequences.length > 0) {
+        const seq = sequences[0];
+        const number = String(seq.next_number).padStart(6, '0');
+        invoiceNumber = `${seq.prefix || 'INV'}-${year}-${String(month).padStart(2, '0')}-${number}`;
+      } else {
+        invoiceNumber = `INV-${year}-${String(month).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+      }
+    } catch (seqError) {
+      // Fallback if sequence table doesn't exist
+      logger.warn('Invoice sequence generation failed, using timestamp', { error: seqError.message });
+      invoiceNumber = `INV-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+    }
+    
+    // Calculate invoice dates
+    const invoiceDate = new Date();
+    const issueDate = new Date();
+    const paymentTermsDays = 30; // Could be fetched from supplier settings
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + paymentTermsDays);
+    
+    // Calculate amounts with comprehensive line item details
+    let subtotal = 0;
+    const lineItemsData = [];
+    
+    for (const item of orderItems) {
+      // Get full product details
+      const { rows: products } = await client.query(`
+        SELECT p.* FROM product p WHERE p.id = $1
+      `, [item.product_id]);
+      
+      const product = products.length > 0 ? products[0] : null;
+      const unitPrice = parseFloat(item.unit_price || 0);
+      const quantity = parseFloat(item.quantity || 0);
+      const lineTotal = unitPrice * quantity;
+      subtotal += lineTotal;
+      
+      lineItemsData.push({
+        product_id: item.product_id,
+        description: product?.name || item.product_name || 'Product',
+        sku: product?.sku || 'N/A',
+        quantity,
+        unit_price: unitPrice,
+        line_total: lineTotal,
+        tax_rate: taxRate,
+        tax_amount: (lineTotal * taxRate) / 100,
+        order_item_id: item.id,
+      });
+    }
+    
+    // Calculate tax (assuming tax is NOT included in subtotal)
+    const taxAmount = (subtotal * taxRate) / 100;
+    const totalAmount = subtotal + taxAmount;
+    
+    // Create invoice with comprehensive data
     const { rows: invoices } = await client.query(`
       INSERT INTO invoice (
-        supplier_id, restaurant_id, order_id, invoice_number,
-        issue_date, due_date, status, total_amount, amount_due,
-        currency, tax_amount, discount_amount, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, 'ISSUED', $7, $7, 'USD', 0, 0, NULL)
+        invoice_number, supplier_id, restaurant_id, order_id,
+        invoice_date, issue_date, due_date,
+        subtotal, tax_amount, tax_rate, tax_included, total_amount,
+        balance_due, paid_amount,
+        status, currency,
+        payment_terms_days,
+        notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *
-    `, [supplierId, order.restaurant_id, order.id, invoiceNumber, new Date(), dueDate, totalAmount]);
+    `, [
+      invoiceNumber,
+      supplierId,
+      order.restaurant_id,
+      order.id,
+      invoiceDate,
+      issueDate,
+      dueDate,
+      subtotal,
+      taxAmount,
+      taxRate,
+      false, // tax_included
+      totalAmount,
+      totalAmount, // balance_due initially equals total
+      0, // paid_amount
+      'ISSUED',
+      order.currency || 'USD',
+      paymentTermsDays,
+      `Invoice for Order #${order.id.slice(0, 8)} - Placed: ${new Date(order.placed_at || order.created_at).toLocaleDateString()}`,
+    ]);
     
     const invoice = invoices[0];
     
-    // Create invoice line items
-    for (const item of orderItems) {
-      const lineTotal = parseFloat(item.unit_price) * parseFloat(item.quantity);
-      
+    // Create comprehensive invoice line items
+    for (const lineItem of lineItemsData) {
       await client.query(`
         INSERT INTO invoice_line_item (
-          invoice_id, product_id, description, quantity, unit_price, line_total
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          invoice_id, product_id, description, sku,
+          quantity, unit_price, line_total,
+          tax_rate, tax_amount,
+          order_item_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `, [
         invoice.id,
-        item.product_id,
-        item.notes || `Product ordered`,
-        item.quantity,
-        item.unit_price,
-        lineTotal
+        lineItem.product_id,
+        lineItem.description,
+        lineItem.sku,
+        lineItem.quantity,
+        lineItem.unit_price,
+        lineItem.line_total,
+        lineItem.tax_rate,
+        lineItem.tax_amount,
+        lineItem.order_item_id,
       ]);
     }
     
-    logger.info('Invoice created from order', {
+    logger.info('Comprehensive invoice created from order', {
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoice_number,
       orderId: order.id,
-      totalAmount
+      supplierId,
+      restaurantId: order.restaurant_id,
+      subtotal,
+      taxAmount,
+      totalAmount,
+      lineItemsCount: lineItemsData.length,
     });
     
     return invoice;

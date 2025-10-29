@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireAuth, requireRole } from '../lib/rbac.js';
-import { query } from '../lib/db.js';
+import { query, withTransaction } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
@@ -116,6 +116,82 @@ router.get('/invoices', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
   }
 });
 
+// Get invoices by order ID
+router.get('/orders/:orderId/invoices', requireAuth, requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    let restaurantId = null;
+    let supplierId = null;
+
+    if (req.userData.role === 'RESTAURANT') {
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      );
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found');
+      }
+      restaurantId = restaurants[0].id;
+    } else if (req.userData.role === 'SUPPLIER') {
+      const { rows: suppliers } = await query(
+        'SELECT id FROM supplier WHERE contact_email = $1',
+        [req.userData.email]
+      );
+      if (suppliers.length === 0) {
+        throw new ValidationError('Supplier not found');
+      }
+      supplierId = suppliers[0].id;
+    }
+
+    let invoicesQuery = `
+      SELECT 
+        i.*,
+        s.name as supplier_name,
+        COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0) as total_paid
+      FROM invoice i
+      JOIN supplier s ON s.id = i.supplier_id
+      LEFT JOIN payment p ON p.invoice_id = i.id
+      WHERE i.order_id = $1
+    `;
+
+    const params = [orderId];
+
+    if (restaurantId) {
+      invoicesQuery += ` AND i.restaurant_id = $2`;
+      params.push(restaurantId);
+    } else if (supplierId) {
+      invoicesQuery += ` AND i.supplier_id = $2`;
+      params.push(supplierId);
+    }
+
+    invoicesQuery += `
+      GROUP BY i.id, s.name
+      ORDER BY i.invoice_date DESC
+    `;
+
+    const { rows } = await query(invoicesQuery, params);
+
+    res.json({
+      ok: true,
+      data: { invoices: rows },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get invoices by order error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get invoices',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
 // Get invoice by ID with line items
 router.get('/invoices/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
@@ -213,11 +289,29 @@ router.get('/invoices/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), a
   }
 });
 
-// Mark invoice as paid (manual payment recording)
+// Enhanced payment schema with partial payment and credit/debit support
+const paymentSchemaEnhanced = z.object({
+  paymentAmount: z.number().positive().optional(), // Optional - defaults to full balance if not provided
+  paymentDate: z.string(),
+  paymentMethod: z.enum(['CASH', 'CHECK', 'BANK_TRANSFER', 'CREDIT_CARD', 'ACH', 'STRIPE', 'OTHER']),
+  paymentReference: z.string().optional(),
+  bankName: z.string().optional(),
+  provider: z.string().optional(),
+  providerTransactionId: z.string().optional(),
+  notes: z.string().optional(),
+  // Credit/Debit support
+  creditAmount: z.number().nonnegative().optional().default(0), // Apply credit note to payment
+  creditNoteId: z.string().uuid().optional(), // Reference to credit note if applying
+  // HQ Payment support
+  paidByHQ: z.boolean().optional().default(false),
+  hqNotes: z.string().optional(),
+});
+
+// Mark invoice as paid (with partial payment, credits, and HQ support)
 router.post('/invoices/:id/pay', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const { id } = req.params;
-    const paymentData = markPaidSchema.parse(req.body);
+    const paymentData = paymentSchemaEnhanced.parse(req.body);
 
     const { rows: restaurants } = await query(
       'SELECT id FROM restaurant WHERE contact_email = $1',
@@ -242,7 +336,7 @@ router.post('/invoices/:id/pay', requireAuth, requireRole(['RESTAURANT', 'ADMIN'
 
     const invoice = invoices[0];
 
-    // Calculate remaining balance
+    // Calculate remaining balance and available credits
     const { rows: payments } = await query(`
       SELECT COALESCE(SUM(payment_amount), 0) as total_paid
       FROM payment
@@ -252,39 +346,139 @@ router.post('/invoices/:id/pay', requireAuth, requireRole(['RESTAURANT', 'ADMIN'
     const totalPaid = parseFloat(payments[0].total_paid || 0);
     const remainingBalance = parseFloat(invoice.total_amount) - totalPaid;
 
+    // Get available credit notes for this restaurant-supplier relationship
+    let creditAmount = parseFloat(paymentData.creditAmount || 0);
+    let creditNoteId = paymentData.creditNoteId || null;
+
+    if (creditAmount > 0 && creditNoteId) {
+      // Validate credit note exists and belongs to restaurant
+      const { rows: creditNotes } = await query(`
+        SELECT * FROM credit_note 
+        WHERE id = $1 AND restaurant_id = $2 AND supplier_id = $3
+          AND status = 'ISSUED' AND remaining_amount > 0
+      `, [creditNoteId, restaurantId, invoice.supplier_id]);
+
+      if (creditNotes.length === 0) {
+        throw new ValidationError('Invalid or unavailable credit note');
+      }
+
+      const creditNote = creditNotes[0];
+      const availableCredit = parseFloat(creditNote.remaining_amount || 0);
+      
+      if (creditAmount > availableCredit) {
+        throw new ValidationError(`Credit amount (${creditAmount}) exceeds available credit (${availableCredit})`);
+      }
+    }
+
+    // Determine payment amount
+    let paymentAmount = paymentData.paymentAmount;
+    if (!paymentAmount || paymentAmount === 0) {
+      // Default to full remaining balance
+      paymentAmount = remainingBalance;
+    }
+
+    // Total payment (cash + credit)
+    const totalPaymentWithCredit = paymentAmount + creditAmount;
+
+    if (totalPaymentWithCredit > remainingBalance) {
+      throw new ValidationError(`Total payment amount (${totalPaymentWithCredit}) exceeds remaining balance (${remainingBalance})`);
+    }
+
+    if (paymentAmount <= 0 && creditAmount <= 0) {
+      throw new ValidationError('Payment amount must be greater than 0');
+    }
+
     // Generate payment number
     const paymentNumber = `PAY-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-6)}`;
 
-    // Create payment record
-    const { rows: payment } = await query(`
-      INSERT INTO payment (
-        invoice_id, payment_number, payment_date, payment_amount,
-        payment_method, payment_reference, currency, status,
-        recorded_by, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *
-    `, [
-      id,
-      paymentNumber,
-      paymentData.paymentDate,
-      remainingBalance, // Pay full remaining balance
-      paymentData.paymentMethod,
-      paymentData.paymentReference || null,
-      invoice.currency,
-      'COMPLETED',
-      req.userData.id,
-      paymentData.notes || null,
-    ]);
+    // Use transaction for atomicity
+    const result = await withTransaction(async (client) => {
+      // Create payment record (only if cash payment > 0)
+      let payment = null;
+      if (paymentAmount > 0) {
+        const { rows: paymentRows } = await client.query(`
+          INSERT INTO payment (
+            invoice_id, payment_number, payment_date, payment_amount,
+            payment_method, payment_reference, currency, status,
+            recorded_by, notes, bank_name, provider, provider_transaction_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          RETURNING *
+        `, [
+          id,
+          paymentNumber,
+          paymentData.paymentDate,
+          paymentAmount,
+          paymentData.paymentMethod,
+          paymentData.paymentReference || null,
+          invoice.currency,
+          'COMPLETED',
+          req.userData.id,
+          paymentData.notes || (paymentData.paidByHQ ? `Payment made by HQ${paymentData.hqNotes ? `: ${paymentData.hqNotes}` : ''}` : null),
+          paymentData.bankName || null,
+          paymentData.provider || null,
+          paymentData.providerTransactionId || null,
+        ]);
 
-    logger.info('Invoice payment recorded', {
+        payment = paymentRows[0];
+      }
+
+      // Apply credit note if provided
+      if (creditAmount > 0 && creditNoteId) {
+        // Update credit note to mark as applied
+        await client.query(`
+          UPDATE credit_note
+          SET applied_amount = applied_amount + $1,
+              remaining_amount = remaining_amount - $1,
+              status = CASE WHEN remaining_amount - $1 <= 0 THEN 'APPLIED' ELSE 'ISSUED' END,
+              updated_at = now()
+          WHERE id = $2
+        `, [creditAmount, creditNoteId]);
+
+        // Create a payment record for the credit (with special method)
+        const creditPaymentNumber = `CREDIT-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-6)}`;
+        await client.query(`
+          INSERT INTO payment (
+            invoice_id, payment_number, payment_date, payment_amount,
+            payment_method, currency, status,
+            recorded_by, notes, payment_reference
+          ) VALUES ($1, $2, $3, $4, 'OTHER', $5, 'COMPLETED', $6, $7, $8)
+        `, [
+          id,
+          creditPaymentNumber,
+          paymentData.paymentDate,
+          creditAmount,
+          invoice.currency,
+          req.userData.id,
+          `Credit note applied: ${creditNoteId}`,
+          creditNoteId,
+        ]);
+      }
+
+      // Get updated invoice
+      const { rows: updatedInvoice } = await client.query(`
+        SELECT * FROM invoice WHERE id = $1
+      `, [id]);
+
+      return { payment, updatedInvoice: updatedInvoice[0] };
+    });
+
+    logger.info('Enhanced payment recorded', {
       invoiceId: id,
-      paymentId: payment[0].id,
+      paymentId: result.payment?.id || 'credit-only',
+      cashAmount: paymentAmount,
+      creditAmount: creditAmount,
+      totalPayment: totalPaymentWithCredit,
+      paidByHQ: paymentData.paidByHQ,
       actor: req.userData.id,
     });
 
     res.json({
       ok: true,
-      data: { payment: payment[0] },
+      data: { 
+        payment: result.payment,
+        creditApplied: creditAmount > 0 ? { amount: creditAmount, creditNoteId } : null,
+        invoice: result.updatedInvoice,
+      },
       error: null,
       requestId: req.requestId,
     });
@@ -312,7 +506,7 @@ router.post('/invoices/:id/pay', requireAuth, requireRole(['RESTAURANT', 'ADMIN'
     }
 
     logger.error({
-      message: 'Mark invoice paid error',
+      message: 'Enhanced payment error',
       error: error.message,
       stack: error.stack,
     });
@@ -323,6 +517,127 @@ router.post('/invoices/:id/pay', requireAuth, requireRole(['RESTAURANT', 'ADMIN'
         name: 'INTERNAL_ERROR',
         message: 'Failed to record payment',
         details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get available credit notes for a supplier (for invoice payment)
+router.get('/invoices/:id/credits', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+
+    const restaurantId = restaurants[0].id;
+
+    // Get invoice to get supplier_id
+    const { rows: invoices } = await query(`
+      SELECT supplier_id FROM invoice 
+      WHERE id = $1 AND restaurant_id = $2
+    `, [id, restaurantId]);
+
+    if (invoices.length === 0) {
+      throw new NotFoundError('Invoice not found');
+    }
+
+    const supplierId = invoices[0].supplier_id;
+
+    // Get available credit notes
+    const { rows: creditNotes } = await query(`
+      SELECT 
+        id, credit_note_number, issue_date, credit_amount,
+        applied_amount, remaining_amount, reason, description,
+        expires_at
+      FROM credit_note
+      WHERE restaurant_id = $1 AND supplier_id = $2
+        AND status = 'ISSUED' AND remaining_amount > 0
+        AND (expires_at IS NULL OR expires_at >= CURRENT_DATE)
+      ORDER BY issue_date DESC
+    `, [restaurantId, supplierId]);
+
+    res.json({
+      ok: true,
+      data: { creditNotes },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get credit notes error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get credit notes',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get comprehensive invoice analytics for restaurant
+router.get('/invoices/analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { period = '30' } = req.query;
+
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+
+    if (restaurants.length === 0) {
+      throw new ValidationError('Restaurant not found');
+    }
+
+    const restaurantId = restaurants[0].id;
+
+    const periodDays = parseInt(period) || 30;
+    
+    // Get comprehensive analytics
+    const { rows: analytics } = await query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE i.status = 'ISSUED') as issued_count,
+        COUNT(*) FILTER (WHERE i.status = 'PARTIALLY_PAID') as partial_count,
+        COUNT(*) FILTER (WHERE i.status = 'PAID') as paid_count,
+        COUNT(*) FILTER (WHERE i.status = 'OVERDUE') as overdue_count,
+        COUNT(*) FILTER (WHERE i.due_date < CURRENT_DATE AND i.status NOT IN ('PAID', 'VOID')) as overdue_count_alt,
+        SUM(i.total_amount) FILTER (WHERE i.status = 'ISSUED' OR i.status = 'PARTIALLY_PAID') as total_outstanding,
+        SUM(i.total_amount) FILTER (WHERE i.status = 'PAID') as total_paid_amount,
+        SUM(i.total_amount) FILTER (WHERE i.due_date < CURRENT_DATE AND i.status NOT IN ('PAID', 'VOID')) as total_overdue,
+        AVG(
+          CASE 
+            WHEN i.status = 'PAID' AND i.payment_date IS NOT NULL 
+            THEN i.payment_date - i.due_date 
+          END
+        ) as avg_days_to_pay
+      FROM invoice i
+      WHERE i.restaurant_id = $1
+        AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
+    `, [restaurantId, periodDays]);
+
+    res.json({
+      ok: true,
+      data: { analytics: analytics[0] || {} },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get invoice analytics error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get analytics',
       },
       requestId: req.requestId,
     });

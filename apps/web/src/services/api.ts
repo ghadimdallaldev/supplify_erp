@@ -474,13 +474,29 @@ export const api = createApi({
       query: (id) => `/api/restaurant-finance/invoices/${id}`,
       providesTags: (result, error, id) => [{ type: 'RestaurantFinance', id }],
     }),
+    // Enhanced payment with partial payment, credits, and HQ support
     markInvoicePaid: builder.mutation<any, { invoiceId: string; data: any }>({
       query: ({ invoiceId, data }) => ({
         url: `/api/restaurant-finance/invoices/${invoiceId}/pay`,
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: (result, error, { invoiceId }) => [{ type: 'RestaurantFinance', id: invoiceId }, 'RestaurantFinance'],
+      invalidatesTags: (result, error, { invoiceId }) => [{ type: 'RestaurantFinance', id: invoiceId }, 'RestaurantFinance', 'Order'],
+    }),
+    getInvoiceCredits: builder.query<any, string>({
+      query: (invoiceId) => `/api/restaurant-finance/invoices/${invoiceId}/credits`,
+      providesTags: ['RestaurantFinance'],
+    }),
+    getInvoiceAnalytics: builder.query<any, { period?: number }>({
+      query: ({ period = 30 }) => ({
+        url: '/api/restaurant-finance/invoices/analytics',
+        params: { period },
+      }),
+      providesTags: ['RestaurantFinance'],
+    }),
+    getOrderInvoices: builder.query<any, string>({
+      query: (orderId) => `/api/restaurant-finance/orders/${orderId}/invoices`,
+      providesTags: (result, error, orderId) => [{ type: 'Order', id: orderId }, 'RestaurantFinance'],
     }),
     getSupplierStatement: builder.query<any, { supplierId: string; params?: any }>({
       query: ({ supplierId, params }) => ({
@@ -709,6 +725,9 @@ export const {
   useGetRestaurantInvoicesQuery,
   useGetRestaurantInvoiceQuery,
   useMarkInvoicePaidMutation,
+  useGetInvoiceCreditsQuery,
+  useGetInvoiceAnalyticsQuery,
+  useGetOrderInvoicesQuery,
   useGetSupplierStatementQuery,
   useGetRestaurantExpensesQuery,
   useGetOverdueInvoicesQuery,
