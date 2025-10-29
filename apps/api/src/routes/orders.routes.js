@@ -44,13 +44,13 @@ const orderListSchema = z.object({
 // Helper function to create invoice from delivered order
 export async function createInvoiceFromOrder(order, orderItems, supplierId, client) {
   try {
-    // Check if invoice already exists for this order
+    // Check if invoice already exists for this supplier and order (multi-supplier support)
     const { rows: existingInvoices } = await client.query(`
-      SELECT id FROM invoice WHERE order_id = $1
-    `, [order.id]);
+      SELECT id FROM invoice WHERE order_id = $1 AND supplier_id = $2
+    `, [order.id, supplierId]);
     
     if (existingInvoices.length > 0) {
-      logger.info('Invoice already exists for order', { orderId: order.id });
+      logger.info('Invoice already exists for this supplier and order', { orderId: order.id, supplierId });
       return null;
     }
     
@@ -117,12 +117,9 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
 async function handleOrderDelivery(orderId, userData, res) {
   try {
     const result = await withTransaction(async (client) => {
-      // Update order status to COMPLETED (not FULFILLING)
+      // Get order first
       const { rows: orders } = await client.query(`
-        UPDATE customer_order 
-        SET status = 'COMPLETED', updated_at = now()
-        WHERE id = $1
-        RETURNING *
+        SELECT * FROM customer_order WHERE id = $1
       `, [orderId]);
       
       if (orders.length === 0) {
@@ -131,15 +128,7 @@ async function handleOrderDelivery(orderId, userData, res) {
       
       const order = orders[0];
       
-      // Get order items
-      const { rows: orderItems } = await client.query(`
-        SELECT oi.*, p.supplier_id, p.name as product_name
-        FROM order_item oi
-        JOIN product p ON p.id = oi.product_id
-        WHERE oi.order_id = $1
-      `, [orderId]);
-      
-      // Verify supplier owns all items in this order
+      // Get supplier ID
       const { rows: suppliers } = await client.query(
         'SELECT id FROM supplier WHERE contact_email = $1',
         [userData.email]
@@ -151,15 +140,20 @@ async function handleOrderDelivery(orderId, userData, res) {
       
       const supplierId = suppliers[0].id;
       
-      // Check all items belong to this supplier
-      for (const item of orderItems) {
-        if (item.supplier_id !== supplierId) {
-          throw new ValidationError('Order contains items from other suppliers');
-        }
+      // Get ONLY this supplier's order items (multi-supplier order support)
+      const { rows: supplierItems } = await client.query(`
+        SELECT oi.*, p.supplier_id, p.name as product_name
+        FROM order_item oi
+        JOIN product p ON p.id = oi.product_id
+        WHERE oi.order_id = $1 AND oi.supplier_id = $2
+      `, [orderId, supplierId]);
+      
+      if (supplierItems.length === 0) {
+        throw new ValidationError('No items found for this supplier in this order');
       }
       
-      // Update restaurant inventory for each item
-      for (const item of orderItems) {
+      // Update restaurant inventory ONLY for this supplier's items
+      for (const item of supplierItems) {
         // Check if restaurant inventory exists for this product
         const { rows: restaurantInventory } = await client.query(`
           SELECT * FROM restaurant_inventory 
@@ -182,22 +176,53 @@ async function handleOrderDelivery(orderId, userData, res) {
         }
       }
       
-      // Create invoice from delivered order
-      const invoice = await createInvoiceFromOrder(order, orderItems, supplierId, client);
+      // Create invoice from this supplier's portion of the order
+      const invoice = await createInvoiceFromOrder(order, supplierItems, supplierId, client);
       
-      logger.info('Order delivered and restaurant inventory updated', { 
+      // Check if all suppliers have completed their portions
+      // Count total suppliers in the order
+      const { rows: allOrderItems } = await client.query(`
+        SELECT DISTINCT supplier_id FROM order_item WHERE order_id = $1
+      `, [orderId]);
+      
+      const totalSuppliers = allOrderItems.length;
+      
+      // Count suppliers who have invoices (completed their portion)
+      // An invoice exists when a supplier completes their portion
+      const { rows: suppliersWithInvoices } = await client.query(`
+        SELECT DISTINCT supplier_id 
+        FROM invoice 
+        WHERE order_id = $1 AND status != 'VOID'
+      `, [orderId]);
+      
+      const completedSuppliers = suppliersWithInvoices.length;
+      
+      // Mark order as COMPLETED only if all suppliers have completed
+      if (completedSuppliers >= totalSuppliers) {
+        await client.query(`
+          UPDATE customer_order 
+          SET status = 'COMPLETED', updated_at = now()
+          WHERE id = $1
+        `, [orderId]);
+        order.status = 'COMPLETED';
+      }
+      
+      logger.info('Supplier portion delivered and restaurant inventory updated', { 
         orderId: order.id,
         restaurantId: order.restaurant_id,
-        itemCount: orderItems.length,
+        supplierId,
+        itemCount: supplierItems.length,
+        completedSuppliers,
+        totalSuppliers,
+        orderCompleted: completedSuppliers >= totalSuppliers,
         actor: userData.id 
       });
       
       return { order, supplierId };
     });
     
-    // Send notification to restaurant about completed order
+    // Send notification to restaurant about supplier completion
     try {
-      console.log('📨 Sending notification for completed order:', result.order.id);
       const { rows: restaurantInfo } = await query(`
         SELECT id, name FROM restaurant WHERE id = $1
       `, [result.order.restaurant_id]);
@@ -206,20 +231,36 @@ async function handleOrderDelivery(orderId, userData, res) {
         SELECT id, name FROM supplier WHERE id = $1
       `, [result.supplierId]);
       
-      console.log('📨 Notification params:', {
+      // Check if order is fully completed (all suppliers completed)
+      const { rows: allOrderItems } = await query(`
+        SELECT DISTINCT supplier_id FROM order_item WHERE order_id = $1
+      `, [result.order.id]);
+      
+      const { rows: suppliersWithInvoices } = await query(`
+        SELECT DISTINCT supplier_id 
+        FROM invoice 
+        WHERE order_id = $1 AND status != 'VOID'
+      `, [result.order.id]);
+      
+      const isFullyCompleted = suppliersWithInvoices.length >= allOrderItems.length;
+      
+      console.log('📨 Sending notification for supplier order completion:', {
         order_id: result.order.id,
         restaurant_id: result.order.restaurant_id,
         supplier_id: result.supplierId,
-        status: 'COMPLETED'
+        status: isFullyCompleted ? 'COMPLETED' : 'PARTIAL_COMPLETED',
+        completedSuppliers: suppliersWithInvoices.length,
+        totalSuppliers: allOrderItems.length
       });
       
+      // Notify restaurant - use COMPLETED status only if all suppliers completed
       await notifyOrderStatusChange({
         id: result.order.id,
         total_amount: result.order.total_amount,
         restaurant_id: result.order.restaurant_id,
         supplier_id: result.supplierId,
         supplier_name: supplierInfo[0]?.name || 'Supplier',
-      }, 'COMPLETED');
+      }, isFullyCompleted ? 'COMPLETED' : 'SHIPPED'); // Use SHIPPED for partial completion
       
       console.log('✅ Notification sent successfully');
     } catch (notifError) {
