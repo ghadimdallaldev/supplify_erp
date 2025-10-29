@@ -348,10 +348,9 @@ export const api = createApi({
     }),
     getReceivingHistory: builder.query<any, void>({
       query: () => '/api/receiving/history',
-      providesTags: (result) => 
-        result?.reports 
-          ? [...result.reports.map((r: any) => ({ type: 'Receiving' as const, id: r.id })), 'Receiving']
-          : ['Receiving'],
+      providesTags: ['Receiving'],
+      // Refetch when component mounts if data is stale
+      refetchOnMountOrArgChange: true,
     }),
     createReceivingReport: builder.mutation<any, any>({
       query: (body) => ({

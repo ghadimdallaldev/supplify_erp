@@ -73,9 +73,10 @@ export function ReceivingPage() {
       setShowDialog(false)
       setSelectedOrder(null)
       
-      // Refetch to update pending list (order should be removed by backend filter)
+      // Refetch to update pending list and history (cache invalidation should also trigger refetch)
       const refetchResult = await refetchPending()
-      await refetchHistory()
+      // Force refetch history to ensure it appears immediately
+      const historyResult = await refetchHistory()
       
       // After successful receive, check if order is still in pending list
       // If it is, it means the backend hasn't filtered it out yet (shouldn't happen but handle it)
@@ -91,6 +92,11 @@ export function ReceivingPage() {
         })
       }
       // If order is still pending, keep it in receivingOrderIds to show "Received" button
+      
+      // Verify history was updated (for debugging - can be removed)
+      if (historyResult.data?.reports) {
+        console.log('Receiving history updated:', historyResult.data.reports.length, 'reports')
+      }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
       // Remove from receivingOrderIds on error
