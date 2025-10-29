@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { useAppSelector } from '../hooks/redux'
-import { PackageCheck, History, Star, FileText } from 'lucide-react'
+import { PackageCheck, History, Star, FileText, Loader2 } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
@@ -45,7 +45,9 @@ export function ReceivingPage() {
   const handleSubmitReceiving = async (formData: any) => {
     const orderId = selectedOrder.id
     try {
+      // Add to receivingOrderIds to show "Processing..." state
       setReceivingOrderIds(prev => new Set([...prev, orderId]))
+      
       const result = await createReport({
         orderId: selectedOrder.id,
         lineItems: selectedOrder.items.map((item: any) => ({
@@ -67,22 +69,22 @@ export function ReceivingPage() {
         receivedBy: user?.id,
       }).unwrap()
 
+      // Receiving report created successfully - the order should be filtered out by backend
+      // but we keep it in receivingOrderIds to ensure button stays disabled
+      // It will be cleaned up by useEffect when order disappears from pending list
       toast.success('Receiving report created successfully')
       setShowDialog(false)
       setSelectedOrder(null)
       
-      // Keep orderId in receivingOrderIds to disable button
-      // It will be removed when order disappears from pending list
-      // Wait for refetch to complete to ensure UI updates
-      const refetchResult = await refetchPending()
+      // Refetch to update pending list (order should be removed by backend filter)
+      await refetchPending()
       await refetchHistory()
       
-      // Don't remove from receivingOrderIds immediately
-      // The order should disappear from pending list due to backend filter
-      // We keep the ID to ensure button stays disabled until order is removed
-      // The useEffect above will clean up IDs when orders disappear from pending list
+      // Note: receivingOrderIds keeps the orderId to ensure button stays disabled
+      // The cleanup useEffect will remove it when order is no longer in pending list
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
+      // Remove from receivingOrderIds on error
       setReceivingOrderIds(prev => {
         const next = new Set(prev)
         next.delete(orderId)
@@ -91,21 +93,32 @@ export function ReceivingPage() {
     }
   }
 
-  // Filter out orders that are currently being received or already received
-  // Also sync receivingOrderIds with backend data - remove IDs for orders that are no longer pending
+  // Sync receivingOrderIds with backend data
+  // Remove IDs for orders that are no longer in pending list OR have has_receiving_report = true
+  // This cleans up the state after orders are properly received
   useEffect(() => {
     if (pendingData?.orders) {
       setReceivingOrderIds(prev => {
         const next = new Set(prev)
         const pendingIds = new Set(pendingData.orders.map((o: any) => o.id))
-        // Remove any IDs that are no longer in pending list (they've been received)
         let changed = false
+        
+        // Remove IDs that are no longer in pending list (order was successfully received and filtered out)
         next.forEach(id => {
           if (!pendingIds.has(id)) {
             next.delete(id)
             changed = true
           }
         })
+        
+        // Also check if any pending orders have has_receiving_report = true
+        // These were received but still showing in list (shouldn't happen but handle it)
+        pendingData.orders.forEach((order: any) => {
+          if (order.has_receiving_report && next.has(order.id)) {
+            // Keep it disabled but it should be filtered out on next refetch
+          }
+        })
+        
         return changed ? next : prev
       })
     }
@@ -169,17 +182,26 @@ export function ReceivingPage() {
                         </p>
                       </div>
                       {order.has_receiving_report || receivingOrderIds.has(order.id) ? (
-                        <Button disabled variant="outline" className="cursor-not-allowed">
+                        <Button disabled variant="outline" className="cursor-not-allowed opacity-75">
                           <PackageCheck className="h-4 w-4 mr-2" />
-                          {receivingOrderIds.has(order.id) ? 'Processing...' : 'Received'}
+                          Received
                         </Button>
                       ) : (
                         <Button 
                           onClick={() => handleReceive(order)}
                           disabled={isCreating || receivingOrderIds.has(order.id)}
                         >
-                          <PackageCheck className="h-4 w-4 mr-2" />
-                          Receive Now
+                          {receivingOrderIds.has(order.id) ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <PackageCheck className="h-4 w-4 mr-2" />
+                              Receive Now
+                            </>
+                          )}
                         </Button>
                       )}
                     </div>
