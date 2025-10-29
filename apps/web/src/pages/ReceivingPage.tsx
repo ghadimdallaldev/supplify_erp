@@ -27,7 +27,9 @@ export function ReceivingPage() {
   }
 
   const handleSubmitReceiving = async (formData: any) => {
+    const orderId = selectedOrder.id
     try {
+      setReceivingOrderIds(prev => new Set([...prev, orderId]))
       const result = await createReport({
         orderId: selectedOrder.id,
         lineItems: selectedOrder.items.map((item: any) => ({
@@ -52,10 +54,22 @@ export function ReceivingPage() {
       toast.success('Receiving report created successfully')
       setShowDialog(false)
       setSelectedOrder(null)
-      refetchPending()
-      refetchHistory()
+      // Wait for refetch to complete to ensure UI updates
+      await refetchPending()
+      await refetchHistory()
+      // Remove from receiving set after successful refetch
+      setReceivingOrderIds(prev => {
+        const next = new Set(prev)
+        next.delete(orderId)
+        return next
+      })
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
+      setReceivingOrderIds(prev => {
+        const next = new Set(prev)
+        next.delete(orderId)
+        return next
+      })
     }
   }
 
@@ -112,13 +126,16 @@ export function ReceivingPage() {
                           Completed: {new Date(order.created_at).toLocaleString()}
                         </p>
                       </div>
-                      {order.has_receiving_report ? (
+                      {order.has_receiving_report || receivingOrderIds.has(order.id) ? (
                         <Button disabled variant="outline">
                           <PackageCheck className="h-4 w-4 mr-2" />
-                          Received
+                          {receivingOrderIds.has(order.id) ? 'Processing...' : 'Received'}
                         </Button>
                       ) : (
-                        <Button onClick={() => handleReceive(order)}>
+                        <Button 
+                          onClick={() => handleReceive(order)}
+                          disabled={isCreating}
+                        >
                           <PackageCheck className="h-4 w-4 mr-2" />
                           Receive Now
                         </Button>

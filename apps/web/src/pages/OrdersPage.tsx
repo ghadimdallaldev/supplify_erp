@@ -148,13 +148,18 @@ export function OrdersPage() {
     }
   }
 
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
+  
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
+      setUpdatingOrderId(orderId)
       await updateOrder({ id: orderId, data: { status: newStatus } }).unwrap()
       toast.success(`Order status updated to ${newStatus}`)
-      refetch()
+      await refetch()
+      setUpdatingOrderId(null)
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to update order status')
+      setUpdatingOrderId(null)
     }
   }
 
@@ -366,8 +371,9 @@ export function OrdersPage() {
                         <Button 
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'COMPLETED')}
+                          disabled={updatingOrderId === order.id || order.status === 'COMPLETED'}
                         >
-                          Complete Order
+                          {updatingOrderId === order.id ? 'Completing...' : 'Complete Order'}
                         </Button>
                       )}
                       {isSupplier && order.status === 'COMPLETED' && (
