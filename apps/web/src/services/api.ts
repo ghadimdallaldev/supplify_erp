@@ -50,12 +50,33 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
     },
   })(args, api, extraOptions);
   
+  // Handle 401 Unauthorized errors (token expired or invalid)
+  if (result.error && (result.error.status === 401 || result.error.status === 'FETCH_ERROR')) {
+    // Check if it's an authentication error
+    const errorData = result.error.data;
+    if (typeof errorData === 'object' && errorData?.error?.name === 'UNAUTHORIZED') {
+      // Token expired or invalid - redirect to login
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        // Clear any auth state
+        window.location.href = '/login?expired=true'
+        return { ...result }
+      }
+    }
+  }
+  
   // Unwrap the API response envelope { ok: true/false, data: ..., error: ... }
   if (result.data && typeof result.data === 'object' && 'ok' in result.data) {
     if (result.data.ok) {
       // Return the actual data
       return { ...result, data: result.data.data };
     } else {
+      // Check for authentication errors in the response
+      if (result.data.error?.name === 'UNAUTHORIZED' || result.data.error?.name === 'JWT_EXPIRED') {
+        // Redirect to login on auth errors
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          window.location.href = '/login?expired=true'
+        }
+      }
       // Return an error
       return { ...result, error: { status: 'CUSTOM_ERROR', data: result.data.error } };
     }

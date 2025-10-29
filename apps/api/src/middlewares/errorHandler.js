@@ -26,10 +26,10 @@ export function errorHandler(err, req, res, next) {
     statusCode = 400;
     errorName = 'VALIDATION_ERROR';
     message = err.message;
-  } else if (err.name === 'UnauthorizedError') {
+  } else if (err.name === 'UnauthorizedError' || err.name === 'JWTExpired' || err.code === 'ERR_JWT_EXPIRED') {
     statusCode = 401;
-    errorName = 'UNAUTHORIZED';
-    message = 'Unauthorized';
+    errorName = 'JWT_EXPIRED';
+    message = err.message || 'Token has expired. Please log in again.';
   } else if (err.name === 'ForbiddenError') {
     statusCode = 403;
     errorName = 'FORBIDDEN';
