@@ -359,12 +359,23 @@ export function OrdersPage() {
                           Mark as Shipped
                         </Button>
                       )}
-                      {isSupplier && order.status === 'SHIPPED' && (
+                      {isSupplier && order.status === 'SHIPPED' && order.status !== 'COMPLETED' && (
                         <Button 
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'COMPLETED')}
+                          disabled={order.status === 'COMPLETED'}
                         >
                           Complete Order
+                        </Button>
+                      )}
+                      {isSupplier && order.status === 'COMPLETED' && (
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          disabled
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Completed
                         </Button>
                       )}
                       <Button variant="outline" size="sm" asChild>
