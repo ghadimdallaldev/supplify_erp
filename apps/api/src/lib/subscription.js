@@ -81,11 +81,11 @@ export async function isFeatureEnabled(tenantId, tenantType, featureKey) {
 }
 
 /**
- * Check if tenant has reached limit
+ * Check if tenant has reached limit (with override support)
  * @param {string} tenantId - Tenant ID
  * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
  * @param {string} meterType - Type of meter (e.g., 'products', 'warehouses')
- * @returns {Promise<{current: number, limit: number|null, isUnlimited: boolean, isOverLimit: boolean}>}
+ * @returns {Promise<{current: number, limit: number|null, isUnlimited: boolean, isOverLimit: boolean, effectiveLimit: number}>}
  */
 export async function checkLimit(tenantId, tenantType, meterType) {
   try {
@@ -97,20 +97,40 @@ export async function checkLimit(tenantId, tenantType, meterType) {
         current: 0,
         limit: 0,
         isUnlimited: false,
-        isOverLimit: true
+        isOverLimit: true,
+        effectiveLimit: 0
       };
     }
 
     // Get limit from plan
-    const limit = subscription.limits?.[meterType];
+    let limit = subscription.limits?.[meterType];
     const isUnlimited = limit === -1 || limit === null || limit === undefined;
 
-    if (isUnlimited) {
+    // Check for admin override
+    const { rows: overrides } = await query(`
+      SELECT override_value, expiration_date
+      FROM tenant_limit_override
+      WHERE tenant_id = $1 
+        AND tenant_type = $2 
+        AND limit_type = $3
+        AND (expiration_date IS NULL OR expiration_date > now())
+    `, [tenantId, tenantType, meterType]);
+
+    if (overrides.length > 0) {
+      const override = overrides[0];
+      // Override takes precedence
+      limit = parseInt(override.override_value);
+    } else {
+      limit = limit === -1 ? null : parseInt(limit);
+    }
+
+    if (isUnlimited && !overrides.length) {
       return {
         current: 0,
         limit: null,
         isUnlimited: true,
-        isOverLimit: false
+        isOverLimit: false,
+        effectiveLimit: null
       };
     }
 
@@ -125,12 +145,14 @@ export async function checkLimit(tenantId, tenantType, meterType) {
     `, [tenantId, tenantType, meterType]);
 
     const current = usage.length > 0 ? parseInt(usage[0].current_value || 0) : 0;
+    const effectiveLimit = limit;
 
     return {
       current,
-      limit: parseInt(limit),
-      isUnlimited: false,
-      isOverLimit: current >= limit
+      limit: effectiveLimit,
+      isUnlimited: effectiveLimit === null,
+      isOverLimit: effectiveLimit !== null && current >= effectiveLimit,
+      effectiveLimit
     };
   } catch (error) {
     logger.error('Check limit error:', error);
@@ -138,7 +160,8 @@ export async function checkLimit(tenantId, tenantType, meterType) {
       current: 0,
       limit: 0,
       isUnlimited: false,
-      isOverLimit: true // Fail safe
+      isOverLimit: true, // Fail safe
+      effectiveLimit: 0
     };
   }
 }

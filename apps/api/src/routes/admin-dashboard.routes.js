@@ -820,6 +820,93 @@ router.get('/tenants/restaurants', requireAuth, requireRole(['ADMIN']), async (r
   }
 });
 
+// ========================================
+// TENANT OVERRIDES
+// ========================================
+
+/**
+ * POST /api/admin-dashboard/tenants/:id/override-limit
+ * Manually override a tenant's limit (e.g., grant temporary increase)
+ */
+router.post('/tenants/:tenantType/:id/override-limit', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { id: tenantId, tenantType } = req.params;
+    const { limit_type, override_value, expiration_date, reason } = req.body;
+
+    // Create override record
+    const { rows: overrides } = await query(`
+      INSERT INTO tenant_limit_override (
+        tenant_id, tenant_type, limit_type, override_value, expiration_date, reason, created_by
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `, [tenantId, tenantType.toUpperCase(), limit_type, override_value, expiration_date || null, reason || null, req.userData.id]);
+
+    // Log audit
+    await logAudit(req, 'OVERRIDE_LIMIT', 
+      `Granted ${limit_type} override: ${override_value}`, 
+      tenantType.toUpperCase(), tenantId, null, { limit_type, override_value, expiration_date, reason });
+
+    res.json({
+      ok: true,
+      data: { override: overrides[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Override limit error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to set override' },
+      requestId: req.requestId,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin-dashboard/tenants/:id/override-limit/:overrideId
+ * Remove a tenant limit override
+ */
+router.delete('/tenants/:tenantType/:id/override-limit/:overrideId', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { overrideId } = req.params;
+
+    const { rows: deleted } = await query(`
+      DELETE FROM tenant_limit_override WHERE id = $1 RETURNING *
+    `, [overrideId]);
+
+    if (deleted.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Override not found' },
+        requestId: req.requestId,
+      });
+    }
+
+    // Log audit
+    await logAudit(req, 'REMOVE_OVERRIDE', 
+      `Removed limit override`, 
+      deleted[0].tenant_type, deleted[0].tenant_id, deleted[0], null);
+
+    res.json({
+      ok: true,
+      data: { override: deleted[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Remove override error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to remove override' },
+      requestId: req.requestId,
+    });
+  }
+});
+
 // Get supplier usage details
 router.get('/tenants/suppliers/:id/usage', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
