@@ -16,6 +16,7 @@ export function ReceivingPage() {
   const { user } = useAppSelector((state) => state.auth)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [showDialog, setShowDialog] = useState(false)
+  const [receivingOrderIds, setReceivingOrderIds] = useState<Set<string>>(new Set())
 
   const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = useGetPendingOrdersForReceivingQuery()
   const { data: historyData, isLoading: historyLoading, refetch: refetchHistory } = useGetReceivingHistoryQuery()
