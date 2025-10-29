@@ -29,7 +29,9 @@ router.get('/pending-orders', requireAuth, requireRole(['RESTAURANT', 'ADMIN']),
 
     const restaurantId = restaurants[0].id;
 
-    // Get orders that are delivered but not yet received
+    // Get all active orders that are not cancelled or draft
+    // Orders should appear in pending list as soon as they're placed
+    // But can only be received when status is COMPLETED
     // Note: supplier_id is in order_item, not customer_order
     const { rows: orders } = await query(`
       SELECT DISTINCT ON (o.id)
@@ -48,7 +50,7 @@ router.get('/pending-orders', requireAuth, requireRole(['RESTAURANT', 'ADMIN']),
       JOIN order_item oi ON oi.order_id = o.id
       JOIN supplier s ON s.id = oi.supplier_id
       WHERE o.restaurant_id = $1 
-        AND o.status = 'COMPLETED'
+        AND o.status NOT IN ('CANCELLED', 'DRAFT')
         AND NOT EXISTS (
           SELECT 1 FROM receiving_report 
           WHERE order_id = o.id 

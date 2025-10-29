@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { useAppSelector } from '../hooks/redux'
-import { PackageCheck, History, Star, FileText, Loader2 } from 'lucide-react'
+import { PackageCheck, History, Star, FileText, Loader2, Clock, AlertCircle, Truck, CheckCircle } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
@@ -230,21 +230,60 @@ export function ReceivingPage() {
                 <Card key={order.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
-                      <div>
+                      <div className="flex-1">
                         <CardTitle className="flex items-center gap-2">
                           Order #{order.id.slice(0, 8)}
                           <Badge variant="outline">{order.supplier_name}</Badge>
+                          <Badge 
+                            variant={
+                              order.status === 'COMPLETED' ? 'default' :
+                              order.status === 'SHIPPED' ? 'secondary' :
+                              order.status === 'PROCESSING' ? 'secondary' :
+                              'outline'
+                            }
+                          >
+                            {order.status}
+                          </Badge>
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Completed: {new Date(order.created_at).toLocaleString()}
+                          Placed: {new Date(order.created_at).toLocaleString()}
                         </p>
+                        {/* Status message explaining why order can't be received */}
+                        {order.status !== 'COMPLETED' && (
+                          <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                            {order.status === 'PLACED' && (
+                              <>
+                                <Clock className="h-4 w-4" />
+                                <span>Waiting for supplier to acknowledge order</span>
+                              </>
+                            )}
+                            {order.status === 'ACKNOWLEDGED' && (
+                              <>
+                                <CheckCircle className="h-4 w-4" />
+                                <span>Supplier acknowledged. Order is being prepared.</span>
+                              </>
+                            )}
+                            {order.status === 'PROCESSING' && (
+                              <>
+                                <PackageCheck className="h-4 w-4" />
+                                <span>Supplier is processing your order</span>
+                              </>
+                            )}
+                            {order.status === 'SHIPPED' && (
+                              <>
+                                <Truck className="h-4 w-4" />
+                                <span>Order is in transit. Waiting for supplier to mark as completed.</span>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                       {order.has_receiving_report || receivingOrderIds.has(order.id) ? (
                         <Button disabled variant="outline" className="cursor-not-allowed opacity-75">
                           <PackageCheck className="h-4 w-4 mr-2" />
                           Received
                         </Button>
-                      ) : (
+                      ) : order.status === 'COMPLETED' ? (
                         <Button 
                           onClick={() => handleReceive(order)}
                           disabled={isCreating || receivingOrderIds.has(order.id)}
@@ -260,6 +299,16 @@ export function ReceivingPage() {
                               Receive Now
                             </>
                           )}
+                        </Button>
+                      ) : (
+                        <Button 
+                          disabled 
+                          variant="outline" 
+                          className="cursor-not-allowed opacity-75"
+                          title="Order must be completed by supplier before receiving"
+                        >
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          Waiting for Completion
                         </Button>
                       )}
                     </div>
