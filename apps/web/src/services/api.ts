@@ -155,7 +155,10 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'Order', id }],
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'Order', id },
+        'Order', // Also invalidate all orders list
+      ],
     }),
 
     // Supplier endpoints
@@ -351,7 +354,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Receiving', 'RestaurantInventory'],
+      invalidatesTags: ['Receiving', 'RestaurantInventory', 'Order'],
     }),
 
     // Quick Lists endpoints

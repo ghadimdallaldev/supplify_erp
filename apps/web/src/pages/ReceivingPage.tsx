@@ -112,10 +112,17 @@ export function ReceivingPage() {
                           Completed: {new Date(order.created_at).toLocaleString()}
                         </p>
                       </div>
-                      <Button onClick={() => handleReceive(order)}>
-                        <PackageCheck className="h-4 w-4 mr-2" />
-                        Receive Now
-                      </Button>
+                      {order.has_receiving_report ? (
+                        <Button disabled variant="outline">
+                          <PackageCheck className="h-4 w-4 mr-2" />
+                          Received
+                        </Button>
+                      ) : (
+                        <Button onClick={() => handleReceive(order)}>
+                          <PackageCheck className="h-4 w-4 mr-2" />
+                          Receive Now
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>

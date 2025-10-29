@@ -39,6 +39,9 @@ export function OrdersPage() {
     status: status || undefined,
     limit: 100,
     offset: 0,
+  }, {
+    // Refetch when component mounts or when query is invalidated
+    refetchOnMountOrArgChange: true,
   })
   
   const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
@@ -359,7 +362,7 @@ export function OrdersPage() {
                           Mark as Shipped
                         </Button>
                       )}
-                      {isSupplier && order.status === 'SHIPPED' && order.status !== 'COMPLETED' && (
+                      {isSupplier && order.status === 'SHIPPED' && (
                         <Button 
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'COMPLETED')}

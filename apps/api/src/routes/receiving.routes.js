@@ -36,17 +36,23 @@ router.get('/pending-orders', requireAuth, requireRole(['RESTAURANT', 'ADMIN']),
         o.*,
         s.name as supplier_name,
         s.contact_email as supplier_email,
-        COALESCE(rr.id IS NOT NULL, false) as has_receiving_report
+        COALESCE(
+          (SELECT COUNT(*) > 0 
+           FROM receiving_report 
+           WHERE order_id = o.id 
+             AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
+          ), 
+          false
+        ) as has_receiving_report
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id
       JOIN supplier s ON s.id = oi.supplier_id
-      LEFT JOIN receiving_report rr ON rr.order_id = o.id
       WHERE o.restaurant_id = $1 
         AND o.status = 'COMPLETED'
         AND NOT EXISTS (
           SELECT 1 FROM receiving_report 
           WHERE order_id = o.id 
-            AND status IN ('ACCEPTED', 'REJECTED')
+            AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
         )
       ORDER BY o.id, o.created_at DESC
     `, [restaurantId]);
