@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -16,7 +16,22 @@ export function ReceivingPage() {
   const { user } = useAppSelector((state) => state.auth)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [showDialog, setShowDialog] = useState(false)
-  const [receivingOrderIds, setReceivingOrderIds] = useState<Set<string>>(new Set())
+  
+  // Load received order IDs from localStorage on mount
+  const [receivingOrderIds, setReceivingOrderIds] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('receivingOrderIds')
+      return stored ? new Set(JSON.parse(stored)) : new Set()
+    }
+    return new Set()
+  })
+
+  // Update localStorage whenever receivingOrderIds changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('receivingOrderIds', JSON.stringify(Array.from(receivingOrderIds)))
+    }
+  }, [receivingOrderIds])
 
   const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = useGetPendingOrdersForReceivingQuery()
   const { data: historyData, isLoading: historyLoading, refetch: refetchHistory } = useGetReceivingHistoryQuery()
@@ -62,21 +77,10 @@ export function ReceivingPage() {
       const refetchResult = await refetchPending()
       await refetchHistory()
       
-      // Check if order still exists in pending list
-      // If it does, keep it disabled (shouldn't happen but safety check)
-      // The order should be removed by backend filter, but we keep the ID
-      // to prevent any race conditions
-      setTimeout(() => {
-        setReceivingOrderIds(prev => {
-          const next = new Set(prev)
-          // Only remove if order is no longer in pending list
-          const stillPending = refetchResult.data?.orders?.some((o: any) => o.id === orderId)
-          if (!stillPending) {
-            next.delete(orderId)
-          }
-          return next
-        })
-      }, 500)
+      // Don't remove from receivingOrderIds immediately
+      // The order should disappear from pending list due to backend filter
+      // We keep the ID to ensure button stays disabled until order is removed
+      // The useEffect above will clean up IDs when orders disappear from pending list
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
       setReceivingOrderIds(prev => {
@@ -87,10 +91,29 @@ export function ReceivingPage() {
     }
   }
 
-  // Filter out orders that are currently being received
+  // Filter out orders that are currently being received or already received
+  // Also sync receivingOrderIds with backend data - remove IDs for orders that are no longer pending
+  useEffect(() => {
+    if (pendingData?.orders) {
+      setReceivingOrderIds(prev => {
+        const next = new Set(prev)
+        const pendingIds = new Set(pendingData.orders.map((o: any) => o.id))
+        // Remove any IDs that are no longer in pending list (they've been received)
+        let changed = false
+        next.forEach(id => {
+          if (!pendingIds.has(id)) {
+            next.delete(id)
+            changed = true
+          }
+        })
+        return changed ? next : prev
+      })
+    }
+  }, [pendingData?.orders])
+
   const pendingOrders = (pendingData?.orders || []).map((order: any) => ({
     ...order,
-    // Ensure has_receiving_report is true if order is in receivingOrderIds
+    // Ensure has_receiving_report is true if order is in receivingOrderIds or if backend says it has a report
     has_receiving_report: order.has_receiving_report || receivingOrderIds.has(order.id)
   }))
   const historyReports = historyData?.reports || []
