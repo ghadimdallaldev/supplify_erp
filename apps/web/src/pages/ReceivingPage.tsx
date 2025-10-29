@@ -230,7 +230,7 @@ export function ReceivingPage() {
                 // Debug: Log order status to verify it's in the data
                 console.log('Order status debug:', { orderId: order.id, status: order.status, orderKeys: Object.keys(order) })
                 return (
-                <Card key={order.id}>
+                  <Card key={order.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -350,7 +350,8 @@ export function ReceivingPage() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           )}
         </TabsContent>
