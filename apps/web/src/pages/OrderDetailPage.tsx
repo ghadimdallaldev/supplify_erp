@@ -43,7 +43,7 @@ export function OrderDetailPage() {
   const [showPickingNotes, setShowPickingNotes] = useState(false)
   const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
   
-  const { data, isLoading, error } = useGetOrderQuery(id!)
+  const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
   const [updateOrder] = useUpdateOrderMutation()
 
   const getStatusColor = (status: string) => {
@@ -161,7 +161,6 @@ export function OrderDetailPage() {
                   size="sm"
                   variant="default"
                   onClick={() => handleStatusUpdate('COMPLETED')}
-                  disabled={order.status === 'COMPLETED'}
                 >
                   Complete Order
                 </Button>

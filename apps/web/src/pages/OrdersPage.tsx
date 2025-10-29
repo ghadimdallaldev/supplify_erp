@@ -366,7 +366,6 @@ export function OrdersPage() {
                         <Button 
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'COMPLETED')}
-                          disabled={order.status === 'COMPLETED'}
                         >
                           Complete Order
                         </Button>
