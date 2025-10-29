@@ -55,15 +55,28 @@ export function ReceivingPage() {
       toast.success('Receiving report created successfully')
       setShowDialog(false)
       setSelectedOrder(null)
+      
+      // Keep orderId in receivingOrderIds to disable button
+      // It will be removed when order disappears from pending list
       // Wait for refetch to complete to ensure UI updates
-      await refetchPending()
+      const refetchResult = await refetchPending()
       await refetchHistory()
-      // Remove from receiving set after successful refetch
-      setReceivingOrderIds(prev => {
-        const next = new Set(prev)
-        next.delete(orderId)
-        return next
-      })
+      
+      // Check if order still exists in pending list
+      // If it does, keep it disabled (shouldn't happen but safety check)
+      // The order should be removed by backend filter, but we keep the ID
+      // to prevent any race conditions
+      setTimeout(() => {
+        setReceivingOrderIds(prev => {
+          const next = new Set(prev)
+          // Only remove if order is no longer in pending list
+          const stillPending = refetchResult.data?.orders?.some((o: any) => o.id === orderId)
+          if (!stillPending) {
+            next.delete(orderId)
+          }
+          return next
+        })
+      }, 500)
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
       setReceivingOrderIds(prev => {
@@ -74,7 +87,12 @@ export function ReceivingPage() {
     }
   }
 
-  const pendingOrders = pendingData?.orders || []
+  // Filter out orders that are currently being received
+  const pendingOrders = (pendingData?.orders || []).map((order: any) => ({
+    ...order,
+    // Ensure has_receiving_report is true if order is in receivingOrderIds
+    has_receiving_report: order.has_receiving_report || receivingOrderIds.has(order.id)
+  }))
   const historyReports = historyData?.reports || []
 
   return (
@@ -128,14 +146,14 @@ export function ReceivingPage() {
                         </p>
                       </div>
                       {order.has_receiving_report || receivingOrderIds.has(order.id) ? (
-                        <Button disabled variant="outline">
+                        <Button disabled variant="outline" className="cursor-not-allowed">
                           <PackageCheck className="h-4 w-4 mr-2" />
                           {receivingOrderIds.has(order.id) ? 'Processing...' : 'Received'}
                         </Button>
                       ) : (
                         <Button 
                           onClick={() => handleReceive(order)}
-                          disabled={isCreating}
+                          disabled={isCreating || receivingOrderIds.has(order.id)}
                         >
                           <PackageCheck className="h-4 w-4 mr-2" />
                           Receive Now
