@@ -2,7 +2,7 @@
  * E2E Tests for Invoices and Payments System
  */
 
-import { describe, it, expect, beforeAll } from '@jest/globals';
+import { describe, it, expect, beforeAll } from 'vitest';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.API_URL || 'http://localhost:4000';
