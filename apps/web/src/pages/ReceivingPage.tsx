@@ -226,7 +226,10 @@ export function ReceivingPage() {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {pendingOrders.map((order: any) => (
+              {pendingOrders.map((order: any) => {
+                // Debug: Log order status to verify it's in the data
+                console.log('Order status debug:', { orderId: order.id, status: order.status, orderKeys: Object.keys(order) })
+                return (
                 <Card key={order.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
@@ -236,45 +239,65 @@ export function ReceivingPage() {
                           <Badge variant="outline">{order.supplier_name}</Badge>
                           <Badge 
                             variant={
-                              order.status === 'COMPLETED' ? 'default' :
-                              order.status === 'SHIPPED' ? 'secondary' :
-                              order.status === 'PROCESSING' ? 'secondary' :
+                              (order.status?.toUpperCase() || order.status) === 'COMPLETED' ? 'default' :
+                              (order.status?.toUpperCase() || order.status) === 'SHIPPED' ? 'secondary' :
+                              (order.status?.toUpperCase() || order.status) === 'PROCESSING' ? 'secondary' :
                               'outline'
                             }
                           >
-                            {order.status}
+                            {order.status || 'UNKNOWN'}
                           </Badge>
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                           Placed: {new Date(order.created_at).toLocaleString()}
                         </p>
                         {/* Status message explaining why order can't be received */}
-                        {order.status !== 'COMPLETED' && (
+                        {((order.status?.toUpperCase() || order.status) !== 'COMPLETED') && (
                           <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                            {order.status === 'PLACED' && (
-                              <>
-                                <Clock className="h-4 w-4" />
-                                <span>Waiting for supplier to acknowledge order</span>
-                              </>
-                            )}
-                            {order.status === 'ACKNOWLEDGED' && (
-                              <>
-                                <CheckCircle className="h-4 w-4" />
-                                <span>Supplier acknowledged. Order is being prepared.</span>
-                              </>
-                            )}
-                            {order.status === 'PROCESSING' && (
-                              <>
-                                <PackageCheck className="h-4 w-4" />
-                                <span>Supplier is processing your order</span>
-                              </>
-                            )}
-                            {order.status === 'SHIPPED' && (
-                              <>
-                                <Truck className="h-4 w-4" />
-                                <span>Order is in transit. Waiting for supplier to mark as completed.</span>
-                              </>
-                            )}
+                            {(() => {
+                              const status = order.status?.toUpperCase() || order.status
+                              console.log('Rendering status message for:', status, 'order:', order.id)
+                              
+                              if (status === 'PLACED') {
+                                return (
+                                  <>
+                                    <Clock className="h-4 w-4" />
+                                    <span>Waiting for supplier to acknowledge order</span>
+                                  </>
+                                )
+                              }
+                              if (status === 'ACKNOWLEDGED') {
+                                return (
+                                  <>
+                                    <CheckCircle className="h-4 w-4" />
+                                    <span>Supplier acknowledged. Order is being prepared.</span>
+                                  </>
+                                )
+                              }
+                              if (status === 'PROCESSING') {
+                                return (
+                                  <>
+                                    <PackageCheck className="h-4 w-4" />
+                                    <span>Supplier is processing your order</span>
+                                  </>
+                                )
+                              }
+                              if (status === 'SHIPPED') {
+                                return (
+                                  <>
+                                    <Truck className="h-4 w-4" />
+                                    <span>Order is in transit. Waiting for supplier to mark as completed.</span>
+                                  </>
+                                )
+                              }
+                              // Fallback for any other status
+                              return (
+                                <>
+                                  <AlertCircle className="h-4 w-4" />
+                                  <span>Order status: {status}. Waiting for supplier to complete the order.</span>
+                                </>
+                              )
+                            })()}
                           </div>
                         )}
                       </div>
@@ -283,7 +306,7 @@ export function ReceivingPage() {
                           <PackageCheck className="h-4 w-4 mr-2" />
                           Received
                         </Button>
-                      ) : order.status === 'COMPLETED' ? (
+                      ) : ((order.status?.toUpperCase() || order.status) === 'COMPLETED') ? (
                         <Button 
                           onClick={() => handleReceive(order)}
                           disabled={isCreating || receivingOrderIds.has(order.id)}
