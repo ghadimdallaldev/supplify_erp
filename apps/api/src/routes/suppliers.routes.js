@@ -508,13 +508,43 @@ router.post('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req,
         requestId: req.requestId,
       });
     }
+
+    // Check plan limit for suppliers_per_restaurant
+    const { checkLimit } = await import('../lib/subscription.js');
+    const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'suppliers_per_restaurant');
+    
+    // Get current follow count
+    const { rows: followCount } = await query(
+      'SELECT COUNT(*) as count FROM supplier_follow WHERE restaurant_id = $1',
+      [restaurantId]
+    );
+    
+    const currentFollowCount = parseInt(followCount[0]?.count || 0);
+    
+    // Check if within limit (or unlimited)
+    if (!limitCheck.isUnlimited && limitCheck.limit !== null && currentFollowCount >= limitCheck.limit) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'SUPPLIER_FOLLOW_LIMIT_REACHED',
+          message: `You have reached your plan limit for followed suppliers (${limitCheck.limit}). Upgrade your plan to follow more suppliers.`,
+          details: {
+            current: currentFollowCount,
+            limit: limitCheck.limit,
+            requiredPlan: limitCheck.limit === 2 ? 'Bronze' : 'Gold'
+          }
+        },
+        requestId: req.requestId,
+      });
+    }
     
     await query(
       'INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)',
       [id, restaurantId]
     );
     
-    logger.info('Supplier followed', { supplierId: id, restaurantId });
+    logger.info('Supplier followed', { supplierId: id, restaurantId, followCount: currentFollowCount + 1 });
     
     res.json({
       ok: true,
@@ -524,6 +554,12 @@ router.post('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req,
     });
   } catch (error) {
     logger.error('Follow supplier error:', error);
+    
+    // ValidationError is already handled by the error handler middleware
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    
     res.status(500).json({
       ok: false,
       data: null,

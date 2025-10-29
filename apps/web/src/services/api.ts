@@ -175,14 +175,20 @@ export const api = createApi({
         url: `/api/suppliers/${id}/follow`,
         method: 'POST',
       }),
-      invalidatesTags: ['Supplier'],
+      invalidatesTags: (result, error, id) => [
+        { type: 'Supplier', id },
+        'Supplier',
+      ],
     }),
     unfollowSupplier: builder.mutation<any, string>({
       query: (id) => ({
         url: `/api/suppliers/${id}/follow`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Supplier'],
+      invalidatesTags: (result, error, id) => [
+        { type: 'Supplier', id },
+        'Supplier',
+      ],
     }),
 
     // Restaurant endpoints

@@ -14,7 +14,7 @@ export function SupplierDetailPage() {
   const { user } = useAppSelector((state) => state.auth)
   const isRestaurant = user?.role === 'RESTAURANT'
   
-  const { data, isLoading, error } = useGetSupplierQuery(id!)
+  const { data, isLoading, error, refetch } = useGetSupplierQuery(id!)
   const { data: restaurantsData } = useGetRestaurantsQuery()
   const [createConversation, { isLoading: isCreatingConversation }] = useCreateConversationMutation()
   const [followSupplier, { isLoading: isFollowing }] = useFollowSupplierMutation()
@@ -82,6 +82,7 @@ export function SupplierDetailPage() {
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to update follow status')
     }
+    refetch()
   }
 
   return (

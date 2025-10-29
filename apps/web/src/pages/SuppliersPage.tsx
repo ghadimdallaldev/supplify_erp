@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetSuppliersQuery, useGetSupplierFollowsQuery } from '../services/api'
+import { useGetSuppliersQuery, useFollowSupplierMutation, useUnfollowSupplierMutation } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -22,6 +22,9 @@ export function SuppliersPage() {
     limit: 20,
     offset: 0,
   })
+  
+  const [followSupplier] = useFollowSupplierMutation()
+  const [unfollowSupplier] = useUnfollowSupplierMutation()
 
   if (isLoading) {
     return (
@@ -150,8 +153,14 @@ export function SuppliersPage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => {
-                            toast.success('Feature coming soon: Follow supplier')
+                          onClick={async () => {
+                            try {
+                              await followSupplier(supplier.id).unwrap()
+                              toast.success('Supplier followed')
+                              refetch()
+                            } catch (error: any) {
+                              toast.error(error?.data?.error?.message || 'Failed to follow supplier')
+                            }
                           }}
                         >
                           <Heart className="h-4 w-4 mr-1" />
@@ -161,10 +170,17 @@ export function SuppliersPage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => {
-                            toast.success('Feature coming soon: Unfollow supplier')
+                          onClick={async () => {
+                            try {
+                              await unfollowSupplier(supplier.id).unwrap()
+                              toast.success('Supplier unfollowed')
+                              refetch()
+                            } catch (error: any) {
+                              toast.error(error?.data?.error?.message || 'Failed to unfollow supplier')
+                            }
                           }}
                         >
+                          <Heart className="h-4 w-4 mr-1 fill-current" />
                           Unfollow
                         </Button>
                       )}
