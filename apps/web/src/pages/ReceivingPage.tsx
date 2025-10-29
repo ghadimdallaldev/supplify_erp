@@ -78,13 +78,30 @@ export function ReceivingPage() {
       
       // Force refetch history to ensure it appears immediately
       // Add a small delay to ensure the database transaction is fully committed
-      await new Promise(resolve => setTimeout(resolve, 200))
-      const historyResult = await refetchHistory()
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Refetch history multiple times to ensure it updates (sometimes cache needs a few attempts)
+      let historyResult = await refetchHistory()
+      let retries = 0
+      const maxRetries = 3
+      
+      // Check if the new report is in the history, retry if not
+      while (retries < maxRetries) {
+        const reports = historyResult?.data?.reports || []
+        const reportExists = reports.some((r: any) => r.order_id === orderId)
+        
+        if (reportExists) {
+          console.log('✅ Receiving report found in history after', retries + 1, 'attempt(s)')
+          break
+        }
+        
+        // Wait a bit and retry
+        await new Promise(resolve => setTimeout(resolve, 300))
+        historyResult = await refetchHistory()
+        retries++
+      }
       
       // After successful receive, check if order is still in pending list
-      // If it is, it means the backend hasn't filtered it out yet (shouldn't happen but handle it)
-      // In that case, we keep the ID to show "Received" button
-      // If order is gone from pending list, the useEffect will clean it up
       const orderStillPending = refetchResult.data?.orders?.some((o: any) => o.id === orderId)
       if (!orderStillPending) {
         // Order was successfully removed from pending list - clean up the ID immediately
@@ -94,13 +111,11 @@ export function ReceivingPage() {
           return next
         })
       }
-      // If order is still pending, keep it in receivingOrderIds to show "Received" button
       
       // Debug: Log the history result to verify it's updating
       console.log('Receiving history refetch result:', historyResult)
       if (historyResult?.data?.reports) {
         console.log('Receiving history updated:', historyResult.data.reports.length, 'reports')
-        // Check if the new report is in the list
         const reportExists = historyResult.data.reports.some((r: any) => r.order_id === orderId)
         console.log('New report exists in history:', reportExists, 'orderId:', orderId)
       } else {

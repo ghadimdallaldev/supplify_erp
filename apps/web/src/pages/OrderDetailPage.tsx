@@ -78,20 +78,28 @@ export function OrderDetailPage() {
       toast.success(`Order status updated to ${newStatus}`)
       
       // Refetch to get updated data
-      await refetch()
+      const refetchResult = await refetch()
       
-      // For COMPLETED status, keep button disabled (it will be replaced by the disabled "Completed" button)
-      // For other statuses, clear the updating state
-      if (newStatus !== 'COMPLETED') {
-        setIsUpdating(false)
-      }
-      // Note: For COMPLETED, we don't clear isUpdating immediately
-      // The button will be replaced by the disabled "Completed" button once order.status === 'COMPLETED'
-      // But we'll clear it after a short delay as a safety measure
+      // For COMPLETED status, verify the order is actually completed before clearing updating state
       if (newStatus === 'COMPLETED') {
-        setTimeout(() => {
+        if (refetchResult.data?.status === 'COMPLETED') {
+          // Order is confirmed as COMPLETED, clear updating state
           setIsUpdating(false)
-        }, 1000)
+        } else {
+          // Status not updated yet, wait and retry
+          setTimeout(async () => {
+            const retryRefetch = await refetch()
+            if (retryRefetch.data?.status === 'COMPLETED') {
+              setIsUpdating(false)
+            } else {
+              // Still not updated, clear anyway after delay (button will be hidden once status changes)
+              setTimeout(() => setIsUpdating(false), 2000)
+            }
+          }, 500)
+        }
+      } else {
+        // For other statuses, clear immediately
+        setIsUpdating(false)
       }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to update order status')
