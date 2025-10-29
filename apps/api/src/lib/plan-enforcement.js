@@ -1,6 +1,6 @@
 // Plan enforcement utilities for branches and warehouses
-const { query } = require('./db');
-const logger = require('./logger');
+import { query } from './db.js';
+import { logger } from './logger.js';
 
 /**
  * Check if a tenant can create a branch (restaurants only)
@@ -194,7 +194,7 @@ async function createAuditLog(action, details) {
   }
 }
 
-module.exports = {
+export {
   checkBranchLimit,
   checkWarehouseLimit,
   createAuditLog

@@ -1,9 +1,9 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const { requireAuth, requireRole } = require('../lib/auth');
-const { query } = require('../lib/db');
-const logger = require('../lib/logger');
-const { checkBranchLimit, createAuditLog } = require('../lib/plan-enforcement');
+import { requireAuth, requireRole } from '../lib/rbac.js';
+import { query } from '../lib/db.js';
+import { logger } from '../lib/logger.js';
+import { checkBranchLimit, createAuditLog } from '../lib/plan-enforcement.js';
 
 /**
  * GET /api/branches
@@ -234,5 +234,5 @@ router.delete('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (
   }
 });
 
-module.exports = router;
+export default router;
 
