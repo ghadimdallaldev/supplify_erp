@@ -503,6 +503,11 @@ router.post('/conversations/:conversationId/messages', requireAuth, requireRole(
       
       const message = messages[0];
       
+      // Increment chat usage after successful message
+      if (tenantId && tenantType) {
+        await incrementUsage(tenantId, tenantType, 'chats_per_day', 1);
+      }
+      
       // Add attachments if any
       if (messageData.attachments && messageData.attachments.length > 0) {
         for (const attachment of messageData.attachments) {
@@ -547,9 +552,18 @@ router.post('/conversations/:conversationId/messages', requireAuth, requireRole(
         actor: req.userData.id 
       });
       
+      // Include warning in response if applicable
+      const responseData = { message: fullMessages[0] };
+      if (req.chatWarning) {
+        responseData.warning = {
+          message: `You've used ${req.chatWarningPercent.toFixed(0)}% of your daily chat limit. Consider upgrading your plan.`,
+          usagePercent: req.chatWarningPercent
+        };
+      }
+      
       res.status(201).json({
         ok: true,
-        data: { message: fullMessages[0] },
+        data: responseData,
         error: null,
         requestId: req.requestId,
       });
