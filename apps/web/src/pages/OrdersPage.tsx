@@ -394,24 +394,30 @@ export function OrdersPage() {
                           Mark as Shipped
                         </Button>
                       )}
-                      {isSupplier && order.status === 'SHIPPED' && (
+                      {isSupplier && order.status === 'SHIPPED' && updatingOrderId !== order.id && (
                         <Button 
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'COMPLETED')}
-                          disabled={updatingOrderId === order.id || order.status === 'COMPLETED'}
-                          className={updatingOrderId === order.id ? 'cursor-not-allowed opacity-75' : ''}
+                          disabled={false}
                         >
-                          {updatingOrderId === order.id ? 'Completing...' : 'Complete Order'}
+                          Complete Order
                         </Button>
                       )}
-                      {isSupplier && order.status === 'COMPLETED' && (
+                      {isSupplier && (updatingOrderId === order.id || order.status === 'COMPLETED') && (
                         <Button 
                           size="sm"
-                          variant="outline"
+                          variant={order.status === 'COMPLETED' ? 'outline' : 'default'}
                           disabled
+                          className="cursor-not-allowed opacity-75"
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Completed
+                          {updatingOrderId === order.id ? (
+                            <>Completing...</>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Completed
+                            </>
+                          )}
                         </Button>
                       )}
                       <Button variant="outline" size="sm" asChild>

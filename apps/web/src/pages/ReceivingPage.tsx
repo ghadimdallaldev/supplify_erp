@@ -73,53 +73,64 @@ export function ReceivingPage() {
       setShowDialog(false)
       setSelectedOrder(null)
       
-      // Refetch to update pending list and history (cache invalidation should also trigger refetch)
-      const refetchResult = await refetchPending()
+      // Wait a moment for database transaction to commit
+      await new Promise(resolve => setTimeout(resolve, 500))
       
-      // Force refetch history to ensure it appears immediately
-      // Add a small delay to ensure the database transaction is fully committed
-      await new Promise(resolve => setTimeout(resolve, 300))
+      // Refetch both pending and history
+      const [refetchPendingResult, refetchHistoryResult] = await Promise.all([
+        refetchPending(),
+        refetchHistory()
+      ])
       
-      // Refetch history multiple times to ensure it updates (sometimes cache needs a few attempts)
-      let historyResult = await refetchHistory()
+      // Check if order is now in history - retry if not found
+      let historyCheckResult = refetchHistoryResult
+      let reports = historyCheckResult?.data?.reports || []
+      let reportFound = reports.some((r: any) => r.order_id === orderId)
       let retries = 0
-      const maxRetries = 3
+      const maxRetries = 5
       
-      // Check if the new report is in the history, retry if not
-      while (retries < maxRetries) {
-        const reports = historyResult?.data?.reports || []
-        const reportExists = reports.some((r: any) => r.order_id === orderId)
+      while (!reportFound && retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        const retryResult = await refetchHistory()
+        reports = retryResult?.data?.reports || []
+        reportFound = reports.some((r: any) => r.order_id === orderId)
         
-        if (reportExists) {
-          console.log('✅ Receiving report found in history after', retries + 1, 'attempt(s)')
+        if (reportFound) {
+          console.log('✅ Receiving report found in history after', retries + 1, 'retry attempt(s)')
+          historyCheckResult = retryResult
           break
         }
-        
-        // Wait a bit and retry
-        await new Promise(resolve => setTimeout(resolve, 300))
-        historyResult = await refetchHistory()
         retries++
       }
       
-      // After successful receive, check if order is still in pending list
-      const orderStillPending = refetchResult.data?.orders?.some((o: any) => o.id === orderId)
-      if (!orderStillPending) {
-        // Order was successfully removed from pending list - clean up the ID immediately
+      // Debug logs
+      console.log('Receiving history check:', {
+        reportFound,
+        retries,
+        totalReports: reports.length,
+        orderId,
+        reportIds: reports.map((r: any) => r.order_id).slice(0, 5)
+      })
+      
+      // Order will be automatically removed from pending list by backend filter
+      // Keep it in receivingOrderIds if it's still in pending OR if it's not yet in history
+      const orderStillPending = refetchPendingResult.data?.orders?.some((o: any) => o.id === orderId)
+      
+      if (!orderStillPending && reportFound) {
+        // Order is gone from pending AND found in history - success!
         setReceivingOrderIds(prev => {
           const next = new Set(prev)
           next.delete(orderId)
           return next
         })
-      }
-      
-      // Debug: Log the history result to verify it's updating
-      console.log('Receiving history refetch result:', historyResult)
-      if (historyResult?.data?.reports) {
-        console.log('Receiving history updated:', historyResult.data.reports.length, 'reports')
-        const reportExists = historyResult.data.reports.some((r: any) => r.order_id === orderId)
-        console.log('New report exists in history:', reportExists, 'orderId:', orderId)
+        console.log('✅ Order successfully received and removed from pending')
+      } else if (!reportFound) {
+        // Report not found in history - something went wrong
+        console.error('⚠️ Receiving report not found in history after', maxRetries, 'retries')
+        // Keep it in receivingOrderIds to show "Processing..." state
       } else {
-        console.log('No reports in history result, data structure:', historyResult?.data)
+        // Order still in pending but we created report - keep showing processing state
+        console.log('Order still in pending list, keeping in receivingOrderIds')
       }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')

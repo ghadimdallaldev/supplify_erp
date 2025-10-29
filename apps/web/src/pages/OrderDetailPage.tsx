@@ -185,25 +185,31 @@ export function OrderDetailPage() {
                   Mark as Shipped
                 </Button>
               )}
-              {order.status === 'SHIPPED' && (
+              {order.status === 'SHIPPED' && !isUpdating && (
                 <Button 
                   size="sm"
                   variant="default"
                   onClick={() => handleStatusUpdate('COMPLETED')}
-                  disabled={isUpdating || order.status === 'COMPLETED'}
-                  className={isUpdating ? 'cursor-not-allowed opacity-75' : ''}
+                  disabled={false}
                 >
-                  {isUpdating ? 'Completing...' : 'Complete Order'}
+                  Complete Order
                 </Button>
               )}
-              {order.status === 'COMPLETED' && (
+              {(isUpdating || order.status === 'COMPLETED') && (
                 <Button 
                   size="sm"
-                  variant="outline"
+                  variant={order.status === 'COMPLETED' ? 'outline' : 'default'}
                   disabled
+                  className="cursor-not-allowed opacity-75"
                 >
-                  <Check className="h-4 w-4 mr-1" />
-                  Completed
+                  {isUpdating ? (
+                    <>Completing...</>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 mr-1" />
+                      Completed
+                    </>
+                  )}
                 </Button>
               )}
             </div>
