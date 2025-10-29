@@ -70,13 +70,29 @@ export function OrderDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   
   const handleStatusUpdate = async (newStatus: string) => {
-    if (!id || isUpdating) return
+    if (!id || isUpdating) return // Prevent multiple clicks
+    
     try {
       setIsUpdating(true)
       await updateOrder({ id, data: { status: newStatus } }).unwrap()
       toast.success(`Order status updated to ${newStatus}`)
-      await refetch() // Refresh order data to show updated status
-      setIsUpdating(false)
+      
+      // Refetch to get updated data
+      await refetch()
+      
+      // For COMPLETED status, keep button disabled (it will be replaced by the disabled "Completed" button)
+      // For other statuses, clear the updating state
+      if (newStatus !== 'COMPLETED') {
+        setIsUpdating(false)
+      }
+      // Note: For COMPLETED, we don't clear isUpdating immediately
+      // The button will be replaced by the disabled "Completed" button once order.status === 'COMPLETED'
+      // But we'll clear it after a short delay as a safety measure
+      if (newStatus === 'COMPLETED') {
+        setTimeout(() => {
+          setIsUpdating(false)
+        }, 1000)
+      }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to update order status')
       setIsUpdating(false)
@@ -167,6 +183,7 @@ export function OrderDetailPage() {
                   variant="default"
                   onClick={() => handleStatusUpdate('COMPLETED')}
                   disabled={isUpdating || order.status === 'COMPLETED'}
+                  className={isUpdating ? 'cursor-not-allowed opacity-75' : ''}
                 >
                   {isUpdating ? 'Completing...' : 'Complete Order'}
                 </Button>
