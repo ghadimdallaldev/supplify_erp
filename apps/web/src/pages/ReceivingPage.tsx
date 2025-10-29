@@ -75,7 +75,10 @@ export function ReceivingPage() {
       
       // Refetch to update pending list and history (cache invalidation should also trigger refetch)
       const refetchResult = await refetchPending()
+      
       // Force refetch history to ensure it appears immediately
+      // Add a small delay to ensure the database transaction is fully committed
+      await new Promise(resolve => setTimeout(resolve, 200))
       const historyResult = await refetchHistory()
       
       // After successful receive, check if order is still in pending list
@@ -93,9 +96,15 @@ export function ReceivingPage() {
       }
       // If order is still pending, keep it in receivingOrderIds to show "Received" button
       
-      // Verify history was updated (for debugging - can be removed)
-      if (historyResult.data?.reports) {
+      // Debug: Log the history result to verify it's updating
+      console.log('Receiving history refetch result:', historyResult)
+      if (historyResult?.data?.reports) {
         console.log('Receiving history updated:', historyResult.data.reports.length, 'reports')
+        // Check if the new report is in the list
+        const reportExists = historyResult.data.reports.some((r: any) => r.order_id === orderId)
+        console.log('New report exists in history:', reportExists, 'orderId:', orderId)
+      } else {
+        console.log('No reports in history result, data structure:', historyResult?.data)
       }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
@@ -138,6 +147,14 @@ export function ReceivingPage() {
       })
     }
   }, [pendingData?.orders])
+
+  // Debug: Monitor historyData changes
+  useEffect(() => {
+    console.log('historyData changed:', historyData)
+    if (historyData?.reports) {
+      console.log('History reports count:', historyData.reports.length)
+    }
+  }, [historyData])
 
   const pendingOrders = (pendingData?.orders || []).map((order: any) => ({
     ...order,

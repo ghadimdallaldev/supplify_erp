@@ -359,6 +359,15 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Receiving', 'RestaurantInventory', 'Order'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          // Force immediate refetch of receiving history
+          dispatch(api.util.invalidateTags(['Receiving']))
+        } catch {
+          // Error will be handled by the component
+        }
+      },
     }),
 
     // Quick Lists endpoints
