@@ -18,7 +18,7 @@ export function Header() {
   const { data: notificationsData, refetch: refetchNotifications } = useGetNotificationsQuery(
     { limit: 10, offset: 0 },
     { 
-      pollingInterval: 30000, // Poll every 30 seconds
+      pollingInterval: 60000, // Poll every 60 seconds (reduced from 30)
       skip: !user // Skip if not logged in
     }
   )

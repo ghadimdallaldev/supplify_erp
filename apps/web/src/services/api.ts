@@ -73,6 +73,8 @@ export const api = createApi({
     getMe: builder.query<User, void>({
       query: () => '/auth/me',
       providesTags: ['User'],
+      // Cache for 5 minutes to reduce requests
+      keepUnusedDataFor: 300,
     }),
     logout: builder.mutation<void, void>({
       query: () => ({

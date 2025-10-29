@@ -13,7 +13,12 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { data, error, isLoading } = useGetMeQuery()
+  // Disable refetch on mount/focus to reduce requests, only fetch once
+  const { data, error, isLoading } = useGetMeQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: true, // Only refetch on reconnect
+  })
 
   useEffect(() => {
     if (isLoading) {
