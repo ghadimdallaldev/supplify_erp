@@ -69,19 +69,28 @@ export function ReceivingPage() {
         receivedBy: user?.id,
       }).unwrap()
 
-      // Receiving report created successfully - the order should be filtered out by backend
-      // but we keep it in receivingOrderIds to ensure button stays disabled
-      // It will be cleaned up by useEffect when order disappears from pending list
       toast.success('Receiving report created successfully')
       setShowDialog(false)
       setSelectedOrder(null)
       
       // Refetch to update pending list (order should be removed by backend filter)
-      await refetchPending()
+      const refetchResult = await refetchPending()
       await refetchHistory()
       
-      // Note: receivingOrderIds keeps the orderId to ensure button stays disabled
-      // The cleanup useEffect will remove it when order is no longer in pending list
+      // After successful receive, check if order is still in pending list
+      // If it is, it means the backend hasn't filtered it out yet (shouldn't happen but handle it)
+      // In that case, we keep the ID to show "Received" button
+      // If order is gone from pending list, the useEffect will clean it up
+      const orderStillPending = refetchResult.data?.orders?.some((o: any) => o.id === orderId)
+      if (!orderStillPending) {
+        // Order was successfully removed from pending list - clean up the ID immediately
+        setReceivingOrderIds(prev => {
+          const next = new Set(prev)
+          next.delete(orderId)
+          return next
+        })
+      }
+      // If order is still pending, keep it in receivingOrderIds to show "Received" button
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
       // Remove from receivingOrderIds on error
