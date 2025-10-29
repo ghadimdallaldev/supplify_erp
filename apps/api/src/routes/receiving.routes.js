@@ -235,6 +235,18 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         }
       }
 
+      // Create invoice if it doesn't exist for this order
+      const { createInvoiceFromOrder } = await import('./orders.routes.js');
+      // Get order items for invoice creation
+      const { rows: orderItems } = await client.query(`
+        SELECT oi.*, p.name as product_name
+        FROM order_item oi
+        JOIN product p ON p.id = oi.product_id
+        WHERE oi.order_id = $1
+      `, [orderId]);
+      
+      await createInvoiceFromOrder(order, orderItems, supplierId, client);
+
       return report;
     });
 

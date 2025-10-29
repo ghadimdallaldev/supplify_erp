@@ -134,17 +134,31 @@ export async function checkLimit(tenantId, tenantType, meterType) {
       };
     }
 
-    // Get current usage from usage_meter
-    const { rows: usage } = await query(`
-      SELECT current_value
-      FROM usage_meter
-      WHERE tenant_id = $1 
-        AND tenant_type = $2 
-        AND meter_type = $3
-        AND period_start_date = CURRENT_DATE
-    `, [tenantId, tenantType, meterType]);
+    // Get current usage
+    let current = 0;
+    if (meterType === 'products' && tenantType === 'RESTAURANT') {
+      // For restaurants, products = distinct products in restaurant_inventory
+      const { rows: productCount } = await query(`
+        SELECT COUNT(DISTINCT product_id) as count
+        FROM restaurant_inventory
+        WHERE restaurant_id = $1
+      `, [tenantId]);
+      current = parseInt(productCount[0]?.count || 0);
+    } else {
+      // For other metrics, use usage_meter
+      // Daily metrics use CURRENT_DATE, cumulative metrics might use different periods
+      const { rows: usage } = await query(`
+        SELECT current_value
+        FROM usage_meter
+        WHERE tenant_id = $1 
+          AND tenant_type = $2 
+          AND meter_type = $3
+          AND period_start_date = CURRENT_DATE
+      `, [tenantId, tenantType, meterType]);
+      
+      current = usage.length > 0 ? parseInt(usage[0].current_value || 0) : 0;
+    }
 
-    const current = usage.length > 0 ? parseInt(usage[0].current_value || 0) : 0;
     const effectiveLimit = limit;
 
     return {

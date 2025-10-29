@@ -95,7 +95,7 @@ export function SubscriptionInfo() {
                 </span>
               </div>
               <Progress 
-                value={(productsUsage.current / limits.products) * 100} 
+                value={limits.products > 0 ? (productsUsage.current / limits.products) * 100 : 0} 
                 className={productsUsage.isOverLimit ? 'bg-red-200' : ''}
               />
               {productsUsage.isOverLimit && (
@@ -117,9 +117,15 @@ export function SubscriptionInfo() {
                 </span>
               </div>
               <Progress 
-                value={(ordersUsage.current / limits.orders_per_day) * 100}
+                value={limits.orders_per_day > 0 && ordersUsage.current > 0 ? (ordersUsage.current / limits.orders_per_day) * 100 : 0}
                 className={ordersUsage.isOverLimit ? 'bg-red-200' : ''}
               />
+              {ordersUsage.isOverLimit && (
+                <div className="flex items-center gap-2 text-sm text-red-600">
+                  <AlertCircle className="w-4 h-4" />
+                  Limit exceeded
+                </div>
+              )}
             </div>
           )}
 

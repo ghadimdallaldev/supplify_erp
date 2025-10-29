@@ -42,7 +42,7 @@ const orderListSchema = z.object({
 });
 
 // Helper function to create invoice from delivered order
-async function createInvoiceFromOrder(order, orderItems, supplierId, client) {
+export async function createInvoiceFromOrder(order, orderItems, supplierId, client) {
   try {
     // Check if invoice already exists for this order
     const { rows: existingInvoices } = await client.query(`
