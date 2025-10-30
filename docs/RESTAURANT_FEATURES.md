@@ -707,6 +707,15 @@ Display History:
 - **Draft Orders**: Create orders as DRAFT before placing
 - **Packing Slip**: Download packing slip data (JSON format, PDF planned)
 
+#### ✅ Order Reminders
+- Send reminders to suppliers for unacknowledged orders
+- Reminder button available on orders with status PLACED
+- Reminder count tracking (shows number of reminders sent)
+- Notifications sent to suppliers when reminder is triggered
+- **API Endpoint**: `POST /api/orders/:id/remind`
+- **Usage**: Restaurants can send friendly reminders if an order hasn't been acknowledged
+- Reminders tracked per order (`reminder_count`, `last_reminder_sent_at`)
+
 ---
 
 ## 8️⃣ CHAT & COMMUNICATION
@@ -824,6 +833,7 @@ Display History:
 16. ✅ **Draft Orders** - Create orders as drafts before placing
 17. ✅ **Notifications System** - In-app notifications with bell icon
 18. ✅ **Extended Session Timeout** - 1 hour session (was 5 minutes)
+19. ✅ **Order Reminders** - Send reminders to suppliers for unacknowledged orders
 
 ### Partially Implemented 🔄:
 1. 🔄 Supplier Discovery (needs follow/block functionality)

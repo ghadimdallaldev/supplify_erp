@@ -25,11 +25,49 @@ const productUpdateSchema = productCreateSchema.partial();
 
 const productListSchema = z.object({
   q: z.string().optional(),
-  category: z.string().optional(),
+  category: z.string().optional(), // Support both old category and category_id
+  categoryId: z.string().uuid().optional(),
+  tags: z.string().optional(), // Comma-separated tags
   supplier: z.string().uuid().optional(),
   inStock: z.string().transform(val => val === 'true').optional(),
+  minPrice: z.string().transform(val => val ? parseFloat(val) : undefined).optional(),
+  maxPrice: z.string().transform(val => val ? parseFloat(val) : undefined).optional(),
   limit: z.string().transform(val => parseInt(val, 10)).default('20'),
   offset: z.string().transform(val => parseInt(val, 10)).default('0'),
+});
+
+// Get product categories
+router.get('/categories', async (req, res) => {
+  try {
+    const { rows: categories } = await query(`
+      SELECT id, name, slug, description, display_order
+      FROM product_category
+      WHERE is_active = true
+      ORDER BY display_order, name
+    `);
+    
+    return res.json({ ok: true, data: { categories }, error: null, requestId: req.requestId });
+  } catch (error) {
+    logger.warn('Categories unavailable, returning empty list:', error.message);
+    return res.json({ ok: true, data: { categories: [] }, error: null, requestId: req.requestId });
+  }
+});
+
+// Get available tags (from all products)
+router.get('/tags', async (req, res) => {
+  try {
+    const { rows: tags } = await query(`
+      SELECT DISTINCT tag
+      FROM product, jsonb_array_elements_text(tags) AS tag
+      WHERE tags IS NOT NULL AND jsonb_array_length(tags) > 0
+      ORDER BY tag
+    `);
+    
+    return res.json({ ok: true, data: { tags: tags.map(t => t.tag) }, error: null, requestId: req.requestId });
+  } catch (error) {
+    logger.warn('Tags unavailable, returning empty list:', error.message);
+    return res.json({ ok: true, data: { tags: [] }, error: null, requestId: req.requestId });
+  }
 });
 
 // List products with filters
@@ -48,11 +86,29 @@ router.get('/', async (req, res) => {
       paramIndex++;
     }
     
-    // Category filter
-    if (params.category) {
+    // Category filter (support both old category field and new category_id)
+    if (params.categoryId) {
+      whereConditions.push(`p.category_id = $${paramIndex}`);
+      queryParams.push(params.categoryId);
+      paramIndex++;
+    } else if (params.category) {
+      // Fallback to plain category text match only to avoid dependency on product_category
       whereConditions.push(`p.category = $${paramIndex}`);
       queryParams.push(params.category);
       paramIndex++;
+    }
+    
+    // Tags filter (check if any tag in the array matches)
+    if (params.tags) {
+      const tagsArray = params.tags.split(',').map(t => t.trim()).filter(t => t);
+      if (tagsArray.length > 0) {
+        // Check if product tags JSONB array contains any of the specified tags
+        // Using jsonb_exists_any operator (checks if any key in array exists in JSONB)
+        // Convert tags array to PostgreSQL array format
+        whereConditions.push(`p.tags ?| $${paramIndex}::text[]`);
+        queryParams.push(tagsArray);
+        paramIndex++;
+      }
     }
     
     // Supplier filter
@@ -62,9 +118,21 @@ router.get('/', async (req, res) => {
       paramIndex++;
     }
     
+    // Price range filter
+    if (params.minPrice !== undefined) {
+      whereConditions.push(`pr.amount >= $${paramIndex}`);
+      queryParams.push(params.minPrice);
+      paramIndex++;
+    }
+    if (params.maxPrice !== undefined) {
+      whereConditions.push(`pr.amount <= $${paramIndex}`);
+      queryParams.push(params.maxPrice);
+      paramIndex++;
+    }
+    
     // In stock filter
     if (params.inStock) {
-      whereConditions.push(`i.available_qty > 0`);
+      whereConditions.push(`inv.total_available > 0`);
     }
     
     const whereClause = whereConditions.length > 0 
@@ -271,24 +339,31 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
     await query('BEGIN');
     
     try {
+      // Parse tags from request (can be array or comma-separated string)
+      const tagsArray = req.body.tags 
+        ? (Array.isArray(req.body.tags) ? req.body.tags : req.body.tags.split(',').map(t => t.trim()).filter(t => t))
+        : [];
+      
       // Create product
       const { rows } = await query(`
         INSERT INTO product (
           supplier_id, sku, name, name_ar, description, description_ar,
-          brand, category, image_url, unit
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          brand, category, category_id, tags, image_url, unit
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)
         RETURNING *
       `, [
         supplierId,
         productData.sku,
         productData.name,
-        productData.name_ar,
-        productData.description,
-        productData.description_ar,
-        productData.brand,
-        productData.category,
-        productData.image_url,
-        productData.unit,
+        productData.name_ar || null,
+        productData.description || null,
+        productData.description_ar || null,
+        productData.brand || null,
+        productData.category || null,
+        req.body.category_id || null,
+        JSON.stringify(tagsArray),
+        productData.image_url || null,
+        productData.unit || null,
       ]);
       
       const product = rows[0];
@@ -395,8 +470,25 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     const updateValues = [];
     let paramIndex = 1;
     
+    // Handle tags separately (convert to JSONB)
+    if (req.body.tags !== undefined) {
+      const tagsArray = Array.isArray(req.body.tags) 
+        ? req.body.tags 
+        : (typeof req.body.tags === 'string' ? req.body.tags.split(',').map(t => t.trim()).filter(t => t) : []);
+      updateFields.push(`tags = $${paramIndex}::jsonb`);
+      updateValues.push(JSON.stringify(tagsArray));
+      paramIndex++;
+    }
+    
+    // Handle category_id separately
+    if (req.body.category_id !== undefined) {
+      updateFields.push(`category_id = $${paramIndex}`);
+      updateValues.push(req.body.category_id || null);
+      paramIndex++;
+    }
+    
     Object.entries(updateData).forEach(([key, value]) => {
-      if (value !== undefined) {
+      if (value !== undefined && key !== 'tags' && key !== 'category_id') {
         updateFields.push(`${key} = $${paramIndex}`);
         updateValues.push(value);
         paramIndex++;

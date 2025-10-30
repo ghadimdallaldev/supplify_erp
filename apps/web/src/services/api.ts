@@ -113,6 +113,14 @@ export const api = createApi({
       }),
       providesTags: ['Product'],
     }),
+    getProductCategories: builder.query<{ categories: Array<{ id: string; name: string; slug: string; description?: string; display_order: number }> }, void>({
+      query: () => '/api/products/categories',
+      providesTags: ['Product'],
+    }),
+    getProductTags: builder.query<{ tags: string[] }, void>({
+      query: () => '/api/products/tags',
+      providesTags: ['Product'],
+    }),
     getProduct: builder.query<Product, string>({
       query: (id) => `/api/products/${id}`,
       providesTags: (result, error, id) => [{ type: 'Product', id }],
@@ -190,6 +198,17 @@ export const api = createApi({
         }
         return tags
       },
+    }),
+    sendOrderReminder: builder.mutation<{ order: Order; message: string }, string>({
+      query: (id) => ({
+        url: `/api/orders/${id}/remind`,
+        method: 'POST',
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: 'Order', id },
+        'Order',
+        'Notification',
+      ],
     }),
 
     // Supplier endpoints
@@ -678,6 +697,8 @@ export const {
   useGetMeQuery,
   useLogoutMutation,
   useGetProductsQuery,
+  useGetProductCategoriesQuery,
+  useGetProductTagsQuery,
   useGetProductQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
@@ -686,6 +707,7 @@ export const {
   useCreateOrderMutation,
   useCreateManualOrderMutation,
   useUpdateOrderMutation,
+  useSendOrderReminderMutation,
   useGetSuppliersQuery,
   useGetSupplierQuery,
   useFollowSupplierMutation,
@@ -719,6 +741,7 @@ export const {
   useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
   useAdjustRestaurantInventoryMutation,
+  useGetReorderSuggestionsQuery,
   useGetPendingOrdersForReceivingQuery,
   useGetReceivingHistoryQuery,
   useCreateReceivingReportMutation,

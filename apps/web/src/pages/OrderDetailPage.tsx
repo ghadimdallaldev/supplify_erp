@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useGetOrderQuery, useUpdateOrderMutation, useGetOrderInvoicesQuery } from '../services/api'
+import { useGetOrderQuery, useUpdateOrderMutation, useGetOrderInvoicesQuery, useSendOrderReminderMutation } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -46,6 +46,7 @@ export function OrderDetailPage() {
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
   const { data: invoicesData, isLoading: isLoadingInvoices, refetch: refetchInvoices } = useGetOrderInvoicesQuery(id!, { skip: !id })
   const [updateOrder] = useUpdateOrderMutation()
+  const [sendReminder, { isLoading: isSendingReminder }] = useSendOrderReminderMutation()
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -106,6 +107,18 @@ export function OrderDetailPage() {
     toast.success('Preparing packing slip for printing...')
   }
 
+  const handleSendReminder = async () => {
+    if (!id || isSendingReminder) return
+    
+    try {
+      await sendReminder(id).unwrap()
+      toast.success('Reminder sent to supplier successfully')
+      refetch() // Refresh order data to update reminder count
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to send reminder')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -144,6 +157,17 @@ export function OrderDetailPage() {
           <Badge variant={getStatusColor(order.status)} className="text-lg px-3 py-1">
             {order.status}
           </Badge>
+          {!isSupplier && order.status === 'PLACED' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSendReminder}
+              disabled={isSendingReminder}
+            >
+              <AlertCircle className="h-4 w-4 mr-2" />
+              {isSendingReminder ? 'Sending...' : order.reminder_count > 0 ? `Send Reminder (${order.reminder_count})` : 'Send Reminder'}
+            </Button>
+          )}
           {isSupplier && (
             <div className="flex gap-2 ml-4">
               {order.status === 'PLACED' && (

@@ -144,6 +144,24 @@ export async function checkLimit(tenantId, tenantType, meterType) {
         WHERE restaurant_id = $1
       `, [tenantId]);
       current = parseInt(productCount[0]?.count || 0);
+    } else if (meterType === 'orders_per_day' && tenantType === 'RESTAURANT') {
+      // For restaurants, orders_per_day = count of PLACED orders today
+      const { rows: orderCount } = await query(`
+        SELECT COUNT(*) as count
+        FROM customer_order
+        WHERE restaurant_id = $1
+          AND status = 'PLACED'
+          AND DATE(placed_at) = CURRENT_DATE
+      `, [tenantId]);
+      current = parseInt(orderCount[0]?.count || 0);
+    } else if (meterType === 'products' && tenantType === 'SUPPLIER') {
+      // For suppliers, products = count of products they own
+      const { rows: productCount } = await query(`
+        SELECT COUNT(*) as count
+        FROM product
+        WHERE supplier_id = $1
+      `, [tenantId]);
+      current = parseInt(productCount[0]?.count || 0);
     } else {
       // For other metrics, use usage_meter
       // Daily metrics use CURRENT_DATE, cumulative metrics might use different periods

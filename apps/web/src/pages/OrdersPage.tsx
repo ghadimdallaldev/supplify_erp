@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGetOrdersQuery, useUpdateOrderMutation, useCreateManualOrderMutation, useGetRestaurantsQuery, useGetProductsQuery } from '../services/api'
+import { useGetOrdersQuery, useUpdateOrderMutation, useCreateManualOrderMutation, useGetRestaurantsQuery, useGetProductsQuery, useSendOrderReminderMutation } from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -17,6 +17,7 @@ import {
   Clock,
   Filter,
   Plus,
+  AlertCircle,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
@@ -48,6 +49,7 @@ export function OrdersPage() {
   const { data: productsData } = useGetProductsQuery({ limit: 1000 })
   const [updateOrder] = useUpdateOrderMutation()
   const [createManualOrder, { isLoading: isCreatingManualOrder }] = useCreateManualOrderMutation()
+  const [sendReminder] = useSendOrderReminderMutation()
 
   const handleAddProductToOrder = (product: any) => {
     const existingItem = manualOrderItems.find(item => item.productId === product.id)
@@ -179,6 +181,16 @@ export function OrdersPage() {
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to update order status')
       setUpdatingOrderId(null)
+    }
+  }
+
+  const handleSendReminder = async (orderId: string) => {
+    try {
+      await sendReminder(orderId).unwrap()
+      toast.success('Reminder sent to supplier successfully')
+      refetch() // Refresh orders to update reminder count
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to send reminder')
     }
   }
 
@@ -410,6 +422,16 @@ export function OrdersPage() {
                               Completed
                             </>
                           )}
+                        </Button>
+                      )}
+                      {!isSupplier && order.status === 'PLACED' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSendReminder(order.id)}
+                        >
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          {order.reminder_count > 0 ? `Remind (${order.reminder_count})` : 'Send Reminder'}
                         </Button>
                       )}
                       <Button variant="outline" size="sm" asChild>

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useGetProductsQuery, useCreateProductMutation, useGeneratePresignedUrlMutation, useGetWarehousesQuery, useGetSuppliersQuery } from '../services/api'
+import { useState, useMemo } from 'react'
+import { useGetProductsQuery, useGetProductCategoriesQuery, useGetProductTagsQuery, useCreateProductMutation, useGeneratePresignedUrlMutation, useGetWarehousesQuery, useGetSuppliersQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -23,6 +23,10 @@ import {
 export function ProductsPage() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
@@ -41,12 +45,15 @@ export function ProductsPage() {
     sku: '',
     description: '',
     category: '',
+    category_id: '',
+    tags: [] as string[],
     unit: '',
     price: '',
     initialStock: '',
     image_url: '',
     warehouse_id: '',
   })
+  const [newTag, setNewTag] = useState('')
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
@@ -54,13 +61,6 @@ export function ProductsPage() {
   
   // Check if user is a supplier
   const isSupplier = user?.role === 'SUPPLIER'
-
-  const { data, isLoading, error } = useGetProductsQuery({
-    q: search || undefined,
-    category: category || undefined,
-    limit: 20,
-    offset: 0,
-  })
   
   // Fetch warehouses only for suppliers (warehouse selection in product creation)
   const { data: warehousesData } = useGetWarehousesQuery(undefined, {
@@ -72,17 +72,35 @@ export function ProductsPage() {
     skip: isSupplier // Skip if supplier
   })
   
+  // Fetch categories and tags
+  const { data: categoriesData } = useGetProductCategoriesQuery()
+  const { data: tagsData } = useGetProductTagsQuery()
+  
   // Use API suppliers if available, otherwise fall back to unique suppliers from products
   const uniqueSuppliers = isSupplier
     ? []  // Suppliers don't need supplier filter
     : (suppliersData?.suppliers?.map(s => ({ name: s.name, email: s.contact_email })) || [])
+  
+  // Build query params with all filters
+  const queryParams = useMemo(() => ({
+    q: search || undefined,
+    category: category || undefined,
+    categoryId: categoryId || undefined,
+    tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined,
+    minPrice: minPrice ? minPrice : undefined,
+    maxPrice: maxPrice ? maxPrice : undefined,
+    limit: 100, // Increase limit to show more products
+    offset: 0,
+  }), [search, category, categoryId, selectedTags, minPrice, maxPrice])
+  
+  const { data, isLoading, error } = useGetProductsQuery(queryParams)
   
   // Filter products to show only supplier's products if user is a supplier
   let filteredProducts = isSupplier 
     ? data?.products.filter(p => p.supplier_email === user?.email)
     : data?.products || []
   
-  // Apply supplier filter for restaurants
+  // Apply supplier filter for restaurants (client-side filter for supplier name)
   if (!isSupplier && supplierFilter) {
     filteredProducts = filteredProducts.filter(p => 
       p.supplier_name?.toLowerCase().includes(supplierFilter.toLowerCase())
@@ -165,7 +183,9 @@ export function ProductsPage() {
         name: productForm.name,
         sku: productForm.sku,
         description: productForm.description,
-        category: productForm.category,
+        category: productForm.category || undefined,
+        category_id: productForm.category_id || undefined,
+        tags: productForm.tags.length > 0 ? productForm.tags : undefined,
         unit: productForm.unit,
         price: parseFloat(productForm.price),
         initialStock: parseFloat(productForm.initialStock),
@@ -179,12 +199,15 @@ export function ProductsPage() {
         sku: '',
         description: '',
         category: '',
+        category_id: '',
+        tags: [],
         unit: '',
         price: '',
         initialStock: '',
         image_url: '',
         warehouse_id: '',
       })
+      setNewTag('')
       setProductImage(null)
       setImagePreview(null)
     } catch (error: any) {
@@ -399,30 +422,124 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             </div>
           )}
           <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            value={categoryId}
+            onChange={(e) => {
+              setCategoryId(e.target.value)
+              setCategory('') // Clear old category when using new one
+            }}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">All Categories</option>
-            <option value="Vegetables">Vegetables</option>
-            <option value="Meat">Meat</option>
-            <option value="Grains">Grains</option>
-            <option value="Oils">Oils</option>
+            {categoriesData?.categories?.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
           </select>
         </div>
         
+        {/* Tags Filter */}
+        {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium">Filter by Tags:</Label>
+            <div className="flex flex-wrap gap-2">
+              {tagsData.tags.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant={selectedTags.includes(tag) ? "default" : "outline"}
+                  className="cursor-pointer hover:bg-gray-100"
+                  onClick={() => {
+                    setSelectedTags(prev => 
+                      prev.includes(tag) 
+                        ? prev.filter(t => t !== tag)
+                        : [...prev, tag]
+                    )
+                  }}
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Price Range Filter */}
+        {!isSupplier && (
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <Label className="text-sm font-medium mb-2 block">Price Range:</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    type="number"
+                    placeholder="Min Price"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <span className="self-center text-gray-500">-</span>
+                <div className="flex-1">
+                  <Input
+                    type="number"
+                    placeholder="Max Price"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                {(minPrice || maxPrice) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setMinPrice('')
+                      setMaxPrice('')
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Filter Summary */}
-        {(supplierFilter || category) && !isSupplier && (
+        {(supplierFilter || categoryId || category || selectedTags.length > 0 || minPrice || maxPrice) && !isSupplier && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm text-gray-600">Filtered by:</span>
             {supplierFilter && (
               <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => setSupplierFilter('')}>
-                Supplier: {supplierFilter}
+                Supplier: {supplierFilter} ×
               </Badge>
             )}
-            {category && (
-              <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => setCategory('')}>
-                Category: {category}
+            {(categoryId || category) && (
+              <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => {
+                setCategoryId('')
+                setCategory('')
+              }}>
+                Category: {categoriesData?.categories?.find(c => c.id === categoryId)?.name || category} ×
+              </Badge>
+            )}
+            {selectedTags.map((tag) => (
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="cursor-pointer hover:bg-gray-300"
+                onClick={() => setSelectedTags(prev => prev.filter(t => t !== tag))}
+              >
+                Tag: {tag} ×
+              </Badge>
+            ))}
+            {(minPrice || maxPrice) && (
+              <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => {
+                setMinPrice('')
+                setMaxPrice('')
+              }}>
+                Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
               </Badge>
             )}
           </div>
@@ -464,7 +581,23 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <Badge variant="secondary">{product.category || 'N/A'}</Badge>
+                  <div className="flex flex-col gap-1">
+                    <Badge variant="secondary">{product.category_name || product.category || 'N/A'}</Badge>
+                    {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {product.tags.slice(0, 3).map((tag: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {product.tags.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{product.tags.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-4">
                   <p className="text-sm text-gray-600">{product.supplier_name || 'N/A'}</p>
@@ -588,21 +721,19 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
+                <Label htmlFor="category_id">Category *</Label>
                 <select
-                  id="category"
+                  id="category_id"
                   className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
-                  value={productForm.category}
-                  onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                  value={productForm.category_id}
+                  onChange={(e) => setProductForm({ ...productForm, category_id: e.target.value, category: '' })}
                 >
                   <option value="">Select category</option>
-                  <option value="Vegetables">Vegetables</option>
-                  <option value="Meat">Meat</option>
-                  <option value="Grains">Grains</option>
-                  <option value="Oils">Oils</option>
-                  <option value="Dairy">Dairy</option>
-                  <option value="Beverages">Beverages</option>
-                  <option value="Other">Other</option>
+                  {categoriesData?.categories?.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-2">
@@ -670,6 +801,78 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 ))}
               </select>
             </div>
+            
+            {/* Tags Input */}
+            <div className="space-y-2">
+              <Label htmlFor="tags">Tags (comma-separated)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="tags"
+                  placeholder="e.g., organic, fresh, local"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newTag.trim()) {
+                      e.preventDefault()
+                      if (!productForm.tags.includes(newTag.trim())) {
+                        setProductForm({ ...productForm, tags: [...productForm.tags, newTag.trim()] })
+                      }
+                      setNewTag('')
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (newTag.trim() && !productForm.tags.includes(newTag.trim())) {
+                      setProductForm({ ...productForm, tags: [...productForm.tags, newTag.trim()] })
+                      setNewTag('')
+                    }
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
+              {productForm.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {productForm.tags.map((tag, index) => (
+                    <Badge
+                      key={index}
+                      variant="secondary"
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setProductForm({ ...productForm, tags: productForm.tags.filter((_, i) => i !== index) })
+                      }}
+                    >
+                      {tag} ×
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {tagsData?.tags && tagsData.tags.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-500 mb-1">Suggested tags:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {tagsData.tags.slice(0, 10).map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="cursor-pointer text-xs"
+                        onClick={() => {
+                          if (!productForm.tags.includes(tag)) {
+                            setProductForm({ ...productForm, tags: [...productForm.tags, tag] })
+                          }
+                        }}
+                      >
+                        + {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="productImage">Product Image</Label>
               <div className="flex items-center gap-4">

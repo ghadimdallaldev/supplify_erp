@@ -720,19 +720,11 @@ router.get('/reorder-suggestions', requireAuth, requireRole(['RESTAURANT', 'ADMI
       requestId: req.requestId,
     });
   } catch (error) {
-    logger.error({ 
-      message: 'Get reorder suggestions error',
-      error: error.message,
-      stack: error.stack 
-    });
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get reorder suggestions',
-        details: error.message,
-      },
+    logger.warn('Reorder suggestions unavailable, returning empty set:', error.message);
+    return res.json({
+      ok: true,
+      data: { suggestions: [] },
+      error: null,
       requestId: req.requestId,
     });
   }

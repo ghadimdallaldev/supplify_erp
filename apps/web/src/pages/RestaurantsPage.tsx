@@ -289,7 +289,7 @@ export function RestaurantsPage() {
                   </div>
                   <div className="mt-2">
                     <p className="text-sm text-gray-600">
-                      Total: <span className="font-semibold">${restaurant.latestOrder.total_amount?.toFixed(2)}</span>
+                      Total: <span className="font-semibold">${typeof restaurant.latestOrder.total_amount === 'number' ? restaurant.latestOrder.total_amount.toFixed(2) : typeof restaurant.latestOrder.total_amount === 'string' ? parseFloat(restaurant.latestOrder.total_amount || '0').toFixed(2) : '0.00'}</span>
                     </p>
                   </div>
                 </div>

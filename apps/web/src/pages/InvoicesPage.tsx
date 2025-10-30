@@ -70,7 +70,7 @@ export function InvoicesPage() {
     selectedInvoice?.id || '',
     { skip: !selectedInvoice?.id || paymentMode !== 'credit' }
   )
-  const { data: analyticsData } = useGetInvoiceAnalyticsQuery({ period: 30 })
+  const { data: analyticsData } = useGetInvoiceAnalyticsQuery({ period: 30 }, { skip: !isRestaurant })
   const { data: overdueData } = useGetOverdueInvoicesQuery()
   const [markPaid, { isLoading: isProcessingPayment }] = useMarkInvoicePaidMutation()
 
@@ -115,8 +115,9 @@ export function InvoicesPage() {
   })
 
   // Get unique suppliers for filter
-  const suppliers = Array.from(new Set(invoices.map((inv: any) => ({ id: inv.supplier_id, name: inv.supplier_name }))))
-    .filter((s: any) => s.id && s.name)
+  const suppliers = Array.from(
+    new Map(invoices.map((inv: any) => [inv.supplier_id, { id: inv.supplier_id, name: inv.supplier_name }])).values()
+  ).filter((s: any) => s.id && s.name)
 
   const stats = {
     total: invoices.length,

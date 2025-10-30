@@ -108,15 +108,43 @@ router.get('/', requireAuth, async (req, res) => {
       : '';
     
     const sql = `
-      SELECT * FROM restaurant
+      SELECT 
+        r.*,
+        (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as total_orders,
+        (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND status = 'COMPLETED') as total_spent,
+        (
+          SELECT json_build_object(
+            'id', o.id,
+            'status', o.status,
+            'total_amount', o.total_amount,
+            'placed_at', o.placed_at,
+            'created_at', o.created_at
+          )
+          FROM customer_order o
+          WHERE o.restaurant_id = r.id
+          ORDER BY COALESCE(o.placed_at, o.created_at) DESC
+          LIMIT 1
+        ) as latest_order
+      FROM restaurant r
       ${whereClause}
-      ORDER BY created_at DESC
+      ORDER BY r.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
     queryParams.push(params.limit, params.offset);
     
     const { rows } = await query(sql, queryParams);
+    
+    // Parse latest_order JSON and format the response
+    const restaurantsWithLatestOrder = rows.map(row => ({
+      ...row,
+      totalOrders: parseInt(row.total_orders || 0),
+      totalSpent: parseFloat(row.total_spent || 0),
+      latestOrder: row.latest_order ? {
+        ...row.latest_order,
+        total_amount: parseFloat(row.latest_order.total_amount || 0),
+      } : null,
+    }));
     
     // Get total count
     const countSql = `SELECT COUNT(*) as total FROM restaurant ${whereClause}`;
@@ -126,7 +154,7 @@ router.get('/', requireAuth, async (req, res) => {
     res.json({
       ok: true,
       data: {
-        restaurants: rows,
+        restaurants: restaurantsWithLatestOrder,
         pagination: {
           total: parseInt(countRows[0].total),
           limit: params.limit,
