@@ -195,3 +195,8 @@ Update Database with Send Results
 **Version:** 1.0.0
 **Status:** Production Ready (with test logging)
 
+## Order/Invoice notifications
+- On DELIVERED (supplier action): notify restaurant to receive
+- On RECEIVED_*: notify supplier that receiving is completed; invoice is created
+- On invoice overdue: notify restaurant (and optionally supplier for visibility)
+

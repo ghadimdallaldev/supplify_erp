@@ -131,6 +131,14 @@ export function OrdersPage() {
         return 'default'
       case 'SHIPPED':
         return 'default'
+      case 'DELIVERED':
+        return 'secondary'
+      case 'RECEIVED_PARTIAL':
+        return 'secondary'
+      case 'RECEIVED_FULL':
+        return 'default'
+      case 'INVOICED':
+        return 'default'
       case 'COMPLETED':
         return 'default'
       case 'CANCELLED':
@@ -148,6 +156,13 @@ export function OrdersPage() {
         return <Package className="h-4 w-4" />
       case 'SHIPPED':
         return <Truck className="h-4 w-4" />
+      case 'DELIVERED':
+        return <Truck className="h-4 w-4" />
+      case 'RECEIVED_PARTIAL':
+      case 'RECEIVED_FULL':
+        return <CheckCircle className="h-4 w-4" />
+      case 'INVOICED':
+        return <FileText className="h-4 w-4" />
       case 'COMPLETED':
         return <CheckCircle className="h-4 w-4" />
       default:
@@ -208,7 +223,8 @@ export function OrdersPage() {
     const matchesStatus = activeTab === 'all' || 
       (activeTab === 'new' && order.status === 'PLACED') ||
       (activeTab === 'processing' && ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)) ||
-      (activeTab === 'completed' && order.status === 'COMPLETED')
+      (activeTab === 'shipped' && order.status === 'SHIPPED') ||
+      (activeTab === 'completed' && ['RECEIVED_FULL','INVOICED','COMPLETED'].includes(order.status))
     
     return matchesSearch && matchesStatus
   })
@@ -287,6 +303,10 @@ export function OrdersPage() {
                 <option value="ACKNOWLEDGED">Acknowledged</option>
                 <option value="PROCESSING">Processing</option>
                 <option value="SHIPPED">Shipped</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="RECEIVED_PARTIAL">Received (Partial)</option>
+                <option value="RECEIVED_FULL">Received (Full)</option>
+                <option value="INVOICED">Invoiced</option>
                 <option value="COMPLETED">Completed</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
@@ -333,6 +353,16 @@ export function OrdersPage() {
                         <div>
                           Placed: {new Date(order.placed_at || order.created_at).toLocaleString()}
                         </div>
+                        {!isSupplier && order.status === 'DELIVERED' && (
+                          <div className="mt-2 p-2 rounded bg-blue-50 text-blue-700 border border-blue-200 text-xs">
+                            Supplier marked this order as delivered. Please <Link to="/app/receiving" className="underline">receive items</Link> to update inventory and generate an invoice.
+                          </div>
+                        )}
+                        {isSupplier && order.status === 'DELIVERED' && (
+                          <div className="mt-2 p-2 rounded bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs">
+                            Awaiting restaurant receiving. You’ll see the invoice after they receive.
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -406,25 +436,25 @@ export function OrdersPage() {
                       {isSupplier && order.status === 'SHIPPED' && updatingOrderId !== order.id && (
                         <Button 
                           size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'COMPLETED')}
+                          onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
                           disabled={false}
                         >
-                          Complete Order
+                          Mark Delivered
                         </Button>
                       )}
-                      {isSupplier && (updatingOrderId === order.id || order.status === 'COMPLETED') && (
+                      {isSupplier && (updatingOrderId === order.id || order.status === 'DELIVERED') && (
                         <Button 
                           size="sm"
-                          variant={order.status === 'COMPLETED' ? 'outline' : 'default'}
+                          variant={order.status === 'DELIVERED' ? 'outline' : 'default'}
                           disabled
                           className="cursor-not-allowed opacity-75"
                         >
                           {updatingOrderId === order.id ? (
-                            <>Completing...</>
+                            <>Updating...</>
                           ) : (
                             <>
                               <CheckCircle className="h-4 w-4 mr-1" />
-                              Completed
+                              Delivered
                             </>
                           )}
                         </Button>

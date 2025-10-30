@@ -141,7 +141,7 @@ router.get('/pending-orders/supplier', requireAuth, requireRole(['SUPPLIER', 'AD
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id
       JOIN restaurant r ON r.id = o.restaurant_id
-      WHERE o.status = 'COMPLETED' AND oi.supplier_id = $1
+      WHERE o.status = 'DELIVERED' AND oi.supplier_id = $1
       ORDER BY o.id, o.created_at DESC
     `, [supplierId]);
 
@@ -308,17 +308,97 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         }
       }
 
-      // Create invoice if it doesn't exist for this order
-      const { createInvoiceFromOrder } = await import('./orders.routes.js');
-      // Get order items for invoice creation
-      const { rows: orderItems } = await client.query(`
-        SELECT oi.*, p.name as product_name
-        FROM order_item oi
-        JOIN product p ON p.id = oi.product_id
-        WHERE oi.order_id = $1
-      `, [orderId]);
-      
-      await createInvoiceFromOrder(order, orderItems, supplierId, client);
+      // Update order status to RECEIVED_PARTIAL/FULL
+      const nextStatus = (totalItemsReceived < totalItemsOrdered) ? 'RECEIVED_PARTIAL' : 'RECEIVED_FULL';
+      await client.query(`
+        UPDATE customer_order
+        SET status = $1, updated_at = now()
+        WHERE id = $2
+      `, [nextStatus, orderId]);
+
+      // Build invoice from received items (actual quantities/prices)
+      const { rows: rItems } = await client.query(`
+        SELECT 
+          rli.product_id,
+          rli.order_item_id,
+          rli.product_name,
+          rli.product_sku as sku,
+          rli.received_quantity as quantity,
+          COALESCE(rli.actual_unit_price, rli.expected_unit_price) as unit_price
+        FROM receiving_line_item rli
+        WHERE rli.receiving_report_id = $1
+      `, [report.id]);
+
+      if (rItems.length > 0) {
+        // Generate minimal invoice based on orders.routes.js logic
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        let invoiceNumber = `INV-${year}-${String(month).padStart(2,'0')}-${String(Date.now()).slice(-6)}`;
+        try {
+          const { rows: sequences } = await client.query(`
+            INSERT INTO invoice_sequence (supplier_id, year, month, current_number, next_number)
+            VALUES ($1, $2, $3, 0, 1)
+            ON CONFLICT (supplier_id, year, month)
+            DO UPDATE SET next_number = invoice_sequence.next_number + 1
+            RETURNING next_number, prefix, format
+          `, [supplierId, year, month]);
+          if (sequences.length > 0) {
+            const seq = sequences[0];
+            const number = String(seq.next_number).padStart(6, '0');
+            invoiceNumber = `${seq.prefix || 'INV'}-${year}-${String(month).padStart(2, '0')}-${number}`;
+          }
+        } catch (_) {}
+
+        let subtotal = 0;
+        const taxRate = 0; // keep simple; tax config can be applied later
+        for (const it of rItems) {
+          subtotal += parseFloat(it.unit_price || 0) * parseFloat(it.quantity || 0);
+        }
+        const taxAmount = subtotal * taxRate / 100;
+        const totalAmount = subtotal + taxAmount;
+
+        const { rows: invRows } = await client.query(`
+          INSERT INTO invoice (
+            invoice_number, supplier_id, restaurant_id, order_id,
+            invoice_date, issue_date, due_date,
+            subtotal, tax_amount, tax_rate, tax_included, total_amount,
+            balance_due, paid_amount, status, currency, payment_terms_days, notes
+          ) VALUES ($1, $2, $3, $4, now(), now(), now() + interval '30 days',
+            $5, $6, $7, false, $8, $8, 0, 'ISSUED', $9, 30, $10)
+          RETURNING *
+        `, [
+          invoiceNumber,
+          supplierId,
+          restaurantId,
+          orderId,
+          subtotal,
+          taxAmount,
+          taxRate,
+          totalAmount,
+          order.currency || 'USD',
+          `Invoice after receiving for Order #${orderId.slice(0,8)}`,
+        ]);
+
+        const invoice = invRows[0];
+        for (const it of rItems) {
+          const lineTotal = parseFloat(it.unit_price || 0) * parseFloat(it.quantity || 0);
+          await client.query(`
+            INSERT INTO invoice_line_item (
+              invoice_id, product_id, description, sku,
+              quantity, unit_price, line_total, tax_rate, tax_amount, order_item_id
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          `, [
+            invoice.id, it.product_id, it.product_name, it.sku,
+            it.quantity, it.unit_price, lineTotal, taxRate, 0, it.order_item_id,
+          ]);
+        }
+
+        // Mark order as INVOICED
+        await client.query(`
+          UPDATE customer_order SET status = 'INVOICED', updated_at = now() WHERE id = $1
+        `, [orderId]);
+      }
 
       return report;
     });

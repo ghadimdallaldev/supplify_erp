@@ -875,3 +875,12 @@ Display History:
 - Notification system with bell icon
 - Session timeout extended to 1 hour
 - Database migration: order status enum updated
+
+## Order lifecycle (restaurant)
+- PLACED → supplier acknowledges and fulfills
+- DELIVERED → supplier marked delivered; Restaurant should perform Receiving
+- RECEIVED_FULL / RECEIVED_PARTIAL → created by Receiving; updates inventory
+- INVOICED → system creates invoice from received quantities
+- CLOSED → after invoice fully paid
+
+Receiving creates inventory movements and triggers invoice creation. Use the Receiving page to record actual quantities.

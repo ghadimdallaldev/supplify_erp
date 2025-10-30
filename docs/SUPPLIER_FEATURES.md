@@ -1022,3 +1022,14 @@ Settings → Configure
 - Session timeout extended to 1 hour
 - Database migration: order status enum updated
 - Competed order now triggers auto-invoice and notifications
+
+# Supplier Features
+
+## Order lifecycle (supplier)
+- PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → DELIVERED
+- After DELIVERED, the restaurant performs Receiving. The system then creates the invoice and marks the order INVOICED.
+
+Suppliers can:
+- Acknowledge, move to Processing, Shipped, and Mark Delivered
+- View invoices (read-only) once created by the system after restaurant receiving
+- See orders awaiting restaurant receiving under the supplier receiving view

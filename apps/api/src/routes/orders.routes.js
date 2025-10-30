@@ -303,15 +303,16 @@ async function handleOrderDelivery(orderId, userData, res) {
       }
       
       // Create invoice from the order (orders are now single-supplier)
-      const invoice = await createInvoiceFromOrder(order, supplierItems, supplierId, client);
+      // Do not create invoice here; invoice will be created after restaurant receiving
+      const invoice = null;
       
-      // Mark order as COMPLETED (orders are now single-supplier, so completing supplier completes the order)
+      // Mark order as DELIVERED; restaurant will move it to RECEIVED_* upon receiving
       await client.query(`
         UPDATE customer_order 
-        SET status = 'COMPLETED', updated_at = now()
+        SET status = 'DELIVERED', updated_at = now()
         WHERE id = $1
       `, [orderId]);
-      order.status = 'COMPLETED';
+      order.status = 'DELIVERED';
       
       logger.info('Order delivered and restaurant inventory updated', { 
         orderId: order.id,
