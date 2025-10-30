@@ -44,6 +44,8 @@ const orderListSchema = z.object({
 // Helper function to create invoice from delivered order
 export async function createInvoiceFromOrder(order, orderItems, supplierId, client) {
   try {
+    // Use a savepoint so failures don't abort the outer transaction
+    await client.query('SAVEPOINT invoice_create_sp');
     // Check if invoice already exists for this supplier and order (multi-supplier support)
     const { rows: existingInvoices } = await client.query(`
       SELECT id FROM invoice WHERE order_id = $1 AND supplier_id = $2
@@ -203,6 +205,8 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
         lineItem.order_item_id,
       ]);
     }
+    // Release savepoint on success
+    await client.query('RELEASE SAVEPOINT invoice_create_sp');
     
     logger.info('Comprehensive invoice created from order', {
       invoiceId: invoice.id,
@@ -218,6 +222,8 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
     
     return invoice;
   } catch (error) {
+    // Roll back only the invoice part and continue outer transaction
+    try { await client.query('ROLLBACK TO SAVEPOINT invoice_create_sp'); } catch (_) {}
     logger.error('Error creating invoice from order', { error: error.message, orderId: order.id });
     // Don't throw - invoice creation is non-critical
     return null;
@@ -350,14 +356,28 @@ async function handleOrderDelivery(orderId, userData, res) {
   } catch (error) {
     console.error('❌ Handle order delivery error:', error.message);
     console.error('Stack:', error.stack);
-    logger.error('Handle order delivery error:', error);
-    res.status(500).json({
+    logger.error('Handle order delivery error:', { message: error.message, stack: error.stack });
+    // Return meaningful status codes for known errors
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: res.locals.requestId,
+      });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: res.locals.requestId,
+      });
+    }
+    return res.status(500).json({
       ok: false,
       data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to deliver order',
-      },
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to deliver order' },
       requestId: res.locals.requestId,
     });
   }
@@ -1336,14 +1356,14 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
       }
     }
     
-    // Only allow reminders for orders that are PLACED (not acknowledged)
-    if (order.status !== 'PLACED') {
+    // Allow reminders for orders that are not completed/cancelled
+    if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
       return res.status(400).json({
         ok: false,
         data: null,
         error: {
           name: 'VALIDATION_ERROR',
-          message: `Reminders can only be sent for orders with status PLACED. Current status: ${order.status}`,
+          message: `Cannot send reminder for ${order.status} orders`,
         },
         requestId: req.requestId,
       });
@@ -1391,32 +1411,36 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
     const { sendNotification } = await import('../services/notification.service.js');
     
     // Send reminder notification
-    const reminderMessage = order.reminder_count > 0
+    const reminderMessage = (order.reminder_count || 0) > 0
       ? `Friendly reminder: Order #${order.id.slice(0, 8)} from ${order.restaurant_name} is still awaiting acknowledgment. Order total: $${order.total_amount || 0}`
       : `Reminder: You have an unacknowledged order #${order.id.slice(0, 8)} from ${order.restaurant_name} for $${order.total_amount || 0}. Please acknowledge when ready.`;
     
-    await sendNotification({
-      userId: supplier.user_id,
-      userType: 'SUPPLIER',
-      notificationType: 'ORDER',
-      notificationCategory: 'PLACED',
-      title: 'Order Reminder',
-      message: reminderMessage,
-      referenceId: order.id,
-      referenceType: 'ORDER',
-      metadata: { 
-        order_id: order.id, 
-        status: order.status,
-        reminder_count: (order.reminder_count || 0) + 1,
-        restaurant_name: order.restaurant_name,
-      },
-    });
+    try {
+      await sendNotification({
+        userId: supplier.user_id,
+        userType: 'SUPPLIER',
+        notificationType: 'ORDER',
+        notificationCategory: 'PLACED',
+        title: 'Order Reminder',
+        message: reminderMessage,
+        referenceId: order.id,
+        referenceType: 'ORDER',
+        metadata: { 
+          order_id: order.id, 
+          status: order.status,
+          reminder_count: (order.reminder_count || 0) + 1,
+          restaurant_name: order.restaurant_name,
+        },
+      });
+    } catch (notifError) {
+      logger.warn('Order reminder notification failed; proceeding anyway', { error: notifError.message });
+    }
     
     // Update order with reminder tracking
     const { rows: updatedOrders } = await query(`
       UPDATE customer_order
       SET last_reminder_sent_at = now(),
-          reminder_count = reminder_count + 1,
+          reminder_count = COALESCE(reminder_count, 0) + 1,
           updated_at = now()
       WHERE id = $1
       RETURNING *

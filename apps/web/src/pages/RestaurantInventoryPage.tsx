@@ -239,6 +239,7 @@ export function RestaurantInventoryPage() {
         <TabsList>
           <TabsTrigger value="inventory">Current Inventory</TabsTrigger>
           <TabsTrigger value="history">Movement History</TabsTrigger>
+          <TabsTrigger value="totals">Totals & Sources</TabsTrigger>
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-6">
@@ -430,7 +431,7 @@ export function RestaurantInventoryPage() {
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold">{item.quantity}</span>
-                          <span className="text-sm text-gray-500">{item.unit}</span>
+                          <span className="text-sm text-gray-500">{item.product_unit}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
@@ -576,6 +577,30 @@ export function RestaurantInventoryPage() {
               <CardDescription>Recent inventory changes and adjustments</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="flex gap-4 mb-4">
+                <div>
+                  <label className="text-sm text-gray-600 mr-2">Source</label>
+                  <select
+                    onChange={(e) => {
+                      const val = e.target.value
+                      const table = document.getElementById('history-table-body') as HTMLTableSectionElement | null
+                      if (!table) return
+                      const rows = Array.from(table.querySelectorAll('tr')) as HTMLTableRowElement[]
+                      rows.forEach((row) => {
+                        const cell = row.querySelector('[data-col="source"]') as HTMLElement | null
+                        if (!cell) return
+                        const src = cell.dataset?.value || cell.textContent || ''
+                        row.style.display = val === 'ALL' || src === val ? '' : 'none'
+                      })
+                    }}
+                    className="px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="ALL">All</option>
+                    <option value="Order">Order</option>
+                    <option value="Manual">Manual</option>
+                  </select>
+                </div>
+              </div>
               {isLoadingHistory ? (
                 <div className="text-center py-12">Loading history...</div>
               ) : history.length === 0 ? (
@@ -591,14 +616,27 @@ export function RestaurantInventoryPage() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance Before</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance After</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {history.map((movement: any) => (
+                    <tbody id="history-table-body" className="divide-y divide-gray-200">
+                      {history.map((movement: any) => {
+                        const source = movement.reference_type === 'RECEIVING_REPORT' ? 'Order' : movement.reference_type === 'MANUAL_ADD' ? 'Manual' : (movement.reference_type || '—')
+                        const typeLabel = (() => {
+                          const t = (movement.type || '').toUpperCase()
+                          if (source === 'Order') return 'ADD'
+                          if (t === 'ORDER' || t === 'RECEIVED') return 'ADD'
+                          if (t === 'ADD') return 'ADD'
+                          if (t === 'SUBTRACT') return 'SUBTRACT'
+                          if (t === 'COUNT_CORRECTION') return 'ADJUST'
+                          if (t === 'WASTAGE' || t === 'SPOILAGE') return 'SUBTRACT'
+                          return t || '—'
+                        })()
+                        return (
                         <tr key={movement.id} className="hover:bg-gray-50">
                           <td className="px-4 py-4 text-sm text-gray-900">
                             {new Date(movement.created_at).toLocaleString()}
@@ -610,22 +648,67 @@ export function RestaurantInventoryPage() {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <Badge variant={movement.type === 'ADD' ? 'default' : 'destructive'}>
-                              {movement.type}
+                            <Badge variant={typeLabel === 'ADD' ? 'default' : typeLabel === 'ADJUST' ? 'secondary' : 'destructive'}>
+                              {typeLabel}
                             </Badge>
                           </td>
+                          <td className="px-4 py-4 text-sm text-gray-900" data-col="source" data-value={source}>{source}</td>
                           <td className="px-4 py-4 text-sm text-gray-900">
                             {movement.quantity > 0 ? '+' : ''}{movement.quantity}
                           </td>
                           <td className="px-4 py-4 text-sm text-gray-500">{movement.balance_before}</td>
                           <td className="px-4 py-4 text-sm font-medium text-gray-900">{movement.balance_after}</td>
                           <td className="px-4 py-4 text-sm text-gray-500">{movement.reason || '-'}</td>
-                        </tr>
-                      ))}
+                        </tr>)
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="totals" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Totals After Receiving</CardTitle>
+              <CardDescription>Current stock per product and last update source</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Source</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Change</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {inventory.map((item: any) => {
+                      const lastMovement = history.find((m: any) => m.product_id === item.product_id);
+                      const source = lastMovement?.reference_type === 'RECEIVING_REPORT' ? 'Order' : lastMovement?.reference_type === 'MANUAL_ADD' ? 'Manual' : (lastMovement?.reference_type || '—')
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-4">
+                            <div>
+                              <p className="font-medium text-gray-900">{item.product_name}</p>
+                              <p className="text-sm text-gray-500">{item.product_sku}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 font-semibold">{item.quantity}</td>
+                          <td className="px-4 py-4 text-sm text-gray-500">{item.product_unit}</td>
+                          <td className="px-4 py-4 text-sm text-gray-900">{source}</td>
+                          <td className="px-4 py-4 text-sm text-gray-500">{lastMovement ? new Date(lastMovement.created_at).toLocaleString() : '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

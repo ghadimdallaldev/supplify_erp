@@ -29,9 +29,7 @@ router.get('/pending-orders', requireAuth, requireRole(['RESTAURANT', 'ADMIN']),
 
     const restaurantId = restaurants[0].id;
 
-    // Get all active orders that are not cancelled or draft
-    // Orders should appear in pending list as soon as they're placed
-    // But can only be received when status is COMPLETED
+    // Show only orders that are ready to be received: status = COMPLETED
     // Note: supplier_id is in order_item, not customer_order
     const { rows: orders } = await query(`
       SELECT DISTINCT ON (o.id)
@@ -50,7 +48,7 @@ router.get('/pending-orders', requireAuth, requireRole(['RESTAURANT', 'ADMIN']),
       JOIN order_item oi ON oi.order_id = o.id
       JOIN supplier s ON s.id = oi.supplier_id
       WHERE o.restaurant_id = $1 
-        AND o.status NOT IN ('CANCELLED', 'DRAFT')
+        AND o.status = 'COMPLETED'
         AND NOT EXISTS (
           SELECT 1 FROM receiving_report 
           WHERE order_id = o.id 
@@ -105,6 +103,64 @@ router.get('/pending-orders', requireAuth, requireRole(['RESTAURANT', 'ADMIN']),
         message: 'Failed to get pending orders',
         details: error.message,
       },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Supplier view of orders awaiting restaurant receiving (COMPLETED orders per supplier)
+router.get('/pending-orders/supplier', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const { rows: suppliers } = await query(
+      'SELECT id FROM supplier WHERE contact_email = $1',
+      [req.userData.email]
+    );
+
+    if (suppliers.length === 0) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      });
+    }
+
+    const supplierId = suppliers[0].id;
+
+    const { rows: orders } = await query(`
+      SELECT DISTINCT ON (o.id)
+        o.*,
+        r.name as restaurant_name,
+        COALESCE(
+          (SELECT COUNT(*) > 0 
+           FROM receiving_report 
+           WHERE order_id = o.id 
+             AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
+          ), false
+        ) as has_receiving_report
+      FROM customer_order o
+      JOIN order_item oi ON oi.order_id = o.id
+      JOIN restaurant r ON r.id = o.restaurant_id
+      WHERE o.status = 'COMPLETED' AND oi.supplier_id = $1
+      ORDER BY o.id, o.created_at DESC
+    `, [supplierId]);
+
+    res.json({
+      ok: true,
+      data: { orders },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error({
+      message: 'Get supplier pending receiving orders error',
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get supplier receiving list', details: error.message },
       requestId: req.requestId,
     });
   }
@@ -214,6 +270,10 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
             WHERE restaurant_id = $1 AND product_id = $2
           `, [restaurantId, item.productId]);
 
+          const receivedQty = parseFloat(item.received_quantity || 0);
+          const balanceBefore = existingInventory.length > 0 ? Number(existingInventory[0].quantity) : 0;
+          const balanceAfter = balanceBefore + receivedQty;
+
           if (existingInventory.length > 0) {
             // Update existing inventory
             await client.query(`
@@ -222,7 +282,7 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
                   last_restocked_at = now(),
                   updated_at = now()
               WHERE id = $2
-            `, [item.received_quantity, existingInventory[0].id]);
+            `, [receivedQty, existingInventory[0].id]);
           } else {
             // Create new inventory entry
             await client.query(`
@@ -230,16 +290,21 @@ router.post('/receive', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
                 restaurant_id, product_id, quantity, last_restocked_at
               )
               VALUES ($1, $2, $3, now())
-            `, [restaurantId, item.productId, item.received_quantity]);
+            `, [restaurantId, item.productId, receivedQty]);
           }
 
-          // Add inventory movement log
+          // Add inventory movement log (treat receiving as an ADD)
           await client.query(`
             INSERT INTO inventory_movement_log (
-              restaurant_id, product_id, type, quantity, reason, reference_id, reference_type
+              restaurant_id, product_id, type, quantity,
+              balance_before, balance_after, reason, reference_id, reference_type
             )
-            VALUES ($1, $2, 'RECEIVED', $3, $4, $5, 'RECEIVING_REPORT')
-          `, [restaurantId, item.productId, item.received_quantity, 'Order received', report.id]);
+            VALUES ($1, $2, 'ADD', $3, $4, $5, $6, $7, 'RECEIVING_REPORT')
+          `, [
+            restaurantId, item.productId, receivedQty,
+            balanceBefore, balanceAfter,
+            'Order received', report.id,
+          ]);
         }
       }
 

@@ -867,8 +867,13 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
 });
 
 // Get overdue payments and alerts
-router.get('/overdue', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.get('/overdue', requireAuth, requireRole(['RESTAURANT', 'ADMIN', 'SUPPLIER']), async (req, res) => {
   try {
+    // If the caller is not a restaurant/admin, return empty (avoid UI 403s)
+    if (req.userData.role && !['RESTAURANT', 'ADMIN'].includes(req.userData.role)) {
+      return res.json({ ok: true, data: { invoices: [], summary: { count: 0, totalOverdue: 0 } }, error: null, requestId: req.requestId });
+    }
+
     const { rows: restaurants } = await query(
       'SELECT id FROM restaurant WHERE contact_email = $1',
       [req.userData.email]

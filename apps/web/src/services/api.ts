@@ -393,6 +393,10 @@ export const api = createApi({
     getPendingOrdersForReceiving: builder.query<any, void>({
       query: () => '/api/receiving/pending-orders',
       providesTags: ['Receiving'],
+      // Keep list fresh on navigation/focus and poll periodically for new orders
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+      pollingInterval: 15000,
     }),
     getReceivingHistory: builder.query<any, void>({
       query: () => '/api/receiving/history',
@@ -533,6 +537,12 @@ export const api = createApi({
     }),
     getOverdueInvoices: builder.query<any, void>({
       query: () => '/api/restaurant-finance/overdue',
+      providesTags: ['RestaurantFinance'],
+    }),
+
+    // Supplier invoices
+    getSupplierInvoices: builder.query<any, any>({
+      query: (params) => ({ url: '/api/invoices', params }),
       providesTags: ['RestaurantFinance'],
     }),
 
@@ -754,6 +764,7 @@ export const {
   useGetSupplierStatementQuery,
   useGetRestaurantExpensesQuery,
   useGetOverdueInvoicesQuery,
+  useGetSupplierInvoicesQuery,
   useGetNotificationsQuery,
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,

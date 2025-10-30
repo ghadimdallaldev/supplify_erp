@@ -20,15 +20,26 @@ const invoiceCreateSchema = z.object({
 });
 
 // Get all invoices for current supplier
-router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+// Also allow RESTAURANT to call this endpoint safely (returns empty list)
+router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), async (req, res) => {
   try {
+    // If the caller is not a supplier/admin, return empty to avoid frontend 403 noise
+    if (req.userData.role && !['SUPPLIER', 'ADMIN'].includes(req.userData.role)) {
+      return res.json({
+        ok: true,
+        data: { invoices: [] },
+        error: null,
+        requestId: req.requestId,
+      });
+    }
+
     let invoicesQuery = `
       SELECT 
         i.*,
         r.name as restaurant_name,
         o.id as order_id,
         o.status as order_status,
-        COALESCE(SUM(p.amount), 0) as total_paid
+        COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0) as total_paid
       FROM invoice i
       JOIN supplier s ON s.id = i.supplier_id
       LEFT JOIN restaurant r ON r.id = i.restaurant_id

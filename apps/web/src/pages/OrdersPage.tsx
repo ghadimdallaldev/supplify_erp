@@ -43,6 +43,11 @@ export function OrdersPage() {
   }, {
     // Refetch when component mounts or when query is invalidated
     refetchOnMountOrArgChange: true,
+    // Auto-refresh lightly: when window regains focus or reconnects
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+    // Poll every 20s to catch status changes without user action
+    pollingInterval: 20000,
   })
   
   const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })

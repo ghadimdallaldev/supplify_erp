@@ -34,6 +34,7 @@ import {
   useGetInvoiceCreditsQuery,
   useGetInvoiceAnalyticsQuery,
   useGetOverdueInvoicesQuery,
+  useGetSupplierInvoicesQuery,
 } from '../services/api'
 import { Link } from 'react-router-dom'
 
@@ -61,7 +62,11 @@ export function InvoicesPage() {
   const isRestaurant = user?.role === 'RESTAURANT'
   
   // Fetch invoices from database
-  const { data: invoicesData, isLoading, refetch } = useGetRestaurantInvoicesQuery({})
+  const { data: restaurantInvoicesData, isLoading: isLoadingRestaurant, refetch: refetchRestaurant } = useGetRestaurantInvoicesQuery({}, { skip: !isRestaurant })
+  const { data: supplierInvoicesData, isLoading: isLoadingSupplier, refetch: refetchSupplier } = useGetSupplierInvoicesQuery({}, { skip: isRestaurant })
+  const invoicesData = isRestaurant ? restaurantInvoicesData : supplierInvoicesData
+  const isLoading = isRestaurant ? isLoadingRestaurant : isLoadingSupplier
+  const refetch = isRestaurant ? refetchRestaurant : refetchSupplier
   const { data: invoiceDetail, isLoading: isLoadingDetail, refetch: refetchDetail } = useGetRestaurantInvoiceQuery(
     selectedInvoice?.id || '',
     { skip: !selectedInvoice?.id }
@@ -71,7 +76,7 @@ export function InvoicesPage() {
     { skip: !selectedInvoice?.id || paymentMode !== 'credit' }
   )
   const { data: analyticsData } = useGetInvoiceAnalyticsQuery({ period: 30 }, { skip: !isRestaurant })
-  const { data: overdueData } = useGetOverdueInvoicesQuery()
+  const { data: overdueData } = useGetOverdueInvoicesQuery(undefined, { skip: !isRestaurant })
   const [markPaid, { isLoading: isProcessingPayment }] = useMarkInvoicePaidMutation()
 
   const invoices = invoicesData?.invoices || []
@@ -438,7 +443,7 @@ export function InvoicesPage() {
                           Paid: ${parseFloat(invoice.total_paid || 0).toFixed(2)}
                         </p>
                       )}
-                      {remaining > 0 && (
+                      {isRestaurant && remaining > 0 && (
                         <Button
                           size="sm"
                           variant="default"
@@ -480,7 +485,7 @@ export function InvoicesPage() {
                   <Download className="h-4 w-4 mr-2" />
                   PDF
                 </Button>
-                {selectedInvoice && parseFloat(selectedInvoice.balance_due || selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0) > 0 && (
+                {isRestaurant && selectedInvoice && parseFloat(selectedInvoice.balance_due || selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0) > 0 && (
                   <Button 
                     size="sm"
                     onClick={() => {
@@ -688,7 +693,7 @@ export function InvoicesPage() {
                         </CardContent>
                       </Card>
                     ))}
-                    {remainingBalance > 0 && (
+                    {isRestaurant && remainingBalance > 0 && (
                       <div className="border-2 border-orange-300 rounded-lg p-4 bg-orange-50">
                         <div className="flex justify-between items-center">
                           <div>
@@ -710,7 +715,7 @@ export function InvoicesPage() {
                   <div className="border rounded-lg p-8 text-center bg-gray-50">
                     <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-gray-600">No payments recorded yet</p>
-                    {remainingBalance > 0 && (
+                    {isRestaurant && remainingBalance > 0 && (
                       <Button 
                         className="mt-4"
                         onClick={() => {
@@ -776,8 +781,8 @@ export function InvoicesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Enhanced Payment Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+      {/* Enhanced Payment Dialog (Restaurant only) */}
+      <Dialog open={isRestaurant && showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>

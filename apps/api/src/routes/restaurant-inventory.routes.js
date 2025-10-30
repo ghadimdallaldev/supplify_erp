@@ -377,8 +377,8 @@ router.post('/add', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (re
       await client.query(`
         INSERT INTO inventory_movement_log (
           restaurant_id, product_id, type, quantity, 
-          balance_before, balance_after, reason
-        ) VALUES ($1, $2, 'ADD', $3, $4, $5, $6)
+          balance_before, balance_after, reason, reference_type
+        ) VALUES ($1, $2, 'ADD', $3, $4, $5, $6, 'MANUAL_ADD')
       `, [restaurantId, productId, quantity, balanceBefore, balanceAfter, reason || null]);
     });
 
