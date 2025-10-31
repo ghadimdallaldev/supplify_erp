@@ -20,9 +20,30 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
+import { LogoUpload } from '../components/LogoUpload'
+import { useGetRestaurantMeQuery, useUploadRestaurantLogoMutation, useGetPresignedUrlMutation } from '../services/api'
 
 export function RestaurantOnboardingPage() {
+  const { data: restaurantData, isLoading: isLoadingRestaurant } = useGetRestaurantMeQuery()
+  const [uploadRestaurantLogo] = useUploadRestaurantLogoMutation()
+  const [getPresignedUrl] = useGetPresignedUrlMutation()
+  
   const [activeTab, setActiveTab] = useState('profile')
+  
+  const restaurant = restaurantData?.restaurant
+  
+  const handleLogoUpload = async (logoUrl: string) => {
+    if (!restaurant?.id) {
+      toast.error('Restaurant information not loaded')
+      return
+    }
+    await uploadRestaurantLogo({ id: restaurant.id, logoUrl }).unwrap()
+  }
+  
+  const handleGetPresignedUrl = async (params: { fileName: string; fileType: string; fileSize?: number }) => {
+    const result = await getPresignedUrl(params).unwrap()
+    return result
+  }
   
   // Profile state
   const [businessName, setBusinessName] = useState('')
@@ -116,6 +137,30 @@ export function RestaurantOnboardingPage() {
 
         {/* Profile Tab */}
         <TabsContent value="profile">
+          <Card>
+            <CardHeader>
+              <CardTitle>Business Logo</CardTitle>
+              <CardDescription>Upload your business logo. This will be displayed in your profile and to suppliers.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingRestaurant ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : restaurant ? (
+                <LogoUpload
+                  currentLogo={restaurant.logo_url}
+                  onUpload={handleLogoUpload}
+                  entityId={restaurant.id}
+                  entityName={restaurant.name || 'Restaurant'}
+                  getPresignedUrl={handleGetPresignedUrl}
+                />
+              ) : (
+                <p className="text-sm text-gray-500">Loading restaurant information...</p>
+              )}
+            </CardContent>
+          </Card>
+          
           <Card>
             <CardHeader>
               <CardTitle>Business Profile</CardTitle>

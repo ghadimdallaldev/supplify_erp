@@ -92,8 +92,39 @@ export function CartPage() {
       setDeliveryDate('')
       setDeliveryNotes('')
       toast.success('Order placed successfully!')
-    } catch (error) {
-      toast.error('Failed to place order')
+    } catch (error: any) {
+      // Show the actual error message from the API
+      const errorMessage = error?.data?.error?.message || error?.message || 'Failed to place order'
+      const errorName = error?.data?.error?.name
+      
+      // For limit exceeded errors, show a more helpful message with upgrade suggestion
+      if (errorName === 'LIMIT_EXCEEDED') {
+        toast.error(errorMessage, {
+          duration: 6000,
+          icon: '⚠️',
+        })
+        // Show additional toast with upgrade link
+        setTimeout(() => {
+          toast((t) => (
+            <div className="flex items-center gap-3">
+              <span>💡 Want more orders? Upgrade your subscription!</span>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id)
+                  window.location.href = '/app/settings'
+                }}
+                className="px-3 py-1 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
+              >
+                View Plans
+              </button>
+            </div>
+          ), {
+            duration: 8000,
+          })
+        }, 500)
+      } else {
+        toast.error(errorMessage)
+      }
     } finally {
       setIsPlacingOrder(false)
     }

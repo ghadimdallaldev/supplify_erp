@@ -112,7 +112,37 @@ export function OrdersPage() {
       setManualOrderItems([])
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to create order')
+      const errorMessage = error?.data?.error?.message || 'Failed to create order'
+      const errorName = error?.data?.error?.name
+      
+      // For limit exceeded errors, show a more helpful message with upgrade suggestion
+      if (errorName === 'LIMIT_EXCEEDED') {
+        toast.error(errorMessage, {
+          duration: 6000,
+          icon: '⚠️',
+        })
+        // Show additional toast with upgrade link
+        setTimeout(() => {
+          toast((t) => (
+            <div className="flex items-center gap-3">
+              <span>💡 Want more orders? Upgrade your subscription!</span>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id)
+                  window.location.href = '/app/settings'
+                }}
+                className="px-3 py-1 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
+              >
+                View Plans
+              </button>
+            </div>
+          ), {
+            duration: 8000,
+          })
+        }, 500)
+      } else {
+        toast.error(errorMessage)
+      }
     }
   }
 

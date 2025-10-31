@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth, requireRole } from '../lib/rbac.js';
+import { requireAuth, requireRole, optionalAuth } from '../lib/rbac.js';
 import { query } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError } from '../middlewares/errorHandler.js';
@@ -32,7 +32,8 @@ const supplierListSchema = z.object({
 });
 
 // List suppliers - publicly available with filters for restaurants
-router.get('/', async (req, res) => {
+// Use optionalAuth to get restaurant ID for follow status without requiring auth
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const params = supplierListSchema.parse(req.query);
     
@@ -158,8 +159,26 @@ router.get('/', async (req, res) => {
     });
     
     // Get total count
+    // Build count params separately - exclude is_followed param and limit/offset
+    // The count query uses the same whereClause but doesn't need is_followed
+    const countParams = [];
+    let countParamIndex = 1;
+    
+    // Rebuild count params from whereClause conditions only
+    // Text search
+    if (params.q) {
+      countParams.push(`%${params.q.toLowerCase()}%`);
+    }
+    // City filter
+    if (params.city) {
+      countParams.push(params.city);
+    }
+    // Restaurant blocklist filter
+    if (restaurantId) {
+      countParams.push(restaurantId);
+    }
+    
     const countSql = `SELECT COUNT(*) as total FROM supplier s ${whereClause}`;
-    const countParams = queryParams.slice(0, -2);
     const { rows: countRows } = await query(countSql, countParams);
     
     res.json({
@@ -312,6 +331,128 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to create supplier',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Upload supplier logo
+router.post('/:id/logo', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { logoUrl } = req.body;
+    
+    if (!logoUrl) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'logoUrl is required',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    // Check permissions
+    const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [id]);
+    
+    if (suppliers.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Supplier not found',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    const supplier = suppliers[0];
+    
+    // Suppliers can only update their own logo
+    if (req.userData.role === 'SUPPLIER' && supplier.contact_email !== req.userData.email) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Access denied. You can only update your own logo',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    // Update logo URL
+    const { rows } = await query(`
+      UPDATE supplier 
+      SET logo_url = $1, updated_at = now()
+      WHERE id = $2
+      RETURNING *
+    `, [logoUrl, id]);
+    
+    logger.info('Supplier logo updated', { 
+      supplierId: id, 
+      logoUrl,
+      actor: req.userData.id 
+    });
+    
+    res.json({
+      ok: true,
+      data: { supplier: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Update supplier logo error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to update supplier logo',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get current supplier (for settings page)
+router.get('/me', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const { rows: suppliers } = await query(
+      'SELECT * FROM supplier WHERE contact_email = $1',
+      [req.userData.email]
+    );
+    
+    if (suppliers.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Supplier not found',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    res.json({
+      ok: true,
+      data: { supplier: suppliers[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get supplier error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get supplier',
       },
       requestId: req.requestId,
     });

@@ -4,6 +4,7 @@ import { query, withTransaction } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js';
 import { executeScheduledOrders } from '../services/scheduled-orders.service.js';
+import { checkLimit } from '../lib/subscription.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -108,7 +109,7 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
 
       return {
         ...list,
-        items
+        items: items || []
       };
     }));
 
@@ -187,7 +188,7 @@ router.get('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
       data: { 
         quickList: {
           ...quickList,
-          items
+          items: items || []
         }
       },
       error: null,
@@ -623,18 +624,61 @@ router.post('/:id/schedule', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), 
       throw new NotFoundError('Quick list not found');
     }
 
+    const quickList = lists[0];
+
+    // Check order limit if auto_create_order is enabled
+    if (scheduleData.autoCreateOrder) {
+      // Get quick list items to calculate how many orders would be created
+      const { rows: items } = await query(`
+        SELECT DISTINCT supplier_id
+        FROM quick_list_item
+        WHERE quick_list_id = $1
+      `, [id]);
+
+      if (items.length > 0) {
+        const ordersToCreate = items.length; // One order per supplier
+        const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day');
+        const newTotal = limitCheck.current + ordersToCreate;
+
+        if (!limitCheck.isUnlimited && limitCheck.limit !== null && newTotal > limitCheck.limit) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'LIMIT_EXCEEDED',
+              message: `Scheduling this quick list would create ${ordersToCreate} order(s) which would exceed your daily limit of ${limitCheck.limit} orders. Current usage: ${limitCheck.current}/${limitCheck.limit}. Please upgrade your subscription to obtain more features and higher order limits.`,
+              details: {
+                current: limitCheck.current,
+                limit: limitCheck.limit,
+                requested: ordersToCreate,
+                meterType: 'orders_per_day'
+              }
+            },
+            requestId: req.requestId,
+          });
+        }
+      }
+    }
+
     // Calculate next execution date if not provided
     let nextExecutionDate = scheduleData.nextExecutionDate;
     if (!nextExecutionDate) {
       const today = new Date();
+      // Use local date to avoid timezone issues
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const day = today.getDate();
+      
       switch (scheduleData.frequency) {
         case 'DAILY':
-          today.setDate(today.getDate() + 1);
-          nextExecutionDate = today.toISOString().split('T')[0];
+          // Tomorrow in local timezone
+          const tomorrow = new Date(year, month, day + 1);
+          nextExecutionDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
           break;
         case 'WEEKLY':
-          today.setDate(today.getDate() + 7);
-          nextExecutionDate = today.toISOString().split('T')[0];
+          // Next week in local timezone
+          const nextWeek = new Date(year, month, day + 7);
+          nextExecutionDate = `${nextWeek.getFullYear()}-${String(nextWeek.getMonth() + 1).padStart(2, '0')}-${String(nextWeek.getDate()).padStart(2, '0')}`;
           break;
         case 'WEEKLY_3X':
           // 3 times per week - find the next scheduled day within the week
@@ -643,29 +687,33 @@ router.post('/:id/schedule', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), 
           const scheduledDays = scheduleData.daysOfWeek || [];
           
           // Find the next scheduled day
+          let foundDay = false;
           for (let i = 1; i <= 7; i++) {
             const nextDay = (currentDay + i) % 7;
             const nextDayName = dayNames[nextDay];
             if (scheduledDays.includes(nextDayName)) {
-              today.setDate(today.getDate() + i);
-              nextExecutionDate = today.toISOString().split('T')[0];
+              const nextScheduledDate = new Date(year, month, day + i);
+              nextExecutionDate = `${nextScheduledDate.getFullYear()}-${String(nextScheduledDate.getMonth() + 1).padStart(2, '0')}-${String(nextScheduledDate.getDate()).padStart(2, '0')}`;
+              foundDay = true;
               break;
             }
           }
           
           // If no day found, default to next week
-          if (!nextExecutionDate) {
-            today.setDate(today.getDate() + 7);
-            nextExecutionDate = today.toISOString().split('T')[0];
+          if (!foundDay) {
+            const defaultNextWeek = new Date(year, month, day + 7);
+            nextExecutionDate = `${defaultNextWeek.getFullYear()}-${String(defaultNextWeek.getMonth() + 1).padStart(2, '0')}-${String(defaultNextWeek.getDate()).padStart(2, '0')}`;
           }
           break;
         case 'BIWEEKLY':
-          today.setDate(today.getDate() + 14);
-          nextExecutionDate = today.toISOString().split('T')[0];
+          // Two weeks in local timezone
+          const twoWeeks = new Date(year, month, day + 14);
+          nextExecutionDate = `${twoWeeks.getFullYear()}-${String(twoWeeks.getMonth() + 1).padStart(2, '0')}-${String(twoWeeks.getDate()).padStart(2, '0')}`;
           break;
         case 'MONTHLY':
-          today.setMonth(today.getMonth() + 1);
-          nextExecutionDate = today.toISOString().split('T')[0];
+          // Next month in local timezone
+          const nextMonth = new Date(year, month + 1, day);
+          nextExecutionDate = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-${String(nextMonth.getDate()).padStart(2, '0')}`;
           break;
       }
     }

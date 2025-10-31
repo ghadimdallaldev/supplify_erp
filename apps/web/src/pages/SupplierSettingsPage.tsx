@@ -8,13 +8,34 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Building2, Warehouse, MapPin, FileText, Clock, AlertCircle, UserPlus, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
+import { LogoUpload } from '../components/LogoUpload'
+import { useGetSupplierMeQuery, useUploadSupplierLogoMutation, useGetPresignedUrlMutation } from '../services/api'
 
 export function SupplierSettingsPage() {
+  const { data: supplierData, isLoading: isLoadingSupplier } = useGetSupplierMeQuery()
+  const [uploadSupplierLogo] = useUploadSupplierLogoMutation()
+  const [getPresignedUrl] = useGetPresignedUrlMutation()
+  
   const [showAddWarehouse, setShowAddWarehouse] = useState(false)
   const [showAddZone, setShowAddZone] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [uploadedContacts, setUploadedContacts] = useState<any[]>([])
+  
+  const supplier = supplierData?.supplier
+  
+  const handleLogoUpload = async (logoUrl: string) => {
+    if (!supplier?.id) {
+      toast.error('Supplier information not loaded')
+      return
+    }
+    await uploadSupplierLogo({ id: supplier.id, logoUrl }).unwrap()
+  }
+  
+  const handleGetPresignedUrl = async (params: { fileName: string; fileType: string; fileSize?: number }) => {
+    const result = await getPresignedUrl(params).unwrap()
+    return result
+  }
   
   // Warehouse form state
   const [warehouseForm, setWarehouseForm] = useState({
@@ -159,6 +180,33 @@ export function SupplierSettingsPage() {
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Company Logo
+              </CardTitle>
+              <CardDescription>Upload your company logo. This will be displayed in your profile and to restaurants.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingSupplier ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : supplier ? (
+                <LogoUpload
+                  currentLogo={supplier.logo_url}
+                  onUpload={handleLogoUpload}
+                  entityId={supplier.id}
+                  entityName={supplier.name || 'Supplier'}
+                  getPresignedUrl={handleGetPresignedUrl}
+                />
+              ) : (
+                <p className="text-sm text-gray-500">Loading supplier information...</p>
+              )}
+            </CardContent>
+          </Card>
+          
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

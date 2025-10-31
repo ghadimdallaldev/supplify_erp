@@ -140,9 +140,10 @@ async function createOrderFromQuickList(quickList) {
   const newTotal = limitCheck.current + ordersToCreate;
 
   if (!limitCheck.isUnlimited && limitCheck.limit !== null && newTotal > limitCheck.limit) {
-    logger.warn(`Order limit exceeded for restaurant ${restaurantId}, skipping order creation`);
-    // You could send a notification here
-    return;
+    const errorMessage = `Order limit exceeded: Cannot create ${ordersToCreate} order(s) as it would exceed your daily limit of ${limitCheck.limit} orders. Current usage: ${limitCheck.current}/${limitCheck.limit}. Please upgrade your subscription to obtain more features and higher order limits.`;
+    logger.warn(`Order limit exceeded for restaurant ${restaurantId}: ${errorMessage}`);
+    // Throw error so it's properly tracked in the execution results
+    throw new Error(errorMessage);
   }
 
   // Group items by supplier

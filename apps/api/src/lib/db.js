@@ -49,14 +49,26 @@ export async function query(text, params = []) {
     return result;
   } catch (error) {
     const duration = Date.now() - start;
-    console.error('❌ Query failed:', error.message);
-    console.error('Query:', text.substring(0, 200));
-    console.error('Error details:', error);
-    logger.error('Query failed', { 
-      error: error.message,
-      details: error,
-      params: params || []
-    });
+    
+    // Don't log expected errors (like table not found) as errors
+    // These are handled gracefully in the calling code
+    if (error.code === '42P01') {
+      // Table doesn't exist - expected in some cases
+      logger.debug('Query skipped (table not found)', { 
+        text: text.substring(0, 100) + '...',
+        duration: `${duration}ms`,
+        code: error.code
+      });
+    } else {
+      console.error('❌ Query failed:', error.message);
+      console.error('Query:', text.substring(0, 200));
+      console.error('Error details:', error);
+      logger.error('Query failed', { 
+        error: error.message,
+        details: error,
+        params: params || []
+      });
+    }
     throw error;
   }
 }

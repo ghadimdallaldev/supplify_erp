@@ -219,6 +219,65 @@ export async function requireAuth(req, res, next) {
   }
 }
 
+// Optional authentication middleware - doesn't fail if token is missing, but sets req.userData if available
+export async function optionalAuth(req, res, next) {
+  try {
+    const accessToken = extractTokenFromCookie(req);
+    
+    if (!accessToken) {
+      // No token, continue without authentication
+      return next();
+    }
+
+    try {
+      // Verify the access token
+      const payload = await verifyToken(accessToken);
+      req.user = payload;
+      req.userSub = payload.sub;
+      
+      // Get user from database
+      const user = await getUserBySub(payload.sub);
+      if (user) {
+        req.userData = user;
+      }
+    } catch (error) {
+      // Token is invalid or expired, try to refresh
+      const refreshToken = extractRefreshTokenFromCookie(req);
+      
+      if (refreshToken) {
+        try {
+          const newTokens = await refreshAccessToken(refreshToken);
+          
+          if (newTokens) {
+            // Set new cookies
+            setAuthCookies(res, newTokens.access_token, newTokens.refresh_token);
+            
+            // Verify the new token
+            const payload = await verifyToken(newTokens.access_token);
+            req.user = payload;
+            req.userSub = payload.sub;
+            
+            // Get user from database
+            const user = await getUserBySub(payload.sub);
+            if (user) {
+              req.userData = user;
+            }
+          }
+        } catch (refreshError) {
+          // Refresh failed, continue without authentication
+          logger.debug('Token refresh failed in optionalAuth, continuing without auth');
+        }
+      }
+    }
+    
+    next();
+  } catch (error) {
+    // If anything fails, just continue without authentication
+    logger.debug('Optional auth error, continuing without auth:', error.message);
+    next();
+  }
+}
+
 // Role-based access control middleware
 export function requireRole(allowedRoles) {
   return (req, res, next) => {

@@ -243,6 +243,28 @@ export const api = createApi({
         'Supplier',
       ],
     }),
+    getSupplierMe: builder.query<{ supplier: Supplier }, void>({
+      query: () => '/api/suppliers/me',
+      providesTags: ['Supplier'],
+    }),
+    uploadSupplierLogo: builder.mutation<Supplier, { id: string; logoUrl: string }>({
+      query: ({ id, logoUrl }) => ({
+        url: `/api/suppliers/${id}/logo`,
+        method: 'POST',
+        body: { logoUrl },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'Supplier', id },
+        'Supplier',
+      ],
+    }),
+    getPresignedUrl: builder.mutation<{ presignedUrl: string; fileKey: string; fileName: string; fileType: string }, { fileName: string; fileType: string; fileSize?: number }>({
+      query: (body) => ({
+        url: '/api/files/presign',
+        method: 'POST',
+        body,
+      }),
+    }),
 
     // Restaurant endpoints
     getRestaurants: builder.query<RestaurantsResponse, RestaurantFilters>({
@@ -255,6 +277,21 @@ export const api = createApi({
     getRestaurant: builder.query<Restaurant, string>({
       query: (id) => `/api/restaurants/${id}`,
       providesTags: (result, error, id) => [{ type: 'Restaurant', id }],
+    }),
+    getRestaurantMe: builder.query<{ restaurant: Restaurant }, void>({
+      query: () => '/api/restaurants/me',
+      providesTags: ['Restaurant'],
+    }),
+    uploadRestaurantLogo: builder.mutation<Restaurant, { id: string; logoUrl: string }>({
+      query: ({ id, logoUrl }) => ({
+        url: `/api/restaurants/${id}/logo`,
+        method: 'POST',
+        body: { logoUrl },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'Restaurant', id },
+        'Restaurant',
+      ],
     }),
 
     // Price endpoints
@@ -722,6 +759,11 @@ export const {
   useGetSupplierQuery,
   useFollowSupplierMutation,
   useUnfollowSupplierMutation,
+  useGetSupplierMeQuery,
+  useUploadSupplierLogoMutation,
+  useGetRestaurantMeQuery,
+  useUploadRestaurantLogoMutation,
+  useGetPresignedUrlMutation,
   useGetRestaurantsQuery,
   useGetRestaurantQuery,
   useGetPricesQuery,

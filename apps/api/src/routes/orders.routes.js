@@ -761,7 +761,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
           data: null,
           error: {
             name: 'LIMIT_EXCEEDED',
-            message: `Creating ${ordersToCreate} order(s) would exceed your daily limit (${limitCheck.limit})`,
+            message: `Creating ${ordersToCreate} order(s) would exceed your daily limit of ${limitCheck.limit} orders. Current usage: ${limitCheck.current}/${limitCheck.limit}. Please upgrade your subscription to obtain more features and higher order limits.`,
             details: {
               current: limitCheck.current,
               limit: limitCheck.limit,

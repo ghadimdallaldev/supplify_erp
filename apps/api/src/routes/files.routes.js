@@ -17,7 +17,7 @@ const s3 = new AWS.S3({
 });
 
 // Generate presigned URL for file upload
-router.post('/presign', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+router.post('/presign', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const { fileName, fileType, fileSize } = req.body;
     
