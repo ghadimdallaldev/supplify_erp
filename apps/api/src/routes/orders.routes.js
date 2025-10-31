@@ -16,7 +16,7 @@ const orderCreateSchema = z.object({
     quantity: z.number().positive(),
     notes: z.string().optional(),
   })).min(1),
-  status: z.enum(['DRAFT', 'PLACED']).default('PLACED'),
+  status: z.enum(['DRAFT', 'PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'RECEIVED_PARTIAL', 'RECEIVED_FULL', 'INVOICED', 'COMPLETED', 'CANCELLED']).default('PLACED'),
 });
 
 const supplierOrderCreateSchema = z.object({
@@ -30,7 +30,7 @@ const supplierOrderCreateSchema = z.object({
 });
 
 const orderUpdateSchema = z.object({
-  status: z.enum(['DRAFT', 'PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED']).optional(),
+  status: z.enum(['DRAFT', 'PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'RECEIVED_PARTIAL', 'RECEIVED_FULL', 'INVOICED', 'COMPLETED', 'CANCELLED']).optional(),
   notes: z.string().optional(),
 });
 

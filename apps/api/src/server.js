@@ -36,6 +36,7 @@ import { subscriptionsRoutes } from './routes/subscriptions.routes.js';
 import adminDashboardRoutes from './routes/admin-dashboard.routes.js';
 import branchesRoutes from './routes/branches.routes.js';
 import warehousesRoutes from './routes/warehouses.routes.js';
+import { executeScheduledOrders } from './services/scheduled-orders.service.js';
 
 const app = express();
 
@@ -175,6 +176,24 @@ server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${config.NODE_ENV}`);
   logger.info(`Web origin: ${config.WEB_ORIGIN}`);
+  
+  // Start scheduled orders cron job
+  // Run every 5 minutes to check for scheduled orders (for testing)
+  const CRON_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+  
+  // Run immediately on startup
+  executeScheduledOrders().catch(err => {
+    logger.error('Error in initial scheduled orders execution:', err);
+  });
+  
+  // Then run every hour
+  setInterval(() => {
+    executeScheduledOrders().catch(err => {
+      logger.error('Error in scheduled orders execution:', err);
+    });
+  }, CRON_INTERVAL);
+  
+  logger.info('Scheduled orders cron job started (runs every 5 minutes for testing)');
 });
 
 export default app;

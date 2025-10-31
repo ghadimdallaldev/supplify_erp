@@ -199,17 +199,18 @@ export async function verifyToken(token) {
     const errorName = error?.name || 'Unknown';
     const errorCode = error?.code || 'Unknown';
     
-    console.error('=== TOKEN VERIFICATION ERROR ===');
-    console.error('Message:', errorMessage);
-    console.error('Name:', errorName);
-    console.error('Code:', errorCode);
-    console.error('Full error:', error);
-    console.error('================================');
+    // If token is expired, throw a specific error that can be caught for refresh
+    if (errorCode === 'ERR_JWT_EXPIRED' || errorName === 'JWTExpired') {
+      logger.info('Token expired, will attempt refresh in middleware');
+      const expiredError = new Error('Token expired');
+      expiredError.name = 'JWTExpired';
+      expiredError.code = 'ERR_JWT_EXPIRED';
+      throw expiredError;
+    }
     
     logger.error('Token verification failed:', errorMessage);
     logger.error('Error name:', errorName);
     logger.error('Error code:', errorCode);
-    logger.error('Full error object:', error);
     throw new Error('Invalid token');
   }
 }

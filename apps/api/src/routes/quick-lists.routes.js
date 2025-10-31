@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from '../lib/rbac.js';
 import { query, withTransaction } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js';
+import { executeScheduledOrders } from '../services/scheduled-orders.service.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -31,6 +32,27 @@ const scheduleQuickListSchema = z.object({
   preferredTime: z.string().optional(), // HH:MM format
   autoCreateOrder: z.boolean().default(true),
   nextExecutionDate: z.string().optional(), // YYYY-MM-DD
+}).refine((data) => {
+  // Validate daysOfWeek based on frequency
+  if (data.frequency === 'WEEKLY' && data.daysOfWeek) {
+    if (data.daysOfWeek.length > 1) {
+      return false;
+    }
+  }
+  if (data.frequency === 'WEEKLY_3X' && data.daysOfWeek) {
+    if (data.daysOfWeek.length > 3) {
+      return false;
+    }
+  }
+  return true;
+}, (data) => {
+  if (data.frequency === 'WEEKLY' && data.daysOfWeek && data.daysOfWeek.length > 1) {
+    return { message: 'Once per week frequency allows only one day to be selected' };
+  }
+  if (data.frequency === 'WEEKLY_3X' && data.daysOfWeek && data.daysOfWeek.length > 3) {
+    return { message: 'Three times per week frequency allows only up to 3 days to be selected' };
+  }
+  return { message: 'Invalid number of days selected for the chosen frequency' };
 });
 
 const addItemSchema = z.object({
@@ -791,6 +813,40 @@ router.delete('/:id/schedule', requireAuth, requireRole(['RESTAURANT', 'ADMIN'])
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to unschedule quick list',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Manually execute scheduled orders (for testing or immediate execution)
+router.post('/execute-scheduled', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const result = await executeScheduledOrders();
+    
+    res.json({
+      ok: true,
+      data: {
+        executed: result.executed,
+        errors: result.errors,
+        message: `Executed ${result.executed} scheduled orders, ${result.errors} errors`
+      },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error({
+      message: 'Execute scheduled orders error',
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to execute scheduled orders',
         details: error.message,
       },
       requestId: req.requestId,

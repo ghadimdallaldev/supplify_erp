@@ -106,15 +106,26 @@ export async function checkLimit(tenantId, tenantType, meterType) {
     let limit = subscription.limits?.[meterType];
     const isUnlimited = limit === -1 || limit === null || limit === undefined;
 
-    // Check for admin override
-    const { rows: overrides } = await query(`
-      SELECT override_value, expiration_date
-      FROM tenant_limit_override
-      WHERE tenant_id = $1 
-        AND tenant_type = $2 
-        AND limit_type = $3
-        AND (expiration_date IS NULL OR expiration_date > now())
-    `, [tenantId, tenantType, meterType]);
+    // Check for admin override (table may not exist in all installations)
+    let overrides = [];
+    try {
+      const result = await query(`
+        SELECT override_value, expiration_date
+        FROM tenant_limit_override
+        WHERE tenant_id = $1 
+          AND tenant_type = $2 
+          AND limit_type = $3
+          AND (expiration_date IS NULL OR expiration_date > now())
+      `, [tenantId, tenantType, meterType]);
+      overrides = result.rows;
+    } catch (error) {
+      // Table doesn't exist - that's OK, just skip override check
+      if (error.code === '42P01') {
+        // Table doesn't exist, continue without override
+      } else {
+        throw error;
+      }
+    }
 
     if (overrides.length > 0) {
       const override = overrides[0];
