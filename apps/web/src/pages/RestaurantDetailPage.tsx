@@ -29,7 +29,12 @@ export function RestaurantDetailPage() {
   // Calculate statistics
   const stats = useMemo(() => {
     const totalOrders = restaurantOrders.length
-    const totalSpent = restaurantOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
+    const totalSpent = restaurantOrders.reduce((sum, order) => {
+      const amount = typeof order.total_amount === 'number' 
+        ? order.total_amount 
+        : parseFloat(order.total_amount || 0)
+      return sum + (isNaN(amount) ? 0 : amount)
+    }, 0)
     const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
     
     // Get most purchased products
@@ -46,8 +51,10 @@ export function RestaurantDetailPage() {
           })
         }
         const product = productCount.get(item.product_id)!
-        product.totalQuantity += item.quantity
-        product.totalRevenue += item.line_total || 0
+        const quantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity || 0)
+        const lineTotal = typeof item.line_total === 'number' ? item.line_total : parseFloat(item.line_total || 0)
+        product.totalQuantity += isNaN(quantity) ? 0 : quantity
+        product.totalRevenue += isNaN(lineTotal) ? 0 : lineTotal
       })
     })
     
@@ -178,7 +185,7 @@ export function RestaurantDetailPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.totalSpent.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${typeof stats.totalSpent === 'number' ? stats.totalSpent.toFixed(2) : '0.00'}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Lifetime value
             </p>
@@ -191,7 +198,7 @@ export function RestaurantDetailPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.averageOrderValue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${typeof stats.averageOrderValue === 'number' ? stats.averageOrderValue.toFixed(2) : '0.00'}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Per order
             </p>
@@ -235,8 +242,8 @@ export function RestaurantDetailPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold">{product.totalQuantity} units</p>
-                    <p className="text-sm text-gray-500">${product.totalRevenue.toFixed(2)}</p>
+                    <p className="font-semibold">{typeof product.totalQuantity === 'number' ? product.totalQuantity : 0} units</p>
+                    <p className="text-sm text-gray-500">${typeof product.totalRevenue === 'number' ? product.totalRevenue.toFixed(2) : '0.00'}</p>
                   </div>
                 </div>
               ))
@@ -277,7 +284,9 @@ export function RestaurantDetailPage() {
                   <Badge variant={order.status === 'COMPLETED' ? 'default' : 'secondary'}>
                     {order.status}
                   </Badge>
-                  <p className="text-sm font-medium mt-1">${order.total_amount?.toFixed(2)}</p>
+                  <p className="text-sm font-medium mt-1">${typeof order.total_amount === 'number' 
+                    ? order.total_amount.toFixed(2) 
+                    : parseFloat(order.total_amount || 0).toFixed(2)}</p>
                 </div>
               </div>
             ))}

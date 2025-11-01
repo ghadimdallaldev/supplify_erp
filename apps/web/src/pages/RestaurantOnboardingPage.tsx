@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -16,28 +16,102 @@ import {
   Phone,
   Mail,
   Plus,
-  Trash2
+  Trash2,
+  Package,
+  ShoppingCart,
+  TrendingUp,
+  Globe,
+  Save,
+  Loader2,
+  DollarSign,
+  MapPin,
+  Clock,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  AlertCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { LogoUpload } from '../components/LogoUpload'
-import { useGetRestaurantMeQuery, useUploadRestaurantLogoMutation, useGetPresignedUrlMutation } from '../services/api'
+import { 
+  useGetRestaurantMeQuery, 
+  useUpdateRestaurantMutation, 
+  useUploadRestaurantLogoMutation, 
+  useGetPresignedUrlMutation,
+  useGetOrdersQuery,
+  useGetDashboardStatsQuery
+} from '../services/api'
 
 export function RestaurantOnboardingPage() {
-  const { data: restaurantData, isLoading: isLoadingRestaurant } = useGetRestaurantMeQuery()
+  const { data: restaurantData, isLoading: isLoadingRestaurant, refetch: refetchRestaurant } = useGetRestaurantMeQuery()
+  const [updateRestaurant, { isLoading: isUpdating }] = useUpdateRestaurantMutation()
   const [uploadRestaurantLogo] = useUploadRestaurantLogoMutation()
   const [getPresignedUrl] = useGetPresignedUrlMutation()
+  
+  // Get statistics for dashboard
+  const { data: stats } = useGetDashboardStatsQuery()
+  const { data: ordersData } = useGetOrdersQuery({ limit: 100 }, { skip: !restaurantData?.restaurant?.id })
   
   const [activeTab, setActiveTab] = useState('profile')
   
   const restaurant = restaurantData?.restaurant
+  
+  // Profile form state
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    business_type: '',
+    trade_license_no: '',
+    tax_id: '',
+    vat_number: '',
+    phone: '',
+    contact_email: '',
+    address: {
+      street: '',
+      city: '',
+      region: '',
+      country: '',
+    },
+    delivery_instructions: '',
+    description: '',
+    website: '',
+  })
+  
+  // Load restaurant data into form
+  useEffect(() => {
+    if (restaurant) {
+      setProfileForm({
+        name: restaurant.name || '',
+        business_type: restaurant.business_type || 'restaurant',
+        trade_license_no: restaurant.trade_license_no || '',
+        tax_id: restaurant.tax_id || '',
+        vat_number: restaurant.vat_number || '',
+        phone: restaurant.phone || '',
+        contact_email: restaurant.contact_email || '',
+        address: restaurant.address_json || {
+          street: '',
+          city: '',
+          region: '',
+          country: '',
+        },
+        delivery_instructions: restaurant.delivery_instructions || '',
+        description: restaurant.description || '',
+        website: restaurant.website || '',
+      })
+    }
+  }, [restaurant])
   
   const handleLogoUpload = async (logoUrl: string) => {
     if (!restaurant?.id) {
       toast.error('Restaurant information not loaded')
       return
     }
-    await uploadRestaurantLogo({ id: restaurant.id, logoUrl }).unwrap()
+    try {
+      await uploadRestaurantLogo({ id: restaurant.id, logoUrl }).unwrap()
+      refetchRestaurant()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to upload logo')
+    }
   }
   
   const handleGetPresignedUrl = async (params: { fileName: string; fileType: string; fileSize?: number }) => {
@@ -45,13 +119,44 @@ export function RestaurantOnboardingPage() {
     return result
   }
   
-  // Profile state
-  const [businessName, setBusinessName] = useState('')
-  const [businessType, setBusinessType] = useState('restaurant')
-  const [registrationNumber, setRegistrationNumber] = useState('')
-  const [taxId, setTaxId] = useState('')
-  const [vatNumber, setVatNumber] = useState('')
-  const [deliveryInstructions, setDeliveryInstructions] = useState('')
+  const handleSaveProfile = async () => {
+    if (!restaurant?.id) {
+      toast.error('Restaurant information not loaded')
+      return
+    }
+    
+    try {
+      await updateRestaurant({
+        id: restaurant.id,
+        data: {
+          name: profileForm.name,
+          tradeLicenseNo: profileForm.trade_license_no,
+          phone: profileForm.phone,
+          contactEmail: profileForm.contact_email,
+          address: profileForm.address,
+        }
+      }).unwrap()
+      
+      toast.success('Profile updated successfully!')
+      refetchRestaurant()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to update profile')
+    }
+  }
+  
+  // Calculate statistics
+  const statistics = useMemo(() => {
+    const orders = ordersData?.orders || []
+    
+    return {
+      totalOrders: stats?.totalOrders || orders.length,
+      pendingOrders: stats?.pendingOrders || orders.filter((o: any) => o.status === 'PENDING' || o.status === 'PLACED').length,
+      completedOrders: stats?.completedOrders || orders.filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED').length,
+      totalSpent: stats?.totalSpent || orders
+        .filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED')
+        .reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0),
+    }
+  }, [ordersData, stats])
   
   // Team state
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false)
@@ -97,6 +202,7 @@ export function RestaurantOnboardingPage() {
   }
 
   const handleSaveNotifications = () => {
+    // TODO: Implement API call to save notification preferences
     toast.success('Notification preferences saved!')
   }
 
@@ -104,11 +210,76 @@ export function RestaurantOnboardingPage() {
     setNotifications({ ...notifications, [key]: !notifications[key as keyof typeof notifications] })
   }
 
+  if (isLoadingRestaurant) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Account Setup</h1>
         <p className="text-gray-600 mt-2">Complete your business profile and preferences</p>
+      </div>
+
+      {/* Statistics Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-700">Total Orders</p>
+                <p className="text-2xl font-bold text-blue-900">{statistics.totalOrders}</p>
+                <p className="text-xs text-blue-600 mt-1">All orders</p>
+              </div>
+              <ShoppingCart className="h-10 w-10 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-700">Completed Orders</p>
+                <p className="text-2xl font-bold text-green-900">{statistics.completedOrders}</p>
+                <p className="text-xs text-green-600 mt-1">Received</p>
+              </div>
+              <Package className="h-10 w-10 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-yellow-700">Pending Orders</p>
+                <p className="text-2xl font-bold text-yellow-900">{statistics.pendingOrders}</p>
+                <p className="text-xs text-yellow-600 mt-1">In progress</p>
+              </div>
+              <Clock className="h-10 w-10 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-700">Total Spent</p>
+                <p className="text-2xl font-bold text-purple-900">
+                  ${Number(statistics.totalSpent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-purple-600 mt-1">All-time</p>
+              </div>
+              <DollarSign className="h-10 w-10 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -136,18 +307,14 @@ export function RestaurantOnboardingPage() {
         </TabsList>
 
         {/* Profile Tab */}
-        <TabsContent value="profile">
+        <TabsContent value="profile" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Business Logo</CardTitle>
               <CardDescription>Upload your business logo. This will be displayed in your profile and to suppliers.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isLoadingRestaurant ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : restaurant ? (
+              {restaurant ? (
                 <LogoUpload
                   currentLogo={restaurant.logo_url}
                   onUpload={handleLogoUpload}
@@ -164,21 +331,26 @@ export function RestaurantOnboardingPage() {
           <Card>
             <CardHeader>
               <CardTitle>Business Profile</CardTitle>
-              <CardDescription>Update your business information</CardDescription>
+              <CardDescription>Update your business information and contact details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="businessName">Business Name *</Label>
-                  <Input id="businessName" placeholder="Enter business name" />
+                  <Input 
+                    id="businessName" 
+                    placeholder="Enter business name"
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="businessType">Business Type *</Label>
                   <select 
                     id="businessType" 
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    value={businessType}
-                    onChange={(e) => setBusinessType(e.target.value)}
+                    value={profileForm.business_type}
+                    onChange={(e) => setProfileForm({ ...profileForm, business_type: e.target.value })}
                   >
                     <option value="restaurant">Restaurant</option>
                     <option value="cafe">Café</option>
@@ -191,17 +363,140 @@ export function RestaurantOnboardingPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="registrationNumber">Registration Number</Label>
-                  <Input id="registrationNumber" placeholder="Enter registration number" />
+                  <Input 
+                    id="registrationNumber" 
+                    placeholder="Enter registration number"
+                    value={profileForm.trade_license_no}
+                    onChange={(e) => setProfileForm({ ...profileForm, trade_license_no: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="taxId">Tax ID</Label>
-                  <Input id="taxId" placeholder="Enter tax ID" />
+                  <Input 
+                    id="taxId" 
+                    placeholder="Enter tax ID"
+                    value={profileForm.tax_id}
+                    onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="vatNumber">VAT Number</Label>
-                <Input id="vatNumber" placeholder="Enter VAT number" />
+                <Input 
+                  id="vatNumber" 
+                  placeholder="Enter VAT number"
+                  value={profileForm.vat_number}
+                  onChange={(e) => setProfileForm({ ...profileForm, vat_number: e.target.value })}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="contact-email">Contact Email *</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input 
+                      id="contact-email"
+                      type="email"
+                      placeholder="contact@restaurant.com"
+                      value={profileForm.contact_email}
+                      onChange={(e) => setProfileForm({ ...profileForm, contact_email: e.target.value })}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact-phone">Phone</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input 
+                      id="contact-phone"
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="website">Website</Label>
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input 
+                    id="website"
+                    type="url"
+                    placeholder="https://www.restaurant.com"
+                    value={profileForm.website}
+                    onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Business Description</Label>
+                <Textarea 
+                  id="description"
+                  placeholder="Tell suppliers about your restaurant..."
+                  rows={4}
+                  value={profileForm.description}
+                  onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="street">Street Address</Label>
+                  <Input 
+                    id="street"
+                    placeholder="123 Main Street"
+                    value={profileForm.address.street}
+                    onChange={(e) => setProfileForm({ 
+                      ...profileForm, 
+                      address: { ...profileForm.address, street: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input 
+                    id="city"
+                    placeholder="City Name"
+                    value={profileForm.address.city}
+                    onChange={(e) => setProfileForm({ 
+                      ...profileForm, 
+                      address: { ...profileForm.address, city: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="region">Region/State</Label>
+                  <Input 
+                    id="region"
+                    placeholder="State or Region"
+                    value={profileForm.address.region}
+                    onChange={(e) => setProfileForm({ 
+                      ...profileForm, 
+                      address: { ...profileForm.address, region: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Input 
+                    id="country"
+                    placeholder="Country"
+                    value={profileForm.address.country}
+                    onChange={(e) => setProfileForm({ 
+                      ...profileForm, 
+                      address: { ...profileForm.address, country: e.target.value }
+                    })}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -210,20 +505,30 @@ export function RestaurantOnboardingPage() {
                   id="deliveryInstructions"
                   placeholder="e.g., Gate A, Floor 2, Landmark: next to gas station"
                   rows={3}
-                  value={deliveryInstructions}
-                  onChange={(e) => setDeliveryInstructions(e.target.value)}
+                  value={profileForm.delivery_instructions}
+                  onChange={(e) => setProfileForm({ ...profileForm, delivery_instructions: e.target.value })}
                 />
               </div>
 
-              <Button onClick={() => toast.success('Profile updated!')}>
-                Save Changes
+              <Button onClick={handleSaveProfile} disabled={isUpdating}>
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Team Tab */}
-        <TabsContent value="team">
+        <TabsContent value="team" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -239,7 +544,7 @@ export function RestaurantOnboardingPage() {
             </CardHeader>
             <CardContent>
               {teamMembers.length === 0 ? (
-                <div className="text-center py-12">
+                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
                   <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">No team members added yet</p>
                   <p className="text-sm text-gray-500 mt-2">Add contacts for owner, manager, purchasing, finance, and kitchen</p>
@@ -247,15 +552,25 @@ export function RestaurantOnboardingPage() {
               ) : (
                 <div className="space-y-3">
                   {teamMembers.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between border rounded-lg p-4">
+                    <div key={member.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-2">
                           <p className="font-medium">{member.name}</p>
                           {member.isPrimary && <Badge variant="default">Primary</Badge>}
                           <Badge variant="outline" className="capitalize">{member.role}</Badge>
                         </div>
-                        <p className="text-sm text-gray-600">{member.email}</p>
-                        {member.phone && <p className="text-sm text-gray-600">{member.phone}</p>}
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span className="flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
+                            {member.email}
+                          </span>
+                          {member.phone && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {member.phone}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => {
                         setTeamMembers(teamMembers.filter(m => m.id !== member.id))
@@ -272,7 +587,7 @@ export function RestaurantOnboardingPage() {
         </TabsContent>
 
         {/* Branches Tab */}
-        <TabsContent value="branches">
+        <TabsContent value="branches" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -288,7 +603,7 @@ export function RestaurantOnboardingPage() {
             </CardHeader>
             <CardContent>
               {branches.length === 0 ? (
-                <div className="text-center py-12">
+                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
                   <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">No branches added yet</p>
                   <p className="text-sm text-gray-500 mt-2">Add multiple locations for your restaurant</p>
@@ -296,11 +611,23 @@ export function RestaurantOnboardingPage() {
               ) : (
                 <div className="space-y-3">
                   {branches.map((branch) => (
-                    <div key={branch.id} className="flex items-center justify-between border rounded-lg p-4">
+                    <div key={branch.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex-1">
-                        <p className="font-medium">{branch.name}</p>
-                        {branch.phone && <p className="text-sm text-gray-600">{branch.phone}</p>}
-                        {branch.address && <p className="text-sm text-gray-600">{branch.address}</p>}
+                        <p className="font-medium mb-2">{branch.name}</p>
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          {branch.phone && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {branch.phone}
+                            </span>
+                          )}
+                          {branch.address && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {branch.address}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => {
                         setBranches(branches.filter(b => b.id !== branch.id))
@@ -322,7 +649,7 @@ export function RestaurantOnboardingPage() {
         </TabsContent>
 
         {/* Notifications Tab */}
-        <TabsContent value="notifications">
+        <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Notification Preferences</CardTitle>
@@ -330,78 +657,110 @@ export function RestaurantOnboardingPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <Label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={notifications.email}
-                    onChange={() => handleToggleNotification('email')}
-                    className="h-4 w-4" 
-                  />
-                  <span>Email Notifications</span>
-                </Label>
-                <Label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={notifications.sms}
-                    onChange={() => handleToggleNotification('sms')}
-                    className="h-4 w-4" 
-                  />
-                  <span>SMS Notifications</span>
-                </Label>
-                <Label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={notifications.push}
-                    onChange={() => handleToggleNotification('push')}
-                    className="h-4 w-4" 
-                  />
-                  <span>Push Notifications</span>
-                </Label>
-              </div>
-
-              <div className="border-t pt-6">
-                <h4 className="font-semibold mb-4">Notification Types</h4>
+                <h4 className="font-semibold">Delivery Methods</h4>
                 <div className="space-y-3">
-                  <Label className="flex items-center gap-2 cursor-pointer">
+                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
                     <input 
                       type="checkbox" 
-                      checked={notifications.orderUpdates}
-                      onChange={() => handleToggleNotification('orderUpdates')}
-                      className="h-4 w-4" 
+                      checked={notifications.email}
+                      onChange={() => handleToggleNotification('email')}
+                      className="h-5 w-5" 
                     />
-                    <span>Order Updates</span>
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-500" />
+                      <span>Email Notifications</span>
+                    </div>
+                    {notifications.email && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
                   </Label>
-                  <Label className="flex items-center gap-2 cursor-pointer">
+                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
                     <input 
                       type="checkbox" 
-                      checked={notifications.newMessages}
-                      onChange={() => handleToggleNotification('newMessages')}
-                      className="h-4 w-4" 
+                      checked={notifications.sms}
+                      onChange={() => handleToggleNotification('sms')}
+                      className="h-5 w-5" 
                     />
-                    <span>New Messages from Suppliers</span>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-gray-500" />
+                      <span>SMS Notifications</span>
+                    </div>
+                    {notifications.sms && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
                   </Label>
-                  <Label className="flex items-center gap-2 cursor-pointer">
+                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
                     <input 
                       type="checkbox" 
-                      checked={notifications.invoiceReminders}
-                      onChange={() => handleToggleNotification('invoiceReminders')}
-                      className="h-4 w-4" 
+                      checked={notifications.push}
+                      onChange={() => handleToggleNotification('push')}
+                      className="h-5 w-5" 
                     />
-                    <span>Invoice Due Reminders</span>
-                  </Label>
-                  <Label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={notifications.lowStock}
-                      onChange={() => handleToggleNotification('lowStock')}
-                      className="h-4 w-4" 
-                    />
-                    <span>Low Stock Alerts</span>
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-4 w-4 text-gray-500" />
+                      <span>Push Notifications</span>
+                    </div>
+                    {notifications.push && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
                   </Label>
                 </div>
               </div>
 
-              <Button onClick={handleSaveNotifications}>
+              <div className="border-t pt-6 space-y-4">
+                <h4 className="font-semibold">Notification Types</h4>
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.orderUpdates}
+                      onChange={() => handleToggleNotification('orderUpdates')}
+                      className="h-5 w-5" 
+                    />
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4 text-gray-500" />
+                      <span>Order Updates</span>
+                    </div>
+                    {notifications.orderUpdates && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
+                  </Label>
+                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.newMessages}
+                      onChange={() => handleToggleNotification('newMessages')}
+                      className="h-5 w-5" 
+                    />
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-500" />
+                      <span>New Messages from Suppliers</span>
+                    </div>
+                    {notifications.newMessages && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
+                  </Label>
+                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.invoiceReminders}
+                      onChange={() => handleToggleNotification('invoiceReminders')}
+                      className="h-5 w-5" 
+                    />
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-gray-500" />
+                      <span>Invoice Due Reminders</span>
+                    </div>
+                    {notifications.invoiceReminders && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
+                  </Label>
+                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
+                    <input 
+                      type="checkbox" 
+                      checked={notifications.lowStock}
+                      onChange={() => handleToggleNotification('lowStock')}
+                      className="h-5 w-5" 
+                    />
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-gray-500" />
+                      <span>Low Stock Alerts</span>
+                    </div>
+                    {notifications.lowStock && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
+                  </Label>
+                </div>
+              </div>
+
+              <Button onClick={handleSaveNotifications} className="w-full">
+                <Save className="h-4 w-4 mr-2" />
                 Save Preferences
               </Button>
             </CardContent>
@@ -555,4 +914,3 @@ export function RestaurantOnboardingPage() {
     </div>
   )
 }
-

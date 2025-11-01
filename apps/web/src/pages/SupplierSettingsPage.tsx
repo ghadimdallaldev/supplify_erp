@@ -1,20 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
-import { Building2, Warehouse, MapPin, FileText, Clock, AlertCircle, UserPlus, Upload } from 'lucide-react'
+import { 
+  Building2, Warehouse, MapPin, FileText, Clock, AlertCircle, UserPlus, Upload, 
+  Package, ShoppingCart, TrendingUp, Mail, Phone, Globe, Save, Loader2,
+  Activity, Users, DollarSign, Calendar, CheckCircle2, XCircle
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
 import { LogoUpload } from '../components/LogoUpload'
-import { useGetSupplierMeQuery, useUploadSupplierLogoMutation, useGetPresignedUrlMutation } from '../services/api'
+import { 
+  useGetSupplierMeQuery, 
+  useUpdateSupplierMutation, 
+  useUploadSupplierLogoMutation, 
+  useGetPresignedUrlMutation,
+  useGetProductsQuery,
+  useGetOrdersQuery,
+  useGetDashboardStatsQuery
+} from '../services/api'
 
 export function SupplierSettingsPage() {
-  const { data: supplierData, isLoading: isLoadingSupplier } = useGetSupplierMeQuery()
+  const { data: supplierData, isLoading: isLoadingSupplier, refetch: refetchSupplier } = useGetSupplierMeQuery()
+  const [updateSupplier, { isLoading: isUpdating }] = useUpdateSupplierMutation()
   const [uploadSupplierLogo] = useUploadSupplierLogoMutation()
   const [getPresignedUrl] = useGetPresignedUrlMutation()
+  
+  // Get statistics for dashboard
+  const { data: stats } = useGetDashboardStatsQuery()
+  const { data: productsData } = useGetProductsQuery({ limit: 1000 }, { skip: !supplierData?.supplier?.id })
+  const { data: ordersData } = useGetOrdersQuery({ limit: 100 }, { skip: !supplierData?.supplier?.id })
   
   const [showAddWarehouse, setShowAddWarehouse] = useState(false)
   const [showAddZone, setShowAddZone] = useState(false)
@@ -24,18 +44,107 @@ export function SupplierSettingsPage() {
   
   const supplier = supplierData?.supplier
   
+  // Profile form state
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    legal_name: '',
+    vat_no: '',
+    trade_license_no: '',
+    phone: '',
+    contact_email: '',
+    address: {
+      street: '',
+      city: '',
+      region: '',
+      country: '',
+    },
+    description: '',
+    website: '',
+  })
+  
+  // Load supplier data into form
+  useEffect(() => {
+    if (supplier) {
+      setProfileForm({
+        name: supplier.name || '',
+        legal_name: supplier.legal_name || '',
+        vat_no: supplier.vat_no || '',
+        trade_license_no: supplier.trade_license_no || '',
+        phone: supplier.phone || '',
+        contact_email: supplier.contact_email || '',
+        address: supplier.address_json || {
+          street: '',
+          city: '',
+          region: '',
+          country: '',
+        },
+        description: supplier.description || '',
+        website: supplier.website || '',
+      })
+    }
+  }, [supplier])
+  
   const handleLogoUpload = async (logoUrl: string) => {
     if (!supplier?.id) {
       toast.error('Supplier information not loaded')
       return
     }
-    await uploadSupplierLogo({ id: supplier.id, logoUrl }).unwrap()
+    try {
+      await uploadSupplierLogo({ id: supplier.id, logoUrl }).unwrap()
+      refetchSupplier()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to upload logo')
+    }
   }
   
   const handleGetPresignedUrl = async (params: { fileName: string; fileType: string; fileSize?: number }) => {
     const result = await getPresignedUrl(params).unwrap()
     return result
   }
+  
+  const handleSaveProfile = async () => {
+    if (!supplier?.id) {
+      toast.error('Supplier information not loaded')
+      return
+    }
+    
+    try {
+      await updateSupplier({
+        id: supplier.id,
+        data: {
+          name: profileForm.name,
+          vatNo: profileForm.vat_no,
+          phone: profileForm.phone,
+          contactEmail: profileForm.contact_email,
+          address: profileForm.address,
+        }
+      }).unwrap()
+      
+      // Also update fields that might not be in the standard schema
+      // These would need to be added to the API schema if needed
+      toast.success('Profile updated successfully!')
+      refetchSupplier()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to update profile')
+    }
+  }
+  
+  // Calculate statistics
+  const statistics = useMemo(() => {
+    const products = productsData?.products || []
+    const orders = ordersData?.orders || []
+    
+    return {
+      totalProducts: products.length,
+      activeProducts: products.filter((p: any) => p.status === 'ACTIVE').length,
+      totalOrders: stats?.totalOrders || orders.length,
+      pendingOrders: stats?.pendingOrders || orders.filter((o: any) => o.status === 'PENDING' || o.status === 'PLACED').length,
+      completedOrders: stats?.completedOrders || orders.filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED').length,
+      totalRevenue: stats?.totalRevenue || orders
+        .filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED')
+        .reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0),
+    }
+  }, [productsData, ordersData, stats])
   
   // Warehouse form state
   const [warehouseForm, setWarehouseForm] = useState({
@@ -163,11 +272,76 @@ export function SupplierSettingsPage() {
     setUploadedContacts([])
   }
 
+  if (isLoadingSupplier) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Supplier Settings</h1>
         <p className="text-gray-600 mt-2">Manage your business profile and settings</p>
+      </div>
+
+      {/* Statistics Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-700">Total Products</p>
+                <p className="text-2xl font-bold text-blue-900">{statistics.totalProducts}</p>
+                <p className="text-xs text-blue-600 mt-1">{statistics.activeProducts} active</p>
+              </div>
+              <Package className="h-10 w-10 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-700">Total Orders</p>
+                <p className="text-2xl font-bold text-green-900">{statistics.totalOrders}</p>
+                <p className="text-xs text-green-600 mt-1">{statistics.completedOrders} completed</p>
+              </div>
+              <ShoppingCart className="h-10 w-10 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-yellow-700">Pending Orders</p>
+                <p className="text-2xl font-bold text-yellow-900">{statistics.pendingOrders}</p>
+                <p className="text-xs text-yellow-600 mt-1">Awaiting fulfillment</p>
+              </div>
+              <Clock className="h-10 w-10 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-700">Total Revenue</p>
+                <p className="text-2xl font-bold text-purple-900">
+                  ${Number(statistics.totalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-purple-600 mt-1">All-time</p>
+              </div>
+              <DollarSign className="h-10 w-10 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
@@ -189,11 +363,7 @@ export function SupplierSettingsPage() {
               <CardDescription>Upload your company logo. This will be displayed in your profile and to restaurants.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isLoadingSupplier ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : supplier ? (
+              {supplier ? (
                 <LogoUpload
                   currentLogo={supplier.logo_url}
                   onUpload={handleLogoUpload}
@@ -210,30 +380,172 @@ export function SupplierSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
+                <Building2 className="h-5 w-5" />
                 Company Information
               </CardTitle>
+              <CardDescription>Update your company details and contact information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Company Name</label>
-                  <Input defaultValue="Fresh Produce Co" />
+                  <Label htmlFor="name">Company Name *</Label>
+                  <Input 
+                    id="name"
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                    placeholder="Fresh Produce Co"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Legal Name</label>
-                  <Input defaultValue="Fresh Produce Co LLC" />
+                  <Label htmlFor="legal_name">Legal Name</Label>
+                  <Input 
+                    id="legal_name"
+                    value={profileForm.legal_name}
+                    onChange={(e) => setProfileForm({ ...profileForm, legal_name: e.target.value })}
+                    placeholder="Fresh Produce Co LLC"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">VAT Number</label>
-                  <Input defaultValue="VAT-123456" />
+                  <Label htmlFor="vat_no">VAT Number</Label>
+                  <Input 
+                    id="vat_no"
+                    value={profileForm.vat_no}
+                    onChange={(e) => setProfileForm({ ...profileForm, vat_no: e.target.value })}
+                    placeholder="VAT-123456"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Trade License</label>
-                  <Input defaultValue="TL-456789" />
+                  <Label htmlFor="trade_license_no">Trade License</Label>
+                  <Input 
+                    id="trade_license_no"
+                    value={profileForm.trade_license_no}
+                    onChange={(e) => setProfileForm({ ...profileForm, trade_license_no: e.target.value })}
+                    placeholder="TL-456789"
+                  />
                 </div>
               </div>
-              <Button>Save Changes</Button>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="contact_email">Contact Email *</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input 
+                      id="contact_email"
+                      type="email"
+                      value={profileForm.contact_email}
+                      onChange={(e) => setProfileForm({ ...profileForm, contact_email: e.target.value })}
+                      placeholder="contact@example.com"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input 
+                      id="phone"
+                      type="tel"
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                      placeholder="+1 (555) 123-4567"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="website">Website</Label>
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input 
+                    id="website"
+                    type="url"
+                    value={profileForm.website}
+                    onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                    placeholder="https://www.example.com"
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="description">Company Description</Label>
+                <Textarea 
+                  id="description"
+                  value={profileForm.description}
+                  onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
+                  placeholder="Tell restaurants about your company..."
+                  rows={4}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="street">Street Address</Label>
+                  <Input 
+                    id="street"
+                    value={profileForm.address.street}
+                    onChange={(e) => setProfileForm({ 
+                      ...profileForm, 
+                      address: { ...profileForm.address, street: e.target.value }
+                    })}
+                    placeholder="123 Main Street"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input 
+                    id="city"
+                    value={profileForm.address.city}
+                    onChange={(e) => setProfileForm({ 
+                      ...profileForm, 
+                      address: { ...profileForm.address, city: e.target.value }
+                    })}
+                    placeholder="City Name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="region">Region/State</Label>
+                  <Input 
+                    id="region"
+                    value={profileForm.address.region}
+                    onChange={(e) => setProfileForm({ 
+                      ...profileForm, 
+                      address: { ...profileForm.address, region: e.target.value }
+                    })}
+                    placeholder="State or Region"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Input 
+                    id="country"
+                    value={profileForm.address.country}
+                    onChange={(e) => setProfileForm({ 
+                      ...profileForm, 
+                      address: { ...profileForm.address, country: e.target.value }
+                    })}
+                    placeholder="Country"
+                  />
+                </div>
+              </div>
+              
+              <Button onClick={handleSaveProfile} disabled={isUpdating}>
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -254,45 +566,70 @@ export function SupplierSettingsPage() {
                     <Upload className="h-4 w-4 mr-2" />
                     Upload CSV/Excel
                   </Button>
-                  <Button onClick={() => setShowAddContact(true)}>Add Contact</Button>
+                  <Button onClick={() => setShowAddContact(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Contact
+                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border rounded-lg p-4">
+                <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-semibold">John Doe</h4>
                         <Badge variant="secondary">Sales Manager</Badge>
-                        <Badge>Primary</Badge>
+                        <Badge className="bg-blue-500 text-white">Primary</Badge>
                       </div>
-                      <p className="text-sm text-gray-600">john.doe@freshproduce.com</p>
-                      <p className="text-sm text-gray-600">+1 (555) 123-4567</p>
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          john.doe@freshproduce.com
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          +1 (555) 123-4567
+                        </span>
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="outline" size="sm">Remove</Button>
+                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">Remove</Button>
                     </div>
                   </div>
                 </div>
                 
-                <div className="border rounded-lg p-4">
+                <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-semibold">Jane Smith</h4>
                         <Badge variant="secondary">Operations Lead</Badge>
                       </div>
-                      <p className="text-sm text-gray-600">jane.smith@freshproduce.com</p>
-                      <p className="text-sm text-gray-600">+1 (555) 987-6543</p>
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          jane.smith@freshproduce.com
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          +1 (555) 987-6543
+                        </span>
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="outline" size="sm">Remove</Button>
+                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">Remove</Button>
                     </div>
                   </div>
+                </div>
+                
+                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                  <UserPlus className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+                  <p className="text-gray-600">No additional contacts</p>
+                  <p className="text-sm text-gray-500 mt-1">Add contacts to manage your team</p>
                 </div>
               </div>
             </CardContent>
@@ -306,42 +643,64 @@ export function SupplierSettingsPage() {
                 <Clock className="h-5 w-5" />
                 Business Hours & Policies
               </CardTitle>
+              <CardDescription>Set your operating hours and business policies</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="space-y-4">
-                <h3 className="font-medium">Operating Hours</h3>
-                <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-lg">Operating Hours</h3>
+                  <Badge variant="outline">Configure your weekly schedule</Badge>
+                </div>
+                <div className="space-y-3">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                    <div key={day} className="flex items-center gap-4">
-                      <div className="w-24">{day}</div>
-                      <Input type="time" placeholder="09:00" />
+                    <div key={day} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-gray-50">
+                      <div className="w-28 font-medium">{day}</div>
+                      <Input type="time" className="w-32" placeholder="09:00" />
                       <span className="text-gray-500">to</span>
-                      <Input type="time" placeholder="17:00" />
-                      <Button variant="outline" size="sm">Closed</Button>
+                      <Input type="time" className="w-32" placeholder="17:00" />
+                      <Button variant="outline" size="sm" className="ml-auto">Closed</Button>
                     </div>
                   ))}
                 </div>
               </div>
               
-              <div className="space-y-4 pt-6">
-                <h3 className="font-medium">Policies</h3>
-                <div className="space-y-2">
+              <div className="border-t pt-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-lg">Business Policies</h3>
+                  <Badge variant="outline">Terms & Conditions</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Minimum Order Value</label>
-                    <Input type="number" placeholder="100" />
+                    <Label>Minimum Order Value ($)</Label>
+                    <Input type="number" placeholder="100.00" />
+                    <p className="text-xs text-gray-500">Restaurants must order at least this amount</p>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Payment Terms</label>
+                    <Label>Payment Terms</Label>
                     <Input placeholder="Net 30" />
+                    <p className="text-xs text-gray-500">e.g., Net 30, Cash on Delivery</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Return Policy</label>
-                    <Input placeholder="7 days return window" />
+                  <div className="space-y-2 col-span-2">
+                    <Label>Return Policy</Label>
+                    <Textarea 
+                      placeholder="7 days return window for damaged goods..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Terms & Conditions</Label>
+                    <Textarea 
+                      placeholder="Your terms and conditions for orders..."
+                      rows={4}
+                    />
                   </div>
                 </div>
               </div>
               
-              <Button>Save Changes</Button>
+              <Button>
+                <Save className="h-4 w-4 mr-2" />
+                Save Business Settings
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -357,23 +716,35 @@ export function SupplierSettingsPage() {
                   </CardTitle>
                   <CardDescription>Manage your warehouse locations</CardDescription>
                 </div>
-                <Button onClick={() => setShowAddWarehouse(true)}>Add Warehouse</Button>
+                <Button onClick={() => setShowAddWarehouse(true)}>
+                  <Warehouse className="h-4 w-4 mr-2" />
+                  Add Warehouse
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border rounded-lg p-4">
+                <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-semibold">Main Warehouse</h4>
-                        <Badge>Main</Badge>
+                        <Badge className="bg-green-500 text-white">Main</Badge>
+                        <Badge variant="outline">WH-001</Badge>
                       </div>
-                      <p className="text-sm text-gray-600">WH-001</p>
-                      <p className="text-sm text-gray-500">123 Farm Road, Agricultural City</p>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <MapPin className="h-4 w-4" />
+                        <span>123 Farm Road, Agricultural City, USA</span>
+                      </div>
                     </div>
                     <Button variant="outline" size="sm">Edit</Button>
                   </div>
+                </div>
+                
+                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                  <Warehouse className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+                  <p className="text-gray-600">No additional warehouses</p>
+                  <p className="text-sm text-gray-500 mt-1">Add warehouses to manage multiple locations</p>
                 </div>
               </div>
             </CardContent>
@@ -389,25 +760,43 @@ export function SupplierSettingsPage() {
                     <MapPin className="h-5 w-5" />
                     Delivery Zones
                   </CardTitle>
-                  <CardDescription>Manage delivery coverage areas</CardDescription>
+                  <CardDescription>Manage delivery coverage areas and pricing</CardDescription>
                 </div>
-                <Button onClick={() => setShowAddZone(true)}>Add Zone</Button>
+                <Button onClick={() => setShowAddZone(true)}>
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Add Zone
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border rounded-lg p-4">
+                <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold">Downtown Zone</h4>
-                      <div className="text-sm text-gray-600 space-x-4 mt-1">
-                        <span>Fee: $10</span>
-                        <span>Min Order: $50</span>
-                        <span>Delivery: 2 days</span>
+                    <div className="flex-1">
+                      <h4 className="font-semibold mb-2">Downtown Zone</h4>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Fee:</span>
+                          <span className="ml-2 font-medium">$10.00</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Min Order:</span>
+                          <span className="ml-2 font-medium">$50.00</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Delivery:</span>
+                          <span className="ml-2 font-medium">2 days</span>
+                        </div>
                       </div>
                     </div>
                     <Button variant="outline" size="sm">Edit</Button>
                   </div>
+                </div>
+                
+                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                  <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+                  <p className="text-gray-600">No additional delivery zones</p>
+                  <p className="text-sm text-gray-500 mt-1">Add zones to define delivery areas and pricing</p>
                 </div>
               </div>
             </CardContent>
@@ -427,40 +816,45 @@ export function SupplierSettingsPage() {
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Warehouse Name *</label>
+                <Label htmlFor="warehouse-name">Warehouse Name *</Label>
                 <Input
+                  id="warehouse-name"
                   placeholder="Main Warehouse"
                   value={warehouseForm.name}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, name: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Warehouse Code *</label>
+                <Label htmlFor="warehouse-code">Warehouse Code *</Label>
                 <Input
+                  id="warehouse-code"
                   placeholder="WH-001"
                   value={warehouseForm.code}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, code: e.target.value })}
                 />
               </div>
               <div className="space-y-2 col-span-2">
-                <label className="text-sm font-medium">Street Address</label>
+                <Label htmlFor="warehouse-address">Street Address</Label>
                 <Input
+                  id="warehouse-address"
                   placeholder="123 Farm Road"
                   value={warehouseForm.address}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, address: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">City</label>
+                <Label htmlFor="warehouse-city">City</Label>
                 <Input
+                  id="warehouse-city"
                   placeholder="Agricultural City"
                   value={warehouseForm.city}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, city: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Country</label>
+                <Label htmlFor="warehouse-country">Country</Label>
                 <Input
+                  id="warehouse-country"
                   placeholder="USA"
                   value={warehouseForm.country}
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, country: e.target.value })}
@@ -474,9 +868,9 @@ export function SupplierSettingsPage() {
                   onChange={(e) => setWarehouseForm({ ...warehouseForm, isMain: e.target.checked })}
                   className="rounded"
                 />
-                <label htmlFor="isMain" className="text-sm font-medium">
+                <Label htmlFor="isMain" className="text-sm font-medium">
                   Set as main warehouse
-                </label>
+                </Label>
               </div>
             </div>
           </div>
@@ -502,8 +896,9 @@ export function SupplierSettingsPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Zone Name *</label>
+              <Label htmlFor="zone-name">Zone Name *</Label>
               <Input
+                id="zone-name"
                 placeholder="Downtown Zone"
                 value={zoneForm.name}
                 onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })}
@@ -511,8 +906,9 @@ export function SupplierSettingsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Delivery Fee ($)</label>
+                <Label htmlFor="delivery-fee">Delivery Fee ($)</Label>
                 <Input
+                  id="delivery-fee"
                   type="number"
                   placeholder="10.00"
                   value={zoneForm.deliveryFee}
@@ -520,8 +916,9 @@ export function SupplierSettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Min Order Amount ($)</label>
+                <Label htmlFor="min-order">Min Order Amount ($)</Label>
                 <Input
+                  id="min-order"
                   type="number"
                   placeholder="50.00"
                   value={zoneForm.minOrderAmount}
@@ -529,8 +926,9 @@ export function SupplierSettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Delivery Time (days)</label>
+                <Label htmlFor="delivery-time">Delivery Time (days)</Label>
                 <Input
+                  id="delivery-time"
                   type="number"
                   placeholder="2"
                   value={zoneForm.deliveryTimeDays}
@@ -539,7 +937,7 @@ export function SupplierSettingsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Coverage Area (Map Integration)</label>
+              <Label>Coverage Area (Map Integration)</Label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                 <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-2" />
                 <p className="text-sm text-gray-500">Map picker will be integrated here</p>
@@ -569,8 +967,9 @@ export function SupplierSettingsPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Name *</label>
+              <Label htmlFor="contact-name">Name *</Label>
               <Input
+                id="contact-name"
                 placeholder="John Doe"
                 value={contactForm.name}
                 onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
@@ -578,8 +977,9 @@ export function SupplierSettingsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email *</label>
+                <Label htmlFor="contact-email">Email *</Label>
                 <Input
+                  id="contact-email"
                   type="email"
                   placeholder="john.doe@example.com"
                   value={contactForm.email}
@@ -587,8 +987,9 @@ export function SupplierSettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Phone *</label>
+                <Label htmlFor="contact-phone">Phone *</Label>
                 <Input
+                  id="contact-phone"
                   type="tel"
                   placeholder="+1 (555) 123-4567"
                   value={contactForm.phone}
@@ -597,8 +998,9 @@ export function SupplierSettingsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Role/Title</label>
+              <Label htmlFor="contact-role">Role/Title</Label>
               <Input
+                id="contact-role"
                 placeholder="Sales Manager"
                 value={contactForm.role}
                 onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })}
@@ -612,9 +1014,9 @@ export function SupplierSettingsPage() {
                 onChange={(e) => setContactForm({ ...contactForm, isPrimary: e.target.checked })}
                 className="rounded"
               />
-              <label htmlFor="isPrimary" className="text-sm font-medium">
+              <Label htmlFor="isPrimary" className="text-sm font-medium">
                 Set as primary contact
-              </label>
+              </Label>
             </div>
           </div>
           <DialogFooter>
@@ -638,7 +1040,7 @@ export function SupplierSettingsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer transition-colors">
               <input
                 type="file"
                 accept=".csv,.xlsx,.xls"
@@ -652,8 +1054,8 @@ export function SupplierSettingsPage() {
                 <p className="text-xs text-gray-400 mt-1">or click to browse</p>
               </label>
             </div>
-            <div className="text-sm text-gray-600">
-              <p className="font-medium mb-1">Expected columns:</p>
+            <div className="text-sm text-gray-600 bg-blue-50 p-4 rounded-lg">
+              <p className="font-medium mb-2">Expected columns:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>Name (required)</li>
                 <li>Email (required)</li>
@@ -686,9 +1088,9 @@ export function SupplierSettingsPage() {
                           <td className="px-3 py-2">{contact.role}</td>
                           <td className="px-3 py-2 text-center">
                             {contact.isPrimary ? (
-                              <Badge variant="secondary">Yes</Badge>
+                              <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
                             ) : (
-                              <Badge variant="outline">No</Badge>
+                              <XCircle className="h-4 w-4 text-gray-400 mx-auto" />
                             )}
                           </td>
                         </tr>

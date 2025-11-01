@@ -17,6 +17,7 @@ const sendMessageSchema = z.object({
   content: z.string().min(1),
   messageType: z.enum(['TEXT', 'SYSTEM', 'ORDER_REFERENCE']).default('TEXT'),
   orderId: z.string().uuid().optional(),
+  replyTo: z.string().uuid().optional(),
   attachments: z.array(z.object({
     fileUrl: z.string().url(),
     fileType: z.string(),
@@ -92,13 +93,16 @@ router.get('/conversations', requireAuth, async (req, res) => {
           s.name as supplier_name,
           r.name as restaurant_name,
           r.contact_email as restaurant_email,
+          cp.is_pinned,
+          cp.is_archived,
+          COALESCE(r.name, s.name) as participant_name,
           (SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_preview
         FROM conversation c
         JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
         LEFT JOIN supplier s ON s.id = c.supplier_id
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
-        WHERE c.supplier_id = $1
-        ORDER BY c.last_message_at DESC NULLS LAST
+        WHERE c.supplier_id = $1 AND cp.is_archived = false
+        ORDER BY cp.is_pinned DESC, c.last_message_at DESC NULLS LAST
       `;
       queryParams = [suppliers[0].id];
     } else if (req.userData.role === 'RESTAURANT') {
@@ -125,13 +129,16 @@ router.get('/conversations', requireAuth, async (req, res) => {
           s.name as supplier_name,
           s.contact_email as supplier_email,
           r.name as restaurant_name,
+          cp.is_pinned,
+          cp.is_archived,
+          COALESCE(s.name, r.name) as participant_name,
           (SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_preview
         FROM conversation c
         JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
         LEFT JOIN supplier s ON s.id = c.supplier_id
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
-        WHERE c.restaurant_id = $1
-        ORDER BY c.last_message_at DESC NULLS LAST
+        WHERE c.restaurant_id = $1 AND cp.is_archived = false
+        ORDER BY cp.is_pinned DESC, c.last_message_at DESC NULLS LAST
       `;
       queryParams = [restaurants[0].id];
     } else {
@@ -310,15 +317,22 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
       throw new NotFoundError('Conversation not found');
     }
     
-    // Get messages
+    // Get messages with reply information
     const { rows: messages } = await query(`
       SELECT 
         m.*,
         s.name as supplier_name,
-        r.name as restaurant_name
+        r.name as restaurant_name,
+        rm.content as reply_to_content,
+        rm.sender_type as reply_to_sender_type,
+        rs.name as reply_to_supplier_name,
+        rr.name as reply_to_restaurant_name
       FROM message m
       LEFT JOIN supplier s ON s.id = m.sender_id AND m.sender_type = 'SUPPLIER'
       LEFT JOIN restaurant r ON r.id = m.sender_id AND m.sender_type = 'RESTAURANT'
+      LEFT JOIN message rm ON rm.id = m.reply_to
+      LEFT JOIN supplier rs ON rs.id = rm.sender_id AND rm.sender_type = 'SUPPLIER'
+      LEFT JOIN restaurant rr ON rr.id = rm.sender_id AND rm.sender_type = 'RESTAURANT'
       WHERE m.conversation_id = $1
       ORDER BY m.created_at DESC
       LIMIT $2 OFFSET $3
@@ -481,16 +495,48 @@ router.post('/conversations/:conversationId/messages', requireAuth, requireRole(
       senderId = restaurants[0].id;
     }
     
+    // Verify reply_to message exists and is in the same conversation (before transaction)
+    if (messageData.replyTo) {
+      const { rows: replyMessages } = await query(`
+        SELECT id, conversation_id FROM message WHERE id = $1
+      `, [messageData.replyTo]);
+      
+      if (replyMessages.length === 0) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Reply to message not found',
+          },
+          requestId: req.requestId,
+        });
+      }
+      
+      if (replyMessages[0].conversation_id !== conversationId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Reply to message must be in the same conversation',
+          },
+          requestId: req.requestId,
+        });
+      }
+    }
+    
     // Start transaction
     await query('BEGIN');
     
     try {
+      
       // Create message
       const { rows: messages } = await query(`
         INSERT INTO message (
-          conversation_id, sender_type, sender_id, content, message_type, order_id
+          conversation_id, sender_type, sender_id, content, message_type, order_id, reply_to
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `, [
         conversationId,
@@ -499,6 +545,7 @@ router.post('/conversations/:conversationId/messages', requireAuth, requireRole(
         messageData.content,
         messageData.messageType,
         messageData.orderId || null,
+        messageData.replyTo || null,
       ]);
       
       const message = messages[0];
@@ -528,22 +575,27 @@ router.post('/conversations/:conversationId/messages', requireAuth, requireRole(
       
       // Fetch message with attachments
       const { rows: fullMessages } = await query(`
-        SELECT m.*, COALESCE(
-          json_agg(
-            json_build_object(
-              'id', ma.id,
-              'fileUrl', ma.file_url,
-              'fileType', ma.file_type,
-              'fileName', ma.file_name,
-              'fileSize', ma.file_size
-            )
-          ) FILTER (WHERE ma.id IS NOT NULL),
-          '[]'::json
-        ) as attachments
+        SELECT 
+          m.*,
+          rm.content as reply_to_content,
+          rm.sender_type as reply_to_sender_type,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', ma.id,
+                'fileUrl', ma.file_url,
+                'fileType', ma.file_type,
+                'fileName', ma.file_name,
+                'fileSize', ma.file_size
+              )
+            ) FILTER (WHERE ma.id IS NOT NULL),
+            '[]'::json
+          ) as attachments
         FROM message m
+        LEFT JOIN message rm ON rm.id = m.reply_to
         LEFT JOIN message_attachment ma ON ma.message_id = m.id
         WHERE m.id = $1
-        GROUP BY m.id
+        GROUP BY m.id, rm.content, rm.sender_type
       `, [message.id]);
       
       logger.info('Message sent', { 
@@ -592,6 +644,7 @@ router.post('/conversations/:conversationId/messages', requireAuth, requireRole(
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to send message',
+        details: error.message,
       },
       requestId: req.requestId,
     });
@@ -606,6 +659,18 @@ router.patch('/conversations/:conversationId/read', requireAuth, async (req, res
     // Reset unread count
     const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT';
     
+    // Mark all unread messages in this conversation as read for the current participant
+    const { rows: updatedMessages } = await query(`
+      UPDATE message
+      SET is_read = true,
+          read_at = now(),
+          updated_at = now()
+      WHERE conversation_id = $1
+        AND sender_type != $2
+        AND is_read = false
+      RETURNING id
+    `, [conversationId, participantType]);
+    
     await query(`
       UPDATE conversation_participant
       SET unread_count = 0,
@@ -613,6 +678,21 @@ router.patch('/conversations/:conversationId/read', requireAuth, async (req, res
           updated_at = now()
       WHERE conversation_id = $1 AND participant_type = $2
     `, [conversationId, participantType]);
+    
+    // Emit socket event for real-time read receipt updates
+    try {
+      const { getIO } = await import('../lib/socket.js');
+      const io = getIO();
+      if (io && updatedMessages.length > 0) {
+        io.to(`conversation_${conversationId}`).emit('messages_read_update', {
+          conversationId,
+          messageIds: updatedMessages.map(m => m.id),
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (socketError) {
+      logger.warn('Failed to emit read receipt updates:', socketError);
+    }
     
     res.json({
       ok: true,
@@ -628,6 +708,86 @@ router.patch('/conversations/:conversationId/read', requireAuth, async (req, res
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to mark as read',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Mark message as read
+router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    
+    // Verify message exists and get conversation
+    const { rows: messages } = await query(`
+      SELECT * FROM message WHERE id = $1
+    `, [messageId]);
+    
+    if (messages.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Message not found',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    const message = messages[0];
+    
+    // Only mark as read if the current user is the receiver (not the sender)
+    const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT';
+    if (message.sender_type === participantType) {
+      // User is the sender, can't mark their own message as read
+      return res.json({
+        ok: true,
+        data: { message: 'Message already read' },
+        error: null,
+        requestId: req.requestId,
+      });
+    }
+    
+    // Mark message as read
+    await query(`
+      UPDATE message
+      SET is_read = true,
+          read_at = now(),
+          updated_at = now()
+      WHERE id = $1 AND is_read = false
+    `, [messageId]);
+    
+    // Emit socket event for real-time read receipt update
+    try {
+      const { getIO } = await import('../lib/socket.js');
+      const io = getIO();
+      if (io) {
+        io.to(`conversation_${message.conversation_id}`).emit('message_read_update', {
+          conversationId: message.conversation_id,
+          messageId: messageId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (socketError) {
+      logger.warn('Failed to emit read receipt update:', socketError);
+    }
+    
+    res.json({
+      ok: true,
+      data: { message: 'Message marked as read' },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Mark message as read error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to mark message as read',
       },
       requestId: req.requestId,
     });

@@ -226,12 +226,162 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// Get current supplier (for settings page) - MUST be before /:id route
+router.get('/me', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const { rows: suppliers } = await query(
+      'SELECT * FROM supplier WHERE contact_email = $1',
+      [req.userData.email]
+    );
+    
+    if (suppliers.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Supplier not found',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    res.json({
+      ok: true,
+      data: { supplier: suppliers[0] },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get supplier error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get supplier',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
+// Get supplier statistics for restaurant
+router.get('/:id/statistics', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+  try {
+    const { id: supplierId } = req.params;
+    
+    // Get restaurant ID
+    const { rows: restaurants } = await query(
+      'SELECT id FROM restaurant WHERE contact_email = $1',
+      [req.userData.email]
+    );
+    
+    if (restaurants.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Restaurant not found',
+        },
+        requestId: req.requestId,
+      });
+    }
+    
+    const restaurantId = restaurants[0].id;
+    
+    // Calculate statistics from orders
+    // Count distinct orders that have items from this supplier
+    const { rows: orderStats } = await query(`
+      SELECT 
+        COUNT(DISTINCT o.id) as total_orders,
+        COALESCE(SUM(oi.line_total), 0) as total_spent
+      FROM customer_order o
+      INNER JOIN order_item oi ON oi.order_id = o.id
+      WHERE o.restaurant_id = $1 
+        AND oi.supplier_id = $2
+    `, [restaurantId, supplierId]);
+    
+    const totalOrders = parseInt(orderStats[0]?.total_orders || 0);
+    const totalSpent = parseFloat(orderStats[0]?.total_spent || 0);
+    const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
+    
+    res.json({
+      ok: true,
+      data: {
+        totalOrders,
+        totalSpent,
+        averageOrderValue,
+      },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Get supplier statistics error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to get supplier statistics',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
 // Get supplier by ID
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const { rows } = await query('SELECT * FROM supplier WHERE id = $1', [id]);
+    // Get restaurant ID for follow status if user is a restaurant
+    let restaurantId = null;
+    if (req.userData && req.userData.role === 'RESTAURANT') {
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      );
+      if (restaurants.length > 0) {
+        restaurantId = restaurants[0].id;
+      }
+    }
+    
+    // Build query with product_count and avg_price
+    let sql = `
+      SELECT 
+        s.*,
+        COALESCE(
+          (SELECT COUNT(DISTINCT p.id) FROM product p WHERE p.supplier_id = s.id), 
+          0
+        ) as product_count,
+        COALESCE(
+          (SELECT AVG(pr.amount) FROM product p 
+           JOIN price pr ON pr.product_id = p.id 
+           WHERE p.supplier_id = s.id 
+             AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)), 
+          0
+        ) as avg_price
+    `;
+    
+    // Add follow status if restaurant
+    let rows;
+    if (restaurantId) {
+      sql += `,
+        EXISTS (
+          SELECT 1 FROM supplier_follow sf
+          WHERE sf.supplier_id = s.id 
+            AND sf.restaurant_id = $2
+        ) as is_followed
+      `;
+      const result = await query(sql + ' FROM supplier s WHERE s.id = $1', [id, restaurantId]);
+      rows = result.rows;
+    } else {
+      sql += `, false as is_followed`;
+      const result = await query(sql + ' FROM supplier s WHERE s.id = $1', [id]);
+      rows = result.rows;
+    }
     
     if (rows.length === 0) {
       return res.status(404).json({
@@ -413,46 +563,6 @@ router.post('/:id/logo', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async 
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to update supplier logo',
-      },
-      requestId: req.requestId,
-    });
-  }
-});
-
-// Get current supplier (for settings page)
-router.get('/me', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
-  try {
-    const { rows: suppliers } = await query(
-      'SELECT * FROM supplier WHERE contact_email = $1',
-      [req.userData.email]
-    );
-    
-    if (suppliers.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Supplier not found',
-        },
-        requestId: req.requestId,
-      });
-    }
-    
-    res.json({
-      ok: true,
-      data: { supplier: suppliers[0] },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error('Get supplier error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get supplier',
       },
       requestId: req.requestId,
     });

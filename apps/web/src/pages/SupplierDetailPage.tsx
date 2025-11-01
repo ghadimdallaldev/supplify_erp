@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useGetSupplierQuery, useGetProductsQuery, useCreateConversationMutation, useGetRestaurantsQuery, useFollowSupplierMutation, useUnfollowSupplierMutation } from '../services/api'
+import { useGetSupplierQuery, useGetProductsQuery, useCreateConversationMutation, useGetRestaurantsQuery, useFollowSupplierMutation, useUnfollowSupplierMutation, useGetSupplierStatisticsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
-import { Building2, Mail, Phone, MapPin, Package, MessageSquare, Heart } from 'lucide-react'
+import { Building2, Mail, Phone, MapPin, Package, MessageSquare, Heart, ShoppingCart, TrendingUp, DollarSign, Clock, Globe, FileText, Award, CheckCircle, Star } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -26,6 +26,14 @@ export function SupplierDetailPage() {
     limit: 50,
     offset: 0,
   })
+
+  // Fetch supplier statistics (for restaurants viewing suppliers)
+  const { data: statsData, isLoading: isLoadingStats } = useGetSupplierStatisticsQuery(
+    id!,
+    { skip: !isRestaurant || !id }
+  )
+
+  const stats = statsData || null
 
   if (isLoading) {
     return (
@@ -87,10 +95,32 @@ export function SupplierDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header with Logo */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{supplier.name}</h1>
-          <p className="text-gray-600 mt-2">{supplier.slug}</p>
+        <div className="flex items-center gap-4">
+          {supplier.logo_url ? (
+            <img 
+              src={supplier.logo_url} 
+              alt={supplier.name} 
+              className="h-20 w-20 rounded-lg object-cover border-2 border-gray-200 shadow-md"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.style.display = 'none'
+                const fallback = target.nextElementSibling as HTMLDivElement
+                if (fallback) fallback.style.display = 'flex'
+              }}
+            />
+          ) : null}
+          <div className={`h-20 w-20 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-3xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
+            {supplier.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{supplier.name}</h1>
+            <p className="text-gray-600 mt-1">{supplier.slug}</p>
+            {supplier.description && (
+              <p className="text-sm text-gray-500 mt-2 max-w-2xl">{supplier.description}</p>
+            )}
+          </div>
         </div>
         <div className="flex space-x-2">
           {isRestaurant && (
@@ -116,71 +146,164 @@ export function SupplierDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Basic Info */}
+      {/* Statistics Cards - Show only for restaurants */}
+      {isRestaurant && stats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Orders</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+                </div>
+                <ShoppingCart className="h-8 w-8 text-blue-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Spent</p>
+                  <p className="text-2xl font-bold text-gray-900">${stats.totalSpent.toFixed(0)}</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
+                  <p className="text-2xl font-bold text-gray-900">${stats.averageOrderValue.toFixed(0)}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-purple-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Products Available</p>
+                  <p className="text-2xl font-bold text-gray-900">{supplier.product_count || 0}</p>
+                </div>
+                <Package className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Contact Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Contact Information
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Mail className="h-4 w-4 text-gray-400" />
-              <span>{supplier.contact_email}</span>
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              <a href={`mailto:${supplier.contact_email}`} className="text-blue-600 hover:underline truncate">
+                {supplier.contact_email}
+              </a>
             </div>
             {supplier.phone && (
-              <div className="flex items-center space-x-2">
-                <Phone className="h-4 w-4 text-gray-400" />
-                <span>{supplier.phone}</span>
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <a href={`tel:${supplier.phone}`} className="text-gray-700 hover:text-blue-600">
+                  {supplier.phone}
+                </a>
               </div>
             )}
             {supplier.address_json && (
-              <div className="flex items-center space-x-2">
-                <MapPin className="h-4 w-4 text-gray-400" />
-                <span>
-                  {supplier.address_json.city}, {supplier.address_json.country}
-                </span>
+              <div className="flex items-start gap-2">
+                <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  {supplier.address_json.street && (
+                    <p className="text-gray-700">{supplier.address_json.street}</p>
+                  )}
+                  <p className="text-gray-700">
+                    {supplier.address_json.city}, {supplier.address_json.country}
+                  </p>
+                </div>
+              </div>
+            )}
+            {supplier.website && (
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <a href={supplier.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">
+                  {supplier.website}
+                </a>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Products */}
+        {/* Business Information */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Package className="h-5 w-5" />
-              <span>Products</span>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Business Information
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{supplier.product_count || 0}</p>
-            <p className="text-sm text-gray-600">Total products available</p>
-            {supplier.avg_price > 0 && (
-              <p className="text-sm text-gray-600 mt-2">
-                Average price: ${parseFloat(supplier.avg_price).toFixed(2)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Additional Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Additional Information</CardTitle>
-          </CardHeader>
           <CardContent className="space-y-4">
+            {supplier.legal_name && (
+              <div>
+                <p className="text-sm text-gray-600">Legal Name</p>
+                <p className="font-medium">{supplier.legal_name}</p>
+              </div>
+            )}
             {supplier.vat_no && (
               <div>
                 <p className="text-sm text-gray-600">VAT Number</p>
                 <p className="font-medium">{supplier.vat_no}</p>
               </div>
             )}
+            {supplier.trade_license_no && (
+              <div>
+                <p className="text-sm text-gray-600">Trade License</p>
+                <p className="font-medium">{supplier.trade_license_no}</p>
+              </div>
+            )}
             <div>
               <p className="text-sm text-gray-600">Member Since</p>
-              <p className="font-medium">
-                {new Date(supplier.created_at).toLocaleDateString()}
+              <p className="font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {new Date(supplier.created_at).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
               </p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Products & Pricing */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Products & Pricing
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-3xl font-bold">{supplier.product_count || 0}</p>
+              <p className="text-sm text-gray-600">Total products available</p>
+            </div>
+            {supplier.avg_price > 0 && (
+              <div>
+                <p className="text-2xl font-bold text-green-600">${parseFloat(supplier.avg_price).toFixed(2)}</p>
+                <p className="text-sm text-gray-600">Average product price</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

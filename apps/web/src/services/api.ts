@@ -223,6 +223,10 @@ export const api = createApi({
       query: (id) => `/api/suppliers/${id}`,
       providesTags: (result, error, id) => [{ type: 'Supplier', id }],
     }),
+    getSupplierStatistics: builder.query<{ totalOrders: number; totalSpent: number; averageOrderValue: number }, string>({
+      query: (id) => `/api/suppliers/${id}/statistics`,
+      providesTags: (result, error, id) => [{ type: 'Supplier', id }],
+    }),
     followSupplier: builder.mutation<any, string>({
       query: (id) => ({
         url: `/api/suppliers/${id}/follow`,
@@ -246,6 +250,17 @@ export const api = createApi({
     getSupplierMe: builder.query<{ supplier: Supplier }, void>({
       query: () => '/api/suppliers/me',
       providesTags: ['Supplier'],
+    }),
+    updateSupplier: builder.mutation<Supplier, { id: string; data: Partial<Supplier> }>({
+      query: ({ id, data }) => ({
+        url: `/api/suppliers/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'Supplier', id },
+        'Supplier',
+      ],
     }),
     uploadSupplierLogo: builder.mutation<Supplier, { id: string; logoUrl: string }>({
       query: ({ id, logoUrl }) => ({
@@ -281,6 +296,17 @@ export const api = createApi({
     getRestaurantMe: builder.query<{ restaurant: Restaurant }, void>({
       query: () => '/api/restaurants/me',
       providesTags: ['Restaurant'],
+    }),
+    updateRestaurant: builder.mutation<Restaurant, { id: string; data: Partial<Restaurant> }>({
+      query: ({ id, data }) => ({
+        url: `/api/restaurants/${id}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: 'Restaurant', id },
+        'Restaurant',
+      ],
     }),
     uploadRestaurantLogo: builder.mutation<Restaurant, { id: string; logoUrl: string }>({
       query: ({ id, logoUrl }) => ({
@@ -385,11 +411,46 @@ export const api = createApi({
       }),
       invalidatesTags: ['Chat'],
     }),
-    sendMessage: builder.mutation<any, { conversationId: string; content: string; messageType?: string; orderId?: string }>({
+    sendMessage: builder.mutation<any, { conversationId: string; content: string; messageType?: string; orderId?: string; replyTo?: string; attachments?: Array<{ fileUrl: string; fileType: string; fileName: string; fileSize?: number }> }>({
       query: ({ conversationId, ...body }) => ({
         url: `/api/chat/conversations/${conversationId}/messages`,
         method: 'POST',
         body,
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+    markConversationRead: builder.mutation<any, string>({
+      query: (conversationId) => ({
+        url: `/api/chat/conversations/${conversationId}/read`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+    markMessageRead: builder.mutation<any, string>({
+      query: (messageId) => ({
+        url: `/api/chat/messages/${messageId}/read`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+    pinConversation: builder.mutation<any, string>({
+      query: (conversationId) => ({
+        url: `/api/chat/conversations/${conversationId}/pin`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+    archiveConversation: builder.mutation<any, string>({
+      query: (conversationId) => ({
+        url: `/api/chat/conversations/${conversationId}/archive`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Chat'],
+    }),
+    deleteConversation: builder.mutation<any, string>({
+      query: (conversationId) => ({
+        url: `/api/chat/conversations/${conversationId}`,
+        method: 'DELETE',
       }),
       invalidatesTags: ['Chat'],
     }),
@@ -757,11 +818,14 @@ export const {
   useSendOrderReminderMutation,
   useGetSuppliersQuery,
   useGetSupplierQuery,
+  useGetSupplierStatisticsQuery,
   useFollowSupplierMutation,
   useUnfollowSupplierMutation,
   useGetSupplierMeQuery,
+  useUpdateSupplierMutation,
   useUploadSupplierLogoMutation,
   useGetRestaurantMeQuery,
+  useUpdateRestaurantMutation,
   useUploadRestaurantLogoMutation,
   useGetPresignedUrlMutation,
   useGetRestaurantsQuery,
@@ -780,6 +844,11 @@ export const {
   useGetMessagesQuery,
   useCreateConversationMutation,
   useSendMessageMutation,
+  useMarkConversationReadMutation,
+  useMarkMessageReadMutation,
+  usePinConversationMutation,
+  useArchiveConversationMutation,
+  useDeleteConversationMutation,
   useGetQuickListsQuery,
   useGetQuickListQuery,
   useCreateQuickListMutation,
