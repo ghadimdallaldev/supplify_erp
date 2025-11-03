@@ -32,8 +32,6 @@ import type {
   ReorderSuggestionsResponse,
   SubscriptionPlan,
   Subscription,
-  FeatureFlag,
-  FeatureFlagOverride,
   UsageMeter,
 } from '../types'
 
@@ -733,41 +731,6 @@ export const api = createApi({
       }),
       invalidatesTags: ['Admin'],
     }),
-    getAdminFeatureFlags: builder.query<{ flags: FeatureFlag[] }, void>({
-      query: () => '/api/admin-dashboard/feature-flags',
-      providesTags: ['Admin'],
-    }),
-    updateAdminFeatureFlag: builder.mutation<FeatureFlag, { key: string; data: any }>({
-      query: ({ key, data }) => ({
-        url: `/api/admin-dashboard/feature-flags/${key}`,
-        method: 'PATCH',
-        body: data,
-      }),
-      invalidatesTags: ['Admin'],
-    }),
-    getTenantFeatureFlags: builder.query<{ overrides: FeatureFlagOverride[] }, { tenantId: string; tenantType: string }>({
-      query: ({ tenantId, tenantType }) => ({
-        url: `/api/admin-dashboard/tenants/${tenantId}/feature-flags`,
-        params: { tenantType },
-      }),
-      providesTags: ['Admin'],
-    }),
-    setTenantFeatureFlag: builder.mutation<FeatureFlagOverride, any>({
-      query: ({ tenantId, ...body }) => ({
-        url: `/api/admin-dashboard/tenants/${tenantId}/feature-flags`,
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['Admin'],
-    }),
-    deleteTenantFeatureFlag: builder.mutation<any, { tenantId: string; featureKey: string; tenantType: string }>({
-      query: ({ tenantId, featureKey, tenantType }) => ({
-        url: `/api/admin-dashboard/tenants/${tenantId}/feature-flags/${featureKey}`,
-        method: 'DELETE',
-        params: { tenantType },
-      }),
-      invalidatesTags: ['Admin'],
-    }),
     getTenantUsage: builder.query<{ usage: UsageMeter[]; period: string }, { tenantId: string; tenantType: string; period?: string }>({
       query: ({ tenantId, tenantType, period }) => ({
         url: `/api/admin-dashboard/usage/${tenantId}`,
@@ -890,11 +853,6 @@ export const {
   useUpdateAdminPlanMutation,
   useGetAdminSubscriptionsQuery,
   useUpdateAdminSubscriptionMutation,
-  useGetAdminFeatureFlagsQuery,
-  useUpdateAdminFeatureFlagMutation,
-  useGetTenantFeatureFlagsQuery,
-  useSetTenantFeatureFlagMutation,
-  useDeleteTenantFeatureFlagMutation,
     useGetTenantUsageQuery,
     useGetAdminAuditLogsQuery,
     useGetAdminSuppliersQuery,

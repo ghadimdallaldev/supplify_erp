@@ -11,7 +11,7 @@ Full admin panel with all features:
 - **Plans**: Manage subscription plans
 - **Subscriptions**: All tenant subscriptions
 - **Tenants**: Supplier & Restaurant directories
-- **Feature Flags**: Global & per-tenant feature toggles
+- **Features**: Controlled via subscription plan features JSONB
 - **Usage**: Usage metrics and quotas
 - **Audit Logs**: Admin action history
 

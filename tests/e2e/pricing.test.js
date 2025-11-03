@@ -49,7 +49,7 @@ describe('Pricing E2E Tests', () => {
 
     it('Should support contract pricing (Gold+)', async () => {
       // Gold+ supports contract pricing
-      // TODO: Implement if feature flag enabled
+      // TODO: Implement if feature enabled in plan
     });
   });
 });

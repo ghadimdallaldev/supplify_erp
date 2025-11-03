@@ -480,28 +480,6 @@ export interface Subscription {
   plan_features?: string[]
 }
 
-export interface FeatureFlag {
-  id: string
-  feature_key: string
-  feature_name: string
-  description?: string
-  is_enabled_globally: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface FeatureFlagOverride {
-  id: string
-  tenant_id: string
-  tenant_type: 'SUPPLIER' | 'RESTAURANT'
-  feature_flag_id: string
-  feature_key: string
-  is_enabled: boolean
-  created_at: string
-  updated_at: string
-  feature_name?: string
-  is_enabled_globally?: boolean
-}
 
 export interface UsageMeter {
   id: string

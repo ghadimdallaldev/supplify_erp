@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers everything admins need to manage Supplify effectively, including plan changes, tenant management, feature flags, chat involvement, and usage monitoring.
+This guide covers everything admins need to manage Supplify effectively, including plan changes, tenant management, chat involvement, and usage monitoring.
 
 ---
 
@@ -15,12 +15,11 @@ Navigate to `/app/admin` (visible only to users with ADMIN role).
 ### Available Tabs
 
 1. **Overview** - Platform metrics, MRR, ARR, tenant counts
-2. **Plans** - Manage subscription plans and limits
+2. **Plans** - Manage subscription plans and features
 3. **Subscriptions** - View all tenant subscriptions
 4. **Tenants** - Supplier and Restaurant directories
-5. **Feature Flags** - Global and plan-level feature control
-6. **Usage** - Usage tracking and quotas
-7. **Audit Logs** - All admin actions and changes
+5. **Usage** - Usage tracking and quotas
+6. **Audit Logs** - All admin actions and changes
 
 ---
 
@@ -212,31 +211,18 @@ Conversation appears in tenant's chat with "From Supplify Admin" label.
 
 ---
 
-## Feature Flag Management
+## Managing Plan Features
 
-See [FEATURE_FLAGS.md](./FEATURE_FLAGS.md) for detailed guide.
+Features are controlled directly through subscription plans. Each plan has a `features` JSONB field that defines which features are available.
 
-### Quick Actions
-
-**Enable Feature Globally:**
-1. Admin → Feature Flags
-2. Toggle switch
-3. Confirms
-4. Feature enabled for all plans and tenants
-
-**Disable Feature for Specific Tenant:**
-1. Admin → Tenants
-2. Select tenant
-3. Feature Overrides
-4. Toggle off
-5. Tenant sees feature disabled regardless of plan
-
-**Change Plan Default:**
+**To Enable/Disable Features:**
 1. Admin → Plans
-2. Select plan
+2. Select plan (Free, Bronze, Gold, Platinum)
 3. Edit plan features
-4. Toggle features on/off
-5. Save
+4. Update the features JSONB field
+5. Save changes
+
+All tenants on that plan will immediately have access to the updated features.
 
 ---
 
@@ -314,9 +300,7 @@ Audit log records who changed what.
 These actions require explicit confirmation:
 - Plan downgrade (shows impact preview)
 - Account suspension
-- Feature flag global toggle
 - Usage counter manual adjustment
-- Override removal
 
 **Why?** Prevents accidental changes with significant business impact.
 

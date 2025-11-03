@@ -10,8 +10,6 @@ import {
   useGetAdminOverviewQuery,
   useGetAdminPlansQuery,
   useGetAdminSubscriptionsQuery,
-  useGetAdminFeatureFlagsQuery,
-  useUpdateAdminFeatureFlagMutation,
   useGetAdminAuditLogsQuery,
   useUpdateAdminPlanMutation,
   useUpdateAdminSubscriptionMutation,
@@ -32,7 +30,6 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const { data: overview, isLoading: overviewLoading } = useGetAdminOverviewQuery();
   const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery();
   const { data: subscriptionsData, isLoading: subscriptionsLoading } = useGetAdminSubscriptionsQuery({});
-  const { data: featureFlagsData, isLoading: flagsLoading } = useGetAdminFeatureFlagsQuery();
   const { data: auditLogsData, isLoading: auditLoading } = useGetAdminAuditLogsQuery({});
   
   // Load tenant data
@@ -53,15 +50,6 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [createPlan] = useCreateAdminPlanMutation();
   const [updatePlan] = useUpdateAdminPlanMutation();
   const [updateSubscription] = useUpdateAdminSubscriptionMutation();
-  const [updateFeatureFlag] = useUpdateAdminFeatureFlagMutation();
-
-  const handleToggleFlag = async (key: string, enabled: boolean) => {
-    try {
-      await updateFeatureFlag({ key, data: { isEnabledGlobally: enabled } }).unwrap();
-    } catch (error) {
-      console.error('Failed to toggle flag:', error);
-    }
-  };
 
   const handleUpdatePlan = async (id: string, data: any) => {
     try {
@@ -83,18 +71,17 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600 mt-2">Manage subscriptions, plans, feature flags, and tenant quotas</p>
+        <p className="text-gray-600 mt-2">Manage subscriptions, plans, and tenant quotas</p>
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-        <TabsList className={initialTab === 'suppliers' || initialTab === 'restaurants' ? 'grid w-full grid-cols-3' : 'grid w-full grid-cols-7'}>
+        <TabsList className={initialTab === 'suppliers' || initialTab === 'restaurants' ? 'grid w-full grid-cols-3' : 'grid w-full grid-cols-6'}>
           {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
             <>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="plans">Plans</TabsTrigger>
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
           <TabsTrigger value="tenants">Tenants</TabsTrigger>
-          <TabsTrigger value="feature-flags">Feature Flags</TabsTrigger>
           <TabsTrigger value="usage">Usage</TabsTrigger>
           <TabsTrigger value="audit">Audit Logs</TabsTrigger>
             </>
@@ -495,52 +482,6 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           </div>
             );
           })()}
-        </TabsContent>
-
-        <TabsContent value="feature-flags" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900">Feature Flags</h2>
-            <p className="text-sm text-gray-600">Toggle features globally or per-tenant</p>
-          </div>
-
-          {flagsLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {featureFlagsData?.flags?.map((flag) => (
-                <Card key={flag.id} className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{flag.feature_name}</h3>
-                      {flag.description && (
-                        <p className="text-sm text-gray-600 mt-1">{flag.description}</p>
-                      )}
-                      <p className="text-xs text-gray-500 mt-2">Key: {flag.feature_key}</p>
-                    </div>
-                    <button
-                      onClick={() => handleToggleFlag(flag.feature_key, !flag.is_enabled_globally)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        flag.is_enabled_globally ? 'bg-blue-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          flag.is_enabled_globally ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  <div className="mt-3">
-                    <Badge variant={flag.is_enabled_globally ? 'default' : 'secondary'}>
-                      {flag.is_enabled_globally ? 'Enabled Globally' : 'Disabled Globally'}
-                    </Badge>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
         </TabsContent>
 
         <TabsContent value="usage" className="space-y-6">

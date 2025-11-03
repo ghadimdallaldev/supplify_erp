@@ -265,7 +265,7 @@ Admins can:
 - Override limits temporarily
 - Apply credits and trials
 - View usage analytics
-- Manage feature flags
+- Configure plan features directly in plan JSONB field
 
 See [ADMIN.md](./ADMIN.md) for details.
 

@@ -313,16 +313,16 @@ describe('Subscription-First System - Comprehensive E2E Tests', () => {
     });
   });
 
-  describe('Feature Flags', () => {
+  describe('Plan Features', () => {
     
-    it('Feature should respect tenant override', async () => {
-      // Disable feature via tenant override
-      // Feature should be disabled regardless of plan
-      // TODO: Implement
+    it('Feature should be determined by subscription plan', async () => {
+      // Features are now controlled solely by subscription plan features JSONB
+      // Verify isFeatureEnabled() checks plan.features correctly
+      // TODO: Implement plan feature tests
     });
 
-    it('Feature should use plan default when no override', async () => {
-      // Check feature enabled based on plan
+    it('Feature should be disabled if not in plan', async () => {
+      // Check feature disabled when not in plan.features
       // TODO: Implement
     });
   });

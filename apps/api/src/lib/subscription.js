@@ -28,8 +28,8 @@ export async function getTenantSubscription(tenantId, tenantType) {
 }
 
 /**
- * Check if feature is enabled for tenant
- * Resolution order: tenant.override > plan.features > global.flag.default
+ * Check if feature is enabled for tenant based on subscription plan
+ * Features are determined solely by the subscription plan's features JSONB field
  * @param {string} tenantId - Tenant ID
  * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
  * @param {string} featureKey - Feature key to check
@@ -37,18 +37,7 @@ export async function getTenantSubscription(tenantId, tenantType) {
  */
 export async function isFeatureEnabled(tenantId, tenantType, featureKey) {
   try {
-    // First check tenant-specific override
-    const { rows: override } = await query(`
-      SELECT is_enabled
-      FROM feature_flag_override
-      WHERE tenant_id = $1 AND tenant_type = $2 AND feature_key = $3
-    `, [tenantId, tenantType, featureKey]);
-
-    if (override.length > 0) {
-      return override[0].is_enabled;
-    }
-
-    // Get tenant's plan features
+    // Get tenant's subscription and check plan features
     const subscription = await getTenantSubscription(tenantId, tenantType);
     if (subscription && subscription.features) {
       const featureValue = subscription.features[featureKey];
@@ -66,14 +55,8 @@ export async function isFeatureEnabled(tenantId, tenantType, featureKey) {
       }
     }
 
-    // Fallback to global flag
-    const { rows: globalFlag } = await query(`
-      SELECT is_enabled_globally
-      FROM feature_flag
-      WHERE feature_key = $1
-    `, [featureKey]);
-
-    return globalFlag.length > 0 ? globalFlag[0].is_enabled_globally : false;
+    // No subscription or feature not found in plan = disabled
+    return false;
   } catch (error) {
     logger.error('Check feature enabled error:', error);
     return false; // Default to disabled on error

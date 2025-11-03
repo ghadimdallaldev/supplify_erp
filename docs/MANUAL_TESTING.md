@@ -465,16 +465,19 @@ This document provides a comprehensive manual testing checklist for all features
 - [ ] Verify navigation sidebar shows admin items only
 
 #### TC-ADMIN-002: Subscription Plans Management
-- [ ] Navigate to Admin → Subscriptions
+- [ ] Navigate to Admin → Plans
 - [ ] View all subscription plans
 - [ ] Create new plan:
   - [ ] Enter plan details (name, price, interval)
-  - [ ] Set limits for each feature
-  - [ ] Configure features array
+  - [ ] Set limits JSONB (e.g., products, orders_per_day, warehouses)
+  - [ ] Configure features JSONB (e.g., {"chat": "enabled", "multi_branch": true})
   - [ ] Save plan
-- [ ] Edit existing plan
+- [ ] Edit existing plan:
+  - [ ] Update plan limits
+  - [ ] Update plan features JSONB
+  - [ ] Save changes
+- [ ] Verify plan updates reflect immediately in tenant subscriptions
 - [ ] Delete plan (if allowed)
-- [ ] Verify plan updates reflect immediately
 
 #### TC-ADMIN-003: Tenant Subscriptions
 - [ ] Navigate to tenant subscriptions view
@@ -487,25 +490,24 @@ This document provides a comprehensive manual testing checklist for all features
 - [ ] View tenant usage meters
 - [ ] View subscription history
 
-#### TC-ADMIN-004: Feature Flags
-- [ ] Navigate to Feature Flags
-- [ ] View global feature flags
-- [ ] Update global default:
-  - [ ] Toggle feature on/off
-  - [ ] Verify change saves
-- [ ] View plan-level defaults
-- [ ] Update plan default:
-  - [ ] Select plan
-  - [ ] Toggle feature
-  - [ ] Verify override applies
-- [ ] View tenant-level overrides
-- [ ] Create tenant override:
-  - [ ] Select tenant
-  - [ ] Select feature
-  - [ ] Set override value
-  - [ ] Verify override takes precedence
-- [ ] Delete tenant override
-- [ ] Verify resolution order: tenant → plan → global
+#### TC-ADMIN-004: Plan Features (Subscription-Based)
+- [ ] Navigate to Admin → Plans
+- [ ] Select a plan (Free, Bronze, Gold, Platinum)
+- [ ] Edit plan features JSONB field:
+  - [ ] Add a feature: `{"feature_key": "enabled"}` or `{"feature_key": true}`
+  - [ ] Remove a feature from JSONB
+  - [ ] Update feature value (boolean or string)
+- [ ] Save changes
+- [ ] Verify changes are immediately reflected:
+  - [ ] All tenants on the plan get access to new features
+  - [ ] All tenants on the plan lose access to removed features
+- [ ] Test feature access from tenant perspective:
+  - [ ] Login as tenant on updated plan
+  - [ ] Verify enabled features are accessible (UI shows, API allows)
+  - [ ] Verify disabled features are not accessible (UI hidden, API blocks)
+- [ ] Test `/api/subscriptions/features/:featureKey` endpoint:
+  - [ ] Call endpoint as tenant
+  - [ ] Verify response matches plan features JSONB
 
 #### TC-ADMIN-005: Usage Meters
 - [ ] Navigate to tenant usage view
@@ -757,12 +759,29 @@ This document provides a comprehensive manual testing checklist for all features
 
 ### Test Cases
 
-#### TC-SUB-001: Plan Enforcement
-- [ ] Restaurant with Free plan places order
-- [ ] Verify orders_per_day limit enforced
-- [ ] Test 80% warning threshold
-- [ ] Test 100% block threshold
-- [ ] Verify upgrade prompt displays
+#### TC-SUB-000: Feature Checking API
+- [ ] Login as Restaurant user
+- [ ] Call `GET /api/subscriptions/features/:featureKey` for various features:
+  - [ ] Test feature in plan: Verify response `{"featureKey": "chat", "isEnabled": true}`
+  - [ ] Test feature not in plan: Verify response `{"featureKey": "advanced_analytics", "isEnabled": false}`
+- [ ] Login as Supplier user
+- [ ] Test same endpoint - verify supplier features checked correctly
+- [ ] Test with tenant on Free plan - verify only Free plan features enabled
+- [ ] Test with tenant on Platinum plan - verify all features enabled
+- [ ] Test with tenant without subscription - verify all features disabled (returns false)
+
+#### TC-SUB-001: Plan Enforcement (Limits & Features)
+- [ ] Restaurant with Free plan
+- [ ] Verify plan limits (orders_per_day, products, etc.)
+- [ ] Verify plan features (check via `/api/subscriptions/features/:featureKey`)
+- [ ] Place orders up to limit:
+  - [ ] Verify orders_per_day limit enforced
+  - [ ] Test 80% warning threshold (warning message appears)
+  - [ ] Test 100% block threshold (order creation blocked)
+  - [ ] Verify upgrade prompt displays when blocked
+- [ ] Test feature access:
+  - [ ] Attempt to access feature in plan - verify allowed
+  - [ ] Attempt to access feature not in plan - verify blocked with upgrade prompt
 
 #### TC-SUB-002: Usage Tracking
 - [ ] Create product (for supplier)
@@ -773,18 +792,31 @@ This document provides a comprehensive manual testing checklist for all features
 
 #### TC-SUB-003: Plan Upgrade
 - [ ] Restaurant on Free plan
+- [ ] Verify current plan features (check via `/api/subscriptions/features/:featureKey`)
+- [ ] Attempt to access feature not in Free plan - verify blocked
 - [ ] Attempt to exceed limit
 - [ ] Click upgrade prompt
-- [ ] Select new plan
+- [ ] Select new plan (e.g., Bronze → Gold)
+- [ ] Verify subscription updates immediately
 - [ ] Verify limits update immediately
-- [ ] Verify features unlock
+- [ ] Verify new plan features unlock immediately:
+  - [ ] Check feature endpoint returns enabled for new plan features
+  - [ ] Verify UI elements appear for new features
+  - [ ] Verify API endpoints allow access to new features
 
 #### TC-SUB-004: Plan Downgrade
 - [ ] Restaurant on Gold plan
-- [ ] Downgrade to Bronze
-- [ ] Verify limits reduce
-- [ ] Verify exceeding features locked
-- [ ] Verify existing data preserved
+- [ ] Verify current plan features (note which features are enabled)
+- [ ] Use features available in Gold but not Bronze
+- [ ] Downgrade to Bronze plan
+- [ ] Verify subscription updates immediately
+- [ ] Verify limits reduce immediately
+- [ ] Verify disabled features lock immediately:
+  - [ ] Check feature endpoint returns disabled for removed features
+  - [ ] Verify UI elements hide for disabled features
+  - [ ] Verify API endpoints block access to disabled features
+- [ ] Verify existing data preserved (not deleted)
+- [ ] Verify upgrade prompt shows for locked features
 
 ---
 
@@ -926,6 +958,13 @@ After completing all manual tests, verify:
 
 ---
 
-**Last Updated**: [Current Date]
-**Version**: 1.0.0
+**Last Updated**: 2024-12-19
+**Version**: 2.0.0
+
+**Recent Changes**:
+- Removed feature flag system - features now controlled solely by subscription plan features JSONB field
+- Added test cases for subscription-based feature checking (TC-SUB-000)
+- Updated admin test cases to reflect plan features management via JSONB (TC-ADMIN-004)
+- Enhanced plan upgrade/downgrade tests to verify feature access changes (TC-SUB-003, TC-SUB-004)
+- Updated plan enforcement tests to include feature checking (TC-SUB-001)
 

@@ -54,7 +54,7 @@ Tests cover:
 - ✅ All CRUD operations
 - ✅ Plan limit enforcement
 - ✅ 80% warnings and 100% blocks
-- ✅ Feature flag resolution
+- ✅ Feature resolution via subscription plans
 - ✅ Admin overrides
 - ✅ Multi-branch/warehouse scoping
 - ✅ Audit logging

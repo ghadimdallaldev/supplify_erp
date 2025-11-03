@@ -29,7 +29,7 @@ describe('Finance E2E Tests', () => {
 
     it('Should view expense analytics (Gold+)', async () => {
       // Gold+ has expense analytics feature
-      // TODO: Verify feature flag enabled
+      // TODO: Verify feature enabled in plan
       // TODO: Test analytics endpoint
     });
   });

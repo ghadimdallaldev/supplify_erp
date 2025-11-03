@@ -119,42 +119,12 @@ describe('Admin Dashboard E2E Tests', () => {
     });
   });
 
-  describe('Feature Flags', () => {
+  describe('Plan Features', () => {
     
-    it('Should list all feature flags', async () => {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/admin-dashboard/feature-flags`,
-        { headers: { Authorization: `Bearer ${adminToken}` } }
-      );
-      
-      expect(response.status).toBe(200);
-      expect(response.data.data.flags).toBeInstanceOf(Array);
-    });
-
-    it('Should toggle global feature flag', async () => {
-      const flags = await axios.get(
-        `${API_BASE_URL}/api/admin-dashboard/feature-flags`,
-        { headers: { Authorization: `Bearer ${adminToken}` } }
-      );
-      
-      if (flags.data.data.flags.length > 0) {
-        const flag = flags.data.data.flags[0];
-        const updated = await axios.patch(
-          `${API_BASE_URL}/api/admin-dashboard/feature-flags/${flag.feature_key}`,
-          { isEnabledGlobally: !flag.is_enabled_globally },
-          { headers: { Authorization: `Bearer ${adminToken}` } }
-        );
-        
-        expect(updated.status).toBe(200);
-      }
-    });
-
-    it('Should create tenant override', async () => {
-      // TODO: Implement
-    });
-
-    it('Should remove tenant override', async () => {
-      // TODO: Implement
+    it('Should check features from subscription plan', async () => {
+      // Features are now controlled solely by subscription plan features JSONB
+      // To test, verify isFeatureEnabled() checks plan.features correctly
+      // TODO: Implement plan feature tests
     });
   });
 
