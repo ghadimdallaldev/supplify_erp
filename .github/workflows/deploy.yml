@@ -1,68 +1,122 @@
-name: Deploy to AWS
+name: Deploy
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      deploy_type:
+        description: 'Deployment type'
+        required: true
+        type: choice
+        options:
+          - api
+          - web
+          - both
 
 jobs:
-  deploy:
+  deploy-api:
+    name: Deploy API to AWS ECS
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_type == 'api' || github.event.inputs.deploy_type == 'both'))
     environment: production
-
+    
+    permissions:
+      id-token: write
+      contents: read
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+      
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
-
+          role-session-name: GitHubActions-Deploy
+      
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v2
+      
+      - uses: pnpm/action-setup@v2
         with:
           version: 8
-
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
+      
       - name: Build packages
         run: pnpm build
-
-      - name: Build and push Docker images
+      
+      - name: Build and push Docker image
+        if: hashFiles('**/Dockerfile') != ''
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: supplify
-          IMAGE_TAG: ${{ github.sha }}
+          ECR_REPOSITORY: supplify-api
+          IMAGE_TAG: ${{ github.ref_name }}
         run: |
-          # Build and push API Gateway
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-gateway:$IMAGE_TAG -f apps/api-gateway/Dockerfile .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-gateway:$IMAGE_TAG
-
-          # Build and push services (example for catalog)
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-catalog:$IMAGE_TAG -f services/catalog/Dockerfile .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-catalog:$IMAGE_TAG
-
+          if [ -f "apps/api/Dockerfile" ]; then
+            docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f apps/api/Dockerfile apps/api
+            docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          else
+            echo "No Dockerfile found for API, skipping Docker build"
+          fi
+      
       - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           echo "Running database migrations..."
-          # Add migration commands here
-
+          pnpm --filter @supplify/api db:migrate
+      
       - name: Deploy to ECS
+        env:
+          AWS_REGION: eu-central-1
+          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
         run: |
           echo "Deploying to ECS..."
-          # Add ECS deployment commands here
-          # aws ecs update-service --cluster supplify-cluster --service api-gateway --force-new-deployment
+          if [ -n "$ECS_CLUSTER" ] && [ -n "$ECS_SERVICE" ]; then
+            aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment --region $AWS_REGION
+          else
+            echo "ECS cluster and service not configured, skipping ECS deployment"
+          fi
 
+  deploy-web:
+    name: Deploy Web to Vercel
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_type == 'web' || github.event.inputs.deploy_type == 'both'))
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+      
+      - name: Pull Vercel Environment Information
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./apps/web

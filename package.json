@@ -7,8 +7,13 @@
   "scripts": {
     "dev": "concurrently \"pnpm --filter @supplify/api dev\" \"pnpm --filter @supplify/web dev\"",
     "build": "pnpm --filter @supplify/api build && pnpm --filter @supplify/web build",
+    "typecheck": "pnpm --filter @supplify/web type-check",
     "lint": "pnpm --filter @supplify/api lint && pnpm --filter @supplify/web lint",
+    "lint:fix": "pnpm --filter @supplify/api lint:fix && pnpm --filter @supplify/web lint:fix",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "test": "pnpm --filter @supplify/api test && pnpm --filter @supplify/web test",
+    "test:ci": "pnpm --filter @supplify/api test:run && pnpm --filter @supplify/web test:run",
+    "e2e": "pnpm --filter @supplify/api test:e2e",
     "db:migrate": "pnpm --filter @supplify/api db:migrate",
     "db:seed": "pnpm --filter @supplify/api db:seed",
     "db:reset": "pnpm --filter @supplify/api db:reset",
@@ -16,11 +21,17 @@
     "prepare": "husky install"
   },
   "devDependencies": {
+    "@commitlint/cli": "^18.6.0",
+    "@commitlint/config-conventional": "^18.6.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^9.0.7",
     "@types/node": "^20.10.0",
     "concurrently": "^8.2.2",
     "husky": "^8.0.3",
     "lint-staged": "^15.2.0",
     "prettier": "^3.1.0",
+    "semantic-release": "^22.0.12",
     "typescript": "^5.3.0"
   },
   "engines": {

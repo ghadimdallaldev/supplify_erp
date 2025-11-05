@@ -5,22 +5,26 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
 ## Quick Start
 
 1. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
 2. **Start infrastructure**
+
    ```bash
    docker compose up -d
    ```
 
 3. **Setup database**
+
    ```bash
    pnpm db:migrate
    pnpm db:seed
    ```
 
 4. **Start development servers**
+
    ```bash
    pnpm dev
    ```
@@ -46,8 +50,13 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
 
 - `pnpm dev` - Start both API and web development servers
 - `pnpm build` - Build all applications
+- `pnpm typecheck` - Type check TypeScript code
 - `pnpm lint` - Lint all code
-- `pnpm test` - Run all tests
+- `pnpm lint:fix` - Fix linting issues automatically
+- `pnpm format` - Format code with Prettier
+- `pnpm test` - Run all tests in watch mode
+- `pnpm test:ci` - Run all tests once (for CI)
+- `pnpm e2e` - Run end-to-end tests
 - `pnpm db:migrate` - Run database migrations
 - `pnpm db:seed` - Seed database with sample data
 - `pnpm db:reset` - Reset database (drop, migrate, seed)
@@ -92,13 +101,122 @@ The API follows RESTful conventions with:
 - Input validation with Zod
 - Rate limiting and CSRF protection
 
+## CI/CD Automation
+
+This repository uses GitHub Actions for automated CI/CD workflows.
+
+### PR Flow
+
+Every pull request automatically triggers:
+
+1. **Type Checking** - Validates TypeScript types in the web app
+2. **Linting** - Runs ESLint on both API and web code
+3. **Testing** - Executes unit tests for both API and web
+4. **Build** - Verifies that both applications build successfully
+
+All checks must pass before a PR can be merged.
+
+### Conventional Commits
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) for semantic versioning. Commit messages must follow the format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks
+- `perf`: Performance improvements
+- `ci`: CI/CD changes
+- `build`: Build system changes
+
+**Example:**
+
+```
+feat(auth): add OAuth2 login support
+
+Add support for OAuth2 authentication flow with Keycloak.
+Includes token refresh and logout functionality.
+
+Closes #123
+```
+
+Commitlint will automatically validate commit messages on commit using Husky.
+
+### Automatic Release
+
+When code is merged into `main`, semantic-release automatically:
+
+1. Analyzes commits since the last release
+2. Determines the version bump (patch, minor, or major)
+3. Generates release notes from commit messages
+4. Updates `CHANGELOG.md`
+5. Creates a Git tag for the new version
+6. Creates a GitHub release
+
+**No manual version bumping required!** The version is determined automatically based on commit types:
+
+- `feat`: minor version bump
+- `fix`: patch version bump
+- `BREAKING CHANGE`: major version bump
+
+### Deployment Trigger
+
+Tagged releases (e.g., `v1.2.3`) automatically trigger deployment:
+
+- **API**: Deploys to AWS ECS using OIDC authentication (no static secrets)
+- **Web**: Deploys to Vercel (if configured)
+
+Deployment requires:
+
+- AWS OIDC role configured (for API deployment)
+- Vercel tokens configured (for web deployment)
+
+### Running Tests Locally
+
+To run tests locally before pushing:
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests once (CI mode)
+pnpm test:ci
+
+# Run E2E tests
+pnpm e2e
+
+# Run tests with coverage
+pnpm --filter @supplify/api test:coverage
+pnpm --filter @supplify/web test:coverage
+```
+
+### Workflow Files
+
+- `.github/workflows/ci.yml` - Runs on every PR and push to main/develop
+- `.github/workflows/release.yml` - Runs semantic-release on main branch
+- `.github/workflows/deploy.yml` - Deploys to production on tagged releases
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
+3. Make your changes following Conventional Commit format
+4. Run tests and linting locally: `pnpm test:ci && pnpm lint`
+5. Commit your changes (commitlint will validate the message)
+6. Submit a pull request
+7. Ensure all CI checks pass before requesting review
 
 ## License
 

@@ -8,10 +8,15 @@
     "dev": "node --watch src/server.js",
     "build": "echo 'Build not needed for JS'",
     "start": "node src/server.js",
+    "typecheck": "echo 'Typecheck not needed for JS'",
     "test": "vitest",
     "test:watch": "vitest --watch",
+    "test:run": "vitest run",
+    "test:coverage": "vitest --coverage",
+    "test:e2e": "vitest run --config ../../tests/e2e/vitest.config.js",
     "lint": "eslint src/**/*.js",
     "lint:fix": "eslint src/**/*.js --fix",
+    "format": "prettier --write \"src/**/*.{js,json}\"",
     "db:migrate": "node scripts/migrate.js",
     "db:seed": "node scripts/seed.js",
     "db:reset": "node scripts/reset.js",
@@ -46,6 +51,7 @@
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.1.0",
     "supertest": "^6.3.3",
-    "vitest": "^1.1.0"
+    "vitest": "^1.1.0",
+    "@vitest/coverage-v8": "^1.1.0"
   }
 }
