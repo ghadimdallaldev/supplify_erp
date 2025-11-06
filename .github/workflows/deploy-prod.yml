@@ -43,7 +43,7 @@ jobs:
       - name: Install CDK dependencies
         run: |
           cd infra
-          pnpm install
+          pnpm install --frozen-lockfile
       
       - name: Bootstrap CDK (if needed)
         run: |
