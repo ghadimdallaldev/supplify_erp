@@ -5,6 +5,7 @@ import { Construct } from 'constructs'
 export interface VpcStackProps extends cdk.StackProps {
   environment: string
   projectName: string
+  env?: cdk.Environment
 }
 
 export class VpcStack extends cdk.Stack {

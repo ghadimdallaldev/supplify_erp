@@ -6,6 +6,7 @@ import { Construct } from 'constructs'
 export interface S3StackProps extends cdk.StackProps {
   environment: string
   projectName: string
+  env?: cdk.Environment
 }
 
 export class S3Stack extends cdk.Stack {

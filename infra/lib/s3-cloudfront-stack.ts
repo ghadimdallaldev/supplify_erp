@@ -9,6 +9,7 @@ import { Construct } from 'constructs'
 export interface S3CloudFrontStackProps extends cdk.StackProps {
   environment: string
   projectName: string
+  env?: cdk.Environment
 }
 
 export class S3CloudFrontStack extends cdk.Stack {

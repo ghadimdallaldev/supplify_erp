@@ -9,6 +9,7 @@ import { Construct } from 'constructs'
 export interface ObservabilityStackProps extends cdk.StackProps {
   environment: string
   projectName: string
+  env?: cdk.Environment
 }
 
 export class ObservabilityStack extends cdk.Stack {

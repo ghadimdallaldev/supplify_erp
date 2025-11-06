@@ -6,6 +6,7 @@ export interface IAMStackProps extends cdk.StackProps {
   environment: string
   projectName: string
   githubRepo: string
+  env?: cdk.Environment
 }
 
 export class IAMStack extends cdk.Stack {

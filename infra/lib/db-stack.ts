@@ -11,6 +11,7 @@ export interface DbStackProps extends cdk.StackProps {
   privateSubnets: ec2.ISubnet[]
   minCapacity: number
   maxCapacity: number
+  env?: cdk.Environment
 }
 
 export class DbStack extends cdk.Stack {
