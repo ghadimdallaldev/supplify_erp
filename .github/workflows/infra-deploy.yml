@@ -1,0 +1,80 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  deploy-infra:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Set environment
+        id: env
+        run: |
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          echo "env=$ENV" >> $GITHUB_OUTPUT
+          ENV_UPPER=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
+          echo "env_upper=$ENV_UPPER" >> $GITHUB_OUTPUT
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets[format('AWS_ROLE_ARN_{0}', steps.env.outputs.env_upper)] }}
+          aws-region: ${{ secrets.AWS_REGION || 'me-south-1' }}
+          role-session-name: GitHubActions-Deploy-Infra
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Install CDK dependencies
+        run: |
+          cd infra
+          pnpm install
+      
+      - name: Bootstrap CDK (if needed)
+        run: |
+          cd infra
+          pnpm cdk:bootstrap || true
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'me-south-1' }}
+      
+      - name: Deploy infrastructure
+        run: |
+          cd infra
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          pnpm cdk:deploy:$ENV
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'me-south-1' }}

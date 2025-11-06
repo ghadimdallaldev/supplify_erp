@@ -1,0 +1,47 @@
+{
+  "name": "supplify-infra",
+  "version": "1.0.0",
+  "description": "Supplify AWS Infrastructure using CDK",
+  "main": "bin/supplify.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "cdk": "npx cdk",
+    "synth": "npx cdk synth",
+    "synth:dev": "npx cdk synth --context env=dev",
+    "synth:staging": "npx cdk synth --context env=staging",
+    "synth:prod": "npx cdk synth --context env=prod",
+    "deploy": "npx cdk deploy --all --require-approval never",
+    "deploy:dev": "npx cdk deploy --all --context env=dev --require-approval never",
+    "deploy:staging": "npx cdk deploy --all --context env=staging --require-approval never",
+    "deploy:prod": "npx cdk deploy --all --context env=prod --require-approval never",
+    "bootstrap": "npx cdk bootstrap",
+    "cdk:bootstrap": "npx cdk bootstrap",
+    "cdk:synth": "npx cdk synth",
+    "cdk:synth:dev": "npx cdk synth --context env=dev",
+    "cdk:synth:staging": "npx cdk synth --context env=staging",
+    "cdk:synth:prod": "npx cdk synth --context env=prod",
+    "cdk:deploy": "npx cdk deploy --all --require-approval never",
+    "cdk:deploy:dev": "npx cdk deploy --all --context env=dev --require-approval never",
+    "cdk:deploy:staging": "npx cdk deploy --all --context env=staging --require-approval never",
+    "cdk:deploy:prod": "npx cdk deploy --all --context env=prod --require-approval never",
+    "destroy": "npx cdk destroy --all",
+    "destroy:dev": "npx cdk destroy --all --context env=dev",
+    "destroy:staging": "npx cdk destroy --all --context env=staging",
+    "destroy:prod": "npx cdk destroy --all --context env=prod"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "aws-cdk": "^2.120.0",
+    "aws-cdk-lib": "^2.120.0",
+    "constructs": "^10.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.120.0",
+    "constructs": "^10.3.0",
+    "source-map-support": "^0.5.21"
+  }
+}

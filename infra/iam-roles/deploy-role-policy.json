@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:*",
+        "ecs:*",
+        "ecr:*",
+        "rds:*",
+        "logs:*",
+        "s3:*",
+        "ec2:*",
+        "secretsmanager:*",
+        "route53:*",
+        "acm:*",
+        "cloudfront:*",
+        "elasticloadbalancing:*",
+        "application-autoscaling:*",
+        "events:*",
+        "ssm:*",
+        "sts:GetCallerIdentity",
+        "iam:PassRole",
+        "xray:*",
+        "cloudwatch:*",
+        "wafv2:*"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Environment": "${env}"
+        }
+      }
+    }
+  ]
+}

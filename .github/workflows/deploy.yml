@@ -2,6 +2,7 @@ name: Deploy
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -11,16 +12,71 @@ on:
         required: true
         type: choice
         options:
+          - infra
           - api
           - web
-          - both
+          - all
 
 jobs:
-  deploy-api:
-    name: Deploy API to AWS ECS
+  deploy-infra:
+    name: Deploy Infrastructure with CDK
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_type == 'api' || github.event.inputs.deploy_type == 'both'))
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_type == 'infra' || github.event.inputs.deploy_type == 'all'))
     environment: production
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: me-south-1
+          role-session-name: GitHubActions-Deploy
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Install CDK dependencies
+        run: |
+          cd infra
+          pnpm install
+      
+      - name: Bootstrap CDK
+        run: pnpm cdk:bootstrap
+        env:
+          AWS_ACCOUNT_ID: 302428338355
+          AWS_REGION: me-south-1
+      
+      - name: Synthesize CDK stacks
+        run: pnpm cdk:synth
+      
+      - name: Deploy CDK stacks
+        run: pnpm cdk:deploy
+        env:
+          AWS_ACCOUNT_ID: 302428338355
+          AWS_REGION: me-south-1
+
+  deploy-api:
+    name: Deploy API to ECS
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_type == 'api' || github.event.inputs.deploy_type == 'all'))
+    environment: production
+    needs: deploy-infra
     
     permissions:
       id-token: write
@@ -34,7 +90,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: eu-central-1
+          aws-region: me-south-1
           role-session-name: GitHubActions-Deploy
       
       - name: Login to Amazon ECR
@@ -57,11 +113,11 @@ jobs:
         run: pnpm build
       
       - name: Build and push Docker image
-        if: hashFiles('**/Dockerfile') != ''
+        if: hashFiles('apps/api/Dockerfile') != ''
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: supplify-api
-          IMAGE_TAG: ${{ github.ref_name }}
+          IMAGE_TAG: ${{ github.ref_name || 'latest' }}
         run: |
           if [ -f "apps/api/Dockerfile" ]; then
             docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f apps/api/Dockerfile apps/api
@@ -70,22 +126,19 @@ jobs:
             echo "No Dockerfile found for API, skipping Docker build"
           fi
       
-      - name: Run database migrations
+      - name: Update ECS service
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ECS_CLUSTER: supplify-cluster
+          ECS_SERVICE: supplify-api
+          ECR_REPOSITORY: supplify-api
+          IMAGE_TAG: ${{ github.ref_name || 'latest' }}
         run: |
-          echo "Running database migrations..."
-          pnpm --filter @supplify/api db:migrate
-      
-      - name: Deploy to ECS
-        env:
-          AWS_REGION: eu-central-1
-          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
-          ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
-        run: |
-          echo "Deploying to ECS..."
           if [ -n "$ECS_CLUSTER" ] && [ -n "$ECS_SERVICE" ]; then
-            aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment --region $AWS_REGION
+            aws ecs update-service \
+              --cluster $ECS_CLUSTER \
+              --service $ECS_SERVICE \
+              --force-new-deployment \
+              --region me-south-1
           else
             echo "ECS cluster and service not configured, skipping ECS deployment"
           fi
@@ -93,7 +146,7 @@ jobs:
   deploy-web:
     name: Deploy Web to Vercel
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_type == 'web' || github.event.inputs.deploy_type == 'both'))
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_type == 'web' || github.event.inputs.deploy_type == 'all'))
     environment: production
     
     steps:
