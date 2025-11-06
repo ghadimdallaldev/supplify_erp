@@ -23,6 +23,7 @@ export interface EcsStackProps extends cdk.StackProps {
   minCapacity: number
   maxCapacity: number
   aiAccessRole?: iam.IRole
+  env?: cdk.Environment
 }
 
 export class EcsStack extends cdk.Stack {
