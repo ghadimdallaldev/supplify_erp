@@ -39,30 +39,26 @@ jobs:
         run: pnpm install --frozen-lockfile
       
       - name: Install CDK dependencies
-        run: |
-          cd infra
-          pnpm install --frozen-lockfile
+        working-directory: infra
+        run: pnpm install --frozen-lockfile
       
       - name: Bootstrap CDK (if needed)
-        run: |
-          cd infra
-          pnpm cdk:bootstrap || true
+        working-directory: infra
+        run: pnpm cdk:bootstrap || true
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'me-south-1' }}
       
       - name: Synthesize CDK stacks
-        run: |
-          cd infra
-          pnpm cdk:synth:dev
+        working-directory: infra
+        run: pnpm cdk:synth:dev
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'me-south-1' }}
       
       - name: Deploy CDK stacks
-        run: |
-          cd infra
-          pnpm cdk:deploy:dev
+        working-directory: infra
+        run: pnpm cdk:deploy:dev
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'me-south-1' }}
