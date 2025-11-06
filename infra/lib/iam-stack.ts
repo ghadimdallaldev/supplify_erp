@@ -39,6 +39,10 @@ export class IAMStack extends cdk.Stack {
     }
 
     // Deploy Role for GitHub Actions
+    // Trust policy allows branch refs, workflow runs, and environment deployments
+    // Using wildcard pattern to match all valid GitHub Actions OIDC token subjects
+    const branchRef =
+      props.environment === 'prod' ? 'ref:refs/heads/main' : `ref:refs/heads/${props.environment}`
     this.deployRole = new iam.Role(this, 'DeployRole', {
       roleName: `SupplifyDeployRole_${props.environment}`,
       description: `Role for GitHub Actions to deploy ${props.projectName} ${props.environment} environment`,
@@ -47,7 +51,7 @@ export class IAMStack extends cdk.Stack {
           'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
         },
         StringLike: {
-          [`token.actions.githubusercontent.com:sub`]: `repo:${props.githubRepo}:${props.environment === 'prod' ? 'ref:refs/heads/main' : `ref:refs/heads/${props.environment}`}`,
+          [`token.actions.githubusercontent.com:sub`]: `repo:${props.githubRepo}:*`,
         },
       }),
     })
