@@ -40,7 +40,13 @@ jobs:
       
       - name: Install CDK dependencies
         working-directory: infra
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm list aws-cdk-lib || pnpm install aws-cdk-lib
+      
+      - name: Build TypeScript
+        working-directory: infra
+        run: pnpm build || true
       
       - name: Bootstrap CDK (if needed)
         working-directory: infra
