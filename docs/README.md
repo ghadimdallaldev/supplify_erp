@@ -43,6 +43,7 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
 - **Authentication**: Keycloak OIDC with server-side token handling
 - **Storage**: MinIO for file uploads
 - **State Management**: RTK Query
+- **FOH Experience**: Reservations cockpit with drag-and-drop status board, full-width floor builder, and guest flow analytics
 
 ## Development
 

@@ -101,23 +101,25 @@ export function ReservationsPage() {
         <ReservationBoard reservations={reservations} tables={tables} waitlist={waitlist} />
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[1.6fr,1.4fr]">
-        <ReservationTableBuilder tables={tables} />
-        <div className="space-y-6">
-          <ReservationAnalyticsPanel analytics={analytics} activeRange={range} onRangeChange={handleRangeChange} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Guest intelligence</CardTitle>
-              <CardDescription>Snapshot of recent guests and smart follow-ups (coming soon).</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-gray-500">
-              <p>We’ll surface repeat guests, loyalty moments, and VIP nudges here.</p>
-              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-xs text-gray-400">
-                <p>✨ Heads up: SMS and WhatsApp confirmations trigger automatically for confirmed seats (configure from Settings soon).</p>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="space-y-6">
+        <div className="-mx-4 lg:-mx-6">
+          <ReservationTableBuilder tables={tables} />
         </div>
+
+        <ReservationAnalyticsPanel analytics={analytics} activeRange={range} onRangeChange={handleRangeChange} />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Guest intelligence</CardTitle>
+            <CardDescription>Snapshot of recent guests and smart follow-ups (coming soon).</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-gray-500">
+            <p>We’ll surface repeat guests, loyalty moments, and VIP nudges here.</p>
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-xs text-gray-400">
+              <p>✨ Heads up: SMS and WhatsApp confirmations trigger automatically for confirmed seats (configure from Settings soon).</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

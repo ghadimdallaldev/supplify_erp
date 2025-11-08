@@ -19,6 +19,23 @@ Supplify provides comprehensive restaurant procurement and inventory management,
 9. **Staff Roster** - Weekly scheduling, attendance, and labor cost tracking
 10. **Settings** - Account and profile settings
 
+---
+
+## 🪑 Reservations Cockpit & Floor Builder
+
+Supplify’s reservations module gives front-of-house teams a live operational command centre:
+
+- **Drag-and-drop reservations board** with status swimlanes (Pending, Confirmed, Seated, Waitlist) and inline status transitions.
+- **Full-width visual floor builder**:
+  - Add preset table shapes (round, square, banquet, booth, chef’s table) and resize them to match reality.
+  - Drag, rotate, recolor, and zone tables (main floor, patio, bar, VIP, private) with instant capacity totals.
+  - Capture amenity tags (accessible, window view, high-top, power outlet, romantic, near music) and store notes per table.
+  - Layout metadata (shape, rotation, size ratios, color, zone, notes) persists via the reservations API for consistent seat maps.
+- **Guest flow intelligence** sits directly beneath the builder, surfacing hourly demand, waitlist load, and cancellation patterns.
+- **Quick duplication & archival tools** to spin up seasonal layouts or retire tables without losing historical reservations.
+
+---
+
 ## 👥 Staff Roster & Scheduling
 - Visual weekly grid to plan kitchen, floor, and cashier coverage per branch
 - Assign roles to shifts and optionally send WhatsApp or in-app alerts

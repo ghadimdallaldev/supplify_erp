@@ -889,6 +889,67 @@ This document provides a comprehensive manual testing checklist for all features
 
 ---
 
+## 🪑 Reservations Cockpit
+
+### Test Cases
+
+#### TC-RES-001: Reservations Board Status Lanes
+- [ ] Navigate to Reservations page
+- [ ] Confirm Pending, Confirmed, Seated, Waitlist columns render
+- [ ] Verify each reservation appears under the correct status
+- [ ] Check column counters match visible cards
+
+#### TC-RES-002: Drag & Drop Status Update
+- [ ] Drag a reservation from Pending to Confirmed
+- [ ] Release card and verify success toast
+- [ ] Refresh page; confirm reservation persists in Confirmed
+- [ ] Repeat for Seated and Waitlist lanes
+
+#### TC-RES-003: Add Table Preset
+- [ ] Click a shape preset (e.g., Round)
+- [ ] Confirm new table appears on the canvas with auto-generated name
+- [ ] Verify active table and capacity summary updates
+- [ ] Ensure table inspector opens with the new table selected
+
+#### TC-RES-004: Drag, Resize, and Rotate Table
+- [ ] Drag selected table across canvas; ensure it stays within bounds
+- [ ] Resize via corner handle and confirm dimensions update smoothly
+- [ ] Adjust rotation slider; verify canvas preview rotates
+- [ ] Reset rotation via button and confirm zero degrees
+
+#### TC-RES-005: Tag Table Metadata
+- [ ] Change zone (e.g., VIP) and color swatch
+- [ ] Toggle feature badges (Accessible, Window view)
+- [ ] Enter note text
+- [ ] Hover table to confirm feature badges display
+
+#### TC-RES-006: Duplicate & Retire Table
+- [ ] Click duplicate icon; verify copy appears offset with “copy” suffix
+- [ ] Toggle Active off; ensure table hides from canvas
+- [ ] Toggle Active on; confirm table reappears
+
+#### TC-RES-007: Persist Layout Metadata
+- [ ] Move, resize, rotate, recolor, and tag a table
+- [ ] Click “Save layout”
+- [ ] Refresh page; confirm all metadata remains intact
+
+#### TC-RES-008: Guest Flow Intelligence Refresh
+- [ ] Change analytics range (Day → Week)
+- [ ] Confirm spinner shows then charts refresh
+- [ ] Verify waitlist totals match board counts
+
+#### TC-RES-009: Create Reservation Drawer
+- [ ] Create new reservation via drawer
+- [ ] Observe board auto-refreshes with new entry
+- [ ] Confirm analytics metrics update after creation
+
+#### TC-RES-010: Responsive Layout
+- [ ] Resize viewport below 768px width
+- [ ] Ensure inspector stacks beneath canvas
+- [ ] Verify no horizontal scrolling is required for controls
+
+---
+
 ## 🐛 Error Handling Tests
 
 ### Test Cases
