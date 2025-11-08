@@ -7,7 +7,6 @@ import { getRestaurantIdByEmail } from '../lib/tenant.js'
 
 const router = express.Router()
 
-const wageTypeEnum = z.enum(['HOURLY', 'SALARY', 'CONTRACT', 'OTHER'])
 const staffStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED'])
 
 const staffWageTypeEnum = z.enum(['HOURLY', 'SALARY', 'CONTRACT', 'OTHER'])
@@ -19,7 +18,6 @@ const createStaffSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional(),
   role: z.string().min(1),
-  wageType: staffWageTypeEnum.default('HOURLY'),
   wageType: staffWageTypeEnum.default('HOURLY'),
   wageRate: z.number().nonnegative().optional(),
   hireDate: z.string().optional(),
@@ -60,6 +58,13 @@ const checkInSchema = z.object({
 })
 
 const checkOutSchema = z.object({
+  clockOutAt: z.string().optional(),
+  method: z.string().optional(),
+  breakMinutes: z.number().min(0).optional(),
+  note: z.string().optional(),
+  status: z.enum(['OPEN', 'APPROVED', 'LOCKED', 'ADJUSTMENT_REQUIRED']).optional(),
+})
+
 const ptoTypeEnum = z.enum(['VACATION', 'SICK', 'PERSONAL', 'UNPAID', 'OTHER'])
 const ptoStatusEnum = z.enum(['PENDING', 'APPROVED', 'DECLINED', 'CANCELLED'])
 
@@ -157,13 +162,6 @@ const createPayrollExportSchema = z.object({
   periodEnd: z.string(),
   totals: z.record(z.any()).optional(),
   exportUrl: z.string().url().optional(),
-})
-
-  clockOutAt: z.string().optional(),
-  method: z.string().optional(),
-  breakMinutes: z.number().min(0).optional(),
-  note: z.string().optional(),
-  status: z.enum(['APPROVED', 'OPEN', 'LOCKED', 'ADJUSTMENT_REQUIRED']).optional(),
 })
 
 async function resolveRestaurantId(req) {
