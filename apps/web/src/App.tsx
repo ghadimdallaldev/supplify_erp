@@ -24,6 +24,7 @@ import { RestaurantOnboardingPage } from './pages/RestaurantOnboardingPage'
 import { ReceivingPage } from './pages/ReceivingPage'
 import { AdminDashboardPage } from './pages/AdminDashboardPage'
 import { ReservationsPage } from './pages/ReservationsPage'
+import { StaffPage } from './pages/StaffPage'
 
 const router = createBrowserRouter([
   {
@@ -89,6 +90,10 @@ const router = createBrowserRouter([
       {
         path: 'app/reservations',
         element: <ReservationsPage />,
+      },
+      {
+        path: 'app/staff',
+        element: <StaffPage />,
       },
       {
         path: 'app/suppliers',

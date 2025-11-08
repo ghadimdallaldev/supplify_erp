@@ -577,6 +577,70 @@ export interface ReservationAnalyticsResponse {
   waitlist: Array<{ status: string; total: number }>
 }
 
+// Staff App types
+export type StaffStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
+export type StaffWageType = 'HOURLY' | 'SALARY' | 'CONTRACT' | 'OTHER'
+
+export interface StaffMember {
+  id: string
+  restaurantId: string
+  status: StaffStatus
+  firstName: string
+  lastName: string
+  displayName: string
+  email?: string | null
+  phone?: string | null
+  role: string
+  wageType: StaffWageType
+  wageRate?: number | null
+  hireDate?: string | null
+  profileColor?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type StaffShiftStatus = 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'CANCELLED'
+
+export interface StaffShift {
+  id: string
+  restaurantId: string
+  staffId?: string | null
+  role: string
+  shiftDate: string
+  startsAt: string
+  endsAt: string
+  status: StaffShiftStatus
+  notes?: string | null
+  staff?: {
+    id: string
+    name: string
+    role: string
+  } | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type StaffTimeEntryStatus = 'OPEN' | 'APPROVED' | 'LOCKED' | 'ADJUSTMENT_REQUIRED'
+
+export interface StaffTimeEntry {
+  id: string
+  restaurantId: string
+  staffId: string
+  shiftId?: string | null
+  clockInAt: string
+  clockInMethod?: string | null
+  clockOutAt?: string | null
+  clockOutMethod?: string | null
+  breakMinutes: number
+  breakDetails?: Record<string, unknown> | null
+  status: StaffTimeEntryStatus
+  note?: string | null
+  staffName?: string | null
+  role?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 // Admin Dashboard types
 export interface SubscriptionPlan {
   id: string

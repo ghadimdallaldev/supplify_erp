@@ -40,6 +40,7 @@ import branchesRoutes from './routes/branches.routes.js';
 import warehousesRoutes from './routes/warehouses.routes.js';
 import { executeScheduledOrders } from './services/scheduled-orders.service.js';
 import { ensureReservationsSchema } from './lib/migrator.js';
+import { staffRoutes } from './routes/staff.routes.js';
 
 if (config.NODE_ENV !== 'test') {
   try {
@@ -156,6 +157,7 @@ app.use('/api/restaurant-onboarding', restaurantOnboardingRoutes);
 app.use('/api/receiving', receivingRoutes);
 app.use('/api/restaurant-finance', restaurantFinanceRoutes);
 app.use('/api/reservations', reservationsRoutes);
+app.use('/api/staff', staffRoutes);
 app.use('/api/restaurant-pricing', restaurantPricingRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);

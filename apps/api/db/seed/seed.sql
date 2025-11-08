@@ -145,3 +145,122 @@ INSERT INTO invoice (
   '2025-05-02T12:00:00Z'
 )
 ON CONFLICT (invoice_number) DO NOTHING;
+
+-- Seed sample staff members
+INSERT INTO staff_member (
+  id,
+  restaurant_id,
+  status,
+  first_name,
+  last_name,
+  display_name,
+  email,
+  phone,
+  role,
+  wage_type,
+  wage_rate,
+  hire_date,
+  profile_color
+) VALUES
+(
+  '910e8400-e29b-41d4-a716-4466554400aa',
+  '550e8400-e29b-41d4-a716-446655440002',
+  'ACTIVE',
+  'Sara',
+  'Malik',
+  'Sara Malik',
+  'sara.malik@goldenfork.com',
+  '+971507654322',
+  'Floor Manager',
+  'SALARY',
+  3200.00,
+  '2023-01-12',
+  '#2563eb'
+),
+(
+  '920e8400-e29b-41d4-a716-4466554400bb',
+  '550e8400-e29b-41d4-a716-446655440002',
+  'ACTIVE',
+  'Imran',
+  'Khalid',
+  'Imran',
+  'imran.khalid@goldenfork.com',
+  '+971507654399',
+  'Kitchen',
+  'HOURLY',
+  18.50,
+  '2022-10-01',
+  '#16a34a'
+),
+(
+  '930e8400-e29b-41d4-a716-4466554400cc',
+  '550e8400-e29b-41d4-a716-446655440002',
+  'ACTIVE',
+  'Layla',
+  'Hassan',
+  'Layla',
+  'layla.hassan@goldenfork.com',
+  '+971507650123',
+  'Server',
+  'HOURLY',
+  14.00,
+  '2024-03-18',
+  '#f97316'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample shifts
+INSERT INTO staff_shift (
+  id,
+  restaurant_id,
+  staff_id,
+  role,
+  shift_date,
+  starts_at,
+  ends_at,
+  status,
+  notes
+) VALUES
+(
+  '940e8400-e29b-41d4-a716-4466554400dd',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '930e8400-e29b-41d4-a716-4466554400cc',
+  'Server',
+  CURRENT_DATE,
+  CURRENT_DATE + TIME '10:00',
+  CURRENT_DATE + TIME '18:00',
+  'PUBLISHED',
+  'Lunch + early dinner coverage'
+),
+(
+  '950e8400-e29b-41d4-a716-4466554400ee',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '920e8400-e29b-41d4-a716-4466554400bb',
+  'Kitchen',
+  CURRENT_DATE,
+  CURRENT_DATE + TIME '09:00',
+  CURRENT_DATE + TIME '17:00',
+  'PUBLISHED',
+  'Prep and line coverage'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample open time entry
+INSERT INTO staff_time_entry (
+  id,
+  restaurant_id,
+  staff_id,
+  shift_id,
+  clock_in_at,
+  clock_in_method,
+  status
+) VALUES (
+  '960e8400-e29b-41d4-a716-4466554400ff',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '930e8400-e29b-41d4-a716-4466554400cc',
+  '940e8400-e29b-41d4-a716-4466554400dd',
+  CURRENT_TIMESTAMP - INTERVAL '2 hours',
+  'web',
+  'OPEN'
+)
+ON CONFLICT (id) DO NOTHING;

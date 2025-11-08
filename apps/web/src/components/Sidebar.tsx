@@ -17,6 +17,7 @@ import {
   PackageCheck,
   Shield,
   CalendarDays,
+  UserCircle2,
 } from 'lucide-react'
 
 const navigation = [
@@ -31,6 +32,7 @@ const restaurantNavigation = [
   { name: 'Cart', href: '/app/cart', icon: ShoppingBag },
   { name: 'Suppliers', href: '/app/suppliers', icon: Building2 },
   { name: 'Reservations', href: '/app/reservations', icon: CalendarDays },
+  { name: 'Staff', href: '/app/staff', icon: UserCircle2 },
   { name: 'Inventory', href: '/app/restaurant-inventory', icon: Package2 },
   { name: 'Receiving', href: '/app/receiving', icon: PackageCheck },
   { name: 'Invoices', href: '/app/invoices', icon: FileText },

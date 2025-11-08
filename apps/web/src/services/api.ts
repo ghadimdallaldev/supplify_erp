@@ -86,7 +86,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap,
-  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification', 'Subscription', 'Admin', 'Reservation', 'OrdersCalendar', 'QuickList'],
+  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification', 'Subscription', 'Admin', 'Reservation', 'OrdersCalendar', 'QuickList', 'StaffMember', 'StaffShift', 'StaffTimeEntry'],
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({

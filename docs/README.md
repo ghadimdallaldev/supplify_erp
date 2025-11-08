@@ -44,6 +44,7 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
 - **Storage**: MinIO for file uploads
 - **State Management**: RTK Query
 - **FOH Experience**: Reservations cockpit with drag-and-drop status board, full-width floor builder, and guest flow analytics
+- **Labour Management**: Staff App delivering team directory, shift scheduling, and time clock flows (single-location focus)
 
 ## Development
 
@@ -101,6 +102,17 @@ The API follows RESTful conventions with:
 - Audit logging for all operations
 - Input validation with Zod
 - Rate limiting and CSRF protection
+
+## Staff App Snapshot
+
+Supplify now bundles a lightweight Staff App tailored for single-location restaurants:
+
+- **Directory** – maintain active/inactive staff with wage context and hire dates.
+- **Scheduling** – create shifts with assigned roles, view upcoming coverage, and keep notes.
+- **Time Clock** – browser-based check-in/out with break capture and audit-friendly time entries.
+- **Progressive Phases** – PTO, swaps, announcements, documents, and payroll exports build on this foundation.
+
+All data lives under the restaurant tenant so it’s ready for multi-location expansion in later phases.
 
 ## CI/CD Automation
 

@@ -36,6 +36,22 @@ Supplify’s reservations module gives front-of-house teams a live operational c
 
 ---
 
+## 👥 Staff App (Scheduling, Time & PTO)
+
+The Staff App brings single-location labour management directly into Supplify:
+
+- **Team directory** with contact details, wage types, hire dates, and live shift status (on/off clock).
+- **Shift scheduling**:
+  - Create, copy, and assign shifts with clear start/end times and role tagging.
+  - Quick view of the upcoming week with unassigned coverage and notes.
+- **Time & attendance**:
+  - One-click web check-in/check-out with open-entry safeguards.
+  - Track clock methods, break minutes, and notes; review recent punches instantly.
+- **Foundational PTO & availability groundwork** (API-ready for future flows).
+- **Payroll-ready groundwork** with structured time entries (breaks, overtime flags coming in later phases).
+
+---
+
 ## 👥 Staff Roster & Scheduling
 - Visual weekly grid to plan kitchen, floor, and cashier coverage per branch
 - Assign roles to shifts and optionally send WhatsApp or in-app alerts
