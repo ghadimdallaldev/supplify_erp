@@ -16,7 +16,14 @@ Supplify provides comprehensive restaurant procurement and inventory management,
 6. **Receiving** - Match deliveries and record quality
 7. **Invoices** - View and pay supplier invoices
 8. **Chat** - Communicate with suppliers
-9. **Settings** - Account and profile settings
+9. **Staff Roster** - Weekly scheduling, attendance, and labor cost tracking
+10. **Settings** - Account and profile settings
+
+## 👥 Staff Roster & Scheduling
+- Visual weekly grid to plan kitchen, floor, and cashier coverage per branch
+- Assign roles to shifts and optionally send WhatsApp or in-app alerts
+- Mobile-friendly check-in/out to capture attendance in real time
+- Daily labor cost auto-calculated from scheduled vs actual hours
 
 ---
 

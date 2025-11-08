@@ -86,7 +86,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithUnwrap,
-  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification', 'Subscription', 'Admin'],
+  tagTypes: ['User', 'Product', 'Order', 'Supplier', 'Restaurant', 'Price', 'Inventory', 'RestaurantInventory', 'Chat', 'Receiving', 'RestaurantFinance', 'Notification', 'Subscription', 'Admin', 'Reservation', 'OrdersCalendar', 'QuickList'],
   endpoints: (builder) => ({
     // Auth endpoints
     getMe: builder.query<User, void>({
@@ -121,7 +121,7 @@ export const api = createApi({
     }),
     getProduct: builder.query<Product, string>({
       query: (id) => `/api/products/${id}`,
-      providesTags: (result, error, id) => [{ type: 'Product', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Product', id }],
     }),
     createProduct: builder.mutation<Product, CreateProductRequest>({
       query: (body) => ({
@@ -129,17 +129,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled
-          // Manually invalidate and refetch all product lists
-          dispatch(
-            api.util.invalidateTags(['Product'])
-          )
-        } catch {
-          // Error handling
-        }
-      },
+      invalidatesTags: ['Product'],
     }),
     updateProduct: builder.mutation<Product, { id: string; data: UpdateProductRequest }>({
       query: ({ id, data }) => ({
@@ -147,7 +137,7 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'Product', id }, 'Product'],
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Product', id }, 'Product'],
     }),
 
     // Order endpoints
@@ -219,20 +209,20 @@ export const api = createApi({
     }),
     getSupplier: builder.query<Supplier, string>({
       query: (id) => `/api/suppliers/${id}`,
-      providesTags: (result, error, id) => [{ type: 'Supplier', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Supplier', id }],
     }),
     getSupplierStatistics: builder.query<{ totalOrders: number; totalSpent: number; averageOrderValue: number }, string>({
       query: (id) => `/api/suppliers/${id}/statistics`,
-      providesTags: (result, error, id) => [{ type: 'Supplier', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Supplier', id }],
     }),
     followSupplier: builder.mutation<any, string>({
       query: (id) => ({
         url: `/api/suppliers/${id}/follow`,
         method: 'POST',
       }),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
-        'Supplier',
+        { type: 'Supplier', id: 'LIST' },
       ],
     }),
     unfollowSupplier: builder.mutation<any, string>({
@@ -240,9 +230,9 @@ export const api = createApi({
         url: `/api/suppliers/${id}/follow`,
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
-        'Supplier',
+        { type: 'Supplier', id: 'LIST' },
       ],
     }),
     getSupplierMe: builder.query<{ supplier: Supplier }, void>({
@@ -255,9 +245,9 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: 'Supplier', id },
-        'Supplier',
+        { type: 'Supplier', id: 'LIST' },
       ],
     }),
     uploadSupplierLogo: builder.mutation<Supplier, { id: string; logoUrl: string }>({
@@ -266,9 +256,9 @@ export const api = createApi({
         method: 'POST',
         body: { logoUrl },
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: 'Supplier', id },
-        'Supplier',
+        { type: 'Supplier', id: 'LIST' },
       ],
     }),
     getPresignedUrl: builder.mutation<{ presignedUrl: string; fileKey: string; fileName: string; fileType: string }, { fileName: string; fileType: string; fileSize?: number }>({
@@ -301,9 +291,9 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: 'Restaurant', id },
-        'Restaurant',
+        { type: 'Restaurant', id: 'LIST' },
       ],
     }),
     uploadRestaurantLogo: builder.mutation<Restaurant, { id: string; logoUrl: string }>({
@@ -312,9 +302,9 @@ export const api = createApi({
         method: 'POST',
         body: { logoUrl },
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: 'Restaurant', id },
-        'Restaurant',
+        { type: 'Restaurant', id: 'LIST' },
       ],
     }),
 
@@ -489,16 +479,11 @@ export const api = createApi({
     getPendingOrdersForReceiving: builder.query<any, void>({
       query: () => '/api/receiving/pending-orders',
       providesTags: ['Receiving'],
-      // Keep list fresh on navigation/focus and poll periodically for new orders
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
       pollingInterval: 15000,
     }),
     getReceivingHistory: builder.query<any, void>({
       query: () => '/api/receiving/history',
       providesTags: ['Receiving'],
-      // Refetch when component mounts if data is stale
-      refetchOnMountOrArgChange: true,
     }),
     createReceivingReport: builder.mutation<any, any>({
       query: (body) => ({
@@ -507,7 +492,7 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Receiving', 'RestaurantInventory', 'Order'],
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled
           // Force immediate refetch of receiving history
@@ -525,7 +510,7 @@ export const api = createApi({
     }),
     getQuickList: builder.query<any, string>({
       query: (id) => `/api/quick-lists/${id}`,
-      providesTags: (result, error, id) => [{ type: 'QuickList', id }],
+      providesTags: (_result, _error, id) => [{ type: 'QuickList', id }],
     }),
     createQuickList: builder.mutation<any, any>({
       query: (body) => ({
@@ -541,7 +526,7 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'QuickList', id }],
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'QuickList', id }],
     }),
     deleteQuickList: builder.mutation<any, string>({
       query: (id) => ({
@@ -591,7 +576,7 @@ export const api = createApi({
     }),
     getRestaurantInvoice: builder.query<any, string>({
       query: (id) => `/api/restaurant-finance/invoices/${id}`,
-      providesTags: (result, error, id) => [{ type: 'RestaurantFinance', id }],
+      providesTags: (_result, _error, id) => [{ type: 'RestaurantFinance', id }],
     }),
     // Enhanced payment with partial payment, credits, and HQ support
     markInvoicePaid: builder.mutation<any, { invoiceId: string; data: any }>({
@@ -600,7 +585,7 @@ export const api = createApi({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: (result, error, { invoiceId }) => [{ type: 'RestaurantFinance', id: invoiceId }, 'RestaurantFinance', 'Order'],
+      invalidatesTags: (_result, _error, { invoiceId }) => [{ type: 'RestaurantFinance', id: invoiceId }, 'RestaurantFinance', 'Order'],
     }),
     getInvoiceCredits: builder.query<any, string>({
       query: (invoiceId) => `/api/restaurant-finance/invoices/${invoiceId}/credits`,
@@ -615,7 +600,7 @@ export const api = createApi({
     }),
     getOrderInvoices: builder.query<any, string>({
       query: (orderId) => `/api/restaurant-finance/orders/${orderId}/invoices`,
-      providesTags: (result, error, orderId) => [{ type: 'Order', id: orderId }, 'RestaurantFinance'],
+      providesTags: (_result, _error, orderId) => [{ type: 'Order', id: orderId }, 'RestaurantFinance'],
     }),
     getSupplierStatement: builder.query<any, { supplierId: string; params?: any }>({
       query: ({ supplierId, params }) => ({

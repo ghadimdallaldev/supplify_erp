@@ -23,6 +23,7 @@ import { RestaurantInventoryPage } from './pages/RestaurantInventoryPage'
 import { RestaurantOnboardingPage } from './pages/RestaurantOnboardingPage'
 import { ReceivingPage } from './pages/ReceivingPage'
 import { AdminDashboardPage } from './pages/AdminDashboardPage'
+import { ReservationsPage } from './pages/ReservationsPage'
 
 const router = createBrowserRouter([
   {
@@ -86,6 +87,10 @@ const router = createBrowserRouter([
         element: <ReceivingPage />,
       },
       {
+        path: 'app/reservations',
+        element: <ReservationsPage />,
+      },
+      {
         path: 'app/suppliers',
         element: <SuppliersPage />,
       },
@@ -141,6 +146,8 @@ const router = createBrowserRouter([
   },
 ])
 
-export default function App() {
+export function App() {
   return <RouterProvider router={router} />
 }
+
+export default App

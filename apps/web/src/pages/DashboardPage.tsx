@@ -1,8 +1,16 @@
-import { useGetDashboardStatsQuery, useGetOrdersQuery, useGetReorderSuggestionsQuery, useGetInvoiceAnalyticsQuery, useGetProductCategoriesQuery } from '../services/api'
+import {
+  useGetDashboardStatsQuery,
+  useGetOrdersQuery,
+  useGetReorderSuggestionsQuery,
+  useGetInvoiceAnalyticsQuery,
+  useGetProductCategoriesQuery,
+} from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { Package, ShoppingCart, Users, Building2, DollarSign, TrendingUp, Truck, FileText, ListChecks, ClipboardCheck } from 'lucide-react'
+import { Badge } from '../components/ui/badge'
+import { Package, ShoppingCart, Users, Building2, DollarSign, TrendingUp, ClipboardCheck } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, AreaChart, Area } from 'recharts'
 import { useAppSelector } from '../hooks/redux'
+import { CalendarView } from '../components/CalendarView'
 
 export function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -137,7 +145,6 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {kpis.map((kpi) => (
           <Card key={kpi.title} className="transition-transform hover:shadow-md hover:-translate-y-0.5">
@@ -153,182 +160,183 @@ export function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Recent orders */}
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
-            <CardDescription>Last 5 orders {isSupplier ? 'from your customers' : 'you placed'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={recentOrderData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="amountGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
-                  <Tooltip cursor={{ stroke: '#6366f1', strokeWidth: 1 }} />
-                  <Area type="monotone" dataKey="amount" stroke="#6366f1" fillOpacity={1} fill="url(#amountGradient)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="divide-y">
-              {recentOrders?.orders?.length ? recentOrders.orders.map((o: any) => (
-                <a key={o.id} href={`/app/orders/${o.id}`} className="flex items-center justify-between py-3 hover:bg-gray-50 rounded-md px-2 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium">Order #{o.id.slice(0, 8)}</p>
-                    <p className="text-xs text-gray-500">{o.status}</p>
-                  </div>
-                  <div className="text-sm font-semibold">${o.total_amount?.toFixed ? o.total_amount.toFixed(2) : o.total_amount}</div>
-                </a>
-              )) : (
-                <p className="text-sm text-muted-foreground py-2">No recent orders</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      <CalendarView role={user?.role ?? null} isAdmin={user?.role === 'ADMIN'} />
 
-        {/* Orders trend (last 50) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Orders Trend</CardTitle>
-            <CardDescription>Amounts over recent orders</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={ordersTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.35}/>
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="amount" stroke="#22c55e" fillOpacity={1} fill="url(#ordersGradient)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
+        <div className="space-y-6">
 
-      {/* Order status breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Order Status</CardTitle>
-          <CardDescription>Pending vs Completed</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={80} innerRadius={48} paddingAngle={2}>
-                  {statusPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            {statusPieData.map((s) => (
-              <div key={s.name} className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }}></span>
-                <span className="text-gray-600">{s.name}</span>
-                <span className="ml-auto font-medium">{s.value}</span>
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Orders</CardTitle>
+              <CardDescription>Last 5 orders {isSupplier ? 'from your customers' : 'you placed'}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={recentOrderData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="amountGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
+                    <Tooltip cursor={{ stroke: '#6366f1', strokeWidth: 1 }} />
+                    <Area type="monotone" dataKey="amount" stroke="#6366f1" fillOpacity={1} fill="url(#amountGradient)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="divide-y">
+                {recentOrders?.orders?.length ? recentOrders.orders.map((o: any) => (
+                  <a key={o.id} href={`/app/orders/${o.id}`} className="flex items-center justify-between py-3 hover:bg-gray-50 rounded-md px-2 transition-colors">
+                    <div>
+                      <p className="text-sm font-medium">Order #{o.id.slice(0, 8)}</p>
+                      <p className="text-xs text-gray-500">{o.status}</p>
+                    </div>
+                    <div className="text-sm font-semibold">${o.total_amount?.toFixed ? o.total_amount.toFixed(2) : o.total_amount}</div>
+                  </a>
+                )) : (
+                  <p className="text-sm text-muted-foreground py-2">No recent orders</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Restaurant-only: Reorder suggestions snapshot */}
-      {isRestaurant && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Reorder Suggestions</CardTitle>
-            <CardDescription>Top items predicted to run low</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y">
-              {reorderSuggestions?.suggestions?.length ? reorderSuggestions.suggestions.slice(0, 5).map((s: any) => (
-                <div key={s.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium">{s.product_name}</p>
-                    <p className="text-xs text-gray-500">Current: {s.current_qty} • Suggested: {s.suggested_reorder_qty ?? Math.max(0, Math.ceil(s.avg_daily_usage_30day * 3))}</p>
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Status</CardTitle>
+              <CardDescription>Pending vs Completed</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={80} innerRadius={48} paddingAngle={2}>
+                      {statusPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                {statusPieData.map((s) => (
+                  <div key={s.name} className="flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }}></span>
+                    <span className="text-gray-600">{s.name}</span>
+                    <span className="ml-auto font-medium">{s.value}</span>
                   </div>
-                  <a href="/app/quick-lists" className="text-sm text-primary hover:underline">Add to Quick List</a>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {isRestaurant && spendTrend.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Spend Trend</CardTitle>
+                <CardDescription>Last 30 days</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={spendTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.35}/>
+                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                      <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                      <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="value" stroke="#8b5cf6" fillOpacity={1} fill="url(#spendGradient)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
-              )) : (
-                <p className="text-sm text-muted-foreground py-2">No suggestions available</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Restaurant-only: Spend trend (30 days) */}
-      {isRestaurant && spendTrend.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Spend Trend</CardTitle>
-            <CardDescription>Last 30 days</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={spendTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.35}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="value" stroke="#8b5cf6" fillOpacity={1} fill="url(#spendGradient)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {isSupplier && categoryDist.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Categories</CardTitle>
+                <CardDescription>Top distribution</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={categoryDist} layout="vertical" margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                      <XAxis type="number" hide />
+                      <YAxis type="category" dataKey="name" width={120} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#06b6d4" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-      {/* Supplier-only: Product category distribution */}
-      {isSupplier && categoryDist.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Categories</CardTitle>
-            <CardDescription>Top distribution</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryDist} layout="vertical" margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                  <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={120} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#06b6d4" radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Orders Trend</CardTitle>
+              <CardDescription>Amounts over recent orders</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={ordersTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.35}/>
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="amount" stroke="#22c55e" fillOpacity={1} fill="url(#ordersGradient)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {isRestaurant && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Reorder Suggestions</CardTitle>
+                <CardDescription>Top items predicted to run low</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y">
+                  {reorderSuggestions?.suggestions?.length ? reorderSuggestions.suggestions.slice(0, 5).map((s: any) => (
+                    <div key={s.id} className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="text-sm font-medium">{s.product_name}</p>
+                        <p className="text-xs text-gray-500">Current: {s.current_qty} • Suggested: {s.suggested_reorder_qty ?? Math.max(0, Math.ceil(s.avg_daily_usage_30day * 3))}</p>
+                      </div>
+                      <a href="/app/quick-lists" className="text-sm text-primary hover:underline">Add to Quick List</a>
+                    </div>
+                  )) : (
+                    <p className="text-sm text-muted-foreground py-2">No suggestions available</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
 
     </div>
   )

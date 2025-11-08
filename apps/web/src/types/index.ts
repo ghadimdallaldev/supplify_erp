@@ -150,6 +150,59 @@ export interface OrdersResponse {
   }
 }
 
+export type CalendarStatusCategory = 'completed' | 'pending' | 'in_transit' | 'cancelled'
+
+export interface OrdersCalendarEvent {
+  id: string
+  orderId?: string
+  invoiceId?: string
+  type: 'RECEIVED_ORDER' | 'DELIVERY_SCHEDULE' | 'PAYMENT_DUE' | 'PURCHASE_ORDER' | 'DELIVERY_PICKUP' | 'PAYMENT_COLLECTION'
+  source: 'ORDER' | 'INVOICE'
+  title: string
+  status: string
+  statusCategory: CalendarStatusCategory
+  start: string
+  end?: string
+  totalAmount: number
+  currency?: string
+  counterpartName?: string
+  supplierId?: string
+  supplierName?: string
+  supplierList?: Array<{ id: string; name: string }>
+  branchId?: string
+  branchName?: string
+  categories?: string[]
+  role: 'RESTAURANT' | 'SUPPLIER'
+}
+
+export interface OrdersCalendarFilters {
+  page?: number
+  pageSize?: number
+  start?: string
+  end?: string
+  status?: string
+  supplier?: string
+  branch?: string
+  category?: string
+  role?: 'RESTAURANT' | 'SUPPLIER'
+  view?: string
+}
+
+export interface OrdersCalendarResponse {
+  events: OrdersCalendarEvent[]
+  pagination: {
+    total: number
+    page: number
+    pageSize: number
+  }
+  filters: {
+    statuses: string[]
+    suppliers: Array<{ id: string; name: string }>
+    branches: Array<{ id: string; name: string }>
+    categories: string[]
+  }
+}
+
 // Supplier types
 export interface Supplier {
   id: string
@@ -436,6 +489,75 @@ export interface ReorderSuggestion {
 
 export interface ReorderSuggestionsResponse {
   suggestions: ReorderSuggestion[]
+}
+
+// Reservations types
+export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'SEATED' | 'COMPLETED' | 'CANCELLED' | 'WAITLIST'
+
+export interface ReservationTable {
+  id: string
+  restaurant_id: string
+  branch_id?: string | null
+  name: string
+  capacity: number
+  layout?: Record<string, unknown>
+  position?: { x?: number; y?: number }
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Reservation {
+  id: string
+  restaurant_id: string
+  branch_id?: string | null
+  tables: string[]
+  status: ReservationStatus
+  customer_name: string
+  customer_phone?: string | null
+  party_size: number
+  scheduled_at: string
+  duration_minutes: number
+  notes?: string | null
+  metadata?: Record<string, unknown>
+  waitlist: boolean
+  auto_confirmed: boolean
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ReservationWaitlist {
+  id: string
+  restaurant_id: string
+  branch_id?: string | null
+  customer_name: string
+  customer_phone?: string | null
+  party_size: number
+  requested_at: string
+  preferred_time?: string | null
+  notes?: string | null
+  status: 'WAITING' | 'NOTIFIED' | 'SEATED' | 'CANCELLED'
+  metadata?: Record<string, unknown>
+}
+
+export interface ReservationBoardResponse {
+  day: string
+  tables: ReservationTable[]
+  reservations: Reservation[]
+  waitlist: ReservationWaitlist[]
+}
+
+export interface ReservationAnalyticsResponse {
+  periodStart: string
+  slots: Array<{
+    hour_slot: string
+    confirmed: number
+    cancelled: number
+    waitlisted: number
+    total_covers: number
+  }>
+  waitlist: Array<{ status: string; total: number }>
 }
 
 // Admin Dashboard types

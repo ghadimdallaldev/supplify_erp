@@ -57,3 +57,47 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .fc .fc-scrollgrid {
+    border-radius: 1rem;
+    overflow: hidden;
+  }
+
+  .fc-theme-standard td,
+  .fc-theme-standard th {
+    border-color: hsl(var(--border));
+  }
+
+  .fc .fc-daygrid-day.fc-day-today {
+    background: hsl(var(--primary) / 0.12);
+    position: relative;
+  }
+
+  .fc .fc-daygrid-day.fc-day-today::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 0.75rem;
+    border: 1px solid hsl(var(--primary) / 0.25);
+    pointer-events: none;
+  }
+
+  .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+    color: hsl(var(--primary));
+    font-weight: 600;
+  }
+
+  .fc .fc-list-event-dot {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary));
+  }
+
+  .fc .supplify-calendar-event {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .fc .supplify-calendar-event:hover {
+    transform: translateY(-2px);
+  }
+}

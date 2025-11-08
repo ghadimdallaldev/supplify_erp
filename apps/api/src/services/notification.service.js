@@ -81,6 +81,47 @@ const smsService = {
   }
 };
 
+const whatsappService = {
+  async send(phone, message) {
+    logger.info('💬 WhatsApp message', { to: phone, message });
+
+    if (
+      process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      (process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER)
+    ) {
+      try {
+        const twilio = await import('twilio').catch(() => null);
+
+        if (twilio) {
+          const client = twilio.default(
+            process.env.TWILIO_ACCOUNT_SID,
+            process.env.TWILIO_AUTH_TOKEN
+          );
+
+          const baseFrom = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER;
+          const from = baseFrom.startsWith('whatsapp:') ? baseFrom : `whatsapp:${baseFrom}`;
+          const to = phone.startsWith('whatsapp:') ? phone : `whatsapp:${phone}`;
+
+          await client.messages.create({
+            body: message,
+            to,
+            from,
+          });
+
+          logger.info('WhatsApp message sent via Twilio', { to });
+          return true;
+        }
+      } catch (error) {
+        logger.error('Twilio WhatsApp error:', error);
+      }
+    }
+
+    console.log(`WHATSAPP: To: ${phone}, Message: ${message}`);
+    return true;
+  }
+};
+
 // Push notifications disabled for now
 // const pushService = { ... }
 
@@ -300,6 +341,13 @@ export async function getUserNotifications(userId, userType, { limit = 50, offse
     notifications: rows,
     unreadCount: parseInt(countRows[0].count, 10),
   };
+}
+
+export async function sendWhatsAppMessage(phone, message) {
+  if (!phone) {
+    throw new Error('WhatsApp phone is required');
+  }
+  return whatsappService.send(phone, message);
 }
 
 /**

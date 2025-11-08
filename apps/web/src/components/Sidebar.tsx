@@ -11,12 +11,12 @@ import {
   MessageSquare,
   ShoppingBag,
   Truck,
-  Warehouse,
   FileText,
   List,
   Package2,
   PackageCheck,
   Shield,
+  CalendarDays,
 } from 'lucide-react'
 
 const navigation = [
@@ -30,6 +30,7 @@ const restaurantNavigation = [
   { name: 'Quick Lists', href: '/app/quick-lists', icon: List },
   { name: 'Cart', href: '/app/cart', icon: ShoppingBag },
   { name: 'Suppliers', href: '/app/suppliers', icon: Building2 },
+  { name: 'Reservations', href: '/app/reservations', icon: CalendarDays },
   { name: 'Inventory', href: '/app/restaurant-inventory', icon: Package2 },
   { name: 'Receiving', href: '/app/receiving', icon: PackageCheck },
   { name: 'Invoices', href: '/app/invoices', icon: FileText },
