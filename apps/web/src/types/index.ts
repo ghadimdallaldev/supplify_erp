@@ -494,13 +494,30 @@ export interface ReorderSuggestionsResponse {
 // Reservations types
 export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'SEATED' | 'COMPLETED' | 'CANCELLED' | 'WAITLIST'
 
+export type ReservationTableShape = 'round' | 'square' | 'rectangle' | 'booth' | 'chef_table'
+export type ReservationTableZone = 'main' | 'patio' | 'bar' | 'vip' | 'private'
+
+export interface ReservationTableLayout {
+  shape?: ReservationTableShape
+  color?: string
+  zone?: ReservationTableZone
+  features?: string[]
+  notes?: string
+  rotation?: number
+  width?: number
+  height?: number
+  widthRatio?: number
+  heightRatio?: number
+  [key: string]: unknown
+}
+
 export interface ReservationTable {
   id: string
   restaurant_id: string
   branch_id?: string | null
   name: string
   capacity: number
-  layout?: Record<string, unknown>
+  layout?: ReservationTableLayout
   position?: { x?: number; y?: number }
   is_active: boolean
   created_at: string
