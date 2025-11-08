@@ -79,7 +79,7 @@ const initialStaffForm: StaffFormState = {
   wageType: 'HOURLY',
   wageRate: '',
   hireDate: '',
-  profileColor: '',
+  profileColor: '#2563eb',
 }
 
 const initialShiftForm: ShiftFormState = {
@@ -283,7 +283,7 @@ export function StaffPage() {
         wageType: staffForm.wageType,
         wageRate: staffForm.wageRate ? Number(staffForm.wageRate) : undefined,
         hireDate: staffForm.hireDate || undefined,
-        profileColor: staffForm.profileColor || undefined,
+        profileColor: staffForm.profileColor || '#2563eb',
       }).unwrap()
       toast.success('Staff member added')
       setIsAddStaffOpen(false)
@@ -775,8 +775,8 @@ export function StaffPage() {
                     <Input
                       id="profileColor"
                       type="color"
-                      value={staffForm.profileColor}
-                      onChange={(event) => handleStaffInputChange('profileColor', event.target.value)}
+                    value={staffForm.profileColor || '#2563eb'}
+                    onChange={(event) => handleStaffInputChange('profileColor', event.target.value || '#2563eb')}
                     />
                   </div>
                 </div>

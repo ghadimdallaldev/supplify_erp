@@ -166,6 +166,26 @@ const createPayrollExportSchema = z.object({
 
 async function resolveRestaurantId(req) {
   const email = req.userData?.email
+  const role = req.userData?.role
+
+  if (role === 'ADMIN') {
+    if (req.query.restaurantId && typeof req.query.restaurantId === 'string') {
+      return req.query.restaurantId
+    }
+    const { rows } = await query(
+      `
+        SELECT id
+        FROM restaurant
+        ORDER BY created_at
+        LIMIT 1
+      `,
+    )
+    if (rows.length) {
+      return rows[0].id
+    }
+    throw new Error('No restaurants available for admin context')
+  }
+
   if (!email) {
     throw new Error('Unable to resolve restaurant context')
   }
