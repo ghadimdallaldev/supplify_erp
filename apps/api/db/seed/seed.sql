@@ -264,3 +264,185 @@ INSERT INTO staff_time_entry (
   'OPEN'
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- Sample PTO requests
+INSERT INTO staff_pto_request (
+  id,
+  restaurant_id,
+  staff_id,
+  type,
+  status,
+  start_date,
+  end_date,
+  hours_requested,
+  reason
+) VALUES
+(
+  '970e8400-e29b-41d4-a716-446655440100',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '930e8400-e29b-41d4-a716-4466554400cc',
+  'VACATION',
+  'APPROVED',
+  CURRENT_DATE + INTERVAL '5 days',
+  CURRENT_DATE + INTERVAL '7 days',
+  16,
+  'Family weekend getaway'
+),
+(
+  '980e8400-e29b-41d4-a716-446655440111',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '920e8400-e29b-41d4-a716-4466554400bb',
+  'SICK',
+  'PENDING',
+  CURRENT_DATE + INTERVAL '2 days',
+  CURRENT_DATE + INTERVAL '3 days',
+  8,
+  'Flu symptoms'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample shift swap
+INSERT INTO staff_shift_swap (
+  id,
+  restaurant_id,
+  shift_id,
+  requested_by,
+  proposed_cover_id,
+  status,
+  reason
+) VALUES (
+  '990e8400-e29b-41d4-a716-446655440122',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '940e8400-e29b-41d4-a716-4466554400dd',
+  '930e8400-e29b-41d4-a716-4466554400cc',
+  '910e8400-e29b-41d4-a716-4466554400aa',
+  'REQUESTED',
+  'Cover needed to attend family event'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample availability
+INSERT INTO staff_availability (
+  id,
+  restaurant_id,
+  staff_id,
+  weekday,
+  availability,
+  notes
+) VALUES (
+  '9a0e8400-e29b-41d4-a716-446655440133',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '930e8400-e29b-41d4-a716-4466554400cc',
+  5,
+  '{"blocks":[{"start":"10:00","end":"22:00"}]}'::jsonb,
+  'Prefers double shifts on Fridays'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample announcement
+INSERT INTO staff_announcement (
+  id,
+  restaurant_id,
+  title,
+  body,
+  audience,
+  require_ack
+) VALUES (
+  '9b0e8400-e29b-41d4-a716-446655440144',
+  '550e8400-e29b-41d4-a716-446655440002',
+  'Menu Refresh Training',
+  'Meet at 3pm for the new tasting menu overview. Bring training binder.',
+  '{"roles":["Server","Floor Manager"]}'::jsonb,
+  true
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO staff_announcement_ack (
+  id,
+  announcement_id,
+  staff_id,
+  acknowledged_at
+) VALUES (
+  '9c0e8400-e29b-41d4-a716-446655440155',
+  '9b0e8400-e29b-41d4-a716-446655440144',
+  '910e8400-e29b-41d4-a716-4466554400aa',
+  now()
+)
+ON CONFLICT (announcement_id, staff_id) DO NOTHING;
+
+-- Sample document
+INSERT INTO staff_document (
+  id,
+  restaurant_id,
+  staff_id,
+  doc_type,
+  title,
+  file_url,
+  file_size,
+  expires_at,
+  status
+) VALUES (
+  '9d0e8400-e29b-41d4-a716-446655440166',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '920e8400-e29b-41d4-a716-4466554400bb',
+  'FOOD_HANDLER_CERT',
+  'Food Handler Certificate',
+  'https://example.com/docs/food-handler.pdf',
+  524288,
+  CURRENT_DATE + INTERVAL '11 months',
+  'ACTIVE'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample incident and performance note
+INSERT INTO staff_incident (
+  id,
+  restaurant_id,
+  staff_id,
+  category,
+  severity,
+  occurred_at,
+  notes
+) VALUES (
+  '9e0e8400-e29b-41d4-a716-446655440177',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '930e8400-e29b-41d4-a716-4466554400cc',
+  'Guest complaint',
+  'MEDIUM',
+  now() - INTERVAL '3 days',
+  'Guest reported a delayed appetizer; coaching provided.'
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO staff_performance_note (
+  id,
+  restaurant_id,
+  staff_id,
+  note_type,
+  body
+) VALUES (
+  '9f0e8400-e29b-41d4-a716-446655440188',
+  '550e8400-e29b-41d4-a716-446655440002',
+  '910e8400-e29b-41d4-a716-4466554400aa',
+  'KUDOS',
+  'Handled a large VIP party flawlessly with rave feedback.'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample payroll export
+INSERT INTO staff_payroll_export (
+  id,
+  restaurant_id,
+  period_start,
+  period_end,
+  status,
+  totals
+) VALUES (
+  'a00e8400-e29b-41d4-a716-446655440199',
+  '550e8400-e29b-41d4-a716-446655440002',
+  CURRENT_DATE - INTERVAL '14 days',
+  CURRENT_DATE - INTERVAL '1 day',
+  'APPROVED',
+  '{"regularHours":128,"overtimeHours":12,"breakMinutes":340}'::jsonb
+)
+ON CONFLICT (id) DO NOTHING;

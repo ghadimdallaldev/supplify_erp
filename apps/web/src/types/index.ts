@@ -641,6 +641,159 @@ export interface StaffTimeEntry {
   updatedAt: string
 }
 
+export type StaffPtoType = 'VACATION' | 'SICK' | 'PERSONAL' | 'UNPAID' | 'OTHER'
+export type StaffPtoStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'CANCELLED'
+
+export interface StaffPtoRequest {
+  id: string
+  restaurantId: string
+  staffId: string
+  type: StaffPtoType
+  status: StaffPtoStatus
+  startDate: string
+  endDate: string
+  hoursRequested?: number | null
+  reason?: string | null
+  managerNote?: string | null
+  createdBy?: string | null
+  createdAt: string
+  updatedAt: string
+  staff?: {
+    id: string
+    name: string
+    role: string
+  } | null
+}
+
+export interface StaffAvailability {
+  id: string
+  restaurantId: string
+  staffId: string
+  weekday: number
+  availability: {
+    blocks: Array<{ start: string; end: string }>
+  }
+  notes?: string | null
+  staffName?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type StaffSwapStatus = 'REQUESTED' | 'APPROVED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED'
+
+export interface StaffShiftSwap {
+  id: string
+  restaurantId: string
+  shiftId: string
+  requestedBy: string
+  proposedCoverId?: string | null
+  status: StaffSwapStatus
+  reason?: string | null
+  managerNote?: string | null
+  createdAt: string
+  updatedAt: string
+  shift?: {
+    id: string
+    role: string
+    startsAt: string
+    endsAt: string
+    date: string
+  } | null
+  requester?: {
+    id: string
+    name: string
+  } | null
+  cover?: {
+    id: string
+    name: string
+  } | null
+}
+
+export interface StaffAnnouncement {
+  id: string
+  restaurantId: string
+  title: string
+  body: string
+  audience?: Record<string, unknown> | null
+  requireAck: boolean
+  publishedAt: string
+  createdBy?: string | null
+  createdAt: string
+  updatedAt: string
+  acknowledgmentCount: number
+  acknowledged: boolean
+}
+
+export interface StaffDocument {
+  id: string
+  restaurantId: string
+  staffId: string
+  docType: string
+  title?: string | null
+  fileUrl: string
+  fileSize?: number | null
+  uploadedAt: string
+  expiresAt?: string | null
+  status?: string | null
+  metadata?: Record<string, unknown> | null
+  staff?: {
+    id: string
+    name: string
+  } | null
+}
+
+export type StaffIncidentSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+
+export interface StaffIncident {
+  id: string
+  restaurantId: string
+  staffId?: string | null
+  category: string
+  severity: StaffIncidentSeverity
+  occurredAt: string
+  notes?: string | null
+  followUpAction?: string | null
+  attachments?: Record<string, unknown> | null
+  staff?: {
+    id: string
+    name: string
+  } | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type StaffPerformanceNoteType = 'COACHING' | 'KUDOS' | 'GENERAL'
+
+export interface StaffPerformanceNote {
+  id: string
+  restaurantId: string
+  staffId: string
+  noteType: StaffPerformanceNoteType
+  body: string
+  createdBy?: string | null
+  staff?: {
+    id: string
+    name: string
+  } | null
+  createdAt: string
+}
+
+export type StaffPayrollStatus = 'DRAFT' | 'APPROVED' | 'EXPORTED'
+
+export interface StaffPayrollExport {
+  id: string
+  restaurantId: string
+  periodStart: string
+  periodEnd: string
+  status: StaffPayrollStatus
+  totals?: Record<string, unknown> | null
+  exportUrl?: string | null
+  exportedAt?: string | null
+  exportedBy?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 // Admin Dashboard types
 export interface SubscriptionPlan {
   id: string

@@ -6,6 +6,14 @@ import type {
   StaffWageType,
   StaffShiftStatus,
   StaffTimeEntryStatus,
+  StaffPtoRequest,
+  StaffAvailability,
+  StaffShiftSwap,
+  StaffAnnouncement,
+  StaffDocument,
+  StaffIncident,
+  StaffPerformanceNote,
+  StaffPayrollExport,
 } from '../types'
 
 interface CreateStaffMemberInput {
@@ -52,6 +60,90 @@ interface CheckOutInput {
   breakMinutes?: number
   note?: string
   status?: StaffTimeEntryStatus
+}
+
+interface CreatePtoInput {
+  staffId: string
+  type: 'VACATION' | 'SICK' | 'PERSONAL' | 'UNPAID' | 'OTHER'
+  startDate: string
+  endDate: string
+  hoursRequested?: number
+  reason?: string
+}
+
+interface UpdatePtoInput {
+  id: string
+  status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'CANCELLED'
+  managerNote?: string
+}
+
+interface SetAvailabilityInput {
+  staffId: string
+  weekday: number
+  availability: { blocks: Array<{ start: string; end: string }> }
+  notes?: string
+}
+
+interface CreateSwapInput {
+  shiftId: string
+  requestedBy: string
+  proposedCoverId?: string
+  reason?: string
+}
+
+interface DecideSwapInput {
+  id: string
+  status: 'REQUESTED' | 'APPROVED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED'
+  managerNote?: string
+}
+
+interface CreateAnnouncementInput {
+  title: string
+  body: string
+  requireAck?: boolean
+  audience?: {
+    roles?: string[]
+    staffIds?: string[]
+  }
+}
+
+interface AcknowledgeAnnouncementInput {
+  id: string
+  staffId: string
+}
+
+interface CreateDocumentInput {
+  staffId: string
+  docType: string
+  title?: string
+  fileUrl: string
+  fileSize?: number
+  expiresAt?: string
+  status?: 'ACTIVE' | 'EXPIRED' | 'RENEWAL_REQUIRED'
+  metadata?: Record<string, unknown>
+}
+
+interface CreateIncidentInput {
+  staffId?: string
+  category: string
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  occurredAt: string
+  notes?: string
+  followUpAction?: string
+  attachments?: Record<string, unknown>
+}
+
+interface CreatePerformanceNoteInput {
+  staffId: string
+  noteType?: 'COACHING' | 'KUDOS' | 'GENERAL'
+  body: string
+}
+
+interface CreatePayrollExportInput {
+  periodStart: string
+  periodEnd: string
+  totals?: Record<string, unknown>
+  exportUrl?: string
 }
 
 export const staffApi = api.injectEndpoints({
@@ -167,6 +259,197 @@ export const staffApi = api.injectEndpoints({
       }),
       invalidatesTags: [{ type: 'StaffTimeEntry', id: 'LIST' }],
     }),
+    getStaffPtoRequests: build.query<StaffPtoRequest[], void>({
+      query: () => ({
+        url: '/api/staff/pto',
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((pto) => ({ type: 'StaffPto' as const, id: pto.id })),
+              { type: 'StaffPto' as const, id: 'LIST' },
+            ]
+          : [{ type: 'StaffPto' as const, id: 'LIST' }],
+    }),
+    createStaffPtoRequest: build.mutation<StaffPtoRequest, CreatePtoInput>({
+      query: (body) => ({
+        url: '/api/staff/pto',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'StaffPto', id: 'LIST' }],
+    }),
+    updateStaffPtoRequest: build.mutation<StaffPtoRequest, UpdatePtoInput>({
+      query: ({ id, status, managerNote }) => ({
+        url: `/api/staff/pto/${id}`,
+        method: 'PATCH',
+        body: { status, managerNote },
+      }),
+      invalidatesTags: (result) =>
+        result
+          ? [
+              { type: 'StaffPto', id: result.id },
+              { type: 'StaffPto', id: 'LIST' },
+            ]
+          : [{ type: 'StaffPto', id: 'LIST' }],
+    }),
+    getStaffAvailability: build.query<StaffAvailability[], void>({
+      query: () => ({
+        url: '/api/staff/availability',
+      }),
+      providesTags: [{ type: 'StaffAvailability', id: 'LIST' }],
+    }),
+    setStaffAvailability: build.mutation<StaffAvailability, SetAvailabilityInput>({
+      query: (body) => ({
+        url: '/api/staff/availability',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'StaffAvailability', id: 'LIST' }],
+    }),
+    getStaffSwaps: build.query<StaffShiftSwap[], void>({
+      query: () => ({
+        url: '/api/staff/swaps',
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((swap) => ({ type: 'StaffSwap' as const, id: swap.id })),
+              { type: 'StaffSwap' as const, id: 'LIST' },
+            ]
+          : [{ type: 'StaffSwap' as const, id: 'LIST' }],
+    }),
+    createStaffSwap: build.mutation<StaffShiftSwap, CreateSwapInput>({
+      query: (body) => ({
+        url: '/api/staff/swaps',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'StaffSwap', id: 'LIST' }],
+    }),
+    decideStaffSwap: build.mutation<StaffShiftSwap, DecideSwapInput>({
+      query: ({ id, status, managerNote }) => ({
+        url: `/api/staff/swaps/${id}/decision`,
+        method: 'POST',
+        body: { status, managerNote },
+      }),
+      invalidatesTags: (result) =>
+        result
+          ? [
+              { type: 'StaffSwap', id: result.id },
+              { type: 'StaffSwap', id: 'LIST' },
+            ]
+          : [{ type: 'StaffSwap', id: 'LIST' }],
+    }),
+    getStaffAnnouncements: build.query<StaffAnnouncement[], { staffId?: string } | void>({
+      query: (params) => ({
+        url: '/api/staff/announcements',
+        params,
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((announcement) => ({ type: 'StaffAnnouncement' as const, id: announcement.id })),
+              { type: 'StaffAnnouncement' as const, id: 'LIST' },
+            ]
+          : [{ type: 'StaffAnnouncement' as const, id: 'LIST' }],
+    }),
+    createStaffAnnouncement: build.mutation<StaffAnnouncement, CreateAnnouncementInput>({
+      query: (body) => ({
+        url: '/api/staff/announcements',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'StaffAnnouncement', id: 'LIST' }],
+    }),
+    acknowledgeStaffAnnouncement: build.mutation<void, AcknowledgeAnnouncementInput>({
+      query: ({ id, staffId }) => ({
+        url: `/api/staff/announcements/${id}/ack`,
+        method: 'POST',
+        body: { staffId },
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: 'StaffAnnouncement', id }],
+    }),
+    getStaffDocuments: build.query<StaffDocument[], void>({
+      query: () => ({
+        url: '/api/staff/documents',
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((doc) => ({ type: 'StaffDocument' as const, id: doc.id })),
+              { type: 'StaffDocument' as const, id: 'LIST' },
+            ]
+          : [{ type: 'StaffDocument' as const, id: 'LIST' }],
+    }),
+    createStaffDocument: build.mutation<StaffDocument, CreateDocumentInput>({
+      query: (body) => ({
+        url: '/api/staff/documents',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'StaffDocument', id: 'LIST' }],
+    }),
+    getStaffIncidents: build.query<StaffIncident[], void>({
+      query: () => ({
+        url: '/api/staff/incidents',
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((incident) => ({ type: 'StaffIncident' as const, id: incident.id })),
+              { type: 'StaffIncident' as const, id: 'LIST' },
+            ]
+          : [{ type: 'StaffIncident' as const, id: 'LIST' }],
+    }),
+    createStaffIncident: build.mutation<StaffIncident, CreateIncidentInput>({
+      query: (body) => ({
+        url: '/api/staff/incidents',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'StaffIncident', id: 'LIST' }],
+    }),
+    getStaffPerformanceNotes: build.query<StaffPerformanceNote[], void>({
+      query: () => ({
+        url: '/api/staff/performance-notes',
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((note) => ({ type: 'StaffPerformance', id: note.id })),
+              { type: 'StaffPerformance', id: 'LIST' },
+            ]
+          : [{ type: 'StaffPerformance', id: 'LIST' }],
+    }),
+    createStaffPerformanceNote: build.mutation<StaffPerformanceNote, CreatePerformanceNoteInput>({
+      query: (body) => ({
+        url: '/api/staff/performance-notes',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'StaffPerformance', id: 'LIST' }],
+    }),
+    getStaffPayrollExports: build.query<StaffPayrollExport[], void>({
+      query: () => ({
+        url: '/api/staff/payroll',
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((exportRow) => ({ type: 'StaffPayroll', id: exportRow.id })),
+              { type: 'StaffPayroll', id: 'LIST' },
+            ]
+          : [{ type: 'StaffPayroll', id: 'LIST' }],
+    }),
+    createStaffPayrollExport: build.mutation<StaffPayrollExport, CreatePayrollExportInput>({
+      query: (body) => ({
+        url: '/api/staff/payroll',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'StaffPayroll', id: 'LIST' }],
+    }),
   }),
   overrideExisting: false,
 })
@@ -182,5 +465,24 @@ export const {
   useGetStaffTimeEntriesQuery,
   useCheckInStaffMemberMutation,
   useCheckOutTimeEntryMutation,
+  useGetStaffPtoRequestsQuery,
+  useCreateStaffPtoRequestMutation,
+  useUpdateStaffPtoRequestMutation,
+  useGetStaffAvailabilityQuery,
+  useSetStaffAvailabilityMutation,
+  useGetStaffSwapsQuery,
+  useCreateStaffSwapMutation,
+  useDecideStaffSwapMutation,
+  useGetStaffAnnouncementsQuery,
+  useCreateStaffAnnouncementMutation,
+  useAcknowledgeStaffAnnouncementMutation,
+  useGetStaffDocumentsQuery,
+  useCreateStaffDocumentMutation,
+  useGetStaffIncidentsQuery,
+  useCreateStaffIncidentMutation,
+  useGetStaffPerformanceNotesQuery,
+  useCreateStaffPerformanceNoteMutation,
+  useGetStaffPayrollExportsQuery,
+  useCreateStaffPayrollExportMutation,
 } = staffApi
 
