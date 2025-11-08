@@ -8,7 +8,12 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const RESERVATIONS_MIGRATION = '0033_reservations_system.sql'
+const STAFF_BASE_MIGRATION = '0034_staff_app.sql'
+const STAFF_EXTENSIONS_MIGRATION = '0035_staff_app_extensions.sql'
+
 const RESERVATIONS_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', RESERVATIONS_MIGRATION)
+const STAFF_BASE_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', STAFF_BASE_MIGRATION)
+const STAFF_EXTENSIONS_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', STAFF_EXTENSIONS_MIGRATION)
 
 async function reservationsSchemaExists() {
   const { rows } = await query(`
@@ -43,6 +48,55 @@ export async function ensureReservationsSchema() {
     logger.info('Reservations schema migration applied successfully')
   } catch (error) {
     logger.error('Failed to apply reservations schema migration', { error: error.message })
+    throw error
+  }
+}
+
+async function staffBaseSchemaExists() {
+  const { rows } = await query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_name = 'staff_member'
+    ) AS has_staff_member
+  `)
+
+  return Boolean(rows[0]?.has_staff_member)
+}
+
+async function staffExtensionsSchemaExists() {
+  const { rows } = await query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_name = 'staff_pto_request'
+    ) AS has_pto
+  `)
+
+  return Boolean(rows[0]?.has_pto)
+}
+
+export async function ensureStaffAppSchema() {
+  try {
+    if (!(await staffBaseSchemaExists())) {
+      logger.info('Applying staff app base schema migration (0034)')
+      const baseSql = await readFile(STAFF_BASE_MIGRATION_PATH, 'utf8')
+      await query(baseSql)
+      logger.info('Staff app base schema migration applied successfully')
+    } else {
+      logger.debug('Staff app base schema already present, skipping migration')
+    }
+
+    if (!(await staffExtensionsSchemaExists())) {
+      logger.info('Applying staff app extensions migration (0035)')
+      const extSql = await readFile(STAFF_EXTENSIONS_MIGRATION_PATH, 'utf8')
+      await query(extSql)
+      logger.info('Staff app extensions migration applied successfully')
+    } else {
+      logger.debug('Staff app extensions already present, skipping migration')
+    }
+  } catch (error) {
+    logger.error('Failed to ensure staff app schema', { error: error.message })
     throw error
   }
 }
