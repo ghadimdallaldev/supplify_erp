@@ -611,19 +611,19 @@ export function StaffPage() {
                   </div>
                   <div>
                     <Label htmlFor="shiftStaff">Assign to (optional)</Label>
-                    <Select
+                    <select
+                      id="shiftStaff"
                       value={shiftForm.staffId}
-                      onValueChange={(value) => handleShiftInputChange('staffId', value)}
+                      onChange={(event) => handleShiftInputChange('staffId', event.target.value)}
+                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                     >
-                      <SelectTrigger placeholder="Unassigned">
-                        <option value="">Unassigned</option>
-                        {staffMembers.map((member) => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.displayName} · {member.role}
-                          </SelectItem>
-                        ))}
-                      </SelectTrigger>
-                    </Select>
+                      <option value="">Unassigned</option>
+                      {staffMembers.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.displayName} · {member.role}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -735,14 +735,18 @@ export function StaffPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="wageType">Wage type</Label>
-                    <Select value={staffForm.wageType} onValueChange={(value) => handleStaffInputChange('wageType', value)}>
-                      <SelectTrigger>
-                        <SelectItem value="HOURLY">Hourly</SelectItem>
-                        <SelectItem value="SALARY">Salary</SelectItem>
-                        <SelectItem value="CONTRACT">Contract</SelectItem>
-                        <SelectItem value="OTHER">Other</SelectItem>
-                      </SelectTrigger>
-                    </Select>
+                    <select
+                      id="wageType"
+                      value={staffForm.wageType}
+                      onChange={(event) => handleStaffInputChange('wageType', event.target.value)}
+                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    >
+                      {wageTypeOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option.charAt(0) + option.slice(1).toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <Label htmlFor="wageRate">Base rate</Label>
