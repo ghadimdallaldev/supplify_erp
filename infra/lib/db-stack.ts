@@ -17,7 +17,9 @@ export interface DbStackProps extends cdk.StackProps {
 export class DbStack extends cdk.Stack {
   public readonly databaseSecret: secretsmanager.ISecret
   public readonly databaseEndpoint: string
-  public readonly database: rds.DatabaseCluster
+  public readonly databasePort: number
+  public readonly databaseCluster?: rds.DatabaseCluster
+  public readonly databaseInstance?: rds.DatabaseInstance
 
   constructor(scope: Construct, id: string, props: DbStackProps) {
     super(scope, id, props)
@@ -44,6 +46,12 @@ export class DbStack extends cdk.Stack {
       allowAllOutbound: false,
     })
 
+    dbSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(props.vpc.vpcCidrBlock),
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access from within the VPC'
+    )
+
     // Create subnet group
     const subnetGroup = new rds.SubnetGroup(this, 'DatabaseSubnetGroup', {
       vpc: props.vpc,
@@ -53,32 +61,61 @@ export class DbStack extends cdk.Stack {
       },
     })
 
-    // Create Aurora PostgreSQL Serverless v2 cluster
-    this.database = new rds.DatabaseCluster(this, 'Database', {
-      engine: rds.DatabaseClusterEngine.auroraPostgres({
-        version: rds.AuroraPostgresEngineVersion.VER_15_3,
-      }),
-      credentials: rds.Credentials.fromSecret(this.databaseSecret),
-      serverlessV2MinCapacity: props.minCapacity,
-      serverlessV2MaxCapacity: props.maxCapacity,
-      vpc: props.vpc,
-      vpcSubnets: {
-        subnets: props.privateSubnets,
-      },
-      subnetGroup,
-      securityGroups: [dbSecurityGroup],
-      writer: rds.ClusterInstance.serverlessV2('writer', {
-        instanceIdentifier: 'writer',
-      }),
-      removalPolicy: cdk.RemovalPolicy.RETAIN, // Retain on delete to preserve data
-      deletionProtection: true,
-      defaultDatabaseName: 'supplify',
-      monitoringInterval: cdk.Duration.seconds(60),
-      storageEncrypted: true,
-    })
+    if (props.environment === 'dev') {
+      this.databaseInstance = new rds.DatabaseInstance(this, 'DatabaseInstance', {
+        engine: rds.DatabaseInstanceEngine.postgres({
+          version: rds.PostgresEngineVersion.VER_12,
+        }),
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MICRO),
+        credentials: rds.Credentials.fromSecret(this.databaseSecret),
+        vpc: props.vpc,
+        vpcSubnets: {
+          subnets: props.privateSubnets,
+        },
+        subnetGroup,
+        securityGroups: [dbSecurityGroup],
+        allocatedStorage: 20,
+        storageEncrypted: true,
+        multiAz: false,
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+        deletionProtection: false,
+        databaseName: 'supplify',
+        backupRetention: cdk.Duration.days(1),
+        deleteAutomatedBackups: true,
+        publiclyAccessible: false,
+        enablePerformanceInsights: false,
+        autoMinorVersionUpgrade: true,
+      })
 
-    // Get database endpoint
-    this.databaseEndpoint = this.database.clusterEndpoint.hostname
+      this.databaseEndpoint = this.databaseInstance.instanceEndpoint.hostname
+      this.databasePort = this.databaseInstance.instanceEndpoint.port
+    } else {
+      this.databaseCluster = new rds.DatabaseCluster(this, 'Database', {
+        engine: rds.DatabaseClusterEngine.auroraPostgres({
+          version: rds.AuroraPostgresEngineVersion.VER_15_3,
+        }),
+        credentials: rds.Credentials.fromSecret(this.databaseSecret),
+        serverlessV2MinCapacity: props.minCapacity,
+        serverlessV2MaxCapacity: props.maxCapacity,
+        vpc: props.vpc,
+        vpcSubnets: {
+          subnets: props.privateSubnets,
+        },
+        subnetGroup,
+        securityGroups: [dbSecurityGroup],
+        writer: rds.ClusterInstance.serverlessV2('writer', {
+          instanceIdentifier: 'writer',
+        }),
+        removalPolicy: cdk.RemovalPolicy.RETAIN, // Retain on delete to preserve data
+        deletionProtection: true,
+        defaultDatabaseName: 'supplify',
+        monitoringInterval: cdk.Duration.seconds(60),
+        storageEncrypted: true,
+      })
+
+      this.databaseEndpoint = this.databaseCluster.clusterEndpoint.hostname
+      this.databasePort = this.databaseCluster.clusterEndpoint.port
+    }
 
     // Outputs
     new cdk.CfnOutput(this, 'DatabaseEndpoint', {
@@ -87,15 +124,15 @@ export class DbStack extends cdk.Stack {
       exportName: `Supplify-DatabaseEndpoint-${props.environment}`,
     })
 
+    new cdk.CfnOutput(this, 'DatabasePort', {
+      value: this.databasePort.toString(),
+      description: 'Database port',
+    })
+
     new cdk.CfnOutput(this, 'DatabaseSecretArn', {
       value: this.databaseSecret.secretArn,
       description: 'Database secret ARN',
       exportName: `Supplify-DatabaseSecretArn-${props.environment}`,
-    })
-
-    new cdk.CfnOutput(this, 'DatabasePort', {
-      value: this.database.clusterEndpoint.port.toString(),
-      description: 'Database port',
     })
   }
 }

@@ -115,6 +115,7 @@ const ecsStack = new EcsStack(app, `${PROJECT_NAME}-EcsStack-${envName}`, {
   minCapacity: environment.minCapacity,
   maxCapacity: environment.maxCapacity,
   aiAccessRole: iamStack.aiAccessRole,
+  logGroup: observabilityStack.logGroup,
 })
 
 // S3 + CloudFront Stack (for frontend)
@@ -133,24 +134,6 @@ new cdk.CfnOutput(ecsStack, `ApiUrl-${envName}`, {
   value: `http://${ecsStack.alb.loadBalancerDnsName}`,
   description: `API URL for ${envName} environment`,
   exportName: `${PROJECT_NAME}-ApiUrl-${envName}`,
-})
-
-new cdk.CfnOutput(dbStack, `DatabaseEndpoint-${envName}`, {
-  value: dbStack.databaseEndpoint,
-  description: `Database endpoint for ${envName} environment`,
-  exportName: `${PROJECT_NAME}-DatabaseEndpoint-${envName}`,
-})
-
-new cdk.CfnOutput(s3Stack, `S3BucketName-${envName}`, {
-  value: s3Stack.bucket.bucketName,
-  description: `S3 bucket name for ${envName} environment`,
-  exportName: `${PROJECT_NAME}-S3BucketName-${envName}`,
-})
-
-new cdk.CfnOutput(s3CloudFrontStack, `CloudFrontUrl-${envName}`, {
-  value: `https://${s3CloudFrontStack.distribution.distributionDomainName}`,
-  description: `CloudFront URL for ${envName} environment`,
-  exportName: `${PROJECT_NAME}-CloudFrontUrl-${envName}`,
 })
 
 new cdk.CfnOutput(iamStack, `DeployRoleArn-${envName}`, {

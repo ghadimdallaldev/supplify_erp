@@ -23,6 +23,7 @@ export interface EcsStackProps extends cdk.StackProps {
   minCapacity: number
   maxCapacity: number
   aiAccessRole?: iam.IRole
+  logGroup: logs.ILogGroup
   env?: cdk.Environment
 }
 
@@ -98,14 +99,6 @@ export class EcsStack extends cdk.Stack {
     // Grant S3 access to task role
     props.s3Bucket.grantReadWrite(taskRole)
 
-    // Create CloudWatch log group (should match ObservabilityStack)
-    const logGroup = new logs.LogGroup(this, 'LogGroup', {
-      logGroupName: `/supplify/api/${props.environment}`,
-      retention:
-        props.environment === 'prod' ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-    })
-
     // Create task definition
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDefinition', {
       memoryLimitMiB: 1024,
@@ -126,11 +119,11 @@ export class EcsStack extends cdk.Stack {
       cpu: 512,
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'supplify-api',
-        logGroup,
+        logGroup: props.logGroup,
       }),
       environment: {
         NODE_ENV: 'production',
-        PORT: '4000',
+        PORT: '80',
         DATABASE_ENDPOINT: props.databaseEndpoint,
         DATABASE_PORT: '5432',
         DATABASE_NAME: 'supplify',
@@ -143,7 +136,7 @@ export class EcsStack extends cdk.Stack {
     })
 
     container.addPortMappings({
-      containerPort: 4000,
+      containerPort: 80,
       protocol: ecs.Protocol.TCP,
     })
 
@@ -164,9 +157,12 @@ export class EcsStack extends cdk.Stack {
     })
 
     // Enable auto-scaling
+    const minTaskCapacity = Math.max(1, Math.round(props.minCapacity))
+    const maxTaskCapacity = Math.max(minTaskCapacity, Math.round(props.maxCapacity))
+
     const scaling = this.service.autoScaleTaskCount({
-      minCapacity: props.minCapacity,
-      maxCapacity: props.maxCapacity,
+      minCapacity: minTaskCapacity,
+      maxCapacity: maxTaskCapacity,
     })
 
     scaling.scaleOnCpuUtilization('CpuScaling', {
@@ -178,12 +174,12 @@ export class EcsStack extends cdk.Stack {
     // Create target group
     const targetGroup = new elbv2.ApplicationTargetGroup(this, 'TargetGroup', {
       vpc: props.vpc,
-      port: 4000,
+      port: 80,
       protocol: elbv2.ApplicationProtocol.HTTP,
       targetType: elbv2.TargetType.IP,
       healthCheck: {
         enabled: true,
-        path: '/health',
+        path: '/',
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         healthyThresholdCount: 2,

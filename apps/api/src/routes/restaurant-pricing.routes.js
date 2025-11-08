@@ -1,11 +1,11 @@
-import express from 'express';
-import { requireAuth, requireRole } from '../lib/rbac.js';
-import { query, withTransaction } from '../lib/db.js';
-import { logger } from '../lib/logger.js';
-import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js';
-import { z } from 'zod';
+import express from 'express'
+import { requireAuth, requireRole } from '../lib/rbac.js'
+import { query, withTransaction } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
+import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { z } from 'zod'
 
-const router = express.Router();
+const router = express.Router()
 
 // Validation schemas
 const createPricingSchema = z.object({
@@ -19,7 +19,14 @@ const createPricingSchema = z.object({
   agreementType: z.enum(['VOLUME', 'RELATIONSHIP', 'CUSTOM', 'SPECIAL']).default('CUSTOM'),
   minOrderQuantity: z.number().nonnegative().optional(),
   notes: z.string().optional(),
-});
+})
+
+const createPricingTierSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  minOrderValue: z.number().nonnegative().optional(),
+  discountPercentage: z.number().min(0).max(100).optional(),
+})
 
 const updatePricingSchema = z.object({
   price: z.number().positive().optional(),
@@ -30,16 +37,17 @@ const updatePricingSchema = z.object({
   minOrderQuantity: z.number().nonnegative().optional(),
   isActive: z.boolean().optional(),
   notes: z.string().optional(),
-});
+})
 
 // SUPPLIER ENDPOINTS - Manage restaurant-specific pricing
 
 // Get all restaurant-specific pricing for a supplier
 router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const { supplierId } = await getSupplierFromEmail(req.userData.email);
-    
-    const { rows } = await query(`
+    const { supplierId } = await getSupplierFromEmail(req.userData.email)
+
+    const { rows } = await query(
+      `
       SELECT 
         rp.*,
         r.name as restaurant_name,
@@ -53,20 +61,22 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res
       LEFT JOIN pricing_tier pt ON pt.id = rp.pricing_tier_id
       WHERE rp.supplier_id = $1
       ORDER BY r.name, p.name
-    `, [supplierId]);
+    `,
+      [supplierId]
+    )
 
     res.json({
       ok: true,
       data: { pricing: rows },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     logger.error({
       message: 'Get restaurant pricing error',
       error: error.message,
       stack: error.stack,
-    });
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -76,34 +86,33 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Create restaurant-specific pricing (supplier action)
 router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const pricingData = createPricingSchema.parse(req.body);
-    const { supplierId } = await getSupplierFromEmail(req.userData.email);
+    const pricingData = createPricingSchema.parse(req.body)
+    const { supplierId } = await getSupplierFromEmail(req.userData.email)
 
     // Verify product belongs to supplier
     const { rows: products } = await query(
       'SELECT id FROM product WHERE id = $1 AND supplier_id = $2',
       [pricingData.productId, supplierId]
-    );
+    )
 
     if (products.length === 0) {
-      throw new NotFoundError('Product not found or does not belong to supplier');
+      throw new NotFoundError('Product not found or does not belong to supplier')
     }
 
     // Verify restaurant exists
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE id = $1',
-      [pricingData.restaurantId]
-    );
+    const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
+      pricingData.restaurantId,
+    ])
 
     if (restaurants.length === 0) {
-      throw new NotFoundError('Restaurant not found');
+      throw new NotFoundError('Restaurant not found')
     }
 
     // Check if pricing tier exists (if provided)
@@ -111,15 +120,18 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       const { rows: tiers } = await query(
         'SELECT id FROM pricing_tier WHERE id = $1 AND supplier_id = $2',
         [pricingData.pricingTierId, supplierId]
-      );
+      )
 
       if (tiers.length === 0) {
-        throw new NotFoundError('Pricing tier not found or does not belong to supplier');
+        throw new NotFoundError('Pricing tier not found or does not belong to supplier')
       }
     }
 
     // Create or update pricing
-    const { rows: [pricing] } = await query(`
+    const {
+      rows: [pricing],
+    } = await query(
+      `
       INSERT INTO restaurant_pricing (
         supplier_id, restaurant_id, product_id, price, currency,
         pricing_tier_id, contract_discount_percentage, 
@@ -137,33 +149,35 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         is_active = true,
         updated_at = now()
       RETURNING *
-    `, [
-      supplierId,
-      pricingData.restaurantId,
-      pricingData.productId,
-      pricingData.price,
-      pricingData.currency,
-      pricingData.pricingTierId || null,
-      pricingData.contractDiscountPercentage || null,
-      pricingData.contractStartDate || null,
-      pricingData.contractEndDate || null,
-      pricingData.pricingType,
-      pricingData.notes || null,
-    ]);
+    `,
+      [
+        supplierId,
+        pricingData.restaurantId,
+        pricingData.productId,
+        pricingData.price,
+        pricingData.currency,
+        pricingData.pricingTierId || null,
+        pricingData.contractDiscountPercentage || null,
+        pricingData.contractStartDate || null,
+        pricingData.contractEndDate || null,
+        pricingData.pricingType,
+        pricingData.notes || null,
+      ]
+    )
 
     logger.info('Restaurant pricing created', {
       supplierId,
       restaurantId: pricingData.restaurantId,
       productId: pricingData.productId,
       price: pricingData.price,
-    });
+    })
 
     res.json({
       ok: true,
       data: { pricing },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     if (error instanceof NotFoundError) {
       return res.status(404).json({
@@ -171,7 +185,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         data: null,
         error: { name: 'NOT_FOUND', message: error.message },
         requestId: req.requestId,
-      });
+      })
     }
 
     if (error instanceof z.ZodError) {
@@ -184,14 +198,14 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
           details: error.errors,
         },
         requestId: req.requestId,
-      });
+      })
     }
 
     logger.error({
       message: 'Create restaurant pricing error',
       error: error.message,
       stack: error.stack,
-    });
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -201,71 +215,76 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Update restaurant-specific pricing
 router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const { id } = req.params;
-    const updateData = updatePricingSchema.parse(req.body);
-    const { supplierId } = await getSupplierFromEmail(req.userData.email);
+    const { id } = req.params
+    const updateData = updatePricingSchema.parse(req.body)
+    const { supplierId } = await getSupplierFromEmail(req.userData.email)
 
     // Build update query dynamically
-    const updateFields = [];
-    const updateValues = [];
-    let paramIndex = 1;
+    const updateFields = []
+    const updateValues = []
+    let paramIndex = 1
 
     if (updateData.price !== undefined) {
-      updateFields.push(`price = $${paramIndex++}`);
-      updateValues.push(updateData.price);
+      updateFields.push(`price = $${paramIndex++}`)
+      updateValues.push(updateData.price)
     }
     if (updateData.pricingTierId !== undefined) {
-      updateFields.push(`pricing_tier_id = $${paramIndex++}`);
-      updateValues.push(updateData.pricingTierId);
+      updateFields.push(`pricing_tier_id = $${paramIndex++}`)
+      updateValues.push(updateData.pricingTierId)
     }
     if (updateData.contractDiscountPercentage !== undefined) {
-      updateFields.push(`contract_discount_percentage = $${paramIndex++}`);
-      updateValues.push(updateData.contractDiscountPercentage);
+      updateFields.push(`contract_discount_percentage = $${paramIndex++}`)
+      updateValues.push(updateData.contractDiscountPercentage)
     }
     if (updateData.contractStartDate !== undefined) {
-      updateFields.push(`contract_start_date = $${paramIndex++}`);
-      updateValues.push(updateData.contractStartDate);
+      updateFields.push(`contract_start_date = $${paramIndex++}`)
+      updateValues.push(updateData.contractStartDate)
     }
     if (updateData.contractEndDate !== undefined) {
-      updateFields.push(`contract_end_date = $${paramIndex++}`);
-      updateValues.push(updateData.contractEndDate);
+      updateFields.push(`contract_end_date = $${paramIndex++}`)
+      updateValues.push(updateData.contractEndDate)
     }
     if (updateData.pricingType !== undefined) {
-      updateFields.push(`pricing_type = $${paramIndex++}`);
-      updateValues.push(updateData.pricingType);
+      updateFields.push(`pricing_type = $${paramIndex++}`)
+      updateValues.push(updateData.pricingType)
     }
     if (updateData.isActive !== undefined) {
-      updateFields.push(`is_active = $${paramIndex++}`);
-      updateValues.push(updateData.isActive);
+      updateFields.push(`is_active = $${paramIndex++}`)
+      updateValues.push(updateData.isActive)
     }
     if (updateData.notes !== undefined) {
-      updateFields.push(`notes = $${paramIndex++}`);
-      updateValues.push(updateData.notes);
+      updateFields.push(`notes = $${paramIndex++}`)
+      updateValues.push(updateData.notes)
     }
 
     if (updateFields.length === 0) {
-      throw new ValidationError('No fields to update');
+      throw new ValidationError('No fields to update')
     }
 
-    updateFields.push(`updated_at = now()`);
-    updateValues.push(id, supplierId);
+    updateFields.push(`updated_at = now()`)
+    updateValues.push(id, supplierId)
 
-    const { rows: [pricing] } = await query(`
+    const {
+      rows: [pricing],
+    } = await query(
+      `
       UPDATE restaurant_pricing
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex} AND supplier_id = $${paramIndex + 1}
       RETURNING *
-    `, updateValues);
+    `,
+      updateValues
+    )
 
     if (!pricing) {
-      throw new NotFoundError('Pricing not found');
+      throw new NotFoundError('Pricing not found')
     }
 
     res.json({
@@ -273,7 +292,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
       data: { pricing },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     if (error instanceof NotFoundError || error instanceof ValidationError) {
       return res.status(404).json({
@@ -281,7 +300,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
         data: null,
         error: { name: 'NOT_FOUND', message: error.message },
         requestId: req.requestId,
-      });
+      })
     }
 
     if (error instanceof z.ZodError) {
@@ -294,14 +313,14 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
           details: error.errors,
         },
         requestId: req.requestId,
-      });
+      })
     }
 
     logger.error({
       message: 'Update restaurant pricing error',
       error: error.message,
       stack: error.stack,
-    });
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -311,33 +330,36 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Get pricing tiers for a supplier
 router.get('/tiers', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const { supplierId } = await getSupplierFromEmail(req.userData.email);
+    const { supplierId } = await getSupplierFromEmail(req.userData.email)
 
-    const { rows } = await query(`
+    const { rows } = await query(
+      `
       SELECT * FROM pricing_tier
       WHERE supplier_id = $1
       ORDER BY min_order_value ASC NULLS LAST, name ASC
-    `, [supplierId]);
+    `,
+      [supplierId]
+    )
 
     res.json({
       ok: true,
       data: { tiers: rows },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     logger.error({
       message: 'Get pricing tiers error',
       error: error.message,
       stack: error.stack,
-    });
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -347,45 +369,50 @@ router.get('/tiers', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Create pricing tier
 router.post('/tiers', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const tierData = createPricingTierSchema.parse(req.body);
-    const { supplierId } = await getSupplierFromEmail(req.userData.email);
+    const tierData = createPricingTierSchema.parse(req.body)
+    const { supplierId } = await getSupplierFromEmail(req.userData.email)
 
     // Check if tier name already exists for supplier
     const { rows: existing } = await query(
       'SELECT id FROM pricing_tier WHERE supplier_id = $1 AND name = $2',
       [supplierId, tierData.name]
-    );
+    )
 
     if (existing.length > 0) {
-      throw new ValidationError('Pricing tier name already exists');
+      throw new ValidationError('Pricing tier name already exists')
     }
 
-    const { rows: [tier] } = await query(`
+    const {
+      rows: [tier],
+    } = await query(
+      `
       INSERT INTO pricing_tier (
         supplier_id, name, description, min_order_value, discount_percentage
       ) VALUES ($1, $2, $3, $4, $5)
       RETURNING *
-    `, [
-      supplierId,
-      tierData.name,
-      tierData.description || null,
-      tierData.minOrderValue || null,
-      tierData.discountPercentage || null,
-    ]);
+    `,
+      [
+        supplierId,
+        tierData.name,
+        tierData.description || null,
+        tierData.minOrderValue || null,
+        tierData.discountPercentage || null,
+      ]
+    )
 
     res.json({
       ok: true,
       data: { tier },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     if (error instanceof ValidationError) {
       return res.status(400).json({
@@ -393,7 +420,7 @@ router.post('/tiers', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (re
         data: null,
         error: { name: 'VALIDATION_ERROR', message: error.message },
         requestId: req.requestId,
-      });
+      })
     }
 
     if (error instanceof z.ZodError) {
@@ -406,14 +433,14 @@ router.post('/tiers', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (re
           details: error.errors,
         },
         requestId: req.requestId,
-      });
+      })
     }
 
     logger.error({
       message: 'Create pricing tier error',
       error: error.message,
       stack: error.stack,
-    });
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -423,15 +450,15 @@ router.post('/tiers', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (re
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // RESTAURANT ENDPOINT - Get their pricing from suppliers
 router.get('/my-pricing', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { supplierId } = req.query; // Optional filter
-    const { restaurantId } = await getRestaurantFromEmail(req.userData.email);
+    const { supplierId } = req.query // Optional filter
+    const { restaurantId } = await getRestaurantFromEmail(req.userData.email)
 
     let queryStr = `
       SELECT 
@@ -455,22 +482,22 @@ router.get('/my-pricing', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
         AND rp.is_active = true
         AND (rp.contract_end_date IS NULL OR rp.contract_end_date >= CURRENT_DATE)
         AND (rp.contract_start_date IS NULL OR rp.contract_start_date <= CURRENT_DATE)
-    `;
+    `
 
-    const params = [restaurantId];
+    const params = [restaurantId]
 
     if (supplierId) {
-      queryStr += ` AND rp.supplier_id = $${params.length + 1}`;
-      params.push(supplierId);
+      queryStr += ` AND rp.supplier_id = $${params.length + 1}`
+      params.push(supplierId)
     }
 
-    queryStr += ` ORDER BY s.name, p.name`;
+    queryStr += ` ORDER BY s.name, p.name`
 
-    const { rows } = await query(queryStr, params);
+    const { rows } = await query(queryStr, params)
 
     // Group by supplier and calculate summary
-    const bySupplier = {};
-    rows.forEach(row => {
+    const bySupplier = {}
+    rows.forEach((row) => {
       if (!bySupplier[row.supplier_name]) {
         bySupplier[row.supplier_name] = {
           supplier_id: row.supplier_id,
@@ -478,12 +505,12 @@ router.get('/my-pricing', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
           product_count: 0,
           total_contract_value: 0,
           products: [],
-        };
+        }
       }
-      bySupplier[row.supplier_name].product_count++;
-      bySupplier[row.supplier_name].total_contract_value += parseFloat(row.effective_price || 0);
-      bySupplier[row.supplier_name].products.push(row);
-    });
+      bySupplier[row.supplier_name].product_count++
+      bySupplier[row.supplier_name].total_contract_value += parseFloat(row.effective_price || 0)
+      bySupplier[row.supplier_name].products.push(row)
+    })
 
     res.json({
       ok: true,
@@ -493,13 +520,13 @@ router.get('/my-pricing', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
       },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     logger.error({
       message: 'Get my pricing error',
       error: error.message,
       stack: error.stack,
-    });
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -509,26 +536,25 @@ router.get('/my-pricing', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Helper functions
 async function getSupplierFromEmail(email) {
-  const { rows } = await query('SELECT id FROM supplier WHERE contact_email = $1', [email]);
+  const { rows } = await query('SELECT id FROM supplier WHERE contact_email = $1', [email])
   if (rows.length === 0) {
-    throw new NotFoundError('Supplier not found');
+    throw new NotFoundError('Supplier not found')
   }
-  return { supplierId: rows[0].id };
+  return { supplierId: rows[0].id }
 }
 
 async function getRestaurantFromEmail(email) {
-  const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [email]);
+  const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [email])
   if (rows.length === 0) {
-    throw new NotFoundError('Restaurant not found');
+    throw new NotFoundError('Restaurant not found')
   }
-  return { restaurantId: rows[0].id };
+  return { restaurantId: rows[0].id }
 }
 
-export { router as restaurantPricingRoutes };
-
+export { router as restaurantPricingRoutes }
