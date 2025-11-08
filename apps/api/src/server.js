@@ -39,6 +39,16 @@ import adminDashboardRoutes from './routes/admin-dashboard.routes.js';
 import branchesRoutes from './routes/branches.routes.js';
 import warehousesRoutes from './routes/warehouses.routes.js';
 import { executeScheduledOrders } from './services/scheduled-orders.service.js';
+import { ensureReservationsSchema } from './lib/migrator.js';
+
+if (config.NODE_ENV !== 'test') {
+  try {
+    await ensureReservationsSchema();
+  } catch (error) {
+    logger.error('Aborting server startup due to reservations migration failure', { error: error.message });
+    process.exit(1);
+  }
+}
 
 const app = express();
 
