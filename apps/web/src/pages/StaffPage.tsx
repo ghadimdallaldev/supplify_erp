@@ -288,8 +288,13 @@ export function StaffPage() {
       toast.success('Staff member added')
       setIsAddStaffOpen(false)
       resetStaffForm()
-    } catch (error) {
-      toast.error('Unable to create staff member')
+    } catch (error: any) {
+      const apiMessage =
+        error?.data?.error?.message ||
+        error?.error ||
+        (typeof error?.message === 'string' ? error.message : null) ||
+        'Unable to create staff member'
+      toast.error(apiMessage)
     }
   }
 
@@ -320,8 +325,13 @@ export function StaffPage() {
       toast.success('Shift scheduled')
       setIsAddShiftOpen(false)
       resetShiftForm()
-    } catch (error) {
-      toast.error('Unable to schedule shift')
+    } catch (error: any) {
+      const apiMessage =
+        error?.data?.error?.message ||
+        error?.error ||
+        (typeof error?.message === 'string' ? error.message : null) ||
+        'Unable to schedule shift'
+      toast.error(apiMessage)
     }
   }
 

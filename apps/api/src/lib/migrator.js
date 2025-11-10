@@ -10,10 +10,12 @@ const __dirname = dirname(__filename)
 const RESERVATIONS_MIGRATION = '0033_reservations_system.sql'
 const STAFF_BASE_MIGRATION = '0034_staff_app.sql'
 const STAFF_EXTENSIONS_MIGRATION = '0035_staff_app_extensions.sql'
+const PORTAL_SUPPORT_MIGRATION = '0037_portal_support.sql'
 
 const RESERVATIONS_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', RESERVATIONS_MIGRATION)
 const STAFF_BASE_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', STAFF_BASE_MIGRATION)
 const STAFF_EXTENSIONS_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', STAFF_EXTENSIONS_MIGRATION)
+const PORTAL_SUPPORT_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', PORTAL_SUPPORT_MIGRATION)
 
 async function reservationsSchemaExists() {
   const { rows } = await query(`
@@ -34,18 +36,53 @@ async function reservationsSchemaExists() {
   return Boolean(result.has_tables && result.has_reservations)
 }
 
+async function reservationPublicColumnsExist() {
+  const { rows } = await query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'reservation'
+        AND column_name = 'public_token'
+    ) AS has_public_token
+  `)
+  return Boolean(rows[0]?.has_public_token)
+}
+
+async function staffPortalSessionTableExists() {
+  const { rows } = await query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_name = 'staff_portal_session'
+    ) AS has_portal_session
+  `)
+  return Boolean(rows[0]?.has_portal_session)
+}
+
 export async function ensureReservationsSchema() {
   try {
     if (await reservationsSchemaExists()) {
-      logger.debug('Reservations schema already present, skipping migration')
-      return
+      logger.debug('Reservations schema already present, skipping migration 0033')
+    } else {
+      logger.info('Applying reservations schema migration (0033)')
+      const sql = await readFile(RESERVATIONS_MIGRATION_PATH, 'utf8')
+      await query(sql)
+      logger.info('Reservations schema migration applied successfully')
     }
 
-    logger.info('Applying reservations schema migration (0033)')
-    const sql = await readFile(RESERVATIONS_MIGRATION_PATH, 'utf8')
-    await query(sql)
-
-    logger.info('Reservations schema migration applied successfully')
+    if (!(await reservationPublicColumnsExist())) {
+      logger.info('Applying reservation portal support migration (0037)')
+      const portalSql = await readFile(PORTAL_SUPPORT_MIGRATION_PATH, 'utf8')
+      await query(portalSql)
+      logger.info('Reservation portal support migration applied successfully')
+    } else if (!(await staffPortalSessionTableExists())) {
+      logger.info('Ensuring staff portal session table via migration (0037)')
+      const portalSql = await readFile(PORTAL_SUPPORT_MIGRATION_PATH, 'utf8')
+      await query(portalSql)
+      logger.info('Staff portal session table created successfully')
+    } else {
+      logger.debug('Portal support schema already present, skipping migration 0037')
+    }
   } catch (error) {
     logger.error('Failed to apply reservations schema migration', { error: error.message })
     throw error

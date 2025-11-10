@@ -25,11 +25,36 @@ import { ReceivingPage } from './pages/ReceivingPage'
 import { AdminDashboardPage } from './pages/AdminDashboardPage'
 import { ReservationsPage } from './pages/ReservationsPage'
 import { StaffPage } from './pages/StaffPage'
+import { PublicReservationPortal } from './pages/PublicReservationPortal'
+import { PublicReservationConfirmation } from './pages/PublicReservationConfirmation'
+import { PublicReservationManage } from './pages/PublicReservationManage'
+import { StaffSelfServiceLogin } from './pages/StaffSelfServiceLogin'
+import { StaffSelfServiceDashboard } from './pages/StaffSelfServiceDashboard'
 
 const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/reserve',
+    element: <PublicReservationPortal />,
+  },
+  {
+    path: '/reserve/confirmation',
+    element: <PublicReservationConfirmation />,
+  },
+  {
+    path: '/reserve/manage/:token',
+    element: <PublicReservationManage />,
+  },
+  {
+    path: '/staff',
+    element: <StaffSelfServiceLogin />,
+  },
+  {
+    path: '/staff/dashboard',
+    element: <StaffSelfServiceDashboard />,
   },
   {
     path: '/',

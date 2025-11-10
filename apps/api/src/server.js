@@ -41,6 +41,7 @@ import warehousesRoutes from './routes/warehouses.routes.js';
 import { executeScheduledOrders } from './services/scheduled-orders.service.js';
 import { ensureReservationsSchema, ensureStaffAppSchema } from './lib/migrator.js';
 import { staffRoutes } from './routes/staff.routes.js';
+import { publicRoutes } from './routes/public.routes.js';
 
 if (config.NODE_ENV !== 'test') {
   try {
@@ -125,8 +126,14 @@ app.use(session({
 // Request context middleware
 app.use(requestContext);
 
-// CSRF protection for state-changing operations
-app.use(csrfProtection);
+// CSRF protection for state-changing operations (skip for public APIs)
+const csrfBypassPrefixes = ['/api/public'];
+app.use((req, res, next) => {
+  if (csrfBypassPrefixes.some((prefix) => req.path.startsWith(prefix))) {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -162,6 +169,7 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/restaurant-pricing', restaurantPricingRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
+app.use('/api/public', publicRoutes);
 app.use('/api/admin-dashboard', adminDashboardRoutes);
 app.use('/api/branches', branchesRoutes);
 app.use('/api/warehouses', warehousesRoutes);

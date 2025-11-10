@@ -4,7 +4,7 @@ import { query } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { NotFoundError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
-import { getUserNotifications, getUserPreferences, sendNotification } from '../services/notification.service.js';
+import { ensureNotificationPreferences, getUserNotifications, getUserPreferences, sendNotification } from '../services/notification.service.js';
 
 const router = express.Router();
 
@@ -31,6 +31,14 @@ const updatePreferencesSchema = z.object({
   notifyOutOfStock: z.boolean().optional(),
   notifySystemUpdates: z.boolean().optional(),
   notifyPromotions: z.boolean().optional(),
+  notifyReservationCreated: z.boolean().optional(),
+  notifyReservationWaitlist: z.boolean().optional(),
+  notifyStaffPto: z.boolean().optional(),
+  notifyStaffSwap: z.boolean().optional(),
+  notifyStaffClock: z.boolean().optional(),
+  notifyStaffAnnouncement: z.boolean().optional(),
+  notifyStaffDocument: z.boolean().optional(),
+  notifyScheduledOrder: z.boolean().optional(),
 });
 
 // Get user's notifications
@@ -111,6 +119,8 @@ router.patch('/preferences', requireAuth, async (req, res) => {
     const userType = req.userData.role;
     const updateData = updatePreferencesSchema.parse(req.body);
 
+    await ensureNotificationPreferences(userId, userType);
+
     // Build update query dynamically
     const updateFields = [];
     const updateValues = [];
@@ -135,12 +145,18 @@ router.patch('/preferences', requireAuth, async (req, res) => {
     updateFields.push('updated_at = now()');
     updateValues.push(userId, userType);
 
-    const { rows: [prefs] } = await query(`
+    const { rowCount } = await query(`
       UPDATE notification_preferences
       SET ${updateFields.join(', ')}
       WHERE user_id = $${paramIndex} AND user_type = $${paramIndex + 1}
       RETURNING *
     `, updateValues);
+
+    if (rowCount === 0) {
+      throw new NotFoundError('Notification preferences not found');
+    }
+
+    const prefs = await getUserPreferences(userId, userType);
 
     res.json({
       ok: true,

@@ -175,6 +175,133 @@ router.get('/conversations', requireAuth, async (req, res) => {
   }
 });
 
+router.delete('/conversations/:conversationId', requireAuth, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const role = req.userData.role;
+
+    if (!['SUPPLIER', 'RESTAURANT', 'ADMIN'].includes(role)) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Only suppliers, restaurants, or admins can manage conversations',
+        },
+        requestId: req.requestId,
+      });
+    }
+
+    const { rows: conversations } = await query(
+      `
+        SELECT id, supplier_id, restaurant_id
+        FROM conversation
+        WHERE id = $1
+      `,
+      [conversationId],
+    );
+
+    if (!conversations.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Conversation not found' },
+        requestId: req.requestId,
+      });
+    }
+
+    const conversation = conversations[0];
+    let participantTypeFilter = null;
+
+    if (role === 'SUPPLIER') {
+      const { rows: suppliers } = await query(
+        `
+          SELECT id
+          FROM supplier
+          WHERE contact_email = $1
+        `,
+        [req.userData.email],
+      );
+
+      if (!suppliers.length || suppliers[0].id !== conversation.supplier_id) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Conversation does not belong to this supplier',
+          },
+          requestId: req.requestId,
+        });
+      }
+      participantTypeFilter = 'SUPPLIER';
+    } else if (role === 'RESTAURANT') {
+      const { rows: restaurants } = await query(
+        `
+          SELECT id
+          FROM restaurant
+          WHERE contact_email = $1
+        `,
+        [req.userData.email],
+      );
+
+      if (!restaurants.length || restaurants[0].id !== conversation.restaurant_id) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Conversation does not belong to this restaurant',
+          },
+          requestId: req.requestId,
+        });
+      }
+      participantTypeFilter = 'RESTAURANT';
+    }
+
+    const updateParams = participantTypeFilter ? [conversationId, participantTypeFilter] : [conversationId];
+    const updateQuery = `
+      UPDATE conversation_participant
+      SET is_archived = true,
+          is_pinned = false,
+          updated_at = now()
+      WHERE conversation_id = $1
+        ${participantTypeFilter ? 'AND participant_type = $2' : ''}
+      RETURNING id
+    `;
+
+    const { rowCount } = await query(updateQuery, updateParams);
+
+    if (rowCount === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Conversation participant not found' },
+        requestId: req.requestId,
+      });
+    }
+
+    // Admins can optionally hard-delete the conversation (including messages) by passing ?hard=true
+    if (role === 'ADMIN' && req.query.hard === 'true') {
+      await query(`DELETE FROM conversation WHERE id = $1`, [conversationId]);
+    }
+
+    res.json({ ok: true, data: { archived: true }, error: null, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Delete conversation error:', error);
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to delete conversation',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    });
+  }
+});
+
 // Get or create conversation
 router.post('/conversations', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT']), async (req, res) => {
   try {

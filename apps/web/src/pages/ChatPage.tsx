@@ -495,9 +495,9 @@ export function ChatPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex gap-6 h-[calc(100vh-8rem)]">
+      <div className="flex gap-6 h-[calc(100vh-8rem)] min-h-0">
         {/* Conversations List */}
-        <Card className="w-80 flex-shrink-0">
+        <Card className="w-80 flex-shrink-0 flex flex-col min-h-0">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -506,7 +506,7 @@ export function ChatPage() {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 flex-1 flex flex-col min-h-0">
             <div className="divide-y max-h-[calc(100vh-14rem)] overflow-y-auto">
               {conversations.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground space-y-3">
@@ -576,7 +576,7 @@ export function ChatPage() {
         </Card>
 
         {/* Chat Area */}
-        <Card className="flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col min-h-0">
           {selectedConversation ? (
             <>
               <CardHeader className="border-b bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/50 dark:to-purple-950/50">
@@ -664,11 +664,11 @@ export function ChatPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col p-0 relative">
+              <CardContent className="flex-1 flex flex-col p-0 relative min-h-0">
                 {/* Messages */}
                 <div
                   ref={messagesContainerRef}
-                  className="flex-1 overflow-y-auto p-4 space-y-4"
+                  className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
                 >
                   {messagesLoading ? (
                     <div className="text-center text-muted-foreground">Loading messages...</div>

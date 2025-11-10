@@ -125,31 +125,106 @@ const whatsappService = {
 // Push notifications disabled for now
 // const pushService = { ... }
 
+const DEFAULT_NOTIFICATION_PREFS = {
+  email_enabled: true,
+  sms_enabled: true,
+  push_enabled: false,
+  in_app_enabled: true,
+  notify_order_new: true,
+  notify_order_acknowledged: true,
+  notify_order_processing: true,
+  notify_order_shipped: true,
+  notify_order_delivered: true,
+  notify_order_cancelled: true,
+  notify_message_received: true,
+  notify_invoice_issued: true,
+  notify_invoice_overdue: true,
+  notify_payment_received: true,
+  notify_low_stock: true,
+  notify_out_of_stock: true,
+  notify_system_updates: true,
+  notify_promotions: true,
+  notify_reservation_created: true,
+  notify_reservation_waitlist: true,
+  notify_staff_pto: true,
+  notify_staff_swap: true,
+  notify_staff_clock: true,
+  notify_staff_announcement: true,
+  notify_staff_document: true,
+  notify_scheduled_order: true,
+};
+
+async function getRestaurantUserContext(restaurantId) {
+  const { rows } = await query(
+    `
+      SELECT r.id AS restaurant_id, r.name AS restaurant_name, u.id AS user_id, u.email
+      FROM restaurant r
+      JOIN app_user u ON u.email = r.contact_email
+      WHERE r.id = $1
+    `,
+    [restaurantId],
+  );
+  return rows[0] || null;
+}
+
+async function getStaffMemberContext(staffId) {
+  const { rows } = await query(
+    `
+      SELECT m.id, m.display_name, m.role, m.restaurant_id
+      FROM staff_member m
+      WHERE m.id = $1
+    `,
+    [staffId],
+  );
+  return rows[0] || null;
+}
+
+function mapPreferencesRow(row) {
+  if (!row) return null;
+  const entries = Object.entries(row).map(([key, value]) => {
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    return [camelKey, value];
+  });
+  return Object.fromEntries(entries);
+}
+
+/**
+ * Ensure notification preferences row exists for a user
+ */
+export async function ensureNotificationPreferences(userId, userType) {
+  const { rows } = await query(
+    `
+      SELECT *
+      FROM notification_preferences
+      WHERE user_id = $1 AND user_type = $2
+    `,
+    [userId, userType],
+  );
+
+  if (rows.length) {
+    return rows[0];
+  }
+
+  const { rows: inserted } = await query(
+    `
+      INSERT INTO notification_preferences (user_id, user_type)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id, user_type)
+      DO UPDATE SET updated_at = now()
+      RETURNING *
+    `,
+    [userId, userType],
+  );
+
+  return inserted[0];
+}
+
 /**
  * Get or create notification preferences for a user
  */
 export async function getUserPreferences(userId, userType) {
-  // For now, return default preferences (preferences will be stored in contact_info table)
-  return {
-    email_enabled: true,
-    sms_enabled: true,
-    push_enabled: false,
-    in_app_enabled: true,
-    notify_order_new: true,
-    notify_order_acknowledged: true,
-    notify_order_processing: true,
-    notify_order_shipped: true,
-    notify_order_delivered: true,
-    notify_order_cancelled: true,
-    notify_message_received: true,
-    notify_invoice_issued: true,
-    notify_invoice_overdue: true,
-    notify_payment_received: true,
-    notify_low_stock: true,
-    notify_out_of_stock: true,
-    notify_system_updates: true,
-    notify_promotions: true,
-  };
+  const row = await ensureNotificationPreferences(userId, userType);
+  return mapPreferencesRow({ ...DEFAULT_NOTIFICATION_PREFS, ...row });
 }
 
 /**
@@ -442,6 +517,157 @@ export async function notifyOrderStatusChange(order, status) {
     referenceId: order.id,
     referenceType: 'ORDER',
     metadata: { order_id: order.id, status },
+  });
+}
+
+export async function notifyReservationCreated(reservation) {
+  const restaurantId = reservation.restaurant_id || reservation.restaurantId;
+  const branchId = reservation.branch_id || reservation.branchId || null;
+  const customerName = reservation.customer_name || reservation.customerName || 'Guest';
+  const partySize = reservation.party_size || reservation.partySize || 0;
+  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt;
+  const status = reservation.status || reservation.reservationStatus;
+
+  const context = await getRestaurantUserContext(restaurantId);
+  if (!context?.user_id) return null;
+
+  const timeslot = scheduledAt ? new Date(scheduledAt).toLocaleString() : 'unscheduled time';
+  return sendNotification({
+    userId: context.user_id,
+    userType: 'RESTAURANT',
+    notificationType: 'RESERVATION_CREATED',
+    notificationCategory: 'RESERVATION_CREATED',
+    title: 'New reservation booked',
+    message: `${customerName} party of ${partySize} for ${timeslot}`,
+    referenceId: reservation.id || reservation.reservationId,
+    referenceType: 'RESERVATION',
+    metadata: {
+      restaurantId,
+      branchId,
+      partySize,
+      scheduledAt,
+      status,
+    },
+  });
+}
+
+export async function notifyReservationWaitlist(reservation) {
+  const restaurantId = reservation.restaurant_id || reservation.restaurantId;
+  const branchId = reservation.branch_id || reservation.branchId || null;
+  const customerName = reservation.customer_name || reservation.customerName || 'Guest';
+  const partySize = reservation.party_size || reservation.partySize || 0;
+  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt;
+  const status = reservation.status || reservation.reservationStatus;
+
+  const context = await getRestaurantUserContext(restaurantId);
+  if (!context?.user_id) return null;
+
+  return sendNotification({
+    userId: context.user_id,
+    userType: 'RESTAURANT',
+    notificationType: 'RESERVATION_WAITLIST',
+    notificationCategory: 'RESERVATION_WAITLIST',
+    title: 'Reservation moved to waitlist',
+    message: `${customerName} is waiting for a table (${partySize} guests).`,
+    referenceId: reservation.id || reservation.reservationId,
+    referenceType: 'RESERVATION',
+    metadata: {
+      restaurantId,
+      branchId,
+      partySize,
+      scheduledAt,
+      status,
+    },
+  });
+}
+
+export async function notifyStaffPtoRequest(ptoRequest) {
+  const staffId = ptoRequest.staff_id || ptoRequest.staffId;
+  const staffContext = await getStaffMemberContext(staffId);
+  if (!staffContext) return null;
+  const restaurantContext = await getRestaurantUserContext(staffContext.restaurant_id);
+  if (!restaurantContext?.user_id) return null;
+
+  const startDate = ptoRequest.start_date || ptoRequest.startDate;
+  const endDate = ptoRequest.end_date || ptoRequest.endDate;
+  const type = ptoRequest.type || ptoRequest.requestType || 'PTO';
+  const status = ptoRequest.status || ptoRequest.requestStatus;
+  const dateRange = `${startDate} → ${endDate}`;
+  return sendNotification({
+    userId: restaurantContext.user_id,
+    userType: 'RESTAURANT',
+    notificationType: 'STAFF_PTO_REQUEST',
+    notificationCategory: 'STAFF_PTO',
+    title: 'New PTO request submitted',
+    message: `${staffContext.display_name || 'Team member'} requested ${type} (${dateRange})`,
+    referenceId: ptoRequest.id || ptoRequest.requestId,
+    referenceType: 'STAFF_PTO',
+    metadata: {
+      staffId,
+      restaurantId: staffContext.restaurant_id,
+      status,
+      startDate,
+      endDate,
+    },
+  });
+}
+
+export async function notifyStaffSwapRequest(swap) {
+  const requestedBy = swap.requested_by || swap.requestedBy;
+  const restaurantId = swap.restaurant_id || swap.restaurantId;
+  const shift = swap.shift || {};
+
+  const staffContext = await getStaffMemberContext(requestedBy);
+  if (!staffContext) return null;
+
+  const restaurantContext = await getRestaurantUserContext(restaurantId || staffContext.restaurant_id);
+  if (!staffContext) return null;
+  if (!restaurantContext?.user_id) return null;
+
+  const shiftDate = shift.date || swap.shift_date || 'upcoming shift';
+
+  return sendNotification({
+    userId: restaurantContext.user_id,
+    userType: 'RESTAURANT',
+    notificationType: 'STAFF_SWAP_REQUEST',
+    notificationCategory: 'STAFF_SWAP',
+    title: 'Shift swap requested',
+    message: `${staffContext.display_name || 'Team member'} requested a swap for ${shiftDate}`,
+    referenceId: swap.id || swap.swapId,
+    referenceType: 'STAFF_SWAP',
+    metadata: {
+      staffId: staffContext.id,
+      restaurantId: restaurantId || staffContext.restaurant_id,
+      shiftId: swap.shift_id || shift.id,
+      status: swap.status,
+    },
+  });
+}
+
+export async function notifyScheduledOrderEvent(quickList, action) {
+  const restaurantId = quickList.restaurant_id || quickList.restaurantId;
+  const context = await getRestaurantUserContext(restaurantId);
+  if (!context?.user_id) return null;
+
+  const autoMessage =
+    action === 'EXECUTED'
+      ? `Scheduled order "${quickList.name}" has been created automatically.`
+      : `Scheduled order "${quickList.name}" will run soon. Review inventory if you need to pause it.`;
+
+  return sendNotification({
+    userId: context.user_id,
+    userType: 'RESTAURANT',
+    notificationType: 'SCHEDULED_ORDER',
+    notificationCategory: 'SCHEDULED_ORDER',
+    title: action === 'EXECUTED' ? 'Scheduled order executed' : 'Scheduled order reminder',
+    message: autoMessage,
+    referenceId: quickList.id,
+    referenceType: 'QUICK_LIST',
+    metadata: {
+      quickListId: quickList.id,
+      autoCreate: quickList.auto_create_order,
+      nextExecutionDate: quickList.next_execution_date,
+    },
   });
 }
 

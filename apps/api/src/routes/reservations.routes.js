@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, requireRole } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { notifyReservationCreated, notifyReservationWaitlist } from '../services/notification.service.js'
 
 const router = express.Router()
 
@@ -404,6 +405,15 @@ router.post(
 
         return rows[0]
       })
+
+      try {
+        await notifyReservationCreated(reservation)
+        if (reservation.waitlist) {
+          await notifyReservationWaitlist(reservation)
+        }
+      } catch (notifyError) {
+        logger.warn('Reservation notification failed', { error: notifyError.message, reservationId: reservation.id })
+      }
 
       res.status(201).json({
         ok: true,

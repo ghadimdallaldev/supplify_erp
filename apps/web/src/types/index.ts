@@ -851,3 +851,105 @@ export interface UsageMeter {
   last_updated: string
   created_at: string
 }
+
+export interface PublicRestaurant {
+  id: string
+  name: string
+  contact_email?: string | null
+  created_at?: string
+}
+
+export interface PublicAvailabilitySlot {
+  startTime: string
+  endTime: string
+  capacityAvailable: number
+  isAvailable: boolean
+}
+
+export interface PublicReservationSummary {
+  id: string
+  restaurantId: string
+  scheduledAt: string
+  partySize: number
+  status: string
+  manageToken: string
+  manageUrl: string
+}
+
+export interface PublicReservationDetails {
+  id: string
+  restaurant_id: string
+  tables: string[]
+  status: string
+  customer_name: string
+  customer_phone?: string | null
+  party_size: number
+  scheduled_at: string
+  duration_minutes: number
+  notes?: string | null
+  waitlist: boolean
+  auto_confirmed: boolean
+  public_token: string
+}
+
+export interface StaffPortalSession {
+  sessionToken: string
+  expiresAt: string
+  staffId: string
+  restaurantId: string
+  staffName: string
+}
+
+export interface StaffPortalDashboard {
+  staff: {
+    id: string
+    display_name: string
+    role: string
+    email?: string | null
+    phone?: string | null
+  }
+  upcomingShifts: Array<{
+    id: string
+    role: string
+    shift_date: string
+    starts_at: string
+    ends_at: string
+    status: string
+  }>
+  ptoRequests: Array<{
+    id: string
+    type: string
+    status: string
+    start_date: string
+    end_date: string
+    hours_requested?: number | null
+    created_at: string
+  }>
+  swapRequests: Array<{
+    id: string
+    status: string
+    reason?: string | null
+    created_at: string
+  }>
+  announcements: Array<{
+    id: string
+    title: string
+    body: string
+    require_ack: boolean
+    published_at: string
+    acknowledged: boolean
+  }>
+  documents: Array<{
+    id: string
+    doc_type: string
+    title?: string | null
+    file_url: string
+    status?: string | null
+    uploaded_at: string
+    expires_at?: string | null
+  }>
+  session: {
+    token: string
+    expiresAt: string
+  }
+}

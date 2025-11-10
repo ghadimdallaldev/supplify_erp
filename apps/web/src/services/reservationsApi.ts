@@ -17,6 +17,7 @@ export const reservationsApi = api.injectEndpoints({
           branchId,
         },
       }),
+      providesTags: (_result) => [{ type: 'Reservation' as const, id: 'BOARD' }],
     }),
     saveReservationTables: build.mutation<
       { tables: ReservationTable[] },
@@ -30,6 +31,7 @@ export const reservationsApi = api.injectEndpoints({
           tables,
         },
       }),
+      invalidatesTags: [{ type: 'Reservation' as const, id: 'BOARD' }],
     }),
     createReservation: build.mutation<{ reservation: Reservation }, Record<string, unknown>>({
       query: (body) => ({

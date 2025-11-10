@@ -11,7 +11,18 @@ import { Badge } from '../ui/badge'
 import { Textarea } from '../ui/textarea'
 import { useSaveReservationTablesMutation } from '../../services/reservationsApi'
 import { toast } from 'react-hot-toast'
-import { Circle, RectangleHorizontal, Square, Armchair, Sparkles, Copy, RotateCcw, Trash2 } from 'lucide-react'
+import {
+  Circle,
+  RectangleHorizontal,
+  Square,
+  Armchair,
+  Sparkles,
+  Copy,
+  RotateCcw,
+  Trash2,
+  X,
+  ChevronRight,
+} from 'lucide-react'
 
 const DEFAULT_CANVAS_WIDTH = 900
 const DEFAULT_CANVAS_HEIGHT = 520
@@ -198,6 +209,7 @@ export function ReservationTableBuilder({ tables }: ReservationTableBuilderProps
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: DEFAULT_CANVAS_WIDTH, height: DEFAULT_CANVAS_HEIGHT })
   const canvasRef = useRef<HTMLDivElement | null>(null)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(true)
 
   const [saveTables, { isLoading }] = useSaveReservationTablesMutation()
 
@@ -524,24 +536,43 @@ export function ReservationTableBuilder({ tables }: ReservationTableBuilderProps
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-lg transition-all lg:absolute lg:top-6 lg:right-6 lg:mt-0 lg:w-[360px] lg:bg-white/95 lg:backdrop-blur">
-              <div className="flex items-center justify-between">
+          {isDetailsOpen ? (
+            <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-lg transition-all lg:absolute lg:top-6 lg:right-6 lg:mt-0 lg:w-[360px] lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:bg-white/95 lg:backdrop-blur">
+              <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-gray-900">Table details</h3>
-                {selectedTable ? (
-                  <div className="flex gap-2">
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-500 hover:text-primary" onClick={() => handleDuplicateTable(selectedTable)}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-gray-500 hover:text-red-500"
-                      onClick={() => selectedTable && handleDeleteTable(selectedTable.localId)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : null}
+                <div className="flex gap-2">
+                  {selectedTable ? (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-gray-500 hover:text-primary"
+                        onClick={() => handleDuplicateTable(selectedTable)}
+                        aria-label="Duplicate table"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-gray-500 hover:text-red-500"
+                        onClick={() => selectedTable && handleDeleteTable(selectedTable.localId)}
+                        aria-label="Delete table"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : null}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-gray-400 hover:text-gray-600"
+                    onClick={() => setIsDetailsOpen(false)}
+                    aria-label="Hide table details"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               {!selectedTable ? (
                 <p className="mt-3 text-sm text-gray-500">Select a table from the canvas to reveal granular controls.</p>
@@ -691,7 +722,20 @@ export function ReservationTableBuilder({ tables }: ReservationTableBuilderProps
                   </div>
                 </div>
               )}
-          </div>
+            </div>
+          ) : (
+            <div className="mt-6 flex justify-end lg:absolute lg:top-6 lg:right-6 lg:mt-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDetailsOpen(true)}
+                className="flex items-center gap-2 rounded-full border-gray-300 text-gray-600 hover:text-primary"
+              >
+                <ChevronRight className="h-4 w-4" />
+                Show table details
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-dashed border-gray-200 bg-white/80 p-5 text-xs text-gray-600">

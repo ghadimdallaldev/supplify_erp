@@ -29,8 +29,10 @@ import {
   Calendar,
   CheckCircle2,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Bell
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { LogoUpload } from '../components/LogoUpload'
@@ -40,8 +42,50 @@ import {
   useUploadRestaurantLogoMutation, 
   useGetPresignedUrlMutation,
   useGetOrdersQuery,
-  useGetDashboardStatsQuery
+  useGetDashboardStatsQuery,
+  useGetNotificationPreferencesQuery,
+  useUpdateNotificationPreferencesMutation,
 } from '../services/api'
+
+const DEFAULT_NOTIFICATION_PREFS = {
+  emailEnabled: true,
+  smsEnabled: false,
+  inAppEnabled: true,
+  notifyOrderNew: true,
+  notifyMessageReceived: true,
+  notifyInvoiceIssued: true,
+  notifyLowStock: true,
+  notifyReservationCreated: true,
+  notifyReservationWaitlist: true,
+  notifyStaffPto: true,
+  notifyStaffSwap: true,
+  notifyScheduledOrder: true,
+}
+
+interface PreferenceField {
+  key: keyof typeof DEFAULT_NOTIFICATION_PREFS
+  label: string
+  description: string
+  icon: LucideIcon
+}
+
+const CHANNEL_FIELDS: PreferenceField[] = [
+  { key: 'emailEnabled', label: 'Email', description: 'Receive alerts via email', icon: Mail },
+  { key: 'smsEnabled', label: 'SMS', description: 'Receive SMS messages', icon: Phone },
+  { key: 'inAppEnabled', label: 'In-app', description: 'Show alerts inside Supplify', icon: Bell },
+]
+
+const CATEGORY_FIELDS: PreferenceField[] = [
+  { key: 'notifyOrderNew', label: 'Order updates', description: 'New orders and status changes', icon: ShoppingCart },
+  { key: 'notifyMessageReceived', label: 'Supplier messages', description: 'Chat and inbox notifications', icon: Mail },
+  { key: 'notifyInvoiceIssued', label: 'Invoice reminders', description: 'Issued and overdue invoices', icon: FileText },
+  { key: 'notifyLowStock', label: 'Low stock alerts', description: 'Inventory thresholds reached', icon: AlertCircle },
+  { key: 'notifyReservationCreated', label: 'New reservations', description: 'Reservations booked by guests or staff', icon: Calendar },
+  { key: 'notifyReservationWaitlist', label: 'Waitlist changes', description: 'Guests added or moved on waitlist', icon: Clock },
+  { key: 'notifyStaffPto', label: 'PTO requests', description: 'Team time-off submissions awaiting review', icon: Users },
+  { key: 'notifyStaffSwap', label: 'Shift swap requests', description: 'Coverage and swap approvals', icon: Users },
+  { key: 'notifyScheduledOrder', label: 'Scheduled orders', description: 'Recurring orders executing automatically', icon: Package },
+]
 
 export function RestaurantOnboardingPage() {
   const { data: restaurantData, isLoading: isLoadingRestaurant, refetch: refetchRestaurant } = useGetRestaurantMeQuery()
@@ -166,16 +210,31 @@ export function RestaurantOnboardingPage() {
   const [newMember, setNewMember] = useState({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
   const [newBranch, setNewBranch] = useState({ name: '', phone: '', address: '', deliveryInstructions: '' })
   
-  // Notification state
-  const [notifications, setNotifications] = useState({
-    email: true,
-    sms: false,
-    push: true,
-    orderUpdates: true,
-    newMessages: true,
-    invoiceReminders: true,
-    lowStock: false
-  })
+  // Notification preferences
+  const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
+  const { data: notificationPrefsData, isLoading: isLoadingPrefs } = useGetNotificationPreferencesQuery()
+  const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
+
+  useEffect(() => {
+    const prefs = notificationPrefsData?.preferences
+    if (prefs) {
+      setNotificationPrefs((previous) => ({
+        ...previous,
+        emailEnabled: prefs.emailEnabled ?? previous.emailEnabled,
+        smsEnabled: prefs.smsEnabled ?? previous.smsEnabled,
+        inAppEnabled: prefs.inAppEnabled ?? previous.inAppEnabled,
+        notifyOrderNew: prefs.notifyOrderNew ?? previous.notifyOrderNew,
+        notifyMessageReceived: prefs.notifyMessageReceived ?? previous.notifyMessageReceived,
+        notifyInvoiceIssued: prefs.notifyInvoiceIssued ?? previous.notifyInvoiceIssued,
+        notifyLowStock: prefs.notifyLowStock ?? previous.notifyLowStock,
+        notifyReservationCreated: prefs.notifyReservationCreated ?? previous.notifyReservationCreated,
+        notifyReservationWaitlist: prefs.notifyReservationWaitlist ?? previous.notifyReservationWaitlist,
+        notifyStaffPto: prefs.notifyStaffPto ?? previous.notifyStaffPto,
+        notifyStaffSwap: prefs.notifyStaffSwap ?? previous.notifyStaffSwap,
+        notifyScheduledOrder: prefs.notifyScheduledOrder ?? previous.notifyScheduledOrder,
+      }))
+    }
+  }, [notificationPrefsData])
 
   const handleAddMember = () => {
     if (!newMember.name || !newMember.email) {
@@ -201,13 +260,17 @@ export function RestaurantOnboardingPage() {
     toast.success('Branch added!')
   }
 
-  const handleSaveNotifications = () => {
-    // TODO: Implement API call to save notification preferences
-    toast.success('Notification preferences saved!')
+  const handleToggleNotification = (key: keyof typeof DEFAULT_NOTIFICATION_PREFS) => {
+    setNotificationPrefs((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const handleToggleNotification = (key: string) => {
-    setNotifications({ ...notifications, [key]: !notifications[key as keyof typeof notifications] })
+  const handleSaveNotifications = async () => {
+    try {
+      await updateNotificationPreferences(notificationPrefs).unwrap()
+      toast.success('Notification preferences saved!')
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to save notification preferences')
+    }
   }
 
   if (isLoadingRestaurant) {
@@ -656,113 +719,89 @@ export function RestaurantOnboardingPage() {
               <CardDescription>Choose how you want to be notified</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h4 className="font-semibold">Delivery Methods</h4>
-                <div className="space-y-3">
-                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
-                    <input 
-                      type="checkbox" 
-                      checked={notifications.email}
-                      onChange={() => handleToggleNotification('email')}
-                      className="h-5 w-5" 
-                    />
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-500" />
-                      <span>Email Notifications</span>
-                    </div>
-                    {notifications.email && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  </Label>
-                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
-                    <input 
-                      type="checkbox" 
-                      checked={notifications.sms}
-                      onChange={() => handleToggleNotification('sms')}
-                      className="h-5 w-5" 
-                    />
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-gray-500" />
-                      <span>SMS Notifications</span>
-                    </div>
-                    {notifications.sms && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  </Label>
-                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
-                    <input 
-                      type="checkbox" 
-                      checked={notifications.push}
-                      onChange={() => handleToggleNotification('push')}
-                      className="h-5 w-5" 
-                    />
-                    <div className="flex items-center gap-2">
-                      <Settings className="h-4 w-4 text-gray-500" />
-                      <span>Push Notifications</span>
-                    </div>
-                    {notifications.push && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  </Label>
+              {isLoadingPrefs ? (
+                <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading notification preferences…
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700">Delivery methods</h4>
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      {CHANNEL_FIELDS.map(({ key, label, description, icon: Icon }) => {
+                        const checked = notificationPrefs[key]
+                        return (
+                          <label
+                            key={key}
+                            className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Icon className="h-4 w-4 text-gray-500" />
+                                <span className="text-sm font-medium text-gray-800">{label}</span>
+                              </div>
+                              {checked && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
+                            </div>
+                            <p className="text-xs text-gray-500">{description}</p>
+                            <input
+                              type="checkbox"
+                              className="hidden"
+                              checked={checked}
+                              onChange={() => handleToggleNotification(key)}
+                            />
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
 
-              <div className="border-t pt-6 space-y-4">
-                <h4 className="font-semibold">Notification Types</h4>
-                <div className="space-y-3">
-                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
-                    <input 
-                      type="checkbox" 
-                      checked={notifications.orderUpdates}
-                      onChange={() => handleToggleNotification('orderUpdates')}
-                      className="h-5 w-5" 
-                    />
-                    <div className="flex items-center gap-2">
-                      <ShoppingCart className="h-4 w-4 text-gray-500" />
-                      <span>Order Updates</span>
+                  <div className="border-t pt-6">
+                    <h4 className="text-sm font-semibold text-gray-700">Notification types</h4>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      {CATEGORY_FIELDS.map(({ key, label, description, icon: Icon }) => {
+                        const checked = notificationPrefs[key]
+                        return (
+                          <label
+                            key={key}
+                            className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Icon className="h-4 w-4 text-gray-500" />
+                                <div>
+                                  <span className="text-sm font-medium text-gray-800">{label}</span>
+                                  <p className="text-xs text-gray-500">{description}</p>
+                                </div>
+                              </div>
+                              {checked && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
+                            </div>
+                            <input
+                              type="checkbox"
+                              className="hidden"
+                              checked={checked}
+                              onChange={() => handleToggleNotification(key)}
+                            />
+                          </label>
+                        )
+                      })}
                     </div>
-                    {notifications.orderUpdates && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  </Label>
-                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
-                    <input 
-                      type="checkbox" 
-                      checked={notifications.newMessages}
-                      onChange={() => handleToggleNotification('newMessages')}
-                      className="h-5 w-5" 
-                    />
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-500" />
-                      <span>New Messages from Suppliers</span>
-                    </div>
-                    {notifications.newMessages && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  </Label>
-                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
-                    <input 
-                      type="checkbox" 
-                      checked={notifications.invoiceReminders}
-                      onChange={() => handleToggleNotification('invoiceReminders')}
-                      className="h-5 w-5" 
-                    />
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-gray-500" />
-                      <span>Invoice Due Reminders</span>
-                    </div>
-                    {notifications.invoiceReminders && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  </Label>
-                  <Label className="flex items-center gap-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
-                    <input 
-                      type="checkbox" 
-                      checked={notifications.lowStock}
-                      onChange={() => handleToggleNotification('lowStock')}
-                      className="h-5 w-5" 
-                    />
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-gray-500" />
-                      <span>Low Stock Alerts</span>
-                    </div>
-                    {notifications.lowStock && <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />}
-                  </Label>
-                </div>
-              </div>
+                  </div>
 
-              <Button onClick={handleSaveNotifications} className="w-full">
-                <Save className="h-4 w-4 mr-2" />
-                Save Preferences
-              </Button>
+                  <Button
+                    onClick={handleSaveNotifications}
+                    className="w-full"
+                    disabled={isSavingNotificationPrefs}
+                  >
+                    {isSavingNotificationPrefs ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    {isSavingNotificationPrefs ? 'Saving preferences…' : 'Save Preferences'}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

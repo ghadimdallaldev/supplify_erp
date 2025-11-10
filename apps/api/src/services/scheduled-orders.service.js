@@ -1,6 +1,7 @@
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLimit } from '../lib/subscription.js'
+import { notifyScheduledOrderEvent } from './notification.service.js'
 
 /**
  * Execute scheduled quick lists and create orders if auto_create_order is true
@@ -94,11 +95,23 @@ export async function executeScheduledOrders() {
         // Check if we should create order or just send reminder
         if (quickList.auto_create_order) {
           await createOrderFromQuickList(quickList)
+          try {
+            await notifyScheduledOrderEvent(quickList, 'EXECUTED')
+          } catch (notifyError) {
+            logger.warn('Failed to send scheduled order execution notification', {
+              error: notifyError.message,
+              quickListId: quickList.id,
+            })
+          }
         } else {
-          // Send reminder notification (you can implement this)
-          logger.info(
-            `Sending reminder for quick list ${quickList.id} (auto_create_order is false)`
-          )
+          try {
+            await notifyScheduledOrderEvent(quickList, 'REMINDER')
+          } catch (notifyError) {
+            logger.warn('Failed to send scheduled order reminder', {
+              error: notifyError.message,
+              quickListId: quickList.id,
+            })
+          }
         }
 
         // Update next execution date

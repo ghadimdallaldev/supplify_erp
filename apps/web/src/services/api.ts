@@ -33,6 +33,14 @@ import type {
   SubscriptionPlan,
   Subscription,
   UsageMeter,
+  PublicRestaurant,
+  PublicAvailabilitySlot,
+  PublicReservationSummary,
+  StaffPortalSession,
+  StaffPortalDashboard,
+  StaffPtoRequest,
+  StaffShiftSwap,
+  PublicReservationDetails,
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -691,6 +699,117 @@ export const api = createApi({
       invalidatesTags: ['Notification'],
     }),
 
+    // Public reservation portal
+    getPublicRestaurants: builder.query<PublicRestaurant[], void>({
+      query: () => ({
+        url: '/api/public/restaurants',
+        credentials: 'omit',
+      }),
+    }),
+    getPublicReservationAvailability: builder.query<{ slots: PublicAvailabilitySlot[] }, { restaurantId: string; partySize: number; date: string }>({
+      query: ({ restaurantId, partySize, date }) => ({
+        url: '/api/public/reservations/availability',
+        params: { restaurantId, partySize, date },
+        credentials: 'omit',
+      }),
+    }),
+    createPublicReservation: builder.mutation<{ reservation: PublicReservationSummary }, {
+      restaurantId: string
+      partySize: number
+      scheduledAt: string
+      durationMinutes?: number
+      customerName: string
+      customerEmail?: string
+      customerPhone?: string
+      notes?: string
+    }>({
+      query: (body) => ({
+        url: '/api/public/reservations',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+    }),
+    getPublicReservationDetails: builder.query<{ reservation: PublicReservationDetails }, string>({
+      query: (token) => ({
+        url: '/api/public/reservations/manage',
+        params: { token },
+        credentials: 'omit',
+      }),
+      providesTags: (_result, _error, token) => [{ type: 'Reservation', id: token }],
+    }),
+    cancelPublicReservation: builder.mutation<{ reservation: PublicReservationDetails }, { token: string }>({
+      query: (body) => ({
+        url: '/api/public/reservations/manage/cancel',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+      invalidatesTags: (_result, _error, { token }) => [{ type: 'Reservation', id: token }],
+    }),
+    reschedulePublicReservation: builder.mutation<{ reservation: PublicReservationDetails }, { token: string; scheduledAt: string }>({
+      query: (body) => ({
+        url: '/api/public/reservations/manage/reschedule',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+      invalidatesTags: (_result, _error, { token }) => [{ type: 'Reservation', id: token }],
+    }),
+
+    // Staff self-service portal
+    requestStaffPortalLink: builder.mutation<{ sessionToken: string; expiresAt: string }, { email: string }>({
+      query: (body) => ({
+        url: '/api/public/staff/request-link',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+    }),
+    createStaffPortalSession: builder.mutation<StaffPortalSession, { token: string }>({
+      query: (body) => ({
+        url: '/api/public/staff/session',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+    }),
+    getStaffPortalDashboard: builder.query<StaffPortalDashboard, { token: string }>({
+      query: ({ token }) => ({
+        url: '/api/public/staff/dashboard',
+        params: { token },
+        credentials: 'omit',
+      }),
+    }),
+    submitStaffPortalPto: builder.mutation<StaffPtoRequest, {
+      token: string
+      type: StaffPtoRequest['type']
+      startDate: string
+      endDate: string
+      hoursRequested?: number
+      reason?: string
+    }>({
+      query: (body) => ({
+        url: '/api/public/staff/pto',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+    }),
+    submitStaffPortalSwap: builder.mutation<StaffShiftSwap, {
+      token: string
+      shiftId: string
+      proposedCoverId?: string
+      reason?: string
+    }>({
+      query: (body) => ({
+        url: '/api/public/staff/swaps',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+    }),
+
     // Subscription endpoints
     getCurrentSubscription: builder.query<{ subscription: Subscription }, void>({
       query: () => '/api/subscriptions/current',
@@ -858,6 +977,18 @@ export const {
   useUpdateNotificationPreferencesMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
+  useGetPublicRestaurantsQuery,
+  useGetPublicReservationAvailabilityQuery,
+  useLazyGetPublicReservationAvailabilityQuery,
+  useCreatePublicReservationMutation,
+  useGetPublicReservationDetailsQuery,
+  useCancelPublicReservationMutation,
+  useReschedulePublicReservationMutation,
+  useRequestStaffPortalLinkMutation,
+  useCreateStaffPortalSessionMutation,
+  useGetStaffPortalDashboardQuery,
+  useSubmitStaffPortalPtoMutation,
+  useSubmitStaffPortalSwapMutation,
   useGetCurrentSubscriptionQuery,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,

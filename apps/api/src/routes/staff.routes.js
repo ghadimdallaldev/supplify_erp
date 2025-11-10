@@ -1,9 +1,10 @@
 import express from 'express'
-import { z } from 'zod'
+import { z, ZodError } from 'zod'
 import { requireAuth, requireRole } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getRestaurantIdByEmail } from '../lib/tenant.js'
+import { notifyStaffPtoRequest, notifyStaffSwapRequest } from '../services/notification.service.js'
 
 const router = express.Router()
 
@@ -797,6 +798,18 @@ router.post(
       })
     } catch (error) {
       logger.error('Failed to create staff shift', { error: error.message })
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'SHIFT_CREATE_ERROR',
+            message: 'Please provide role, date, start time, and end time when creating a shift.',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
       res.status(400).json({
         ok: false,
         data: null,
@@ -1254,6 +1267,12 @@ router.post(
         row.staff_role = staffInfo.rows[0].staff_role
       }
 
+      try {
+        await notifyStaffPtoRequest(mapPtoRow(row))
+      } catch (notifyError) {
+        logger.warn('Failed to send PTO notification', { error: notifyError.message, ptoId: row.id })
+      }
+
       res.status(201).json({
         ok: true,
         data: mapPtoRow(row),
@@ -1567,9 +1586,17 @@ router.post(
         [swapRow.id],
       )
 
+      const mappedSwap = mapSwapRow(joined.rows[0])
+
+      try {
+        await notifyStaffSwapRequest(mappedSwap)
+      } catch (notifyError) {
+        logger.warn('Failed to send shift swap notification', { error: notifyError.message, swapId: mappedSwap.id })
+      }
+
       res.status(201).json({
         ok: true,
-        data: mapSwapRow(joined.rows[0]),
+        data: mappedSwap,
         error: null,
         requestId: req.requestId,
       })

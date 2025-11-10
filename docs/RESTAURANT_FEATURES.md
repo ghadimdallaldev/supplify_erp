@@ -812,6 +812,52 @@ Display History:
 
 ---
 
+## 🧑‍🍽️ PUBLIC RESERVATION PORTAL
+
+### Highlights
+- Guest-facing `/reserve` experience with responsive design
+- Self-service availability search by date, time, and party size
+- Live capacity checks against active tables and bookings
+- Instant confirmation with management token + follow-up email/SMS hooks
+- Manage or cancel existing reservations via secure tokenised links
+- Custom notes for seating preferences, allergies, or special occasions
+- Tokenized management URL for cancellations or updates (no login required)
+
+### Guest Flow
+1. Select restaurant, date, and party size
+2. Preview open time slots with live capacity indicators
+3. Provide contact details and optional notes
+4. Receive confirmation + management token for future changes
+
+### Operational Impact
+- Reservations flow directly into the restaurant’s reservations board
+- Notifications fire for new bookings and waitlist events
+- Works even when restaurant accounts are offline—guests can self-serve
+
+---
+
+## 👥 STAFF SELF-SERVICE PORTAL
+
+### Highlights
+- Dedicated `/staff` login via passwordless magic link
+- Personal dashboard with upcoming shifts, announcements, and documents
+- Submit PTO requests, log shift swaps, and review history
+- Mobile-friendly UI for on-the-go access
+- Secure session tokens (12-hour expiry) with audit-ready trails
+
+### Staff Flow
+1. Request a secure link using work email
+2. Open the dashboard to review shifts and key updates
+3. Submit PTO or swap requests that sync with manager tools
+4. Access training docs, policies, and acknowledgment resources
+
+### Operational Impact
+- Reduces manager overhead for simple requests
+- Keeps team in sync with announcements and staffing changes
+- Extends Supplify beyond the back office into the front-of-house team
+
+---
+
 ## 🔐 AUTHENTICATION & AUTHORIZATION
 
 ### Restaurant Role Access:
@@ -874,6 +920,8 @@ Display History:
 17. ✅ **Notifications System** - In-app notifications with bell icon
 18. ✅ **Extended Session Timeout** - 1 hour session (was 5 minutes)
 19. ✅ **Order Reminders** - Send reminders to suppliers for unacknowledged orders
+20. ✅ **Public Reservation Portal** - Guest self-service booking with live availability
+21. ✅ **Staff Self-Service Portal** - Passwordless access for schedules, PTO, swaps, docs
 
 ### Partially Implemented 🔄:
 1. 🔄 Supplier Discovery (needs follow/block functionality)

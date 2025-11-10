@@ -20,6 +20,27 @@ Navigate to `/app/admin` (visible only to users with ADMIN role).
 4. **Tenants** - Supplier and Restaurant directories
 5. **Usage** - Usage tracking and quotas
 6. **Audit Logs** - All admin actions and changes
+7. **Portals** - Monitor public reservation and staff self-service performance
+
+---
+
+## Managing Portals
+
+### Public Reservation Booking Portal
+
+- View per-tenant adoption, daily traffic, and conversion rates
+- Toggle availability of the public `/reserve` experience per plan or tenant
+- Inspect recent guest bookings and revoke management tokens if necessary
+- Configure default opening hours, slot intervals, and notification templates
+- Export guest reservation ledger for compliance requests
+
+### Staff Self-Service Portal
+
+- Monitor active staff sessions and revoke compromised tokens
+- Review PTO/swaps submitted via the portal alongside manager approvals
+- Force session expiry or generate hyperlinks for frontline training
+- Gate access by subscription tier or role-based overrides
+- Audit staff document acknowledgements from the self-service dashboard
 
 ---
 
