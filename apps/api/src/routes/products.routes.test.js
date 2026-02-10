@@ -57,8 +57,14 @@ describe('Products Routes', () => {
   beforeEach(async () => {
     clearAllMocks();
     db = setupMocks();
-    // Get the mocked query function from the module
+    
+    // Sync db mocks
     const dbModule = await import('../lib/db.js');
+    vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args));
+    vi.mocked(dbModule.withTransaction).mockImplementation((...args) => db.withTransaction(...args));
+    
+    // Get the mocked query function from the module
+    queryMock = dbModule.__queryMock || dbModule.query;
     queryMock = dbModule.__queryMock || dbModule.query;
     // Sync the mock with our test mock
     vi.mocked(queryMock).mockImplementation((...args) => db.query(...args));

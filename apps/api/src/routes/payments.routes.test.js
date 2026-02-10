@@ -1,8 +1,40 @@
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { paymentsRoutes } from './payments.routes.js';
 import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js';
+
+// Mock db before importing routes
+vi.mock('../lib/db.js', () => {
+  const queryMock = vi.fn();
+  const withTransactionMock = vi.fn();
+  return {
+    query: queryMock,
+    withTransaction: withTransactionMock,
+    pool: { query: queryMock },
+    __queryMock: queryMock,
+    __withTransactionMock: withTransactionMock,
+  };
+});
+
+vi.mock('../lib/rbac.js', () => ({
+  requireAuth: vi.fn(async (req, res, next) => {
+    req.userData = req.userData || { ...mockUser };
+    next();
+  }),
+  requireRole: () => (req, res, next) => next(),
+}));
+
+vi.mock('../lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+// Import routes after mocks
+import { paymentsRoutes } from './payments.routes.js';
 
 describe('Payments Routes', () => {
   let app;
@@ -11,12 +43,18 @@ describe('Payments Routes', () => {
   beforeEach(async () => {
     clearAllMocks();
     db = setupMocks();
+    
+    // Sync db mocks
+    const dbModule = await import('../lib/db.js');
+    vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args));
+    vi.mocked(dbModule.withTransaction).mockImplementation((...args) => db.withTransaction(...args));
+    
     app = express();
     app.use(express.json());
     app.use((req, res, next) => {
       req.requestId = 'test-request-id';
       req.user = mockUser;
-      req.userData = { ...mockUser };
+      req.userData = { ...mockUser, role: 'SUPPLIER', email: 'supplier@example.com' };
       next();
     });
     app.use('/api/payments', paymentsRoutes);
@@ -24,8 +62,8 @@ describe('Payments Routes', () => {
     app.use(errorHandler);
   });
 
-  describe('GET /api/payments', () => {
-    it('should return list of payments', async () => {
+  describe('GET /api/payments/invoice/:invoiceId', () => {
+    it('should return list of payments for invoice', async () => {
       db.query.mockResolvedValueOnce({
         rows: [
           {
@@ -33,13 +71,13 @@ describe('Payments Routes', () => {
             invoice_id: 'invoice-1',
             amount: 100.50,
             payment_method: 'CASH',
-            paid_at: new Date(),
+            payment_date: new Date(),
           },
         ],
       });
 
       const response = await request(app)
-        .get('/api/payments')
+        .get('/api/payments/invoice/invoice-1')
         .expect(200);
 
       expect(response.body.ok).toBe(true);
@@ -49,23 +87,35 @@ describe('Payments Routes', () => {
 
   describe('POST /api/payments', () => {
     it('should create a payment', async () => {
-      db.query
-        .mockResolvedValueOnce({
-          rows: [{ id: 'invoice-1', restaurant_id: 'restaurant-1' }],
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'payment-1', invoice_id: 'invoice-1', amount: 100.50 }],
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'invoice-1', status: 'PAID' }],
-        });
+      // Mock: invoice lookup, then transaction with payment insert and invoice update
+      db.query.mockResolvedValueOnce({
+        rows: [{ 
+          id: 'invoice-1', 
+          restaurant_id: 'restaurant-1',
+          supplier_id: 'supplier-1',
+          contact_email: 'supplier@example.com',
+          total_amount: 100.50,
+          balance_due: 100.50,
+        }],
+      });
+
+      // Mock transaction
+      const mockClient = {
+        query: vi.fn()
+          .mockResolvedValueOnce({ rows: [{ id: 'payment-1', invoice_id: 'invoice-1', amount: 100.50 }] }) // Payment insert
+          .mockResolvedValueOnce({ rows: [{ id: 'invoice-1', status: 'PAID', balance_due: 0 }] }), // Invoice update
+      };
+
+      db.withTransaction.mockImplementation(async (fn) => {
+        return await fn(mockClient);
+      });
 
       const response = await request(app)
         .post('/api/payments')
         .send({
-          invoiceId: 'invoice-1',
+          invoice_id: 'invoice-1',
           amount: 100.50,
-          paymentMethod: 'CASH',
+          payment_method: 'CASH',
         })
         .expect(201);
 

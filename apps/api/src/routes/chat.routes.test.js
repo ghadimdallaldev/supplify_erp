@@ -1,8 +1,42 @@
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { chatRoutes } from './chat.routes.js';
 import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js';
+
+// Mock db before importing routes
+vi.mock('../lib/db.js', () => {
+  const queryMock = vi.fn();
+  return {
+    query: queryMock,
+    pool: { query: queryMock },
+    __queryMock: queryMock,
+  };
+});
+
+vi.mock('../lib/rbac.js', () => ({
+  requireAuth: vi.fn(async (req, res, next) => {
+    req.userData = req.userData || { ...mockUser };
+    next();
+  }),
+  requireRole: () => (req, res, next) => next(),
+}));
+
+vi.mock('../lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+vi.mock('../lib/subscription.js', () => ({
+  checkLimit: vi.fn().mockResolvedValue({ allowed: true, current: 0, limit: 100, isOverLimit: false }),
+  incrementUsage: vi.fn().mockResolvedValue(true),
+}));
+
+// Import routes after mocks
+import { chatRoutes } from './chat.routes.js';
 
 describe('Chat Routes', () => {
   let app;
@@ -11,12 +45,17 @@ describe('Chat Routes', () => {
   beforeEach(async () => {
     clearAllMocks();
     db = setupMocks();
+    
+    // Sync db mocks
+    const dbModule = await import('../lib/db.js');
+    vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args));
+    
     app = express();
     app.use(express.json());
     app.use((req, res, next) => {
       req.requestId = 'test-request-id';
       req.user = mockUser;
-      req.userData = { ...mockUser };
+      req.userData = { ...mockUser, role: 'SUPPLIER', email: 'supplier@example.com' };
       next();
     });
     app.use('/api/chat', chatRoutes);
@@ -26,17 +65,22 @@ describe('Chat Routes', () => {
 
   describe('GET /api/chat/conversations', () => {
     it('should return list of conversations', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'conv-1',
-            restaurant_id: 'restaurant-1',
-            supplier_id: 'supplier-1',
-            last_message: 'Hello',
-            last_message_at: new Date(),
-          },
-        ],
-      });
+      // Mock: supplier lookup, then conversations query
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'supplier-1' }], // Supplier lookup
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'conv-1',
+              restaurant_id: 'restaurant-1',
+              supplier_id: 'supplier-1',
+              last_message: 'Hello',
+              last_message_at: new Date(),
+            },
+          ],
+        });
 
       const response = await request(app)
         .get('/api/chat/conversations')
@@ -47,26 +91,35 @@ describe('Chat Routes', () => {
     });
   });
 
-  describe('POST /api/chat/messages', () => {
+  describe('POST /api/chat/conversations/:conversationId/messages', () => {
     it('should send a message', async () => {
+      // Mock: restaurant lookup, conversation check, subscription check, message insert
       db.query
         .mockResolvedValueOnce({
-          rows: [{ id: 'msg-1', conversation_id: 'conv-1', message: 'Hello' }],
+          rows: [{ id: 'restaurant-1' }], // Restaurant lookup (for RESTAURANT role)
         })
         .mockResolvedValueOnce({
-          rows: [{ id: 'msg-1', conversation_id: 'conv-1', message: 'Hello' }],
+          rows: [{ id: 'conv-1', restaurant_id: 'restaurant-1', supplier_id: 'supplier-1' }], // Conversation check
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'msg-1', conversation_id: 'conv-1', content: 'Hello' }], // Message insert
         });
 
+      // Change user role to RESTAURANT for this test
+      app.use((req, res, next) => {
+        req.userData = { ...mockUser, role: 'RESTAURANT', email: 'restaurant@example.com' };
+        next();
+      });
+
       const response = await request(app)
-        .post('/api/chat/messages')
+        .post('/api/chat/conversations/conv-1/messages')
         .send({
-          conversationId: 'conv-1',
-          message: 'Hello',
+          content: 'Hello',
         })
         .expect(201);
 
       expect(response.body.ok).toBe(true);
-      expect(response.body.data.message.message).toBe('Hello');
+      expect(response.body.data.message.content).toBe('Hello');
     });
   });
 });

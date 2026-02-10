@@ -135,7 +135,8 @@ describe('Auth Routes', () => {
       const appWithSession = express();
       appWithSession.use(express.json());
       appWithSession.use((req, res, next) => {
-        req.session = session;
+        // Create a new session object for each request to avoid mutation issues
+        req.session = { ...session };
         req.sessionID = 'test-session-id';
         req.session.save = (callback) => {
           if (callback) callback(null);
@@ -278,8 +279,21 @@ describe('Auth Routes', () => {
 
   describe('POST /auth/refresh', () => {
     it('should refresh access token', async () => {
+      const cookieParser = (await import('cookie-parser')).default;
       const { refreshAccessToken } = await import('../lib/auth.js');
       const { setAuthCookies } = await import('../lib/rbac.js');
+
+      // Add cookie-parser middleware to app
+      const appWithCookies = express();
+      appWithCookies.use(cookieParser());
+      appWithCookies.use(express.json());
+      appWithCookies.use((req, res, next) => {
+        req.requestId = 'test-request-id';
+        next();
+      });
+      appWithCookies.use('/auth', authRoutes);
+      const { errorHandler } = await import('../middlewares/errorHandler.js');
+      appWithCookies.use(errorHandler);
 
       // Mock refreshAccessToken to return new tokens
       vi.mocked(refreshAccessToken).mockResolvedValueOnce({
@@ -287,7 +301,7 @@ describe('Auth Routes', () => {
         refresh_token: 'new-refresh-token',
       });
 
-      const response = await request(app)
+      const response = await request(appWithCookies)
         .post('/auth/refresh')
         .set('Cookie', 'refresh_token=valid-refresh-token')
         .expect(200);

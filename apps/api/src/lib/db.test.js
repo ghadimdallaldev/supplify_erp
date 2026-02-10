@@ -1,10 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Pool } from 'pg';
-import { query, withTransaction, pool } from './db.js';
 
-vi.mock('pg', () => ({
-  Pool: vi.fn(),
-}));
+// Mock pg before importing db.js - use factory function
+vi.mock('pg', () => {
+  const mockClient = {
+    query: vi.fn(),
+    release: vi.fn(),
+  };
+  
+  const mockPool = {
+    query: vi.fn(),
+    connect: vi.fn().mockResolvedValue(mockClient),
+    on: vi.fn(), // Add on method for event listeners
+  };
+  
+  return {
+    Pool: vi.fn(() => mockPool),
+    __mockPool: mockPool,
+    __mockClient: mockClient,
+  };
+});
 
 vi.mock('./logger.js', () => ({
   logger: {
@@ -15,23 +29,14 @@ vi.mock('./logger.js', () => ({
   },
 }));
 
+// Import after mocks are set up
+import { query, withTransaction } from './db.js';
+import { __mockPool as mockPool, __mockClient as mockClient } from 'pg';
+
 describe('Database Utilities', () => {
-  let mockPool;
-  let mockClient;
-
   beforeEach(() => {
-    mockClient = {
-      query: vi.fn(),
-      release: vi.fn(),
-    };
-
-    mockPool = {
-      query: vi.fn(),
-      connect: vi.fn().mockResolvedValue(mockClient),
-      on: vi.fn(),
-    };
-
-    Pool.mockImplementation(() => mockPool);
+    vi.clearAllMocks();
+    mockPool.connect.mockResolvedValue(mockClient);
   });
 
   describe('query', () => {

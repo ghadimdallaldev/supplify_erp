@@ -124,7 +124,7 @@ describe('Orders Routes', () => {
     });
 
     it('should filter orders by status', async () => {
-      // Mock: restaurant lookup, orders query, order items query (empty)
+      // Mock: restaurant lookup, orders query
       // The route handles empty orderIds array gracefully
       db.query
         .mockResolvedValueOnce({
@@ -136,7 +136,7 @@ describe('Orders Routes', () => {
         // No items query needed when orderIds is empty
 
       const response = await request(app)
-        .get('/api/orders?status=PENDING')
+        .get('/api/orders?status=PLACED')
         .expect(200);
 
       expect(response.body.ok).toBe(true);
@@ -180,7 +180,7 @@ describe('Orders Routes', () => {
 
       expect(response.body.ok).toBe(true);
       expect(response.body.data.order.id).toBe('order-1');
-      expect(response.body.data.items).toHaveLength(1);
+      expect(response.body.data.order.items).toHaveLength(1);
     });
 
     it('should return 404 for non-existent order', async () => {

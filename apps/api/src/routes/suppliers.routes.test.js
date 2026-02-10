@@ -1,8 +1,41 @@
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { suppliersRoutes } from './suppliers.routes.js';
 import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js';
+
+// Mock db before importing routes
+vi.mock('../lib/db.js', () => {
+  const queryMock = vi.fn();
+  return {
+    query: queryMock,
+    pool: { query: queryMock },
+    __queryMock: queryMock,
+  };
+});
+
+vi.mock('../lib/rbac.js', () => ({
+  requireAuth: vi.fn(async (req, res, next) => {
+    req.userData = req.userData || { ...mockUser };
+    next();
+  }),
+  requireRole: () => (req, res, next) => next(),
+  optionalAuth: vi.fn(async (req, res, next) => {
+    req.userData = req.userData || { ...mockUser };
+    next();
+  }),
+}));
+
+vi.mock('../lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+// Import routes after mocks
+import { suppliersRoutes } from './suppliers.routes.js';
 
 describe('Suppliers Routes', () => {
   let app;
@@ -11,12 +44,17 @@ describe('Suppliers Routes', () => {
   beforeEach(async () => {
     clearAllMocks();
     db = setupMocks();
+    
+    // Sync db mocks
+    const dbModule = await import('../lib/db.js');
+    vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args));
+    
     app = express();
     app.use(express.json());
     app.use((req, res, next) => {
       req.requestId = 'test-request-id';
       req.user = mockUser;
-      req.userData = { ...mockUser };
+      req.userData = { ...mockUser, role: 'RESTAURANT', email: 'test@example.com' };
       next();
     });
     app.use('/api/suppliers', suppliersRoutes);
@@ -26,16 +64,24 @@ describe('Suppliers Routes', () => {
 
   describe('GET /api/suppliers', () => {
     it('should return list of suppliers', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'supplier-1',
-            name: 'Test Supplier',
-            email: 'supplier@example.com',
-            phone: '1234567890',
-          },
-        ],
-      });
+      // Mock: restaurant lookup, then suppliers query
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'restaurant-1' }], // Restaurant lookup
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'supplier-1',
+              name: 'Test Supplier',
+              contact_email: 'supplier@example.com',
+              phone: '1234567890',
+              product_count: 5,
+              avg_price: 10.50,
+              is_followed: false,
+            },
+          ],
+        });
 
       const response = await request(app)
         .get('/api/suppliers')
@@ -52,7 +98,7 @@ describe('Suppliers Routes', () => {
         rows: [{
           id: 'supplier-1',
           name: 'Test Supplier',
-          email: 'supplier@example.com',
+          contact_email: 'supplier@example.com',
         }],
       });
 
