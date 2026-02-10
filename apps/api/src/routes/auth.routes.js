@@ -4,6 +4,7 @@ import {
   exchangeCodeForTokens,
   getUserInfo,
   revokeToken,
+  refreshAccessToken,
 } from '../lib/auth.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
@@ -211,6 +212,63 @@ router.get('/me', requireAuth, async (req, res) => {
     })
   }
 })
+
+// Refresh access token
+router.post('/refresh', async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refresh_token;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'UNAUTHORIZED',
+          message: 'No refresh token provided',
+        },
+        requestId: req.requestId,
+      });
+    }
+
+    const newTokens = await refreshAccessToken(refreshToken);
+
+    if (!newTokens) {
+      clearAuthCookies(res);
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'UNAUTHORIZED',
+          message: 'Token refresh failed',
+        },
+        requestId: req.requestId,
+      });
+    }
+
+    setAuthCookies(res, newTokens.access_token, newTokens.refresh_token);
+
+    res.json({
+      ok: true,
+      data: {
+        message: 'Token refreshed successfully',
+      },
+      error: null,
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    logger.error('Refresh error:', error);
+    clearAuthCookies(res);
+    res.status(401).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'UNAUTHORIZED',
+        message: 'Token refresh failed',
+      },
+      requestId: req.requestId,
+    });
+  }
+});
 
 // Logout
 router.post('/logout', requireAuth, async (req, res) => {

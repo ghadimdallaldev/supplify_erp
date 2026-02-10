@@ -21,7 +21,7 @@ const getCacheMock = vi.fn()
 const setCacheMock = vi.fn()
 
 vi.mock('../lib/db.js', () => ({
-  query: (...args) => queryMock(...args),
+  query: vi.fn((...args) => queryMock(...args)),
 }))
 
 vi.mock('../lib/cache.js', () => ({
@@ -32,7 +32,7 @@ vi.mock('../lib/cache.js', () => ({
 describe('orders.calendar.routes', () => {
   let app
 
-  beforeEach(() => {
+  beforeEach(async () => {
     queryMock.mockReset()
     getCacheMock.mockReset()
     setCacheMock.mockReset()
@@ -43,9 +43,13 @@ describe('orders.calendar.routes', () => {
     app.use(express.json())
     app.use((req, res, next) => {
       req.requestId = 'test-request-id'
+      req.user = mockUser
+      req.userData = { ...mockUser }
       next()
     })
     app.use('/api/orders/calendar', ordersCalendarRoutes)
+    const { errorHandler } = await import('../middlewares/errorHandler.js')
+    app.use(errorHandler)
   })
 
   it('returns calendar events for restaurant users with derived filters', async () => {
@@ -53,9 +57,15 @@ describe('orders.calendar.routes', () => {
     getCacheMock.mockResolvedValue(null)
 
     queryMock
+      // Query 1: Get restaurant by email
       .mockResolvedValueOnce({
         rows: [{ id: 'restaurant-1', name: 'Golden Fork Restaurant' }],
       })
+      // Query 2: Check if branch_id column exists
+      .mockResolvedValueOnce({
+        rows: [{ exists: true }],
+      })
+      // Query 3: Get orders
       .mockResolvedValueOnce({
         rows: [
           {
@@ -75,9 +85,11 @@ describe('orders.calendar.routes', () => {
           },
         ],
       })
+      // Query 4: Get order count
       .mockResolvedValueOnce({
         rows: [{ count: '1' }],
       })
+      // Query 5: Get invoices
       .mockResolvedValueOnce({
         rows: [
           {
@@ -112,10 +124,8 @@ describe('orders.calendar.routes', () => {
 
   it('returns cached payload when available', async () => {
     mockUser.role = 'RESTAURANT'
-    queryMock.mockResolvedValueOnce({
-      rows: [{ id: 'restaurant-1', name: 'Golden Fork Restaurant' }],
-    })
-
+    mockUser.email = 'orders@goldenfork.com'
+    
     const cachedData = {
       tenant: { id: 'restaurant-1', role: 'RESTAURANT' },
       events: [],
@@ -123,12 +133,24 @@ describe('orders.calendar.routes', () => {
       filters: { statuses: [], suppliers: [], branches: [], categories: [] },
     }
 
+    // Mock tenant query (happens before cache check)
+    queryMock.mockResolvedValueOnce({
+      rows: [{ id: 'restaurant-1', name: 'Golden Fork Restaurant' }],
+    })
+    // Mock branch column check query
+    queryMock.mockResolvedValueOnce({
+      rows: [{ exists: true }],
+    })
+    
+    // Mock cache to return data
     getCacheMock.mockResolvedValue(cachedData)
 
     const response = await request(app).get('/api/orders/calendar').expect(200)
+    expect(response.body.ok).toBe(true)
     expect(response.body.data).toEqual(cachedData)
     expect(setCacheMock).not.toHaveBeenCalled()
-    expect(queryMock).toHaveBeenCalledTimes(1)
+    // Tenant query and branch check should be made even when cache is hit (cache check happens after tenant lookup)
+    expect(queryMock).toHaveBeenCalledTimes(2)
   })
 
   it('filters events by status for supplier users', async () => {
@@ -137,9 +159,15 @@ describe('orders.calendar.routes', () => {
     getCacheMock.mockResolvedValue(null)
 
     queryMock
+      // Query 1: Get supplier by email
       .mockResolvedValueOnce({
         rows: [{ id: 'supplier-1', name: 'Fresh Foods Co.' }],
       })
+      // Query 2: Check if branch_id column exists
+      .mockResolvedValueOnce({
+        rows: [{ exists: true }],
+      })
+      // Query 3: Get orders
       .mockResolvedValueOnce({
         rows: [
           {
@@ -159,9 +187,11 @@ describe('orders.calendar.routes', () => {
           },
         ],
       })
+      // Query 4: Get order count
       .mockResolvedValueOnce({
         rows: [{ count: '1' }],
       })
+      // Query 5: Get invoices
       .mockResolvedValueOnce({
         rows: [
           {
