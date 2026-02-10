@@ -130,7 +130,14 @@ export interface CreateManualOrderRequest {
 }
 
 export interface UpdateOrderRequest {
-  status?: 'DRAFT' | 'PLACED' | 'ACKNOWLEDGED' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
+  status?:
+    | 'DRAFT'
+    | 'PLACED'
+    | 'ACKNOWLEDGED'
+    | 'PROCESSING'
+    | 'SHIPPED'
+    | 'COMPLETED'
+    | 'CANCELLED'
   notes?: string
 }
 
@@ -156,7 +163,13 @@ export interface OrdersCalendarEvent {
   id: string
   orderId?: string
   invoiceId?: string
-  type: 'RECEIVED_ORDER' | 'DELIVERY_SCHEDULE' | 'PAYMENT_DUE' | 'PURCHASE_ORDER' | 'DELIVERY_PICKUP' | 'PAYMENT_COLLECTION'
+  type:
+    | 'RECEIVED_ORDER'
+    | 'DELIVERY_SCHEDULE'
+    | 'PAYMENT_DUE'
+    | 'PURCHASE_ORDER'
+    | 'DELIVERY_PICKUP'
+    | 'PAYMENT_COLLECTION'
   source: 'ORDER' | 'INVOICE'
   title: string
   status: string
@@ -492,7 +505,13 @@ export interface ReorderSuggestionsResponse {
 }
 
 // Reservations types
-export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'SEATED' | 'COMPLETED' | 'CANCELLED' | 'WAITLIST'
+export type ReservationStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'SEATED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'WAITLIST'
 
 export type ReservationTableShape = 'round' | 'square' | 'rectangle' | 'booth' | 'chef_table'
 export type ReservationTableZone = 'main' | 'patio' | 'bar' | 'vip' | 'private'
@@ -835,7 +854,6 @@ export interface Subscription {
   plan_limits?: Record<string, any>
   plan_features?: string[]
 }
-
 
 export interface UsageMeter {
   id: string

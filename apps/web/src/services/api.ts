@@ -35,6 +35,7 @@ import type {
   UsageMeter,
   PublicRestaurant,
   PublicAvailabilitySlot,
+  PublicAvailabilityResponse,
   PublicReservationSummary,
   StaffPortalSession,
   StaffPortalDashboard,
@@ -54,12 +55,12 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
       // CSRF token will be handled by the server
       return headers
     },
-  })(args, api, extraOptions);
-  
+  })(args, api, extraOptions)
+
   // Handle 401 Unauthorized errors (token expired or invalid)
   if (result.error && (result.error.status === 401 || result.error.status === 'FETCH_ERROR')) {
     // Check if it's an authentication error
-    const errorData = result.error.data;
+    const errorData = result.error.data
     if (typeof errorData === 'object' && errorData?.error?.name === 'UNAUTHORIZED') {
       // Token expired or invalid - redirect to login
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
@@ -69,12 +70,12 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
       }
     }
   }
-  
+
   // Unwrap the API response envelope { ok: true/false, data: ..., error: ... }
   if (result.data && typeof result.data === 'object' && 'ok' in result.data) {
     if (result.data.ok) {
       // Return the actual data
-      return { ...result, data: result.data.data };
+      return { ...result, data: result.data.data }
     } else {
       // Check for authentication errors in the response
       if (result.data.error?.name === 'UNAUTHORIZED' || result.data.error?.name === 'JWT_EXPIRED') {
@@ -84,12 +85,12 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
         }
       }
       // Return an error
-      return { ...result, error: { status: 'CUSTOM_ERROR', data: result.data.error } };
+      return { ...result, error: { status: 'CUSTOM_ERROR', data: result.data.error } }
     }
   }
-  
-  return result;
-};
+
+  return result
+}
 
 export const api = createApi({
   reducerPath: 'api',
@@ -148,7 +149,18 @@ export const api = createApi({
       }),
       providesTags: ['Product'],
     }),
-    getProductCategories: builder.query<{ categories: Array<{ id: string; name: string; slug: string; description?: string; display_order: number }> }, void>({
+    getProductCategories: builder.query<
+      {
+        categories: Array<{
+          id: string
+          name: string
+          slug: string
+          description?: string
+          display_order: number
+        }>
+      },
+      void
+    >({
       query: () => '/api/products/categories',
       providesTags: ['Product'],
     }),
@@ -229,11 +241,7 @@ export const api = createApi({
         url: `/api/orders/${id}/remind`,
         method: 'POST',
       }),
-      invalidatesTags: (result, error, id) => [
-        { type: 'Order', id },
-        'Order',
-        'Notification',
-      ],
+      invalidatesTags: (result, error, id) => [{ type: 'Order', id }, 'Order', 'Notification'],
     }),
 
     // Supplier endpoints
@@ -248,7 +256,10 @@ export const api = createApi({
       query: (id) => `/api/suppliers/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Supplier', id }],
     }),
-    getSupplierStatistics: builder.query<{ totalOrders: number; totalSpent: number; averageOrderValue: number }, string>({
+    getSupplierStatistics: builder.query<
+      { totalOrders: number; totalSpent: number; averageOrderValue: number },
+      string
+    >({
       query: (id) => `/api/suppliers/${id}/statistics`,
       providesTags: (_result, _error, id) => [{ type: 'Supplier', id }],
     }),
@@ -298,7 +309,10 @@ export const api = createApi({
         { type: 'Supplier', id: 'LIST' },
       ],
     }),
-    getPresignedUrl: builder.mutation<{ presignedUrl: string; fileKey: string; fileName: string; fileType: string }, { fileName: string; fileType: string; fileSize?: number }>({
+    getPresignedUrl: builder.mutation<
+      { presignedUrl: string; fileKey: string; fileName: string; fileType: string },
+      { fileName: string; fileType: string; fileSize?: number }
+    >({
       query: (body) => ({
         url: '/api/files/presign',
         method: 'POST',
@@ -368,7 +382,10 @@ export const api = createApi({
       query: (productId) => `/api/inventory/product/${productId}`,
       providesTags: ['Inventory'],
     }),
-    updateInventory: builder.mutation<Inventory, { productId: string; data: UpdateInventoryRequest }>({
+    updateInventory: builder.mutation<
+      Inventory,
+      { productId: string; data: UpdateInventoryRequest }
+    >({
       query: ({ productId, data }) => ({
         url: `/api/inventory/product/${productId}`,
         method: 'PATCH',
@@ -388,10 +405,10 @@ export const api = createApi({
       query: () => '/api/admin/dashboard',
       providesTags: ['User'],
       transformResponse: (response: any) => {
-        console.log('Dashboard transformResponse - raw response:', response);
-        const stats = response?.stats || {};
-        console.log('Dashboard transformResponse - extracted stats:', stats);
-        return stats;
+        console.log('Dashboard transformResponse - raw response:', response)
+        const stats = response?.stats || {}
+        console.log('Dashboard transformResponse - extracted stats:', stats)
+        return stats
       },
     }),
     getAuditLogs: builder.query<AuditLogsResponse, AuditLogFilters>({
@@ -410,7 +427,10 @@ export const api = createApi({
         body,
       }),
     }),
-    attachFileToProduct: builder.mutation<Attachment, { productId: string; data: AttachFileRequest }>({
+    attachFileToProduct: builder.mutation<
+      Attachment,
+      { productId: string; data: AttachFileRequest }
+    >({
       query: ({ productId, data }) => ({
         url: `/api/files/product/${productId}/attach`,
         method: 'POST',
@@ -436,7 +456,22 @@ export const api = createApi({
       }),
       invalidatesTags: ['Chat'],
     }),
-    sendMessage: builder.mutation<any, { conversationId: string; content: string; messageType?: string; orderId?: string; replyTo?: string; attachments?: Array<{ fileUrl: string; fileType: string; fileName: string; fileSize?: number }> }>({
+    sendMessage: builder.mutation<
+      any,
+      {
+        conversationId: string
+        content: string
+        messageType?: string
+        orderId?: string
+        replyTo?: string
+        attachments?: Array<{
+          fileUrl: string
+          fileType: string
+          fileName: string
+          fileSize?: number
+        }>
+      }
+    >({
       query: ({ conversationId, ...body }) => ({
         url: `/api/chat/conversations/${conversationId}/messages`,
         method: 'POST',
@@ -492,7 +527,10 @@ export const api = createApi({
       }),
       providesTags: ['RestaurantInventory'],
     }),
-    addRestaurantInventory: builder.mutation<any, { productId: string; quantity: number; reason?: string }>({
+    addRestaurantInventory: builder.mutation<
+      any,
+      { productId: string; quantity: number; reason?: string }
+    >({
       query: (body) => ({
         url: '/api/restaurant-inventory/add',
         method: 'POST',
@@ -500,7 +538,15 @@ export const api = createApi({
       }),
       invalidatesTags: ['RestaurantInventory'],
     }),
-    adjustRestaurantInventory: builder.mutation<any, { productId: string; adjustmentType: 'WASTAGE' | 'SPOILAGE' | 'COUNT_CORRECTION' | 'OTHER'; quantity: number; reason?: string }>({
+    adjustRestaurantInventory: builder.mutation<
+      any,
+      {
+        productId: string
+        adjustmentType: 'WASTAGE' | 'SPOILAGE' | 'COUNT_CORRECTION' | 'OTHER'
+        quantity: number
+        reason?: string
+      }
+    >({
       query: (body) => ({
         url: '/api/restaurant-inventory/adjust',
         method: 'POST',
@@ -622,7 +668,11 @@ export const api = createApi({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: (_result, _error, { invoiceId }) => [{ type: 'RestaurantFinance', id: invoiceId }, 'RestaurantFinance', 'Order'],
+      invalidatesTags: (_result, _error, { invoiceId }) => [
+        { type: 'RestaurantFinance', id: invoiceId },
+        'RestaurantFinance',
+        'Order',
+      ],
     }),
     getInvoiceCredits: builder.query<any, string>({
       query: (invoiceId) => `/api/restaurant-finance/invoices/${invoiceId}/credits`,
@@ -637,7 +687,10 @@ export const api = createApi({
     }),
     getOrderInvoices: builder.query<any, string>({
       query: (orderId) => `/api/restaurant-finance/orders/${orderId}/invoices`,
-      providesTags: (_result, _error, orderId) => [{ type: 'Order', id: orderId }, 'RestaurantFinance'],
+      providesTags: (_result, _error, orderId) => [
+        { type: 'Order', id: orderId },
+        'RestaurantFinance',
+      ],
     }),
     getSupplierStatement: builder.query<any, { supplierId: string; params?: any }>({
       query: ({ supplierId, params }) => ({
@@ -706,23 +759,47 @@ export const api = createApi({
         credentials: 'omit',
       }),
     }),
-    getPublicReservationAvailability: builder.query<{ slots: PublicAvailabilitySlot[] }, { restaurantId: string; partySize: number; date: string }>({
+    getPublicReservationAvailability: builder.query<
+      PublicAvailabilityResponse,
+      { restaurantId: string; partySize: number; date: string }
+    >({
       query: ({ restaurantId, partySize, date }) => ({
         url: '/api/public/reservations/availability',
         params: { restaurantId, partySize, date },
         credentials: 'omit',
       }),
     }),
-    createPublicReservation: builder.mutation<{ reservation: PublicReservationSummary }, {
-      restaurantId: string
-      partySize: number
-      scheduledAt: string
-      durationMinutes?: number
-      customerName: string
-      customerEmail?: string
-      customerPhone?: string
-      notes?: string
-    }>({
+    joinPublicWaitlist: builder.mutation<
+      { message: string },
+      {
+        restaurantId: string
+        partySize: number
+        desiredAt?: string
+        customerName: string
+        customerPhone: string
+        notes?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/public/reservations/waitlist',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+    }),
+    createPublicReservation: builder.mutation<
+      { reservation: PublicReservationSummary },
+      {
+        restaurantId: string
+        partySize: number
+        scheduledAt: string
+        durationMinutes?: number
+        customerName: string
+        customerEmail?: string
+        customerPhone?: string
+        notes?: string
+      }
+    >({
       query: (body) => ({
         url: '/api/public/reservations',
         method: 'POST',
@@ -738,7 +815,10 @@ export const api = createApi({
       }),
       providesTags: (_result, _error, token) => [{ type: 'Reservation', id: token }],
     }),
-    cancelPublicReservation: builder.mutation<{ reservation: PublicReservationDetails }, { token: string }>({
+    cancelPublicReservation: builder.mutation<
+      { reservation: PublicReservationDetails },
+      { token: string }
+    >({
       query: (body) => ({
         url: '/api/public/reservations/manage/cancel',
         method: 'POST',
@@ -747,7 +827,10 @@ export const api = createApi({
       }),
       invalidatesTags: (_result, _error, { token }) => [{ type: 'Reservation', id: token }],
     }),
-    reschedulePublicReservation: builder.mutation<{ reservation: PublicReservationDetails }, { token: string; scheduledAt: string }>({
+    reschedulePublicReservation: builder.mutation<
+      { reservation: PublicReservationDetails },
+      { token: string; scheduledAt: string }
+    >({
       query: (body) => ({
         url: '/api/public/reservations/manage/reschedule',
         method: 'POST',
@@ -758,7 +841,10 @@ export const api = createApi({
     }),
 
     // Staff self-service portal
-    requestStaffPortalLink: builder.mutation<{ sessionToken: string; expiresAt: string }, { email: string }>({
+    requestStaffPortalLink: builder.mutation<
+      { sessionToken: string; expiresAt: string },
+      { email: string }
+    >({
       query: (body) => ({
         url: '/api/public/staff/request-link',
         method: 'POST',
@@ -781,14 +867,17 @@ export const api = createApi({
         credentials: 'omit',
       }),
     }),
-    submitStaffPortalPto: builder.mutation<StaffPtoRequest, {
-      token: string
-      type: StaffPtoRequest['type']
-      startDate: string
-      endDate: string
-      hoursRequested?: number
-      reason?: string
-    }>({
+    submitStaffPortalPto: builder.mutation<
+      StaffPtoRequest,
+      {
+        token: string
+        type: StaffPtoRequest['type']
+        startDate: string
+        endDate: string
+        hoursRequested?: number
+        reason?: string
+      }
+    >({
       query: (body) => ({
         url: '/api/public/staff/pto',
         method: 'POST',
@@ -796,17 +885,63 @@ export const api = createApi({
         credentials: 'omit',
       }),
     }),
-    submitStaffPortalSwap: builder.mutation<StaffShiftSwap, {
-      token: string
-      shiftId: string
-      proposedCoverId?: string
-      reason?: string
-    }>({
+    submitStaffPortalSwap: builder.mutation<
+      StaffShiftSwap,
+      {
+        token: string
+        shiftId: string
+        proposedCoverId?: string
+        reason?: string
+      }
+    >({
       query: (body) => ({
         url: '/api/public/staff/swaps',
         method: 'POST',
         body,
         credentials: 'omit',
+      }),
+    }),
+    getStaffSelfDashboard: builder.query<StaffPortalDashboard, void>({
+      query: () => ({
+        url: '/api/staff/self/dashboard',
+      }),
+      providesTags: [
+        'StaffMember',
+        'StaffShift',
+        'StaffPto',
+        'StaffSwap',
+        'StaffAnnouncement',
+        'StaffDocument',
+      ],
+    }),
+    submitStaffSelfPto: builder.mutation<
+      StaffPtoRequest,
+      {
+        type: StaffPtoRequest['type']
+        startDate: string
+        endDate: string
+        hoursRequested?: number
+        reason?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/staff/self/pto',
+        method: 'POST',
+        body,
+      }),
+    }),
+    submitStaffSelfSwap: builder.mutation<
+      StaffShiftSwap,
+      {
+        shiftId: string
+        proposedCoverId?: string
+        reason?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/staff/self/swaps',
+        method: 'POST',
+        body,
       }),
     }),
 
@@ -864,7 +999,10 @@ export const api = createApi({
       }),
       invalidatesTags: ['Admin'],
     }),
-    getTenantUsage: builder.query<{ usage: UsageMeter[]; period: string }, { tenantId: string; tenantType: string; period?: string }>({
+    getTenantUsage: builder.query<
+      { usage: UsageMeter[]; period: string },
+      { tenantId: string; tenantType: string; period?: string }
+    >({
       query: ({ tenantId, tenantType, period }) => ({
         url: `/api/admin-dashboard/usage/${tenantId}`,
         params: { tenantType, period },
@@ -981,6 +1119,7 @@ export const {
   useGetPublicReservationAvailabilityQuery,
   useLazyGetPublicReservationAvailabilityQuery,
   useCreatePublicReservationMutation,
+  useJoinPublicWaitlistMutation,
   useGetPublicReservationDetailsQuery,
   useCancelPublicReservationMutation,
   useReschedulePublicReservationMutation,
@@ -989,6 +1128,9 @@ export const {
   useGetStaffPortalDashboardQuery,
   useSubmitStaffPortalPtoMutation,
   useSubmitStaffPortalSwapMutation,
+  useGetStaffSelfDashboardQuery,
+  useSubmitStaffSelfPtoMutation,
+  useSubmitStaffSelfSwapMutation,
   useGetCurrentSubscriptionQuery,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,
@@ -998,10 +1140,10 @@ export const {
   useUpdateAdminPlanMutation,
   useGetAdminSubscriptionsQuery,
   useUpdateAdminSubscriptionMutation,
-    useGetTenantUsageQuery,
-    useGetAdminAuditLogsQuery,
-    useGetAdminSuppliersQuery,
-    useGetAdminRestaurantsQuery,
-    useGetSupplierUsageQuery,
-    useGetRestaurantUsageQuery,
+  useGetTenantUsageQuery,
+  useGetAdminAuditLogsQuery,
+  useGetAdminSuppliersQuery,
+  useGetAdminRestaurantsQuery,
+  useGetSupplierUsageQuery,
+  useGetRestaurantUsageQuery,
 } = api
