@@ -87,40 +87,42 @@ describe('Payments Routes', () => {
 
   describe('POST /api/payments', () => {
     it('should create a payment', async () => {
-      // Mock: invoice lookup, then transaction with payment insert and invoice update
-      db.query.mockResolvedValueOnce({
-        rows: [{ 
-          id: 'invoice-1', 
-          restaurant_id: 'restaurant-1',
-          supplier_id: 'supplier-1',
-          contact_email: 'supplier@example.com',
-          total_amount: 100.50,
-          balance_due: 100.50,
-        }],
-      });
-
-      // Mock transaction
-      const mockClient = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'payment-1', invoice_id: 'invoice-1', amount: 100.50 }] }) // Payment insert
-          .mockResolvedValueOnce({ rows: [{ id: 'invoice-1', status: 'PAID', balance_due: 0 }] }), // Invoice update
-      };
-
-      db.withTransaction.mockImplementation(async (fn) => {
-        return await fn(mockClient);
-      });
+      // Mock: invoice lookup (with supplier join), then payment insert
+      // The route doesn't use withTransaction, it queries directly
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ 
+            id: 'invoice-1', 
+            restaurant_id: 'restaurant-1',
+            supplier_id: 'supplier-1',
+            contact_email: 'supplier@example.com', // From supplier join
+            total_amount: 100.50,
+            balance_due: 100.50,
+          }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ 
+            id: 'payment-1', 
+            invoice_id: 'invoice-1', 
+            payment_amount: 100.50,
+            payment_method: 'CASH',
+            payment_number: 'PAY-1234567890',
+            status: 'COMPLETED',
+          }],
+        });
 
       const response = await request(app)
         .post('/api/payments')
         .send({
           invoice_id: 'invoice-1',
-          amount: 100.50,
+          payment_amount: 100.50,
           payment_method: 'CASH',
+          payment_date: new Date().toISOString(),
         })
         .expect(201);
 
       expect(response.body.ok).toBe(true);
-      expect(response.body.data.payment.amount).toBe(100.50);
+      expect(response.body.data.payment.payment_amount).toBe(100.50);
     });
   });
 });

@@ -32,6 +32,14 @@ vi.mock('../lib/logger.js', () => ({
 
 vi.mock('../lib/subscription.js', () => ({
   checkLimit: vi.fn().mockResolvedValue({ allowed: true, current: 0, limit: 100, isOverLimit: false }),
+  checkUsageWithWarning: vi.fn().mockResolvedValue({ 
+    current: 0, 
+    limit: 100, 
+    isUnlimited: false, 
+    isOverLimit: false, 
+    isWarning: false, 
+    usagePercent: 0 
+  }),
   incrementUsage: vi.fn().mockResolvedValue(true),
 }));
 
@@ -93,25 +101,42 @@ describe('Chat Routes', () => {
 
   describe('POST /api/chat/conversations/:conversationId/messages', () => {
     it('should send a message', async () => {
-      // Mock: restaurant lookup, conversation check, subscription check, message insert
+      // Create a new app instance with RESTAURANT role for this test
+      const appRestaurant = express();
+      appRestaurant.use(express.json());
+      appRestaurant.use((req, res, next) => {
+        req.requestId = 'test-request-id';
+        req.user = mockUser;
+        req.userData = { ...mockUser, role: 'RESTAURANT', email: 'restaurant@example.com' };
+        next();
+      });
+      appRestaurant.use('/api/chat', chatRoutes);
+      const { errorHandler } = await import('../middlewares/errorHandler.js');
+      appRestaurant.use(errorHandler);
+
+      // Mock: restaurant lookup, usage check, conversation check, restaurant verification, message insert
       db.query
         .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1' }], // Restaurant lookup (for RESTAURANT role)
+          rows: [{ id: 'restaurant-1' }], // Restaurant lookup for tenantId
         })
         .mockResolvedValueOnce({
           rows: [{ id: 'conv-1', restaurant_id: 'restaurant-1', supplier_id: 'supplier-1' }], // Conversation check
         })
         .mockResolvedValueOnce({
-          rows: [{ id: 'msg-1', conversation_id: 'conv-1', content: 'Hello' }], // Message insert
+          rows: [{ id: 'restaurant-1' }], // Restaurant verification (must match conversation.restaurant_id)
+        })
+        .mockResolvedValueOnce({
+          rows: [{ 
+            id: 'msg-1', 
+            conversation_id: 'conv-1', 
+            content: 'Hello',
+            sender_id: 'restaurant-1',
+            sender_type: 'RESTAURANT',
+            created_at: new Date(),
+          }], // Message insert
         });
 
-      // Change user role to RESTAURANT for this test
-      app.use((req, res, next) => {
-        req.userData = { ...mockUser, role: 'RESTAURANT', email: 'restaurant@example.com' };
-        next();
-      });
-
-      const response = await request(app)
+      const response = await request(appRestaurant)
         .post('/api/chat/conversations/conv-1/messages')
         .send({
           content: 'Hello',

@@ -1,0 +1,36 @@
+# Cursor Rules (MUST FOLLOW)
+
+## Non-negotiables
+- If you add or change any function, you MUST:
+  1) add/update unit tests covering the new/changed behavior
+  2) update relevant documentation (README, docs/, or JSDoc/TSDoc)
+  3) keep changes minimal and scoped
+
+- Do NOT change public APIs unless explicitly asked. If you must, document breaking changes.
+
+## Testing rules
+- Prefer unit tests first. Add integration tests only when needed.
+- Every new function must have:
+  - happy path test
+  - at least 1 edge case test
+  - error path test when applicable
+- Tests must be deterministic (no real network calls). Mock external services.
+
+## Code quality
+- Follow existing patterns in the codebase (naming, folder structure).
+- No silent failures. Errors must be logged with context and rethrown or returned in a structured way.
+- Do not introduce new dependencies unless requested. If needed, justify and keep minimal.
+
+## Documentation rules
+- If behavior changes, update docs:
+  - API route docs (OpenAPI/README) if endpoints changed
+  - config/env docs if env vars changed
+  - architecture notes if flow changes
+- Update comments only when they add clarity; avoid redundant commentary.
+
+## Output rules (how you respond)
+- Always include:
+  - what changed
+  - where tests were added/updated
+  - how to run tests
+  - docs updated (and where)

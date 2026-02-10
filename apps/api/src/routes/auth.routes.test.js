@@ -56,7 +56,15 @@ vi.mock('../lib/rbac.js', () => ({
     };
     next();
   }),
-  upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
+  upsertUser: vi.fn().mockResolvedValue({ 
+    id: 'user-1', 
+    email: 'test@example.com',
+    role: 'RESTAURANT',
+    keycloak_sub: 'sub-123',
+    display_name: 'Test User',
+    created_at: new Date(),
+    updated_at: new Date(),
+  }),
   setAuthCookies: vi.fn(),
   clearAuthCookies: vi.fn(),
   getUserBySub: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com', keycloak_sub: 'sub-123' }),
@@ -180,8 +188,19 @@ describe('Auth Routes', () => {
         family_name: 'User',
       });
       
-      // Mock database query for upsertUser (it uses query internally)
-      // The route calls upsertUser which calls query() to insert/update user
+      // Ensure upsertUser mock returns the user (the mock should prevent real function from running)
+      // But also mock database query in case the real function is called
+      vi.mocked(upsertUser).mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'test@example.com',
+        role: 'RESTAURANT',
+        keycloak_sub: 'sub-123',
+        display_name: 'Test User',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      
+      // Also mock database query in case the real upsertUser is called
       vi.mocked(dbModule.query).mockResolvedValueOnce({
         rows: [{
           id: 'user-1',
@@ -189,14 +208,9 @@ describe('Auth Routes', () => {
           role: 'RESTAURANT',
           keycloak_sub: 'sub-123',
           display_name: 'Test User',
+          created_at: new Date(),
+          updated_at: new Date(),
         }],
-      });
-
-      // Also ensure upsertUser mock returns the user (in case the real function isn't called)
-      vi.mocked(upsertUser).mockImplementation(async (userInfo, roles) => {
-        // Call the mocked query to simulate the database call
-        const result = await dbModule.query('INSERT INTO app_user...', []);
-        return result.rows[0];
       });
 
       // Set WEB_ORIGIN for redirect

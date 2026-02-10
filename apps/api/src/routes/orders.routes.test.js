@@ -124,16 +124,16 @@ describe('Orders Routes', () => {
     });
 
     it('should filter orders by status', async () => {
-      // Mock: restaurant lookup, orders query
-      // The route handles empty orderIds array gracefully
+      // Mock: restaurant lookup, orders query (empty result)
+      // When orderIds is empty, no items query is made
       db.query
         .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1' }], // Restaurant lookup
+          rows: [{ id: 'restaurant-1' }], // Restaurant lookup for RESTAURANT role
         })
         .mockResolvedValueOnce({
-          rows: [], // No orders with this status
+          rows: [], // No orders with this status - orderIds will be empty
         });
-        // No items query needed when orderIds is empty
+        // No items query needed when orderIds.length === 0
 
       const response = await request(app)
         .get('/api/orders?status=PLACED')
@@ -185,9 +185,11 @@ describe('Orders Routes', () => {
 
     it('should return 404 for non-existent order', async () => {
       // Mock: order query returns empty (order not found)
+      // The route queries: order with restaurant join, then checks if empty
       db.query.mockResolvedValueOnce({
-        rows: [], // Order not found
+        rows: [], // Order not found - triggers NotFoundError
       });
+      // No restaurant lookup needed since order query returns empty
 
       const response = await request(app)
         .get('/api/orders/non-existent')

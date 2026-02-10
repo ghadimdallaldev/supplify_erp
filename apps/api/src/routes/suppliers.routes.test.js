@@ -64,10 +64,11 @@ describe('Suppliers Routes', () => {
 
   describe('GET /api/suppliers', () => {
     it('should return list of suppliers', async () => {
-      // Mock: restaurant lookup, then suppliers query
+      // Mock: restaurant lookup (for RESTAURANT role with userData), then suppliers query
+      // The route checks if req.userData?.role === 'RESTAURANT' and queries restaurant table
       db.query
         .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1' }], // Restaurant lookup
+          rows: [{ id: 'restaurant-1' }], // Restaurant lookup when role is RESTAURANT
         })
         .mockResolvedValueOnce({
           rows: [
@@ -79,6 +80,7 @@ describe('Suppliers Routes', () => {
               product_count: 5,
               avg_price: 10.50,
               is_followed: false,
+              created_at: new Date(),
             },
           ],
         });
