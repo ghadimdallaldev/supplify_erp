@@ -94,13 +94,22 @@ describe('Suppliers Routes', () => {
 
   describe('GET /api/suppliers/:id', () => {
     it('should return supplier details', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [{
-          id: 'supplier-1',
-          name: 'Test Supplier',
-          contact_email: 'supplier@example.com',
-        }],
-      });
+      // Mock: restaurant lookup (for RESTAURANT role), then supplier query
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'restaurant-1' }], // Restaurant lookup
+        })
+        .mockResolvedValueOnce({
+          rows: [{
+            id: 'supplier-1',
+            name: 'Test Supplier',
+            contact_email: 'supplier@example.com',
+            phone: '1234567890',
+            address: '123 Main St',
+            product_count: 5,
+            avg_price: 10.50,
+          }],
+        });
 
       const response = await request(app)
         .get('/api/suppliers/supplier-1')

@@ -131,6 +131,9 @@ describe('Auth Routes', () => {
 
   describe('GET /auth/callback', () => {
     it('should handle successful OAuth callback', async () => {
+      // Setup database mocks first
+      const dbModule = await import('../lib/db.js');
+      
       const session = { oauthState: 'test-state' };
       const appWithSession = express();
       appWithSession.use(express.json());
@@ -176,10 +179,24 @@ describe('Auth Routes', () => {
         given_name: 'Test',
         family_name: 'User',
       });
-      vi.mocked(upsertUser).mockResolvedValueOnce({
-        id: 'user-1',
-        email: 'test@example.com',
-        role: 'RESTAURANT',
+      
+      // Mock database query for upsertUser (it uses query internally)
+      // The route calls upsertUser which calls query() to insert/update user
+      vi.mocked(dbModule.query).mockResolvedValueOnce({
+        rows: [{
+          id: 'user-1',
+          email: 'test@example.com',
+          role: 'RESTAURANT',
+          keycloak_sub: 'sub-123',
+          display_name: 'Test User',
+        }],
+      });
+
+      // Also ensure upsertUser mock returns the user (in case the real function isn't called)
+      vi.mocked(upsertUser).mockImplementation(async (userInfo, roles) => {
+        // Call the mocked query to simulate the database call
+        const result = await dbModule.query('INSERT INTO app_user...', []);
+        return result.rows[0];
       });
 
       // Set WEB_ORIGIN for redirect
@@ -189,7 +206,6 @@ describe('Auth Routes', () => {
       const response = await request(appWithSession)
         .get('/auth/callback?code=test-code&state=test-state')
         .expect(302);
-
       expect(exchangeCodeForTokens).toHaveBeenCalled();
       expect(getUserInfo).toHaveBeenCalled();
       expect(upsertUser).toHaveBeenCalled();
@@ -226,6 +242,7 @@ describe('Auth Routes', () => {
       process.env.WEB_ORIGIN = 'http://localhost:3000';
 
       // The route redirects on invalid state, so we expect a redirect
+      // No database calls should be made for invalid state
       const response = await request(appWithSession)
         .get('/auth/callback?code=test-code&state=invalid-state')
         .expect(302);
