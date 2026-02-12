@@ -101,6 +101,30 @@ router.get('/:id', requireAuth, async (req, res) => {
     if (rows.length === 0) {
       throw new NotFoundError('Invoice not found');
     }
+
+    const invoice = rows[0];
+    const role = req.userData?.role;
+
+    // Tenant scoping: only the invoice's supplier, restaurant, or admin may read it
+    if (role === 'SUPPLIER') {
+      const { rows: suppliers } = await query(
+        'SELECT id FROM supplier WHERE contact_email = $1',
+        [req.userData.email]
+      );
+      if (suppliers.length === 0 || suppliers[0].id !== invoice.supplier_id) {
+        throw new NotFoundError('Invoice not found');
+      }
+    } else if (role === 'RESTAURANT') {
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      );
+      if (restaurants.length === 0 || restaurants[0].id !== invoice.restaurant_id) {
+        throw new NotFoundError('Invoice not found');
+      }
+    } else if (role !== 'ADMIN') {
+      throw new NotFoundError('Invoice not found');
+    }
     
     // Get line items
     const { rows: lineItems } = await query(`
@@ -110,7 +134,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     res.json({
       ok: true,
       data: { 
-        invoice: rows[0],
+        invoice,
         lineItems 
       },
       error: null,

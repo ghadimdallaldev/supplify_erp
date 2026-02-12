@@ -393,14 +393,27 @@ export function SuppliersPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t">
+                <div className="flex gap-2 pt-2 border-t flex-wrap">
+                  {isRestaurant && (
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="flex-1 min-w-0"
+                      asChild
+                    >
+                      <Link to={`/app/chat?supplier=${supplier.id}`}>
+                        <MessageCircle className="h-4 w-4 mr-1 shrink-0" />
+                        Message
+                      </Link>
+                    </Button>
+                  )}
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex-1"
+                    className="flex-1 min-w-0"
                     onClick={() => handleViewProducts(supplier.id)}
                   >
-                    <Package className="h-4 w-4 mr-1" />
+                    <Package className="h-4 w-4 mr-1 shrink-0" />
                     Products
                   </Button>
                   <Button 
@@ -409,7 +422,7 @@ export function SuppliersPage() {
                     asChild
                   >
                     <Link to={`/app/suppliers/${supplier.id}`}>
-                      <Eye className="h-4 w-4 mr-1" />
+                      <Eye className="h-4 w-4 mr-1 shrink-0" />
                       View
                     </Link>
                   </Button>
@@ -505,7 +518,19 @@ export function SuppliersPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isRestaurant && (
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        asChild
+                      >
+                        <Link to={`/app/chat?supplier=${supplier.id}`}>
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          Message
+                        </Link>
+                      </Button>
+                    )}
                     <Button 
                       variant="outline" 
                       size="sm"

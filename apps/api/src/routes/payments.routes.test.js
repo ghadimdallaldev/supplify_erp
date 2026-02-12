@@ -92,7 +92,7 @@ describe('Payments Routes', () => {
       db.query
         .mockResolvedValueOnce({
           rows: [{ 
-            id: 'invoice-1', 
+            id: '00000000-0000-0000-0000-000000000001', 
             restaurant_id: 'restaurant-1',
             supplier_id: 'supplier-1',
             contact_email: 'supplier@example.com', // From supplier join
@@ -103,7 +103,7 @@ describe('Payments Routes', () => {
         .mockResolvedValueOnce({
           rows: [{ 
             id: 'payment-1', 
-            invoice_id: 'invoice-1', 
+            invoice_id: '00000000-0000-0000-0000-000000000001', 
             payment_amount: 100.50,
             payment_method: 'CASH',
             payment_number: 'PAY-1234567890',
@@ -114,10 +114,10 @@ describe('Payments Routes', () => {
       const response = await request(app)
         .post('/api/payments')
         .send({
-          invoice_id: 'invoice-1',
+          invoice_id: '00000000-0000-0000-0000-000000000001', // Valid UUID format
           payment_amount: 100.50,
           payment_method: 'CASH',
-          payment_date: new Date().toISOString(),
+          payment_date: new Date().toISOString().split('T')[0], // Date string (YYYY-MM-DD)
         })
         .expect(201);
 

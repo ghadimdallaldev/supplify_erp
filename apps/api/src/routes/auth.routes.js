@@ -152,7 +152,7 @@ router.get('/callback', async (req, res) => {
     })
 
     // Redirect to application
-    const redirectUrl = 'http://localhost:5173/app'
+    const redirectUrl = `${process.env.WEB_ORIGIN || 'http://localhost:5173'}/app`
     logger.info({ action: 'Redirecting to frontend', url: redirectUrl })
     res.redirect(redirectUrl)
   } catch (error) {

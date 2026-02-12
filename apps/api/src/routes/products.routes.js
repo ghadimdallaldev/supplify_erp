@@ -435,7 +435,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 });
 
 // Update product (supplier owner or admin only)
-router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res, next) => {
   try {
     const { id } = req.params;
     const updateData = productUpdateSchema.parse(req.body);
@@ -529,6 +529,10 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
       requestId: req.requestId,
     });
   } catch (error) {
+    // Let NotFoundError pass through to error handler (next middleware)
+    if (error instanceof NotFoundError) {
+      return next(error);
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         ok: false,

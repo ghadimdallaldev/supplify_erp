@@ -20,7 +20,11 @@ vi.mock('../lib/rbac.js', () => ({
   }),
   requireRole: () => (req, res, next) => next(),
   optionalAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || { ...mockUser };
+    // optionalAuth should set req.userData if available, but not fail if missing
+    // In tests, we set it in the middleware, so optionalAuth just passes through
+    if (!req.userData) {
+      req.userData = { ...mockUser };
+    }
     next();
   }),
 }));
@@ -64,8 +68,9 @@ describe('Suppliers Routes', () => {
 
   describe('GET /api/suppliers', () => {
     it('should return list of suppliers', async () => {
-      // Mock: restaurant lookup (for RESTAURANT role with userData), then suppliers query
+      // Mock: restaurant lookup (for RESTAURANT role with userData), then suppliers query, then count query
       // The route checks if req.userData?.role === 'RESTAURANT' and queries restaurant table
+      // Then queries suppliers, then queries count for pagination
       db.query
         .mockResolvedValueOnce({
           rows: [{ id: 'restaurant-1' }], // Restaurant lookup when role is RESTAURANT
@@ -83,6 +88,9 @@ describe('Suppliers Routes', () => {
               created_at: new Date(),
             },
           ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ total: '1' }], // Count query for pagination
         });
 
       const response = await request(app)

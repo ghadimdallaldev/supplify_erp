@@ -430,17 +430,40 @@ router.post('/conversations', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT'
 });
 
 // Get conversation messages
-router.get('/conversations/:conversationId/messages', requireAuth, async (req, res) => {
+router.get('/conversations/:conversationId/messages', requireAuth, async (req, res, next) => {
   try {
     const { conversationId } = req.params;
     const { limit = '50', offset = '0' } = req.query;
     
-    // Verify conversation access
+    // Verify conversation exists and current user is a participant (tenant scoping)
     const { rows: conversations } = await query(`
-      SELECT * FROM conversation WHERE id = $1
+      SELECT id, supplier_id, restaurant_id FROM conversation WHERE id = $1
     `, [conversationId]);
     
     if (conversations.length === 0) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    const conversation = conversations[0];
+    const role = req.userData?.role;
+
+    if (role === 'RESTAURANT') {
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      );
+      if (restaurants.length === 0 || restaurants[0].id !== conversation.restaurant_id) {
+        throw new NotFoundError('Conversation not found');
+      }
+    } else if (role === 'SUPPLIER') {
+      const { rows: suppliers } = await query(
+        'SELECT id FROM supplier WHERE contact_email = $1',
+        [req.userData.email]
+      );
+      if (suppliers.length === 0 || suppliers[0].id !== conversation.supplier_id) {
+        throw new NotFoundError('Conversation not found');
+      }
+    } else if (role !== 'ADMIN') {
       throw new NotFoundError('Conversation not found');
     }
     
@@ -499,6 +522,9 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
       requestId: req.requestId,
     });
   } catch (error) {
+    if (error instanceof NotFoundError) {
+      return next(error);
+    }
     logger.error('Get messages error:', error);
     res.status(500).json({
       ok: false,

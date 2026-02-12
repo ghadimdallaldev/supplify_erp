@@ -1,8 +1,5 @@
--- Create schema_migrations table to track applied migrations
+-- Create schema_migrations table to track applied migrations (version = migration filename)
 CREATE TABLE IF NOT EXISTS schema_migrations (
-  id SERIAL PRIMARY KEY,
-  migration TEXT NOT NULL UNIQUE,
+  version TEXT PRIMARY KEY,
   applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE INDEX IF NOT EXISTS idx_schema_migrations_migration ON schema_migrations(migration);

@@ -3,6 +3,9 @@ import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import axios from 'axios'
 
+/** Timeout for outbound HTTP calls to Keycloak (ms). Prevents hung requests. */
+const KEYCLOAK_HTTP_TIMEOUT_MS = 10000
+
 let keycloakConfig = null
 
 // Get Keycloak configuration values
@@ -28,7 +31,7 @@ export async function getKeycloakConfig() {
   logger.info('Attempting to fetch Keycloak config from:', WELL_KNOWN_URL)
 
   try {
-    const response = await axios.get(WELL_KNOWN_URL)
+    const response = await axios.get(WELL_KNOWN_URL, { timeout: KEYCLOAK_HTTP_TIMEOUT_MS })
     keycloakConfig = response.data
     logger.info('Keycloak configuration loaded from well-known endpoint')
     return keycloakConfig
@@ -80,6 +83,7 @@ export async function exchangeCodeForTokens(code, redirectUri) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
     })
 
     logger.info('Token exchange response status:', response.status)
@@ -121,6 +125,7 @@ export async function refreshAccessToken(refreshToken) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
     })
 
     const tokens = response.data
@@ -230,6 +235,7 @@ export async function getUserInfo(accessToken) {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
     })
 
     return response.data
@@ -255,6 +261,7 @@ export async function revokeToken(token) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
     })
 
     return response.status === 200

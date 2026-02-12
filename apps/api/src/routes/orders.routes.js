@@ -177,25 +177,22 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
     const dueDate = new Date()
     dueDate.setDate(dueDate.getDate() + paymentTermsDays)
 
-    // Calculate amounts with comprehensive line item details
+    // Batch-fetch product details for line items (avoids N+1 inside transaction)
+    const productIds = orderItems.map((item) => item.product_id)
+    const { rows: productRows } = await client.query(
+      `SELECT id, name, sku FROM product WHERE id = ANY($1)`,
+      [productIds]
+    )
+    const productMap = new Map(productRows.map((p) => [p.id, p]))
+
     let subtotal = 0
     const lineItemsData = []
-
     for (const item of orderItems) {
-      // Get full product details
-      const { rows: products } = await client.query(
-        `
-        SELECT p.* FROM product p WHERE p.id = $1
-      `,
-        [item.product_id]
-      )
-
-      const product = products.length > 0 ? products[0] : null
+      const product = productMap.get(item.product_id) || null
       const unitPrice = parseFloat(item.unit_price || 0)
       const quantity = parseFloat(item.quantity || 0)
       const lineTotal = unitPrice * quantity
       subtotal += lineTotal
-
       lineItemsData.push({
         product_id: item.product_id,
         description: product?.name || item.product_name || 'Product',
@@ -688,7 +685,7 @@ router.get('/', requireAuth, async (req, res) => {
 })
 
 // Get order by ID
-router.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params
 
@@ -785,6 +782,10 @@ router.get('/:id', requireAuth, async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
+    // Let NotFoundError pass through to error handler (next middleware)
+    if (error instanceof NotFoundError) {
+      return next(error);
+    }
     logger.error('Get order error:', error)
     res.status(500).json({
       ok: false,
@@ -826,33 +827,36 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
     // Group items by supplier - split into separate orders per supplier
     const orderStatus = orderData.status || 'PLACED'
 
-    // First, validate all products and group by supplier
-    const supplierGroups = new Map()
-
-    for (const item of orderData.items) {
-      // Get product and supplier info
-      const { rows: products } = await query(
-        `
-        SELECT p.*, pr.amount as current_price, pr.currency
-        FROM product p
-        LEFT JOIN price pr ON pr.product_id = p.id 
+    // Batch-fetch all products and current prices (avoids N+1)
+    const productIds = [...new Set(orderData.items.map((item) => item.productId))]
+    const { rows: products } = await query(
+      `
+      SELECT p.*, pr.amount as current_price, pr.currency
+      FROM product p
+      LEFT JOIN LATERAL (
+        SELECT amount, currency FROM price pr
+        WHERE pr.product_id = p.id
           AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
-        WHERE p.id = $1
+        ORDER BY pr.valid_from DESC
+        LIMIT 1
+      ) pr ON true
+      WHERE p.id = ANY($1)
       `,
-        [item.productId]
-      )
+      [productIds]
+    )
 
-      if (products.length === 0) {
+    const productMap = new Map(products.map((p) => [p.id, p]))
+
+    // Validate and group items by supplier
+    const supplierGroups = new Map()
+    for (const item of orderData.items) {
+      const product = productMap.get(item.productId)
+      if (!product) {
         throw new ValidationError(`Product ${item.productId} not found`)
       }
-
-      const product = products[0]
-
       if (!product.current_price) {
         throw new ValidationError(`No valid price found for product ${product.sku}`)
       }
-
-      // Group by supplier
       if (!supplierGroups.has(product.supplier_id)) {
         supplierGroups.set(product.supplier_id, [])
       }

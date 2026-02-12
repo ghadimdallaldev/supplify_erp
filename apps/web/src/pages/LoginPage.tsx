@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Alert, AlertDescription } from '../components/ui/alert'
@@ -17,12 +16,12 @@ import {
   CheckCircle2
 } from 'lucide-react'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
 export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const navigate = useNavigate()
 
-  // Check for error from URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const errorParam = urlParams.get('error')
@@ -33,8 +32,7 @@ export function LoginPage() {
 
   const handleLogin = () => {
     setIsLoading(true)
-    // Redirect to server login endpoint
-    window.location.href = 'http://localhost:4000/auth/login'
+    window.location.href = `${API_URL}/auth/login`
   }
 
   const features = [
@@ -45,9 +43,9 @@ export function LoginPage() {
   ]
 
   const demoAccounts = [
-    { role: 'Admin', email: 'admin@supplify.com', password: 'admin123', color: 'bg-purple-100 text-purple-800' },
-    { role: 'Supplier', email: 'supplier@example.com', password: 'supplier123', color: 'bg-blue-100 text-blue-800' },
-    { role: 'Restaurant', email: 'restaurant@example.com', password: 'restaurant123', color: 'bg-green-100 text-green-800' },
+    { role: 'Admin', email: 'admin@supplify.com', password: 'SupplifyAdmin1!', color: 'bg-purple-100 text-purple-800' },
+    { role: 'Supplier', email: 'supplier@supplify.com', password: 'SupplifySupplier1!', color: 'bg-blue-100 text-blue-800' },
+    { role: 'Restaurant', email: 'restaurant@supplify.com', password: 'SupplifyRestaurant1!', color: 'bg-green-100 text-green-800' },
   ]
 
   return (

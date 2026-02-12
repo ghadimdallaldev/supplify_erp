@@ -5,15 +5,15 @@ INSERT INTO app_user (keycloak_sub, email, display_name, role) VALUES
 ('admin-sub', 'admin@supplify.com', 'Admin User', 'ADMIN')
 ON CONFLICT (keycloak_sub) DO NOTHING;
 
--- Insert sample supplier
+-- Insert sample supplier (contact_email must match Keycloak user for /auth/me)
 INSERT INTO supplier (id, name, slug, vat_no, contact_email, phone, address_json) VALUES 
-('550e8400-e29b-41d4-a716-446655440001', 'Fresh Foods Co.', 'fresh-foods-co', 'VAT123456789', 'contact@freshfoods.com', '+971501234567', 
+('550e8400-e29b-41d4-a716-446655440001', 'Fresh Foods Co.', 'fresh-foods-co', 'VAT123456789', 'supplier@supplify.com', '+971501234567', 
  '{"street": "123 Business District", "city": "Dubai", "region": "Dubai", "country": "UAE"}')
 ON CONFLICT (slug) DO NOTHING;
 
--- Insert sample restaurant
+-- Insert sample restaurant (contact_email must match Keycloak user for /auth/me)
 INSERT INTO restaurant (id, name, slug, trade_license_no, contact_email, phone, address_json) VALUES 
-('550e8400-e29b-41d4-a716-446655440002', 'Golden Fork Restaurant', 'golden-fork-restaurant', 'TL987654321', 'orders@goldenfork.com', '+971507654321',
+('550e8400-e29b-41d4-a716-446655440002', 'Golden Fork Restaurant', 'golden-fork-restaurant', 'TL987654321', 'restaurant@supplify.com', '+971507654321',
  '{"street": "456 Marina Walk", "city": "Dubai", "region": "Dubai", "country": "UAE"}')
 ON CONFLICT (slug) DO NOTHING;
 
@@ -446,3 +446,7 @@ INSERT INTO staff_payroll_export (
   '{"regularHours":128,"overtimeHours":12,"breakMinutes":340}'::jsonb
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- Ensure demo supplier/restaurant contact emails match Keycloak users (for /auth/me)
+UPDATE supplier SET contact_email = 'supplier@supplify.com' WHERE slug = 'fresh-foods-co';
+UPDATE restaurant SET contact_email = 'restaurant@supplify.com' WHERE slug = 'golden-fork-restaurant';

@@ -22,9 +22,6 @@ vi.mock('../lib/logger.js', () => ({
   },
 }));
 
-// Import routes after mocks
-import { authRoutes } from './auth.routes.js';
-
 vi.mock('../lib/auth.js', () => ({
   getAuthorizationUrl: vi.fn().mockResolvedValue('https://keycloak.example.com/auth'),
   exchangeCodeForTokens: vi.fn().mockResolvedValue({
@@ -69,6 +66,9 @@ vi.mock('../lib/rbac.js', () => ({
   clearAuthCookies: vi.fn(),
   getUserBySub: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com', keycloak_sub: 'sub-123' }),
 }));
+
+// Import routes after mocks
+import { authRoutes } from './auth.routes.js';
 
 describe('Auth Routes', () => {
   let app;
@@ -139,8 +139,9 @@ describe('Auth Routes', () => {
 
   describe('GET /auth/callback', () => {
     it('should handle successful OAuth callback', async () => {
-      // Setup database mocks first
+      // Setup database mocks first - sync with test db mock
       const dbModule = await import('../lib/db.js');
+      vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args));
       
       const session = { oauthState: 'test-state' };
       const appWithSession = express();
@@ -162,8 +163,9 @@ describe('Auth Routes', () => {
       appWithSession.use(errorHandler);
 
       const { exchangeCodeForTokens, getUserInfo } = await import('../lib/auth.js');
-      const { upsertUser } = await import('../lib/rbac.js');
-
+      const rbacModule = await import('../lib/rbac.js');
+      const upsertUser = rbacModule.upsertUser;
+      
       // Mock the functions to return proper data
       // The route decodes the access token to get roles, so we need a valid JWT-like structure
       // JWT format: header.payload.signature (base64url encoded)
@@ -188,8 +190,9 @@ describe('Auth Routes', () => {
         family_name: 'User',
       });
       
-      // Ensure upsertUser mock returns the user (the mock should prevent real function from running)
-      // But also mock database query in case the real function is called
+      // Ensure upsertUser mock returns the user - the mock is already set up at module level
+      // The route imports upsertUser at the top level, so it should use the mocked version
+      // But we need to ensure it returns the right value for this specific call
       vi.mocked(upsertUser).mockResolvedValueOnce({
         id: 'user-1',
         email: 'test@example.com',
@@ -200,8 +203,9 @@ describe('Auth Routes', () => {
         updated_at: new Date(),
       });
       
-      // Also mock database query in case the real upsertUser is called
-      vi.mocked(dbModule.query).mockResolvedValueOnce({
+      // Also mock database query as fallback in case the real upsertUser is called
+      // The real upsertUser calls query() to insert/update user
+      db.query.mockResolvedValueOnce({
         rows: [{
           id: 'user-1',
           email: 'test@example.com',

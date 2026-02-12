@@ -96,7 +96,7 @@ describe('Invoices Routes', () => {
 
   describe('GET /api/invoices/:id', () => {
     it('should return invoice details', async () => {
-      // Mock: invoice query, then line items query
+      // Mock: invoice query, tenant check (supplier lookup), then line items query
       db.query
         .mockResolvedValueOnce({
           rows: [{
@@ -109,6 +109,9 @@ describe('Invoices Routes', () => {
             restaurant_name: 'Test Restaurant',
             supplier_name: 'Test Supplier',
           }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'supplier-1' }], // Tenant scoping: supplier lookup by email must match invoice.supplier_id
         })
         .mockResolvedValueOnce({
           rows: [

@@ -119,11 +119,15 @@ The application uses Keycloak for authentication with server-side OIDC flow:
 5. Server exchanges code for tokens and sets HTTP-only cookies
 6. User is redirected to the application
 
-### Demo Accounts
+### Demo Accounts (Keycloak login only)
 
-- **Admin**: admin@supplify.com / admin123
-- **Supplier**: supplier@example.com / supplier123  
-- **Restaurant**: restaurant@example.com / restaurant123
+| Role        | Email                   | Password            |
+|------------|-------------------------|---------------------|
+| **Admin**  | admin@supplify.com      | SupplifyAdmin1!     |
+| **Supplier**  | supplier@supplify.com | SupplifySupplier1!  |
+| **Restaurant** | restaurant@supplify.com | SupplifyRestaurant1! |
+
+Sign in via **Sign in with Keycloak** on the login page. Keycloak must be running (`docker-compose up -d`). To pick up the new users, recreate Keycloak so it re-imports the realm: `docker-compose up -d --force-recreate keycloak`.
 
 ## 🗄️ Database
 

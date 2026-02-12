@@ -9,18 +9,13 @@ const __dirname = dirname(__filename);
 
 async function runAllMigrations() {
   try {
-    // Create schema_migrations table if it doesn't exist
+    // Create schema_migrations table if it doesn't exist (matches 0001_init.sql: version + applied_at)
     console.log('Ensuring schema_migrations table exists...');
     await query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
-        id SERIAL PRIMARY KEY,
-        migration TEXT NOT NULL UNIQUE,
+        version TEXT PRIMARY KEY,
         applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
-    `);
-    
-    await query(`
-      CREATE INDEX IF NOT EXISTS idx_schema_migrations_migration ON schema_migrations(migration)
     `);
     console.log('✓ schema_migrations table ready');
 
@@ -33,7 +28,7 @@ async function runAllMigrations() {
     for (const file of files) {
       // Check if migration was already applied
       const { rows } = await query(
-        "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE migration = $1)",
+        "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1)",
         [file]
       );
 
@@ -57,7 +52,7 @@ async function runAllMigrations() {
 
       // Record migration
       await query(
-        "INSERT INTO schema_migrations (migration) VALUES ($1)",
+        "INSERT INTO schema_migrations (version) VALUES ($1)",
         [file]
       );
 

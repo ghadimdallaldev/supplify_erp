@@ -272,8 +272,9 @@ describe('Products Routes', () => {
     it('should return 404 for non-existent product', async () => {
       // Mock: product query returns empty (product not found)
       // The route validates the body first, then checks if product exists
+      // If empty, throws NotFoundError which error handler should catch and return 404
       db.query.mockResolvedValueOnce({
-        rows: [], // Product not found - triggers NotFoundError
+        rows: [], // Product not found - route throws NotFoundError
       });
 
       const response = await request(app)
