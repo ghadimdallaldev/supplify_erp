@@ -7,30 +7,39 @@ import { getTenantSubscription, isFeatureEnabled, checkLimit } from '../lib/subs
 const router = express.Router();
 
 /**
- * Get current user's subscription (restaurant)
+ * Resolve tenant id and type for current user (restaurant or supplier)
  */
-router.get('/current', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    // Get restaurant ID
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+async function getTenantForUser(req) {
+  if (req.userData.role === 'RESTAURANT') {
+    const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [req.userData.email]);
+    if (rows.length > 0) return { tenantId: rows[0].id, tenantType: 'RESTAURANT' };
+  }
+  if (req.userData.role === 'SUPPLIER') {
+    const { rows } = await query('SELECT id FROM supplier WHERE contact_email = $1', [req.userData.email]);
+    if (rows.length > 0) return { tenantId: rows[0].id, tenantType: 'SUPPLIER' };
+  }
+  return null;
+}
 
-    if (restaurants.length === 0) {
+/**
+ * Get current user's subscription (restaurant or supplier)
+ */
+router.get('/current', requireAuth, requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res) => {
+  try {
+    const tenant = await getTenantForUser(req);
+    if (!tenant) {
       return res.status(404).json({
         ok: false,
         data: null,
         error: {
           name: 'NOT_FOUND',
-          message: 'Restaurant not found',
+          message: req.userData.role === 'RESTAURANT' ? 'Restaurant not found' : 'Supplier not found',
         },
         requestId: req.requestId,
       });
     }
 
-    const tenantId = restaurants[0].id;
-    const subscription = await getTenantSubscription(tenantId, 'RESTAURANT');
+    const subscription = await getTenantSubscription(tenant.tenantId, tenant.tenantType);
 
     if (!subscription) {
       return res.status(404).json({
@@ -73,32 +82,22 @@ router.get('/current', requireAuth, requireRole(['RESTAURANT']), async (req, res
 });
 
 /**
- * Get usage for a specific meter
+ * Get usage for a specific meter (restaurant or supplier)
  */
-router.get('/usage/:meterType', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+router.get('/usage/:meterType', requireAuth, requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res) => {
   try {
-    // Get restaurant ID
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
-
-    if (restaurants.length === 0) {
+    const tenant = await getTenantForUser(req);
+    if (!tenant) {
       return res.status(404).json({
         ok: false,
         data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Restaurant not found',
-        },
+        error: { name: 'NOT_FOUND', message: 'Tenant not found' },
         requestId: req.requestId,
       });
     }
 
-    const tenantId = restaurants[0].id;
     const { meterType } = req.params;
-
-    const limitInfo = await checkLimit(tenantId, 'RESTAURANT', meterType);
+    const limitInfo = await checkLimit(tenant.tenantId, tenant.tenantType, meterType);
 
     res.json({
       ok: true,
@@ -124,32 +123,22 @@ router.get('/usage/:meterType', requireAuth, requireRole(['RESTAURANT']), async 
 });
 
 /**
- * Check if feature is enabled
+ * Check if feature is enabled (restaurant or supplier)
  */
-router.get('/features/:featureKey', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
+router.get('/features/:featureKey', requireAuth, requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res) => {
   try {
-    // Get restaurant ID
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
-
-    if (restaurants.length === 0) {
+    const tenant = await getTenantForUser(req);
+    if (!tenant) {
       return res.status(404).json({
         ok: false,
         data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Restaurant not found',
-        },
+        error: { name: 'NOT_FOUND', message: 'Tenant not found' },
         requestId: req.requestId,
       });
     }
 
-    const tenantId = restaurants[0].id;
     const { featureKey } = req.params;
-
-    const isEnabled = await isFeatureEnabled(tenantId, 'RESTAURANT', featureKey);
+    const isEnabled = await isFeatureEnabled(tenant.tenantId, tenant.tenantType, featureKey);
 
     res.json({
       ok: true,

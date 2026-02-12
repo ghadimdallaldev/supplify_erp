@@ -2,6 +2,28 @@ import { query } from './db.js';
 import { logger } from './logger.js';
 
 /**
+ * Ensure tenant has an active subscription; if none, create one with the free plan.
+ * Used so suppliers and restaurants never hit "no subscription" (0/0 limits).
+ */
+async function ensureTenantSubscription(tenantId, tenantType) {
+  const { rows: plans } = await query(
+    `SELECT id, name, code FROM subscription_plan WHERE code = 'free' AND is_active = true LIMIT 1`
+  );
+  if (plans.length === 0) return;
+  const plan = plans[0];
+  await query(
+    `INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
+     SELECT $1, $2, $3, $4, 'ACTIVE', 'MONTHLY', now(), now() + INTERVAL '1 month'
+     WHERE NOT EXISTS (
+       SELECT 1 FROM subscription
+       WHERE tenant_id = $1 AND tenant_type = $2 AND status IN ('TRIALING', 'ACTIVE')
+     )`,
+    [tenantId, tenantType, plan.id, plan.name]
+  );
+  logger.debug('Ensured subscription for tenant', { tenantId, tenantType, plan: plan.code });
+}
+
+/**
  * Get tenant's active subscription
  * @param {string} tenantId - Tenant ID (supplier or restaurant)
  * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
@@ -9,7 +31,7 @@ import { logger } from './logger.js';
  */
 export async function getTenantSubscription(tenantId, tenantType) {
   try {
-    const { rows } = await query(`
+    let { rows } = await query(`
       SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code
       FROM subscription s
       JOIN subscription_plan sp ON sp.id = s.plan_id
@@ -20,9 +42,24 @@ export async function getTenantSubscription(tenantId, tenantType) {
       LIMIT 1
     `, [tenantId, tenantType]);
 
+    if (rows.length === 0) {
+      await ensureTenantSubscription(tenantId, tenantType);
+      const result = await query(`
+        SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code
+        FROM subscription s
+        JOIN subscription_plan sp ON sp.id = s.plan_id
+        WHERE s.tenant_id = $1 
+          AND s.tenant_type = $2
+          AND s.status IN ('TRIALING', 'ACTIVE')
+        ORDER BY s.created_at DESC
+        LIMIT 1
+      `, [tenantId, tenantType]);
+      rows = result.rows;
+    }
+
     return rows[0] || null;
   } catch (error) {
-    logger.error('Get tenant subscription error:', error);
+    logger.error('Get tenant subscription error', { error: error.message });
     return null;
   }
 }

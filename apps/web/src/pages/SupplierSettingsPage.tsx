@@ -15,6 +15,7 @@ import {
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
 import { LogoUpload } from '../components/LogoUpload'
+import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { useAppSelector } from '../hooks/redux'
 import { 
   useGetSupplierMeQuery, 
@@ -410,6 +411,7 @@ export function SupplierSettingsPage() {
           <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
           <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="plan">Plan & usage</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
@@ -810,6 +812,9 @@ export function SupplierSettingsPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="plan" className="space-y-4">
+          <SubscriptionInfo />
+        </TabsContent>
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
