@@ -7,6 +7,10 @@ export const config = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   WEB_ORIGIN: process.env.WEB_ORIGIN || 'http://localhost:5173',
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/supplify',
+  /** Enable SSL for DB (e.g. DATABASE_SSL=true in production). */
+  DATABASE_SSL: process.env.DATABASE_SSL === 'true',
+  /** Statement timeout in ms (optional; e.g. 30000 for 30s in production). */
+  DATABASE_STATEMENT_TIMEOUT: process.env.DATABASE_STATEMENT_TIMEOUT ? parseInt(process.env.DATABASE_STATEMENT_TIMEOUT, 10) : undefined,
   KEYCLOAK_BASE_URL: process.env.KEYCLOAK_BASE_URL || 'http://localhost:8080',
   KEYCLOAK_REALM: process.env.KEYCLOAK_REALM || 'Supplify',
   KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID || 'supplify-api',

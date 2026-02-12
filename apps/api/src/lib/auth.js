@@ -21,25 +21,21 @@ function getKeycloakValues() {
 // Fetch Keycloak configuration
 export async function getKeycloakConfig() {
   if (keycloakConfig) {
-    logger.info('Using cached Keycloak config')
     return keycloakConfig
   }
 
   const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM } = getKeycloakValues()
   const WELL_KNOWN_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid_configuration`
 
-  logger.info('Attempting to fetch Keycloak config from:', WELL_KNOWN_URL)
+  logger.debug('Fetching Keycloak config', { url: WELL_KNOWN_URL })
 
   try {
     const response = await axios.get(WELL_KNOWN_URL, { timeout: KEYCLOAK_HTTP_TIMEOUT_MS })
     keycloakConfig = response.data
-    logger.info('Keycloak configuration loaded from well-known endpoint')
+    logger.debug('Keycloak configuration loaded')
     return keycloakConfig
   } catch (error) {
-    logger.warn(
-      'Failed to load Keycloak configuration from well-known endpoint, using manual configuration'
-    )
-    logger.warn('Error details:', error.message)
+    logger.warn('Keycloak well-known failed, using manual config', { error: error.message })
 
     // Fallback: construct configuration manually
     keycloakConfig = {
@@ -51,9 +47,7 @@ export async function getKeycloakConfig() {
       issuer: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}`,
     }
 
-    logger.info('Fallback config created:', keycloakConfig)
-
-    logger.info('Keycloak configuration constructed manually')
+    logger.debug('Keycloak fallback config used')
     return keycloakConfig
   }
 }
@@ -64,12 +58,7 @@ export async function exchangeCodeForTokens(code, redirectUri) {
     const config = await getKeycloakConfig()
     const { KEYCLOAK_CLIENT_ID, KEYCLOAK_CLIENT_SECRET } = getKeycloakValues()
 
-    logger.info('Exchanging code for tokens', {
-      code: code.substring(0, 10) + '...',
-      redirectUri,
-      clientId: KEYCLOAK_CLIENT_ID,
-      tokenEndpoint: config.token_endpoint,
-    })
+    logger.debug('Exchanging code for tokens')
 
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -86,17 +75,14 @@ export async function exchangeCodeForTokens(code, redirectUri) {
       timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
     })
 
-    logger.info('Token exchange response status:', response.status)
-
     const tokens = response.data
-    logger.info('Tokens exchanged successfully')
+    logger.debug('Token exchange successful')
     return tokens
   } catch (error) {
     if (error.response) {
-      logger.error('Token exchange failed:', {
+      logger.error('Token exchange failed', {
         status: error.response.status,
         statusText: error.response.statusText,
-        error: error.response.data,
       })
       throw new Error(
         `Token exchange failed: ${error.response.status} ${error.response.statusText}`
@@ -129,7 +115,7 @@ export async function refreshAccessToken(refreshToken) {
     })
 
     const tokens = response.data
-    logger.info('Token refreshed successfully')
+    logger.debug('Token refreshed')
     return tokens
   } catch (error) {
     logger.error('Error refreshing token:', error.message)
@@ -149,11 +135,7 @@ export async function verifyToken(token) {
     const config = await getKeycloakConfig()
     const { KEYCLOAK_CLIENT_ID } = getKeycloakValues()
 
-    logger.info('Verifying token with:', {
-      issuer: config.issuer,
-      audience: KEYCLOAK_CLIENT_ID,
-      tokenPrefix: token.substring(0, 20) + '...',
-    })
+    logger.debug('Verifying token')
 
     // Decode the token manually to extract payload (for issuer/audience handling)
     const parts = token.split('.')
@@ -163,19 +145,12 @@ export async function verifyToken(token) {
     const header = JSON.parse(Buffer.from(headerPart, 'base64url').toString())
     const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString())
 
-    logger.info('Token decoded successfully:', {
-      alg: header.alg,
-      kid: header.kid,
-      iss: payload.iss,
-      azp: payload.azp,
-      aud: payload.aud,
-      sub: payload.sub,
-    })
+    logger.debug('Token decoded')
 
     const expectedIssuer = normalizeIssuer(config.issuer)
     const tokenIssuer = normalizeIssuer(payload.iss)
     if (tokenIssuer && expectedIssuer && tokenIssuer !== expectedIssuer) {
-      logger.warn('Issuer mismatch (normalized):', { expected: expectedIssuer, token: tokenIssuer })
+      logger.warn('Issuer mismatch', { expected: expectedIssuer, token: tokenIssuer })
     }
 
     // Use issuer from token so we match Keycloak's exact format (with or without trailing slash)
@@ -194,7 +169,7 @@ export async function verifyToken(token) {
         issuer: verifyIssuer,
         audience: KEYCLOAK_CLIENT_ID,
       })
-      logger.info('Token verification successful')
+      logger.debug('Token verification successful')
       return payload
     } catch (firstError) {
       const msg = firstError?.message || ''
@@ -204,14 +179,14 @@ export async function verifyToken(token) {
         msg.includes('audience') ||
         msg.includes('aud')
       ) {
-        logger.info('Verifying without strict audience (will check azp/aud manually):', msg.substring(0, 80))
+        logger.debug('Verifying token without strict audience')
         await jwtVerify(token, JWKS, { issuer: verifyIssuer })
         if (!hasValidAud && (tokenAzp || audList.length > 0)) {
           throw new Error(
             `Token audience mismatch. Expected one of: ${acceptableAudiences.join(', ')}, Got azp: ${tokenAzp}, aud: ${JSON.stringify(tokenAud)}`
           )
         }
-        logger.info('Token verification successful (signature + issuer, audience ok)')
+        logger.debug('Token verification successful (audience ok)')
         return payload
       }
       throw firstError
@@ -223,17 +198,14 @@ export async function verifyToken(token) {
 
     // If token is expired, throw a specific error that can be caught for refresh
     if (errorCode === 'ERR_JWT_EXPIRED' || errorName === 'JWTExpired' || errorMessage.includes('expired')) {
-      logger.info('Token expired, will attempt refresh in middleware')
+      logger.debug('Token expired, refresh will be attempted')
       const expiredError = new Error('Token expired')
       expiredError.name = 'JWTExpired'
       expiredError.code = 'ERR_JWT_EXPIRED'
       throw expiredError
     }
 
-    logger.error('Token verification failed:', errorMessage)
-    logger.error('Error name:', errorName)
-    logger.error('Error code:', errorCode)
-    if (error?.stack) logger.error('Stack:', error.stack)
+    logger.error('Token verification failed', { message: errorMessage, name: errorName, code: errorCode })
     throw new Error('Invalid token')
   }
 }
@@ -279,7 +251,7 @@ export async function revokeToken(token) {
 
     return response.status === 200
   } catch (error) {
-    logger.error('Error revoking token:', error)
+    logger.error('Error revoking token', { error: error.message })
     return false
   }
 }

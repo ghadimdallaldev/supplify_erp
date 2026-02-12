@@ -64,7 +64,8 @@
 2. **Database**
    - Run migrations: `pnpm db:migrate`
    - Set up database backups
-   - Configure connection pooling for production
+   - Set `DATABASE_SSL=true` for TLS connections; optionally `DATABASE_STATEMENT_TIMEOUT=30000` (ms)
+   - Connection pool: max 20, 10s connect timeout (configurable via pool)
 
 3. **Security**
    - Update `SESSION_SECRET` to a strong random value
@@ -73,19 +74,24 @@
    - Review and update CORS settings
    - Enable Redis for session storage in production
 
-4. **Monitoring**
-   - Set up application monitoring (e.g., CloudWatch, Datadog)
-   - Configure log aggregation
-   - Set up error tracking (e.g., Sentry)
-   - Configure health check endpoints
+4. **Logging**
+   - `LOG_LEVEL`: `debug` | `info` | `warn` | `error` (default: `info` in production, `debug` in development)
+   - Production: JSON logs only; sensitive keys (tokens, passwords, body, etc.) are redacted
+   - Use `X-Request-ID` response header for tracing; include in log aggregation
 
-5. **Performance**
+5. **Monitoring**
+   - Set up application monitoring (e.g., CloudWatch, Datadog)
+   - Configure log aggregation (stdout JSON)
+   - Set up error tracking (e.g., Sentry)
+   - Configure health check endpoints (`/health`)
+
+6. **Performance**
    - Enable Redis caching
    - Configure CDN for static assets
    - Set up database indexes
    - Configure connection pooling
 
-6. **Testing**
+7. **Testing**
    - Run full test suite: `pnpm test:ci`
    - Perform load testing
    - Test all critical user flows

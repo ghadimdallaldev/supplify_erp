@@ -26,23 +26,20 @@ router.get('/login', async (req, res) => {
     req.session.oauthState = state
     req.session.save((err) => {
       if (err) {
-        logger.error('Error saving session:', err)
+        logger.error('Error saving session', { error: err.message })
       }
     })
 
-    logger.info('=== LOGIN INITIATED ===')
-    logger.info({ newState: state.substring(0, 20) + '...', sessionId: req.sessionID })
-    logger.info('Storing state in session')
-    logger.info('=== END LOGIN INITIATION ===')
+    logger.info('Login initiated')
 
     const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`
 
     const authUrl = await getAuthorizationUrl(redirectUri, state)
 
-    logger.info('Redirecting to Keycloak for authentication')
+    logger.debug('Redirecting to Keycloak for authentication')
     res.redirect(authUrl)
   } catch (error) {
-    logger.error('Login error:', error)
+    logger.error('Login error', { error: error.message })
     res.status(500).json({
       ok: false,
       data: null,
@@ -60,17 +57,10 @@ router.get('/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query
 
-    logger.info('=== KEYCLOAK CALLBACK RECEIVED ===')
-    logger.info({
-      hasCode: !!code,
-      hasState: !!state,
-      hasError: !!error,
-      stateFromQuery: state?.substring(0, 20) + '...',
-    })
-    logger.info('=== END CALLBACK RECEIVED ===')
+    logger.debug('Keycloak callback received', { hasCode: !!code, hasState: !!state, hasError: !!error })
 
     if (error) {
-      logger.error('Keycloak authentication error:', error)
+      logger.warn('Keycloak authentication error', { error })
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=${encodeURIComponent(error)}`)
     }
 
@@ -82,25 +72,8 @@ router.get('/callback', async (req, res) => {
     // Verify state parameter (CSRF protection) - temporarily disabled
     const expectedState = req.session.oauthState
 
-    logger.info('=== STATE VERIFICATION DEBUG ===')
-    logger.info({
-      receivedState: state?.substring(0, 20) + '...',
-      expectedState: expectedState?.substring(0, 20) + '...',
-      sessionId: req.sessionID,
-      sessionOauthState: req.session.oauthState?.substring(0, 20) + '...',
-    })
-    logger.info({
-      statesMatch: state === expectedState,
-      sessionKeys: Object.keys(req.session || {}),
-    })
-    logger.info('=== END STATE VERIFICATION ===')
-
     if (expectedState && state !== expectedState) {
-      logger.error('Invalid state parameter', {
-        received: state,
-        expectedSession: req.session.oauthState,
-        sessionId: req.sessionID,
-      })
+      logger.warn('Invalid state parameter (CSRF)')
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=invalid_state`)
     }
 
@@ -109,12 +82,8 @@ router.get('/callback', async (req, res) => {
 
     const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`
 
-    logger.info('Exchanging code for tokens...')
-
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code, redirectUri)
-
-    logger.info('Tokens received, getting user info...')
 
     // Get user info from Keycloak
     const userInfo = await getUserInfo(tokens.access_token)
@@ -128,38 +97,19 @@ router.get('/callback', async (req, res) => {
     const clientRoles = tokenPayload.resource_access?.[clientId]?.roles || []
     const roles = [...new Set([...realmRoles, ...clientRoles])]
 
-    logger.info('User info received:', {
-      sub: userInfo.sub,
-      email: userInfo.email,
-      realm_access_roles: tokenPayload.realm_access?.roles,
-      resource_access_roles: tokenPayload.resource_access?.[clientId]?.roles,
-      mergedRoles: roles,
-    })
-
-    logger.info('Extracted roles array:', { roles, rolesLength: roles.length })
-
-    logger.info('Upserting user in database...')
-
     // Upsert user in database
     const user = await upsertUser(userInfo, roles)
-
-    logger.info('User upserted successfully:', { userId: user.id })
 
     // Set auth cookies
     setAuthCookies(res, tokens.access_token, tokens.refresh_token)
 
-    logger.info('User authenticated successfully', {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    })
+    logger.info('User authenticated', { userId: user.id, role: user.role })
 
     // Redirect to application
     const redirectUrl = `${process.env.WEB_ORIGIN || 'http://localhost:5173'}/app`
-    logger.info({ action: 'Redirecting to frontend', url: redirectUrl })
     res.redirect(redirectUrl)
   } catch (error) {
-    logger.error('Callback error:', error)
+    logger.error('Callback error', { error: error.message })
     res.redirect(`${process.env.WEB_ORIGIN}/login?error=callback_failed`)
   }
 })
@@ -203,7 +153,7 @@ router.get('/me', requireAuth, async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
-    logger.error('Get user info error:', error)
+    logger.error('Get user info error', { error: error.message })
     res.status(500).json({
       ok: false,
       data: null,
@@ -259,7 +209,7 @@ router.post('/refresh', async (req, res) => {
       requestId: req.requestId,
     });
   } catch (error) {
-    logger.error('Refresh error:', error);
+    logger.error('Refresh error', { error: error.message });
     clearAuthCookies(res);
     res.status(401).json({
       ok: false,
@@ -290,7 +240,7 @@ router.post('/logout', requireAuth, async (req, res) => {
     // Clear cookies
     clearAuthCookies(res)
 
-    logger.info('User logged out successfully', { userId: req.userData.id })
+    logger.info('User logged out', { userId: req.userData.id })
 
     res.json({
       ok: true,
@@ -299,7 +249,7 @@ router.post('/logout', requireAuth, async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
-    logger.error('Logout error:', error)
+    logger.error('Logout error', { error: error.message })
 
     // Clear cookies even if revocation fails
     clearAuthCookies(res)

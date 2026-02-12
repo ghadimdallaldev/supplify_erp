@@ -42,6 +42,16 @@ pnpm run seed:quick-lists
 
 Creates 3–6 quick lists per restaurant with 5–20 items each (from supplier products). Optional: `SEED=1337` for determinism.
 
+### Chats (restaurant–supplier)
+
+After prodlike seed (and optionally seed:accounts), create conversations and messages between every restaurant and each supplier they have ordered from:
+
+```bash
+pnpm run seed:chats
+```
+
+Creates one conversation per (restaurant, supplier) pair that has at least one order, with 2–6 sample messages per conversation so you can test the chat UI. Optional: `SEED=1337` for determinism.
+
 **Optional:**
 
 - `SEED=1337` (default) – use another number for a different deterministic dataset.
@@ -68,6 +78,7 @@ After running the seed:
 - **Orders** – 60–180 orders per restaurant over the last 90 days, 6–25 lines per order, 2–7 suppliers per order; each restaurant’s history includes items from all 50 suppliers.
 - **Staff & shifts** – Restaurant staff (6–14 per restaurant), roles (manager, cashier, chef, receiver, accountant, waiter), and shifts for the last 14 days (morning/evening).
 - **Subscriptions** – Mixed tiers (Free, Bronze, Gold, Platinum), billing cycles (monthly/yearly), and states (Active, Trialing, Past due, Cancelled).
+- **Chat** – After `seed:chats`: one conversation per restaurant–supplier pair that has orders, with 2–6 sample messages each. Log in as any restaurant or supplier to see and test chats.
 
 ## Volumes (minimum)
 
@@ -83,6 +94,7 @@ After running the seed:
 | Invoices per restaurant | 20–60 (last 120 days) |
 | Reservations per restaurant | 40–150 (last 30d + next 14d) |
 | Staff shifts | 2+ per day per restaurant (last 14 days) |
+| Chats (after `seed:chats`) | 1 conversation per (restaurant, supplier) with orders; 2–6 messages per conversation |
 
 ## Implementation details
 

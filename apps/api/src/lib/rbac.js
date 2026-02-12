@@ -51,7 +51,7 @@ export async function getUserBySub(sub) {
     );
     return result.rows[0] || null;
   } catch (error) {
-    logger.error('Error getting user by sub:', error);
+    logger.error('Error getting user by sub', { error: error.message });
     throw error;
   }
 }
@@ -62,7 +62,7 @@ export async function upsertUser(userInfo, roles = []) {
     const { sub, email, given_name, family_name } = userInfo;
     const displayName = `${given_name || ''} ${family_name || ''}`.trim() || email;
     
-    logger.info('Upserting user:', { sub, email, displayName, roles, rolesType: typeof roles, rolesIsArray: Array.isArray(roles) });
+    logger.debug('Upserting user', { sub });
     
     // Normalize to lowercase for comparison (Keycloak may return different casing)
     const rolesLower = (roles || []).map((r) => String(r).toLowerCase());
@@ -72,26 +72,14 @@ export async function upsertUser(userInfo, roles = []) {
     let role = 'RESTAURANT'; // default
     if (hasRole('admin')) {
       role = 'ADMIN';
-      logger.info('Role determined as ADMIN');
     } else if (hasRole('supplier')) {
       role = 'SUPPLIER';
-      logger.info('Role determined as SUPPLIER');
     } else {
-      // Fallback: assign role by demo account email if token has no realm roles
-      // (e.g. Keycloak realm not re-imported or roles scope not in token)
       const emailLower = (email || '').toLowerCase();
-      if (emailLower === 'admin@supplify.com') {
-        role = 'ADMIN';
-        logger.info('Role determined as ADMIN (by demo email fallback)');
-      } else if (emailLower === 'supplier@supplify.com') {
-        role = 'SUPPLIER';
-        logger.info('Role determined as SUPPLIER (by demo email fallback)');
-      } else {
-        logger.info('Role determined as RESTAURANT (default)');
-      }
+      if (emailLower === 'admin@supplify.com') role = 'ADMIN';
+      else if (emailLower === 'supplier@supplify.com') role = 'SUPPLIER';
+      else role = 'RESTAURANT';
     }
-
-    logger.info('Final user data:', { sub, email, displayName, role });
 
     const result = await query(`
       INSERT INTO app_user (keycloak_sub, email, display_name, role)
@@ -105,12 +93,10 @@ export async function upsertUser(userInfo, roles = []) {
       RETURNING *
     `, [sub, email, displayName, role]);
 
-    logger.info('User upserted successfully:', result.rows[0]);
+    logger.debug('User upserted', { userId: result.rows[0]?.id, role });
     return result.rows[0];
   } catch (error) {
-    logger.error('Error upserting user:', error);
-    logger.error('User info:', userInfo);
-    logger.error('Roles:', roles);
+    logger.error('Error upserting user', { error: error.message });
     throw error;
   }
 }
@@ -155,13 +141,13 @@ export async function requireAuth(req, res, next) {
       req.userData = user;
       next();
     } catch (error) {
-      logger.error('Token verification failed, attempting refresh:', error.message);
+      logger.debug('Token verification failed, attempting refresh');
       
       // Token is invalid or expired, try to refresh
       const refreshToken = extractRefreshTokenFromCookie(req);
       
       if (!refreshToken) {
-        logger.error('No refresh token available');
+        logger.debug('No refresh token available');
         clearAuthCookies(res);
         return res.status(401).json({
           ok: false,
@@ -175,11 +161,11 @@ export async function requireAuth(req, res, next) {
       }
 
       // Attempt to refresh the token
-      logger.info('Attempting to refresh token...');
+      logger.debug('Attempting to refresh token');
       const newTokens = await refreshAccessToken(refreshToken);
       
       if (!newTokens) {
-        logger.error('Token refresh returned null');
+        logger.warn('Token refresh returned null');
         clearAuthCookies(res);
         return res.status(401).json({
           ok: false,
@@ -192,7 +178,7 @@ export async function requireAuth(req, res, next) {
         });
       }
       
-      logger.info('Token refresh successful, verifying new token...');
+      logger.debug('Token refresh successful');
 
       // Set new cookies
       setAuthCookies(res, newTokens.access_token, newTokens.refresh_token);
@@ -220,7 +206,7 @@ export async function requireAuth(req, res, next) {
       next();
     }
   } catch (error) {
-    logger.error('Authentication error:', error);
+    logger.error('Authentication error', { error: error.message });
     clearAuthCookies(res);
     return res.status(500).json({
       ok: false,

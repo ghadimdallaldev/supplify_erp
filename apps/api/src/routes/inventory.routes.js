@@ -42,7 +42,7 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res
     
     inventoryQuery += ` ORDER BY p.name`;
     
-    logger.info('Executing inventory query', { queryParams });
+    logger.debug('Executing inventory query');
     const { rows } = await query(inventoryQuery, queryParams);
     
     // Format the data for frontend

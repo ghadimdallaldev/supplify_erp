@@ -9,7 +9,7 @@ import { logger } from '../lib/logger.js';
 // Email service implementation
 const emailService = {
   async send(email, subject, html, text) {
-    logger.info('📧 Email sent', { to: email, subject });
+    logger.info('Email sent', { to: process.env.NODE_ENV === 'development' ? email : '[REDACTED]', subject });
     
     // Check if SendGrid is configured
     if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL) {
@@ -29,17 +29,14 @@ const emailService = {
           };
           
           await sgMail.default.send(msg);
-          logger.info('Email sent via SendGrid', { to: email });
+          logger.info('Email sent via SendGrid');
           return true;
         }
       } catch (error) {
-        logger.error('SendGrid error:', error);
+        logger.error('SendGrid error', { error: error.message });
       }
     }
-    
-    // Fallback: Log to console
-    console.log(`EMAIL: To: ${email}, Subject: ${subject}`);
-    if (text) console.log(`Body: ${text}`);
+    logger.debug('Email fallback (no SendGrid)', { subject });
     return true;
   }
 };
@@ -47,7 +44,7 @@ const emailService = {
 // SMS service implementation
 const smsService = {
   async send(phone, message) {
-    logger.info('📱 SMS sent', { to: phone, message });
+    logger.info('SMS sent', { to: process.env.NODE_ENV === 'development' ? phone : '[REDACTED]' });
     
     // Check if Twilio is configured
     if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
@@ -67,23 +64,21 @@ const smsService = {
             from: process.env.TWILIO_PHONE_NUMBER,
           });
           
-          logger.info('SMS sent via Twilio', { to: phone });
+          logger.info('SMS sent via Twilio');
           return true;
         }
       } catch (error) {
-        logger.error('Twilio error:', error);
+        logger.error('Twilio error', { error: error.message });
       }
     }
-    
-    // Fallback: Log to console
-    console.log(`SMS: To: ${phone}, Message: ${message}`);
+    logger.debug('SMS fallback (no Twilio)');
     return true;
   }
 };
 
 const whatsappService = {
   async send(phone, message) {
-    logger.info('💬 WhatsApp message', { to: phone, message });
+    logger.info('WhatsApp message', { to: process.env.NODE_ENV === 'development' ? phone : '[REDACTED]' });
 
     if (
       process.env.TWILIO_ACCOUNT_SID &&
@@ -109,15 +104,14 @@ const whatsappService = {
             from,
           });
 
-          logger.info('WhatsApp message sent via Twilio', { to });
+          logger.info('WhatsApp message sent via Twilio');
           return true;
         }
       } catch (error) {
-        logger.error('Twilio WhatsApp error:', error);
+        logger.error('Twilio WhatsApp error', { error: error.message });
       }
     }
-
-    console.log(`WHATSAPP: To: ${phone}, Message: ${message}`);
+    logger.debug('WhatsApp fallback (no Twilio)');
     return true;
   }
 };

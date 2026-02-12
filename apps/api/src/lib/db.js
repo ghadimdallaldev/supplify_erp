@@ -2,21 +2,27 @@ import { Pool } from 'pg';
 import { config } from '../config/env.js';
 import { logger } from './logger.js';
 
-// Create connection pool
-export const pool = new Pool({
+// Create connection pool (production: set DATABASE_SSL=true, optional DATABASE_STATEMENT_TIMEOUT)
+const poolConfig = {
   connectionString: config.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+  connectionTimeoutMillis: 10000,
+};
+if (config.DATABASE_SSL) {
+  poolConfig.ssl = { rejectUnauthorized: true };
+}
+if (config.DATABASE_STATEMENT_TIMEOUT) {
+  poolConfig.statement_timeout = config.DATABASE_STATEMENT_TIMEOUT;
+}
+export const pool = new Pool(poolConfig);
 
-// Test connection
 pool.on('connect', () => {
-  logger.info('Database connected');
+  logger.debug('Database client connected');
 });
 
 pool.on('error', (err) => {
-  logger.error('Database connection error:', err);
+  logger.error('Database pool error', { error: err.message, code: err.code });
 });
 
 // Transaction helper
@@ -35,38 +41,28 @@ export async function withTransaction(fn) {
   }
 }
 
-// Query helper with logging
+// Query helper with logging (params never logged to avoid PII/tokens)
 export async function query(text, params = []) {
   const start = Date.now();
   try {
     const result = await pool.query(text, params);
     const duration = Date.now() - start;
-    logger.debug('Query executed', { 
-      text: text.substring(0, 100) + '...', 
-      duration: `${duration}ms`,
-      rowCount: result.rowCount 
-    });
+    if (duration > 5000) {
+      logger.warn('Slow query', { durationMs: duration, rowCount: result.rowCount, queryPreview: text.substring(0, 80) });
+    } else {
+      logger.debug('Query executed', { durationMs: duration, rowCount: result.rowCount });
+    }
     return result;
   } catch (error) {
     const duration = Date.now() - start;
-    
-    // Don't log expected errors (like table not found) as errors
-    // These are handled gracefully in the calling code
     if (error.code === '42P01') {
-      // Table doesn't exist - expected in some cases
-      logger.debug('Query skipped (table not found)', { 
-        text: text.substring(0, 100) + '...',
-        duration: `${duration}ms`,
-        code: error.code
-      });
+      logger.debug('Query skipped (table not found)', { durationMs: duration, code: error.code });
     } else {
-      console.error('❌ Query failed:', error.message);
-      console.error('Query:', text.substring(0, 200));
-      console.error('Error details:', error);
-      logger.error('Query failed', { 
+      logger.error('Query failed', {
         error: error.message,
-        details: error,
-        params: params || []
+        code: error.code,
+        durationMs: duration,
+        queryPreview: text.substring(0, 100),
       });
     }
     throw error;

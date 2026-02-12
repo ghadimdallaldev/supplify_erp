@@ -492,9 +492,7 @@ async function handleOrderDelivery(orderId, userData, res) {
       requestId: res.locals.requestId,
     })
   } catch (error) {
-    console.error('❌ Handle order delivery error:', error.message)
-    console.error('Stack:', error.stack)
-    logger.error('Handle order delivery error:', { message: error.message, stack: error.stack })
+    logger.error('Handle order delivery error', { error: error.message })
     // Return meaningful status codes for known errors
     if (error instanceof ValidationError) {
       return res.status(400).json({
@@ -1299,12 +1297,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
     try {
       updateData = orderUpdateSchema.parse(req.body)
     } catch (validationError) {
-      console.error('❌ Validation error:', validationError.errors)
-      console.error('Body:', req.body)
       logger.error('Validation error', {
         error: validationError.message,
-        body: req.body,
-        errors: validationError.errors,
+        errors: validationError.errors?.map((e) => ({ path: e.path, message: e.message })),
       })
       throw validationError
     }
@@ -1521,14 +1516,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       })
     }
 
-    console.error('❌ Update order error:', error.message)
-    console.error('Stack:', error.stack)
-    logger.error('Update order error:', {
-      message: error.message,
-      stack: error.stack,
-      details: error.details,
-      code: error.code,
-    })
+    logger.error('Update order error', { error: error.message, code: error.code })
     res.status(500).json({
       ok: false,
       data: null,
