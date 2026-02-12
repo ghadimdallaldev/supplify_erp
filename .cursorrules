@@ -5,6 +5,16 @@
   1) add/update unit tests covering the new/changed behavior
   2) update relevant documentation (README, docs/, or JSDoc/TSDoc)
   3) keep changes minimal and scoped
+  4) update the README.md file to reflect the changes
+  5) update the TEST_COVERAGE.md file to reflect the changes
+  6) update the PRODUCTION_READINESS.md file to reflect the changes
+  7) update the NOTIFICATIONS_SUMMARY.md file to reflect the changes
+  8) update the SECURITY.md file to reflect the changes
+  9) update the LICENSE file to reflect the changes
+  10) update the CODE_OF_CONDUCT.md file to reflect the changes
+  11) update the CONTRIBUTING.md file to reflect the changes
+  12) update the PULL_REQUEST_TEMPLATE.md file to reflect the changes
+  13) write test cases since later on a  qa dev will be doing manual testing
 
 - Do NOT change public APIs unless explicitly asked. If you must, document breaking changes.
 

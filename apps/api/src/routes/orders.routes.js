@@ -1,4 +1,5 @@
 import express from 'express'
+import PDFDocument from 'pdfkit'
 import { requireAuth, requireRole } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -8,6 +9,43 @@ import { z } from 'zod'
 import { notifyOrderStatusChange } from '../services/notification.service.js'
 
 const router = express.Router()
+
+/** Build PDF buffer for a packing slip */
+function buildPackingSlipPdf(packingSlip) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50 })
+    const chunks = []
+    doc.on('data', (chunk) => chunks.push(chunk))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+
+    doc.fontSize(20).text('PACKING SLIP', { continued: false })
+    doc.fontSize(10).text(`Order #${packingSlip.orderNumber}`, { continued: false })
+    doc.moveDown()
+    doc.text(`Date: ${packingSlip.orderDate ? new Date(packingSlip.orderDate).toLocaleDateString() : 'N/A'}`)
+    doc.moveDown()
+    doc.text(`Ship To: ${packingSlip.restaurantName || ''}`)
+    if (packingSlip.restaurantAddress && typeof packingSlip.restaurantAddress === 'object') {
+      const addr = packingSlip.restaurantAddress
+      doc.text([addr.street, addr.city, addr.region, addr.country].filter(Boolean).join(', '))
+    } else if (typeof packingSlip.restaurantAddress === 'string') {
+      doc.text(packingSlip.restaurantAddress)
+    }
+    doc.moveDown(1.5)
+
+    doc.fontSize(12).text('Items', { underline: true })
+    doc.moveDown(0.5)
+    doc.fontSize(10)
+    packingSlip.items.forEach((line, i) => {
+      doc.text(
+        `${i + 1}. ${line.sku || '-'} | ${line.name || 'Item'} | Qty: ${line.quantity} ${line.unit || ''}`.trim()
+      )
+    })
+    doc.moveDown(1)
+    doc.text(`Total: ${packingSlip.currency || 'USD'} ${Number(packingSlip.totalAmount || 0).toFixed(2)}`)
+    doc.end()
+  })
+}
 
 // Validation schemas
 const orderCreateSchema = z.object({
@@ -1678,7 +1716,82 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
   }
 })
 
-// Get packing slip (PDF)
+// Get packing slip as PDF (must be before /:id/packing-slip so path matches)
+router.get(
+  '/:id/packing-slip/pdf',
+  requireAuth,
+  requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const { rows: orders } = await query(
+        `
+      SELECT o.*, r.name as restaurant_name, r.contact_email, r.phone,
+        r.address_json as restaurant_address
+      FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
+      WHERE o.id = $1
+    `,
+        [id]
+      )
+      if (orders.length === 0) {
+        return res.status(404).json({ ok: false, error: { message: 'Order not found' } })
+      }
+      const order = orders[0]
+      let supplierId = null
+      if (req.userData.role === 'SUPPLIER') {
+        const { rows: suppliers } = await query(
+          'SELECT id FROM supplier WHERE contact_email = $1',
+          [req.userData.email]
+        )
+        if (suppliers.length > 0) supplierId = suppliers[0].id
+      }
+      const itemsQuery = supplierId
+        ? `
+        SELECT oi.*, p.name as product_name, p.sku as product_sku, p.unit,
+          s.name as supplier_name
+        FROM order_item oi
+        JOIN product p ON p.id = oi.product_id
+        JOIN supplier s ON s.id = oi.supplier_id
+        WHERE oi.order_id = $1 AND oi.supplier_id = $2
+        ORDER BY p.name
+      `
+        : `
+        SELECT oi.*, p.name as product_name, p.sku as product_sku, p.unit,
+          s.name as supplier_name
+        FROM order_item oi
+        JOIN product p ON p.id = oi.product_id
+        JOIN supplier s ON s.id = oi.supplier_id
+        WHERE oi.order_id = $1
+        ORDER BY s.name, p.name
+      `
+      const { rows: items } = await query(itemsQuery, supplierId ? [id, supplierId] : [id])
+      const packingSlip = {
+        orderNumber: order.id.substring(0, 8).toUpperCase(),
+        restaurantName: order.restaurant_name,
+        restaurantAddress: order.restaurant_address,
+        orderDate: order.placed_at || order.created_at,
+        items: items.map((item) => ({
+          sku: item.product_sku,
+          name: item.product_name,
+          quantity: item.quantity,
+          unit: item.unit,
+        })),
+        totalAmount: order.total_amount,
+        currency: order.currency,
+      }
+      const buf = await buildPackingSlipPdf(packingSlip)
+      res.setHeader('Content-Type', 'application/pdf')
+      res.setHeader('Content-Disposition', `attachment; filename="packing-slip-${order.id.substring(0, 8)}.pdf"`)
+      res.send(buf)
+    } catch (error) {
+      logger.error('Get packing slip PDF error:', error)
+      res.status(500).json({ ok: false, error: { message: 'Failed to get packing slip PDF' } })
+    }
+  }
+)
+
+// Get packing slip (JSON)
 router.get(
   '/:id/packing-slip',
   requireAuth,

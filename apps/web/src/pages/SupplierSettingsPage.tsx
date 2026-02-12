@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { 
   Building2, Warehouse, MapPin, FileText, Clock, AlertCircle, UserPlus, Upload, 
   Package, ShoppingCart, TrendingUp, Mail, Phone, Globe, Save, Loader2,
-  Activity, Users, DollarSign, Calendar, CheckCircle2, XCircle
+  Activity, Users, DollarSign, Calendar, CheckCircle2, XCircle, Bell
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
 import { LogoUpload } from '../components/LogoUpload'
+import { useAppSelector } from '../hooks/redux'
 import { 
   useGetSupplierMeQuery, 
   useUpdateSupplierMutation, 
@@ -22,10 +23,33 @@ import {
   useGetPresignedUrlMutation,
   useGetProductsQuery,
   useGetOrdersQuery,
-  useGetDashboardStatsQuery
+  useGetDashboardStatsQuery,
+  useGetNotificationPreferencesQuery,
+  useUpdateNotificationPreferencesMutation,
 } from '../services/api'
 
+const SUPPLIER_NOTIFICATION_DEFAULTS = {
+  emailEnabled: true,
+  smsEnabled: false,
+  inAppEnabled: true,
+  notifyOrderNew: true,
+  notifyMessageReceived: true,
+  notifyInvoiceIssued: true,
+  notifyLowStock: true,
+} as const
+
+const SUPPLIER_NOTIFICATION_FIELDS: Array<{ key: keyof typeof SUPPLIER_NOTIFICATION_DEFAULTS; label: string; description: string }> = [
+  { key: 'emailEnabled', label: 'Email notifications', description: 'Receive important updates via email.' },
+  { key: 'smsEnabled', label: 'SMS notifications', description: 'Get critical alerts by SMS.' },
+  { key: 'inAppEnabled', label: 'In-app notifications', description: 'Show alerts inside Supplify.' },
+  { key: 'notifyOrderNew', label: 'New orders', description: 'Be notified when restaurants place orders.' },
+  { key: 'notifyMessageReceived', label: 'Chat messages', description: 'Receive pings for new chat messages.' },
+  { key: 'notifyInvoiceIssued', label: 'Invoices', description: 'Invoice and payment reminders.' },
+  { key: 'notifyLowStock', label: 'Low stock', description: 'Warehouse low stock warnings.' },
+]
+
 export function SupplierSettingsPage() {
+  const { user } = useAppSelector((state) => state.auth)
   const { data: supplierData, isLoading: isLoadingSupplier, refetch: refetchSupplier } = useGetSupplierMeQuery()
   const [updateSupplier, { isLoading: isUpdating }] = useUpdateSupplierMutation()
   const [uploadSupplierLogo] = useUploadSupplierLogoMutation()
@@ -41,6 +65,10 @@ export function SupplierSettingsPage() {
   const [showAddContact, setShowAddContact] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [uploadedContacts, setUploadedContacts] = useState<any[]>([])
+
+  const [notificationPrefs, setNotificationPrefs] = useState(SUPPLIER_NOTIFICATION_DEFAULTS)
+  const { data: notificationPrefsData, isLoading: isLoadingNotificationPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
+  const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
   
   const supplier = supplierData?.supplier
   
@@ -62,6 +90,36 @@ export function SupplierSettingsPage() {
     website: '',
   })
   
+  useEffect(() => {
+    const prefs = notificationPrefsData?.preferences
+    if (prefs) {
+      setNotificationPrefs((prev) => ({
+        ...prev,
+        emailEnabled: prefs.emailEnabled ?? prev.emailEnabled,
+        smsEnabled: prefs.smsEnabled ?? prev.smsEnabled,
+        inAppEnabled: prefs.inAppEnabled ?? prev.inAppEnabled,
+        notifyOrderNew: prefs.notifyOrderNew ?? prev.notifyOrderNew,
+        notifyMessageReceived: prefs.notifyMessageReceived ?? prev.notifyMessageReceived,
+        notifyInvoiceIssued: prefs.notifyInvoiceIssued ?? prev.notifyInvoiceIssued,
+        notifyLowStock: prefs.notifyLowStock ?? prev.notifyLowStock,
+      }))
+    }
+  }, [notificationPrefsData])
+
+  const handleToggleNotification = (key: keyof typeof SUPPLIER_NOTIFICATION_DEFAULTS) => {
+    setNotificationPrefs((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const handleSaveNotifications = async () => {
+    try {
+      await updateNotificationPreferences(notificationPrefs).unwrap()
+      await refetchNotificationPrefs()
+      toast.success('Notification preferences saved!')
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to save notification preferences')
+    }
+  }
+
   // Load supplier data into form
   useEffect(() => {
     if (supplier) {
@@ -345,12 +403,13 @@ export function SupplierSettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="business">Business</TabsTrigger>
           <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
           <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
@@ -747,6 +806,61 @@ export function SupplierSettingsPage() {
                   <p className="text-sm text-gray-500 mt-1">Add warehouses to manage multiple locations</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notification Preferences
+              </CardTitle>
+              <CardDescription>Choose how you want to be notified</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {isLoadingNotificationPrefs ? (
+                <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading notification preferences…
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {SUPPLIER_NOTIFICATION_FIELDS.map(({ key, label, description }) => (
+                      <label
+                        key={key}
+                        className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-gray-800">{label}</span>
+                          {notificationPrefs[key] && <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />}
+                        </div>
+                        <p className="text-xs text-gray-500">{description}</p>
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={notificationPrefs[key]}
+                          onChange={() => handleToggleNotification(key)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <Button
+                    onClick={handleSaveNotifications}
+                    className="w-full"
+                    disabled={isSavingNotificationPrefs}
+                  >
+                    {isSavingNotificationPrefs ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    {isSavingNotificationPrefs ? 'Saving…' : 'Save preferences'}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

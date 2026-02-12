@@ -49,6 +49,15 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
+**Optional: Prodlike seed (full dataset + login accounts)**  
+For a rich dev dataset (invoices, orders, inventories, reservations, quick lists) and Keycloak accounts for every restaurant/supplier, see [SEED_PRODLIKE.md](SEED_PRODLIKE.md). From repo root:
+
+```bash
+ALLOW_PRODLIKE_SEED=true pnpm run seed:prodlike
+pnpm run seed:accounts    # Keycloak logins for all tenants (password: Supplify1!)
+pnpm run seed:quick-lists # Quick lists for all restaurants
+```
+
 ### 5. Start Development Servers
 
 ```bash
@@ -127,7 +136,7 @@ The application uses Keycloak for authentication with server-side OIDC flow:
 | **Supplier**  | supplier@supplify.com | SupplifySupplier1!  |
 | **Restaurant** | restaurant@supplify.com | SupplifyRestaurant1! |
 
-Sign in via **Sign in with Keycloak** on the login page. Keycloak must be running (`docker-compose up -d`). To pick up the new users, recreate Keycloak so it re-imports the realm: `docker-compose up -d --force-recreate keycloak`.
+Sign in via **Sign in with Keycloak** on the login page. Keycloak must be running (`docker-compose up -d`). Keycloak imports the realm only on first start. If **admin** or **supplier** login fails (wrong role or redirect back to login), recreate Keycloak so it re-imports the realm: `docker-compose up -d --force-recreate keycloak`. If the realm already existed, you may need to reset the Keycloak database (e.g. remove the `keycloak` DB in Postgres and run `infra/db/init.sql` again) so the next Keycloak start re-imports. The app also assigns admin/supplier role by demo email when the token has no roles.
 
 ## 🗄️ Database
 

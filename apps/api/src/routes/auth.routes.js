@@ -119,19 +119,22 @@ router.get('/callback', async (req, res) => {
     // Get user info from Keycloak
     const userInfo = await getUserInfo(tokens.access_token)
 
-    // Decode the access token to get roles from realm_access
+    // Decode the access token to get roles from realm_access and resource_access
     const tokenParts = tokens.access_token.split('.')
     const tokenPayload = JSON.parse(Buffer.from(tokenParts[1], 'base64url').toString())
+
+    const realmRoles = tokenPayload.realm_access?.roles || []
+    const clientId = process.env.KEYCLOAK_CLIENT_ID || 'supplify-api'
+    const clientRoles = tokenPayload.resource_access?.[clientId]?.roles || []
+    const roles = [...new Set([...realmRoles, ...clientRoles])]
 
     logger.info('User info received:', {
       sub: userInfo.sub,
       email: userInfo.email,
-      rolesFromToken: tokenPayload.realm_access?.roles,
-      fullUserInfo: JSON.stringify(userInfo),
+      realm_access_roles: tokenPayload.realm_access?.roles,
+      resource_access_roles: tokenPayload.resource_access?.[clientId]?.roles,
+      mergedRoles: roles,
     })
-
-    // Extract roles from token payload (not from userInfo)
-    const roles = tokenPayload.realm_access?.roles || []
 
     logger.info('Extracted roles array:', { roles, rolesLength: roles.length })
 

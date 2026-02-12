@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { logger } from './logger.js';
+import { persistMessageFromSocket } from '../services/chatSocket.service.js';
 
 let io = null;
 
@@ -27,7 +28,7 @@ export function initializeSocket(server) {
       logger.info('Client left conversation', { socketId: socket.id, conversationId });
     });
 
-    // Handle sending a message
+    // Handle sending a message (fallback for clients that only emit socket; persist so message is not lost)
     socket.on('send_message', async (data) => {
       const { conversationId, content, senderId } = data;
       
@@ -35,15 +36,26 @@ export function initializeSocket(server) {
         socketId: socket.id,
         conversationId,
         senderId,
-        contentLength: content.length,
+        contentLength: content?.length ?? 0,
       });
 
-      // Broadcast message to all clients in the conversation
+      let messageId = null;
+      let timestamp = new Date().toISOString();
+      if (conversationId && senderId && content) {
+        const persisted = await persistMessageFromSocket(conversationId, senderId, content);
+        if (persisted) {
+          messageId = persisted.id;
+          timestamp = persisted.created_at;
+        }
+      }
+
+      // Broadcast so all clients (including REST senders) can refetch or merge
       io.to(`conversation_${conversationId}`).emit('new_message', {
         conversationId,
         content,
         senderId,
-        timestamp: new Date().toISOString(),
+        messageId,
+        timestamp,
       });
     });
 

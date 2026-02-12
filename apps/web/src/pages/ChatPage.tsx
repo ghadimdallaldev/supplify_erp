@@ -364,13 +364,13 @@ export function ChatPage() {
   }
 
   const handleSendMessage = async () => {
-    if ((!message.trim() && selectedFiles.length === 0 && !selectedOrder) || !selectedConversation || !socketRef.current) return
+    if ((!message.trim() && selectedFiles.length === 0 && !selectedOrder) || !selectedConversation) return
     
     const messageContent = message.trim() || (selectedOrder ? `📦 Order #${selectedOrder.id.slice(0, 8)}` : '')
     const replyToId = replyingTo?.id || null
     
     try {
-      let attachments: any[] = []
+      const attachments: any[] = []
 
       // Upload files if any
       if (selectedFiles.length > 0) {
@@ -408,7 +408,7 @@ export function ChatPage() {
         }
       }
 
-      // Save message to database
+      // Save message to database (server will emit new_message so other clients refetch)
       await sendMessage({
         conversationId: selectedConversation,
         content: messageContent,
@@ -418,19 +418,11 @@ export function ChatPage() {
         messageType: selectedOrder ? 'ORDER_REFERENCE' : undefined,
       }).unwrap()
       
-      // Emit socket event for real-time broadcasting
-      socketRef.current.emit('send_message', {
-        conversationId: selectedConversation,
-        content: messageContent,
-        senderId: user?.id,
-        replyToId,
-      })
-      
       // Stop typing indicator
       if (typingTimeout) {
         clearTimeout(typingTimeout)
       }
-      socketRef.current.emit('typing', {
+      socketRef.current?.emit('typing', {
         conversationId: selectedConversation,
         isTyping: false,
       })
@@ -440,7 +432,8 @@ export function ChatPage() {
       setSelectedFiles([])
       setFilePreviews([])
       setSelectedOrder(null)
-      refetchConversations()
+      // Refetch messages and conversations so UI shows persisted message immediately
+      await Promise.all([refetchMessages(), refetchConversations()])
       
       // Scroll to bottom after sending
       setTimeout(() => scrollToBottom(), 100)

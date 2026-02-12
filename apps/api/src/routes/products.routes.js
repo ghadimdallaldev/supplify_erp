@@ -1,12 +1,31 @@
 import express from 'express';
-import { requireAuth, requireRole, requireOwnership } from '../lib/rbac.js';
-import { query, withTransaction } from '../lib/db.js';
+import { requireAuth, requireRole } from '../lib/rbac.js';
+import { query } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js';
 import { checkLimit, incrementUsage } from '../lib/subscription.js';
 import { z } from 'zod';
 
 const router = express.Router();
+
+// Lazy cache: does product table have a tags column? (migration 0026 adds it)
+let _productHasTagsColumn = null;
+async function productHasTagsColumn() {
+  if (_productHasTagsColumn !== null) return _productHasTagsColumn;
+  try {
+    const { rows } = await query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'product' AND column_name = 'tags' LIMIT 1`
+    );
+    _productHasTagsColumn = rows.length > 0;
+  } catch {
+    _productHasTagsColumn = false;
+  }
+  return _productHasTagsColumn;
+}
+/** Reset cache for tests so productHasTagsColumn() is re-queried */
+export function __resetProductTagsColumnCache() {
+  _productHasTagsColumn = null;
+}
 
 // Validation schemas
 const productCreateSchema = z.object({
@@ -53,16 +72,19 @@ router.get('/categories', async (req, res) => {
   }
 });
 
-// Get available tags (from all products)
+// Get available tags (from all products; no-op when product.tags column does not exist)
 router.get('/tags', async (req, res) => {
   try {
+    const hasTags = await productHasTagsColumn();
+    if (!hasTags) {
+      return res.json({ ok: true, data: { tags: [] }, error: null, requestId: req.requestId });
+    }
     const { rows: tags } = await query(`
       SELECT DISTINCT tag
       FROM product, jsonb_array_elements_text(tags) AS tag
       WHERE tags IS NOT NULL AND jsonb_array_length(tags) > 0
       ORDER BY tag
     `);
-    
     return res.json({ ok: true, data: { tags: tags.map(t => t.tag) }, error: null, requestId: req.requestId });
   } catch (error) {
     logger.warn('Tags unavailable, returning empty list:', error.message);
@@ -98,16 +120,16 @@ router.get('/', async (req, res) => {
       paramIndex++;
     }
     
-    // Tags filter (check if any tag in the array matches)
+    // Tags filter (only when product.tags column exists)
     if (params.tags) {
-      const tagsArray = params.tags.split(',').map(t => t.trim()).filter(t => t);
-      if (tagsArray.length > 0) {
-        // Check if product tags JSONB array contains any of the specified tags
-        // Using jsonb_exists_any operator (checks if any key in array exists in JSONB)
-        // Convert tags array to PostgreSQL array format
-        whereConditions.push(`p.tags ?| $${paramIndex}::text[]`);
-        queryParams.push(tagsArray);
-        paramIndex++;
+      const hasTags = await productHasTagsColumn();
+      if (hasTags) {
+        const tagsArray = params.tags.split(',').map(t => t.trim()).filter(t => t);
+        if (tagsArray.length > 0) {
+          whereConditions.push(`p.tags ?| $${paramIndex}::text[]`);
+          queryParams.push(tagsArray);
+          paramIndex++;
+        }
       }
     }
     
@@ -339,19 +361,14 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
     await query('BEGIN');
     
     try {
-      // Parse tags from request (can be array or comma-separated string)
-      const tagsArray = req.body.tags 
+      const hasTags = await productHasTagsColumn();
+      const tagsArray = hasTags && req.body.tags
         ? (Array.isArray(req.body.tags) ? req.body.tags : req.body.tags.split(',').map(t => t.trim()).filter(t => t))
         : [];
-      
-      // Create product
-      const { rows } = await query(`
-        INSERT INTO product (
-          supplier_id, sku, name, name_ar, description, description_ar,
-          brand, category, category_id, tags, image_url, unit
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)
-        RETURNING *
-      `, [
+
+      let insertCols = 'supplier_id, sku, name, name_ar, description, description_ar, brand, category, category_id, image_url, unit';
+      let insertPlaceholders = '$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11';
+      let insertValues = [
         supplierId,
         productData.sku,
         productData.name,
@@ -361,10 +378,19 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         productData.brand || null,
         productData.category || null,
         req.body.category_id || null,
-        JSON.stringify(tagsArray),
         productData.image_url || null,
         productData.unit || null,
-      ]);
+      ];
+      if (hasTags) {
+        insertCols += ', tags';
+        insertPlaceholders += ', $12::jsonb';
+        insertValues.push(JSON.stringify(tagsArray));
+      }
+
+      const { rows } = await query(
+        `INSERT INTO product (${insertCols}) VALUES (${insertPlaceholders}) RETURNING *`,
+        insertValues
+      );
       
       const product = rows[0];
       
@@ -470,14 +496,17 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     const updateValues = [];
     let paramIndex = 1;
     
-    // Handle tags separately (convert to JSONB)
+    // Handle tags separately when product.tags column exists
     if (req.body.tags !== undefined) {
-      const tagsArray = Array.isArray(req.body.tags) 
-        ? req.body.tags 
-        : (typeof req.body.tags === 'string' ? req.body.tags.split(',').map(t => t.trim()).filter(t => t) : []);
-      updateFields.push(`tags = $${paramIndex}::jsonb`);
-      updateValues.push(JSON.stringify(tagsArray));
-      paramIndex++;
+      const hasTags = await productHasTagsColumn();
+      if (hasTags) {
+        const tagsArray = Array.isArray(req.body.tags)
+          ? req.body.tags
+          : (typeof req.body.tags === 'string' ? req.body.tags.split(',').map(t => t.trim()).filter(t => t) : []);
+        updateFields.push(`tags = $${paramIndex}::jsonb`);
+        updateValues.push(JSON.stringify(tagsArray));
+        paramIndex++;
+      }
     }
     
     // Handle category_id separately

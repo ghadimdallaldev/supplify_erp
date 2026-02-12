@@ -272,14 +272,14 @@ export function QuickListsPage() {
     return lists
   }, [data?.quickLists, filterStatus, listSearch])
 
-  // Calculate statistics
+  // Calculate statistics (coerce item_count to number - API may return it as string from PostgreSQL COUNT)
   const stats = useMemo(() => {
     const lists = data?.quickLists || []
     return {
       total: lists.length,
       scheduled: lists.filter((l: any) => l.is_scheduled && l.status === 'ACTIVE').length,
       active: lists.filter((l: any) => l.status === 'ACTIVE').length,
-      totalItems: lists.reduce((sum: number, l: any) => sum + (l.item_count || 0), 0)
+      totalItems: lists.reduce((sum: number, l: any) => sum + Number(l.item_count ?? 0), 0)
     }
   }, [data?.quickLists])
 

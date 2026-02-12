@@ -91,7 +91,7 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
       `
       SELECT 
         ql.*,
-        COUNT(qli.id) as item_count
+        (COUNT(qli.id))::int AS item_count
       FROM quick_list ql
       LEFT JOIN quick_list_item qli ON qli.quick_list_id = ql.id
       WHERE ql.restaurant_id = $1

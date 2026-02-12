@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { setupMocks, mockUser, clearAllMocks, getMockQuery, getMockWithTransaction } from '../test/helpers.js';
+import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js';
 
 // Setup mocks at top level - must be before any imports
 // Use a factory function that doesn't reference variables
@@ -47,7 +47,7 @@ vi.mock('../lib/logger.js', () => ({
 }));
 
 // Now import routes (mocks are set up)
-import { productsRoutes } from './products.routes.js';
+import { productsRoutes, __resetProductTagsColumnCache } from './products.routes.js';
 
 describe('Products Routes', () => {
   let app;
@@ -80,6 +80,19 @@ describe('Products Routes', () => {
     app.use('/api/products', productsRoutes);
     const { errorHandler } = await import('../middlewares/errorHandler.js');
     app.use(errorHandler);
+  });
+
+  describe('GET /api/products/tags', () => {
+    it('should return empty tags when product.tags column does not exist', async () => {
+      db.query.mockResolvedValueOnce({ rows: [] }); // productHasTagsColumn() returns no column
+
+      const response = await request(app)
+        .get('/api/products/tags')
+        .expect(200);
+
+      expect(response.body.ok).toBe(true);
+      expect(response.body.data.tags).toEqual([]);
+    });
   });
 
   describe('GET /api/products/categories', () => {
@@ -164,7 +177,7 @@ describe('Products Routes', () => {
           rows: [{ total: '0' }],
         });
 
-      const response = await request(app)
+      await request(app)
         .get('/api/products?q=test')
         .expect(200);
 
@@ -210,11 +223,12 @@ describe('Products Routes', () => {
 
   describe('POST /api/products', () => {
     it('should create a new product', async () => {
-      // Mock: supplier lookup, checkLimit, BEGIN, INSERT product, COMMIT
-      // Price and inventory inserts are conditional based on req.body
+      __resetProductTagsColumnCache(); // ensure productHasTagsColumn runs (info_schema query)
+      // Mock: supplier lookup, BEGIN, productHasTagsColumn (info_schema), INSERT product, COMMIT
       db.query
         .mockResolvedValueOnce({ rows: [{ id: 'supplier-1' }] }) // Supplier lookup
         .mockResolvedValueOnce({}) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // productHasTagsColumn() when uncached - no tags column
         .mockResolvedValueOnce({ rows: [{ id: 'prod-1', sku: 'SKU001', name: 'New Product', supplier_id: 'supplier-1', created_at: new Date() }] }) // INSERT product
         .mockResolvedValueOnce({}); // COMMIT
 

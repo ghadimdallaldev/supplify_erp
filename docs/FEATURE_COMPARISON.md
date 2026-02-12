@@ -171,3 +171,14 @@ These features work equally well for both suppliers and restaurants:
 
 **Priority**: Add inventory alerts and sales analytics for suppliers to match restaurant feature parity.
 
+---
+
+## 🌱 Development & data (prodlike)
+
+| Capability | Description |
+|------------|-------------|
+| **Prodlike seed** | Full dataset: suppliers, warehouses, products, restaurants, branches, staff, subscriptions, inventory, reservations, orders, invoices, shifts. Run: `npm run seed:prodlike` (see [SEED_PRODLIKE.md](SEED_PRODLIKE.md)). |
+| **Seed accounts** | Keycloak users for all seeded restaurants/suppliers (matching emails, default password). Run after prodlike: `npm run seed:accounts`. |
+| **Quick Lists seed** | Pre-filled quick lists per restaurant. Run: `npm run seed:quick-lists`. |
+| **Schema-adaptive APIs** | Products and warehouses routes work with or without optional columns (`tags`, `tenant_id`/`supplier_id`) for backward compatibility. |
+

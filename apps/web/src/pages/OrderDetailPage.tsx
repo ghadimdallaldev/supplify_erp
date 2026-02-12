@@ -26,6 +26,8 @@ import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import toast from 'react-hot-toast'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
 const formatPrice = (price: any): string => {
   if (typeof price === 'number' && !isNaN(price)) {
     return price.toFixed(2)
@@ -105,6 +107,28 @@ export function OrderDetailPage() {
   const handlePrintPackingSlip = () => {
     window.print()
     toast.success('Preparing packing slip for printing...')
+  }
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const handleDownloadPackingSlipPdf = async () => {
+    if (!id || downloadingPdf) return
+    setDownloadingPdf(true)
+    try {
+      const res = await fetch(`${API_URL}/api/orders/${id}/packing-slip/pdf`, { credentials: 'include' })
+      if (!res.ok) throw new Error('Failed to download PDF')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `packing-slip-${id.slice(0, 8)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Packing slip PDF downloaded')
+    } catch {
+      toast.error('Could not download packing slip PDF')
+    } finally {
+      setDownloadingPdf(false)
+    }
   }
 
   const handleSendReminder = async () => {
@@ -340,13 +364,13 @@ export function OrderDetailPage() {
                       </Link>
                     </Button>
                   )}
-                  <Button className="w-full" variant="outline">
+                  <Button className="w-full" variant="outline" onClick={() => handlePrintPackingSlip()}>
                     <Printer className="h-4 w-4 mr-2" />
                     Print Packing Slip
                   </Button>
-                  <Button className="w-full" variant="outline">
+                  <Button className="w-full" variant="outline" onClick={handleDownloadPackingSlipPdf} disabled={downloadingPdf}>
                     <Download className="h-4 w-4 mr-2" />
-                    Download PDF
+                    {downloadingPdf ? 'Downloading...' : 'Download PDF'}
                   </Button>
                   {isSupplier && (
                     <Button className="w-full" variant="outline">
@@ -650,9 +674,9 @@ export function OrderDetailPage() {
                       <Printer className="h-4 w-4 mr-2" />
                       Print
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleDownloadPackingSlipPdf} disabled={downloadingPdf}>
                       <Download className="h-4 w-4 mr-2" />
-                      Download PDF
+                      {downloadingPdf ? 'Downloading...' : 'Download PDF'}
                     </Button>
                   </div>
                 </div>

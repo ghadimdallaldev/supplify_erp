@@ -8,6 +8,7 @@ export function SubscriptionInfo() {
   const { data, isLoading, error } = useGetCurrentSubscriptionQuery()
   const { data: productsUsage } = useGetSubscriptionUsageQuery('products')
   const { data: ordersUsage } = useGetSubscriptionUsageQuery('orders_per_day')
+  const { data: chatsUsage } = useGetSubscriptionUsageQuery('chats_per_day')
 
   if (isLoading) {
     return (
@@ -129,8 +130,30 @@ export function SubscriptionInfo() {
             </div>
           )}
 
+          {/* Chats per day usage */}
+          {chatsUsage && !isUnlimited(limits.chats_per_day || 0) && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Chats (Today)</span>
+                <span className={chatsUsage.isOverLimit ? 'text-red-600' : ''}>
+                  {chatsUsage.current} / {limits.chats_per_day}
+                </span>
+              </div>
+              <Progress 
+                value={limits.chats_per_day > 0 && chatsUsage.current > 0 ? (chatsUsage.current / limits.chats_per_day) * 100 : 0}
+                className={chatsUsage.isOverLimit ? 'bg-red-200' : ''}
+              />
+              {chatsUsage.isOverLimit && (
+                <div className="flex items-center gap-2 text-sm text-red-600">
+                  <AlertCircle className="w-4 h-4" />
+                  Limit exceeded
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Unlimited indicators */}
-          {(isUnlimited(limits.products || 0) || isUnlimited(limits.orders_per_day || 0)) && (
+          {(isUnlimited(limits.products || 0) || isUnlimited(limits.orders_per_day || 0) || isUnlimited(limits.chats_per_day || 0)) && (
             <div className="flex items-center gap-2 text-sm text-green-600">
               <Infinity className="w-4 h-4" />
               Unlimited access on this plan

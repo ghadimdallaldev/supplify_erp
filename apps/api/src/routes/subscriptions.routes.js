@@ -44,9 +44,17 @@ router.get('/current', requireAuth, requireRole(['RESTAURANT']), async (req, res
       });
     }
 
+    // Normalize for frontend: plan_display_name -> plan_name, ensure limits/features are objects
+    const subscriptionPayload = {
+      ...subscription,
+      plan_name: subscription.plan_display_name || subscription.plan_name,
+      limits: subscription.limits && typeof subscription.limits === 'object' ? subscription.limits : {},
+      features: subscription.features && typeof subscription.features === 'object' ? subscription.features : {},
+    };
+
     res.json({
       ok: true,
-      data: { subscription },
+      data: { subscription: subscriptionPayload },
       error: null,
       requestId: req.requestId,
     });

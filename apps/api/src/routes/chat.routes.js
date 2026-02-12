@@ -757,6 +757,24 @@ router.post('/conversations/:conversationId/messages', requireAuth, requireRole(
         actor: req.userData.id 
       });
       
+      // Notify all clients in the conversation so they refetch messages (ensures persistence is visible)
+      try {
+        const { getIO } = await import('../lib/socket.js');
+        const io = getIO();
+        if (io) {
+          io.to(`conversation_${conversationId}`).emit('new_message', {
+            conversationId,
+            messageId: message.id,
+            senderId: senderId,
+            senderType: req.userData.role,
+            content: messageData.content,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (socketError) {
+        logger.warn('Failed to emit new_message after send:', socketError);
+      }
+      
       // Include warning in response if applicable
       const responseData = { message: fullMessages[0] };
       if (req.chatWarning) {

@@ -38,11 +38,15 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res
       });
     }
 
-    const { rows: warehouses } = await query(`
-      SELECT * FROM warehouse 
-      WHERE tenant_id = $1 
-      ORDER BY created_at DESC
-    `, [supplierId]);
+    // Support both supplier_id (0005) and tenant_id (0023) column names
+    const { rows: colRows } = await query(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'warehouse' AND column_name IN ('supplier_id', 'tenant_id') LIMIT 1`
+    );
+    const supplierCol = colRows[0]?.column_name || 'supplier_id';
+    const { rows: warehouses } = await query(
+      `SELECT * FROM warehouse WHERE ${supplierCol} = $1 ORDER BY created_at DESC`,
+      [supplierId]
+    );
 
     res.json({
       ok: true,
@@ -107,11 +111,16 @@ router.post('/', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
     // Create warehouse
     const { name, code, address, capacity, contact_name, contact_email, contact_phone } = req.body;
 
-    const { rows: newWarehouse } = await query(`
-      INSERT INTO warehouse (tenant_id, name, code, address, capacity, contact_name, contact_email, contact_phone)
+    const { rows: colRows } = await query(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'warehouse' AND column_name IN ('supplier_id', 'tenant_id') LIMIT 1`
+    );
+    const supplierCol = colRows[0]?.column_name || 'supplier_id';
+    const { rows: newWarehouse } = await query(
+      `INSERT INTO warehouse (${supplierCol}, name, code, address, capacity, contact_name, contact_email, contact_phone)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *
-    `, [supplierId, name, code || null, address || null, capacity || null, contact_name || null, contact_email || null, contact_phone || null]);
+      RETURNING *`,
+      [supplierId, name, code || null, address || null, capacity || null, contact_name || null, contact_email || null, contact_phone || null]
+    );
 
     // Create audit log
     await createAuditLog('CREATE_WAREHOUSE', {

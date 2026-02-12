@@ -67,7 +67,7 @@ const NOTIFICATION_FIELDS: Array<{
 export function SettingsPage() {
   const { user } = useAppSelector((state) => state.auth)
   const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
-  const { data: notificationPrefsData, isLoading: isLoadingNotificationPrefs } = useGetNotificationPreferencesQuery()
+  const { data: notificationPrefsData, isLoading: isLoadingNotificationPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
   const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
 
   useEffect(() => {
@@ -98,6 +98,7 @@ export function SettingsPage() {
   const handleSaveNotifications = async () => {
     try {
       await updateNotificationPreferences(notificationPrefs).unwrap()
+      await refetchNotificationPrefs()
       toast.success('Notification preferences saved!')
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to save notification preferences')

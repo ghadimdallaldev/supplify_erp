@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useAppSelector } from '../hooks/redux'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { LogoUpload } from '../components/LogoUpload'
 import { 
@@ -88,6 +89,7 @@ const CATEGORY_FIELDS: PreferenceField[] = [
 ]
 
 export function RestaurantOnboardingPage() {
+  const { user } = useAppSelector((state) => state.auth)
   const { data: restaurantData, isLoading: isLoadingRestaurant, refetch: refetchRestaurant } = useGetRestaurantMeQuery()
   const [updateRestaurant, { isLoading: isUpdating }] = useUpdateRestaurantMutation()
   const [uploadRestaurantLogo] = useUploadRestaurantLogoMutation()
@@ -212,7 +214,7 @@ export function RestaurantOnboardingPage() {
   
   // Notification preferences
   const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
-  const { data: notificationPrefsData, isLoading: isLoadingPrefs } = useGetNotificationPreferencesQuery()
+  const { data: notificationPrefsData, isLoading: isLoadingPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
   const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
 
   useEffect(() => {
@@ -267,6 +269,7 @@ export function RestaurantOnboardingPage() {
   const handleSaveNotifications = async () => {
     try {
       await updateNotificationPreferences(notificationPrefs).unwrap()
+      await refetchNotificationPrefs()
       toast.success('Notification preferences saved!')
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to save notification preferences')

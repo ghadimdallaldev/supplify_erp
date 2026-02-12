@@ -152,10 +152,11 @@ export function RestaurantsPage() {
           return (b.totalOrders || 0) - (a.totalOrders || 0)
         case 'revenue':
           return (b.totalSpent || 0) - (a.totalSpent || 0)
-        case 'recent':
+        case 'recent': {
           const aDate = a.latestOrder ? new Date(a.latestOrder.placed_at || a.latestOrder.created_at).getTime() : 0
           const bDate = b.latestOrder ? new Date(b.latestOrder.placed_at || b.latestOrder.created_at).getTime() : 0
           return bDate - aDate
+        }
         default:
           return 0
       }

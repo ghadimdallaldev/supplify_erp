@@ -64,16 +64,31 @@ export async function upsertUser(userInfo, roles = []) {
     
     logger.info('Upserting user:', { sub, email, displayName, roles, rolesType: typeof roles, rolesIsArray: Array.isArray(roles) });
     
-    // Determine role from Keycloak roles
+    // Normalize to lowercase for comparison (Keycloak may return different casing)
+    const rolesLower = (roles || []).map((r) => String(r).toLowerCase());
+    const hasRole = (name) => rolesLower.includes(name.toLowerCase());
+
+    // Determine role from Keycloak roles (admin > supplier > restaurant)
     let role = 'RESTAURANT'; // default
-    if (roles.includes('admin')) {
+    if (hasRole('admin')) {
       role = 'ADMIN';
       logger.info('Role determined as ADMIN');
-    } else if (roles.includes('supplier')) {
+    } else if (hasRole('supplier')) {
       role = 'SUPPLIER';
       logger.info('Role determined as SUPPLIER');
     } else {
-      logger.info('Role determined as RESTAURANT (default)');
+      // Fallback: assign role by demo account email if token has no realm roles
+      // (e.g. Keycloak realm not re-imported or roles scope not in token)
+      const emailLower = (email || '').toLowerCase();
+      if (emailLower === 'admin@supplify.com') {
+        role = 'ADMIN';
+        logger.info('Role determined as ADMIN (by demo email fallback)');
+      } else if (emailLower === 'supplier@supplify.com') {
+        role = 'SUPPLIER';
+        logger.info('Role determined as SUPPLIER (by demo email fallback)');
+      } else {
+        logger.info('Role determined as RESTAURANT (default)');
+      }
     }
 
     logger.info('Final user data:', { sub, email, displayName, role });

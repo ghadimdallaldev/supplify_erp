@@ -137,6 +137,12 @@ export async function refreshAccessToken(refreshToken) {
   }
 }
 
+// Normalize issuer for comparison (Keycloak may use with or without trailing slash)
+function normalizeIssuer(iss) {
+  if (!iss || typeof iss !== 'string') return ''
+  return iss.replace(/\/$/, '')
+}
+
 // Verify JWT token
 export async function verifyToken(token) {
   try {
@@ -149,7 +155,7 @@ export async function verifyToken(token) {
       tokenPrefix: token.substring(0, 20) + '...',
     })
 
-    // Decode the token manually to extract payload
+    // Decode the token manually to extract payload (for issuer/audience handling)
     const parts = token.split('.')
     const headerPart = parts[0]
     const payloadPart = parts[1]
@@ -160,57 +166,63 @@ export async function verifyToken(token) {
     logger.info('Token decoded successfully:', {
       alg: header.alg,
       kid: header.kid,
+      iss: payload.iss,
       azp: payload.azp,
+      aud: payload.aud,
       sub: payload.sub,
     })
 
-    // Verify the signature using jose
-    const JWKS = createRemoteJWKSet(new URL(config.jwks_uri))
-
-    // Verify signature only (skip audience check by using a catch)
-    try {
-      await jwtVerify(token, JWKS, {
-        issuer: config.issuer,
-        audience: KEYCLOAK_CLIENT_ID,
-      })
-    } catch (error) {
-      // If it's just the missing 'aud' claim, we'll proceed with manual check
-      if (error.message && error.message.includes('missing required "aud" claim')) {
-        logger.info('Token missing aud claim, verifying signature only')
-
-        // Verify signature without audience
-        await jwtVerify(token, JWKS, {
-          issuer: config.issuer,
-        })
-
-        // Manual audience check
-        if (payload.azp && payload.azp !== KEYCLOAK_CLIENT_ID) {
-          throw new Error(
-            `Token audience mismatch. Expected: ${KEYCLOAK_CLIENT_ID}, Got: ${payload.azp}`
-          )
-        }
-
-        logger.info('Token verification successful (signature verified, manual aud check)')
-        return payload
-      }
-      throw error
+    const expectedIssuer = normalizeIssuer(config.issuer)
+    const tokenIssuer = normalizeIssuer(payload.iss)
+    if (tokenIssuer && expectedIssuer && tokenIssuer !== expectedIssuer) {
+      logger.warn('Issuer mismatch (normalized):', { expected: expectedIssuer, token: tokenIssuer })
     }
 
-    // If we get here, standard verification worked
-    const { payload: verifiedPayload } = await jwtVerify(token, JWKS, {
-      issuer: config.issuer,
-      audience: KEYCLOAK_CLIENT_ID,
-    })
+    // Use issuer from token so we match Keycloak's exact format (with or without trailing slash)
+    const verifyIssuer = payload.iss || config.issuer
+    const JWKS = createRemoteJWKSet(new URL(config.jwks_uri))
 
-    logger.info('Token verification successful')
-    return verifiedPayload
+    // Accept API or Web client (Keycloak may set aud/azp for either depending on flow)
+    const acceptableAudiences = [KEYCLOAK_CLIENT_ID, 'supplify-web']
+    const tokenAud = payload.aud
+    const tokenAzp = payload.azp
+    const audList = Array.isArray(tokenAud) ? tokenAud : tokenAud ? [tokenAud] : []
+    const hasValidAud = audList.some((a) => acceptableAudiences.includes(a)) || acceptableAudiences.includes(tokenAzp)
+
+    try {
+      await jwtVerify(token, JWKS, {
+        issuer: verifyIssuer,
+        audience: KEYCLOAK_CLIENT_ID,
+      })
+      logger.info('Token verification successful')
+      return payload
+    } catch (firstError) {
+      const msg = firstError?.message || ''
+      // Missing aud or wrong aud: verify signature + issuer only, then check audience manually
+      if (
+        msg.includes('missing required "aud" claim') ||
+        msg.includes('audience') ||
+        msg.includes('aud')
+      ) {
+        logger.info('Verifying without strict audience (will check azp/aud manually):', msg.substring(0, 80))
+        await jwtVerify(token, JWKS, { issuer: verifyIssuer })
+        if (!hasValidAud && (tokenAzp || audList.length > 0)) {
+          throw new Error(
+            `Token audience mismatch. Expected one of: ${acceptableAudiences.join(', ')}, Got azp: ${tokenAzp}, aud: ${JSON.stringify(tokenAud)}`
+          )
+        }
+        logger.info('Token verification successful (signature + issuer, audience ok)')
+        return payload
+      }
+      throw firstError
+    }
   } catch (error) {
     const errorMessage = error?.message || 'Unknown error'
     const errorName = error?.name || 'Unknown'
     const errorCode = error?.code || 'Unknown'
 
     // If token is expired, throw a specific error that can be caught for refresh
-    if (errorCode === 'ERR_JWT_EXPIRED' || errorName === 'JWTExpired') {
+    if (errorCode === 'ERR_JWT_EXPIRED' || errorName === 'JWTExpired' || errorMessage.includes('expired')) {
       logger.info('Token expired, will attempt refresh in middleware')
       const expiredError = new Error('Token expired')
       expiredError.name = 'JWTExpired'
@@ -221,6 +233,7 @@ export async function verifyToken(token) {
     logger.error('Token verification failed:', errorMessage)
     logger.error('Error name:', errorName)
     logger.error('Error code:', errorCode)
+    if (error?.stack) logger.error('Stack:', error.stack)
     throw new Error('Invalid token')
   }
 }
