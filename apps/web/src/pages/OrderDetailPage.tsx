@@ -332,6 +332,14 @@ export function OrderDetailPage() {
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
+                  {!isSupplier && (order.status === 'COMPLETED' || order.status === 'DELIVERED') && (
+                    <Button className="w-full" variant="default" asChild>
+                      <Link to={`/app/receiving?order=${order.id}`}>
+                        <Package className="h-4 w-4 mr-2" />
+                        Receive this order
+                      </Link>
+                    </Button>
+                  )}
                   <Button className="w-full" variant="outline">
                     <Printer className="h-4 w-4 mr-2" />
                     Print Packing Slip

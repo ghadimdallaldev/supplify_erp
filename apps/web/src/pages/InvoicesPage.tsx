@@ -38,6 +38,8 @@ import {
 } from '../services/api'
 import { Link } from 'react-router-dom'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
 export function InvoicesPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -46,6 +48,7 @@ export function InvoicesPage() {
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'credit'>('full')
+  const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
   
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
@@ -481,8 +484,38 @@ export function InvoicesPage() {
             <DialogTitle className="flex items-center justify-between">
               <span>Invoice {selectedInvoice?.invoice_number}</span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!selectedInvoice?.id || downloadingPdfId === selectedInvoice.id}
+                  onClick={async () => {
+                    if (!selectedInvoice?.id) return
+                    setDownloadingPdfId(selectedInvoice.id)
+                    try {
+                      const res = await fetch(`${API_URL}/api/invoices/${selectedInvoice.id}/pdf`, {
+                        credentials: 'include',
+                      })
+                      if (!res.ok) throw new Error('Failed to download PDF')
+                      const blob = await res.blob()
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `invoice-${(selectedInvoice.invoice_number || selectedInvoice.id).replace(/[^a-zA-Z0-9-_]/g, '-')}.pdf`
+                      a.click()
+                      URL.revokeObjectURL(url)
+                      toast.success('PDF downloaded')
+                    } catch (e) {
+                      toast.error('Could not download PDF')
+                    } finally {
+                      setDownloadingPdfId(null)
+                    }
+                  }}
+                >
+                  {downloadingPdfId === selectedInvoice?.id ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
                   PDF
                 </Button>
                 {isRestaurant && selectedInvoice && parseFloat(selectedInvoice.balance_due || selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0) > 0 && (

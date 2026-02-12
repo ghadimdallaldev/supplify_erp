@@ -385,7 +385,7 @@ export function OrdersPage() {
                         </div>
                         {!isSupplier && order.status === 'DELIVERED' && (
                           <div className="mt-2 p-2 rounded bg-blue-50 text-blue-700 border border-blue-200 text-xs">
-                            Supplier marked this order as delivered. Please <Link to="/app/receiving" className="underline">receive items</Link> to update inventory and generate an invoice.
+                            Supplier marked this order as delivered. Please <Link to={`/app/receiving?order=${order.id}`} className="underline">receive this order</Link> to update inventory and generate an invoice.
                           </div>
                         )}
                         {isSupplier && order.status === 'DELIVERED' && (

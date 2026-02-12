@@ -426,6 +426,48 @@ export async function sendWhatsAppMessage(phone, message) {
 }
 
 /**
+ * Notify supplier when their warehouse/product stock is low.
+ * Call after creating an inventory_alert (e.g. from inventory adjustment).
+ */
+export async function notifySupplierLowStock({ productId, warehouseId, productName, threshold, currentValue }) {
+  const { rows: productRows } = await query(
+    `SELECT p.name, p.supplier_id FROM product p WHERE p.id = $1`,
+    [productId]
+  );
+  if (productRows.length === 0) return null;
+  const supplierId = productRows[0].supplier_id;
+  const name = productName || productRows[0].name;
+
+  const { rows: userRows } = await query(
+    `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
+    [supplierId]
+  );
+  if (userRows.length === 0) {
+    logger.warn('No app_user found for supplier', { supplierId });
+    return null;
+  }
+  const userId = userRows[0].id;
+
+  const message = `Low stock: ${name}. Current: ${currentValue}, threshold: ${threshold}. Restock soon.`;
+  try {
+    return await sendNotification({
+      userId,
+      userType: 'SUPPLIER',
+      notificationType: 'LOW_STOCK',
+      notificationCategory: 'inventory_alerts',
+      title: 'Low stock alert',
+      message,
+      referenceId: productId,
+      referenceType: 'PRODUCT',
+      metadata: { productId, warehouseId, threshold, currentValue },
+    });
+  } catch (err) {
+    logger.error('notifySupplierLowStock failed', { error: err.message, productId });
+    return null;
+  }
+}
+
+/**
  * Helper functions for common notification types
  */
 

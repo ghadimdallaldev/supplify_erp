@@ -4,6 +4,7 @@ import { query } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js';
 import { z } from 'zod';
+import { notifySupplierLowStock } from '../services/notification.service.js';
 
 const router = express.Router();
 
@@ -316,6 +317,7 @@ router.post('/product/:productId/adjustment', requireAuth, requireRole(['SUPPLIE
       );
       
       if (settings.length > 0 && newQty < settings[0].low_stock_threshold) {
+        const threshold = settings[0].low_stock_threshold;
         await query(`
           INSERT INTO inventory_alert (product_id, warehouse_id, alert_type, threshold_value, current_value)
           VALUES ($1, $2, 'LOW_STOCK', $3, $4)
@@ -323,9 +325,18 @@ router.post('/product/:productId/adjustment', requireAuth, requireRole(['SUPPLIE
         `, [
           productId,
           adjustmentData.warehouseId || null,
-          settings[0].low_stock_threshold,
+          threshold,
           newQty
         ]);
+        const { rows: productNameRow } = await query('SELECT name FROM product WHERE id = $1', [productId]);
+        const productName = productNameRow[0]?.name || null;
+        notifySupplierLowStock({
+          productId,
+          warehouseId: adjustmentData.warehouseId || null,
+          productName,
+          threshold,
+          currentValue: newQty,
+        }).catch((err) => logger.warn('Low-stock notification failed', { err: err.message }));
       }
       
       await query('COMMIT');

@@ -4,11 +4,16 @@ import {
   useGetReorderSuggestionsQuery,
   useGetInvoiceAnalyticsQuery,
   useGetProductCategoriesQuery,
+  useGetQuickListsQuery,
+  useAddItemToQuickListMutation,
 } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
-import { Package, ShoppingCart, Users, Building2, DollarSign, TrendingUp, ClipboardCheck } from 'lucide-react'
+import { Button } from '../components/ui/button'
+import { Package, ShoppingCart, Users, Building2, DollarSign, TrendingUp, ClipboardCheck, Loader2 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, AreaChart, Area } from 'recharts'
+import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { CalendarView } from '../components/CalendarView'
 
@@ -25,6 +30,9 @@ export function DashboardPage() {
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
     skip: user?.role !== 'RESTAURANT',
   })
+  const { data: quickListsData } = useGetQuickListsQuery(undefined, { skip: user?.role !== 'RESTAURANT' })
+  const [addItemToQuickList, { isLoading: isAddingToQuickList }] = useAddItemToQuickListMutation()
+  const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null)
 
   // Restaurant spend analytics (30 days)
   const { data: invoiceAnalytics } = useGetInvoiceAnalyticsQuery({ period: 30 }, { skip: user?.role !== 'RESTAURANT' })
@@ -320,15 +328,51 @@ export function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="divide-y">
-                  {reorderSuggestions?.suggestions?.length ? reorderSuggestions.suggestions.slice(0, 5).map((s: any) => (
-                    <div key={s.id} className="flex items-center justify-between py-3">
-                      <div>
-                        <p className="text-sm font-medium">{s.product_name}</p>
-                        <p className="text-xs text-gray-500">Current: {s.current_qty} • Suggested: {s.suggested_reorder_qty ?? Math.max(0, Math.ceil(s.avg_daily_usage_30day * 3))}</p>
+                  {reorderSuggestions?.suggestions?.length ? reorderSuggestions.suggestions.slice(0, 5).map((s: any) => {
+                    const qty = s.suggested_reorder_qty ?? Math.max(1, Math.ceil(s.avg_daily_usage_30day * 3))
+                    const isAdding = addingSuggestionId === s.id
+                    const handleAddToQuickList = async () => {
+                      const lists = quickListsData?.quickLists || []
+                      if (lists.length === 0) {
+                        toast.error('Create a quick list first')
+                        return
+                      }
+                      setAddingSuggestionId(s.id)
+                      try {
+                        await addItemToQuickList({
+                          quickListId: lists[0].id,
+                          body: {
+                            productId: s.product_id,
+                            supplierId: s.supplier_id,
+                            quantity: qty,
+                          },
+                        }).unwrap()
+                        toast.success(`Added ${s.product_name} (${qty}) to ${lists[0].name}`)
+                      } catch (e: any) {
+                        toast.error(e?.data?.error?.message || 'Failed to add to quick list')
+                      } finally {
+                        setAddingSuggestionId(null)
+                      }
+                    }
+                    return (
+                      <div key={s.id} className="flex items-center justify-between py-3">
+                        <div>
+                          <p className="text-sm font-medium">{s.product_name}</p>
+                          <p className="text-xs text-gray-500">Current: {s.current_qty} • Suggested: {qty}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-primary hover:underline"
+                          disabled={isAdding}
+                          onClick={handleAddToQuickList}
+                        >
+                          {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                          Add to Quick List
+                        </Button>
                       </div>
-                      <a href="/app/quick-lists" className="text-sm text-primary hover:underline">Add to Quick List</a>
-                    </div>
-                  )) : (
+                    )
+                  }) : (
                     <p className="text-sm text-muted-foreground py-2">No suggestions available</p>
                   )}
                 </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -13,6 +14,8 @@ import { useGetPendingOrdersForReceivingQuery, useCreateReceivingReportMutation,
 import toast from 'react-hot-toast'
 
 export function ReceivingPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const orderIdFromUrl = searchParams.get('order')
   const { user } = useAppSelector((state) => state.auth)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [showDialog, setShowDialog] = useState(false)
@@ -142,6 +145,21 @@ export function ReceivingPage() {
       })
     }
   }
+
+  // Deep link: open receive dialog when ?order=id is in URL and that order is in pending list
+  useEffect(() => {
+    if (!orderIdFromUrl || !pendingData?.orders?.length) return
+    const order = pendingData.orders.find((o: any) => o.id === orderIdFromUrl)
+    if (order) {
+      setSelectedOrder(order)
+      setShowDialog(true)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('order')
+        return next
+      }, { replace: true })
+    }
+  }, [orderIdFromUrl, pendingData?.orders, setSearchParams])
 
   // Sync receivingOrderIds with backend data
   // Remove IDs for orders that are no longer in pending list OR have has_receiving_report = true
