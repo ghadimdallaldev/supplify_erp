@@ -52,6 +52,14 @@ erDiagram
     jsonb payload_json
     text request_id
   }
+  system_event {
+    uuid id PK
+    text type
+    text severity
+    text source
+    jsonb payload
+    timestamptz created_at
+  }
   invoice {
     uuid id PK
     uuid restaurant_id FK
