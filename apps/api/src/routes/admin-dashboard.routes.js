@@ -824,7 +824,11 @@ router.get('/tenants/suppliers', requireAuth, requireRole(['ADMIN']), async (req
         sub.id as subscription_id,
         (SELECT COUNT(*) FROM product WHERE supplier_id = s.id) as product_count,
         (SELECT COUNT(*) FROM warehouse WHERE supplier_id = s.id AND is_active = true) as warehouse_count,
-        0 as total_revenue
+        (SELECT COALESCE(SUM(oi.line_total), 0)
+         FROM order_item oi
+         JOIN customer_order o ON o.id = oi.order_id
+         WHERE oi.supplier_id = s.id AND o.status = 'COMPLETED'
+        )::numeric(12,2) as total_revenue
       FROM supplier s
       LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
       ORDER BY s.name

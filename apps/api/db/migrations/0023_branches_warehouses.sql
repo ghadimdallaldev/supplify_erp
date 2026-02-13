@@ -1,5 +1,7 @@
 -- Migration: Branches & Warehouses
 -- Supports restaurant branches and supplier warehouses with plan-based limits
+-- Note: 0015 creates branch with restaurant_id, 0005 creates warehouse with supplier_id.
+-- We add tenant_id when those columns exist so indexes and triggers work.
 
 -- ========================================
 -- RESTAURANT BRANCHES
@@ -19,6 +21,24 @@ CREATE TABLE IF NOT EXISTS branch (
   UNIQUE (tenant_id, code)
 );
 
+-- If branch was created by 0015 with restaurant_id, add tenant_id and columns needed by 0023
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'branch' AND column_name = 'restaurant_id')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'branch' AND column_name = 'tenant_id')
+  THEN
+    ALTER TABLE branch ADD COLUMN tenant_id UUID REFERENCES restaurant(id) ON DELETE CASCADE;
+    UPDATE branch SET tenant_id = restaurant_id;
+    ALTER TABLE branch ALTER COLUMN tenant_id SET NOT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'branch' AND column_name = 'code') THEN
+    ALTER TABLE branch ADD COLUMN code TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'branch' AND column_name = 'address') THEN
+    ALTER TABLE branch ADD COLUMN address JSONB;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_branch_tenant ON branch(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_branch_active ON branch(tenant_id, is_active) WHERE is_active = TRUE;
 
@@ -31,7 +51,7 @@ CREATE TABLE IF NOT EXISTS warehouse (
   name TEXT NOT NULL,
   code TEXT,
   address JSONB,
-  capacity JSONB, -- {pallets, m3, temp_zones}
+  capacity JSONB,
   contact_name TEXT,
   contact_email TEXT,
   contact_phone TEXT,
@@ -40,6 +60,21 @@ CREATE TABLE IF NOT EXISTS warehouse (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (tenant_id, code)
 );
+
+-- If warehouse was created by 0005/0002 with supplier_id, add tenant_id and columns needed by 0023
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'warehouse' AND column_name = 'supplier_id')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'warehouse' AND column_name = 'tenant_id')
+  THEN
+    ALTER TABLE warehouse ADD COLUMN tenant_id UUID REFERENCES supplier(id) ON DELETE CASCADE;
+    UPDATE warehouse SET tenant_id = supplier_id;
+    ALTER TABLE warehouse ALTER COLUMN tenant_id SET NOT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'warehouse' AND column_name = 'address') THEN
+    ALTER TABLE warehouse ADD COLUMN address JSONB;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_warehouse_tenant ON warehouse(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_warehouse_active ON warehouse(tenant_id, is_active) WHERE is_active = TRUE;
@@ -93,6 +128,15 @@ CREATE INDEX IF NOT EXISTS idx_plan_snapshot_date ON tenant_plan_snapshot(captur
 -- ========================================
 -- UPDATE TRIGGERS
 -- ========================================
+-- Generic updated_at trigger (used by branch, warehouse, and 0024 tenant_limit_override)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 DROP TRIGGER IF EXISTS update_branch_updated_at_trigger ON branch;
 CREATE TRIGGER update_branch_updated_at_trigger
   BEFORE UPDATE ON branch
@@ -141,13 +185,12 @@ BEGIN
   END IF;
 END $$;
 
--- Receiving logs: add branch_id
+-- Receiving logs: add branch_id (only if receiving_log table exists)
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'receiving_log' AND column_name = 'branch_id'
-  ) THEN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'receiving_log')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'receiving_log' AND column_name = 'branch_id')
+  THEN
     ALTER TABLE receiving_log ADD COLUMN branch_id UUID REFERENCES branch(id);
     CREATE INDEX IF NOT EXISTS idx_receiving_branch ON receiving_log(branch_id);
   END IF;
@@ -253,43 +296,29 @@ CREATE TRIGGER trigger_decrement_warehouse_count
 -- SEED INITIAL DATA (if needed)
 -- ========================================
 
--- Create default branch for existing restaurants
+-- Create default branch for existing restaurants (use address_json if address columns missing)
 INSERT INTO branch (tenant_id, name, code, address)
 SELECT 
-  id,
-  name || ' - Main Branch',
+  r.id,
+  r.name || ' - Main Branch',
   'MAIN',
-  jsonb_build_object(
-    'street', address_line1,
-    'city', city,
-    'state', state,
-    'zip', postal_code,
-    'country', country
-  )
-FROM restaurant
+  COALESCE(r.address_json, '{}'::jsonb)
+FROM restaurant r
 WHERE NOT EXISTS (
-  SELECT 1 FROM branch WHERE branch.tenant_id = restaurant.id
-)
-ON CONFLICT DO NOTHING;
+  SELECT 1 FROM branch b WHERE b.tenant_id = r.id
+);
 
 -- Create default warehouse for existing suppliers
 INSERT INTO warehouse (tenant_id, name, code, address)
 SELECT 
-  id,
-  name || ' - Main Warehouse',
+  s.id,
+  s.name || ' - Main Warehouse',
   'MAIN',
-  jsonb_build_object(
-    'street', address_line1,
-    'city', city,
-    'state', state,
-    'zip', postal_code,
-    'country', country
-  )
-FROM supplier
+  COALESCE(s.address_json, '{}'::jsonb)
+FROM supplier s
 WHERE NOT EXISTS (
-  SELECT 1 FROM warehouse WHERE warehouse.tenant_id = supplier.id
-)
-ON CONFLICT DO NOTHING;
+  SELECT 1 FROM warehouse w WHERE w.tenant_id = s.id
+);
 
 COMMENT ON TABLE branch IS 'Restaurant branches for multi-location operations';
 COMMENT ON TABLE warehouse IS 'Supplier warehouses for inventory management';

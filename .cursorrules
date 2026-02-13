@@ -15,6 +15,19 @@
   11) update the CONTRIBUTING.md file to reflect the changes
   12) update the PULL_REQUEST_TEMPLATE.md file to reflect the changes
   13) write test cases since later on a  qa dev will be doing manual testing
+  14) update any migrations needed to reflect the changes
+  15) update any seed data needed to reflect the changes
+  16) update any config files needed to reflect the changes
+  17) update any documentation needed to reflect the changes
+  18) update any test cases needed to reflect the changes
+  19) update any test coverage needed to reflect the changes
+  20) update any production readiness needed to reflect the changes
+  21) update any notifications summary needed to reflect the changes
+  22) update any security needed to reflect the changes
+  23) update any license needed to reflect the changes
+  24) update any code of conduct needed to reflect the changes
+  25) update any contributing needed to reflect the changes
+  26) update any pull request template needed to reflect the changes
 
 - Do NOT change public APIs unless explicitly asked. If you must, document breaking changes.
 

@@ -1,9 +1,16 @@
 -- Extended staff app schema for PTO, swaps, announcements, documents, incidents, payroll exports
 
-CREATE TYPE staff_pto_type AS ENUM ('VACATION','SICK','PERSONAL','UNPAID','OTHER');
-CREATE TYPE staff_pto_status AS ENUM ('PENDING','APPROVED','DECLINED','CANCELLED');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'staff_pto_type') THEN
+    CREATE TYPE staff_pto_type AS ENUM ('VACATION','SICK','PERSONAL','UNPAID','OTHER');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'staff_pto_status') THEN
+    CREATE TYPE staff_pto_status AS ENUM ('PENDING','APPROVED','DECLINED','CANCELLED');
+  END IF;
+END $$;
 
-CREATE TABLE staff_pto_request (
+CREATE TABLE IF NOT EXISTS staff_pto_request (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
   staff_id UUID NOT NULL REFERENCES staff_member(id) ON DELETE CASCADE,
@@ -24,7 +31,7 @@ CREATE TABLE staff_pto_request (
 CREATE INDEX idx_staff_pto_restaurant_status ON staff_pto_request (restaurant_id, status);
 CREATE INDEX idx_staff_pto_staff ON staff_pto_request (staff_id);
 
-CREATE TABLE staff_availability (
+CREATE TABLE IF NOT EXISTS staff_availability (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
   staff_id UUID NOT NULL REFERENCES staff_member(id) ON DELETE CASCADE,
@@ -36,9 +43,14 @@ CREATE TABLE staff_availability (
   UNIQUE (staff_id, weekday)
 );
 
-CREATE TYPE staff_swap_status AS ENUM ('REQUESTED','APPROVED','DECLINED','CANCELLED','COMPLETED');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'staff_swap_status') THEN
+    CREATE TYPE staff_swap_status AS ENUM ('REQUESTED','APPROVED','DECLINED','CANCELLED','COMPLETED');
+  END IF;
+END $$;
 
-CREATE TABLE staff_shift_swap (
+CREATE TABLE IF NOT EXISTS staff_shift_swap (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
   shift_id UUID NOT NULL REFERENCES staff_shift(id) ON DELETE CASCADE,
@@ -53,7 +65,7 @@ CREATE TABLE staff_shift_swap (
 
 CREATE INDEX idx_staff_swap_restaurant_status ON staff_shift_swap (restaurant_id, status);
 
-CREATE TABLE staff_announcement (
+CREATE TABLE IF NOT EXISTS staff_announcement (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
@@ -68,7 +80,7 @@ CREATE TABLE staff_announcement (
 
 CREATE INDEX idx_staff_announcement_restaurant ON staff_announcement (restaurant_id, published_at DESC);
 
-CREATE TABLE staff_announcement_ack (
+CREATE TABLE IF NOT EXISTS staff_announcement_ack (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   announcement_id UUID NOT NULL REFERENCES staff_announcement(id) ON DELETE CASCADE,
   staff_id UUID NOT NULL REFERENCES staff_member(id) ON DELETE CASCADE,
@@ -76,7 +88,7 @@ CREATE TABLE staff_announcement_ack (
   UNIQUE (announcement_id, staff_id)
 );
 
-CREATE TABLE staff_document (
+CREATE TABLE IF NOT EXISTS staff_document (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
   staff_id UUID NOT NULL REFERENCES staff_member(id) ON DELETE CASCADE,
@@ -94,9 +106,14 @@ CREATE TABLE staff_document (
 CREATE INDEX idx_staff_document_restaurant ON staff_document (restaurant_id, status);
 CREATE INDEX idx_staff_document_staff ON staff_document (staff_id);
 
-CREATE TYPE staff_incident_severity AS ENUM ('LOW','MEDIUM','HIGH','CRITICAL');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'staff_incident_severity') THEN
+    CREATE TYPE staff_incident_severity AS ENUM ('LOW','MEDIUM','HIGH','CRITICAL');
+  END IF;
+END $$;
 
-CREATE TABLE staff_incident (
+CREATE TABLE IF NOT EXISTS staff_incident (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
   staff_id UUID REFERENCES staff_member(id) ON DELETE SET NULL,
@@ -113,7 +130,7 @@ CREATE TABLE staff_incident (
 
 CREATE INDEX idx_staff_incident_restaurant ON staff_incident (restaurant_id, occurred_at DESC);
 
-CREATE TABLE staff_performance_note (
+CREATE TABLE IF NOT EXISTS staff_performance_note (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
   staff_id UUID NOT NULL REFERENCES staff_member(id) ON DELETE CASCADE,
@@ -125,7 +142,7 @@ CREATE TABLE staff_performance_note (
 
 CREATE INDEX idx_staff_performance_restaurant ON staff_performance_note (restaurant_id, created_at DESC);
 
-CREATE TABLE staff_payroll_export (
+CREATE TABLE IF NOT EXISTS staff_payroll_export (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
   period_start DATE NOT NULL,
