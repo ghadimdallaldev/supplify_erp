@@ -1,5 +1,11 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  resolveAdminContext,
+  requirePermission,
+} from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
@@ -14,7 +20,12 @@ import { z } from 'zod'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requirePermission('CATALOG_VIEW'))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  resolveAdminContext,
+  requirePermission('CATALOG_VIEW')
+)
 
 // Lazy cache: does product table have a tags column? (migration 0026 adds it)
 let _productHasTagsColumn = null

@@ -79,27 +79,24 @@ const SelectValue = ({
 SelectValue.displayName = 'SelectValue'
 
 // SelectContent - wrapper for items (for compatibility, but not needed for native select)
-const SelectContent = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<'div'>
->(({ className, children }) => {
-  // For native select, this doesn't render anything - items go directly in SelectTrigger
-  return null
-})
+const SelectContent = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
+  ({ className, children }, ref) => {
+    // For native select, this doesn't render anything - items go directly in SelectTrigger
+    return null
+  }
+)
 SelectContent.displayName = 'SelectContent'
 
 // SelectItem - renders as option
-const SelectItem = React.forwardRef<
-  HTMLOptionElement,
-  React.ComponentProps<'option'>
->(({ className, children, ...rest }, ref) => {
-  return (
-    <option ref={ref} className={cn(className)} {...rest}>
-      {children}
-    </option>
-  )
-})
+const SelectItem = React.forwardRef<HTMLOptionElement, React.ComponentProps<'option'>>(
+  ({ className, children, ...rest }, ref) => {
+    return (
+      <option ref={ref} className={cn(className)} {...rest}>
+        {children}
+      </option>
+    )
+  }
+)
 SelectItem.displayName = 'SelectItem'
 
 export { Select, SelectTrigger, SelectValue, SelectContent, SelectItem }
-
