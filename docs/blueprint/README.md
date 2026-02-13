@@ -8,6 +8,16 @@ This folder contains Mermaid diagrams and documentation that reflect the current
 - **GitHub:** Render `.mmd` by renaming to `.md` or embedding in markdown with ```mermaid code blocks.
 - **Online:** Paste diagram content into [mermaid.live](https://mermaid.live).
 
+## Styling (optional)
+
+UI sitemaps use a shared theme for clearer rendering. To reuse it in other `.mmd` flowcharts, add this first line:
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e3f2fd', 'primaryTextColor':'#0d47a1', 'primaryBorderColor':'#1976d2', 'lineColor':'#546e7a' }}}%%
+```
+
+Use **subgraphs** to group related nodes and **shorter labels** (path + one line) to avoid wrapping in preview.
+
 ## Contents
 
 - **system_context.mmd** — System context (users, API, DB, Keycloak).

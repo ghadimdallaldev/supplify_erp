@@ -1,15 +1,31 @@
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e3f2fd', 'primaryTextColor':'#0d47a1', 'primaryBorderColor':'#1976d2', 'lineColor':'#546e7a', 'secondaryColor':'#f5f5f5', 'tertiaryColor':'#fffde7' }}}%%
 flowchart TB
   Root["/"]
   App["/app"]
-  Dashboard["/app/dashboard\nDashboardPage"]
-  Products["/app/products\nProductsPage"]
-  Orders["/app/orders\nOrdersPage"]
-  Fulfillment["/app/fulfillment\nFulfillmentPage"]
-  Inventory["/app/inventory\nInventoryPage"]
-  Restaurants["/app/restaurants\nRestaurantsPage"]
-  Chat["/app/chat\nChatPage"]
-  Invoices["/app/invoices\nInvoicesPage"]
-  Settings["/app/supplier-settings\nSupplierSettingsPage\nSubscriptionInfo"]
+
+  subgraph core[" Core "]
+    Dashboard["/dashboard\nDashboard"]
+  end
+
+  subgraph catalog[" Catalog & Orders "]
+    Products["/products\nProducts"]
+    Orders["/orders\nOrders"]
+    Fulfillment["/fulfillment\nFulfillment"]
+  end
+
+  subgraph operations[" Operations "]
+    Inventory["/inventory\nInventory"]
+    Restaurants["/restaurants\nRestaurants"]
+  end
+
+  subgraph comms[" Comms & Billing "]
+    Chat["/chat\nChat"]
+    Invoices["/invoices\nInvoices"]
+  end
+
+  subgraph account[" Account "]
+    Settings["/supplier-settings\nSettings\nSubscription"]
+  end
 
   Root --> App
   App --> Dashboard
@@ -21,3 +37,8 @@ flowchart TB
   App --> Chat
   App --> Invoices
   App --> Settings
+
+  classDef root fill:#fff3e0,stroke:#e65100,stroke-width:2px
+  classDef app fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+  class Root root
+  class App app

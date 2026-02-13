@@ -1,26 +1,48 @@
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e3f2fd', 'primaryTextColor':'#0d47a1', 'primaryBorderColor':'#1976d2', 'lineColor':'#546e7a', 'secondaryColor':'#f5f5f5', 'tertiaryColor':'#fffde7' }}}%%
 flowchart TB
   Root["/"]
   App["/app"]
-  Dashboard["/app/dashboard\nDashboardPage"]
-  Orders["/app/orders\nOrdersPage"]
-  OrderDetail["/app/orders/:id\nOrderDetailPage"]
-  Cart["/app/cart\nCartPage"]
-  Products["/app/products\nProductsPage"]
-  QuickLists["/app/quick-lists\nQuickListsPage"]
-  RestaurantInventory["/app/restaurant-inventory\nRestaurantInventoryPage"]
-  Suppliers["/app/suppliers\nSuppliersPage"]
-  Receiving["/app/receiving\nReceivingPage"]
-  Reservations["/app/reservations\nReservationsPage"]
-  Staff["/app/staff\nStaffPage"]
-  Chat["/app/chat\nChatPage"]
-  Invoices["/app/invoices\nInvoicesPage"]
-  Settings["/app/settings\nSettingsPage\nSubscriptionInfo, Usage"]
-  Onboarding["/app/onboarding\nRestaurantOnboardingPage"]
+
+  subgraph core[" Core "]
+    Dashboard["/dashboard\nDashboard"]
+    Onboarding["/onboarding\nOnboarding"]
+  end
+
+  subgraph commerce[" Orders & Cart "]
+    Orders["/orders\nOrders"]
+    OrderDetail["/orders/:id\nOrder details"]
+    Cart["/cart\nCart"]
+  end
+
+  subgraph catalog[" Catalog & Lists "]
+    Products["/products\nProducts"]
+    QuickLists["/quick-lists\nQuick lists"]
+  end
+
+  subgraph operations[" Inventory & Suppliers "]
+    RestaurantInventory["/restaurant-inventory\nInventory"]
+    Suppliers["/suppliers\nSuppliers"]
+    Receiving["/receiving\nReceiving"]
+  end
+
+  subgraph people[" People & Bookings "]
+    Reservations["/reservations\nReservations"]
+    Staff["/staff\nStaff"]
+  end
+
+  subgraph comms[" Comms & Billing "]
+    Chat["/chat\nChat"]
+    Invoices["/invoices\nInvoices"]
+  end
+
+  subgraph account[" Account "]
+    Settings["/settings\nSettings\nSubscription, Usage"]
+  end
 
   Root --> App
   App --> Dashboard
+  App --> Onboarding
   App --> Orders
-  Orders --> OrderDetail
   App --> Cart
   App --> Products
   App --> QuickLists
@@ -32,4 +54,9 @@ flowchart TB
   App --> Chat
   App --> Invoices
   App --> Settings
-  App --> Onboarding
+  Orders --> OrderDetail
+
+  classDef root fill:#fff3e0,stroke:#e65100,stroke-width:2px
+  classDef app fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+  class Root root
+  class App app
