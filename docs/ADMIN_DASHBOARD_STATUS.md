@@ -1,54 +1,101 @@
-# Admin Dashboard System
+# Admin Features – Implementation Status
 
 ## Overview
-Complete subscription-based admin dashboard system with separate views for suppliers and restaurants.
 
-## Features
+Supplify’s admin area is a subscription-based operator console for managing tenants, plans, subscriptions, usage, and support (including chat and impersonation). Access is limited to users with the **ADMIN** role.
 
-### Admin Dashboard (`/app/admin`)
-Full admin panel with all features:
-- **Overview**: Platform metrics (MRR, ARR, tenants, subscriptions)
-- **Plans**: Manage subscription plans
-- **Subscriptions**: All tenant subscriptions
-- **Tenants**: Supplier & Restaurant directories
-- **Features**: Controlled via subscription plan features JSONB
-- **Usage**: Usage metrics and quotas
-- **Audit Logs**: Admin action history
+**Full guide:** [ADMIN.md](./ADMIN.md)  
+**Audit & roadmap:** [ADMIN_AUDIT.md](./ADMIN_AUDIT.md)
 
-### Supplier Admin (`/app/admin/suppliers`)
-Supplier-focused management:
-- **Directory**: Supplier table (products, warehouses, revenue, subscription status)
-- **Usage & Quotas**: Product usage metrics, over-limit tracking
-- **Audit Logs**: Supplier-specific admin actions
+---
 
-### Restaurant Admin (`/app/admin/restaurants`)
-Restaurant-focused management:
-- **Directory**: Restaurant table (orders, spending, subscription status)
-- **Usage & Quotas**: Order metrics, spending analytics
-- **Audit Logs**: Restaurant-specific admin actions
+## Access & Navigation
 
-## Technical Details
+- **Base URL:** `/app/admin` (and `/app/admin/suppliers`, `/app/admin/restaurants`)
+- **Sidebar (admin only):** Admin Dashboard, Supplier Admin, Restaurant Admin, Settings
+- Admins do **not** see the standard Dashboard, Products, Orders, or Chat in the main nav; they use the admin views and can still use Chat in admin mode (join/start conversations).
 
-### Navigation
-- Custom sidebar for admins showing only: Admin Dashboard, Supplier Admin, Restaurant Admin, Settings
-- Directory tab opens by default on supplier/restaurant admin pages
+---
 
-### Data Loading
-- Proper error handling with user-friendly messages
-- Loading states with spinners
-- Empty state messages
-- Debug logging for troubleshooting
+## Admin Dashboard (`/app/admin`)
 
-### Bug Fixes
-- Fixed string concatenation issue in metrics (now uses `parseInt()`)
-- Simplified SQL queries to prevent JOIN errors
-- JSX syntax fixes with proper fragment wrapping
+| Feature           | Status | Description                                                                                                                                                 |
+| ----------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**      | ✅     | Platform metrics: tenant counts (supplier/restaurant), subscription status breakdown, MRR/ARR, active subscriptions, orders/chats last 24h, past-due alerts |
+| **Plans**         | ✅     | List all subscription plans; create plan; edit plan (name, pricing, limits, features, trial days, display order, active)                                    |
+| **Subscriptions** | ✅     | List all tenant subscriptions with filters (status, tenant type); edit subscription (plan, status, cancel reason)                                           |
+| **Tenants**       | ✅     | Supplier and Restaurant directories with plan, status, product/order counts, revenue/spend; **Impersonate** button per row to “view as” that tenant         |
+| **Usage**         | ✅     | Usage & quotas view; per-tenant usage (supplier/restaurant admin pages); over-limit tracking                                                                |
+| **Audit Logs**    | ✅     | Admin action history (plan/subscription/override changes, impersonation start/stop, chat admin actions); filters by tenant, action type                     |
 
-## Usage
+---
 
-Admins can now efficiently manage:
-1. **Suppliers**: Track product counts, warehouses, revenue, subscriptions
-2. **Restaurants**: Monitor orders, spending, subscription status
-3. **Overall Platform**: View aggregated metrics and manage plans
+## Impersonation (View as Tenant)
 
-All data is real-time from the PostgreSQL database with proper subscription enforcement.
+| Feature                  | Status | Description                                                                                                                                                                                                         |
+| ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Start impersonation**  | ✅     | From Tenants tab: click **Impersonate** on a supplier or restaurant. Signed short-lived JWT cookie; configurable duration (`IMPERSONATION_MAX_DURATION_MINUTES`).                                                   |
+| **Impersonation banner** | ✅     | Amber banner at top of app: “You are impersonating [name]” with **Stop impersonating**; shows expiry.                                                                                                               |
+| **Stop impersonation**   | ✅     | Button in banner clears cookie and logs `IMPERSONATION_END`.                                                                                                                                                        |
+| **Security**             | ✅     | Cannot impersonate a user with Admin role; token includes admin user id so only that admin can use the session; start/stop audited in `admin_audit_log`.                                                            |
+| **API**                  | ✅     | `POST/GET /api/admin-dashboard/impersonate`, `POST /api/admin-dashboard/impersonate/stop`; middleware `impersonationContext` sets `req.impersonationContext`; `getEffectiveTenant(req)` for backend tenant scoping. |
+
+---
+
+## Supplier Admin (`/app/admin/suppliers`)
+
+| Feature            | Status | Description                                                                                     |
+| ------------------ | ------ | ----------------------------------------------------------------------------------------------- |
+| **Directory**      | ✅     | Supplier table: name, email, plan, subscription status, product count, warehouse count, revenue |
+| **Usage & Quotas** | ✅     | Product/warehouse usage; over-limit indicators                                                  |
+| **Audit Logs**     | ✅     | Admin actions (tab)                                                                             |
+| **Impersonate**    | ✅     | Per-row **Impersonate** to view as that supplier                                                |
+
+---
+
+## Restaurant Admin (`/app/admin/restaurants`)
+
+| Feature            | Status | Description                                                                         |
+| ------------------ | ------ | ----------------------------------------------------------------------------------- |
+| **Directory**      | ✅     | Restaurant table: name, email, plan, subscription status, orders (30d), total spent |
+| **Usage & Quotas** | ✅     | Order and spending metrics                                                          |
+| **Audit Logs**     | ✅     | Admin actions (tab)                                                                 |
+| **Impersonate**    | ✅     | Per-row **Impersonate** to view as that restaurant                                  |
+
+---
+
+## Tenant Limit Overrides
+
+| Feature             | Status | Description                                                                                                                       |
+| ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Add override**    | ✅     | `POST /api/admin-dashboard/tenants/:tenantType/:id/override-limit` (limit_type, override_value, expiration_date, reason); audited |
+| **Remove override** | ✅     | `DELETE .../override-limit/:overrideId`; audited                                                                                  |
+| **Enforcement**     | ✅     | Plan enforcement (e.g. branches, warehouses) respects overrides from `tenant_limit_override`                                      |
+
+---
+
+## Chat Admin
+
+| Feature                | Status | Description                                                                                                                                   |
+| ---------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Join conversation**  | ✅     | `POST /api/chat/conversations/:id/admin-join`; admin added as participant; system message; audit                                              |
+| **Start conversation** | ✅     | `POST /api/chat/admin/start-conversation` (tenant_id, tenant_type, initial_message); creates conversation with `is_admin_conversation`; audit |
+| **List conversations** | ✅     | `GET /api/chat/admin/conversations`; tenant name/email, admin count, last message                                                             |
+
+---
+
+## Technical Notes
+
+- **Auth:** All admin routes use `requireAuth` and `requireRole(['ADMIN'])`.
+- **Audit:** Admin actions write to `admin_audit_log` (admin_user_id, action_type, target entity, old/new value, ip, user_agent).
+- **Impersonation:** Middleware `impersonationContext` runs globally after request context; cookie `impersonation_token` (httpOnly, sameSite, path=/). Use `getEffectiveTenant(req)` in routes that should scope by impersonated tenant.
+- **Data:** Real-time from PostgreSQL; subscription and plan enforcement applied.
+
+---
+
+## Not Yet Implemented (see ADMIN_AUDIT.md)
+
+- Admin sub-roles (e.g. SUPER_ADMIN, SUPPORT_ADMIN, FINANCE_ADMIN) and permission matrix
+- System Health tab (failed jobs, webhook/API errors, DB pool, email failures)
+- Global Financial Dashboard (GMV, outstanding/overdue, MRR/ARR, top tenants by revenue/overdue, revenue by plan)
+- Full UI wiring for Plan/Subscription “Edit” and Override dialogs (partial today)

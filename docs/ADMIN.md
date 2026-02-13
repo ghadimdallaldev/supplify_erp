@@ -51,12 +51,14 @@ Navigate to `/app/admin` (visible only to users with ADMIN role).
 **Admin → Plans**
 
 Shows all 4 Supplify plans:
+
 - Free (Free)
 - Bronze ($49/mo)
 - Gold ($149/mo)
 - Platinum ($349/mo)
 
 Each shows:
+
 - Pricing (monthly/yearly)
 - Included limits
 - Enabled features
@@ -75,6 +77,7 @@ To change what a plan includes:
 **Impact:** All existing tenants on that plan inherit changes immediately.
 
 **Example:** Changing Bronze to include 2 branches
+
 - Before: Bronze tenants limited to 1 branch
 - After: Bronze tenants can create 2 branches
 - Existing tenants get access instantly
@@ -99,6 +102,7 @@ To update pricing:
 **Admin → Subscriptions**
 
 Shows:
+
 - All active/trial/cancelled subscriptions
 - Tenant name and email
 - Plan and status
@@ -118,11 +122,13 @@ To upgrade or downgrade a tenant:
 5. Confirm change
 
 **Upgrades:**
+
 - Take effect immediately
 - No data loss
 - Prorated billing (future feature)
 
 **Downgrades:**
+
 - Show impact preview first
 - Excess resources locked (not deleted)
 - Upgrade prompts shown to tenant
@@ -138,6 +144,7 @@ To give a tenant a trial:
 4. Confirm
 
 **During Trial:**
+
 - Full plan features enabled
 - Usage tracked normally
 - Auto-converts to paid on expiry (or cancels)
@@ -154,6 +161,7 @@ To temporarily increase limits:
 5. Add reason (required for audit)
 
 **Use Cases:**
+
 - Temporary expansion needs
 - Testing new features
 - Special partnership deals
@@ -170,12 +178,14 @@ To suspend (non-payment, abuse):
 5. Confirm
 
 **While Suspended:**
+
 - Tenant locked out (cannot log in)
 - Usage frozen (no increment)
 - Data preserved
 - Email sent to tenant
 
 **To Resume:**
+
 1. Find suspended tenant
 2. Click "Resume Account"
 3. Confirm
@@ -191,6 +201,7 @@ Account fully reactivated.
 **Admin Dashboard → Coming Soon**
 
 Admins will be able to:
+
 - See all active conversations
 - Filter by restaurant, supplier, or both
 - See escalated conversations
@@ -207,6 +218,7 @@ To help resolve an issue:
 5. You can see full chat history
 
 **While in Chat:**
+
 - Mark issues as "Resolved"
 - Escalate to management
 - Take notes
@@ -232,11 +244,39 @@ Conversation appears in tenant's chat with "From Supplify Admin" label.
 
 ---
 
+## Impersonation (View as Tenant)
+
+Admins can **impersonate** a Restaurant or Supplier to see the app as that tenant would, without logging in as them.
+
+### How to use
+
+1. Go to **Admin Dashboard** → **Tenants** (or Supplier Admin / Restaurant Admin).
+2. Find the tenant and click **Impersonate**.
+3. A banner appears at the top: **"You are impersonating [name]"** with a **Stop impersonating** button.
+4. Click **Stop impersonating** to end the session.
+
+### Design and security
+
+- **Signed short-lived token:** Impersonation is stored in a signed JWT cookie (`impersonation_token`). Token includes admin user id, tenant id/type/name, and expiry.
+- **Duration:** Configurable via `IMPERSONATION_MAX_DURATION_MINUTES` (default 60). Token expires after that time.
+- **Cannot impersonate admins:** If the tenant’s contact email is an ADMIN user, the API returns 403. Only Restaurant or Supplier tenants can be impersonated.
+- **Audit:** Every start and stop is logged in `admin_audit_log` (`IMPERSONATION_START`, `IMPERSONATION_END`) with admin user, target tenant, and timestamp.
+- **Session isolation:** The effective tenant is only applied when the cookie is valid and the logged-in user is the same admin who started impersonation (`getEffectiveTenant(req)`). Other users cannot use a copied cookie to act as that tenant.
+
+### API
+
+- `POST /api/admin-dashboard/impersonate` — body: `{ tenantId, tenantType: "RESTAURANT" | "SUPPLIER" }`. Sets cookie and returns `expiresAt`.
+- `POST /api/admin-dashboard/impersonate/stop` — clears cookie and logs end.
+- `GET /api/admin-dashboard/impersonate` — returns `{ active: true, tenantId, tenantType, tenantName, expiresAt }` or `{ active: false }` for the UI banner.
+
+---
+
 ## Managing Plan Features
 
 Features are controlled directly through subscription plans. Each plan has a `features` JSONB field that defines which features are available.
 
 **To Enable/Disable Features:**
+
 1. Admin → Plans
 2. Select plan (Free, Bronze, Gold, Platinum)
 3. Edit plan features
@@ -254,6 +294,7 @@ All tenants on that plan will immediately have access to the updated features.
 **Admin → Usage**
 
 Shows:
+
 - Total branches across all restaurants
 - Total warehouses across all suppliers
 - Daily orders across platform
@@ -263,6 +304,7 @@ Shows:
 ### Identify At-Risk Tenants
 
 Look for:
+
 - **80% of limits** → Yellow warnings
 - **100% of limits** → Red blocked
 - **Declining usage** → Churn risk
@@ -288,6 +330,7 @@ Audit log records who changed what.
 ### Available Filters
 
 **Tenants:**
+
 - Type (Restaurant/Supplier)
 - Plan
 - Status (Active/Suspended/Trial)
@@ -296,12 +339,14 @@ Audit log records who changed what.
 - Search by name or email
 
 **Subscriptions:**
+
 - Plan
 - Status
 - Date range
 - MRR threshold
 
 **Audit Logs:**
+
 - Action type
 - Admin user
 - Date range
@@ -319,6 +364,7 @@ Audit log records who changed what.
 ## Important Actions Require Confirmation
 
 These actions require explicit confirmation:
+
 - Plan downgrade (shows impact preview)
 - Account suspension
 - Usage counter manual adjustment
@@ -332,6 +378,7 @@ These actions require explicit confirmation:
 ### What's Logged
 
 Every admin action creates an audit entry:
+
 - Who (admin email)
 - When (timestamp)
 - What (action description)
@@ -343,6 +390,7 @@ Every admin action creates an audit entry:
 **Admin → Audit Logs**
 
 Shows:
+
 - All admin actions in chronological order
 - Filterable by action type, admin, date
 - Searchable by tenant name or description
@@ -368,6 +416,7 @@ Always preview downgrades to confirm impact before confirming.
 ### 2. Document Overrides
 
 Always add reason when granting overrides. Helps with:
+
 - Billing reconciliation
 - Support context
 - Compliance audits
@@ -375,6 +424,7 @@ Always add reason when granting overrides. Helps with:
 ### 3. Monitor Usage Trends
 
 Check usage tab weekly to spot:
+
 - Tenants approaching limits (upgrade opportunity)
 - Declining usage (churn risk)
 - Unexpected spikes (data quality issues)
@@ -382,6 +432,7 @@ Check usage tab weekly to spot:
 ### 4. Use Chat Sparingly
 
 Only join conversations when:
+
 - Tenant explicitly requests admin help
 - Issue is escalated
 - Policy clarification needed
@@ -390,6 +441,7 @@ Only join conversations when:
 ### 5. Stay in Audit Trail
 
 Don't make changes via database directly. Always use admin UI for:
+
 - Audit trail
 - Validation
 - User notifications
@@ -400,14 +452,17 @@ Don't make changes via database directly. Always use admin UI for:
 ## Troubleshooting
 
 **Issue:** Tenant can't access feature but it's enabled in their plan
+
 - **Check:** Tenant may have an override disabling it
 - **Fix:** Remove override or check if global flag is off
 
 **Issue:** Upgrade didn't unlock features
+
 - **Check:** Plan defaults may not include the feature
 - **Fix:** Update plan features in Plans tab
 
 **Issue:** Usage counter seems wrong
+
 - **Check:** Run reconciliation job
 - **Fix:** If still wrong, manually adjust with reason
 
@@ -432,4 +487,3 @@ When tenant issues require backend help:
 ---
 
 Last Updated: [Current Date]
-

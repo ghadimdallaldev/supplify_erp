@@ -1032,6 +1032,38 @@ export const api = createApi({
       query: (id) => `/api/admin-dashboard/tenants/restaurants/${id}/usage`,
       providesTags: ['Admin'],
     }),
+    // Impersonation (admin "view as" tenant)
+    getImpersonationStatus: builder.query<
+      {
+        active: boolean
+        tenantId?: string
+        tenantType?: string
+        tenantName?: string
+        expiresAt?: string
+      },
+      void
+    >({
+      query: () => '/api/admin-dashboard/impersonate',
+      providesTags: ['Admin', 'User'],
+    }),
+    startImpersonation: builder.mutation<
+      { tenantId: string; tenantType: string; tenantName: string; expiresAt: string },
+      { tenantId: string; tenantType: 'RESTAURANT' | 'SUPPLIER' }
+    >({
+      query: (body) => ({
+        url: '/api/admin-dashboard/impersonate',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Admin', 'User'],
+    }),
+    stopImpersonation: builder.mutation<{ stopped: boolean }, void>({
+      query: () => ({
+        url: '/api/admin-dashboard/impersonate/stop',
+        method: 'POST',
+      }),
+      invalidatesTags: ['Admin', 'User'],
+    }),
   }),
 })
 
@@ -1146,4 +1178,7 @@ export const {
   useGetAdminRestaurantsQuery,
   useGetSupplierUsageQuery,
   useGetRestaurantUsageQuery,
+  useGetImpersonationStatusQuery,
+  useStartImpersonationMutation,
+  useStopImpersonationMutation,
 } = api

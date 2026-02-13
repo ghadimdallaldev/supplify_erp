@@ -20,6 +20,7 @@
     "seed:accounts": "pnpm --filter @supplify/api seed:accounts",
     "seed:quick-lists": "pnpm --filter @supplify/api seed:quick-lists",
     "seed:chats": "pnpm --filter @supplify/api seed:chats",
+    "seed:demo-users": "pnpm --filter @supplify/api seed:demo-users",
     "db:reset": "pnpm --filter @supplify/api db:reset",
     "openapi:gen": "pnpm --filter @supplify/api openapi:gen",
     "cdk:bootstrap": "cd infra && pnpm install && pnpm bootstrap",

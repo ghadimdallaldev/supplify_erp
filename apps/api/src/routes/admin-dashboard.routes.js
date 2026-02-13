@@ -1,38 +1,57 @@
-import { Router } from 'express';
-import { query } from '../lib/db.js';
-import { requireAuth, requireRole } from '../lib/rbac.js';
-import { z } from 'zod';
-import { logger } from '../lib/logger.js';
-import { ZodError } from 'zod';
+import { Router } from 'express'
+import { query } from '../lib/db.js'
+import { requireAuth, requireRole } from '../lib/rbac.js'
+import { z } from 'zod'
+import { logger } from '../lib/logger.js'
+import { ZodError } from 'zod'
+import { config } from '../config/env.js'
+import {
+  createImpersonationToken,
+  verifyImpersonationToken,
+  getImpersonationCookieName,
+  getEffectiveTenant,
+} from '../lib/impersonation.js'
 
-const router = Router();
+const router = Router()
 
 // ========================================
 // AUDIT LOGGING HELPERS
 // ========================================
-async function logAudit(req, actionType, actionDescription, targetEntityType, targetEntityId, oldValue, newValue, metadata = {}) {
+async function logAudit(
+  req,
+  actionType,
+  actionDescription,
+  targetEntityType,
+  targetEntityId,
+  oldValue,
+  newValue,
+  metadata = {}
+) {
   try {
-    await query(`
+    await query(
+      `
       INSERT INTO admin_audit_log (
         admin_user_id, admin_name, action_type, action_description,
         target_entity_type, target_entity_id, old_value, new_value, metadata,
         ip_address, user_agent
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    `, [
-      req.userData.id,
-      req.userData.display_name || req.userData.email,
-      actionType,
-      actionDescription,
-      targetEntityType,
-      targetEntityId,
-      oldValue ? JSON.stringify(oldValue) : null,
-      newValue ? JSON.stringify(newValue) : null,
-      JSON.stringify(metadata),
-      req.ip,
-      req.get('user-agent')
-    ]);
+    `,
+      [
+        req.userData.id,
+        req.userData.display_name || req.userData.email,
+        actionType,
+        actionDescription,
+        targetEntityType,
+        targetEntityId,
+        oldValue ? JSON.stringify(oldValue) : null,
+        newValue ? JSON.stringify(newValue) : null,
+        JSON.stringify(metadata),
+        req.ip,
+        req.get('user-agent'),
+      ]
+    )
   } catch (error) {
-    logger.error('Failed to log audit event:', error);
+    logger.error('Failed to log audit event:', error)
     // Don't throw - audit logging should not fail requests
   }
 }
@@ -49,7 +68,7 @@ router.get('/overview', requireAuth, requireRole(['ADMIN']), async (req, res) =>
       { rows: revenueStats },
       { rows: recentOrders },
       { rows: recentChats },
-      { rows: alerts }
+      { rows: alerts },
     ] = await Promise.all([
       query(`
         SELECT tenant_type, COUNT(*) as count
@@ -84,46 +103,46 @@ router.get('/overview', requireAuth, requireRole(['ADMIN']), async (req, res) =>
         SELECT COUNT(*) as count
         FROM subscription
         WHERE status = 'PAST_DUE'
-      `)
-    ]);
+      `),
+    ])
 
     res.json({
       ok: true,
       data: {
         tenantCounts: tenantCounts.reduce((acc, row) => {
-          acc[row.tenant_type] = parseInt(row.count);
-          return acc;
+          acc[row.tenant_type] = parseInt(row.count)
+          return acc
         }, {}),
         subscriptionStats: subscriptionStats.reduce((acc, row) => {
-          acc[row.status] = parseInt(row.count);
-          return acc;
+          acc[row.status] = parseInt(row.count)
+          return acc
         }, {}),
         revenue: {
           mrr: parseFloat(revenueStats[0]?.mrr || 0),
           activeSubscriptions: parseInt(revenueStats[0]?.active_subscriptions || 0),
-          arr: parseFloat(revenueStats[0]?.mrr || 0) * 12
+          arr: parseFloat(revenueStats[0]?.mrr || 0) * 12,
         },
         activity: {
           ordersLast24h: parseInt(recentOrders[0]?.count || 0),
-          chatsLast24h: parseInt(recentChats[0]?.count || 0)
+          chatsLast24h: parseInt(recentChats[0]?.count || 0),
         },
         alerts: {
-          pastDueInvoices: parseInt(alerts[0]?.count || 0)
-        }
+          pastDueInvoices: parseInt(alerts[0]?.count || 0),
+        },
       },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get admin overview error:', error);
+    logger.error('Get admin overview error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get admin overview' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // ========================================
 // PLANS MANAGEMENT
@@ -133,28 +152,30 @@ router.get('/plans', requireAuth, requireRole(['ADMIN']), async (req, res) => {
     const { rows: plans } = await query(`
       SELECT * FROM subscription_plan
       ORDER BY display_order, name
-    `);
+    `)
 
     res.json({
       ok: true,
-      data: { plans: plans.map(p => ({
-        ...p,
-        limits: p.limits || {},
-        features: p.features || []
-      })) },
+      data: {
+        plans: plans.map((p) => ({
+          ...p,
+          limits: p.limits || {},
+          features: p.features || [],
+        })),
+      },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get plans error:', error);
+    logger.error('Get plans error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get plans' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 const createPlanSchema = z.object({
   name: z.string().min(1),
@@ -166,58 +187,71 @@ const createPlanSchema = z.object({
   trialDays: z.number().nonnegative().default(0),
   displayOrder: z.number().default(0),
   isActive: z.boolean().default(true),
-});
+})
 
 router.post('/plans', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
-    const planData = createPlanSchema.parse(req.body);
+    const planData = createPlanSchema.parse(req.body)
 
-    const { rows: [plan] } = await query(`
+    const {
+      rows: [plan],
+    } = await query(
+      `
       INSERT INTO subscription_plan (
         name, description, price_per_month, price_per_year,
         limits, features, trial_days, display_order, is_active
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
-    `, [
-      planData.name,
-      planData.description || null,
-      planData.pricePerMonth,
-      planData.pricePerYear || null,
-      JSON.stringify(planData.limits),
-      JSON.stringify(planData.features),
-      planData.trialDays,
-      planData.displayOrder,
-      planData.isActive
-    ]);
+    `,
+      [
+        planData.name,
+        planData.description || null,
+        planData.pricePerMonth,
+        planData.pricePerYear || null,
+        JSON.stringify(planData.limits),
+        JSON.stringify(planData.features),
+        planData.trialDays,
+        planData.displayOrder,
+        planData.isActive,
+      ]
+    )
 
-    await logAudit(req, 'plan.created', `Created plan: ${planData.name}`, 'plan', plan.id, null, plan);
-    logger.info(`Plan created: ${planData.name}`);
+    await logAudit(
+      req,
+      'plan.created',
+      `Created plan: ${planData.name}`,
+      'plan',
+      plan.id,
+      null,
+      plan
+    )
+    logger.info(`Plan created: ${planData.name}`)
 
     res.json({
       ok: true,
       data: { plan },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Create plan error:', error);
+    logger.error('Create plan error:', error)
     if (error instanceof ZodError) {
       res.status(400).json({
         ok: false,
         data: null,
         error: { name: 'VALIDATION_ERROR', message: 'Invalid plan data', details: error.errors },
         requestId: req.requestId,
-      });
+      })
     } else {
       res.status(500).json({
         ok: false,
         data: null,
         error: { name: 'INTERNAL_ERROR', message: 'Failed to create plan' },
         requestId: req.requestId,
-      });
+      })
     }
   }
-});
+})
 
 const updatePlanSchema = z.object({
   name: z.string().min(1).optional(),
@@ -229,131 +263,147 @@ const updatePlanSchema = z.object({
   trialDays: z.number().nonnegative().optional(),
   displayOrder: z.number().optional(),
   isActive: z.boolean().optional(),
-});
+})
 
 router.patch('/plans/:id', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
-    const { id } = req.params;
-    const updateData = updatePlanSchema.parse(req.body);
+    const { id } = req.params
+    const updateData = updatePlanSchema.parse(req.body)
 
     // Get existing plan
-    const { rows: existingPlans } = await query('SELECT * FROM subscription_plan WHERE id = $1', [id]);
+    const { rows: existingPlans } = await query('SELECT * FROM subscription_plan WHERE id = $1', [
+      id,
+    ])
     if (existingPlans.length === 0) {
       res.status(404).json({
         ok: false,
         data: null,
         error: { name: 'NOT_FOUND', message: 'Plan not found' },
         requestId: req.requestId,
-      });
-      return;
+      })
+      return
     }
 
-    const existing = existingPlans[0];
+    const existing = existingPlans[0]
 
     // Build update query dynamically
-    const updates = [];
-    const values = [];
-    let paramIndex = 1;
+    const updates = []
+    const values = []
+    let paramIndex = 1
 
     if (updateData.name !== undefined) {
-      updates.push(`name = $${paramIndex++}`);
-      values.push(updateData.name);
+      updates.push(`name = $${paramIndex++}`)
+      values.push(updateData.name)
     }
     if (updateData.description !== undefined) {
-      updates.push(`description = $${paramIndex++}`);
-      values.push(updateData.description);
+      updates.push(`description = $${paramIndex++}`)
+      values.push(updateData.description)
     }
     if (updateData.pricePerMonth !== undefined) {
-      updates.push(`price_per_month = $${paramIndex++}`);
-      values.push(updateData.pricePerMonth);
+      updates.push(`price_per_month = $${paramIndex++}`)
+      values.push(updateData.pricePerMonth)
     }
     if (updateData.pricePerYear !== undefined) {
-      updates.push(`price_per_year = $${paramIndex++}`);
-      values.push(updateData.pricePerYear);
+      updates.push(`price_per_year = $${paramIndex++}`)
+      values.push(updateData.pricePerYear)
     }
     if (updateData.limits !== undefined) {
-      updates.push(`limits = $${paramIndex++}`);
-      values.push(JSON.stringify(updateData.limits));
+      updates.push(`limits = $${paramIndex++}`)
+      values.push(JSON.stringify(updateData.limits))
     }
     if (updateData.features !== undefined) {
-      updates.push(`features = $${paramIndex++}`);
-      values.push(JSON.stringify(updateData.features));
+      updates.push(`features = $${paramIndex++}`)
+      values.push(JSON.stringify(updateData.features))
     }
     if (updateData.trialDays !== undefined) {
-      updates.push(`trial_days = $${paramIndex++}`);
-      values.push(updateData.trialDays);
+      updates.push(`trial_days = $${paramIndex++}`)
+      values.push(updateData.trialDays)
     }
     if (updateData.displayOrder !== undefined) {
-      updates.push(`display_order = $${paramIndex++}`);
-      values.push(updateData.displayOrder);
+      updates.push(`display_order = $${paramIndex++}`)
+      values.push(updateData.displayOrder)
     }
     if (updateData.isActive !== undefined) {
-      updates.push(`is_active = $${paramIndex++}`);
-      values.push(updateData.isActive);
+      updates.push(`is_active = $${paramIndex++}`)
+      values.push(updateData.isActive)
     }
 
-    values.push(id);
+    values.push(id)
 
-    const { rows: [updated] } = await query(`
+    const {
+      rows: [updated],
+    } = await query(
+      `
       UPDATE subscription_plan
       SET ${updates.join(', ')}, updated_at = now()
       WHERE id = $${paramIndex}
       RETURNING *
-    `, values);
+    `,
+      values
+    )
 
-    await logAudit(req, 'plan.updated', `Updated plan: ${existing.name}`, 'plan', id, existing, updated);
-    logger.info(`Plan updated: ${existing.name}`);
+    await logAudit(
+      req,
+      'plan.updated',
+      `Updated plan: ${existing.name}`,
+      'plan',
+      id,
+      existing,
+      updated
+    )
+    logger.info(`Plan updated: ${existing.name}`)
 
     res.json({
       ok: true,
       data: { plan: updated },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Update plan error:', error);
+    logger.error('Update plan error:', error)
     if (error instanceof ZodError) {
       res.status(400).json({
         ok: false,
         data: null,
         error: { name: 'VALIDATION_ERROR', message: 'Invalid plan data', details: error.errors },
         requestId: req.requestId,
-      });
+      })
     } else {
       res.status(500).json({
         ok: false,
         data: null,
         error: { name: 'INTERNAL_ERROR', message: 'Failed to update plan' },
         requestId: req.requestId,
-      });
+      })
     }
   }
-});
+})
 
 // ========================================
 // SUBSCRIPTIONS MANAGEMENT
 // ========================================
 router.get('/subscriptions', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
-    const { status, tenantType } = req.query;
+    const { status, tenantType } = req.query
 
-    let whereClause = '';
-    const params = [];
-    let paramIndex = 1;
+    let whereClause = ''
+    const params = []
+    let paramIndex = 1
 
     if (status) {
-      whereClause += ` WHERE s.status = $${paramIndex++}`;
-      params.push(status);
+      whereClause += ` WHERE s.status = $${paramIndex++}`
+      params.push(status)
     }
 
     if (tenantType) {
-      if (whereClause) whereClause += ' AND';
-      else whereClause = ' WHERE';
-      whereClause += ` s.tenant_type = $${paramIndex++}`;
-      params.push(tenantType);
+      if (whereClause) whereClause += ' AND'
+      else whereClause = ' WHERE'
+      whereClause += ` s.tenant_type = $${paramIndex++}`
+      params.push(tenantType)
     }
 
-    const { rows: subscriptions } = await query(`
+    const { rows: subscriptions } = await query(
+      `
       SELECT s.*,
         sp.price_per_month, sp.price_per_year, sp.limits as plan_limits, sp.features as plan_features,
         COALESCE(
@@ -367,189 +417,391 @@ router.get('/subscriptions', requireAuth, requireRole(['ADMIN']), async (req, re
       LEFT JOIN restaurant r ON (s.tenant_id = r.id AND s.tenant_type = 'RESTAURANT')
       ${whereClause}
       ORDER BY s.created_at DESC
-    `, params);
+    `,
+      params
+    )
 
     res.json({
       ok: true,
       data: { subscriptions },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get subscriptions error:', error);
+    logger.error('Get subscriptions error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get subscriptions' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 const updateSubscriptionSchema = z.object({
   planId: z.string().uuid().optional(),
   status: z.enum(['TRIALING', 'ACTIVE', 'SUSPENDED', 'CANCELLED', 'PAST_DUE']).optional(),
   cancelReason: z.string().optional(),
-});
+})
 
 router.patch('/subscriptions/:id', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
-    const { id } = req.params;
-    const updateData = updateSubscriptionSchema.parse(req.body);
+    const { id } = req.params
+    const updateData = updateSubscriptionSchema.parse(req.body)
 
-    const { rows: existingSubs } = await query('SELECT * FROM subscription WHERE id = $1', [id]);
+    const { rows: existingSubs } = await query('SELECT * FROM subscription WHERE id = $1', [id])
     if (existingSubs.length === 0) {
       res.status(404).json({
         ok: false,
         data: null,
         error: { name: 'NOT_FOUND', message: 'Subscription not found' },
         requestId: req.requestId,
-      });
-      return;
+      })
+      return
     }
 
-    const existing = existingSubs[0];
+    const existing = existingSubs[0]
 
-    const updates = [];
-    const values = [];
-    let paramIndex = 1;
+    const updates = []
+    const values = []
+    let paramIndex = 1
 
     if (updateData.planId) {
-      updates.push(`plan_id = $${paramIndex++}`);
-      values.push(updateData.planId);
-      
+      updates.push(`plan_id = $${paramIndex++}`)
+      values.push(updateData.planId)
+
       // Get new plan name
-      const { rows: plans } = await query('SELECT name FROM subscription_plan WHERE id = $1', [updateData.planId]);
+      const { rows: plans } = await query('SELECT name FROM subscription_plan WHERE id = $1', [
+        updateData.planId,
+      ])
       if (plans.length > 0) {
-        updates.push(`plan_name = $${paramIndex++}`);
-        values.push(plans[0].name);
+        updates.push(`plan_name = $${paramIndex++}`)
+        values.push(plans[0].name)
       }
     }
 
     if (updateData.status) {
-      updates.push(`status = $${paramIndex++}`);
-      values.push(updateData.status);
-      
+      updates.push(`status = $${paramIndex++}`)
+      values.push(updateData.status)
+
       if (updateData.status === 'CANCELLED') {
-        updates.push(`cancelled_at = now()`);
+        updates.push(`cancelled_at = now()`)
       }
     }
 
     if (updateData.cancelReason) {
-      updates.push(`cancel_reason = $${paramIndex++}`);
-      values.push(updateData.cancelReason);
+      updates.push(`cancel_reason = $${paramIndex++}`)
+      values.push(updateData.cancelReason)
     }
 
-    values.push(id);
+    values.push(id)
 
-    const { rows: [updated] } = await query(`
+    const {
+      rows: [updated],
+    } = await query(
+      `
       UPDATE subscription
       SET ${updates.join(', ')}, updated_at = now()
       WHERE id = $${paramIndex}
       RETURNING *
-    `, values);
+    `,
+      values
+    )
 
-    await logAudit(req, 'subscription.updated', `Updated subscription status to ${updateData.status || 'unchanged'}`, 'subscription', id, existing, updated);
+    await logAudit(
+      req,
+      'subscription.updated',
+      `Updated subscription status to ${updateData.status || 'unchanged'}`,
+      'subscription',
+      id,
+      existing,
+      updated
+    )
 
     res.json({
       ok: true,
       data: { subscription: updated },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Update subscription error:', error);
+    logger.error('Update subscription error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to update subscription' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // ========================================
 // USAGE & QUOTAS
 // ========================================
 router.get('/usage/:tenantId', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
-    const { tenantId } = req.params;
-    const { tenantType, period } = req.query;
+    const { tenantId } = req.params
+    const { tenantType, period } = req.query
 
-    const periodStart = period || 'monthly';
-    
-    const { rows: usage } = await query(`
+    const periodStart = period || 'monthly'
+
+    const { rows: usage } = await query(
+      `
       SELECT * FROM usage_meter
       WHERE tenant_id = $1 AND tenant_type = $2
         AND period_type = $3
       ORDER BY meter_type
-    `, [tenantId, tenantType, periodStart]);
+    `,
+      [tenantId, tenantType, periodStart]
+    )
 
     res.json({
       ok: true,
       data: { usage, period: periodStart },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get usage error:', error);
+    logger.error('Get usage error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get usage' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // ========================================
 // AUDIT LOGS
 // ========================================
 router.get('/audit-logs', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
-    const { limit = 50, offset = 0, tenantId, actionType } = req.query;
+    const { limit = 50, offset = 0, tenantId, actionType } = req.query
 
-    let whereClause = '';
-    const params = [];
-    let paramIndex = 1;
+    let whereClause = ''
+    const params = []
+    let paramIndex = 1
 
     if (tenantId) {
-      whereClause += ` WHERE target_tenant_id = $${paramIndex++}`;
-      params.push(tenantId);
+      whereClause += ` WHERE target_tenant_id = $${paramIndex++}`
+      params.push(tenantId)
     }
 
     if (actionType) {
-      if (whereClause) whereClause += ' AND';
-      else whereClause = ' WHERE';
-      whereClause += ` action_type = $${paramIndex++}`;
-      params.push(actionType);
+      if (whereClause) whereClause += ' AND'
+      else whereClause = ' WHERE'
+      whereClause += ` action_type = $${paramIndex++}`
+      params.push(actionType)
     }
 
-    params.push(limit, offset);
+    params.push(limit, offset)
 
-    const { rows: logs } = await query(`
+    const { rows: logs } = await query(
+      `
       SELECT * FROM admin_audit_log
       ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
-    `, params);
+    `,
+      params
+    )
 
     res.json({
       ok: true,
       data: { logs, limit: parseInt(limit), offset: parseInt(offset) },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get audit logs error:', error);
+    logger.error('Get audit logs error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get audit logs' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
+
+// ========================================
+// IMPERSONATION
+// ========================================
+
+const impersonateSchema = z.object({
+  tenantId: z.string().uuid(),
+  tenantType: z.enum(['RESTAURANT', 'SUPPLIER']),
+})
+
+/**
+ * POST /api/admin-dashboard/impersonate
+ * Start impersonating a tenant (Restaurant or Supplier). Cannot impersonate an admin.
+ */
+router.post('/impersonate', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const { tenantId, tenantType } = impersonateSchema.parse(req.body)
+
+    // Resolve tenant and ensure it is not an admin user (no app_user with ADMIN for this tenant)
+    const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
+    const { rows: tenants } = await query(
+      `SELECT id, name, contact_email FROM ${table} WHERE id = $1`,
+      [tenantId]
+    )
+    if (tenants.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Tenant not found' },
+        requestId: req.requestId,
+      })
+    }
+    const tenant = tenants[0]
+    // Ensure we're not impersonating an admin (contact_email that belongs to ADMIN)
+    const { rows: adminUsers } = await query(
+      "SELECT id FROM app_user WHERE email = $1 AND role = 'ADMIN'",
+      [tenant.contact_email]
+    )
+    if (adminUsers.length > 0) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Cannot impersonate a user with Admin role' },
+        requestId: req.requestId,
+      })
+    }
+
+    const token = await createImpersonationToken({
+      adminUserId: req.userData.id,
+      tenantId,
+      tenantType,
+      tenantName: tenant.name || tenant.contact_email || tenantId,
+    })
+    const maxMin = config.IMPERSONATION_MAX_DURATION_MINUTES || 60
+    const maxAgeMs = maxMin * 60 * 1000
+    const expiresAt = new Date(Date.now() + maxAgeMs)
+
+    res.cookie(getImpersonationCookieName(), token, {
+      httpOnly: true,
+      secure: config.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: maxAgeMs,
+      path: '/',
+    })
+
+    await logAudit(
+      req,
+      'IMPERSONATION_START',
+      `Started impersonating ${tenantType} ${tenant.name || tenantId}`,
+      'TENANT',
+      tenantId,
+      null,
+      { tenantId, tenantType, tenantName: tenant.name },
+      { target_tenant_type: tenantType }
+    )
+
+    res.json({
+      ok: true,
+      data: { tenantId, tenantType, tenantName: tenant.name, expiresAt: expiresAt.toISOString() },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid body', details: error.errors },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Impersonate start error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to start impersonation' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * POST /api/admin-dashboard/impersonate/stop
+ * End impersonation and clear the cookie.
+ */
+router.post('/impersonate/stop', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const ctx = req.impersonationContext
+    res.clearCookie(getImpersonationCookieName(), { path: '/' })
+
+    if (ctx) {
+      await logAudit(
+        req,
+        'IMPERSONATION_END',
+        `Stopped impersonating ${ctx.tenantType} ${ctx.tenantName || ctx.tenantId}`,
+        'TENANT',
+        ctx.tenantId,
+        { tenantId: ctx.tenantId, tenantType: ctx.tenantType },
+        null,
+        { target_tenant_type: ctx.tenantType }
+      )
+    }
+
+    res.json({
+      ok: true,
+      data: { stopped: true },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Impersonate stop error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to stop impersonation' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * GET /api/admin-dashboard/impersonate
+ * Return current impersonation status (for UI banner).
+ */
+router.get('/impersonate', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  try {
+    const effective = getEffectiveTenant(req)
+    if (!effective) {
+      return res.json({
+        ok: true,
+        data: { active: false },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+    const ctx = req.impersonationContext
+    const expiresAt = ctx?.exp ? new Date(ctx.exp * 1000).toISOString() : null
+    res.json({
+      ok: true,
+      data: {
+        active: true,
+        tenantId: effective.tenantId,
+        tenantType: effective.tenantType,
+        tenantName: effective.tenantName,
+        expiresAt,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Impersonate status error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get impersonation status' },
+      requestId: req.requestId,
+    })
+  }
+})
 
 // ========================================
 // TENANT MANAGEMENT
@@ -570,24 +822,24 @@ router.get('/tenants/suppliers', requireAuth, requireRole(['ADMIN']), async (req
       FROM supplier s
       LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
       ORDER BY s.name
-    `);
+    `)
 
     res.json({
       ok: true,
       data: { suppliers },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get suppliers error:', error);
+    logger.error('Get suppliers error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get suppliers' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Get restaurants with detailed info
 router.get('/tenants/restaurants', requireAuth, requireRole(['ADMIN']), async (req, res) => {
@@ -604,24 +856,24 @@ router.get('/tenants/restaurants', requireAuth, requireRole(['ADMIN']), async (r
       FROM restaurant r
       LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
       ORDER BY r.name
-    `);
+    `)
 
     res.json({
       ok: true,
       data: { restaurants },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get restaurants error:', error);
+    logger.error('Get restaurants error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurants' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // ========================================
 // TENANT OVERRIDES
@@ -631,140 +883,191 @@ router.get('/tenants/restaurants', requireAuth, requireRole(['ADMIN']), async (r
  * POST /api/admin-dashboard/tenants/:id/override-limit
  * Manually override a tenant's limit (e.g., grant temporary increase)
  */
-router.post('/tenants/:tenantType/:id/override-limit', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const { id: tenantId, tenantType } = req.params;
-    const { limit_type, override_value, expiration_date, reason } = req.body;
+router.post(
+  '/tenants/:tenantType/:id/override-limit',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res) => {
+    try {
+      const { id: tenantId, tenantType } = req.params
+      const { limit_type, override_value, expiration_date, reason } = req.body
 
-    // Create override record
-    const { rows: overrides } = await query(`
+      // Create override record
+      const { rows: overrides } = await query(
+        `
       INSERT INTO tenant_limit_override (
         tenant_id, tenant_type, limit_type, override_value, expiration_date, reason, created_by
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
-    `, [tenantId, tenantType.toUpperCase(), limit_type, override_value, expiration_date || null, reason || null, req.userData.id]);
+    `,
+        [
+          tenantId,
+          tenantType.toUpperCase(),
+          limit_type,
+          override_value,
+          expiration_date || null,
+          reason || null,
+          req.userData.id,
+        ]
+      )
 
-    // Log audit
-    await logAudit(req, 'OVERRIDE_LIMIT', 
-      `Granted ${limit_type} override: ${override_value}`, 
-      tenantType.toUpperCase(), tenantId, null, { limit_type, override_value, expiration_date, reason });
+      // Log audit
+      await logAudit(
+        req,
+        'OVERRIDE_LIMIT',
+        `Granted ${limit_type} override: ${override_value}`,
+        tenantType.toUpperCase(),
+        tenantId,
+        null,
+        { limit_type, override_value, expiration_date, reason }
+      )
 
-    res.json({
-      ok: true,
-      data: { override: overrides[0] },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error('Override limit error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to set override' },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { override: overrides[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Override limit error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to set override' },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 /**
  * DELETE /api/admin-dashboard/tenants/:id/override-limit/:overrideId
  * Remove a tenant limit override
  */
-router.delete('/tenants/:tenantType/:id/override-limit/:overrideId', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const { overrideId } = req.params;
+router.delete(
+  '/tenants/:tenantType/:id/override-limit/:overrideId',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res) => {
+    try {
+      const { overrideId } = req.params
 
-    const { rows: deleted } = await query(`
+      const { rows: deleted } = await query(
+        `
       DELETE FROM tenant_limit_override WHERE id = $1 RETURNING *
-    `, [overrideId]);
+    `,
+        [overrideId]
+      )
 
-    if (deleted.length === 0) {
-      return res.status(404).json({
+      if (deleted.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Override not found' },
+          requestId: req.requestId,
+        })
+      }
+
+      // Log audit
+      await logAudit(
+        req,
+        'REMOVE_OVERRIDE',
+        `Removed limit override`,
+        deleted[0].tenant_type,
+        deleted[0].tenant_id,
+        deleted[0],
+        null
+      )
+
+      res.json({
+        ok: true,
+        data: { override: deleted[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Remove override error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
-        error: { name: 'NOT_FOUND', message: 'Override not found' },
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to remove override' },
         requestId: req.requestId,
-      });
+      })
     }
-
-    // Log audit
-    await logAudit(req, 'REMOVE_OVERRIDE', 
-      `Removed limit override`, 
-      deleted[0].tenant_type, deleted[0].tenant_id, deleted[0], null);
-
-    res.json({
-      ok: true,
-      data: { override: deleted[0] },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error('Remove override error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to remove override' },
-      requestId: req.requestId,
-    });
   }
-});
+)
 
 // Get supplier usage details
-router.get('/tenants/suppliers/:id/usage', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const { rows: usage } = await query(`
+router.get(
+  '/tenants/suppliers/:id/usage',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+
+      const { rows: usage } = await query(
+        `
       SELECT * FROM usage_meter
       WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER'
       ORDER BY meter_type, period_start_date DESC
-    `, [id]);
+    `,
+        [id]
+      )
 
-    res.json({
-      ok: true,
-      data: { usage },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error('Get supplier usage error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to get supplier usage' },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { usage },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get supplier usage error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to get supplier usage' },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Get restaurant usage details
-router.get('/tenants/restaurants/:id/usage', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const { rows: usage } = await query(`
+router.get(
+  '/tenants/restaurants/:id/usage',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+
+      const { rows: usage } = await query(
+        `
       SELECT * FROM usage_meter
       WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT'
       ORDER BY meter_type, period_start_date DESC
-    `, [id]);
+    `,
+        [id]
+      )
 
-    res.json({
-      ok: true,
-      data: { usage },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error('Get restaurant usage error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurant usage' },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { usage },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get restaurant usage error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurant usage' },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
-export default router;
-
+export default router

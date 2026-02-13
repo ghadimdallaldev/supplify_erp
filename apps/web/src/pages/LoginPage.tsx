@@ -3,17 +3,17 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import { Badge } from '../components/ui/badge'
-import { 
-  Loader2, 
-  LogIn, 
-  Store, 
-  ShoppingCart, 
-  Truck, 
-  Shield, 
+import {
+  Loader2,
+  LogIn,
+  Store,
+  ShoppingCart,
+  Truck,
+  Shield,
   Zap,
   Users,
   BarChart3,
-  CheckCircle2
+  CheckCircle2,
 } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -43,9 +43,24 @@ export function LoginPage() {
   ]
 
   const demoAccounts = [
-    { role: 'Admin', email: 'admin@supplify.com', password: 'SupplifyAdmin1!', color: 'bg-purple-100 text-purple-800' },
-    { role: 'Supplier', email: 'supplier@supplify.com', password: 'SupplifySupplier1!', color: 'bg-blue-100 text-blue-800' },
-    { role: 'Restaurant', email: 'restaurant@supplify.com', password: 'SupplifyRestaurant1!', color: 'bg-green-100 text-green-800' },
+    {
+      role: 'Admin',
+      email: 'supplifyadmin@supplify.com',
+      password: 'Supplify2025!',
+      color: 'bg-purple-100 text-purple-800',
+    },
+    {
+      role: 'Supplier',
+      email: 'supplier@supplify.com',
+      password: 'SupplifySupplier1!',
+      color: 'bg-blue-100 text-blue-800',
+    },
+    {
+      role: 'Restaurant',
+      email: 'restaurant@supplify.com',
+      password: 'SupplifyRestaurant1!',
+      color: 'bg-green-100 text-green-800',
+    },
   ]
 
   return (
@@ -62,16 +77,20 @@ export function LoginPage() {
               <p className="text-primary-foreground/80 text-sm">Food & Beverage Marketplace</p>
             </div>
           </div>
-          
+
           <h2 className="text-4xl font-bold mb-4">Connect. Order. Grow.</h2>
           <p className="text-xl text-primary-foreground/90 mb-12 max-w-md">
-            The premier platform connecting restaurants with trusted F&B suppliers. Streamline your operations, reduce costs, and scale your business.
+            The premier platform connecting restaurants with trusted F&B suppliers. Streamline your
+            operations, reduce costs, and scale your business.
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-6 max-w-lg">
           {features.map((feature, idx) => (
-            <div key={idx} className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+            <div
+              key={idx}
+              className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20"
+            >
               <feature.icon className="w-6 h-6 mb-2" />
               <h3 className="font-semibold mb-1">{feature.title}</h3>
               <p className="text-sm text-primary-foreground/80">{feature.desc}</p>
@@ -117,7 +136,7 @@ export function LoginPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
+
               <Button
                 onClick={handleLogin}
                 disabled={isLoading}
@@ -162,7 +181,9 @@ export function LoginPage() {
                     </div>
                     <div className="text-xs space-y-1 mt-2">
                       <p className="font-mono">{account.email}</p>
-                      <p className="opacity-75">Password: <span className="font-mono">{account.password}</span></p>
+                      <p className="opacity-75">
+                        Password: <span className="font-mono">{account.password}</span>
+                      </p>
                     </div>
                   </div>
                 ))}

@@ -6,7 +6,7 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - pnpm 8+
 - Docker & Docker Compose
 
@@ -35,8 +35,9 @@ docker compose up -d
 ```
 
 This starts:
+
 - PostgreSQL (port 5432)
-- Keycloak (port 8080) 
+- Keycloak (port 8080)
 - MinIO (port 9000, console 9001)
 
 ### 4. Database Setup
@@ -130,11 +131,19 @@ The application uses Keycloak for authentication with server-side OIDC flow:
 
 ### Demo Accounts (Keycloak login only)
 
-| Role        | Email                   | Password            |
-|------------|-------------------------|---------------------|
-| **Admin**  | admin@supplify.com      | SupplifyAdmin1!     |
-| **Supplier**  | supplier@supplify.com | SupplifySupplier1!  |
-| **Restaurant** | restaurant@supplify.com | SupplifyRestaurant1! |
+| Role           | Email                      | Password             |
+| -------------- | -------------------------- | -------------------- |
+| **Admin**      | supplifyadmin@supplify.com | Supplify2025!        |
+| **Supplier**   | supplier@supplify.com      | SupplifySupplier1!   |
+| **Restaurant** | restaurant@supplify.com    | SupplifyRestaurant1! |
+
+If **admin or demo login fails**, create or fix the demo users in Keycloak (Keycloak must be running):
+
+```bash
+pnpm run seed:demo-users
+```
+
+Then sign in again. If the realm was never imported with users, you can instead recreate Keycloak: `docker-compose up -d --force-recreate keycloak`.
 
 Sign in via **Sign in with Keycloak** on the login page. Keycloak must be running (`docker-compose up -d`). Keycloak imports the realm only on first start. If **admin** or **supplier** login fails (wrong role or redirect back to login), recreate Keycloak so it re-imports the realm: `docker-compose up -d --force-recreate keycloak`. If the realm already existed, you may need to reset the Keycloak database (e.g. remove the `keycloak` DB in Postgres and run `infra/db/init.sql` again) so the next Keycloak start re-imports. The app also assigns admin/supplier role by demo email when the token has no roles.
 
@@ -151,7 +160,7 @@ The application uses PostgreSQL with a custom migration system:
 
 - `app_user` - User accounts linked to Keycloak
 - `supplier` - Supplier companies
-- `restaurant` - Restaurant companies  
+- `restaurant` - Restaurant companies
 - `product` - Product catalog
 - `price` - Product pricing
 - `inventory` - Stock levels
@@ -191,6 +200,7 @@ The API follows RESTful conventions with:
 ### Environment Variables
 
 #### API (.env)
+
 ```bash
 PORT=4000
 WEB_ORIGIN=http://localhost:5173
@@ -208,6 +218,7 @@ NODE_ENV=development
 ```
 
 #### Web (.env)
+
 ```bash
 VITE_API_URL=http://localhost:4000
 ```
@@ -221,7 +232,7 @@ pnpm test
 # Run API tests only
 pnpm --filter @supplify/api test
 
-# Run web tests only  
+# Run web tests only
 pnpm --filter @supplify/web test
 
 # Run tests in watch mode
@@ -278,6 +289,7 @@ If you encounter any issues:
 ## 🔄 Changelog
 
 ### v2.0.0
+
 - Complete rewrite with modern tech stack
 - Server-side Keycloak authentication
 - Raw PostgreSQL with migrations
