@@ -6,6 +6,14 @@ export const config = {
   PORT: process.env.PORT || 4000,
   NODE_ENV: process.env.NODE_ENV || 'development',
   WEB_ORIGIN: process.env.WEB_ORIGIN || 'http://localhost:5173',
+  /** Allowed CORS origins (comma-separated). Dev: 5173–5175; prod: use WEB_ORIGINS or single WEB_ORIGIN. */
+  WEB_ORIGINS: process.env.WEB_ORIGINS
+    ? process.env.WEB_ORIGINS.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : process.env.NODE_ENV === 'production'
+      ? [process.env.WEB_ORIGIN || 'http://localhost:5173']
+      : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
   DATABASE_URL:
     process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/supplify',
   /** Enable SSL for DB (e.g. DATABASE_SSL=true in production). */

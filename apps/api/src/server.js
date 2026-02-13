@@ -75,10 +75,13 @@ app.use(
   })
 )
 
-// CORS configuration
+// CORS configuration (allow multiple dev origins e.g. Vite 5173–5175)
 app.use(
   cors({
-    origin: config.WEB_ORIGIN,
+    origin: (origin, cb) => {
+      if (!origin || config.WEB_ORIGINS.includes(origin)) return cb(null, true)
+      return cb(null, false)
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],

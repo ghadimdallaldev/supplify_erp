@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '../lib/utils'
 import { useAppSelector } from '../hooks/redux'
+import { usePermissions } from '../hooks/usePermissions'
 import { useGetImpersonationStatusQuery } from '../services/api'
 import {
   LayoutDashboard,
@@ -84,7 +85,8 @@ export function Sidebar() {
       ...restaurantNavigation.filter((item) => !item.permission || can(item.permission)),
     ]
   } else if (isAdmin && !impersonation?.active) {
-    allNavigation = can('ADMIN_ACCESS') ? [...adminNavigation] : []
+    // Show admin nav for any ADMIN role; API still enforces ADMIN_ACCESS on routes
+    allNavigation = [...adminNavigation]
   } else if (isSupplier || impersonatingSupplier) {
     allNavigation = [
       ...navigation,
