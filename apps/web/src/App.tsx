@@ -31,150 +31,153 @@ import { PublicReservationManage } from './pages/PublicReservationManage'
 import { StaffSelfServiceLogin } from './pages/StaffSelfServiceLogin'
 import { StaffSelfServiceDashboard } from './pages/StaffSelfServiceDashboard'
 
-const router = createBrowserRouter([
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
-  {
-    path: '/reserve',
-    element: <PublicReservationPortal />,
-  },
-  {
-    path: '/reserve/confirmation',
-    element: <PublicReservationConfirmation />,
-  },
-  {
-    path: '/reserve/manage/:token',
-    element: <PublicReservationManage />,
-  },
-  {
-    path: '/staff',
-    element: <StaffSelfServiceLogin />,
-  },
-  {
-    path: '/staff/dashboard',
-    element: <StaffSelfServiceDashboard />,
-  },
-  {
-    path: '/',
-    element: (
-      <AuthGuard>
-        <Layout />
-      </AuthGuard>
-    ),
-    children: [
-      {
-        index: true,
-        element: <DashboardPage />,
-      },
-      {
-        path: 'app',
-        element: <DashboardPage />,
-      },
-      {
-        path: 'app/dashboard',
-        element: <DashboardPage />,
-      },
-      {
-        path: 'app/products',
-        element: <ProductsPage />,
-      },
-      {
-        path: 'app/products/:id',
-        element: <ProductDetailPage />,
-      },
-      {
-        path: 'app/orders',
-        element: <OrdersPage />,
-      },
-      {
-        path: 'app/orders/:id',
-        element: <OrderDetailPage />,
-      },
-      {
-        path: 'app/cart',
-        element: <CartPage />,
-      },
-      {
-        path: 'app/quick-lists',
-        element: <QuickListsPage />,
-      },
-      {
-        path: 'app/restaurant-inventory',
-        element: <RestaurantInventoryPage />,
-      },
-      {
-        path: 'app/onboarding',
-        element: <RestaurantOnboardingPage />,
-      },
-      {
-        path: 'app/receiving',
-        element: <ReceivingPage />,
-      },
-      {
-        path: 'app/reservations',
-        element: <ReservationsPage />,
-      },
-      {
-        path: 'app/staff',
-        element: <StaffPage />,
-      },
-      {
-        path: 'app/suppliers',
-        element: <SuppliersPage />,
-      },
-      {
-        path: 'app/suppliers/:id',
-        element: <SupplierDetailPage />,
-      },
-      {
-        path: 'app/restaurants',
-        element: <RestaurantsPage />,
-      },
-      {
-        path: 'app/restaurants/:id',
-        element: <RestaurantDetailPage />,
-      },
-      {
-        path: 'app/settings',
-        element: <SettingsPage />,
-      },
-      {
-        path: 'app/chat',
-        element: <ChatPage />,
-      },
-      {
-        path: 'app/fulfillment',
-        element: <FulfillmentPage />,
-      },
-      {
-        path: 'app/inventory',
-        element: <InventoryPage />,
-      },
-      {
-        path: 'app/invoices',
-        element: <InvoicesPage />,
-      },
-      {
-        path: 'app/supplier-settings',
-        element: <SupplierSettingsPage />,
-      },
-      {
-        path: 'app/admin',
-        element: <AdminDashboardPage />,
-      },
-      {
-        path: 'app/admin/suppliers',
-        element: <AdminDashboardPage initialTab="suppliers" />,
-      },
-      {
-        path: 'app/admin/restaurants',
-        element: <AdminDashboardPage initialTab="restaurants" />,
-      },
-    ],
-  },
-])
+const router = createBrowserRouter(
+  [
+    {
+      path: '/login',
+      element: <LoginPage />,
+    },
+    {
+      path: '/reserve',
+      element: <PublicReservationPortal />,
+    },
+    {
+      path: '/reserve/confirmation',
+      element: <PublicReservationConfirmation />,
+    },
+    {
+      path: '/reserve/manage/:token',
+      element: <PublicReservationManage />,
+    },
+    {
+      path: '/staff',
+      element: <StaffSelfServiceLogin />,
+    },
+    {
+      path: '/staff/dashboard',
+      element: <StaffSelfServiceDashboard />,
+    },
+    {
+      path: '/',
+      element: (
+        <AuthGuard>
+          <Layout />
+        </AuthGuard>
+      ),
+      children: [
+        {
+          index: true,
+          element: <DashboardPage />,
+        },
+        {
+          path: 'app',
+          element: <DashboardPage />,
+        },
+        {
+          path: 'app/dashboard',
+          element: <DashboardPage />,
+        },
+        {
+          path: 'app/products',
+          element: <ProductsPage />,
+        },
+        {
+          path: 'app/products/:id',
+          element: <ProductDetailPage />,
+        },
+        {
+          path: 'app/orders',
+          element: <OrdersPage />,
+        },
+        {
+          path: 'app/orders/:id',
+          element: <OrderDetailPage />,
+        },
+        {
+          path: 'app/cart',
+          element: <CartPage />,
+        },
+        {
+          path: 'app/quick-lists',
+          element: <QuickListsPage />,
+        },
+        {
+          path: 'app/restaurant-inventory',
+          element: <RestaurantInventoryPage />,
+        },
+        {
+          path: 'app/onboarding',
+          element: <RestaurantOnboardingPage />,
+        },
+        {
+          path: 'app/receiving',
+          element: <ReceivingPage />,
+        },
+        {
+          path: 'app/reservations',
+          element: <ReservationsPage />,
+        },
+        {
+          path: 'app/staff',
+          element: <StaffPage />,
+        },
+        {
+          path: 'app/suppliers',
+          element: <SuppliersPage />,
+        },
+        {
+          path: 'app/suppliers/:id',
+          element: <SupplierDetailPage />,
+        },
+        {
+          path: 'app/restaurants',
+          element: <RestaurantsPage />,
+        },
+        {
+          path: 'app/restaurants/:id',
+          element: <RestaurantDetailPage />,
+        },
+        {
+          path: 'app/settings',
+          element: <SettingsPage />,
+        },
+        {
+          path: 'app/chat',
+          element: <ChatPage />,
+        },
+        {
+          path: 'app/fulfillment',
+          element: <FulfillmentPage />,
+        },
+        {
+          path: 'app/inventory',
+          element: <InventoryPage />,
+        },
+        {
+          path: 'app/invoices',
+          element: <InvoicesPage />,
+        },
+        {
+          path: 'app/supplier-settings',
+          element: <SupplierSettingsPage />,
+        },
+        {
+          path: 'app/admin',
+          element: <AdminDashboardPage />,
+        },
+        {
+          path: 'app/admin/suppliers',
+          element: <AdminDashboardPage initialTab="suppliers" />,
+        },
+        {
+          path: 'app/admin/restaurants',
+          element: <AdminDashboardPage initialTab="restaurants" />,
+        },
+      ],
+    },
+  ],
+  { future: { v7_startTransition: true } }
+)
 
 export function App() {
   return <RouterProvider router={router} />

@@ -73,7 +73,12 @@ function validatePlanLimitsAndFeatures(limits, features, tenantType) {
 
 const router = Router()
 
-router.use(resolveAdminContext, requirePermission('ADMIN_ACCESS'))
+router.use(
+  requireAuth,
+  requireRole(['ADMIN']),
+  resolveAdminContext,
+  requirePermission('ADMIN_ACCESS')
+)
 
 // ========================================
 // AUDIT LOGGING HELPERS

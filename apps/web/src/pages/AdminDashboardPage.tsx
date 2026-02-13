@@ -72,17 +72,6 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     error: restaurantsError,
   } = useGetAdminRestaurantsQuery()
 
-  // Debug: Log data to console
-  console.log('AdminDashboard Debug:', {
-    initialTab,
-    suppliersData,
-    restaurantsData,
-    suppliersLoading,
-    restaurantsLoading,
-    suppliersError,
-    restaurantsError,
-  })
-
   const [createPlan] = useCreateAdminPlanMutation()
   const [updatePlan] = useUpdateAdminPlanMutation()
   const [updateSubscription] = useUpdateAdminSubscriptionMutation()
