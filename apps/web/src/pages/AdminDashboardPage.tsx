@@ -608,6 +608,119 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               ))}
             </div>
           )}
+
+          <Dialog
+            open={!!editPlanModal?.open}
+            onOpenChange={(open) => !open && setEditPlanModal(null)}
+          >
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Plan</DialogTitle>
+              </DialogHeader>
+              {editPlanModal?.plan && (
+                <div className="space-y-4 py-4">
+                  <div>
+                    <Label>Name</Label>
+                    <Input
+                      value={editPlanForm.name}
+                      onChange={(e) => setEditPlanForm((s) => ({ ...s, name: e.target.value }))}
+                      placeholder="Plan name"
+                    />
+                  </div>
+                  <div>
+                    <Label>Description</Label>
+                    <Input
+                      value={editPlanForm.description}
+                      onChange={(e) =>
+                        setEditPlanForm((s) => ({ ...s, description: e.target.value }))
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Price / month ($)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={editPlanForm.pricePerMonth}
+                        onChange={(e) =>
+                          setEditPlanForm((s) => ({
+                            ...s,
+                            pricePerMonth: Number(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Price / year ($)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={editPlanForm.pricePerYear}
+                        onChange={(e) =>
+                          setEditPlanForm((s) => ({
+                            ...s,
+                            pricePerYear: Number(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Trial days</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={editPlanForm.trialDays}
+                        onChange={(e) =>
+                          setEditPlanForm((s) => ({
+                            ...s,
+                            trialDays: Number(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Display order</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={editPlanForm.displayOrder}
+                        onChange={(e) =>
+                          setEditPlanForm((s) => ({
+                            ...s,
+                            displayOrder: Number(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="edit-plan-active"
+                      checked={editPlanForm.isActive}
+                      onChange={(e) =>
+                        setEditPlanForm((s) => ({ ...s, isActive: e.target.checked }))
+                      }
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="edit-plan-active">Active</Label>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setEditPlanModal(null)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEditPlan} disabled={!editPlanForm.name.trim()}>
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="subscriptions" className="space-y-6">
