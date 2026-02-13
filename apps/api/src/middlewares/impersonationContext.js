@@ -4,6 +4,16 @@
  * Does not require auth; context is only trusted when getEffectiveTenant() is used with req.userData (same admin check).
  */
 import { verifyImpersonationToken, getImpersonationCookieName } from '../lib/impersonation.js'
+import { config } from '../config/env.js'
+
+function clearImpersonationCookie(res) {
+  res.clearCookie(getImpersonationCookieName(), {
+    path: '/',
+    httpOnly: true,
+    secure: config.NODE_ENV === 'production',
+    sameSite: 'lax',
+  })
+}
 
 export async function impersonationContext(req, res, next) {
   try {
@@ -13,7 +23,7 @@ export async function impersonationContext(req, res, next) {
     }
     const payload = await verifyImpersonationToken(token)
     if (!payload) {
-      res.clearCookie(getImpersonationCookieName(), { path: '/' })
+      clearImpersonationCookie(res)
       return next()
     }
     req.impersonationContext = {

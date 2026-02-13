@@ -5,7 +5,7 @@ import { UserX } from 'lucide-react'
 
 /**
  * Banner shown when an admin is impersonating a tenant (Restaurant or Supplier).
- * Renders above main content; "Stop impersonating" clears the session and refetches.
+ * "Stop impersonating" clears the cookie and redirects to admin (full reload so sidebar/state are correct).
  */
 export function ImpersonationBanner() {
   const { user } = useAppSelector((state) => state.auth)
@@ -20,7 +20,8 @@ export function ImpersonationBanner() {
   const handleStop = async () => {
     try {
       await stopImpersonation().unwrap()
-      window.location.reload()
+      // Hard redirect so we always land on admin dashboard with fresh state
+      window.location.href = '/app/admin'
     } catch {
       // Error toast could be added here
     }

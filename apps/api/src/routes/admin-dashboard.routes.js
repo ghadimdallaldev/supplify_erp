@@ -731,7 +731,13 @@ router.post('/impersonate', requireAuth, requireRole(['ADMIN']), async (req, res
 router.post('/impersonate/stop', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
     const ctx = req.impersonationContext
-    res.clearCookie(getImpersonationCookieName(), { path: '/' })
+    // Clear with same options as setCookie so the browser actually removes it
+    res.clearCookie(getImpersonationCookieName(), {
+      path: '/',
+      httpOnly: true,
+      secure: config.NODE_ENV === 'production',
+      sameSite: 'lax',
+    })
 
     if (ctx) {
       await logAudit(
