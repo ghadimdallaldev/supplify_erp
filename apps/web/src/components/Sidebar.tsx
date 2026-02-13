@@ -125,7 +125,7 @@ export function Sidebar() {
             )
           })}
 
-          {can('SETTINGS_VIEW') && (
+          {(can('SETTINGS_VIEW') || (isAdmin && !impersonation?.active)) && (
             <li>
               <Link
                 to="/app/settings"
