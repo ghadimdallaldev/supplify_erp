@@ -216,13 +216,33 @@ router.get('/overview', async (req, res) => {
 router.get('/plans', async (req, res) => {
   try {
     const tenantType = req.query.tenant_type // 'RESTAURANT' | 'SUPPLIER' | omit = all
-    const plansQuery =
-      tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType)
-        ? `SELECT * FROM subscription_plan WHERE tenant_type = $1 ORDER BY display_order, name`
-        : `SELECT * FROM subscription_plan ORDER BY tenant_type, display_order, name`
-    const plansParams =
-      tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType) ? [tenantType] : []
-    const { rows: plans } = await query(plansQuery, plansParams)
+    let plans
+
+    try {
+      const plansQuery =
+        tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType)
+          ? `SELECT * FROM subscription_plan WHERE tenant_type = $1 ORDER BY display_order, name`
+          : `SELECT * FROM subscription_plan ORDER BY tenant_type, display_order, name`
+      const plansParams =
+        tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType) ? [tenantType] : []
+      const result = await query(plansQuery, plansParams)
+      plans = result.rows
+    } catch (queryErr) {
+      if (
+        queryErr.code === '42703' ||
+        /tenant_type|column.*does not exist/i.test(queryErr.message)
+      ) {
+        const { rows } = await query(`SELECT * FROM subscription_plan ORDER BY display_order, name`)
+        plans = rows.map((p) => ({ ...p, tenant_type: p.tenant_type || 'RESTAURANT' }))
+        if (tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
+          plans = plans.filter((p) => (p.tenant_type || 'RESTAURANT') === tenantType)
+        }
+      } else if (queryErr.code === '42P01') {
+        plans = []
+      } else {
+        throw queryErr
+      }
+    }
 
     res.json({
       ok: true,
@@ -237,11 +257,14 @@ router.get('/plans', async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
-    logger.error('Get plans error:', error)
+    logger.error('Get plans error:', { error: error.message, code: error.code })
     res.status(500).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to get plans' },
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: process.env.NODE_ENV === 'development' ? error.message : 'Failed to get plans',
+      },
       requestId: req.requestId,
     })
   }

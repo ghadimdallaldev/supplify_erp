@@ -136,6 +136,83 @@ describe('Admin Dashboard Routes', () => {
     })
   })
 
+  describe('GET /plans', () => {
+    it('returns plans when subscription_plan has tenant_type', async () => {
+      query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'p1',
+            code: 'free',
+            name: 'Free',
+            tenant_type: 'RESTAURANT',
+            limits: {},
+            features: {},
+          },
+        ],
+      })
+
+      const res = await request(app).get('/api/admin-dashboard/plans').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.plans).toHaveLength(1)
+      expect(res.body.data.plans[0].name).toBe('Free')
+      expect(res.body.data.plans[0].tenant_type).toBe('RESTAURANT')
+    })
+
+    it('returns plans filtered by tenant_type when query param provided', async () => {
+      query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'p1',
+            code: 'bronze',
+            name: 'Bronze',
+            tenant_type: 'SUPPLIER',
+            limits: {},
+            features: {},
+          },
+        ],
+      })
+
+      const res = await request(app)
+        .get('/api/admin-dashboard/plans?tenant_type=SUPPLIER')
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.plans).toHaveLength(1)
+      expect(query).toHaveBeenCalledWith(expect.stringContaining('WHERE tenant_type = $1'), [
+        'SUPPLIER',
+      ])
+    })
+
+    it('falls back to legacy query when tenant_type column missing (42703)', async () => {
+      query
+        .mockRejectedValueOnce(
+          Object.assign(new Error('column "tenant_type" does not exist'), { code: '42703' })
+        )
+        .mockResolvedValueOnce({
+          rows: [{ id: 'p1', code: 'free', name: 'Free', limits: {}, features: {} }],
+        })
+
+      const res = await request(app).get('/api/admin-dashboard/plans').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.plans).toHaveLength(1)
+      expect(res.body.data.plans[0].tenant_type).toBe('RESTAURANT')
+      expect(query).toHaveBeenCalledTimes(2)
+    })
+
+    it('returns empty plans when subscription_plan table does not exist (42P01)', async () => {
+      query.mockRejectedValueOnce(
+        Object.assign(new Error('relation "subscription_plan" does not exist'), { code: '42P01' })
+      )
+
+      const res = await request(app).get('/api/admin-dashboard/plans').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.plans).toEqual([])
+    })
+  })
+
   describe('POST /plans', () => {
     it('rejects unknown limit keys for tenant type', async () => {
       const res = await request(app)

@@ -405,26 +405,21 @@ export function resolveTenantContext(req, res, next) {
  * Sets req.adminContext = { roles[], permissions[] }.
  * Use after requireAuth and requireRole(['ADMIN']) on admin routes.
  */
-export function resolveAdminContext(req, res, next) {
+export async function resolveAdminContext(req, res, next) {
   if (req.userData?.role !== 'ADMIN') {
     req.adminContext = null
     return next()
   }
-  getRolesForUser(req.userData.id, null, 'ADMIN')
-    .then(async (roles) => {
-      const permissions = await getPermissionsForUser(req.userData.id, null, 'ADMIN')
-      req.adminContext = { roles, permissions }
-      next()
-    })
-    .catch((err) => {
-      logger.error('resolveAdminContext error', { error: err.message })
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to resolve admin context' },
-        requestId: req.requestId,
-      })
-    })
+  try {
+    const roles = await getRolesForUser(req.userData.id, null, 'ADMIN')
+    const permissions = await getPermissionsForUser(req.userData.id, null, 'ADMIN')
+    req.adminContext = { roles, permissions }
+    next()
+  } catch (err) {
+    logger.error('resolveAdminContext error', { error: err.message })
+    req.adminContext = { roles: [], permissions: [] }
+    next()
+  }
 }
 
 /**

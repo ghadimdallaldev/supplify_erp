@@ -39,6 +39,7 @@ import {
   UserCog,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import type { SubscriptionPlan } from '@/types'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -92,6 +93,19 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   } | null>(null)
   const [changePlanForce, setChangePlanForce] = useState(false)
 
+  const [editPlanModal, setEditPlanModal] = useState<{
+    open: boolean
+    plan: SubscriptionPlan
+  } | null>(null)
+  const [editPlanForm, setEditPlanForm] = useState({
+    name: '',
+    description: '',
+    pricePerMonth: 0,
+    pricePerYear: 0,
+    trialDays: 0,
+    displayOrder: 0,
+    isActive: true,
+  })
   const [createPlanOpen, setCreatePlanOpen] = useState(false)
   const [createPlanForm, setCreatePlanForm] = useState({
     code: '',
@@ -127,6 +141,33 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
       })
     } catch (e: any) {
       toast.error(e?.data?.error?.message || 'Failed to create plan')
+    }
+  }
+
+  const openEditPlanModal = (plan: SubscriptionPlan) => {
+    setEditPlanModal({ open: true, plan })
+    setEditPlanForm({
+      name: plan.name,
+      description: plan.description ?? '',
+      pricePerMonth: plan.price_per_month ?? 0,
+      pricePerYear: plan.price_per_year ?? 0,
+      trialDays: plan.trial_days ?? 0,
+      displayOrder: plan.display_order ?? 0,
+      isActive: plan.is_active ?? true,
+    })
+  }
+
+  const handleSaveEditPlan = async () => {
+    if (!editPlanModal?.plan) return
+    try {
+      await updatePlan({
+        id: editPlanModal.plan.id,
+        data: editPlanForm,
+      }).unwrap()
+      toast.success('Plan updated')
+      setEditPlanModal(null)
+    } catch (e: any) {
+      toast.error(e?.data?.error?.message || 'Failed to update plan')
     }
   }
 
@@ -553,7 +594,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     </div>
                   </div>
                   <div className="flex gap-2 mt-4">
-                    <Button size="sm" variant="outline" className="flex-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => openEditPlanModal(plan)}
+                    >
                       <Edit className="mr-2 h-4 w-4" />
                       Edit
                     </Button>
