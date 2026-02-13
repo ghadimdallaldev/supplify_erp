@@ -57,7 +57,11 @@ router.get('/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query
 
-    logger.debug('Keycloak callback received', { hasCode: !!code, hasState: !!state, hasError: !!error })
+    logger.debug('Keycloak callback received', {
+      hasCode: !!code,
+      hasState: !!state,
+      hasError: !!error,
+    })
 
     if (error) {
       logger.warn('Keycloak authentication error', { error })
@@ -110,7 +114,8 @@ router.get('/callback', async (req, res) => {
     res.redirect(redirectUrl)
   } catch (error) {
     logger.error('Callback error', { error: error.message })
-    res.redirect(`${process.env.WEB_ORIGIN}/login?error=callback_failed`)
+    const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+    res.redirect(`${origin}/login?error=callback_failed`)
   }
 })
 
@@ -169,7 +174,7 @@ router.get('/me', requireAuth, async (req, res) => {
 // Refresh access token
 router.post('/refresh', async (req, res) => {
   try {
-    const refreshToken = req.cookies.refresh_token;
+    const refreshToken = req.cookies.refresh_token
 
     if (!refreshToken) {
       return res.status(401).json({
@@ -180,13 +185,13 @@ router.post('/refresh', async (req, res) => {
           message: 'No refresh token provided',
         },
         requestId: req.requestId,
-      });
+      })
     }
 
-    const newTokens = await refreshAccessToken(refreshToken);
+    const newTokens = await refreshAccessToken(refreshToken)
 
     if (!newTokens) {
-      clearAuthCookies(res);
+      clearAuthCookies(res)
       return res.status(401).json({
         ok: false,
         data: null,
@@ -195,10 +200,10 @@ router.post('/refresh', async (req, res) => {
           message: 'Token refresh failed',
         },
         requestId: req.requestId,
-      });
+      })
     }
 
-    setAuthCookies(res, newTokens.access_token, newTokens.refresh_token);
+    setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
 
     res.json({
       ok: true,
@@ -207,10 +212,10 @@ router.post('/refresh', async (req, res) => {
       },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Refresh error', { error: error.message });
-    clearAuthCookies(res);
+    logger.error('Refresh error', { error: error.message })
+    clearAuthCookies(res)
     res.status(401).json({
       ok: false,
       data: null,
@@ -219,9 +224,9 @@ router.post('/refresh', async (req, res) => {
         message: 'Token refresh failed',
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Logout
 router.post('/logout', requireAuth, async (req, res) => {

@@ -22,7 +22,9 @@ function buildPackingSlipPdf(packingSlip) {
     doc.fontSize(20).text('PACKING SLIP', { continued: false })
     doc.fontSize(10).text(`Order #${packingSlip.orderNumber}`, { continued: false })
     doc.moveDown()
-    doc.text(`Date: ${packingSlip.orderDate ? new Date(packingSlip.orderDate).toLocaleDateString() : 'N/A'}`)
+    doc.text(
+      `Date: ${packingSlip.orderDate ? new Date(packingSlip.orderDate).toLocaleDateString() : 'N/A'}`
+    )
     doc.moveDown()
     doc.text(`Ship To: ${packingSlip.restaurantName || ''}`)
     if (packingSlip.restaurantAddress && typeof packingSlip.restaurantAddress === 'object') {
@@ -42,7 +44,9 @@ function buildPackingSlipPdf(packingSlip) {
       )
     })
     doc.moveDown(1)
-    doc.text(`Total: ${packingSlip.currency || 'USD'} ${Number(packingSlip.totalAmount || 0).toFixed(2)}`)
+    doc.text(
+      `Total: ${packingSlip.currency || 'USD'} ${Number(packingSlip.totalAmount || 0).toFixed(2)}`
+    )
     doc.end()
   })
 }
@@ -614,11 +618,7 @@ router.get('/', requireAuth, async (req, res) => {
     let items = []
     if (orderIds.length > 0) {
       try {
-        logger.info({
-          message: 'Fetching items for orders',
-          orderIds,
-          count: orderIds.length,
-        })
+        logger.debug('Fetching order items', { count: orderIds.length })
 
         const { rows: itemsRows } = await query(
           `
@@ -634,10 +634,7 @@ router.get('/', requireAuth, async (req, res) => {
         )
 
         items = itemsRows
-        logger.info({
-          message: 'Fetched order items',
-          count: items.length,
-        })
+        logger.debug('Fetched order items', { count: items.length })
       } catch (itemError) {
         logger.error({
           message: 'Failed to fetch order items',
@@ -820,7 +817,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (error) {
     // Let NotFoundError pass through to error handler (next middleware)
     if (error instanceof NotFoundError) {
-      return next(error);
+      return next(error)
     }
     logger.error('Get order error:', error)
     res.status(500).json({
@@ -1770,7 +1767,10 @@ router.get(
       }
       const buf = await buildPackingSlipPdf(packingSlip)
       res.setHeader('Content-Type', 'application/pdf')
-      res.setHeader('Content-Disposition', `attachment; filename="packing-slip-${order.id.substring(0, 8)}.pdf"`)
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="packing-slip-${order.id.substring(0, 8)}.pdf"`
+      )
       res.send(buf)
     } catch (error) {
       logger.error('Get packing slip PDF error:', error)

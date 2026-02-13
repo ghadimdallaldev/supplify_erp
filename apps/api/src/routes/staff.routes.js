@@ -46,9 +46,11 @@ const createShiftSchema = z.object({
   notes: z.string().optional(),
 })
 
-const updateShiftSchema = createShiftSchema.partial().refine((data) => Object.keys(data).length > 0, {
-  message: 'At least one field must be provided for update',
-})
+const updateShiftSchema = createShiftSchema
+  .partial()
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'At least one field must be provided for update',
+  })
 
 const checkInSchema = z.object({
   staffId: z.string().uuid(),
@@ -93,7 +95,7 @@ const availabilitySchema = z.object({
           z.object({
             start: z.string().regex(/^\d{2}:\d{2}$/),
             end: z.string().regex(/^\d{2}:\d{2}$/),
-          }),
+          })
         )
         .max(6),
     })
@@ -178,7 +180,7 @@ async function resolveRestaurantId(req) {
         FROM restaurant
         ORDER BY created_at
         LIMIT 1
-      `,
+      `
     )
     if (rows.length) {
       return rows[0].id
@@ -194,7 +196,7 @@ async function resolveRestaurantId(req) {
         FROM restaurant
         ORDER BY created_at
         LIMIT 1
-      `,
+      `
     )
     if (rows.length) {
       return rows[0].id
@@ -211,7 +213,7 @@ async function resolveRestaurantId(req) {
         FROM restaurant
         ORDER BY created_at
         LIMIT 1
-      `,
+      `
     )
     if (rows.length) {
       return rows[0].id
@@ -264,6 +266,28 @@ function mapShiftRow(row) {
 }
 
 function mapTimeEntryRow(row) {
+  return {
+    id: row.id,
+    restaurantId: row.restaurant_id,
+    staffId: row.staff_id,
+    clockInAt: row.clock_in_at,
+    clockOutAt: row.clock_out_at,
+    clockOutMethod: row.clock_out_method,
+    breakMinutes: row.break_minutes != null ? Number(row.break_minutes) : null,
+    note: row.note,
+    status: row.status,
+    staff: row.staff_id
+      ? {
+          id: row.staff_id,
+          name: row.staff_name,
+          role: row.staff_role,
+        }
+      : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 function mapPtoRow(row) {
   return {
     id: row.id,
@@ -420,72 +444,43 @@ function mapPayrollExportRow(row) {
   }
 }
 
-  return {
-    id: row.id,
-    restaurantId: row.restaurant_id,
-    staffId: row.staff_id,
-    shiftId: row.shift_id,
-    clockInAt: row.clock_in_at,
-    clockInMethod: row.clock_in_method,
-    clockOutAt: row.clock_out_at,
-    clockOutMethod: row.clock_out_method,
-    breakMinutes: row.break_minutes,
-    breakDetails: row.break_details,
-    status: row.status,
-    note: row.note,
-    staffName: row.staff_name,
-    role: row.staff_role,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-router.get(
-  '/members',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const { rows } = await query(
-        `
+router.get('/members', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const { rows } = await query(
+      `
           SELECT *
           FROM staff_member
           WHERE restaurant_id = $1
           ORDER BY display_name NULLS LAST, first_name, last_name
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: rows.map(mapStaffRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch staff members', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'STAFF_FETCH_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
+    res.json({
+      ok: true,
+      data: rows.map(mapStaffRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to fetch staff members', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'STAFF_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
-router.post(
-  '/members',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = createStaffSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
+router.post('/members', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = createStaffSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
 
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           INSERT INTO staff_member (
             restaurant_id,
             status,
@@ -506,81 +501,75 @@ router.post(
           )
           RETURNING *
         `,
-        [
-          restaurantId,
-          payload.firstName,
-          payload.lastName,
-          payload.displayName ?? `${payload.firstName} ${payload.lastName}`,
-          payload.email ?? null,
-          payload.phone ?? null,
-          payload.role,
-          payload.wageType,
-          payload.wageRate ?? null,
-          payload.hireDate ?? null,
-          payload.profileColor ?? null,
-        ],
-      )
+      [
+        restaurantId,
+        payload.firstName,
+        payload.lastName,
+        payload.displayName ?? `${payload.firstName} ${payload.lastName}`,
+        payload.email ?? null,
+        payload.phone ?? null,
+        payload.role,
+        payload.wageType,
+        payload.wageRate ?? null,
+        payload.hireDate ?? null,
+        payload.profileColor ?? null,
+      ]
+    )
 
-      res.status(201).json({
-        ok: true,
-        data: mapStaffRow(rows[0]),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to create staff member', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'STAFF_CREATE_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
+    res.status(201).json({
+      ok: true,
+      data: mapStaffRow(rows[0]),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to create staff member', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'STAFF_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
-router.get(
-  '/members/:id',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const { rows } = await query(
-        `
+router.get('/members/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const { rows } = await query(
+      `
           SELECT *
           FROM staff_member
           WHERE id = $1 AND restaurant_id = $2
         `,
-        [req.params.id, restaurantId],
-      )
+      [req.params.id, restaurantId]
+    )
 
-      if (!rows.length) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: { name: 'NOT_FOUND', message: 'Staff member not found' },
-          requestId: req.requestId,
-        })
-      }
-
-      res.json({
-        ok: true,
-        data: mapStaffRow(rows[0]),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch staff member', { error: error.message })
-      res.status(400).json({
+    if (!rows.length) {
+      return res.status(404).json({
         ok: false,
         data: null,
-        error: { name: 'STAFF_FETCH_ERROR', message: error.message },
+        error: { name: 'NOT_FOUND', message: 'Staff member not found' },
         requestId: req.requestId,
       })
     }
-  },
-)
+
+    res.json({
+      ok: true,
+      data: mapStaffRow(rows[0]),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to fetch staff member', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'STAFF_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 router.patch(
   '/members/:id',
@@ -664,7 +653,7 @@ router.patch(
           WHERE id = $2 AND restaurant_id = $1
           RETURNING *
         `,
-        [restaurantId, req.params.id, ...values],
+        [restaurantId, req.params.id, ...values]
       )
 
       if (!rows.length) {
@@ -691,21 +680,19 @@ router.patch(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
-router.get(
-  '/shifts',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const startDate = req.query.startDate ? new Date(req.query.startDate) : new Date()
-      const endDate = req.query.endDate ? new Date(req.query.endDate) : new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000)
+router.get('/shifts', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const startDate = req.query.startDate ? new Date(req.query.startDate) : new Date()
+    const endDate = req.query.endDate
+      ? new Date(req.query.endDate)
+      : new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000)
 
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           SELECT s.*, m.display_name AS staff_name, m.role AS staff_role
           FROM staff_shift s
           LEFT JOIN staff_member m ON m.id = s.staff_id
@@ -713,53 +700,51 @@ router.get(
             AND s.shift_date BETWEEN $2 AND $3
           ORDER BY s.starts_at
         `,
-        [restaurantId, startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)],
+      [restaurantId, startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)]
+    )
+
+    res.json({
+      ok: true,
+      data: rows.map(mapShiftRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to fetch staff shifts', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'SHIFT_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/shifts', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = createShiftSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
+
+    if (payload.staffId) {
+      const ownershipCheck = await query(
+        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        [payload.staffId, restaurantId]
       )
-
-      res.json({
-        ok: true,
-        data: rows.map(mapShiftRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch staff shifts', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'SHIFT_FETCH_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
-
-router.post(
-  '/shifts',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = createShiftSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
-
-      if (payload.staffId) {
-        const ownershipCheck = await query(
-          `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
-          [payload.staffId, restaurantId],
-        )
-        if (!ownershipCheck.rowCount) {
-          return res.status(400).json({
-            ok: false,
-            data: null,
-            error: { name: 'SHIFT_CREATE_ERROR', message: 'Staff member does not belong to this restaurant' },
-            requestId: req.requestId,
-          })
-        }
+      if (!ownershipCheck.rowCount) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'SHIFT_CREATE_ERROR',
+            message: 'Staff member does not belong to this restaurant',
+          },
+          requestId: req.requestId,
+        })
       }
+    }
 
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           INSERT INTO staff_shift (
             restaurant_id, staff_id, role,
             shift_date, starts_at, ends_at, status, notes
@@ -767,172 +752,171 @@ router.post(
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           RETURNING *
         `,
-        [
-          restaurantId,
-          payload.staffId ?? null,
-          payload.role,
-          payload.shiftDate,
-          payload.startsAt,
-          payload.endsAt,
-          payload.status ?? 'PUBLISHED',
-          payload.notes ?? null,
-        ],
+      [
+        restaurantId,
+        payload.staffId ?? null,
+        payload.role,
+        payload.shiftDate,
+        payload.startsAt,
+        payload.endsAt,
+        payload.status ?? 'PUBLISHED',
+        payload.notes ?? null,
+      ]
+    )
+
+    const shiftRow = rows[0]
+    if (shiftRow.staff_id) {
+      const { rows: staffRows } = await query(
+        `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
+        [shiftRow.staff_id]
       )
-
-      const shiftRow = rows[0]
-      if (shiftRow.staff_id) {
-        const { rows: staffRows } = await query(`SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`, [
-          shiftRow.staff_id,
-        ])
-        if (staffRows.length) {
-          shiftRow.staff_name = staffRows[0].staff_name
-          shiftRow.staff_role = staffRows[0].staff_role
-        }
+      if (staffRows.length) {
+        shiftRow.staff_name = staffRows[0].staff_name
+        shiftRow.staff_role = staffRows[0].staff_role
       }
+    }
 
-      res.status(201).json({
-        ok: true,
-        data: mapShiftRow(shiftRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to create staff shift', { error: error.message })
-      if (error instanceof ZodError) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'SHIFT_CREATE_ERROR',
-            message: 'Please provide role, date, start time, and end time when creating a shift.',
-            details: error.errors,
-          },
-          requestId: req.requestId,
-        })
-      }
-      res.status(400).json({
+    res.status(201).json({
+      ok: true,
+      data: mapShiftRow(shiftRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to create staff shift', { error: error.message })
+    if (error instanceof ZodError) {
+      return res.status(400).json({
         ok: false,
         data: null,
-        error: { name: 'SHIFT_CREATE_ERROR', message: error.message },
+        error: {
+          name: 'SHIFT_CREATE_ERROR',
+          message: 'Please provide role, date, start time, and end time when creating a shift.',
+          details: error.errors,
+        },
         requestId: req.requestId,
       })
     }
-  },
-)
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'SHIFT_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
-router.patch(
-  '/shifts/:id',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = updateShiftSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
+router.patch('/shifts/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = updateShiftSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
 
-      const fields = []
-      const values = []
-      let index = 2
+    const fields = []
+    const values = []
+    let index = 2
 
-      if (payload.staffId !== undefined) {
-        if (payload.staffId) {
-          const ownershipCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-            payload.staffId,
-            restaurantId,
-          ])
-          if (!ownershipCheck.rowCount) {
-            return res.status(400).json({
-              ok: false,
-              data: null,
-              error: { name: 'SHIFT_UPDATE_ERROR', message: 'Staff member does not belong to this restaurant' },
-              requestId: req.requestId,
-            })
-          }
+    if (payload.staffId !== undefined) {
+      if (payload.staffId) {
+        const ownershipCheck = await query(
+          `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+          [payload.staffId, restaurantId]
+        )
+        if (!ownershipCheck.rowCount) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'SHIFT_UPDATE_ERROR',
+              message: 'Staff member does not belong to this restaurant',
+            },
+            requestId: req.requestId,
+          })
         }
-        fields.push(`staff_id = $${++index}`)
-        values.push(payload.staffId)
       }
-      if (payload.role !== undefined) {
-        fields.push(`role = $${++index}`)
-        values.push(payload.role)
-      }
-      if (payload.shiftDate !== undefined) {
-        fields.push(`shift_date = $${++index}`)
-        values.push(payload.shiftDate)
-      }
-      if (payload.startsAt !== undefined) {
-        fields.push(`starts_at = $${++index}`)
-        values.push(payload.startsAt)
-      }
-      if (payload.endsAt !== undefined) {
-        fields.push(`ends_at = $${++index}`)
-        values.push(payload.endsAt)
-      }
-      if (payload.status !== undefined) {
-        fields.push(`status = $${++index}`)
-        values.push(payload.status)
-      }
-      if (payload.notes !== undefined) {
-        fields.push(`notes = $${++index}`)
-        values.push(payload.notes)
-      }
+      fields.push(`staff_id = $${++index}`)
+      values.push(payload.staffId)
+    }
+    if (payload.role !== undefined) {
+      fields.push(`role = $${++index}`)
+      values.push(payload.role)
+    }
+    if (payload.shiftDate !== undefined) {
+      fields.push(`shift_date = $${++index}`)
+      values.push(payload.shiftDate)
+    }
+    if (payload.startsAt !== undefined) {
+      fields.push(`starts_at = $${++index}`)
+      values.push(payload.startsAt)
+    }
+    if (payload.endsAt !== undefined) {
+      fields.push(`ends_at = $${++index}`)
+      values.push(payload.endsAt)
+    }
+    if (payload.status !== undefined) {
+      fields.push(`status = $${++index}`)
+      values.push(payload.status)
+    }
+    if (payload.notes !== undefined) {
+      fields.push(`notes = $${++index}`)
+      values.push(payload.notes)
+    }
 
-      if (!fields.length) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: { name: 'SHIFT_UPDATE_ERROR', message: 'No valid fields to update' },
-          requestId: req.requestId,
-        })
-      }
+    if (!fields.length) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'SHIFT_UPDATE_ERROR', message: 'No valid fields to update' },
+        requestId: req.requestId,
+      })
+    }
 
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           UPDATE staff_shift
           SET ${fields.join(', ')},
               updated_at = now()
           WHERE id = $1 AND restaurant_id = $2
           RETURNING *
         `,
-        [req.params.id, restaurantId, ...values],
-      )
+      [req.params.id, restaurantId, ...values]
+    )
 
-      if (!rows.length) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: { name: 'NOT_FOUND', message: 'Shift not found' },
-          requestId: req.requestId,
-        })
-      }
-
-      const shiftRow = rows[0]
-      if (shiftRow.staff_id) {
-        const { rows: staffRows } = await query(`SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`, [
-          shiftRow.staff_id,
-        ])
-        if (staffRows.length) {
-          shiftRow.staff_name = staffRows[0].staff_name
-          shiftRow.staff_role = staffRows[0].staff_role
-        }
-      }
-
-      res.json({
-        ok: true,
-        data: mapShiftRow(shiftRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to update staff shift', { error: error.message })
-      res.status(400).json({
+    if (!rows.length) {
+      return res.status(404).json({
         ok: false,
         data: null,
-        error: { name: 'SHIFT_UPDATE_ERROR', message: error.message },
+        error: { name: 'NOT_FOUND', message: 'Shift not found' },
         requestId: req.requestId,
       })
     }
-  },
-)
+
+    const shiftRow = rows[0]
+    if (shiftRow.staff_id) {
+      const { rows: staffRows } = await query(
+        `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
+        [shiftRow.staff_id]
+      )
+      if (staffRows.length) {
+        shiftRow.staff_name = staffRows[0].staff_name
+        shiftRow.staff_role = staffRows[0].staff_role
+      }
+    }
+
+    res.json({
+      ok: true,
+      data: mapShiftRow(shiftRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to update staff shift', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'SHIFT_UPDATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 router.delete(
   '/shifts/:id',
@@ -943,7 +927,7 @@ router.delete(
       const restaurantId = await resolveRestaurantId(req)
       const { rowCount } = await query(
         `DELETE FROM staff_shift WHERE id = $1 AND restaurant_id = $2`,
-        [req.params.id, restaurantId],
+        [req.params.id, restaurantId]
       )
 
       if (!rowCount) {
@@ -965,21 +949,19 @@ router.delete(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
-router.get(
-  '/time-entries',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const startDate = req.query.startDate ? new Date(req.query.startDate) : new Date(new Date().setDate(new Date().getDate() - 7))
-      const endDate = req.query.endDate ? new Date(req.query.endDate) : new Date()
+router.get('/time-entries', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const startDate = req.query.startDate
+      ? new Date(req.query.startDate)
+      : new Date(new Date().setDate(new Date().getDate() - 7))
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : new Date()
 
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           SELECT te.*, sm.display_name AS staff_name, sm.role AS staff_role
           FROM staff_time_entry te
           JOIN staff_member sm ON sm.id = te.staff_id
@@ -987,26 +969,25 @@ router.get(
             AND te.clock_in_at BETWEEN $2 AND $3
           ORDER BY te.clock_in_at DESC
         `,
-        [restaurantId, startDate.toISOString(), endDate.toISOString()],
-      )
+      [restaurantId, startDate.toISOString(), endDate.toISOString()]
+    )
 
-      res.json({
-        ok: true,
-        data: rows.map(mapTimeEntryRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch time entries', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'TIME_ENTRY_FETCH_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
+    res.json({
+      ok: true,
+      data: rows.map(mapTimeEntryRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to fetch time entries', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'TIME_ENTRY_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 router.post(
   '/time-entries/check-in',
@@ -1017,15 +998,18 @@ router.post(
       const payload = checkInSchema.parse(req.body)
       const restaurantId = await resolveRestaurantId(req)
 
-      const ownershipCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-        payload.staffId,
-        restaurantId,
-      ])
+      const ownershipCheck = await query(
+        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        [payload.staffId, restaurantId]
+      )
       if (!ownershipCheck.rowCount) {
         return res.status(400).json({
           ok: false,
           data: null,
-          error: { name: 'TIME_ENTRY_CREATE_ERROR', message: 'Staff member does not belong to this restaurant' },
+          error: {
+            name: 'TIME_ENTRY_CREATE_ERROR',
+            message: 'Staff member does not belong to this restaurant',
+          },
           requestId: req.requestId,
         })
       }
@@ -1039,19 +1023,24 @@ router.post(
             AND clock_out_at IS NULL
           LIMIT 1
         `,
-        [restaurantId, payload.staffId],
+        [restaurantId, payload.staffId]
       )
 
       if (openEntry.rowCount) {
         return res.status(409).json({
           ok: false,
           data: null,
-          error: { name: 'TIME_ENTRY_OPEN_EXISTS', message: 'Staff member already has an open time entry' },
+          error: {
+            name: 'TIME_ENTRY_OPEN_EXISTS',
+            message: 'Staff member already has an open time entry',
+          },
           requestId: req.requestId,
         })
       }
 
-      const clockInAt = payload.clockInAt ? new Date(payload.clockInAt).toISOString() : new Date().toISOString()
+      const clockInAt = payload.clockInAt
+        ? new Date(payload.clockInAt).toISOString()
+        : new Date().toISOString()
 
       const { rows } = await query(
         `
@@ -1076,13 +1065,14 @@ router.post(
           payload.method ?? 'web',
           payload.note ?? null,
           req.userData?.id ?? null,
-        ],
+        ]
       )
 
       const entry = rows[0]
-      const staffInfo = await query(`SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`, [
-        entry.staff_id,
-      ])
+      const staffInfo = await query(
+        `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
+        [entry.staff_id]
+      )
       if (staffInfo.rowCount) {
         entry.staff_name = staffInfo.rows[0].staff_name
         entry.staff_role = staffInfo.rows[0].staff_role
@@ -1103,7 +1093,7 @@ router.post(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
 router.post(
@@ -1115,7 +1105,9 @@ router.post(
       const payload = checkOutSchema.parse(req.body)
       const restaurantId = await resolveRestaurantId(req)
 
-      const clockOutAt = payload.clockOutAt ? new Date(payload.clockOutAt).toISOString() : new Date().toISOString()
+      const clockOutAt = payload.clockOutAt
+        ? new Date(payload.clockOutAt).toISOString()
+        : new Date().toISOString()
 
       const { rows } = await query(
         `
@@ -1140,7 +1132,7 @@ router.post(
           payload.note ?? null,
           payload.status ?? 'APPROVED',
           restaurantId,
-        ],
+        ]
       )
 
       if (!rows.length) {
@@ -1153,9 +1145,10 @@ router.post(
       }
 
       const entry = rows[0]
-      const staffInfo = await query(`SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`, [
-        entry.staff_id,
-      ])
+      const staffInfo = await query(
+        `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
+        [entry.staff_id]
+      )
       if (staffInfo.rowCount) {
         entry.staff_name = staffInfo.rows[0].staff_name
         entry.staff_role = staffInfo.rows[0].staff_role
@@ -1176,69 +1169,66 @@ router.post(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
-router.get(
-  '/pto',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const { rows } = await query(
-        `
+router.get('/pto', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const { rows } = await query(
+      `
           SELECT p.*, m.display_name AS staff_name, m.role AS staff_role
           FROM staff_pto_request p
           JOIN staff_member m ON m.id = p.staff_id
           WHERE p.restaurant_id = $1
           ORDER BY p.created_at DESC
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: rows.map(mapPtoRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch PTO requests', { error: error.message })
-      res.status(400).json({
+    res.json({
+      ok: true,
+      data: rows.map(mapPtoRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.json({ ok: true, data: [], error: null, requestId: req.requestId })
+    }
+    logger.error('Failed to fetch PTO requests', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'PTO_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/pto', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = createPtoSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
+
+    const ownershipCheck = await query(
+      `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+      [payload.staffId, restaurantId]
+    )
+    if (!ownershipCheck.rowCount) {
+      return res.status(400).json({
         ok: false,
         data: null,
-        error: { name: 'PTO_FETCH_ERROR', message: error.message },
+        error: {
+          name: 'PTO_CREATE_ERROR',
+          message: 'Staff member does not belong to this restaurant',
+        },
         requestId: req.requestId,
       })
     }
-  },
-)
 
-router.post(
-  '/pto',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = createPtoSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
-
-      const ownershipCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-        payload.staffId,
-        restaurantId,
-      ])
-      if (!ownershipCheck.rowCount) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: { name: 'PTO_CREATE_ERROR', message: 'Staff member does not belong to this restaurant' },
-          requestId: req.requestId,
-        })
-      }
-
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           INSERT INTO staff_pto_request (
             restaurant_id, staff_id, type, status,
             start_date, end_date, hours_requested, reason, created_by, updated_by
@@ -1246,62 +1236,58 @@ router.post(
           VALUES ($1, $2, $3, 'PENDING', $4, $5, $6, $7, $8, $8)
           RETURNING *
         `,
-        [
-          restaurantId,
-          payload.staffId,
-          payload.type,
-          payload.startDate,
-          payload.endDate,
-          payload.hoursRequested ?? null,
-          payload.reason ?? null,
-          req.userData?.id ?? null,
-        ],
-      )
+      [
+        restaurantId,
+        payload.staffId,
+        payload.type,
+        payload.startDate,
+        payload.endDate,
+        payload.hoursRequested ?? null,
+        payload.reason ?? null,
+        req.userData?.id ?? null,
+      ]
+    )
 
-      const row = rows[0]
-      const staffInfo = await query(`SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`, [
-        row.staff_id,
-      ])
-      if (staffInfo.rowCount) {
-        row.staff_name = staffInfo.rows[0].staff_name
-        row.staff_role = staffInfo.rows[0].staff_role
-      }
-
-      try {
-        await notifyStaffPtoRequest(mapPtoRow(row))
-      } catch (notifyError) {
-        logger.warn('Failed to send PTO notification', { error: notifyError.message, ptoId: row.id })
-      }
-
-      res.status(201).json({
-        ok: true,
-        data: mapPtoRow(row),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to create PTO request', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'PTO_CREATE_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
+    const row = rows[0]
+    const staffInfo = await query(
+      `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
+      [row.staff_id]
+    )
+    if (staffInfo.rowCount) {
+      row.staff_name = staffInfo.rows[0].staff_name
+      row.staff_role = staffInfo.rows[0].staff_role
     }
-  },
-)
 
-router.patch(
-  '/pto/:id',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
     try {
-      const payload = updatePtoSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
+      await notifyStaffPtoRequest(mapPtoRow(row))
+    } catch (notifyError) {
+      logger.warn('Failed to send PTO notification', { error: notifyError.message, ptoId: row.id })
+    }
 
-      const { rows } = await query(
-        `
+    res.status(201).json({
+      ok: true,
+      data: mapPtoRow(row),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to create PTO request', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'PTO_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.patch('/pto/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = updatePtoSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
+
+    const { rows } = await query(
+      `
           UPDATE staff_pto_request
           SET status = $3,
               manager_note = COALESCE($4, manager_note),
@@ -1310,90 +1296,91 @@ router.patch(
           WHERE id = $1 AND restaurant_id = $2
           RETURNING *
         `,
-        [req.params.id, restaurantId, payload.status, payload.managerNote ?? null, req.userData?.id ?? null],
-      )
+      [
+        req.params.id,
+        restaurantId,
+        payload.status,
+        payload.managerNote ?? null,
+        req.userData?.id ?? null,
+      ]
+    )
 
-      if (!rows.length) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: { name: 'NOT_FOUND', message: 'PTO request not found' },
-          requestId: req.requestId,
-        })
-      }
-
-      const row = rows[0]
-      const staffInfo = await query(`SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`, [
-        row.staff_id,
-      ])
-      if (staffInfo.rowCount) {
-        row.staff_name = staffInfo.rows[0].staff_name
-        row.staff_role = staffInfo.rows[0].staff_role
-      }
-
-      res.json({
-        ok: true,
-        data: mapPtoRow(row),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to update PTO request', { error: error.message })
-      res.status(400).json({
+    if (!rows.length) {
+      return res.status(404).json({
         ok: false,
         data: null,
-        error: { name: 'PTO_UPDATE_ERROR', message: error.message },
+        error: { name: 'NOT_FOUND', message: 'PTO request not found' },
         requestId: req.requestId,
       })
     }
-  },
-)
 
-router.get(
-  '/availability',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const { rows } = await query(
-        `
+    const row = rows[0]
+    const staffInfo = await query(
+      `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
+      [row.staff_id]
+    )
+    if (staffInfo.rowCount) {
+      row.staff_name = staffInfo.rows[0].staff_name
+      row.staff_role = staffInfo.rows[0].staff_role
+    }
+
+    res.json({
+      ok: true,
+      data: mapPtoRow(row),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to update PTO request', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'PTO_UPDATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/availability', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const { rows } = await query(
+      `
           SELECT a.*, m.display_name AS staff_name
           FROM staff_availability a
           JOIN staff_member m ON m.id = a.staff_id
           WHERE a.restaurant_id = $1
           ORDER BY m.display_name, weekday
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: rows.map((row) => ({
-          id: row.id,
-          restaurantId: row.restaurant_id,
-          staffId: row.staff_id,
-          weekday: row.weekday,
-          availability: row.availability,
-          notes: row.notes,
-          staffName: row.staff_name,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
-        })),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch staff availability', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'AVAILABILITY_FETCH_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
+    res.json({
+      ok: true,
+      data: rows.map((row) => ({
+        id: row.id,
+        restaurantId: row.restaurant_id,
+        staffId: row.staff_id,
+        weekday: row.weekday,
+        availability: row.availability,
+        notes: row.notes,
+        staffName: row.staff_name,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to fetch staff availability', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'AVAILABILITY_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 router.post(
   '/availability',
@@ -1404,15 +1391,18 @@ router.post(
       const payload = availabilitySchema.parse(req.body)
       const restaurantId = await resolveRestaurantId(req)
 
-      const ownershipCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-        payload.staffId,
-        restaurantId,
-      ])
+      const ownershipCheck = await query(
+        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        [payload.staffId, restaurantId]
+      )
       if (!ownershipCheck.rowCount) {
         return res.status(400).json({
           ok: false,
           data: null,
-          error: { name: 'AVAILABILITY_SET_ERROR', message: 'Staff member does not belong to this restaurant' },
+          error: {
+            name: 'AVAILABILITY_SET_ERROR',
+            message: 'Staff member does not belong to this restaurant',
+          },
           requestId: req.requestId,
         })
       }
@@ -1433,7 +1423,7 @@ router.post(
           payload.weekday,
           payload.availability,
           payload.notes ?? null,
-        ],
+        ]
       )
 
       res.status(201).json({
@@ -1451,18 +1441,14 @@ router.post(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
-router.get(
-  '/swaps',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const { rows } = await query(
-        `
+router.get('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const { rows } = await query(
+      `
           SELECT s.*,
                  sh.role AS shift_role,
                  sh.starts_at AS shift_starts_at,
@@ -1478,97 +1464,104 @@ router.get(
           WHERE s.restaurant_id = $1
           ORDER BY s.created_at DESC
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: rows.map(mapSwapRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch shift swaps', { error: error.message })
-      res.status(400).json({
+    res.json({
+      ok: true,
+      data: rows.map(mapSwapRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.json({ ok: true, data: [], error: null, requestId: req.requestId })
+    }
+    logger.error('Failed to fetch shift swaps', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'SHIFT_SWAP_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = createSwapSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
+
+    const shiftCheck = await query(
+      `SELECT 1 FROM staff_shift WHERE id = $1 AND restaurant_id = $2`,
+      [payload.shiftId, restaurantId]
+    )
+    if (!shiftCheck.rowCount) {
+      return res.status(400).json({
         ok: false,
         data: null,
-        error: { name: 'SHIFT_SWAP_FETCH_ERROR', message: error.message },
+        error: {
+          name: 'SHIFT_SWAP_CREATE_ERROR',
+          message: 'Shift does not belong to this restaurant',
+        },
         requestId: req.requestId,
       })
     }
-  },
-)
 
-router.post(
-  '/swaps',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = createSwapSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
+    const requesterCheck = await query(
+      `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+      [payload.requestedBy, restaurantId]
+    )
+    if (!requesterCheck.rowCount) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'SHIFT_SWAP_CREATE_ERROR',
+          message: 'Requester does not belong to this restaurant',
+        },
+        requestId: req.requestId,
+      })
+    }
 
-      const shiftCheck = await query(`SELECT 1 FROM staff_shift WHERE id = $1 AND restaurant_id = $2`, [
-        payload.shiftId,
-        restaurantId,
-      ])
-      if (!shiftCheck.rowCount) {
+    if (payload.proposedCoverId) {
+      const coverCheck = await query(
+        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        [payload.proposedCoverId, restaurantId]
+      )
+      if (!coverCheck.rowCount) {
         return res.status(400).json({
           ok: false,
           data: null,
-          error: { name: 'SHIFT_SWAP_CREATE_ERROR', message: 'Shift does not belong to this restaurant' },
+          error: {
+            name: 'SHIFT_SWAP_CREATE_ERROR',
+            message: 'Proposed cover does not belong to this restaurant',
+          },
           requestId: req.requestId,
         })
       }
+    }
 
-      const requesterCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-        payload.requestedBy,
-        restaurantId,
-      ])
-      if (!requesterCheck.rowCount) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: { name: 'SHIFT_SWAP_CREATE_ERROR', message: 'Requester does not belong to this restaurant' },
-          requestId: req.requestId,
-        })
-      }
-
-      if (payload.proposedCoverId) {
-        const coverCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-          payload.proposedCoverId,
-          restaurantId,
-        ])
-        if (!coverCheck.rowCount) {
-          return res.status(400).json({
-            ok: false,
-            data: null,
-            error: { name: 'SHIFT_SWAP_CREATE_ERROR', message: 'Proposed cover does not belong to this restaurant' },
-            requestId: req.requestId,
-          })
-        }
-      }
-
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           INSERT INTO staff_shift_swap (
             restaurant_id, shift_id, requested_by, proposed_cover_id, reason, status
           )
           VALUES ($1, $2, $3, $4, $5, 'REQUESTED')
           RETURNING *
         `,
-        [
-          restaurantId,
-          payload.shiftId,
-          payload.requestedBy,
-          payload.proposedCoverId ?? null,
-          payload.reason ?? null,
-        ],
-      )
+      [
+        restaurantId,
+        payload.shiftId,
+        payload.requestedBy,
+        payload.proposedCoverId ?? null,
+        payload.reason ?? null,
+      ]
+    )
 
-      const swapRow = rows[0]
-      const joined = await query(
-        `
+    const swapRow = rows[0]
+    const joined = await query(
+      `
           SELECT s.*,
                  sh.role AS shift_role,
                  sh.starts_at AS shift_starts_at,
@@ -1583,34 +1576,36 @@ router.post(
           LEFT JOIN staff_member cover ON cover.id = s.proposed_cover_id
           WHERE s.id = $1
         `,
-        [swapRow.id],
-      )
+      [swapRow.id]
+    )
 
-      const mappedSwap = mapSwapRow(joined.rows[0])
+    const mappedSwap = mapSwapRow(joined.rows[0])
 
-      try {
-        await notifyStaffSwapRequest(mappedSwap)
-      } catch (notifyError) {
-        logger.warn('Failed to send shift swap notification', { error: notifyError.message, swapId: mappedSwap.id })
-      }
-
-      res.status(201).json({
-        ok: true,
-        data: mappedSwap,
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to create shift swap', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'SHIFT_SWAP_CREATE_ERROR', message: error.message },
-        requestId: req.requestId,
+    try {
+      await notifyStaffSwapRequest(mappedSwap)
+    } catch (notifyError) {
+      logger.warn('Failed to send shift swap notification', {
+        error: notifyError.message,
+        swapId: mappedSwap.id,
       })
     }
-  },
-)
+
+    res.status(201).json({
+      ok: true,
+      data: mappedSwap,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to create shift swap', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'SHIFT_SWAP_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 router.post(
   '/swaps/:id/decision',
@@ -1630,7 +1625,7 @@ router.post(
           WHERE id = $1 AND restaurant_id = $2
           RETURNING *
         `,
-        [req.params.id, restaurantId, payload.status, payload.managerNote ?? null],
+        [req.params.id, restaurantId, payload.status, payload.managerNote ?? null]
       )
 
       if (!rows.length) {
@@ -1658,7 +1653,7 @@ router.post(
           LEFT JOIN staff_member cover ON cover.id = s.proposed_cover_id
           WHERE s.id = $1
         `,
-        [rows[0].id],
+        [rows[0].id]
       )
 
       res.json({
@@ -1676,7 +1671,7 @@ router.post(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
 router.get(
@@ -1699,7 +1694,7 @@ router.get(
           GROUP BY a.id
           ORDER BY a.published_at DESC
         `,
-        [restaurantId, staffId ?? null],
+        [restaurantId, staffId ?? null]
       )
 
       res.json({
@@ -1709,6 +1704,9 @@ router.get(
         requestId: req.requestId,
       })
     } catch (error) {
+      if (error.code === '42P01') {
+        return res.json({ ok: true, data: [], error: null, requestId: req.requestId })
+      }
       logger.error('Failed to fetch announcements', { error: error.message })
       res.status(400).json({
         ok: false,
@@ -1717,7 +1715,7 @@ router.get(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
 router.post(
@@ -1744,7 +1742,7 @@ router.post(
           payload.audience ?? null,
           payload.requireAck ?? false,
           req.userData?.id ?? null,
-        ],
+        ]
       )
 
       res.status(201).json({
@@ -1762,7 +1760,7 @@ router.post(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
 router.post(
@@ -1774,10 +1772,10 @@ router.post(
       const payload = acknowledgeAnnouncementSchema.parse(req.body)
       const restaurantId = await resolveRestaurantId(req)
 
-      const announcementCheck = await query(`SELECT 1 FROM staff_announcement WHERE id = $1 AND restaurant_id = $2`, [
-        req.params.id,
-        restaurantId,
-      ])
+      const announcementCheck = await query(
+        `SELECT 1 FROM staff_announcement WHERE id = $1 AND restaurant_id = $2`,
+        [req.params.id, restaurantId]
+      )
       if (!announcementCheck.rowCount) {
         return res.status(404).json({
           ok: false,
@@ -1793,7 +1791,7 @@ router.post(
           VALUES ($1, $2)
           ON CONFLICT (announcement_id, staff_id) DO NOTHING
         `,
-        [req.params.id, payload.staffId],
+        [req.params.id, payload.staffId]
       )
 
       res.status(204).json({ ok: true, data: null, error: null, requestId: req.requestId })
@@ -1806,175 +1804,171 @@ router.post(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
-router.get(
-  '/documents',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const { rows } = await query(
-        `
+router.get('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const { rows } = await query(
+      `
           SELECT d.*, m.display_name AS staff_name
           FROM staff_document d
           JOIN staff_member m ON m.id = d.staff_id
           WHERE d.restaurant_id = $1
           ORDER BY d.uploaded_at DESC
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: rows.map(mapDocumentRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch staff documents', { error: error.message })
-      res.status(400).json({
+    res.json({
+      ok: true,
+      data: rows.map(mapDocumentRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.json({ ok: true, data: [], error: null, requestId: req.requestId })
+    }
+    logger.error('Failed to fetch staff documents', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'DOCUMENT_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = createDocumentSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
+
+    const ownershipCheck = await query(
+      `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+      [payload.staffId, restaurantId]
+    )
+    if (!ownershipCheck.rowCount) {
+      return res.status(400).json({
         ok: false,
         data: null,
-        error: { name: 'DOCUMENT_FETCH_ERROR', message: error.message },
+        error: {
+          name: 'DOCUMENT_CREATE_ERROR',
+          message: 'Staff member does not belong to this restaurant',
+        },
         requestId: req.requestId,
       })
     }
-  },
-)
 
-router.post(
-  '/documents',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = createDocumentSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
-
-      const ownershipCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-        payload.staffId,
-        restaurantId,
-      ])
-      if (!ownershipCheck.rowCount) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: { name: 'DOCUMENT_CREATE_ERROR', message: 'Staff member does not belong to this restaurant' },
-          requestId: req.requestId,
-        })
-      }
-
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           INSERT INTO staff_document (
             restaurant_id, staff_id, doc_type, title, file_url, file_size, uploaded_by, expires_at, status, metadata
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'ACTIVE'), $10)
           RETURNING *
         `,
-        [
-          restaurantId,
-          payload.staffId,
-          payload.docType,
-          payload.title ?? null,
-          payload.fileUrl,
-          payload.fileSize ?? null,
-          req.userData?.id ?? null,
-          payload.expiresAt ?? null,
-          payload.status ?? null,
-          payload.metadata ?? null,
-        ],
-      )
+      [
+        restaurantId,
+        payload.staffId,
+        payload.docType,
+        payload.title ?? null,
+        payload.fileUrl,
+        payload.fileSize ?? null,
+        req.userData?.id ?? null,
+        payload.expiresAt ?? null,
+        payload.status ?? null,
+        payload.metadata ?? null,
+      ]
+    )
 
-      const docRow = rows[0]
-      const staffInfo = await query(`SELECT display_name AS staff_name FROM staff_member WHERE id = $1`, [docRow.staff_id])
-      if (staffInfo.rowCount) {
-        docRow.staff_name = staffInfo.rows[0].staff_name
-      }
-
-      res.status(201).json({
-        ok: true,
-        data: mapDocumentRow(docRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to create staff document', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'DOCUMENT_CREATE_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
+    const docRow = rows[0]
+    const staffInfo = await query(
+      `SELECT display_name AS staff_name FROM staff_member WHERE id = $1`,
+      [docRow.staff_id]
+    )
+    if (staffInfo.rowCount) {
+      docRow.staff_name = staffInfo.rows[0].staff_name
     }
-  },
-)
 
-router.get(
-  '/incidents',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const { rows } = await query(
-        `
+    res.status(201).json({
+      ok: true,
+      data: mapDocumentRow(docRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to create staff document', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'DOCUMENT_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/incidents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const { rows } = await query(
+      `
           SELECT i.*, m.display_name AS staff_name
           FROM staff_incident i
           LEFT JOIN staff_member m ON m.id = i.staff_id
           WHERE i.restaurant_id = $1
           ORDER BY i.occurred_at DESC
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: rows.map(mapIncidentRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch incidents', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'INCIDENT_FETCH_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
+    res.json({
+      ok: true,
+      data: rows.map(mapIncidentRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.json({ ok: true, data: [], error: null, requestId: req.requestId })
     }
-  },
-)
+    logger.error('Failed to fetch incidents', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'INCIDENT_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
-router.post(
-  '/incidents',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = createIncidentSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
+router.post('/incidents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = createIncidentSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
 
-      if (payload.staffId) {
-        const ownershipCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-          payload.staffId,
-          restaurantId,
-        ])
-        if (!ownershipCheck.rowCount) {
-          return res.status(400).json({
-            ok: false,
-            data: null,
-            error: { name: 'INCIDENT_CREATE_ERROR', message: 'Staff member does not belong to this restaurant' },
-            requestId: req.requestId,
-          })
-        }
+    if (payload.staffId) {
+      const ownershipCheck = await query(
+        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        [payload.staffId, restaurantId]
+      )
+      if (!ownershipCheck.rowCount) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'INCIDENT_CREATE_ERROR',
+            message: 'Staff member does not belong to this restaurant',
+          },
+          requestId: req.requestId,
+        })
       }
+    }
 
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           INSERT INTO staff_incident (
             restaurant_id, staff_id, category, severity, occurred_at,
             notes, follow_up_action, attachments, reported_by
@@ -1982,44 +1976,46 @@ router.post(
           VALUES ($1, $2, $3, COALESCE($4, 'LOW'), $5, $6, $7, $8, $9)
           RETURNING *
         `,
-        [
-          restaurantId,
-          payload.staffId ?? null,
-          payload.category,
-          payload.severity ?? null,
-          payload.occurredAt,
-          payload.notes ?? null,
-          payload.followUpAction ?? null,
-          payload.attachments ?? null,
-          req.userData?.id ?? null,
-        ],
+      [
+        restaurantId,
+        payload.staffId ?? null,
+        payload.category,
+        payload.severity ?? null,
+        payload.occurredAt,
+        payload.notes ?? null,
+        payload.followUpAction ?? null,
+        payload.attachments ?? null,
+        req.userData?.id ?? null,
+      ]
+    )
+
+    const incidentRow = rows[0]
+    if (incidentRow.staff_id) {
+      const staffInfo = await query(
+        `SELECT display_name AS staff_name FROM staff_member WHERE id = $1`,
+        [incidentRow.staff_id]
       )
-
-      const incidentRow = rows[0]
-      if (incidentRow.staff_id) {
-        const staffInfo = await query(`SELECT display_name AS staff_name FROM staff_member WHERE id = $1`, [incidentRow.staff_id])
-        if (staffInfo.rowCount) {
-          incidentRow.staff_name = staffInfo.rows[0].staff_name
-        }
+      if (staffInfo.rowCount) {
+        incidentRow.staff_name = staffInfo.rows[0].staff_name
       }
-
-      res.status(201).json({
-        ok: true,
-        data: mapIncidentRow(incidentRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to create incident', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'INCIDENT_CREATE_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
     }
-  },
-)
+
+    res.status(201).json({
+      ok: true,
+      data: mapIncidentRow(incidentRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to create incident', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'INCIDENT_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 router.get(
   '/performance-notes',
@@ -2036,7 +2032,7 @@ router.get(
           WHERE pn.restaurant_id = $1
           ORDER BY pn.created_at DESC
         `,
-        [restaurantId],
+        [restaurantId]
       )
 
       res.json({
@@ -2046,6 +2042,9 @@ router.get(
         requestId: req.requestId,
       })
     } catch (error) {
+      if (error.code === '42P01') {
+        return res.json({ ok: true, data: [], error: null, requestId: req.requestId })
+      }
       logger.error('Failed to fetch performance notes', { error: error.message })
       res.status(400).json({
         ok: false,
@@ -2054,7 +2053,7 @@ router.get(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
 router.post(
@@ -2066,15 +2065,18 @@ router.post(
       const payload = createPerformanceNoteSchema.parse(req.body)
       const restaurantId = await resolveRestaurantId(req)
 
-      const ownershipCheck = await query(`SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`, [
-        payload.staffId,
-        restaurantId,
-      ])
+      const ownershipCheck = await query(
+        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        [payload.staffId, restaurantId]
+      )
       if (!ownershipCheck.rowCount) {
         return res.status(400).json({
           ok: false,
           data: null,
-          error: { name: 'PERFORMANCE_NOTE_CREATE_ERROR', message: 'Staff member does not belong to this restaurant' },
+          error: {
+            name: 'PERFORMANCE_NOTE_CREATE_ERROR',
+            message: 'Staff member does not belong to this restaurant',
+          },
           requestId: req.requestId,
         })
       }
@@ -2091,11 +2093,14 @@ router.post(
           payload.noteType ?? null,
           payload.body,
           req.userData?.id ?? null,
-        ],
+        ]
       )
 
       const noteRow = rows[0]
-      const staffInfo = await query(`SELECT display_name AS staff_name FROM staff_member WHERE id = $1`, [noteRow.staff_id])
+      const staffInfo = await query(
+        `SELECT display_name AS staff_name FROM staff_member WHERE id = $1`,
+        [noteRow.staff_id]
+      )
       if (staffInfo.rowCount) {
         noteRow.staff_name = staffInfo.rows[0].staff_name
       }
@@ -2115,88 +2120,80 @@ router.post(
         requestId: req.requestId,
       })
     }
-  },
+  }
 )
 
-router.get(
-  '/payroll',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const restaurantId = await resolveRestaurantId(req)
-      const { rows } = await query(
-        `
+router.get('/payroll', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req)
+    const { rows } = await query(
+      `
           SELECT *
           FROM staff_payroll_export
           WHERE restaurant_id = $1
           ORDER BY period_end DESC
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: rows.map(mapPayrollExportRow),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to fetch payroll exports', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'PAYROLL_FETCH_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
+    res.json({
+      ok: true,
+      data: rows.map(mapPayrollExportRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.json({ ok: true, data: [], error: null, requestId: req.requestId })
     }
-  },
-)
+    logger.error('Failed to fetch payroll exports', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'PAYROLL_FETCH_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
-router.post(
-  '/payroll',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = createPayrollExportSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req)
+router.post('/payroll', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = createPayrollExportSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req)
 
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           INSERT INTO staff_payroll_export (
             restaurant_id, period_start, period_end, status, totals, export_url, exported_at, exported_by
           )
           VALUES ($1, $2, $3, 'APPROVED', $4, $5, CASE WHEN $5 IS NOT NULL THEN now() ELSE NULL END, $6)
           RETURNING *
         `,
-        [
-          restaurantId,
-          payload.periodStart,
-          payload.periodEnd,
-          payload.totals ?? null,
-          payload.exportUrl ?? null,
-          req.userData?.id ?? null,
-        ],
-      )
+      [
+        restaurantId,
+        payload.periodStart,
+        payload.periodEnd,
+        payload.totals ?? null,
+        payload.exportUrl ?? null,
+        req.userData?.id ?? null,
+      ]
+    )
 
-      res.status(201).json({
-        ok: true,
-        data: mapPayrollExportRow(rows[0]),
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Failed to create payroll export', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'PAYROLL_CREATE_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
+    res.status(201).json({
+      ok: true,
+      data: mapPayrollExportRow(rows[0]),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Failed to create payroll export', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'PAYROLL_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 export { router as staffRoutes }
-

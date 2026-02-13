@@ -1,6 +1,7 @@
 # Supplier Features - Complete Implementation Summary
 
 ## 🎯 Overview
+
 Supplify provides comprehensive supplier management features for F&B suppliers to manage products, inventory, orders, fulfillment, and customer relationships.
 
 ---
@@ -8,6 +9,7 @@ Supplify provides comprehensive supplier management features for F&B suppliers t
 ## 📋 Navigation & Access
 
 ### Supplier Dashboard Sidebar Includes:
+
 1. **Dashboard** - Overview of business metrics
 2. **Products** - Product catalog management
 3. **Orders** - Inbound order management
@@ -16,7 +18,20 @@ Supplify provides comprehensive supplier management features for F&B suppliers t
 6. **Inventory** - Inventory and warehouse management
 7. **Fulfillment** - Logistics and delivery operations
 8. **Invoices** - Billing and payment management
-9. **Settings** - Account and profile settings
+9. **Settings** - Account and profile settings (includes **Plan & usage** tab)
+
+---
+
+## 📦 Subscription & plan (suppliers)
+
+Suppliers use the **same subscription tiers** as restaurants (Free, Bronze, Gold, Platinum). Each tier defines limits and features that apply to suppliers:
+
+- **Chat:** Daily message limit per plan (e.g. Free: 10 chats/day). If a supplier has no subscription, the system auto-assigns the Free plan so chat and other features work.
+- **Products / warehouses:** Plan limits apply (e.g. Free: 50 products, 0 warehouses; higher tiers allow more).
+- **API:** Suppliers can call `GET /api/subscriptions/current`, `GET /api/subscriptions/usage/:meterType` (e.g. `chats_per_day`), and `GET /api/subscriptions/features/:featureKey` to see their plan and usage.
+- **Settings:** In **Settings → Plan & usage**, suppliers see their current plan, limits, and usage (e.g. chats used today).
+
+See [PLANS.md](PLANS.md) for full tier details. Plan type is `restaurant_and_supplier`; limits such as `chats_per_day` apply to both roles.
 
 ---
 
@@ -57,6 +72,7 @@ Order COMPLETED (Supplier)
 ```
 
 **Key Integration Points:**
+
 - Order items automatically become invoice line items
 - Invoice links to original order (order_id)
 - Invoice shows order status badge
@@ -103,6 +119,7 @@ Product appears in list
 ### **3. INVENTORY MANAGEMENT FLOW**
 
 #### A. View Inventory
+
 ```
 Navigate to Inventory
     ↓
@@ -125,6 +142,7 @@ Display Inventory Table
 ```
 
 #### B. Warehouse View
+
 ```
 Click "View All Warehouses"
     ↓
@@ -145,6 +163,7 @@ Display Warehouse Cards
 ### **4. ORDER MANAGEMENT FLOW**
 
 #### A. Manual Order Creation (NEW!)
+
 ```
 Supplier clicks "Create Order" button
     ↓
@@ -184,6 +203,7 @@ Success notification displayed
 ```
 
 #### B. Order Receipt
+
 ```
 Restaurant places order (OR Supplier creates manual order)
     ↓
@@ -198,6 +218,7 @@ Supplier sees tabbed interface:
 ```
 
 #### C. Order Processing
+
 ```
 Click Order Card
     ↓
@@ -218,6 +239,7 @@ Supplier takes actions:
 ```
 
 #### D. Order Status Transitions
+
 ```
 PLACED (restaurant creates OR supplier manually creates)
     ↓
@@ -281,6 +303,7 @@ Message appears in chat
 ### **6. INVOICE MANAGEMENT FLOW**
 
 #### A. Auto-Invoice Creation (on Completion)
+
 ```
 Order COMPLETED
     ↓
@@ -311,6 +334,7 @@ Invoice created with status: ISSUED
 ```
 
 #### B. Invoice Viewing
+
 ```
 Navigate to Invoices
     ↓
@@ -332,6 +356,7 @@ Invoice List Displays
 ```
 
 #### C. Payment Recording
+
 ```
 Click Invoice Card → View Details
     ↓
@@ -357,6 +382,7 @@ Invoice status updated
 ```
 
 #### D. Invoice Status Transitions
+
 ```
 ISSUED (auto-created on delivery)
     ↓
@@ -372,6 +398,7 @@ VOID (cancelled by supplier)
 ### **7. WAREHOUSE MANAGEMENT FLOW**
 
 #### A. Add Warehouse
+
 ```
 Navigate to Settings → Warehouses Tab
     ↓
@@ -391,6 +418,7 @@ Warehouse appears in list
 ```
 
 #### B. Assign Product to Warehouse
+
 ```
 Create/Edit Product
     ↓
@@ -445,6 +473,7 @@ Refresh product list
 ### **9. SETTINGS & PROFILE FLOW**
 
 #### A. Supplier Settings Tabs
+
 ```
 Navigate to Settings
     ↓
@@ -463,6 +492,7 @@ Settings updated
 ```
 
 #### B. Contact Management
+
 ```
 Navigate to Settings → Contacts Tab
     ↓
@@ -531,6 +561,7 @@ Product created with image
 ### Features Implemented:
 
 #### ✅ Product Creation
+
 - **Single Product Creation**: Add products manually via form
   - Product Name (required)
   - SKU (required)
@@ -545,6 +576,7 @@ Product created with image
   - Integration with MinIO/S3 for storage using presigned URLs
 
 #### ✅ Bulk Product Upload
+
 - **CSV/Excel Upload**: Upload multiple products at once
   - Accepts .csv, .xlsx, .xls files
   - Automatic file parsing and preview
@@ -553,6 +585,7 @@ Product created with image
   - Download example file functionality
 
 #### ✅ Product Display
+
 - Grid and list view options
 - Product search functionality
 - Category filtering
@@ -562,6 +595,7 @@ Product created with image
 - Direct navigation to product detail page
 
 ### API Endpoints:
+
 - `GET /api/products` - List all products (supplier-filtered)
 - `GET /api/products/:id` - Get product details
 - `POST /api/products` - Create product (with warehouse_id, price, inventory)
@@ -574,6 +608,7 @@ Product created with image
 ### Features Implemented:
 
 #### ✅ Inventory Overview Page
+
 - **Summary Cards**:
   - Total Products count
   - Total Reserved quantity
@@ -581,6 +616,7 @@ Product created with image
   - Available Stock total
 
 #### ✅ Inventory Table
+
 - Product-centric view
 - Displays:
   - Product Name and SKU
@@ -594,6 +630,7 @@ Product created with image
   - **Settings** - Stock settings (not implemented)
 
 #### ✅ Warehouse View
+
 - **"View All Warehouses"** button toggles between views
 - Warehouse-centric view
 - Displays:
@@ -604,6 +641,7 @@ Product created with image
   - Expandable product list within each warehouse
 
 ### API Endpoints:
+
 - `GET /api/inventory` - Get inventory with warehouse info
 - `GET /api/warehouses` - Get warehouses with aggregated inventory
 - `POST /api/warehouses` - Create warehouse
@@ -616,6 +654,7 @@ Product created with image
 ### Features Implemented:
 
 #### ✅ Orders Inbox
+
 - **Status Tabs**: Filter orders by status
   - All Orders
   - New (Needs Action) - NEW PLACED orders
@@ -632,6 +671,7 @@ Product created with image
   - Items preview
 
 #### ✅ Order Detail Page
+
 - **Tabbed Interface**:
   1. **Order Details** - Basic info, status, timestamps, notes
   2. **Items** - Full product list with quantities and prices
@@ -640,6 +680,7 @@ Product created with image
   5. **Packing Slip** (Supplier Only) - Print-ready layout
 
 #### ✅ Order Status Workflow
+
 - **Available Statuses**:
   - `DRAFT` - Draft order (not yet placed)
   - `PLACED` - Order submitted by restaurant
@@ -650,20 +691,24 @@ Product created with image
   - `CANCELLED` - Order cancelled
 
 #### ✅ Action Buttons (Supplier Only)
+
 - Status-specific actions:
   - "Acknowledge" → `ACKNOWLEDGED`
   - "Start Processing" → `PROCESSING`
   - "Mark as Shipped" → `SHIPPED`
-  - "Complete Order" → `COMPLETED` *(triggers auto-invoice)*
+  - "Complete Order" → `COMPLETED` _(triggers auto-invoice)_
   - "Decline" → `CANCELLED`
 
 ### API Endpoints:
+
 - `GET /api/orders` - List orders (supplier-filtered by product ownership)
 - `GET /api/orders/:id` - Get order with items
 - `PATCH /api/orders/:id` - Update order status
 
 ### Order Completion Auto-Trigger
+
 When an order is marked as `COMPLETED`:
+
 1. Restaurant inventory updated (receive items)
 2. **Invoice auto-created** (invoice record and line items)
 3. Invoice status set to `ISSUED`
@@ -677,6 +722,7 @@ When an order is marked as `COMPLETED`:
 ### Features Implemented:
 
 #### ✅ Conversation List
+
 - View all conversations
 - Last message preview
 - Unread message count
@@ -684,6 +730,7 @@ When an order is marked as `COMPLETED`:
 - Click to open conversation
 
 #### ✅ Message View
+
 - Message history display
 - Sender name and avatar
 - Timestamp for each message
@@ -691,12 +738,14 @@ When an order is marked as `COMPLETED`:
 - Message input at bottom
 
 #### ✅ Quick Actions
+
 - Send messages
 - View attachments
 - Mark as read
 - Link messages to orders (planned)
 
 ### API Endpoints:
+
 - `GET /api/chat/conversations` - List conversations
 - `GET /api/chat/conversations/:id/messages` - Get messages
 - `POST /api/chat/conversations/:id/messages` - Send message
@@ -708,6 +757,7 @@ When an order is marked as `COMPLETED`:
 ### Features Implemented:
 
 #### ✅ Auto-Invoice Creation
+
 - **Triggered on Order Completion**
   - When order status → `COMPLETED`
   - Invoice automatically created
@@ -717,6 +767,7 @@ When an order is marked as `COMPLETED`:
   - Status: `ISSUED`
 
 #### ✅ Invoice Display
+
 - Invoice list with search and filters
 - Summary cards:
   - Total Invoices
@@ -733,6 +784,7 @@ When an order is marked as `COMPLETED`:
   - Status badge
 
 #### ✅ Invoice Status Flow
+
 ```
 ISSUED (auto-created)
     ↓
@@ -744,6 +796,7 @@ VOID (cancelled)
 ```
 
 #### ✅ Payment Recording
+
 - Record payments from invoice detail view
 - Payment methods: Cash, Check, Bank Transfer, Credit Card, ACH, Other
 - Automatic invoice status update
@@ -751,6 +804,7 @@ VOID (cancelled)
 - **Notifications sent** to supplier when payment recorded
 
 #### ✅ Invoice Detail View
+
 - Bill To information
 - Invoice line items
 - Payment history
@@ -759,6 +813,7 @@ VOID (cancelled)
 - Record payment button
 
 #### ✅ Notifications & Alerts
+
 - **In-app notifications** for:
   - New orders received
   - Order status changes (ACKNOWLEDGED, PROCESSING, SHIPPED, COMPLETED)
@@ -769,6 +824,7 @@ VOID (cancelled)
 - **Notification logging**: All notifications stored in database
 
 ### API Endpoints:
+
 - `GET /api/invoices` - List invoices with order info
 - `GET /api/invoices/:id` - Get invoice details
 - `POST /api/invoices` - Create invoice (manual)
@@ -782,23 +838,27 @@ VOID (cancelled)
 ### Features Implemented:
 
 #### ✅ Warehouse List
+
 - View all warehouses
 - Product count per warehouse
 - Total available & reserved quantities
 - Expandable product inventory
 
 #### ✅ Add Warehouse
+
 - Name and code
 - Address information
 - Storage capacity
 - Contact info
 
 #### ✅ Assign Products
+
 - Optional warehouse dropdown in product form
 - Link products to warehouses
 - Inventory tracked per warehouse
 
 ### API Endpoints:
+
 - `GET /api/warehouses` - Get warehouses with inventory
 - `POST /api/warehouses` - Create warehouse
 - `PATCH /api/warehouses/:id` - Update warehouse
@@ -810,6 +870,7 @@ VOID (cancelled)
 ### Features Implemented:
 
 #### ✅ Profile Tab
+
 - Company name
 - Contact information
 - Business registration
@@ -817,6 +878,7 @@ VOID (cancelled)
 - Logo upload
 
 #### ✅ Contacts Tab
+
 - Add contacts manually
 - Bulk upload via CSV/Excel
 - Contact preview before import
@@ -824,6 +886,7 @@ VOID (cancelled)
 - Primary contact flag
 
 #### ✅ Business Tab
+
 - Business hours
 - Delivery policy
 - Return policy
@@ -831,15 +894,18 @@ VOID (cancelled)
 - Subscriptions
 
 #### ✅ Warehouses Tab (Duplicate from above)
+
 - Manage warehouse locations
 
 #### ✅ Delivery Zones Tab
+
 - Define service areas
 - Set delivery fees
 - Set minimum orders
 - Delivery windows
 
 ### API Endpoints:
+
 - `GET /api/suppliers/:id/settings` - Get settings
 - `PATCH /api/suppliers/:id` - Update profile
 - `POST /api/suppliers/contacts` - Add contact
@@ -852,6 +918,7 @@ VOID (cancelled)
 ### Features Implemented:
 
 #### ✅ Fulfillment Dashboard
+
 - Tabbed interface:
   1. Waves - Delivery waves
   2. Pick Lists - Packing lists
@@ -860,12 +927,14 @@ VOID (cancelled)
   5. Exceptions - Delivery issues
 
 #### ✅ Order Integration
+
 - View orders in fulfillment context
 - Track order status through fulfillment
 - Delivery scheduling
 - Route assignment
 
 ### API Endpoints:
+
 - `GET /api/fulfillment/waves` - Get delivery waves
 - `GET /api/fulfillment/pick-lists` - Get pick lists
 - `GET /api/fulfillment/routes` - Get delivery routes
@@ -876,6 +945,7 @@ VOID (cancelled)
 ## 🔐 AUTHENTICATION & AUTHORIZATION
 
 ### Supplier Role Access:
+
 - **Can Access**:
   - Products (own only)
   - Orders (own products only)
@@ -896,6 +966,7 @@ VOID (cancelled)
 ## 📊 KEY INTEGRATIONS
 
 ### Order → Invoice Integration:
+
 1. **Order Delivered** → **Auto-Invoice Created**
    - Invoice number: `INV-YYYY-MM-XXXXXX`
    - Total = sum of order items
@@ -911,6 +982,7 @@ VOID (cancelled)
    - Links to order for reference
 
 ### Inventory → Warehouse Integration:
+
 1. **Products Assigned to Warehouses**
    - Optional warehouse_id on product creation
    - Inventory tracked per warehouse
@@ -924,6 +996,7 @@ VOID (cancelled)
 ## 🎨 USER EXPERIENCE
 
 ### Navigation Flow:
+
 ```
 Login → Dashboard
     ↓
@@ -943,6 +1016,7 @@ Settings → Configure
 ```
 
 ### Key UI Features:
+
 - **Tabbed Interfaces**: Efficient data organization
 - **Search & Filters**: Quick data access
 - **Status Badges**: Visual status indicators
@@ -955,6 +1029,7 @@ Settings → Configure
 ## ✅ IMPLEMENTATION STATUS
 
 ### Fully Implemented ✅:
+
 1. ✅ Product Management (single & bulk)
 2. ✅ Inventory Management
 3. ✅ Warehouse Management
@@ -975,6 +1050,7 @@ Settings → Configure
 13. ✅ CSV/Excel Upload
 
 ### Partially Implemented 🔄:
+
 1. ✅ Notifications System (in-app implemented, email/SMS planned)
 2. 🔄 Fulfillment (UI only, needs backend API integration)
 3. 🔄 Delivery Zones (UI only, needs backend API integration)
@@ -984,6 +1060,7 @@ Settings → Configure
 7. 🔄 Real-time Order Updates (WebSocket planned)
 
 ### Key Implementation Highlights:
+
 - ✅ **Real-Time Database**: All features query live database - NO mock data
 - ✅ **Manual Order Creation**: Suppliers can create orders on behalf of restaurants
 - ✅ **Auto-Invoice Creation**: Invoices auto-generated when orders completed
@@ -998,6 +1075,7 @@ Settings → Configure
 ## 🚀 NEXT STEPS
 
 ### Recommended Enhancements:
+
 1. **PDF Generation**: Generate printable invoices
 2. **Email Automation**: Send invoices via email
 3. **Advanced Analytics**: Financial KPIs dashboard
@@ -1017,6 +1095,7 @@ Settings → Configure
 **Real-Time Data**: All features use live database queries - NO mock data
 
 **Latest Changes**:
+
 - Order status workflow updated: PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → COMPLETED
 - Notification system integrated with in-app bell
 - Session timeout extended to 1 hour
@@ -1026,10 +1105,12 @@ Settings → Configure
 # Supplier Features
 
 ## Order lifecycle (supplier)
+
 - PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → DELIVERED
 - After DELIVERED, the restaurant performs Receiving. The system then creates the invoice and marks the order INVOICED.
 
 Suppliers can:
+
 - Acknowledge, move to Processing, Shipped, and Mark Delivered
 - View invoices (read-only) once created by the system after restaurant receiving
 - See orders awaiting restaurant receiving under the supplier receiving view

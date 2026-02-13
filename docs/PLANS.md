@@ -2,16 +2,22 @@
 
 ## Overview
 
-Supplify offers tiered subscription plans designed for restaurants and suppliers at various stages of growth. Plans are structured to provide value at every level, with clear upgrade paths and feature alignment.
+Supplify offers tiered subscription plans designed for **restaurants and suppliers** at various stages of growth. Plans are structured to provide value at every level, with clear upgrade paths and feature alignment.
+
+- **Same tiers for both:** Free, Bronze, Gold, and Platinum apply to restaurants and suppliers (plan type: `restaurant_and_supplier`).
+- **Supplier limits:** Each tier defines limits for suppliers (e.g. products, warehouses, **chats_per_day**). Suppliers without an active subscription are auto-assigned the Free plan so chat and other features work (no "0/0" chat limit).
+- **API:** Both roles can use `GET /api/subscriptions/current` and `GET /api/subscriptions/usage/:meterType` (e.g. `chats_per_day`). See [SUPPLIER_FEATURES.md](SUPPLIER_FEATURES.md#-subscription--plan-suppliers).
 
 ---
 
 ## Plan Tiers
 
 ### 🌟 Free Plan
+
 **Best for:** Small businesses getting started
 
 **Pricing:** $0/month
+
 - 1 restaurant
 - Up to 2 supplier connections per restaurant
 - 50 products
@@ -22,6 +28,7 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 - 10 chats per day
 
 **Features:**
+
 - Basic quick lists (manual only)
 - No smart reorder
 - Basic inventory management
@@ -38,11 +45,13 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 ---
 
 ### 🥉 Bronze Plan
+
 **Best for:** Growing single-location restaurants
 
 **Pricing:** $49/month or $490/year (save 2 months)
 
 **Limits:**
+
 - 3 restaurants
 - Up to 10 suppliers per restaurant
 - 1,000 products
@@ -53,6 +62,7 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 - 50 chats per day
 
 **Features:**
+
 - Automated quick lists (weekly scheduling)
 - Smart reorder with 7-day history
 - Real-time inventory management
@@ -75,11 +85,13 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 ---
 
 ### 🥇 Gold Plan
+
 **Best for:** Multi-location restaurants
 
 **Pricing:** $149/month or $1,490/year (save 2 months)
 
 **Limits:**
+
 - 10 restaurants
 - Unlimited suppliers
 - 10,000 products
@@ -90,6 +102,7 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 - 200 chats per day
 
 **Features:**
+
 - Full quick list scheduling
 - AI-powered reorder with 90-day trends
 - Multi-branch inventory tracking
@@ -112,11 +125,13 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 ---
 
 ### 💎 Platinum Plan
+
 **Best for:** Enterprise restaurant chains
 
 **Pricing:** $349/month or $3,490/year (save 2 months)
 
 **Limits:**
+
 - **Unlimited** restaurants
 - Unlimited suppliers
 - Unlimited products
@@ -127,6 +142,7 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 - Unlimited chats/day
 
 **Features:**
+
 - **Everything in Gold PLUS:**
 - AI smart automation for quick lists
 - AI forecast with seasonality
@@ -152,16 +168,19 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 ## Upgrade Paths
 
 ### Free → Bronze
+
 **When:** You need more suppliers, products, or basic automation
 **Cost Impact:** +$49/month
 **Benefits:** Real-time inventory, smart reorder, basic reports
 
 ### Bronze → Gold
+
 **When:** You open a second location or need multi-branch capabilities
 **Cost Impact:** +$100/month
 **Benefits:** Multi-branch support, advanced analytics, warehouse management
 
 ### Gold → Platinum
+
 **When:** You have 10+ locations or need unlimited scalability
 **Cost Impact:** +$200/month
 **Benefits:** Everything unlimited, AI features, white-label branding
@@ -171,6 +190,7 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 ## Plan Limits Explained
 
 ### Branches (Restaurants Only)
+
 - **Free/Bronze:** 1 location (no multi-branch)
 - **Gold:** Up to 3 locations
 - **Platinum:** Unlimited locations
@@ -178,6 +198,7 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 **Enforcement:** Cannot create additional branches beyond limit. Existing branches remain accessible.
 
 ### Warehouses (Suppliers Only)
+
 - **Free/Bronze:** 0 warehouses
 - **Gold:** Up to 3 warehouses
 - **Platinum:** Unlimited warehouses
@@ -185,11 +206,13 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 **Enforcement:** Cannot create warehouses on Free/Bronze plans. Inventory defaults to "Unassigned."
 
 ### Orders Per Day
+
 - Limits reset daily at midnight UTC
 - Orders placed via API count toward daily limit
 - Over-limit attempts are blocked with clear messaging
 
 ### Storage
+
 - Includes product images, documents, chat media
 - 80% warning at plan capacity
 - Not enforced (grace period for upgrades)
@@ -198,23 +221,23 @@ Supplify offers tiered subscription plans designed for restaurants and suppliers
 
 ## Feature Matrix
 
-| Feature | Free | Bronze | Gold | Platinum |
-|---------|------|--------|------|----------|
-| Quick Lists | Basic Manual | Automated Weekly | Full Schedule | AI Automation |
-| Smart Reorder | ❌ | Limited (7-day) | Full (90-day) | AI Forecast |
-| Inventory | Basic | Real-Time | Multi-Branch | Lot Tracking |
-| Waste Tracking | ❌ | Manual | Analytics | Cost vs Sales |
-| Receiving Quality | Manual | Photos | Scoring | Performance Reports |
-| Finance | View Only | Record Payments | Analytics | Advanced Dashboard |
-| Chat | 1 Supplier | Multi-Supplier | Group + Files | Real-Time + Media |
-| Reports | ❌ | Basic KPIs | Usage/Cost | Custom + Forecasting |
-| Approvals | ❌ | Single-Level | Caps | Multi-Level |
-| Multi-Branch | ❌ | ❌ | ✅ | ✅ |
-| Fulfillment | Basic Orders | Manual | Pick/Pack | Full Suite |
-| Notifications | In-App | + Email | + SMS | + Webhooks |
-| API | ❌ | Exports Only | API Keys | Full + Webhooks |
-| Support | Community | 72h | 24h Priority | Dedicated |
-| Branding | None | None | Logo/Colors | White-Label |
+| Feature           | Free         | Bronze           | Gold          | Platinum             |
+| ----------------- | ------------ | ---------------- | ------------- | -------------------- |
+| Quick Lists       | Basic Manual | Automated Weekly | Full Schedule | AI Automation        |
+| Smart Reorder     | ❌           | Limited (7-day)  | Full (90-day) | AI Forecast          |
+| Inventory         | Basic        | Real-Time        | Multi-Branch  | Lot Tracking         |
+| Waste Tracking    | ❌           | Manual           | Analytics     | Cost vs Sales        |
+| Receiving Quality | Manual       | Photos           | Scoring       | Performance Reports  |
+| Finance           | View Only    | Record Payments  | Analytics     | Advanced Dashboard   |
+| Chat              | 1 Supplier   | Multi-Supplier   | Group + Files | Real-Time + Media    |
+| Reports           | ❌           | Basic KPIs       | Usage/Cost    | Custom + Forecasting |
+| Approvals         | ❌           | Single-Level     | Caps          | Multi-Level          |
+| Multi-Branch      | ❌           | ❌               | ✅            | ✅                   |
+| Fulfillment       | Basic Orders | Manual           | Pick/Pack     | Full Suite           |
+| Notifications     | In-App       | + Email          | + SMS         | + Webhooks           |
+| API               | ❌           | Exports Only     | API Keys      | Full + Webhooks      |
+| Support           | Community    | 72h              | 24h Priority  | Dedicated            |
+| Branding          | None         | None             | Logo/Colors   | White-Label          |
 
 ---
 
@@ -229,6 +252,7 @@ When downgrading to a plan with fewer resources:
 5. Upgrade prompt shown on locked features
 
 **Example:** Downgrading from Gold (3 branches) to Bronze (1 branch):
+
 - All 3 branches remain visible
 - Cannot create 4th branch
 - Existing branches read-only until resolved
@@ -261,6 +285,7 @@ A: Suppliers follow the same tier structure with warehouse-based limits.
 ## Admin Controls
 
 Admins can:
+
 - Change tenant plans instantly
 - Override limits temporarily
 - Apply credits and trials
@@ -272,4 +297,3 @@ See [ADMIN.md](./ADMIN.md) for details.
 ---
 
 Last Updated: [Current Date]
-

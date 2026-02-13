@@ -51,41 +51,18 @@ export async function executeScheduledOrders() {
       [todayDate, currentTime]
     )
 
-    logger.info(`Query executed with todayDate=${todayDate}, currentTime=${currentTime}`)
-    logger.info(`Found ${scheduledLists.length} scheduled lists ready to execute`)
+    logger.debug('Scheduled orders check', {
+      todayDate,
+      currentTime,
+      readyCount: scheduledLists.length,
+    })
 
     if (scheduledLists.length === 0) {
       logger.info('No scheduled orders to execute today')
-      // Debug: Log what scheduled orders exist
-      const { rows: allScheduled } = await query(`
-        SELECT ql.id, ql.name, ql.next_execution_date, ql.preferred_time, ql.status, ql.is_scheduled
-        FROM quick_list ql
-        WHERE ql.is_scheduled = true AND ql.status = 'ACTIVE'
-        LIMIT 10
-      `)
-      if (allScheduled.length > 0) {
-        logger.info(`Found ${allScheduled.length} active scheduled quick lists in database:`)
-        allScheduled.forEach((q) => {
-          const execDate = q.next_execution_date
-            ? new Date(q.next_execution_date).toISOString().split('T')[0]
-            : 'null'
-          logger.info(
-            `  - ${q.name}: next_execution_date=${execDate} (DB: ${q.next_execution_date}), preferred_time=${q.preferred_time}, status=${q.status}`
-          )
-          logger.info(
-            `    Comparing: todayDate=${todayDate} <= ${execDate} = ${todayDate <= execDate}`
-          )
-          if (execDate === todayDate && q.preferred_time) {
-            logger.info(
-              `    Time check: ${q.preferred_time} <= ${currentTime} = ${q.preferred_time <= currentTime}`
-            )
-          }
-        })
-      }
       return { executed: 0, errors: 0 }
     }
 
-    logger.info(`Found ${scheduledLists.length} scheduled quick lists to execute`)
+    logger.info('Executing scheduled lists', { count: scheduledLists.length })
 
     let executed = 0
     let errors = 0
