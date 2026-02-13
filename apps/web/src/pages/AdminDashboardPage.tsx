@@ -48,8 +48,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const defaultTab =
     initialTab === 'suppliers' || initialTab === 'restaurants' ? 'tenants' : initialTab
   const [selectedTab, setSelectedTab] = useState(defaultTab)
+  const [plansTenantFilter, setPlansTenantFilter] = useState<'RESTAURANT' | 'SUPPLIER' | undefined>(
+    undefined
+  )
   const { data: overview, isLoading: overviewLoading } = useGetAdminOverviewQuery()
-  const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery()
+  const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery(
+    plansTenantFilter ? { tenant_type: plansTenantFilter } : {}
+  )
   const { data: subscriptionsData, isLoading: subscriptionsLoading } =
     useGetAdminSubscriptionsQuery({})
   const { data: auditLogsData, isLoading: auditLoading } = useGetAdminAuditLogsQuery({})
@@ -81,6 +86,44 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [updatePlan] = useUpdateAdminPlanMutation()
   const [updateSubscription] = useUpdateAdminSubscriptionMutation()
   const [startImpersonation] = useStartImpersonationMutation()
+
+  const [createPlanOpen, setCreatePlanOpen] = useState(false)
+  const [createPlanForm, setCreatePlanForm] = useState({
+    code: '',
+    name: '',
+    tenantType: 'RESTAURANT' as 'RESTAURANT' | 'SUPPLIER',
+    description: '',
+    pricePerMonth: 0,
+    pricePerYear: 0,
+    trialDays: 0,
+    displayOrder: 0,
+    isActive: true,
+  })
+
+  const handleCreatePlan = async () => {
+    try {
+      await createPlan({
+        ...createPlanForm,
+        limits: {},
+        features: {},
+      }).unwrap()
+      toast.success('Plan created')
+      setCreatePlanOpen(false)
+      setCreatePlanForm({
+        code: '',
+        name: '',
+        tenantType: 'RESTAURANT',
+        description: '',
+        pricePerMonth: 0,
+        pricePerYear: 0,
+        trialDays: 0,
+        displayOrder: 0,
+        isActive: true,
+      })
+    } catch (e: any) {
+      toast.error(e?.data?.error?.message || 'Failed to create plan')
+    }
+  }
 
   const handleUpdatePlan = async (id: string, data: any) => {
     try {
@@ -236,12 +279,124 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         </TabsContent>
 
         <TabsContent value="plans" className="space-y-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-4">
             <h2 className="text-2xl font-bold text-gray-900">Subscription Plans</h2>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Plan
-            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Filter:</span>
+              <select
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                value={plansTenantFilter ?? ''}
+                onChange={(e) =>
+                  setPlansTenantFilter(
+                    e.target.value === ''
+                      ? undefined
+                      : (e.target.value as 'RESTAURANT' | 'SUPPLIER')
+                  )
+                }
+              >
+                <option value="">All</option>
+                <option value="RESTAURANT">Restaurant</option>
+                <option value="SUPPLIER">Supplier</option>
+              </select>
+              <Dialog open={createPlanOpen} onOpenChange={setCreatePlanOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Plan
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Create Plan</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label>Code (e.g. free, bronze)</Label>
+                      <Input
+                        value={createPlanForm.code}
+                        onChange={(e) => setCreatePlanForm((s) => ({ ...s, code: e.target.value }))}
+                        placeholder="free"
+                      />
+                    </div>
+                    <div>
+                      <Label>Name</Label>
+                      <Input
+                        value={createPlanForm.name}
+                        onChange={(e) => setCreatePlanForm((s) => ({ ...s, name: e.target.value }))}
+                        placeholder="Free"
+                      />
+                    </div>
+                    <div>
+                      <Label>Tenant type</Label>
+                      <select
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                        value={createPlanForm.tenantType}
+                        onChange={(e) =>
+                          setCreatePlanForm((s) => ({
+                            ...s,
+                            tenantType: e.target.value as 'RESTAURANT' | 'SUPPLIER',
+                          }))
+                        }
+                      >
+                        <option value="RESTAURANT">Restaurant</option>
+                        <option value="SUPPLIER">Supplier</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Description</Label>
+                      <Input
+                        value={createPlanForm.description}
+                        onChange={(e) =>
+                          setCreatePlanForm((s) => ({ ...s, description: e.target.value }))
+                        }
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Price / month ($)</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={createPlanForm.pricePerMonth}
+                          onChange={(e) =>
+                            setCreatePlanForm((s) => ({
+                              ...s,
+                              pricePerMonth: Number(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label>Price / year ($)</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={createPlanForm.pricePerYear}
+                          onChange={(e) =>
+                            setCreatePlanForm((s) => ({
+                              ...s,
+                              pricePerYear: Number(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button variant="outline" onClick={() => setCreatePlanOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleCreatePlan}
+                        disabled={!createPlanForm.code.trim() || !createPlanForm.name.trim()}
+                      >
+                        Create
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
 
           {plansLoading ? (
@@ -253,7 +408,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               {plansData?.plans?.map((plan) => (
                 <Card key={plan.id} className="p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+                      <Badge variant="outline">
+                        {plan.tenant_type === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
+                      </Badge>
+                      {plan.code && <span className="text-xs text-gray-500">{plan.code}</span>}
+                    </div>
                     <Badge variant={plan.is_active ? 'default' : 'secondary'}>
                       {plan.is_active ? 'Active' : 'Inactive'}
                     </Badge>

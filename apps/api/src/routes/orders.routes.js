@@ -826,37 +826,42 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 })
 
 // Create order (restaurant only)
-router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const orderData = orderCreateSchema.parse(req.body)
+router.post(
+  '/',
+  requireAuth,
+  requireRole(['RESTAURANT']),
+  requirePermission('ORDERS_CREATE'),
+  async (req, res) => {
+    try {
+      const orderData = orderCreateSchema.parse(req.body)
 
-    // Get restaurant ID
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
+      // Get restaurant ID
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Restaurant record not found for user',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (restaurants.length === 0) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Restaurant record not found for user',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const restaurantId = restaurants[0].id
+      const restaurantId = restaurants[0].id
 
-    // Group items by supplier - split into separate orders per supplier
-    const orderStatus = orderData.status || 'PLACED'
+      // Group items by supplier - split into separate orders per supplier
+      const orderStatus = orderData.status || 'PLACED'
 
-    // Batch-fetch all products and current prices (avoids N+1)
-    const productIds = [...new Set(orderData.items.map((item) => item.productId))]
-    const { rows: products } = await query(
-      `
+      // Batch-fetch all products and current prices (avoids N+1)
+      const productIds = [...new Set(orderData.items.map((item) => item.productId))]
+      const { rows: products } = await query(
+        `
       SELECT p.*, pr.amount as current_price, pr.currency
       FROM product p
       LEFT JOIN LATERAL (
@@ -868,230 +873,231 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
       ) pr ON true
       WHERE p.id = ANY($1)
       `,
-      [productIds]
-    )
+        [productIds]
+      )
 
-    const productMap = new Map(products.map((p) => [p.id, p]))
+      const productMap = new Map(products.map((p) => [p.id, p]))
 
-    // Validate and group items by supplier
-    const supplierGroups = new Map()
-    for (const item of orderData.items) {
-      const product = productMap.get(item.productId)
-      if (!product) {
-        throw new ValidationError(`Product ${item.productId} not found`)
-      }
-      if (!product.current_price) {
-        throw new ValidationError(`No valid price found for product ${product.sku}`)
-      }
-      if (!supplierGroups.has(product.supplier_id)) {
-        supplierGroups.set(product.supplier_id, [])
-      }
-      supplierGroups.get(product.supplier_id).push({
-        ...item,
-        product,
-        unitPrice: Number(product.current_price),
-      })
-    }
-
-    // Check plan limits before creating orders
-    if (orderStatus === 'PLACED') {
-      const ordersToCreate = supplierGroups.size
-      const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')
-      const newTotal = limitCheck.current + ordersToCreate
-
-      if (!limitCheck.isUnlimited && limitCheck.limit !== null && newTotal > limitCheck.limit) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'LIMIT_EXCEEDED',
-            message: `Creating ${ordersToCreate} order(s) would exceed your daily limit of ${limitCheck.limit} orders. Current usage: ${limitCheck.current}/${limitCheck.limit}. Please upgrade your subscription to obtain more features and higher order limits.`,
-            details: {
-              current: limitCheck.current,
-              limit: limitCheck.limit,
-              requested: ordersToCreate,
-              meterType: 'orders_per_day',
-            },
-          },
-          requestId: req.requestId,
+      // Validate and group items by supplier
+      const supplierGroups = new Map()
+      for (const item of orderData.items) {
+        const product = productMap.get(item.productId)
+        if (!product) {
+          throw new ValidationError(`Product ${item.productId} not found`)
+        }
+        if (!product.current_price) {
+          throw new ValidationError(`No valid price found for product ${product.sku}`)
+        }
+        if (!supplierGroups.has(product.supplier_id)) {
+          supplierGroups.set(product.supplier_id, [])
+        }
+        supplierGroups.get(product.supplier_id).push({
+          ...item,
+          product,
+          unitPrice: Number(product.current_price),
         })
       }
-    }
 
-    // Create separate order for each supplier
-    const createdOrders = []
+      // Check plan limits before creating orders
+      if (orderStatus === 'PLACED') {
+        const ordersToCreate = supplierGroups.size
+        const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')
+        const newTotal = limitCheck.current + ordersToCreate
 
-    const result = await withTransaction(async (client) => {
-      for (const [supplierId, items] of supplierGroups.entries()) {
-        // Create order for this supplier
-        const {
-          rows: [order],
-        } = await client.query(
-          `
+        if (!limitCheck.isUnlimited && limitCheck.limit !== null && newTotal > limitCheck.limit) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'LIMIT_EXCEEDED',
+              message: `Creating ${ordersToCreate} order(s) would exceed your daily limit of ${limitCheck.limit} orders. Current usage: ${limitCheck.current}/${limitCheck.limit}. Please upgrade your subscription to obtain more features and higher order limits.`,
+              details: {
+                current: limitCheck.current,
+                limit: limitCheck.limit,
+                requested: ordersToCreate,
+                meterType: 'orders_per_day',
+              },
+            },
+            requestId: req.requestId,
+          })
+        }
+      }
+
+      // Create separate order for each supplier
+      const createdOrders = []
+
+      const result = await withTransaction(async (client) => {
+        for (const [supplierId, items] of supplierGroups.entries()) {
+          // Create order for this supplier
+          const {
+            rows: [order],
+          } = await client.query(
+            `
           INSERT INTO customer_order (restaurant_id, currency, status)
           VALUES ($1, 'USD', $2)
           RETURNING *
         `,
-          [restaurantId, orderStatus]
-        )
-
-        let totalAmount = 0
-        const orderItems = []
-
-        // Process items for this supplier
-        for (const item of items) {
-          // Check inventory
-          const { rows: inventory } = await client.query(
-            'SELECT available_qty FROM inventory WHERE product_id = $1 FOR UPDATE',
-            [item.productId]
+            [restaurantId, orderStatus]
           )
 
-          if (inventory.length === 0 || Number(inventory[0].available_qty) < item.quantity) {
-            throw new ValidationError(`Insufficient inventory for product ${item.product.sku}`)
-          }
+          let totalAmount = 0
+          const orderItems = []
 
-          // Calculate line total
-          const lineTotal = item.unitPrice * item.quantity
-          totalAmount += lineTotal
+          // Process items for this supplier
+          for (const item of items) {
+            // Check inventory
+            const { rows: inventory } = await client.query(
+              'SELECT available_qty FROM inventory WHERE product_id = $1 FOR UPDATE',
+              [item.productId]
+            )
 
-          // Create order item
-          const {
-            rows: [orderItem],
-          } = await client.query(
-            `
+            if (inventory.length === 0 || Number(inventory[0].available_qty) < item.quantity) {
+              throw new ValidationError(`Insufficient inventory for product ${item.product.sku}`)
+            }
+
+            // Calculate line total
+            const lineTotal = item.unitPrice * item.quantity
+            totalAmount += lineTotal
+
+            // Create order item
+            const {
+              rows: [orderItem],
+            } = await client.query(
+              `
             INSERT INTO order_item (
               order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
           `,
-            [
-              order.id,
-              item.productId,
-              supplierId,
-              item.quantity,
-              item.unitPrice,
-              lineTotal,
-              item.notes,
-            ]
-          )
+              [
+                order.id,
+                item.productId,
+                supplierId,
+                item.quantity,
+                item.unitPrice,
+                lineTotal,
+                item.notes,
+              ]
+            )
 
-          orderItems.push(orderItem)
+            orderItems.push(orderItem)
 
-          // Update inventory
-          await client.query(
-            `
+            // Update inventory
+            await client.query(
+              `
             UPDATE inventory 
             SET available_qty = available_qty - $1, updated_at = now()
             WHERE product_id = $2
           `,
-            [item.quantity, item.productId]
-          )
-        }
+              [item.quantity, item.productId]
+            )
+          }
 
-        // Update order total and placed_at (only if status is PLACED)
-        if (orderStatus === 'PLACED') {
-          await client.query(
-            `
+          // Update order total and placed_at (only if status is PLACED)
+          if (orderStatus === 'PLACED') {
+            await client.query(
+              `
             UPDATE customer_order 
             SET total_amount = $1, placed_at = now()
             WHERE id = $2
           `,
-            [totalAmount, order.id]
-          )
-        } else {
-          // For DRAFT orders, just update total_amount
-          await client.query(
-            `
+              [totalAmount, order.id]
+            )
+          } else {
+            // For DRAFT orders, just update total_amount
+            await client.query(
+              `
             UPDATE customer_order 
             SET total_amount = $1
             WHERE id = $2
           `,
-            [totalAmount, order.id]
-          )
+              [totalAmount, order.id]
+            )
+          }
+
+          createdOrders.push({ ...order, total_amount: totalAmount, items: orderItems })
         }
 
-        createdOrders.push({ ...order, total_amount: totalAmount, items: orderItems })
-      }
-
-      return createdOrders
-    })
-
-    // If only one order was created, return it directly. Otherwise, return array of orders
-    const singleOrder = result.length === 1 ? result[0] : null
-
-    // Log and send notifications for each created order
-    for (const order of result) {
-      logger.info('Order created', {
-        orderId: order.id,
-        restaurantId: order.restaurant_id,
-        supplierId: order.items[0]?.supplier_id,
-        totalAmount: order.total_amount,
-        itemCount: order.items.length,
-        actor: req.userData.id,
+        return createdOrders
       })
 
-      // Send notification to supplier about new order (only if PLACED, not DRAFT)
-      if (order.status === 'PLACED' && order.items.length > 0) {
-        try {
-          const supplierId = order.items[0].supplier_id
-          await notifyOrderStatusChange(
-            {
-              id: order.id,
-              total_amount: order.total_amount,
-              restaurant_id: order.restaurant_id,
-              supplier_id: supplierId,
-            },
-            'PLACED'
-          )
-        } catch (notifError) {
-          // Don't fail order creation if notification fails
-          logger.error('Failed to send order notification', { error: notifError.message })
+      // If only one order was created, return it directly. Otherwise, return array of orders
+      const singleOrder = result.length === 1 ? result[0] : null
+
+      // Log and send notifications for each created order
+      for (const order of result) {
+        logger.info('Order created', {
+          orderId: order.id,
+          restaurantId: order.restaurant_id,
+          supplierId: order.items[0]?.supplier_id,
+          totalAmount: order.total_amount,
+          itemCount: order.items.length,
+          actor: req.userData.id,
+        })
+
+        // Send notification to supplier about new order (only if PLACED, not DRAFT)
+        if (order.status === 'PLACED' && order.items.length > 0) {
+          try {
+            const supplierId = order.items[0].supplier_id
+            await notifyOrderStatusChange(
+              {
+                id: order.id,
+                total_amount: order.total_amount,
+                restaurant_id: order.restaurant_id,
+                supplier_id: supplierId,
+              },
+              'PLACED'
+            )
+          } catch (notifError) {
+            // Don't fail order creation if notification fails
+            logger.error('Failed to send order notification', { error: notifError.message })
+          }
         }
       }
-    }
 
-    // Track usage for each order created (only if PLACED, not DRAFT)
-    if (orderStatus === 'PLACED') {
-      try {
-        await incrementUsage(restaurantId, 'RESTAURANT', 'orders_per_day', result.length)
-      } catch (usageError) {
-        logger.error('Failed to track order usage', { error: usageError.message })
+      // Track usage for each order created (only if PLACED, not DRAFT)
+      if (orderStatus === 'PLACED') {
+        try {
+          await incrementUsage(restaurantId, 'RESTAURANT', 'orders_per_day', result.length)
+        } catch (usageError) {
+          logger.error('Failed to track order usage', { error: usageError.message })
+        }
       }
-    }
 
-    // Return single order if only one, otherwise return array
-    res.status(201).json({
-      ok: true,
-      data: singleOrder ? { order: singleOrder } : { orders: result },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      // Return single order if only one, otherwise return array
+      res.status(201).json({
+        ok: true,
+        data: singleOrder ? { order: singleOrder } : { orders: result },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid order data',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('Create order error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid order data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to create order',
         },
         requestId: req.requestId,
       })
     }
-
-    logger.error('Create order error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to create order',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Create order manually by supplier (for phone orders, chat orders, etc.)
 router.post('/manual', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {

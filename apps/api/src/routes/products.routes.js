@@ -359,7 +359,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       supplierId = suppliers[0].id
 
       // Check plan limits for suppliers
-      const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'products')
+      const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
       if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
         return res.status(403).json({
           ok: false,
@@ -452,7 +452,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
       // Track usage for supplier
       if (req.userData.role === 'SUPPLIER' && supplierId) {
-        await incrementUsage(supplierId, 'SUPPLIER', 'products', 1)
+        await incrementUsage(supplierId, 'SUPPLIER', 'supplier_products_skus', 1)
       }
 
       logger.info('Product created with price and inventory', {

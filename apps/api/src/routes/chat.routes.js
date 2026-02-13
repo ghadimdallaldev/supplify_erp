@@ -546,6 +546,7 @@ router.post(
   '/conversations/:conversationId/messages',
   requireAuth,
   requireRole(['SUPPLIER', 'RESTAURANT']),
+  requirePermission('CHAT_SEND'),
   async (req, res) => {
     try {
       // Check daily chat limit before sending message

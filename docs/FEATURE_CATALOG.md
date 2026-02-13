@@ -1,0 +1,267 @@
+# Supplify Feature Catalog
+
+Canonical list of all implemented features. Single source of truth for backend enforcement, frontend surfaces, permissions, and limits.
+
+**Conventions**
+
+- `feature_key`: stable string identifier
+- `applies_to`: RESTAURANT | SUPPLIER | ADMIN | MULTI (multiple tenant types)
+- Backend enforcement: file and method/route where access or limit is enforced
+- Frontend surfaces: pages/components that expose the feature
+- **PARTIAL**: Feature exists but enforcement or surface is incomplete
+- **UNKNOWN**: Referenced but mapping unclear
+
+---
+
+## Orders
+
+| feature_key     | display_name         | applies_to | permissions_required                   | limit_key      | backend_enforcement                                                                      | frontend_surfaces                                      | plan_availability |
+| --------------- | -------------------- | ---------- | -------------------------------------- | -------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------- |
+| orders_list     | Order list & search  | MULTI      | ORDERS_VIEW                            | —              | apps/api/src/routes/orders.routes.js router.use(requirePermission('ORDERS_VIEW')), GET / | apps/web/src/pages/OrdersPage.tsx                      | UNKNOWN           |
+| order_detail    | Order detail view    | MULTI      | ORDERS_VIEW                            | —              | orders.routes.js GET /:id (tenant check)                                                 | apps/web/src/pages/OrderDetailPage.tsx                 | UNKNOWN           |
+| order_create    | Create / place order | RESTAURANT | ORDERS_CREATE (not enforced per-route) | orders_per_day | orders.routes.js POST / checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')         | OrdersPage, CartPage flow                              | UNKNOWN           |
+| order_edit      | Edit / update order  | MULTI      | ORDERS_EDIT (not enforced per-route)   | —              | orders.routes.js PATCH /:id                                                              | OrderDetailPage                                        | UNKNOWN           |
+| orders_calendar | Orders calendar view | MULTI      | —                                      | —              | apps/api/src/routes/orders.calendar.routes.js requireAuth, getRequestTenant              | apps/web/src/pages (calendar view / useOrdersCalendar) | UNKNOWN           |
+
+**Flags**
+
+- Order create: limit enforced (orders_per_day). No requirePermission('ORDERS_CREATE') on POST; router uses ORDERS_VIEW only. **PARTIAL**.
+
+---
+
+## Inventory
+
+| feature_key          | display_name                      | applies_to | permissions_required                    | limit_key                                                        | backend_enforcement                                                                     | frontend_surfaces                      | plan_availability |
+| -------------------- | --------------------------------- | ---------- | --------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------- | ----------------- |
+| supplier_inventory   | Supplier inventory (stock)        | SUPPLIER   | INVENTORY_VIEW                          | —                                                                | apps/api/src/routes/inventory.routes.js router.use(requirePermission('INVENTORY_VIEW')) | apps/web/src/pages/InventoryPage.tsx   | UNKNOWN           |
+| restaurant_inventory | Restaurant inventory (par levels) | RESTAURANT | INVENTORY_VIEW                          | products (restaurant: distinct products in restaurant_inventory) | restaurant-inventory.routes.js requirePermission('INVENTORY_VIEW')                      | RestaurantInventoryPage.tsx            | UNKNOWN           |
+| inventory_edit       | Edit inventory / stock            | MULTI      | INVENTORY_EDIT (not enforced per-route) | —                                                                | inventory.routes.js, restaurant-inventory.routes.js                                     | InventoryPage, RestaurantInventoryPage | UNKNOWN           |
+
+**Flags**
+
+- SubscriptionInfo shows "Products" usage (limit products). Enforced in subscription.js checkLimit for supplier products count; restaurant_inventory product count used for RESTAURANT products limit. **PARTIAL** (limit_key products used in subscription.js).
+
+---
+
+## Invoices
+
+| feature_key        | display_name                                           | applies_to | permissions_required | limit_key | backend_enforcement                                                                                                      | frontend_surfaces                                                  | plan_availability |
+| ------------------ | ------------------------------------------------------ | ---------- | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ----------------- |
+| invoices_list      | Invoice list                                           | MULTI      | INVOICES_VIEW        | —         | apps/api/src/routes/invoices.routes.js router.use(requirePermission('INVOICES_VIEW'))                                    | apps/web/src/pages/InvoicesPage.tsx                                | UNKNOWN           |
+| invoice_detail     | Invoice detail & PDF                                   | MULTI      | INVOICES_VIEW        | —         | invoices.routes.js GET /:id                                                                                              | InvoicesPage                                                       | UNKNOWN           |
+| restaurant_finance | Restaurant finance (invoices, pay, analytics, overdue) | RESTAURANT | —                    | —         | apps/api/src/routes/restaurant-finance.routes.js requireAuth, requireRole(['RESTAURANT','ADMIN']) — no requirePermission | No dedicated page in App routes; may be under Settings or Invoices | PARTIAL           |
+
+**Flags**
+
+- restaurant-finance.routes.js is not protected by requirePermission; uses requireRole only. **PARTIAL**.
+
+---
+
+## Reservations
+
+| feature_key         | display_name                                      | applies_to     | permissions_required | limit_key | backend_enforcement                                                                           | frontend_surfaces                                                                                                       | plan_availability |
+| ------------------- | ------------------------------------------------- | -------------- | -------------------- | --------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| reservations_board  | Reservations board & management                   | RESTAURANT     | RESERVATIONS_VIEW    | —         | apps/api/src/routes/reservations.routes.js router.use(requirePermission('RESERVATIONS_VIEW')) | ReservationsPage.tsx, ReservationBoard.tsx, ReservationCreateDrawer, ReservationTableBuilder, ReservationAnalyticsPanel | UNKNOWN           |
+| public_reservations | Public reservation portal (book, confirm, manage) | MULTI (public) | —                    | —         | apps/api/src/routes/public.routes.js (no auth for book/confirm/manage by token)               | PublicReservationPortal.tsx, PublicReservationConfirmation.tsx, PublicReservationManage.tsx                             | UNKNOWN           |
+
+---
+
+## Chat
+
+| feature_key        | display_name             | applies_to | permissions_required               | limit_key     | backend_enforcement                                                                                           | frontend_surfaces                    | plan_availability                      |
+| ------------------ | ------------------------ | ---------- | ---------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------- |
+| chat_conversations | Chat conversations list  | MULTI      | CHAT_VIEW                          | —             | apps/api/src/routes/chat.routes.js router.use(requirePermission('CHAT_VIEW'))                                 | ChatPage.tsx                         | UNKNOWN                                |
+| chat_send          | Send chat messages       | MULTI      | CHAT_SEND (not enforced per-route) | chats_per_day | chat.routes.js checkUsageWithWarning('chats_per_day') before send; incrementUsage('chats_per_day') after send | ChatPage                             | SubscriptionInfo shows "Chats (Today)" |
+| chat_feature_flag  | Chat feature flag (plan) | MULTI      | —                                  | —             | GET /api/subscriptions/features/:featureKey isFeatureEnabled(tenantId, tenantType, featureKey)                | SubscriptionInfo.tsx (features.chat) | UI label "Chat"; plan features JSONB   |
+
+**Flags**
+
+- Chat send: limit enforced (chats_per_day). No requirePermission('CHAT_SEND') on send route. **PARTIAL**.
+
+---
+
+## Fulfillment
+
+| feature_key      | display_name           | applies_to | permissions_required | limit_key | backend_enforcement                                                                                             | frontend_surfaces   | plan_availability |
+| ---------------- | ---------------------- | ---------- | -------------------- | --------- | --------------------------------------------------------------------------------------------------------------- | ------------------- | ----------------- |
+| fulfillment_page | Fulfillment (supplier) | SUPPLIER   | —                    | —         | No dedicated fulfillment route with requirePermission; orders routes used                                       | FulfillmentPage.tsx | UNKNOWN           |
+| receiving        | Receiving (restaurant) | RESTAURANT | —                    | —         | apps/api/src/routes/receiving.routes.js requireAuth, requireRole(['RESTAURANT','ADMIN']) — no requirePermission | ReceivingPage.tsx   | PARTIAL           |
+
+**Flags**
+
+- Receiving and Fulfillment: no RBAC permission gate; role-only. **PARTIAL**.
+
+---
+
+## Catalog (Products)
+
+| feature_key    | display_name              | applies_to | permissions_required | limit_key | backend_enforcement                                                                                          | frontend_surfaces        | plan_availability                 |
+| -------------- | ------------------------- | ---------- | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------ | ------------------------ | --------------------------------- |
+| products_list  | Product catalog list      | MULTI      | CATALOG_VIEW         | —         | apps/api/src/routes/products.routes.js router.use(requirePermission('CATALOG_VIEW'))                         | ProductsPage.tsx         | UNKNOWN                           |
+| product_detail | Product detail            | MULTI      | CATALOG_VIEW         | —         | products.routes.js GET /:id                                                                                  | ProductDetailPage.tsx    | UNKNOWN                           |
+| product_create | Create product (supplier) | SUPPLIER   | —                    | products  | products.routes.js POST / checkLimit(supplierId, 'SUPPLIER', 'products'); incrementUsage(..., 'products', 1) | ProductsPage (supplier)  | SubscriptionInfo "Products" usage |
+| product_edit   | Edit product              | SUPPLIER   | —                    | —         | products.routes.js PATCH /:id                                                                                | ProductDetailPage        | UNKNOWN                           |
+| prices         | Supplier pricing          | SUPPLIER   | —                    | —         | apps/api/src/routes/prices.routes.js requireAuth, requireRole                                                | — (API only or embedded) | UNKNOWN                           |
+
+---
+
+## Warehouses & Branches
+
+| feature_key | display_name          | applies_to | permissions_required | limit_key  | backend_enforcement                                                                                                      | frontend_surfaces                                                     | plan_availability                                      |
+| ----------- | --------------------- | ---------- | -------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------ |
+| warehouses  | Warehouses (supplier) | SUPPLIER   | WAREHOUSES_VIEW      | warehouses | apps/api/src/routes/warehouses.routes.js requirePermission('WAREHOUSES_VIEW'); checkWarehouseLimit(supplierId) on create | — (no dedicated page in App; may be under supplier settings or admin) | plan-enforcement.js eligiblePlans Bronze/Gold/Platinum |
+| branches    | Branches (restaurant) | RESTAURANT | SETTINGS_VIEW        | branches   | apps/api/src/routes/branches.routes.js requirePermission('SETTINGS_VIEW'); checkBranchLimit(restaurantId) on create      | — (branches likely under Settings or Reservations)                    | plan-enforcement.js eligiblePlans Gold/Platinum        |
+
+---
+
+## Quick Lists & Cart
+
+| feature_key | display_name    | applies_to | permissions_required | limit_key                       | backend_enforcement                                                                                                                           | frontend_surfaces  | plan_availability |
+| ----------- | --------------- | ---------- | -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----------------- |
+| quick_lists | Quick lists     | RESTAURANT | —                    | orders_per_day                  | apps/api/src/routes/quick-lists.routes.js requireAuth, requireRole(['RESTAURANT','ADMIN']); checkLimit(..., 'orders_per_day') when scheduling | QuickListsPage.tsx | UNKNOWN           |
+| cart        | Cart & checkout | RESTAURANT | —                    | orders_per_day (on place order) | Orders flow                                                                                                                                   | CartPage.tsx       | UNKNOWN           |
+
+**Flags**
+
+- Quick lists: no requirePermission; uses requireRole only. **PARTIAL**.
+
+---
+
+## Staff
+
+| feature_key        | display_name                              | applies_to           | permissions_required | limit_key | backend_enforcement                                                                                           | frontend_surfaces                                        | plan_availability |
+| ------------------ | ----------------------------------------- | -------------------- | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------------- |
+| staff_management   | Staff members, shifts, PTO, etc.          | RESTAURANT           | STAFF_VIEW           | —         | apps/api/src/routes/staff.routes.js router.use(requirePermission('STAFF_VIEW'))                               | StaffPage.tsx                                            | UNKNOWN           |
+| staff_self_service | Staff self-service (PTO, swap, dashboard) | MULTI (public token) | —                    | —         | apps/api/src/routes/public.routes.js staff link request, session, PTO, swap                                   | StaffSelfServiceLogin.tsx, StaffSelfServiceDashboard.tsx | UNKNOWN           |
+| users_limit        | Restaurant team / users limit             | RESTAURANT           | —                    | users     | apps/api/src/routes/restaurant-onboarding.routes.js checkLimit(restaurantId, 'RESTAURANT', 'users') on invite | RestaurantOnboardingPage (onboarding/invite)             | UNKNOWN           |
+
+---
+
+## Settings & Tenants
+
+| feature_key       | display_name           | applies_to | permissions_required | limit_key                | backend_enforcement                                                                                                                     | frontend_surfaces                             | plan_availability |
+| ----------------- | ---------------------- | ---------- | -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ----------------- |
+| settings          | Tenant settings        | MULTI      | SETTINGS_VIEW        | —                        | branches.routes.js uses SETTINGS_VIEW; Settings page not explicitly gated by permission in code (Sidebar gates by can('SETTINGS_VIEW')) | SettingsPage.tsx, Sidebar (Settings link)     | UNKNOWN           |
+| suppliers_list    | Suppliers (restaurant) | RESTAURANT | —                    | suppliers_per_restaurant | apps/api/src/routes/suppliers.routes.js checkLimit(restaurantId, 'RESTAURANT', 'suppliers_per_restaurant') on link                      | SuppliersPage.tsx, SupplierDetailPage.tsx     | UNKNOWN           |
+| restaurants_list  | Restaurants (supplier) | SUPPLIER   | —                    | —                        | restaurants.routes.js requireAuth, requireRole                                                                                          | RestaurantsPage.tsx, RestaurantDetailPage.tsx | UNKNOWN           |
+| supplier_settings | Supplier settings      | SUPPLIER   | —                    | —                        | —                                                                                                                                       | SupplierSettingsPage.tsx                      | UNKNOWN           |
+| onboarding        | Restaurant onboarding  | RESTAURANT | —                    | users                    | restaurant-onboarding.routes.js, checkLimit users                                                                                       | RestaurantOnboardingPage.tsx                  | UNKNOWN           |
+
+---
+
+## Subscriptions
+
+| feature_key         | display_name                      | applies_to | permissions_required                          | limit_key | backend_enforcement                                                                             | frontend_surfaces                                                             | plan_availability   |
+| ------------------- | --------------------------------- | ---------- | --------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------- |
+| subscription_view   | View current subscription & usage | MULTI      | SUBSCRIPTIONS_VIEW                            | —         | apps/api/src/routes/subscriptions.routes.js router.use(requirePermission('SUBSCRIPTIONS_VIEW')) | Settings (SubscriptionInfo), GET /api/subscriptions/current, usage/:meterType | UNKNOWN             |
+| subscription_manage | Change plan / billing             | MULTI      | SUBSCRIPTIONS_MANAGE (not enforced on routes) | —         | —                                                                                               | —                                                                             | UNKNOWN             |
+| feature_flag_api    | Check feature by key (API)        | MULTI      | —                                             | —         | GET /api/subscriptions/features/:featureKey isFeatureEnabled(tenantId, tenantType, featureKey)  | SubscriptionInfo.tsx (chat, smart_reorder, reports, multi_branch)             | Plan features JSONB |
+
+---
+
+## Admin
+
+| feature_key            | display_name                                                                               | applies_to | permissions_required | limit_key | backend_enforcement                                                                                                                                   | frontend_surfaces                                                                            | plan_availability |
+| ---------------------- | ------------------------------------------------------------------------------------------ | ---------- | -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------- |
+| admin_dashboard        | Admin dashboard (overview, plans, subscriptions, tenants, impersonation, audit, overrides) | ADMIN      | ADMIN_ACCESS         | —         | apps/api/src/routes/admin-dashboard.routes.js router.use(requireAuth, requireRole(['ADMIN']), resolveAdminContext, requirePermission('ADMIN_ACCESS')) | AdminDashboardPage.tsx (tabs: overview, plans, subscriptions, tenants, audit, impersonation) | —                 |
+| admin_audit            | Audit log                                                                                  | ADMIN      | —                    | —         | admin-dashboard.routes.js GET /audit-logs                                                                                                             | AdminDashboardPage                                                                           | —                 |
+| admin_impersonation    | Impersonate tenant                                                                         | ADMIN      | —                    | —         | admin-dashboard.routes.js POST /impersonate, /impersonate/stop, GET /impersonate                                                                      | ImpersonationBanner, Admin UI                                                                | —                 |
+| admin_plans            | Manage subscription plans                                                                  | ADMIN      | —                    | —         | admin-dashboard.routes.js GET/POST/PATCH /plans                                                                                                       | AdminDashboardPage Plans tab                                                                 | —                 |
+| admin_subscriptions    | Manage tenant subscriptions                                                                | ADMIN      | —                    | —         | admin-dashboard.routes.js GET/PATCH /subscriptions, GET /usage/:tenantId                                                                              | AdminDashboardPage Subscriptions tab                                                         | —                 |
+| admin_tenants          | List tenants (suppliers/restaurants)                                                       | ADMIN      | —                    | —         | admin-dashboard.routes.js GET /tenants/suppliers, /tenants/restaurants                                                                                | AdminDashboardPage Tenants tab                                                               | —                 |
+| admin_override_limits  | Tenant limit overrides                                                                     | ADMIN      | —                    | —         | admin-dashboard.routes.js POST/DELETE /tenants/:tenantType/:id/override-limit                                                                         | AdminDashboardPage                                                                           | —                 |
+| admin_dashboard_legacy | Legacy admin dashboard/audit                                                               | ADMIN      | —                    | —         | apps/api/src/routes/admin.routes.js GET /audit, GET /dashboard requireAuth, requireRole(['ADMIN'])                                                    | —                                                                                            | —                 |
+
+---
+
+## Files & Storage
+
+| feature_key | display_name | applies_to | permissions_required | limit_key  | backend_enforcement                                                                | frontend_enforcement | plan_availability |
+| ----------- | ------------ | ---------- | -------------------- | ---------- | ---------------------------------------------------------------------------------- | -------------------- | ----------------- |
+| file_upload | File upload  | MULTI      | —                    | storage_mb | apps/api/src/routes/files.routes.js checkLimit(tenantId, tenantType, 'storage_mb') | —                    | UNKNOWN           |
+
+---
+
+## Notifications & Payments
+
+| feature_key   | display_name           | applies_to | permissions_required | limit_key | backend_enforcement                                                     | frontend_surfaces           | plan_availability |
+| ------------- | ---------------------- | ---------- | -------------------- | --------- | ----------------------------------------------------------------------- | --------------------------- | ----------------- |
+| notifications | In-app notifications   | MULTI      | —                    | —         | apps/api/src/routes/notifications.routes.js                             | — (likely Header or Layout) | UNKNOWN           |
+| payments      | Payments (invoice pay) | RESTAURANT | —                    | —         | restaurant-finance.routes.js POST /invoices/:id/pay; payments.routes.js | —                           | UNKNOWN           |
+
+---
+
+## Dashboard & Home
+
+| feature_key | display_name                       | applies_to | permissions_required | limit_key | backend_enforcement                                                              | frontend_surfaces | plan_availability |
+| ----------- | ---------------------------------- | ---------- | -------------------- | --------- | -------------------------------------------------------------------------------- | ----------------- | ----------------- |
+| dashboard   | Main dashboard (stats, role-aware) | MULTI      | —                    | —         | apps/api/src/routes/admin.routes.js GET /dashboard requireAuth, getRequestTenant | DashboardPage.tsx | UNKNOWN           |
+
+---
+
+## Pricing (Contract / Tiers)
+
+| feature_key           | display_name                     | applies_to | permissions_required | limit_key | backend_enforcement                                                                         | frontend_surfaces                      | plan_availability |
+| --------------------- | -------------------------------- | ---------- | -------------------- | --------- | ------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------- |
+| supplier_pricing      | Supplier pricing (prices, tiers) | SUPPLIER   | —                    | —         | apps/api/src/routes/prices.routes.js, restaurant-pricing.routes.js requireAuth, requireRole | — (API; may be in product/supplier UI) | UNKNOWN           |
+| restaurant_my_pricing | Restaurant view "my pricing"     | RESTAURANT | —                    | —         | restaurant-pricing.routes.js GET /my-pricing requireRole(['RESTAURANT','ADMIN'])            | —                                      | UNKNOWN           |
+
+---
+
+## Reporting & Analytics
+
+| feature_key           | display_name                       | applies_to | permissions_required | limit_key | backend_enforcement                                                             | frontend_surfaces                             | plan_availability                             |
+| --------------------- | ---------------------------------- | ---------- | -------------------- | --------- | ------------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------- |
+| reports               | Analytics / reports (feature flag) | MULTI      | —                    | —         | isFeatureEnabled(..., 'reports') — no route uses requireFeature('reports')      | SubscriptionInfo.tsx (features.reports)       | UI only; **PARTIAL** (no backend enforcement) |
+| smart_reorder         | Smart reorder (feature flag)       | MULTI      | —                    | —         | isFeatureEnabled — not used on any route                                        | SubscriptionInfo.tsx (features.smart_reorder) | UI only; **PARTIAL**                          |
+| multi_branch          | Multi-branch (feature flag)        | RESTAURANT | —                    | —         | Branch limit enforced in plan-enforcement.js; no requireFeature('multi_branch') | SubscriptionInfo.tsx (features.multi_branch)  | UI label; branch limit enforced separately    |
+| reservation_analytics | Reservation analytics              | RESTAURANT | RESERVATIONS_VIEW    | —         | reservations.routes.js (same router)                                            | ReservationAnalyticsPanel.tsx                 | UNKNOWN                                       |
+| invoice_analytics     | Invoice analytics                  | RESTAURANT | —                    | —         | restaurant-finance.routes.js GET /invoices/analytics                            | —                                             | UNKNOWN                                       |
+
+---
+
+## Integrations
+
+| feature_key | display_name                  | applies_to     | permissions_required | limit_key | backend_enforcement                                        | frontend_surfaces                           | plan_availability |
+| ----------- | ----------------------------- | -------------- | -------------------- | --------- | ---------------------------------------------------------- | ------------------------------------------- | ----------------- |
+| public_api  | Public reservation/staff APIs | MULTI (public) | —                    | —         | public.routes.js (reserve, staff link, session, PTO, swap) | PublicReservationPortal, StaffSelfService\* | UNKNOWN           |
+
+---
+
+## Limit Keys (summary)
+
+| limit_key                | applies_to | enforced_in                                                                                                       |
+| ------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| orders_per_day           | RESTAURANT | orders.routes.js (create), quick-lists.routes.js (schedule), scheduled-orders.service.js                          |
+| products                 | SUPPLIER   | products.routes.js (create); RESTAURANT product count in subscription.js (restaurant_inventory distinct products) |
+| users                    | RESTAURANT | restaurant-onboarding.routes.js (invite)                                                                          |
+| chats_per_day            | MULTI      | chat.routes.js (send message)                                                                                     |
+| storage_mb               | MULTI      | files.routes.js                                                                                                   |
+| suppliers_per_restaurant | RESTAURANT | suppliers.routes.js (link)                                                                                        |
+| branches                 | RESTAURANT | plan-enforcement.js checkBranchLimit; branches.routes.js                                                          |
+| warehouses               | SUPPLIER   | plan-enforcement.js checkWarehouseLimit; warehouses.routes.js                                                     |
+
+---
+
+## Plan / Feature Keys (UI and API)
+
+- **Plans (from migration 0022 / UI):** Free, Bronze, Gold, Platinum
+- **Feature keys in SubscriptionInfo / plan features:** chat, smart_reorder, reports, multi_branch
+- **requireFeature(featureKey)** exists in subscription.js but is **not used** on any route; only GET /api/subscriptions/features/:featureKey returns isFeatureEnabled. No route blocks access based on feature flag. **PARTIAL**.
+
+---
+
+## Features in UI but not enforced in backend
+
+1. **reports** – Shown in SubscriptionInfo as plan feature; no route checks isFeatureEnabled('reports') or requireFeature('reports').
+2. **smart_reorder** – Same as above.
+3. **multi_branch** – Shown as feature; branch limit is enforced via checkBranchLimit (limits.branches), not via feature flag.
+4. **Receiving** – Page exists; backend uses requireRole only, no requirePermission.
+5. **Fulfillment** – Page exists; no dedicated permission or feature check.
+6. **Quick Lists** – No requirePermission; only requireRole and orders_per_day limit on schedule.
+7. **Restaurant finance** (invoices/analytics/pay/overdue) – requireRole only.
+8. **Order create** – Router requires ORDERS_VIEW only; ORDERS_CREATE not checked on POST.
+
+---
+
+_Generated by scanning backend routes, frontend routes/pages/components, RBAC permissions, subscription.js, plan-enforcement.js, and SubscriptionInfo. Do not invent features; rename only when aligning with a future plan._

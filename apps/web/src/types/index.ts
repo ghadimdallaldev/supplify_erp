@@ -830,6 +830,7 @@ export interface SubscriptionPlan {
   price_per_month: number
   price_per_year?: number
   type: 'restaurant_only' | 'supplier_only' | 'restaurant_and_supplier'
+  tenant_type: 'RESTAURANT' | 'SUPPLIER'
   limits: Record<string, any> // JSONB object with limit keys
   features: Record<string, any> // JSONB object with feature capabilities
   trial_days: number

@@ -10,6 +10,7 @@ import {
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkBranchLimit, createAuditLog } from '../lib/plan-enforcement.js'
+import { requireFeature } from '../lib/subscription.js'
 
 router.use(requireAuth, resolveTenantContext, requirePermission('SETTINGS_VIEW'))
 
@@ -17,145 +18,164 @@ router.use(requireAuth, resolveTenantContext, requirePermission('SETTINGS_VIEW')
  * GET /api/branches
  * Get all branches for authenticated restaurant
  */
-router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const restaurantId =
-      (await getRestaurantIdForRequest(req)) ||
-      (req.userData.role === 'ADMIN' ? req.query.restaurant_id : null)
+router.get(
+  '/',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'multi_branch',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res) => {
+    try {
+      const restaurantId =
+        (await getRestaurantIdForRequest(req)) ||
+        (req.userData.role === 'ADMIN' ? req.query.restaurant_id : null)
 
-    if (!restaurantId) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'BAD_REQUEST', message: 'Restaurant ID required' },
-        requestId: req.requestId,
-      })
-    }
+      if (!restaurantId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'BAD_REQUEST', message: 'Restaurant ID required' },
+          requestId: req.requestId,
+        })
+      }
 
-    const { rows: branches } = await query(
-      `
+      const { rows: branches } = await query(
+        `
       SELECT * FROM branch 
       WHERE tenant_id = $1 
       ORDER BY created_at DESC
     `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
 
-    res.json({
-      ok: true,
-      data: { branches },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get branches error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to get branches' },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: { branches },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get branches error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to get branches' },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 /**
  * POST /api/branches
  * Create a new branch
  */
-router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
+router.post(
+  '/',
+  requireAuth,
+  requireRole(['RESTAURANT']),
+  requireFeature(
+    'multi_branch',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res) => {
+    try {
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'Restaurant not found' },
-        requestId: req.requestId,
-      })
-    }
+      if (restaurants.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Restaurant not found' },
+          requestId: req.requestId,
+        })
+      }
 
-    const restaurantId = restaurants[0].id
+      const restaurantId = restaurants[0].id
 
-    // Check plan limits
-    const limitCheck = await checkBranchLimit(restaurantId)
+      // Check plan limits
+      const limitCheck = await checkBranchLimit(restaurantId)
 
-    if (!limitCheck.allowed) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'BRANCH_LIMIT_REACHED',
-          message: limitCheck.reason,
-          details: {
-            currentPlan: limitCheck.currentPlan,
-            requiredPlan: limitCheck.requiredPlan,
-            limit: limitCheck.limit,
-            current: limitCheck.current,
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'BRANCH_LIMIT_REACHED',
+            message: limitCheck.reason,
+            details: {
+              currentPlan: limitCheck.currentPlan,
+              requiredPlan: limitCheck.requiredPlan,
+              limit: limitCheck.limit,
+              current: limitCheck.current,
+            },
           },
-        },
-        requestId: req.requestId,
-      })
-    }
+          requestId: req.requestId,
+        })
+      }
 
-    // Create branch
-    const { name, code, address, contact_name, contact_email, contact_phone } = req.body
+      // Create branch
+      const { name, code, address, contact_name, contact_email, contact_phone } = req.body
 
-    const { rows: newBranch } = await query(
-      `
+      const { rows: newBranch } = await query(
+        `
       INSERT INTO branch (tenant_id, name, code, address, contact_name, contact_email, contact_phone)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `,
-      [
-        restaurantId,
-        name,
-        code || null,
-        address || null,
-        contact_name || null,
-        contact_email || null,
-        contact_phone || null,
-      ]
-    )
+        [
+          restaurantId,
+          name,
+          code || null,
+          address || null,
+          contact_name || null,
+          contact_email || null,
+          contact_phone || null,
+        ]
+      )
 
-    // Create audit log
-    await createAuditLog('CREATE_BRANCH', {
-      entityType: 'BRANCH',
-      entityId: newBranch[0].id,
-      description: `Created branch: ${name}`,
-      changes: { name, code, address },
-    })
+      // Create audit log
+      await createAuditLog('CREATE_BRANCH', {
+        entityType: 'BRANCH',
+        entityId: newBranch[0].id,
+        description: `Created branch: ${name}`,
+        changes: { name, code, address },
+      })
 
-    res.status(201).json({
-      ok: true,
-      data: { branch: newBranch[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Create branch error:', error)
+      res.status(201).json({
+        ok: true,
+        data: { branch: newBranch[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Create branch error:', error)
 
-    if (error.code === '23505') {
-      // Unique violation
-      return res.status(409).json({
+      if (error.code === '23505') {
+        // Unique violation
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: { name: 'DUPLICATE', message: 'Branch with this code already exists' },
+          requestId: req.requestId,
+        })
+      }
+
+      res.status(500).json({
         ok: false,
         data: null,
-        error: { name: 'DUPLICATE', message: 'Branch with this code already exists' },
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to create branch' },
         requestId: req.requestId,
       })
     }
-
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to create branch' },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 /**
  * PUT /api/branches/:id

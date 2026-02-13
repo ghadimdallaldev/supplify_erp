@@ -7,7 +7,8 @@ import { logger } from './logger.js'
  */
 async function ensureTenantSubscription(tenantId, tenantType) {
   const { rows: plans } = await query(
-    `SELECT id, name, code FROM subscription_plan WHERE code = 'free' AND is_active = true LIMIT 1`
+    `SELECT id, name, code FROM subscription_plan WHERE code = 'free' AND tenant_type = $1 AND is_active = true LIMIT 1`,
+    [tenantType]
   )
   if (plans.length === 0) return
   const plan = plans[0]
@@ -110,7 +111,7 @@ export async function isFeatureEnabled(tenantId, tenantType, featureKey) {
  * Check if tenant has reached limit (with override support)
  * @param {string} tenantId - Tenant ID
  * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
- * @param {string} meterType - Type of meter (e.g., 'products', 'warehouses')
+ * @param {string} meterType - Type of meter (e.g., 'supplier_products_skus', 'restaurant_inventory_skus', 'warehouses')
  * @returns {Promise<{current: number, limit: number|null, isUnlimited: boolean, isOverLimit: boolean, effectiveLimit: number}>}
  */
 export async function checkLimit(tenantId, tenantType, meterType) {
@@ -176,8 +177,7 @@ export async function checkLimit(tenantId, tenantType, meterType) {
 
     // Get current usage
     let current = 0
-    if (meterType === 'products' && tenantType === 'RESTAURANT') {
-      // For restaurants, products = distinct products in restaurant_inventory
+    if (meterType === 'restaurant_inventory_skus' && tenantType === 'RESTAURANT') {
       const { rows: productCount } = await query(
         `
         SELECT COUNT(DISTINCT product_id) as count
@@ -200,8 +200,7 @@ export async function checkLimit(tenantId, tenantType, meterType) {
         [tenantId]
       )
       current = parseInt(orderCount[0]?.count || 0)
-    } else if (meterType === 'products' && tenantType === 'SUPPLIER') {
-      // For suppliers, products = count of products they own
+    } else if (meterType === 'supplier_products_skus' && tenantType === 'SUPPLIER') {
       const { rows: productCount } = await query(
         `
         SELECT COUNT(*) as count

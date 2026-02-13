@@ -6,6 +6,7 @@ import {
   resolveTenantContext,
   requirePermission,
 } from '../lib/rbac.js'
+import { requireFeature } from '../lib/subscription.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -233,217 +234,229 @@ router.get(
 )
 
 // Adjust inventory (for wastage, spoilage, etc.)
-router.post('/adjust', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { productId, ...data } = req.body
-    const adjustmentData = adjustInventorySchema.parse(data)
+router.post(
+  '/adjust',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
+  async (req, res) => {
+    try {
+      const { productId, ...data } = req.body
+      const adjustmentData = adjustInventorySchema.parse(data)
 
-    const restaurantId = await getRestaurantIdForRequest(req)
-    if (!restaurantId) {
-      throw new ValidationError('Restaurant not found')
-    }
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const result = await withTransaction(async (client) => {
-      // Get current inventory
-      const { rows: inventory } = await client.query(
-        `
+      const result = await withTransaction(async (client) => {
+        // Get current inventory
+        const { rows: inventory } = await client.query(
+          `
         SELECT quantity FROM restaurant_inventory
         WHERE restaurant_id = $1 AND product_id = $2
         FOR UPDATE
       `,
-        [restaurantId, productId]
-      )
+          [restaurantId, productId]
+        )
 
-      if (inventory.length === 0) {
-        throw new NotFoundError('Product not found in inventory')
-      }
+        if (inventory.length === 0) {
+          throw new NotFoundError('Product not found in inventory')
+        }
 
-      const balanceBefore = Number(inventory[0].quantity)
-      const balanceAfter = Math.max(0, balanceBefore - adjustmentData.quantity)
+        const balanceBefore = Number(inventory[0].quantity)
+        const balanceAfter = Math.max(0, balanceBefore - adjustmentData.quantity)
 
-      // Calculate unit cost and total cost if provided
-      const unitCost = adjustmentData.unitCost || null
-      const totalCost = unitCost ? unitCost * adjustmentData.quantity : null
+        // Calculate unit cost and total cost if provided
+        const unitCost = adjustmentData.unitCost || null
+        const totalCost = unitCost ? unitCost * adjustmentData.quantity : null
 
-      // Create adjustment record
-      const {
-        rows: [adjustment],
-      } = await client.query(
-        `
+        // Create adjustment record
+        const {
+          rows: [adjustment],
+        } = await client.query(
+          `
         INSERT INTO inventory_adjustment (
           restaurant_id, product_id, adjustment_type, quantity, reason, 
           unit_cost, total_cost, waste_category, created_by
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `,
-        [
-          restaurantId,
-          productId,
-          adjustmentData.adjustmentType,
-          adjustmentData.quantity,
-          adjustmentData.reason || null,
-          unitCost,
-          totalCost,
-          adjustmentData.wasteCategory || null,
-          req.userData.id,
-        ]
-      )
+          [
+            restaurantId,
+            productId,
+            adjustmentData.adjustmentType,
+            adjustmentData.quantity,
+            adjustmentData.reason || null,
+            unitCost,
+            totalCost,
+            adjustmentData.wasteCategory || null,
+            req.userData.id,
+          ]
+        )
 
-      // Update inventory
-      await client.query(
-        `
+        // Update inventory
+        await client.query(
+          `
         UPDATE restaurant_inventory
         SET quantity = $1, updated_at = now()
         WHERE restaurant_id = $2 AND product_id = $3
       `,
-        [balanceAfter, restaurantId, productId]
-      )
+          [balanceAfter, restaurantId, productId]
+        )
 
-      // Log movement
-      await client.query(
-        `
+        // Log movement
+        await client.query(
+          `
         INSERT INTO inventory_movement_log (
           restaurant_id, product_id, type, quantity, 
           balance_before, balance_after, reason,
           reference_id, reference_type
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `,
-        [
-          restaurantId,
-          productId,
-          adjustmentData.adjustmentType,
-          -adjustmentData.quantity,
-          balanceBefore,
-          balanceAfter,
-          adjustmentData.reason || null,
-          adjustment.id,
-          'ADJUSTMENT',
-        ]
-      )
+          [
+            restaurantId,
+            productId,
+            adjustmentData.adjustmentType,
+            -adjustmentData.quantity,
+            balanceBefore,
+            balanceAfter,
+            adjustmentData.reason || null,
+            adjustment.id,
+            'ADJUSTMENT',
+          ]
+        )
 
-      return adjustment
-    })
+        return adjustment
+      })
 
-    logger.info('Inventory adjusted', {
-      productId,
-      adjustmentType: adjustmentData.adjustmentType,
-      quantity: adjustmentData.quantity,
-      actor: req.userData.id,
-    })
+      logger.info('Inventory adjusted', {
+        productId,
+        adjustmentType: adjustmentData.adjustmentType,
+        quantity: adjustmentData.quantity,
+        actor: req.userData.id,
+      })
 
-    res.status(201).json({
-      ok: true,
-      data: { adjustment: result },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error({
-      message: 'Adjust inventory error',
-      error: error.message,
-      stack: error.stack,
-    })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to adjust inventory',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    })
+      res.status(201).json({
+        ok: true,
+        data: { adjustment: result },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Adjust inventory error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to adjust inventory',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Manually add inventory
-router.post('/add', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { productId, quantity, reason } = req.body
+router.post(
+  '/add',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
+  async (req, res) => {
+    try {
+      const { productId, quantity, reason } = req.body
 
-    if (!quantity || quantity <= 0) {
-      throw new ValidationError('Quantity must be positive')
-    }
+      if (!quantity || quantity <= 0) {
+        throw new ValidationError('Quantity must be positive')
+      }
 
-    const restaurantId = await getRestaurantIdForRequest(req)
-    if (!restaurantId) {
-      throw new ValidationError('Restaurant not found')
-    }
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    await withTransaction(async (client) => {
-      // Get or create inventory
-      const { rows: inventory } = await client.query(
-        `
+      await withTransaction(async (client) => {
+        // Get or create inventory
+        const { rows: inventory } = await client.query(
+          `
         SELECT quantity FROM restaurant_inventory
         WHERE restaurant_id = $1 AND product_id = $2
       `,
-        [restaurantId, productId]
-      )
+          [restaurantId, productId]
+        )
 
-      const balanceBefore = inventory.length > 0 ? Number(inventory[0].quantity) : 0
-      const balanceAfter = balanceBefore + quantity
+        const balanceBefore = inventory.length > 0 ? Number(inventory[0].quantity) : 0
+        const balanceAfter = balanceBefore + quantity
 
-      if (inventory.length > 0) {
-        await client.query(
-          `
+        if (inventory.length > 0) {
+          await client.query(
+            `
           UPDATE restaurant_inventory
           SET quantity = $1, updated_at = now()
           WHERE restaurant_id = $2 AND product_id = $3
         `,
-          [balanceAfter, restaurantId, productId]
-        )
-      } else {
-        await client.query(
-          `
+            [balanceAfter, restaurantId, productId]
+          )
+        } else {
+          await client.query(
+            `
           INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
           VALUES ($1, $2, $3, now())
         `,
-          [restaurantId, productId, quantity]
-        )
-      }
+            [restaurantId, productId, quantity]
+          )
+        }
 
-      // Log movement
-      await client.query(
-        `
+        // Log movement
+        await client.query(
+          `
         INSERT INTO inventory_movement_log (
           restaurant_id, product_id, type, quantity, 
           balance_before, balance_after, reason, reference_type
         ) VALUES ($1, $2, 'ADD', $3, $4, $5, $6, 'MANUAL_ADD')
       `,
-        [restaurantId, productId, quantity, balanceBefore, balanceAfter, reason || null]
-      )
-    })
+          [restaurantId, productId, quantity, balanceBefore, balanceAfter, reason || null]
+        )
+      })
 
-    logger.info('Inventory added', {
-      productId,
-      quantity,
-      actor: req.userData.id,
-    })
+      logger.info('Inventory added', {
+        productId,
+        quantity,
+        actor: req.userData.id,
+      })
 
-    res.json({
-      ok: true,
-      data: { message: 'Inventory updated successfully' },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error({
-      message: 'Add inventory error',
-      error: error.message,
-      stack: error.stack,
-    })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to add inventory',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: { message: 'Inventory updated successfully' },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Add inventory error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to add inventory',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 /**
  * GET /api/restaurant-inventory/reorder-suggestions
@@ -459,8 +472,12 @@ router.post('/add', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (re
  */
 router.get(
   '/reorder-suggestions',
-  requireAuth,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
   async (req, res) => {
     try {
       const restaurantId = await getRestaurantIdForRequest(req)
@@ -767,8 +784,12 @@ router.get(
 // Get waste analytics for the restaurant
 router.get(
   '/waste-analytics',
-  requireAuth,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'reports',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
   async (req, res) => {
     try {
       const { period = '30' } = req.query // Default to last 30 days

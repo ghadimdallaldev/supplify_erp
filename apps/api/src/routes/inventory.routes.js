@@ -215,6 +215,7 @@ router.patch(
   '/product/:productId',
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
   async (req, res) => {
     try {
       const { productId } = req.params
@@ -284,6 +285,7 @@ router.post(
   '/product/:productId/adjustment',
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
   async (req, res) => {
     try {
       const { productId } = req.params
@@ -471,6 +473,7 @@ router.patch(
   '/product/:productId/settings',
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
   async (req, res) => {
     try {
       const { productId } = req.params

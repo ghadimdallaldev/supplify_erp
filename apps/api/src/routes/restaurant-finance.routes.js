@@ -1,11 +1,14 @@
-import express from 'express';
-import { requireAuth, requireRole } from '../lib/rbac.js';
-import { query, withTransaction } from '../lib/db.js';
-import { logger } from '../lib/logger.js';
-import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js';
-import { z } from 'zod';
+import express from 'express'
+import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import { requireFeature } from '../lib/subscription.js'
+import { query, withTransaction } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
+import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { z } from 'zod'
 
-const router = express.Router();
+const router = express.Router()
+
+router.use(requireAuth, resolveTenantContext)
 
 // Validation schemas
 const markPaidSchema = z.object({
@@ -13,30 +16,34 @@ const markPaidSchema = z.object({
   paymentMethod: z.enum(['CASH', 'CHECK', 'BANK_TRANSFER', 'CREDIT_CARD', 'ACH', 'OTHER']),
   paymentReference: z.string().optional(),
   notes: z.string().optional(),
-});
+})
 
 const disputeInvoiceSchema = z.object({
   reason: z.string().min(10),
   evidence: z.string().optional(),
-});
+})
 
 // Get all invoices for the restaurant
-router.get('/invoices', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { status, supplier, limit = '100', offset = '0' } = req.query;
+router.get(
+  '/invoices',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
+  async (req, res) => {
+    try {
+      const { status, supplier, limit = '100', offset = '0' } = req.query
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
+      const restaurantId = restaurants[0].id
 
-    let invoicesQuery = `
+      let invoicesQuery = `
       SELECT 
         i.*,
         s.name as supplier_name,
@@ -67,74 +74,85 @@ router.get('/invoices', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
       LEFT JOIN customer_order o ON o.id = i.order_id
       LEFT JOIN payment p ON p.invoice_id = i.id
       WHERE i.restaurant_id = $1
-    `;
+    `
 
-    const queryParams = [restaurantId];
+      const queryParams = [restaurantId]
 
-    if (status) {
-      invoicesQuery += ` AND i.status = $${queryParams.length + 1}`;
-      queryParams.push(status);
-    }
+      if (status) {
+        invoicesQuery += ` AND i.status = $${queryParams.length + 1}`
+        queryParams.push(status)
+      }
 
-    if (supplier) {
-      invoicesQuery += ` AND s.id = $${queryParams.length + 1}`;
-      queryParams.push(supplier);
-    }
+      if (supplier) {
+        invoicesQuery += ` AND s.id = $${queryParams.length + 1}`
+        queryParams.push(supplier)
+      }
 
-    invoicesQuery += `
+      invoicesQuery += `
       GROUP BY i.id, s.name, s.slug, s.contact_email, s.phone, o.id, o.status, o.placed_at
       ORDER BY i.due_date ASC, i.invoice_date DESC
       LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
-    `;
+    `
 
-    queryParams.push(limit, offset);
+      queryParams.push(limit, offset)
 
-    const { rows } = await query(invoicesQuery, queryParams);
+      const { rows } = await query(invoicesQuery, queryParams)
 
-    res.json({
-      ok: true,
-      data: { invoices: rows },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error({
-      message: 'Get invoices error',
-      error: error.message,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get invoices',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { invoices: rows },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Get invoices error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get invoices',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Get comprehensive invoice analytics for restaurant (place BEFORE dynamic :id routes)
-router.get('/invoices/analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { period = '30' } = req.query;
+router.get(
+  '/invoices/analytics',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
+  requireFeature(
+    'reports',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res) => {
+    try {
+      const { period = '30' } = req.query
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
+      const restaurantId = restaurants[0].id
 
-    const periodDays = parseInt(period) || 30;
-    
-    const { rows: analytics } = await query(`
+      const periodDays = parseInt(period) || 30
+
+      const { rows: analytics } = await query(
+        `
       SELECT 
         COUNT(*) FILTER (WHERE i.status = 'ISSUED') as issued_count,
         COUNT(*) FILTER (WHERE i.status = 'PARTIALLY_PAID') as partial_count,
@@ -153,54 +171,61 @@ router.get('/invoices/analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN
       FROM invoice i
       WHERE i.restaurant_id = $1
         AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
-    `, [restaurantId, periodDays]);
+    `,
+        [restaurantId, periodDays]
+      )
 
-    return res.json({
-      ok: true,
-      data: { analytics: analytics[0] || {} },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.warn('Invoice analytics unavailable, returning empty analytics:', error.message);
-    return res.json({
-      ok: true,
-      data: { analytics: {} },
-      error: null,
-      requestId: req.requestId,
-    });
+      return res.json({
+        ok: true,
+        data: { analytics: analytics[0] || {} },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.warn('Invoice analytics unavailable, returning empty analytics:', error.message)
+      return res.json({
+        ok: true,
+        data: { analytics: {} },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Get invoices by order ID
-router.get('/orders/:orderId/invoices', requireAuth, requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
-  try {
-    const { orderId } = req.params;
+router.get(
+  '/orders/:orderId/invoices',
+  requireAuth,
+  requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { orderId } = req.params
 
-    let restaurantId = null;
-    let supplierId = null;
+      let restaurantId = null
+      let supplierId = null
 
-    if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      );
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found');
+      if (req.userData.role === 'RESTAURANT') {
+        const { rows: restaurants } = await query(
+          'SELECT id FROM restaurant WHERE contact_email = $1',
+          [req.userData.email]
+        )
+        if (restaurants.length === 0) {
+          throw new ValidationError('Restaurant not found')
+        }
+        restaurantId = restaurants[0].id
+      } else if (req.userData.role === 'SUPPLIER') {
+        const { rows: suppliers } = await query(
+          'SELECT id FROM supplier WHERE contact_email = $1',
+          [req.userData.email]
+        )
+        if (suppliers.length === 0) {
+          throw new ValidationError('Supplier not found')
+        }
+        supplierId = suppliers[0].id
       }
-      restaurantId = restaurants[0].id;
-    } else if (req.userData.role === 'SUPPLIER') {
-      const { rows: suppliers } = await query(
-        'SELECT id FROM supplier WHERE contact_email = $1',
-        [req.userData.email]
-      );
-      if (suppliers.length === 0) {
-        throw new ValidationError('Supplier not found');
-      }
-      supplierId = suppliers[0].id;
-    }
 
-    let invoicesQuery = `
+      let invoicesQuery = `
       SELECT 
         i.*,
         s.name as supplier_name,
@@ -209,63 +234,69 @@ router.get('/orders/:orderId/invoices', requireAuth, requireRole(['RESTAURANT', 
       JOIN supplier s ON s.id = i.supplier_id
       LEFT JOIN payment p ON p.invoice_id = i.id
       WHERE i.order_id = $1
-    `;
+    `
 
-    const params = [orderId];
+      const params = [orderId]
 
-    if (restaurantId) {
-      invoicesQuery += ` AND i.restaurant_id = $2`;
-      params.push(restaurantId);
-    } else if (supplierId) {
-      invoicesQuery += ` AND i.supplier_id = $2`;
-      params.push(supplierId);
-    }
+      if (restaurantId) {
+        invoicesQuery += ` AND i.restaurant_id = $2`
+        params.push(restaurantId)
+      } else if (supplierId) {
+        invoicesQuery += ` AND i.supplier_id = $2`
+        params.push(supplierId)
+      }
 
-    invoicesQuery += `
+      invoicesQuery += `
       GROUP BY i.id, s.name
       ORDER BY i.invoice_date DESC
-    `;
+    `
 
-    const { rows } = await query(invoicesQuery, params);
+      const { rows } = await query(invoicesQuery, params)
 
-    res.json({
-      ok: true,
-      data: { invoices: rows },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error('Get invoices by order error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get invoices',
-      },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { invoices: rows },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get invoices by order error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get invoices',
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Get invoice by ID with line items
-router.get('/invoices/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params;
+router.get(
+  '/invoices/:id',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
+  async (req, res) => {
+    try {
+      const { id } = req.params
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
+      const restaurantId = restaurants[0].id
 
-    // Get invoice
-    const { rows: invoices } = await query(`
+      // Get invoice
+      const { rows: invoices } = await query(
+        `
       SELECT 
         i.*,
         s.name as supplier_name,
@@ -283,21 +314,27 @@ router.get('/invoices/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), a
       LEFT JOIN payment p ON p.invoice_id = i.id
       WHERE i.id = $1 AND i.restaurant_id = $2
       GROUP BY i.id, s.name, s.slug, s.address_json, s.phone, s.contact_email, o.id, o.status, o.placed_at
-    `, [id, restaurantId]);
+    `,
+        [id, restaurantId]
+      )
 
-    if (invoices.length === 0) {
-      throw new NotFoundError('Invoice not found');
-    }
+      if (invoices.length === 0) {
+        throw new NotFoundError('Invoice not found')
+      }
 
-    // Get line items
-    const { rows: lineItems } = await query(`
+      // Get line items
+      const { rows: lineItems } = await query(
+        `
       SELECT * FROM invoice_line_item 
       WHERE invoice_id = $1 
       ORDER BY created_at
-    `, [id]);
+    `,
+        [id]
+      )
 
-    // Get payment history
-    const { rows: payments } = await query(`
+      // Get payment history
+      const { rows: payments } = await query(
+        `
       SELECT 
         p.*,
         pm.name as recorded_by_name
@@ -305,51 +342,62 @@ router.get('/invoices/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), a
       LEFT JOIN app_user pm ON pm.id::text = p.recorded_by
       WHERE p.invoice_id = $1
       ORDER BY p.payment_date DESC, p.created_at DESC
-    `, [id]);
+    `,
+        [id]
+      )
 
-    res.json({
-      ok: true,
-      data: {
-        invoice: invoices[0],
-        lineItems,
-        payments,
-      },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    if (error instanceof NotFoundError) {
-      return res.status(404).json({
+      res.json({
+        ok: true,
+        data: {
+          invoice: invoices[0],
+          lineItems,
+          payments,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error({
+        message: 'Get invoice error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
         ok: false,
         data: null,
-        error: { name: 'NOT_FOUND', message: error.message },
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get invoice',
+          details: error.message,
+        },
         requestId: req.requestId,
-      });
+      })
     }
-
-    logger.error({
-      message: 'Get invoice error',
-      error: error.message,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get invoice',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    });
   }
-});
+)
 
 // Enhanced payment schema with partial payment and credit/debit support
 const paymentSchemaEnhanced = z.object({
   paymentAmount: z.number().positive().optional(), // Optional - defaults to full balance if not provided
   paymentDate: z.string(),
-  paymentMethod: z.enum(['CASH', 'CHECK', 'BANK_TRANSFER', 'CREDIT_CARD', 'ACH', 'STRIPE', 'OTHER']),
+  paymentMethod: z.enum([
+    'CASH',
+    'CHECK',
+    'BANK_TRANSFER',
+    'CREDIT_CARD',
+    'ACH',
+    'STRIPE',
+    'OTHER',
+  ]),
   paymentReference: z.string().optional(),
   bankName: z.string().optional(),
   provider: z.string().optional(),
@@ -361,254 +409,295 @@ const paymentSchemaEnhanced = z.object({
   // HQ Payment support
   paidByHQ: z.boolean().optional().default(false),
   hqNotes: z.string().optional(),
-});
+})
 
 // Mark invoice as paid (with partial payment, credits, and HQ support)
-router.post('/invoices/:id/pay', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const paymentData = paymentSchemaEnhanced.parse(req.body);
+router.post(
+  '/invoices/:id/pay',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('PAYMENTS_MANAGE'),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const paymentData = paymentSchemaEnhanced.parse(req.body)
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
+      const restaurantId = restaurants[0].id
 
-    // Get invoice and check ownership
-    const { rows: invoices } = await query(`
+      // Get invoice and check ownership
+      const { rows: invoices } = await query(
+        `
       SELECT * FROM invoice 
       WHERE id = $1 AND restaurant_id = $2
-    `, [id, restaurantId]);
+    `,
+        [id, restaurantId]
+      )
 
-    if (invoices.length === 0) {
-      throw new NotFoundError('Invoice not found');
-    }
+      if (invoices.length === 0) {
+        throw new NotFoundError('Invoice not found')
+      }
 
-    const invoice = invoices[0];
+      const invoice = invoices[0]
 
-    // Calculate remaining balance and available credits
-    const { rows: payments } = await query(`
+      // Calculate remaining balance and available credits
+      const { rows: payments } = await query(
+        `
       SELECT COALESCE(SUM(payment_amount), 0) as total_paid
       FROM payment
       WHERE invoice_id = $1 AND status = 'COMPLETED'
-    `, [id]);
+    `,
+        [id]
+      )
 
-    const totalPaid = parseFloat(payments[0].total_paid || 0);
-    const remainingBalance = parseFloat(invoice.total_amount) - totalPaid;
+      const totalPaid = parseFloat(payments[0].total_paid || 0)
+      const remainingBalance = parseFloat(invoice.total_amount) - totalPaid
 
-    // Get available credit notes for this restaurant-supplier relationship
-    let creditAmount = parseFloat(paymentData.creditAmount || 0);
-    let creditNoteId = paymentData.creditNoteId || null;
+      // Get available credit notes for this restaurant-supplier relationship
+      let creditAmount = parseFloat(paymentData.creditAmount || 0)
+      let creditNoteId = paymentData.creditNoteId || null
 
-    if (creditAmount > 0 && creditNoteId) {
-      // Validate credit note exists and belongs to restaurant
-      const { rows: creditNotes } = await query(`
+      if (creditAmount > 0 && creditNoteId) {
+        // Validate credit note exists and belongs to restaurant
+        const { rows: creditNotes } = await query(
+          `
         SELECT * FROM credit_note 
         WHERE id = $1 AND restaurant_id = $2 AND supplier_id = $3
           AND status = 'ISSUED' AND remaining_amount > 0
-      `, [creditNoteId, restaurantId, invoice.supplier_id]);
+      `,
+          [creditNoteId, restaurantId, invoice.supplier_id]
+        )
 
-      if (creditNotes.length === 0) {
-        throw new ValidationError('Invalid or unavailable credit note');
+        if (creditNotes.length === 0) {
+          throw new ValidationError('Invalid or unavailable credit note')
+        }
+
+        const creditNote = creditNotes[0]
+        const availableCredit = parseFloat(creditNote.remaining_amount || 0)
+
+        if (creditAmount > availableCredit) {
+          throw new ValidationError(
+            `Credit amount (${creditAmount}) exceeds available credit (${availableCredit})`
+          )
+        }
       }
 
-      const creditNote = creditNotes[0];
-      const availableCredit = parseFloat(creditNote.remaining_amount || 0);
-      
-      if (creditAmount > availableCredit) {
-        throw new ValidationError(`Credit amount (${creditAmount}) exceeds available credit (${availableCredit})`);
+      // Determine payment amount
+      let paymentAmount = paymentData.paymentAmount
+      if (!paymentAmount || paymentAmount === 0) {
+        // Default to full remaining balance
+        paymentAmount = remainingBalance
       }
-    }
 
-    // Determine payment amount
-    let paymentAmount = paymentData.paymentAmount;
-    if (!paymentAmount || paymentAmount === 0) {
-      // Default to full remaining balance
-      paymentAmount = remainingBalance;
-    }
+      // Total payment (cash + credit)
+      const totalPaymentWithCredit = paymentAmount + creditAmount
 
-    // Total payment (cash + credit)
-    const totalPaymentWithCredit = paymentAmount + creditAmount;
+      if (totalPaymentWithCredit > remainingBalance) {
+        throw new ValidationError(
+          `Total payment amount (${totalPaymentWithCredit}) exceeds remaining balance (${remainingBalance})`
+        )
+      }
 
-    if (totalPaymentWithCredit > remainingBalance) {
-      throw new ValidationError(`Total payment amount (${totalPaymentWithCredit}) exceeds remaining balance (${remainingBalance})`);
-    }
+      if (paymentAmount <= 0 && creditAmount <= 0) {
+        throw new ValidationError('Payment amount must be greater than 0')
+      }
 
-    if (paymentAmount <= 0 && creditAmount <= 0) {
-      throw new ValidationError('Payment amount must be greater than 0');
-    }
+      // Generate payment number
+      const paymentNumber = `PAY-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-6)}`
 
-    // Generate payment number
-    const paymentNumber = `PAY-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-6)}`;
-
-    // Use transaction for atomicity
-    const result = await withTransaction(async (client) => {
-      // Create payment record (only if cash payment > 0)
-      let payment = null;
-      if (paymentAmount > 0) {
-        const { rows: paymentRows } = await client.query(`
+      // Use transaction for atomicity
+      const result = await withTransaction(async (client) => {
+        // Create payment record (only if cash payment > 0)
+        let payment = null
+        if (paymentAmount > 0) {
+          const { rows: paymentRows } = await client.query(
+            `
           INSERT INTO payment (
             invoice_id, payment_number, payment_date, payment_amount,
             payment_method, payment_reference, currency, status,
             recorded_by, notes, bank_name, provider, provider_transaction_id
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
           RETURNING *
-        `, [
-          id,
-          paymentNumber,
-          paymentData.paymentDate,
-          paymentAmount,
-          paymentData.paymentMethod,
-          paymentData.paymentReference || null,
-          invoice.currency,
-          'COMPLETED',
-          req.userData.id,
-          paymentData.notes || (paymentData.paidByHQ ? `Payment made by HQ${paymentData.hqNotes ? `: ${paymentData.hqNotes}` : ''}` : null),
-          paymentData.bankName || null,
-          paymentData.provider || null,
-          paymentData.providerTransactionId || null,
-        ]);
+        `,
+            [
+              id,
+              paymentNumber,
+              paymentData.paymentDate,
+              paymentAmount,
+              paymentData.paymentMethod,
+              paymentData.paymentReference || null,
+              invoice.currency,
+              'COMPLETED',
+              req.userData.id,
+              paymentData.notes ||
+                (paymentData.paidByHQ
+                  ? `Payment made by HQ${paymentData.hqNotes ? `: ${paymentData.hqNotes}` : ''}`
+                  : null),
+              paymentData.bankName || null,
+              paymentData.provider || null,
+              paymentData.providerTransactionId || null,
+            ]
+          )
 
-        payment = paymentRows[0];
-      }
+          payment = paymentRows[0]
+        }
 
-      // Apply credit note if provided
-      if (creditAmount > 0 && creditNoteId) {
-        // Update credit note to mark as applied
-        await client.query(`
+        // Apply credit note if provided
+        if (creditAmount > 0 && creditNoteId) {
+          // Update credit note to mark as applied
+          await client.query(
+            `
           UPDATE credit_note
           SET applied_amount = applied_amount + $1,
               remaining_amount = remaining_amount - $1,
               status = CASE WHEN remaining_amount - $1 <= 0 THEN 'APPLIED' ELSE 'ISSUED' END,
               updated_at = now()
           WHERE id = $2
-        `, [creditAmount, creditNoteId]);
+        `,
+            [creditAmount, creditNoteId]
+          )
 
-        // Create a payment record for the credit (with special method)
-        const creditPaymentNumber = `CREDIT-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-6)}`;
-        await client.query(`
+          // Create a payment record for the credit (with special method)
+          const creditPaymentNumber = `CREDIT-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-6)}`
+          await client.query(
+            `
           INSERT INTO payment (
             invoice_id, payment_number, payment_date, payment_amount,
             payment_method, currency, status,
             recorded_by, notes, payment_reference
           ) VALUES ($1, $2, $3, $4, 'OTHER', $5, 'COMPLETED', $6, $7, $8)
-        `, [
-          id,
-          creditPaymentNumber,
-          paymentData.paymentDate,
-          creditAmount,
-          invoice.currency,
-          req.userData.id,
-          `Credit note applied: ${creditNoteId}`,
-          creditNoteId,
-        ]);
+        `,
+            [
+              id,
+              creditPaymentNumber,
+              paymentData.paymentDate,
+              creditAmount,
+              invoice.currency,
+              req.userData.id,
+              `Credit note applied: ${creditNoteId}`,
+              creditNoteId,
+            ]
+          )
+        }
+
+        // Get updated invoice
+        const { rows: updatedInvoice } = await client.query(
+          `
+        SELECT * FROM invoice WHERE id = $1
+      `,
+          [id]
+        )
+
+        return { payment, updatedInvoice: updatedInvoice[0] }
+      })
+
+      logger.info('Enhanced payment recorded', {
+        invoiceId: id,
+        paymentId: result.payment?.id || 'credit-only',
+        cashAmount: paymentAmount,
+        creditAmount: creditAmount,
+        totalPayment: totalPaymentWithCredit,
+        paidByHQ: paymentData.paidByHQ,
+        actor: req.userData.id,
+      })
+
+      res.json({
+        ok: true,
+        data: {
+          payment: result.payment,
+          creditApplied: creditAmount > 0 ? { amount: creditAmount, creditNoteId } : null,
+          invoice: result.updatedInvoice,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
       }
 
-      // Get updated invoice
-      const { rows: updatedInvoice } = await client.query(`
-        SELECT * FROM invoice WHERE id = $1
-      `, [id]);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid payment data',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
 
-      return { payment, updatedInvoice: updatedInvoice[0] };
-    });
-
-    logger.info('Enhanced payment recorded', {
-      invoiceId: id,
-      paymentId: result.payment?.id || 'credit-only',
-      cashAmount: paymentAmount,
-      creditAmount: creditAmount,
-      totalPayment: totalPaymentWithCredit,
-      paidByHQ: paymentData.paidByHQ,
-      actor: req.userData.id,
-    });
-
-    res.json({
-      ok: true,
-      data: { 
-        payment: result.payment,
-        creditApplied: creditAmount > 0 ? { amount: creditAmount, creditNoteId } : null,
-        invoice: result.updatedInvoice,
-      },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    if (error instanceof NotFoundError) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: error.message },
-        requestId: req.requestId,
-      });
-    }
-
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      logger.error({
+        message: 'Enhanced payment error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid payment data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to record payment',
+          details: error.message,
         },
         requestId: req.requestId,
-      });
+      })
     }
-
-    logger.error({
-      message: 'Enhanced payment error',
-      error: error.message,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to record payment',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    });
   }
-});
+)
 
 // Get available credit notes for a supplier (for invoice payment)
-router.get('/invoices/:id/credits', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params;
+router.get(
+  '/invoices/:id/credits',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { id } = req.params
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
+      const restaurantId = restaurants[0].id
 
-    // Get invoice to get supplier_id
-    const { rows: invoices } = await query(`
+      // Get invoice to get supplier_id
+      const { rows: invoices } = await query(
+        `
       SELECT supplier_id FROM invoice 
       WHERE id = $1 AND restaurant_id = $2
-    `, [id, restaurantId]);
+    `,
+        [id, restaurantId]
+      )
 
-    if (invoices.length === 0) {
-      throw new NotFoundError('Invoice not found');
-    }
+      if (invoices.length === 0) {
+        throw new NotFoundError('Invoice not found')
+      }
 
-    const supplierId = invoices[0].supplier_id;
+      const supplierId = invoices[0].supplier_id
 
-    // Get available credit notes
-    const { rows: creditNotes } = await query(`
+      // Get available credit notes
+      const { rows: creditNotes } = await query(
+        `
       SELECT 
         id, credit_note_number, issue_date, credit_amount,
         applied_amount, remaining_amount, reason, description,
@@ -618,48 +707,61 @@ router.get('/invoices/:id/credits', requireAuth, requireRole(['RESTAURANT', 'ADM
         AND status = 'ISSUED' AND remaining_amount > 0
         AND (expires_at IS NULL OR expires_at >= CURRENT_DATE)
       ORDER BY issue_date DESC
-    `, [restaurantId, supplierId]);
+    `,
+        [restaurantId, supplierId]
+      )
 
-    res.json({
-      ok: true,
-      data: { creditNotes },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error('Get credit notes error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get credit notes',
-      },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { creditNotes },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get credit notes error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get credit notes',
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Get comprehensive invoice analytics for restaurant
-router.get('/invoices/analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { period = '30' } = req.query;
+router.get(
+  '/invoices/analytics',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
+  requireFeature(
+    'reports',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res) => {
+    try {
+      const { period = '30' } = req.query
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
+      const restaurantId = restaurants[0].id
 
-    const periodDays = parseInt(period) || 30;
-    
-    // Get comprehensive analytics
-    const { rows: analytics } = await query(`
+      const periodDays = parseInt(period) || 30
+
+      // Get comprehensive analytics
+      const { rows: analytics } = await query(
+        `
       SELECT 
         COUNT(*) FILTER (WHERE i.status = 'ISSUED') as issued_count,
         COUNT(*) FILTER (WHERE i.status = 'PARTIALLY_PAID') as partial_count,
@@ -678,44 +780,52 @@ router.get('/invoices/analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN
       FROM invoice i
       WHERE i.restaurant_id = $1
         AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
-    `, [restaurantId, periodDays]);
+    `,
+        [restaurantId, periodDays]
+      )
 
-    return res.json({
-      ok: true,
-      data: { analytics: analytics[0] || {} },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.warn('Invoice analytics unavailable, returning empty analytics:', error.message);
-    return res.json({
-      ok: true,
-      data: { analytics: {} },
-      error: null,
-      requestId: req.requestId,
-    });
+      return res.json({
+        ok: true,
+        data: { analytics: analytics[0] || {} },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.warn('Invoice analytics unavailable, returning empty analytics:', error.message)
+      return res.json({
+        ok: true,
+        data: { analytics: {} },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Get account statement for a supplier
-router.get('/suppliers/:supplierId/statement', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { supplierId } = req.params;
-    const { startDate, endDate } = req.query;
+router.get(
+  '/suppliers/:supplierId/statement',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { supplierId } = req.params
+      const { startDate, endDate } = req.query
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
+      const restaurantId = restaurants[0].id
 
-    // Get statement data
-    const { rows: invoices } = await query(`
+      // Get statement data
+      const { rows: invoices } = await query(
+        `
       SELECT 
         i.*,
         s.name as supplier_name,
@@ -728,71 +838,79 @@ router.get('/suppliers/:supplierId/statement', requireAuth, requireRole(['RESTAU
         ${endDate ? `AND i.invoice_date <= $${startDate ? 4 : 3}` : ''}
       GROUP BY i.id, s.name
       ORDER BY i.invoice_date ASC
-    `, [restaurantId, supplierId, startDate, endDate].filter(Boolean));
+    `,
+        [restaurantId, supplierId, startDate, endDate].filter(Boolean)
+      )
 
-    // Calculate summary
-    const summary = {
-      openingBalance: 0, // TODO: Calculate from previous period
-      totalCharges: 0,
-      totalPayments: 0,
-      totalAdjustments: 0,
-      closingBalance: 0,
-      invoiceCount: invoices.length,
-    };
+      // Calculate summary
+      const summary = {
+        openingBalance: 0, // TODO: Calculate from previous period
+        totalCharges: 0,
+        totalPayments: 0,
+        totalAdjustments: 0,
+        closingBalance: 0,
+        invoiceCount: invoices.length,
+      }
 
-    invoices.forEach(inv => {
-      summary.totalCharges += parseFloat(inv.total_amount || 0);
-      summary.totalPayments += parseFloat(inv.total_paid || 0);
-    });
+      invoices.forEach((inv) => {
+        summary.totalCharges += parseFloat(inv.total_amount || 0)
+        summary.totalPayments += parseFloat(inv.total_paid || 0)
+      })
 
-    summary.closingBalance = summary.openingBalance + summary.totalCharges - summary.totalPayments + summary.totalAdjustments;
+      summary.closingBalance =
+        summary.openingBalance +
+        summary.totalCharges -
+        summary.totalPayments +
+        summary.totalAdjustments
 
-    res.json({
-      ok: true,
-      data: {
-        invoices,
-        summary,
-      },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error({
-      message: 'Get statement error',
-      error: error.message,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get statement',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: {
+          invoices,
+          summary,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Get statement error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get statement',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Get monthly expense breakdown
 router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { period = '30' } = req.query;
+    const { period = '30' } = req.query
 
     const { rows: restaurants } = await query(
       'SELECT id FROM restaurant WHERE contact_email = $1',
       [req.userData.email]
-    );
+    )
 
     if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
+      throw new ValidationError('Restaurant not found')
     }
 
-    const restaurantId = restaurants[0].id;
+    const restaurantId = restaurants[0].id
 
     // Get expense breakdown by supplier
-    const { rows: bySupplier } = await query(`
+    const { rows: bySupplier } = await query(
+      `
       SELECT 
         s.id as supplier_id,
         s.name as supplier_name,
@@ -807,10 +925,13 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         AND i.invoice_date >= NOW() - INTERVAL '${period} days'
       GROUP BY s.id, s.name
       ORDER BY total_spent DESC
-    `, [restaurantId]);
+    `,
+      [restaurantId]
+    )
 
     // Get expense breakdown by category (from products)
-    const { rows: byCategory } = await query(`
+    const { rows: byCategory } = await query(
+      `
       SELECT 
         COALESCE(p.category, 'Uncategorized') as category,
         SUM(ili.quantity * ili.unit_price) as total_spent
@@ -821,10 +942,13 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         AND i.invoice_date >= NOW() - INTERVAL '${period} days'
       GROUP BY p.category
       ORDER BY total_spent DESC
-    `, [restaurantId]);
+    `,
+      [restaurantId]
+    )
 
     // Get monthly trend
-    const { rows: monthlyTrend } = await query(`
+    const { rows: monthlyTrend } = await query(
+      `
       SELECT 
         DATE_TRUNC('month', i.invoice_date) as month,
         COUNT(i.id) as invoice_count,
@@ -834,7 +958,9 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         AND i.invoice_date >= NOW() - INTERVAL '12 months'
       GROUP BY DATE_TRUNC('month', i.invoice_date)
       ORDER BY month ASC
-    `, [restaurantId]);
+    `,
+      [restaurantId]
+    )
 
     res.json({
       ok: true,
@@ -846,13 +972,13 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
       },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     logger.error({
       message: 'Get expenses error',
       error: error.message,
       stack: error.stack,
-    });
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -862,30 +988,40 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Get overdue payments and alerts
-router.get('/overdue', requireAuth, requireRole(['RESTAURANT', 'ADMIN', 'SUPPLIER']), async (req, res) => {
-  try {
-    // If the caller is not a restaurant/admin, return empty (avoid UI 403s)
-    if (req.userData.role && !['RESTAURANT', 'ADMIN'].includes(req.userData.role)) {
-      return res.json({ ok: true, data: { invoices: [], summary: { count: 0, totalOverdue: 0 } }, error: null, requestId: req.requestId });
-    }
+router.get(
+  '/overdue',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN', 'SUPPLIER']),
+  async (req, res) => {
+    try {
+      // If the caller is not a restaurant/admin, return empty (avoid UI 403s)
+      if (req.userData.role && !['RESTAURANT', 'ADMIN'].includes(req.userData.role)) {
+        return res.json({
+          ok: true,
+          data: { invoices: [], summary: { count: 0, totalOverdue: 0 } },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      if (restaurants.length === 0) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
+      const restaurantId = restaurants[0].id
 
-    const { rows: overdue } = await query(`
+      const { rows: overdue } = await query(
+        `
       SELECT 
         i.*,
         s.name as supplier_name,
@@ -901,43 +1037,43 @@ router.get('/overdue', requireAuth, requireRole(['RESTAURANT', 'ADMIN', 'SUPPLIE
         AND i.due_date < CURRENT_DATE
         AND i.total_amount > i.paid_amount
       ORDER BY days_overdue DESC, amount_due DESC
-    `, [restaurantId]);
+    `,
+        [restaurantId]
+      )
 
-    // Calculate total overdue amount
-    const totalOverdue = overdue.reduce((sum, inv) => 
-      sum + parseFloat(inv.amount_due || 0), 0
-    );
+      // Calculate total overdue amount
+      const totalOverdue = overdue.reduce((sum, inv) => sum + parseFloat(inv.amount_due || 0), 0)
 
-    res.json({
-      ok: true,
-      data: {
-        invoices: overdue,
-        summary: {
-          count: overdue.length,
-          totalOverdue,
+      res.json({
+        ok: true,
+        data: {
+          invoices: overdue,
+          summary: {
+            count: overdue.length,
+            totalOverdue,
+          },
         },
-      },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error({
-      message: 'Get overdue error',
-      error: error.message,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get overdue invoices',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    });
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Get overdue error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get overdue invoices',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
-export { router as restaurantFinanceRoutes };
-
+export { router as restaurantFinanceRoutes }

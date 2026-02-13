@@ -151,10 +151,14 @@ router.get('/overview', async (req, res) => {
 // ========================================
 router.get('/plans', async (req, res) => {
   try {
-    const { rows: plans } = await query(`
-      SELECT * FROM subscription_plan
-      ORDER BY display_order, name
-    `)
+    const tenantType = req.query.tenant_type // 'RESTAURANT' | 'SUPPLIER' | omit = all
+    const plansQuery =
+      tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType)
+        ? `SELECT * FROM subscription_plan WHERE tenant_type = $1 ORDER BY display_order, name`
+        : `SELECT * FROM subscription_plan ORDER BY tenant_type, display_order, name`
+    const plansParams =
+      tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType) ? [tenantType] : []
+    const { rows: plans } = await query(plansQuery, plansParams)
 
     res.json({
       ok: true,
@@ -162,7 +166,7 @@ router.get('/plans', async (req, res) => {
         plans: plans.map((p) => ({
           ...p,
           limits: p.limits || {},
-          features: p.features || [],
+          features: typeof p.features === 'object' && p.features !== null ? p.features : {},
         })),
       },
       error: null,
@@ -180,12 +184,17 @@ router.get('/plans', async (req, res) => {
 })
 
 const createPlanSchema = z.object({
+  code: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9_]+$/, 'code must be lowercase alphanumeric + underscore'),
   name: z.string().min(1),
+  tenantType: z.enum(['RESTAURANT', 'SUPPLIER']),
   description: z.string().optional(),
   pricePerMonth: z.number().nonnegative(),
   pricePerYear: z.number().nonnegative().optional(),
   limits: z.record(z.any()),
-  features: z.array(z.string()),
+  features: z.record(z.any()),
   trialDays: z.number().nonnegative().default(0),
   displayOrder: z.number().default(0),
   isActive: z.boolean().default(true),
@@ -194,24 +203,28 @@ const createPlanSchema = z.object({
 router.post('/plans', async (req, res) => {
   try {
     const planData = createPlanSchema.parse(req.body)
+    const planType = planData.tenantType === 'RESTAURANT' ? 'restaurant_only' : 'supplier_only'
 
     const {
       rows: [plan],
     } = await query(
       `
       INSERT INTO subscription_plan (
-        name, description, price_per_month, price_per_year,
+        code, name, tenant_type, type, description, price_per_month, price_per_year,
         limits, features, trial_days, display_order, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `,
       [
+        planData.code.toLowerCase(),
         planData.name,
+        planData.tenantType,
+        planType,
         planData.description || null,
         planData.pricePerMonth,
         planData.pricePerYear || null,
-        JSON.stringify(planData.limits),
-        JSON.stringify(planData.features),
+        JSON.stringify(planData.limits || {}),
+        JSON.stringify(planData.features || {}),
         planData.trialDays,
         planData.displayOrder,
         planData.isActive,
@@ -261,7 +274,7 @@ const updatePlanSchema = z.object({
   pricePerMonth: z.number().nonnegative().optional(),
   pricePerYear: z.number().nonnegative().optional(),
   limits: z.record(z.any()).optional(),
-  features: z.array(z.string()).optional(),
+  features: z.record(z.any()).optional(),
   trialDays: z.number().nonnegative().optional(),
   displayOrder: z.number().optional(),
   isActive: z.boolean().optional(),
@@ -469,17 +482,36 @@ router.patch('/subscriptions/:id', async (req, res) => {
     let paramIndex = 1
 
     if (updateData.planId) {
+      const { rows: planRows } = await query(
+        'SELECT id, name, tenant_type FROM subscription_plan WHERE id = $1',
+        [updateData.planId]
+      )
+      if (planRows.length === 0) {
+        res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Plan not found' },
+          requestId: req.requestId,
+        })
+        return
+      }
+      const newPlan = planRows[0]
+      if (newPlan.tenant_type !== existing.tenant_type) {
+        res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Plan tenant_type must match subscription tenant (Restaurant vs Supplier)',
+          },
+          requestId: req.requestId,
+        })
+        return
+      }
       updates.push(`plan_id = $${paramIndex++}`)
       values.push(updateData.planId)
-
-      // Get new plan name
-      const { rows: plans } = await query('SELECT name FROM subscription_plan WHERE id = $1', [
-        updateData.planId,
-      ])
-      if (plans.length > 0) {
-        updates.push(`plan_name = $${paramIndex++}`)
-        values.push(plans[0].name)
-      }
+      updates.push(`plan_name = $${paramIndex++}`)
+      values.push(newPlan.name)
     }
 
     if (updateData.status) {

@@ -964,8 +964,14 @@ export const api = createApi({
       query: () => '/api/admin-dashboard/overview',
       providesTags: ['Admin'],
     }),
-    getAdminPlans: builder.query<{ plans: SubscriptionPlan[] }, void>({
-      query: () => '/api/admin-dashboard/plans',
+    getAdminPlans: builder.query<
+      { plans: SubscriptionPlan[] },
+      { tenant_type?: 'RESTAURANT' | 'SUPPLIER' }
+    >({
+      query: (params) => ({
+        url: '/api/admin-dashboard/plans',
+        params: params ?? {},
+      }),
       providesTags: ['Admin'],
     }),
     createAdminPlan: builder.mutation<SubscriptionPlan, any>({

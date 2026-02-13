@@ -1,6 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import { requireFeature } from '../lib/subscription.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import {
@@ -472,24 +473,33 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
   }
 })
 
-router.get('/analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const params = analyticsQuerySchema.parse(req.query)
-    const restaurantId = await resolveRestaurantId(req.userData.email)
+router.get(
+  '/analytics',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'reports',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res) => {
+    try {
+      const params = analyticsQuerySchema.parse(req.query)
+      const restaurantId = await resolveRestaurantId(req.userData.email)
 
-    const rangeMultiplier = {
-      day: 1,
-      week: 7,
-      month: 30,
-    }
+      const rangeMultiplier = {
+        day: 1,
+        week: 7,
+        month: 30,
+      }
 
-    const daysBack = rangeMultiplier[params.range] || 7
-    const start = new Date()
-    start.setHours(0, 0, 0, 0)
-    start.setDate(start.getDate() - daysBack)
+      const daysBack = rangeMultiplier[params.range] || 7
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+      start.setDate(start.getDate() - daysBack)
 
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
           SELECT
             date_trunc('hour', scheduled_at) AS hour_slot,
             COUNT(*) FILTER (WHERE status = 'CONFIRMED') AS confirmed,
@@ -503,40 +513,41 @@ router.get('/analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asyn
           GROUP BY hour_slot
           ORDER BY hour_slot
         `,
-      params.branchId
-        ? [restaurantId, start.toISOString(), params.branchId]
-        : [restaurantId, start.toISOString()]
-    )
+        params.branchId
+          ? [restaurantId, start.toISOString(), params.branchId]
+          : [restaurantId, start.toISOString()]
+      )
 
-    const { rows: waitlistRows } = await query(
-      `
+      const { rows: waitlistRows } = await query(
+        `
           SELECT status, COUNT(*) AS total
           FROM reservation_waitlist
           WHERE restaurant_id = $1
           GROUP BY status
         `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
 
-    res.json({
-      ok: true,
-      data: {
-        periodStart: start,
-        slots: rows,
-        waitlist: waitlistRows,
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Reservation analytics error', { error: error.message })
-    res.status(400).json({
-      ok: false,
-      data: null,
-      error: { name: 'ANALYTICS_ERROR', message: error.message },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: {
+          periodStart: start,
+          slots: rows,
+          waitlist: waitlistRows,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Reservation analytics error', { error: error.message })
+      res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'ANALYTICS_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 export { router as reservationsRoutes }
