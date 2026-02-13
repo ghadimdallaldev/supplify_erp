@@ -60,6 +60,16 @@ erDiagram
     jsonb payload
     timestamptz created_at
   }
+  restaurant {
+    uuid id PK
+    text name
+    text status
+  }
+  supplier {
+    uuid id PK
+    text name
+    text status
+  }
   invoice {
     uuid id PK
     uuid restaurant_id FK
@@ -69,15 +79,200 @@ erDiagram
     text status
     date due_date
   }
+  invoice_line_item {
+    uuid id PK
+    uuid invoice_id FK
+    uuid product_id FK
+    numeric quantity
+    numeric unit_price
+  }
+  payment {
+    uuid id PK
+    uuid invoice_id FK
+    numeric amount
+    text status
+    timestamptz created_at
+  }
   customer_order {
     uuid id PK
     uuid restaurant_id FK
     text status
   }
+  order_item {
+    uuid id PK
+    uuid customer_order_id FK
+    uuid product_id FK
+    numeric quantity
+  }
+  product {
+    uuid id PK
+    uuid supplier_id FK
+    text name
+    text sku
+  }
+  price {
+    uuid id PK
+    uuid product_id FK
+    uuid restaurant_id FK
+    numeric unit_price
+  }
+  inventory {
+    uuid id PK
+    uuid product_id FK
+    uuid warehouse_id FK
+    int quantity
+    int reserved_qty
+  }
+  restaurant_inventory {
+    uuid id PK
+    uuid restaurant_id FK
+    uuid product_id FK
+    numeric par_level
+    numeric current_qty
+  }
+  warehouse {
+    uuid id PK
+    uuid supplier_id FK
+    text name
+  }
+  branch {
+    uuid id PK
+    uuid restaurant_id FK
+    text name
+  }
   app_user {
     uuid id PK
     text role
   }
+  role {
+    uuid id PK
+    text name
+    text tenant_type
+  }
+  permission {
+    uuid id PK
+    text code
+  }
+  role_permission {
+    uuid role_id FK
+    uuid permission_id FK
+  }
+  user_role {
+    uuid app_user_id FK
+    uuid role_id FK
+    uuid tenant_id FK
+  }
+  conversation {
+    uuid id PK
+    uuid restaurant_id FK
+    uuid supplier_id FK
+  }
+  message {
+    uuid id PK
+    uuid conversation_id FK
+    uuid sender_id FK
+    text body
+    timestamptz created_at
+  }
+  reservation {
+    uuid id PK
+    uuid restaurant_id FK
+    uuid branch_id FK
+    text guest_name
+    text status
+    timestamptz slot_at
+  }
+  reservation_table {
+    uuid id PK
+    uuid branch_id FK
+    text name
+    int capacity
+  }
+  staff_member {
+    uuid id PK
+    uuid restaurant_id FK
+    uuid app_user_id FK
+  }
+  staff_shift {
+    uuid id PK
+    uuid staff_member_id FK
+    timestamptz start_at
+    timestamptz end_at
+  }
+  quick_list {
+    uuid id PK
+    uuid restaurant_id FK
+    text name
+  }
+  quick_list_item {
+    uuid id PK
+    uuid quick_list_id FK
+    uuid product_id FK
+    numeric quantity
+  }
+  receiving_report {
+    uuid id PK
+    uuid customer_order_id FK
+    uuid restaurant_id FK
+    text status
+  }
+  receiving_line_item {
+    uuid id PK
+    uuid receiving_report_id FK
+    uuid order_item_id FK
+    numeric received_qty
+  }
+  attachment {
+    uuid id PK
+    text file_name
+    text storage_key
+    int file_size
+  }
+  notification_preferences {
+    uuid id PK
+    uuid app_user_id FK
+    jsonb channels
+  }
+  delivery_wave {
+    uuid id PK
+    uuid supplier_id FK
+    text status
+  }
+  pick_list {
+    uuid id PK
+    uuid delivery_wave_id FK
+    uuid customer_order_id FK
+  }
 
   subscription }o--|| restaurant : "tenant"
   subscription }o--|| supplier : "tenant"
+  restaurant ||--o{ customer_order : "places"
+  supplier ||--o{ product : "sells"
+  product ||--o{ price : "priced for"
+  product ||--o{ inventory : "stock"
+  product ||--o{ order_item : "line"
+  customer_order ||--o{ order_item : "contains"
+  customer_order ||--o| receiving_report : "received via"
+  receiving_report ||--o{ receiving_line_item : "lines"
+  invoice ||--o{ invoice_line_item : "lines"
+  invoice ||--o{ payment : "payments"
+  restaurant ||--o{ branch : "has"
+  supplier ||--o{ warehouse : "has"
+  warehouse ||--o{ inventory : "holds"
+  restaurant ||--o{ restaurant_inventory : "par levels"
+  restaurant ||--o{ quick_list : "has"
+  quick_list ||--o{ quick_list_item : "items"
+  restaurant ||--o{ reservation : "has"
+  branch ||--o{ reservation : "at"
+  branch ||--o{ reservation_table : "tables"
+  restaurant ||--o{ staff_member : "employs"
+  app_user ||--o| staff_member : "linked"
+  staff_member ||--o{ staff_shift : "shifts"
+  conversation ||--o{ message : "messages"
+  restaurant }o--o{ conversation : "party"
+  supplier }o--o{ conversation : "party"
+  app_user ||--o{ user_role : "has"
+  role ||--o{ role_permission : "grants"
+  user_role }o--|| role : "role"
+  delivery_wave ||--o{ pick_list : "picks"
+  customer_order ||--o| pick_list : "fulfilled by"

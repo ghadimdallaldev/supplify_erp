@@ -5,7 +5,12 @@ flowchart TB
     Admin[Admin Users]
   end
 
-  subgraph Supplify["Supplify"]
+  subgraph Public[" Public (unauthenticated) "]
+    Guest[Reservation Guests\n/reserve book, confirm, manage]
+    StaffPortal[Staff Self-Service\nPTO, swap, dashboard via link]
+  end
+
+  subgraph Supplify[" Supplify "]
     Web[Web App]
     API[API Server]
   end
@@ -18,6 +23,8 @@ flowchart TB
   Restaurant --> Web
   Supplier --> Web
   Admin --> Web
+  Guest --> Web
+  StaffPortal --> Web
   Web --> API
   Web --> Keycloak
   API --> Keycloak

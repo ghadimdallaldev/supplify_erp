@@ -20,12 +20,13 @@ Use **subgraphs** to group related nodes and **shorter labels** (path + one line
 
 ## Contents
 
-- **system_context.mmd** — System context (users, API, DB, Keycloak).
+- **system_context.mmd** — System context (users, public portals, API, DB, Keycloak).
 - **rbac_multitenancy.mmd** — Roles, tenant types, and permission model.
-- **erd_full.mmd** — Entity relationship overview (subscription, invoice, orders, etc.).
-- **api_architecture.mmd** — API route groups and auth flow.
+- **erd_full.mmd** — Entity relationship overview (subscription, orders, products, inventory, reservations, chat, staff, branches, warehouses, invoices, payments, etc.).
+- **api_architecture.mmd** — All API route groups (catalog, orders, inventory, tenants, billing, chat, notifications, reservations, staff, admin, public).
 - **deployment_architecture.mmd** — Deployment components.
+- **feature_overview.mmd** — Single map of every Supplify feature area (orders, cart, catalog, inventory, fulfillment, invoices, reservations, chat, staff, subscriptions, admin, files, notifications, analytics).
 - **folder_structure.md** — Repo folder layout.
 - **ui_sitemap/** — Restaurant, Supplier, Admin UI sitemaps.
-- **workflows/** — Order, invoice, inventory, reservation, subscription, admin, impersonation flows.
+- **workflows/** — Order (with checkout), invoice, inventory, reservation, subscription, admin, impersonation, receiving, chat, fulfillment flows.
 - **admin/** — Admin scope, RBAC matrix, endpoints.

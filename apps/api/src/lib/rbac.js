@@ -317,6 +317,41 @@ export function requireRole(allowedRoles) {
 }
 
 /**
+ * Assign default owner role to a user for a tenant when they have no roles.
+ * Idempotent: uses ON CONFLICT DO NOTHING.
+ * @param {string} userId - app_user.id
+ * @param {string} tenantId - restaurant or supplier id
+ * @param {string} tenantType - 'RESTAURANT' | 'SUPPLIER'
+ * @returns {Promise<boolean>} true if an insert was done (or already had role)
+ */
+export async function assignDefaultRoleForTenant(userId, tenantId, tenantType) {
+  const roleCode =
+    tenantType === 'RESTAURANT'
+      ? 'RESTAURANT_OWNER'
+      : tenantType === 'SUPPLIER'
+        ? 'SUPPLIER_OWNER'
+        : null
+  if (!roleCode) return false
+  try {
+    const { rowCount } = await query(
+      `
+      INSERT INTO user_role (user_id, role_id, tenant_id, tenant_type)
+      SELECT $1, r.id, $2::uuid, $3
+      FROM role r
+      WHERE r.code = $4 AND r.tenant_type = $3
+      ON CONFLICT (user_id, role_id, tenant_id, tenant_type) DO NOTHING
+    `,
+      [userId, tenantId, tenantType, roleCode]
+    )
+    return rowCount !== undefined
+  } catch (err) {
+    if (err.code === '42P01') return false // tables don't exist
+    logger.error('assignDefaultRoleForTenant error', { error: err.message })
+    return false
+  }
+}
+
+/**
  * Get the tenant (restaurant or supplier) for this request.
  * When admin is impersonating, returns the impersonated tenant.
  * Otherwise for RESTAURANT/SUPPLIER resolves by contact_email.
@@ -327,17 +362,21 @@ export async function getRequestTenant(req) {
   if (!req.userData) return null
   const effective = getEffectiveTenant(req)
   if (effective) return effective
+  const email = (req.userData.email || '').trim().toLowerCase()
+  if (!email) return null
   if (req.userData.role === 'SUPPLIER') {
-    const { rows } = await query('SELECT id, name FROM supplier WHERE contact_email = $1', [
-      req.userData.email,
-    ])
+    const { rows } = await query(
+      'SELECT id, name FROM supplier WHERE LOWER(TRIM(contact_email)) = $1',
+      [email]
+    )
     if (rows.length)
       return { tenantId: rows[0].id, tenantType: 'SUPPLIER', tenantName: rows[0].name || '' }
   }
   if (req.userData.role === 'RESTAURANT') {
-    const { rows } = await query('SELECT id, name FROM restaurant WHERE contact_email = $1', [
-      req.userData.email,
-    ])
+    const { rows } = await query(
+      'SELECT id, name FROM restaurant WHERE LOWER(TRIM(contact_email)) = $1',
+      [email]
+    )
     if (rows.length)
       return { tenantId: rows[0].id, tenantType: 'RESTAURANT', tenantName: rows[0].name || '' }
   }
@@ -389,12 +428,25 @@ export function resolveTenantContext(req, res, next) {
           requestId: req.requestId,
         })
       }
-      const roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
-      const permissions = await getPermissionsForUser(
+      let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+      let permissions = await getPermissionsForUser(
         req.userData.id,
         tenant.tenantId,
         tenant.tenantType
       )
+      // If tenant user has no role yet, assign default owner so permission checks succeed
+      if (
+        roles.length === 0 &&
+        (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER')
+      ) {
+        await assignDefaultRoleForTenant(req.userData.id, tenant.tenantId, tenant.tenantType)
+        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+        permissions = await getPermissionsForUser(
+          req.userData.id,
+          tenant.tenantId,
+          tenant.tenantType
+        )
+      }
       req.tenantContext = {
         tenantId: tenant.tenantId,
         tenantType: tenant.tenantType,

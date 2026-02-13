@@ -1,20 +1,57 @@
 flowchart TB
   subgraph Auth
-    AuthRoutes["/auth"]
+    AuthRoutes["/auth\nlogin, refresh, logout"]
     Cookie[Cookies: access_token, refresh_token]
     ImpersonationCookie[impersonation_token]
   end
 
   subgraph API["API Routes"]
-    Products["/api/products"]
-    Orders["/api/orders"]
-    Subscriptions["/api/subscriptions\nentitlements, current, usage, features"]
-    Suppliers["/api/suppliers"]
-    Restaurants["/api/restaurants"]
-    Chat["/api/chat"]
-    Invoices["/api/invoices"]
-    AdminDashboard["/api/admin-dashboard\noverview, plans, subscriptions\nhealth, financial-overview\nimpersonate, audit-logs\noverride-limit"]
-    Public["/api/public\nreservations, staff"]
+    subgraph Catalog[" Catalog & Pricing "]
+      Products["/api/products"]
+      Prices["/api/prices"]
+      RestaurantPricing["/api/restaurant-pricing\nmy-pricing"]
+    end
+    subgraph Orders[" Orders & Fulfillment "]
+      Orders["/api/orders"]
+      OrdersCalendar["/api/orders/calendar"]
+      QuickLists["/api/quick-lists"]
+    end
+    subgraph Inventory[" Inventory "]
+      Inventory["/api/inventory\nsupplier stock"]
+      RestaurantInventory["/api/restaurant-inventory\npar levels"]
+      Receiving["/api/receiving\nreceiving reports"]
+    end
+    subgraph Tenants[" Tenants & Links "]
+      Suppliers["/api/suppliers"]
+      Restaurants["/api/restaurants"]
+      Branches["/api/branches"]
+      Warehouses["/api/warehouses"]
+    end
+    subgraph Billing[" Billing & Finance "]
+      Invoices["/api/invoices"]
+      Payments["/api/payments"]
+      RestaurantFinance["/api/restaurant-finance\ninvoices, pay, analytics"]
+    end
+    subgraph Comms[" Comms & Notifications "]
+      Chat["/api/chat\nconversations, messages"]
+      Notifications["/api/notifications"]
+    end
+    subgraph App[" App & Settings "]
+      Subscriptions["/api/subscriptions\nentitlements, current, usage, features"]
+      Files["/api/files\nupload, storage_mb limit"]
+      RestaurantOnboarding["/api/restaurant-onboarding\nteam, invite, users limit"]
+    end
+    subgraph Reservations[" Reservations & Staff "]
+      Reservations["/api/reservations\nboard, tables"]
+      Staff["/api/staff\nmembers, shifts, PTO, swap"]
+    end
+    subgraph Admin[" Admin "]
+      AdminDashboard["/api/admin-dashboard\noverview, plans, subscriptions\ntenants, health, finance\nusage, audit, impersonate\noverride-limit"]
+      AdminLegacy["/api/admin\ndashboard, audit legacy"]
+    end
+    subgraph Public[" Public (no auth) "]
+      Public["/api/public\nreserve, book, confirm\nstaff link, session, PTO, swap"]
+    end
   end
 
   subgraph Middleware

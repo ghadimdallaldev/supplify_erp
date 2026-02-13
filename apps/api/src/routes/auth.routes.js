@@ -9,7 +9,7 @@ import {
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
 import { clearImpersonationCookie } from '../lib/impersonation.js'
-import { requireAuth, getRequestTenant } from '../lib/rbac.js'
+import { requireAuth, getRequestTenant, assignDefaultRoleForTenant } from '../lib/rbac.js'
 import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -129,17 +129,19 @@ router.get('/me', requireAuth, async (req, res) => {
     // Get additional user data based on role
     let additionalData = {}
 
-    if (user.role === 'SUPPLIER') {
-      const { rows: suppliers } = await query('SELECT * FROM supplier WHERE contact_email = $1', [
-        user.email,
-      ])
+    const emailLower = (user.email || '').trim().toLowerCase()
+    if (user.role === 'SUPPLIER' && emailLower) {
+      const { rows: suppliers } = await query(
+        'SELECT * FROM supplier WHERE LOWER(TRIM(contact_email)) = $1',
+        [emailLower]
+      )
       if (suppliers.length > 0) {
         additionalData.supplier = suppliers[0]
       }
-    } else if (user.role === 'RESTAURANT') {
+    } else if (user.role === 'RESTAURANT' && emailLower) {
       const { rows: restaurants } = await query(
-        'SELECT * FROM restaurant WHERE contact_email = $1',
-        [user.email]
+        'SELECT * FROM restaurant WHERE LOWER(TRIM(contact_email)) = $1',
+        [emailLower]
       )
       if (restaurants.length > 0) {
         additionalData.restaurant = restaurants[0]
@@ -155,6 +157,12 @@ router.get('/me', requireAuth, async (req, res) => {
     if (tenant) {
       tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
       tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
+      // If tenant user has no role (e.g. new user or migration not run), assign default owner role so they get permissions
+      if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
+        await assignDefaultRoleForTenant(user.id, tenant.tenantId, tenant.tenantType)
+        tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
+        tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
+      }
     }
     if (user.role === 'ADMIN') {
       adminRoles = await getRolesForUser(user.id, null, 'ADMIN')

@@ -4,15 +4,25 @@ import { logger } from './logger.js'
 /**
  * Ensure tenant has an active subscription; if none, create one with the free plan.
  * Used so suppliers and restaurants never hit "no subscription" (0/0 limits).
+ * Run migration 0048 to backfill existing tenants; this handles new tenants created after.
  */
 async function ensureTenantSubscription(tenantId, tenantType) {
   const { rows: plans } = await query(
     `SELECT id, name, code FROM subscription_plan WHERE code = 'free' AND tenant_type = $1 AND is_active = true LIMIT 1`,
     [tenantType]
   )
-  if (plans.length === 0) return
+  if (plans.length === 0) {
+    logger.warn(
+      'No Free plan found for tenant_type; run migration 0048 or seed subscription_plan',
+      {
+        tenantId,
+        tenantType,
+      }
+    )
+    return
+  }
   const plan = plans[0]
-  await query(
+  const { rowCount } = await query(
     `INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
      SELECT $1, $2, $3, $4, 'ACTIVE', 'MONTHLY', now(), now() + INTERVAL '1 month'
      WHERE NOT EXISTS (
@@ -21,7 +31,13 @@ async function ensureTenantSubscription(tenantId, tenantType) {
      )`,
     [tenantId, tenantType, plan.id, plan.name]
   )
-  logger.debug('Ensured subscription for tenant', { tenantId, tenantType, plan: plan.code })
+  if (rowCount > 0) {
+    logger.info('Created default Free subscription for tenant', {
+      tenantId,
+      tenantType,
+      plan: plan.code,
+    })
+  }
 }
 
 /**
@@ -40,7 +56,11 @@ export async function getTenantSubscription(tenantId, tenantType) {
       )
       if (subRows.length > 0) {
         const sub = subRows[0]
-        if (sub.pending_plan_id && sub.pending_effective_at && new Date(sub.pending_effective_at) <= new Date()) {
+        if (
+          sub.pending_plan_id &&
+          sub.pending_effective_at &&
+          new Date(sub.pending_effective_at) <= new Date()
+        ) {
           const { rows: planRows } = await query(
             'SELECT id, name, code FROM subscription_plan WHERE id = $1',
             [sub.pending_plan_id]
@@ -726,7 +746,13 @@ export async function getRecommendedPlanNames(tenantType) {
 /**
  * Build standardized LIMIT_EXCEEDED error payload for monetization UX.
  */
-export function buildLimitExceededPayload(limitCheck, meterType, currentPlanName, recommendedPlans, upgradeUrl = DEFAULT_UPGRADE_PATH) {
+export function buildLimitExceededPayload(
+  limitCheck,
+  meterType,
+  currentPlanName,
+  recommendedPlans,
+  upgradeUrl = DEFAULT_UPGRADE_PATH
+) {
   return {
     name: 'LIMIT_EXCEEDED',
     message: `You have reached your plan limit for ${meterType}`,
@@ -744,7 +770,13 @@ export function buildLimitExceededPayload(limitCheck, meterType, currentPlanName
 /**
  * Build standardized FEATURE_NOT_AVAILABLE error payload for monetization UX.
  */
-export function buildFeatureNotAvailablePayload(featureKey, currentPlanName, requiredPlan, recommendedPlans, upgradeUrl = DEFAULT_UPGRADE_PATH) {
+export function buildFeatureNotAvailablePayload(
+  featureKey,
+  currentPlanName,
+  requiredPlan,
+  recommendedPlans,
+  upgradeUrl = DEFAULT_UPGRADE_PATH
+) {
   return {
     name: 'FEATURE_NOT_AVAILABLE',
     message: 'This feature is not available in your current plan',

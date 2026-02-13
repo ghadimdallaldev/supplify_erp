@@ -28,6 +28,7 @@
   24) update any code of conduct needed to reflect the changes
   25) update any contributing needed to reflect the changes
   26) update any pull request template needed to reflect the changes
+  27) update related mmd files
 
 - Do NOT change public APIs unless explicitly asked. If you must, document breaking changes.
 

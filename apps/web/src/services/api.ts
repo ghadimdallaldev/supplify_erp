@@ -63,7 +63,10 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
   if (err && (err.status === 401 || err.status === 'FETCH_ERROR')) {
     // Check if it's an authentication error
     const errorData = err.data
-    if (typeof errorData === 'object' && (errorData as { error?: { name?: string } })?.error?.name === 'UNAUTHORIZED') {
+    if (
+      typeof errorData === 'object' &&
+      (errorData as { error?: { name?: string } })?.error?.name === 'UNAUTHORIZED'
+    ) {
       // Token expired or invalid - redirect to login
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         // Clear any auth state
@@ -74,7 +77,9 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
   }
 
   // Unwrap the API response envelope { ok: true/false, data: ..., error: ... }
-  const data = result.data as { ok?: boolean; data?: unknown; error?: { name?: string } } | undefined
+  const data = result.data as
+    | { ok?: boolean; data?: unknown; error?: { name?: string } }
+    | undefined
   if (data && typeof data === 'object' && 'ok' in data) {
     if (data.ok) {
       // Return the actual data
@@ -97,10 +102,15 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
           api.dispatch(
             showMonetizationBlock({
               type: respErr.name === 'LIMIT_EXCEEDED' ? 'limit' : 'feature',
-              payload: ((respErr as { details?: unknown }).details || {}) as import('../features/monetization/monetizationSlice').LimitExceededPayload | import('../features/monetization/monetizationSlice').FeatureNotAvailablePayload,
+              payload: ((respErr as { details?: unknown }).details || {}) as
+                | import('../features/monetization/monetizationSlice').LimitExceededPayload
+                | import('../features/monetization/monetizationSlice').FeatureNotAvailablePayload,
             })
           )
-        } catch (_) {}
+        } catch {
+          // Ignore dynamic import or dispatch errors for monetization block
+          void 0
+        }
       }
       return { ...result, error: { status: 'CUSTOM_ERROR', data: respErr } }
     }
@@ -1248,5 +1258,5 @@ export const {
   useGetImpersonationStatusQuery,
   useStartImpersonationMutation,
   useStopImpersonationMutation,
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } = api as any

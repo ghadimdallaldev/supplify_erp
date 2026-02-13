@@ -17,11 +17,12 @@ import {
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requirePermission('SUBSCRIPTIONS_VIEW'))
+// Auth + tenant context for all subscription routes (permission only on sensitive endpoints)
+router.use(requireAuth, resolveTenantContext)
 
 /**
  * Get canonical entitlements (plan, limits with overrides, features, usage snapshot).
- * Single endpoint for frontend subscription/usage UI.
+ * Any authenticated tenant can view their own entitlements (no SUBSCRIPTIONS_VIEW required).
  */
 router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
@@ -39,13 +40,58 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
       })
     }
 
-    const entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
+    let entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
     if (!entitlements) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'No active subscription found' },
-        requestId: req.requestId,
+      // Force ensure subscription and retry (handles migration not run or race)
+      const { getTenantSubscription } = await import('../lib/subscription.js')
+      await getTenantSubscription(tenant.tenantId, tenant.tenantType)
+      entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
+    }
+    if (!entitlements) {
+      // Last resort: return synthetic Free so UI always shows something; backend will still enforce limits
+      const { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } = await import('../lib/subscription.js')
+      const limitKeys =
+        tenant.tenantType === 'RESTAURANT' ? RESTAURANT_LIMIT_KEYS : SUPPLIER_LIMIT_KEYS
+      const freeDefaults =
+        tenant.tenantType === 'RESTAURANT'
+          ? {
+              branches: 0,
+              users: 1,
+              orders_per_day: 10,
+              suppliers_per_restaurant: 2,
+              restaurant_inventory_skus: 50,
+              chats_per_day: 10,
+              storage_mb: 100,
+            }
+          : {
+              warehouses: 0,
+              users: 1,
+              supplier_products_skus: 50,
+              chats_per_day: 10,
+              storage_mb: 100,
+            }
+      const defaultLimits = Object.fromEntries(limitKeys.map((k) => [k, freeDefaults[k] ?? 0]))
+      entitlements = {
+        tenantId: tenant.tenantId,
+        tenantType: tenant.tenantType,
+        plan: {
+          id: null,
+          name: 'Free',
+          code: 'free',
+          tenant_type: tenant.tenantType,
+          price_monthly: 0,
+          price_yearly: 0,
+        },
+        features: { chat: true, smart_reorder: false, reports: false, multi_branch: false },
+        limits: defaultLimits,
+        baseLimits: defaultLimits,
+        overrides: [],
+        usage: Object.fromEntries(limitKeys.map((k) => [k, 0])),
+        usageWindowMeta: {},
+      }
+      logger.warn('Returning synthetic Free entitlements; run migration 0048 to fix', {
+        tenantId: tenant.tenantId,
+        tenantType: tenant.tenantType,
       })
     }
 
@@ -67,7 +113,8 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
 })
 
 /**
- * Get current user's subscription (restaurant or supplier; admin when impersonating)
+ * Get current user's subscription (restaurant or supplier; admin when impersonating).
+ * Any authenticated tenant can view (no SUBSCRIPTIONS_VIEW required).
  */
 router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
@@ -85,8 +132,11 @@ router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (
       })
     }
 
-    const subscription = await getTenantSubscription(tenant.tenantId, tenant.tenantType)
-
+    let subscription = await getTenantSubscription(tenant.tenantId, tenant.tenantType)
+    if (!subscription) {
+      // Retry once after getTenantSubscription (which runs ensureTenantSubscription)
+      subscription = await getTenantSubscription(tenant.tenantId, tenant.tenantType)
+    }
     if (!subscription) {
       return res.status(404).json({
         ok: false,
@@ -136,7 +186,7 @@ router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (
  */
 router.get(
   '/usage/:meterType',
-  requireAuth,
+  requirePermission('SUBSCRIPTIONS_VIEW'),
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
   async (req, res) => {
     try {
@@ -182,7 +232,7 @@ router.get(
  */
 router.get(
   '/features/:featureKey',
-  requireAuth,
+  requirePermission('SUBSCRIPTIONS_VIEW'),
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
   async (req, res) => {
     try {

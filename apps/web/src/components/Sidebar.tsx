@@ -125,7 +125,12 @@ export function Sidebar() {
             )
           })}
 
-          {(can('SETTINGS_VIEW') || (isAdmin && !impersonation?.active)) && (
+          {(can('SETTINGS_VIEW') ||
+            (isAdmin && !impersonation?.active) ||
+            isRestaurant ||
+            impersonatingRestaurant ||
+            isSupplier ||
+            impersonatingSupplier) && (
             <li>
               <Link
                 to="/app/settings"
