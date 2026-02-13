@@ -1,0 +1,24 @@
+flowchart TB
+  subgraph Users
+    Restaurant[Restaurant Users]
+    Supplier[Supplier Users]
+    Admin[Admin Users]
+  end
+
+  subgraph Supplify["Supplify"]
+    Web[Web App]
+    API[API Server]
+  end
+
+  subgraph External
+    Keycloak[Keycloak Auth]
+    DB[(PostgreSQL)]
+  end
+
+  Restaurant --> Web
+  Supplier --> Web
+  Admin --> Web
+  Web --> API
+  Web --> Keycloak
+  API --> Keycloak
+  API --> DB

@@ -374,6 +374,21 @@ export function resolveTenantContext(req, res, next) {
         req.tenantContext = null
         return next()
       }
+      const { rows: subRows } = await query(
+        `SELECT status FROM subscription WHERE tenant_id = $1 AND tenant_type = $2 ORDER BY created_at DESC LIMIT 1`,
+        [tenant.tenantId, tenant.tenantType]
+      )
+      if (subRows.length > 0 && subRows[0].status === 'SUSPENDED') {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'SUBSCRIPTION_SUSPENDED',
+            message: 'Access is suspended. Please contact support.',
+          },
+          requestId: req.requestId,
+        })
+      }
       const roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
       const permissions = await getPermissionsForUser(
         req.userData.id,

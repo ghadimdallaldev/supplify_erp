@@ -12,19 +12,23 @@ describe('Subscription lib', () => {
   describe('getTenantSubscription', () => {
     it('returns subscription when one exists', async () => {
       const { getTenantSubscription } = await import('./subscription.js')
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'sub-1',
-            tenant_id: 'rest-1',
-            tenant_type: 'RESTAURANT',
-            plan_id: 'plan-free',
-            plan_name: 'Free',
-            limits: { chats_per_day: 10 },
-            features: { chat: 'enabled' },
-          },
-        ],
-      })
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [{ id: 'sub-1', plan_id: 'plan-free', pending_plan_id: null, pending_effective_at: null }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-1',
+              tenant_id: 'rest-1',
+              tenant_type: 'RESTAURANT',
+              plan_id: 'plan-free',
+              plan_name: 'Free',
+              limits: { chats_per_day: 10 },
+              features: { chat: 'enabled' },
+            },
+          ],
+        })
 
       const result = await getTenantSubscription('rest-1', 'RESTAURANT')
 
@@ -36,6 +40,7 @@ describe('Subscription lib', () => {
     it('creates free subscription when none exists and returns it', async () => {
       const { getTenantSubscription } = await import('./subscription.js')
       mockQuery
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ id: 'plan-free', name: 'Free', code: 'free' }] })
         .mockResolvedValueOnce({ rows: [] })
@@ -78,6 +83,9 @@ describe('Subscription lib', () => {
       const { checkLimit } = await import('./subscription.js')
       mockQuery
         .mockResolvedValueOnce({
+          rows: [{ id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
+        })
+        .mockResolvedValueOnce({
           rows: [
             {
               id: 'sub-1',
@@ -93,6 +101,44 @@ describe('Subscription lib', () => {
       expect(result.isOverLimit).toBe(false)
       expect(result.current).toBe(3)
       expect(result.limit).toBe(10)
+    })
+  })
+
+  describe('getEntitlements', () => {
+    it('applies overrides to limits and excludes expired', async () => {
+      const { getEntitlements } = await import('./subscription.js')
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [{ id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-1',
+              plan_id: 'p1',
+              plan_name: 'Free',
+              plan_code: 'free',
+              limits: { chats_per_day: 10 },
+              features: {},
+              tenant_type: 'SUPPLIER',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            { limitKey: 'chats_per_day', value: 20, expiresAt: new Date(Date.now() + 86400000).toISOString() },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
+        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ current_value: 5 }] })
+
+      const result = await getEntitlements('tenant-1', 'SUPPLIER')
+
+      expect(result).not.toBeNull()
+      expect(result.limits.chats_per_day).toBe(20)
+      expect(result.overrides).toHaveLength(1)
     })
   })
 })

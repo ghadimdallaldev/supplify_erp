@@ -5,25 +5,27 @@ import { Input } from './input';
 
 describe('Input Component', () => {
   it('should render input with placeholder', () => {
-    render(<Input placeholder="Enter text" />);
+    const { container } = render(<Input placeholder="Enter text" />);
     expect(screen.getByPlaceholderText('Enter text')).toBeInTheDocument();
+    expect(container.querySelector('input')).toHaveAttribute('placeholder', 'Enter text');
   });
 
   it('should handle value changes', async () => {
     const handleChange = vi.fn();
     const user = userEvent.setup();
 
-    render(<Input onChange={handleChange} />);
-
-    const input = screen.getByRole('textbox');
-    await user.type(input, 'test');
+    const { container } = render(<Input onChange={handleChange} data-testid="input-change" />);
+    const input = container.querySelector('input');
+    expect(input).toBeInTheDocument();
+    if (input) await user.type(input, 'test');
 
     expect(handleChange).toHaveBeenCalled();
   });
 
   it('should be disabled when disabled prop is true', () => {
-    render(<Input disabled />);
-    expect(screen.getByRole('textbox')).toBeDisabled();
+    const { container } = render(<Input disabled />);
+    const input = container.querySelector('input');
+    expect(input).toBeDisabled();
   });
 
   it('should display error state', () => {

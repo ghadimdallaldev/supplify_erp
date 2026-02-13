@@ -93,7 +93,7 @@ export function Sidebar() {
       { name: 'Restaurants', href: '/app/restaurants', icon: Users },
       { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck },
       { name: 'Invoices', href: '/app/invoices', icon: FileText, permission: 'INVOICES_VIEW' },
-    ].filter((item) => !item.permission || can(item.permission))
+    ].filter((item) => !('permission' in item) || can((item as { permission: string }).permission))
   }
 
   return (

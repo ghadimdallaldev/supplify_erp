@@ -1,0 +1,21 @@
+flowchart TB
+  Admin["/app/admin\nAdminDashboardPage"]
+  Overview[Overview tab]
+  Plans[Plans tab]
+  Subscriptions[Subscriptions tab]
+  Tenants[Tenants tab\nSuppliers / Restaurants]
+  Health[Health tab\nrecent errors, DB pool]
+  Finance[Finance tab\nGMV, MRR, overdue, top tenants]
+  Usage[Usage tab]
+  Audit[Audit Logs tab]
+  Impersonation[Impersonation\nstart/stop, banner]
+
+  Admin --> Overview
+  Admin --> Plans
+  Admin --> Subscriptions
+  Admin --> Tenants
+  Admin --> Health
+  Admin --> Finance
+  Admin --> Usage
+  Admin --> Audit
+  Admin --> Impersonation

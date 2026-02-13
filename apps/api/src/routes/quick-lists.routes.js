@@ -4,7 +4,12 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { executeScheduledOrders } from '../services/scheduled-orders.service.js'
-import { checkLimit } from '../lib/subscription.js'
+import {
+  checkLimit,
+  getTenantSubscription,
+  getRecommendedPlanNames,
+  buildLimitExceededPayload,
+} from '../lib/subscription.js'
 import { z } from 'zod'
 
 const router = express.Router()
@@ -668,19 +673,21 @@ router.post(
           const newTotal = limitCheck.current + ordersToCreate
 
           if (!limitCheck.isUnlimited && limitCheck.limit !== null && newTotal > limitCheck.limit) {
+            const [subscription, recommendedPlans] = await Promise.all([
+              getTenantSubscription(restaurantId, 'RESTAURANT'),
+              getRecommendedPlanNames('RESTAURANT'),
+            ])
+            const err = buildLimitExceededPayload(
+              limitCheck,
+              'orders_per_day',
+              subscription?.plan_name || subscription?.plan_display_name,
+              recommendedPlans
+            )
+            err.details.requested = ordersToCreate
             return res.status(403).json({
               ok: false,
               data: null,
-              error: {
-                name: 'LIMIT_EXCEEDED',
-                message: `Scheduling this quick list would create ${ordersToCreate} order(s) which would exceed your daily limit of ${limitCheck.limit} orders. Current usage: ${limitCheck.current}/${limitCheck.limit}. Please upgrade your subscription to obtain more features and higher order limits.`,
-                details: {
-                  current: limitCheck.current,
-                  limit: limitCheck.limit,
-                  requested: ordersToCreate,
-                  meterType: 'orders_per_day',
-                },
-              },
+              error: err,
               requestId: req.requestId,
             })
           }

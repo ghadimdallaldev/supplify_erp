@@ -243,14 +243,14 @@ export function CartPage() {
                     
                     <div className="text-right">
                       <p className="font-medium">
-                        ${(typeof item.product.current_price === 'number' ? item.product.current_price : parseFloat(item.product.current_price) || 0) * item.quantity}
+                        ${(typeof item.product.current_price === 'number' ? item.product.current_price : parseFloat(String(item.product.current_price ?? '')) || 0) * item.quantity}
                       </p>
                     </div>
                     
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleRemoveItem(item.productId)}
+                      onClick={() => { if (item.productId) handleRemoveItem(item.productId) }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

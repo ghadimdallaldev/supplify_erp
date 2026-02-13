@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { query } from '../lib/db.js'
+import { query, pool } from '../lib/db.js'
 import { requireAuth, requireRole, resolveAdminContext, requirePermission } from '../lib/rbac.js'
 import { z } from 'zod'
 import { logger } from '../lib/logger.js'
@@ -12,6 +12,7 @@ import {
   getEffectiveTenant,
 } from '../lib/impersonation.js'
 import { getEntitlements, RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } from '../lib/subscription.js'
+import { writeAuditLog } from '../lib/audit.js'
 
 /** Allowed feature keys per tenant type (from plan features JSONB in use) */
 const RESTAURANT_FEATURE_KEYS = [
@@ -99,8 +100,8 @@ async function logAudit(
       INSERT INTO admin_audit_log (
         admin_user_id, admin_name, action_type, action_description,
         target_entity_type, target_entity_id, old_value, new_value, metadata,
-        ip_address, user_agent
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ip_address, user_agent, request_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `,
       [
         req.userData.id,
@@ -114,8 +115,19 @@ async function logAudit(
         JSON.stringify(metadata),
         req.ip,
         req.get('user-agent'),
+        req.requestId || null,
       ]
     )
+    const tenantId = metadata.target_tenant_id || newValue?.tenant_id || oldValue?.tenant_id
+    const tenantType = metadata.target_tenant_type || newValue?.tenant_type || oldValue?.tenant_type
+    await writeAuditLog(req, {
+      action_type: actionType,
+      actor_admin_role: 'ADMIN',
+      tenant_type: tenantType || undefined,
+      tenant_id: tenantId || targetEntityId,
+      target_id: targetEntityId,
+      payload_json: { description: actionDescription, old_value: oldValue, new_value: newValue, ...metadata },
+    })
   } catch (error) {
     logger.error('Failed to log audit event:', error)
     // Don't throw - audit logging should not fail requests
@@ -573,6 +585,9 @@ const updateSubscriptionSchema = z.object({
   status: z.enum(['TRIALING', 'ACTIVE', 'SUSPENDED', 'CANCELLED', 'PAST_DUE']).optional(),
   cancelReason: z.string().optional(),
   allowExceedance: z.boolean().optional(),
+  force: z.boolean().optional(),
+  reason: z.string().optional(),
+  applyAtPeriodEnd: z.boolean().optional(),
 })
 
 /**
@@ -705,6 +720,18 @@ router.patch('/subscriptions/:id', async (req, res) => {
   try {
     const { id } = req.params
     const updateData = updateSubscriptionSchema.parse(req.body)
+    const allowExceedance = updateData.allowExceedance || updateData.force === true
+    if (updateData.force === true && !(updateData.reason && updateData.reason.trim())) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'reason is required when force is true',
+        },
+        requestId: req.requestId,
+      })
+    }
 
     const { rows: existingSubs } = await query('SELECT * FROM subscription WHERE id = $1', [id])
     if (existingSubs.length === 0) {
@@ -718,14 +745,24 @@ router.patch('/subscriptions/:id', async (req, res) => {
     }
 
     const existing = existingSubs[0]
+    let existingPlanCode = null
+    if (existing.plan_id) {
+      const { rows: oldPlan } = await query(
+        'SELECT code FROM subscription_plan WHERE id = $1',
+        [existing.plan_id]
+      )
+      existingPlanCode = oldPlan[0]?.code || null
+    }
 
     const updates = []
     const values = []
     let paramIndex = 1
+    let newPlan = null
+    let planChangeApplyAtPeriodEnd = false
 
     if (updateData.planId) {
       const { rows: planRows } = await query(
-        'SELECT id, name, tenant_type, limits FROM subscription_plan WHERE id = $1',
+        'SELECT id, name, code, tenant_type, limits FROM subscription_plan WHERE id = $1',
         [updateData.planId]
       )
       if (planRows.length === 0) {
@@ -737,7 +774,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
         })
         return
       }
-      const newPlan = planRows[0]
+      newPlan = planRows[0]
       if (newPlan.tenant_type !== existing.tenant_type) {
         res.status(400).json({
           ok: false,
@@ -750,7 +787,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
         })
         return
       }
-      if (!updateData.allowExceedance) {
+      if (!allowExceedance) {
         const entitlements = await getEntitlements(existing.tenant_id, existing.tenant_type)
         if (entitlements) {
           const limitKeys =
@@ -775,7 +812,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
               error: {
                 name: 'LIMIT_EXCEEDED',
                 message:
-                  'Current usage exceeds target plan limits. Use preview-change to see impact, or pass allowExceedance: true to force change.',
+                  'Current usage exceeds target plan limits. Use preview-change to see impact, or pass force: true with reason to force change.',
                 details: { willExceed },
               },
               requestId: req.requestId,
@@ -784,10 +821,23 @@ router.patch('/subscriptions/:id', async (req, res) => {
           }
         }
       }
-      updates.push(`plan_id = $${paramIndex++}`)
-      values.push(updateData.planId)
-      updates.push(`plan_name = $${paramIndex++}`)
-      values.push(newPlan.name)
+      if (updateData.applyAtPeriodEnd === true) {
+        const effectiveAt = existing.current_period_end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        updates.push(`pending_plan_id = $${paramIndex++}`)
+        values.push(updateData.planId)
+        updates.push(`pending_effective_at = $${paramIndex++}`)
+        values.push(effectiveAt)
+        planChangeApplyAtPeriodEnd = true
+      } else {
+        updates.push(`plan_id = $${paramIndex++}`)
+        values.push(updateData.planId)
+        updates.push(`plan_name = $${paramIndex++}`)
+        values.push(newPlan.name)
+        updates.push(`previous_plan_code = $${paramIndex++}`)
+        values.push(existingPlanCode)
+        updates.push(`pending_plan_id = NULL`)
+        updates.push(`pending_effective_at = NULL`)
+      }
     }
 
     if (updateData.status) {
@@ -818,15 +868,43 @@ router.patch('/subscriptions/:id', async (req, res) => {
       values
     )
 
-    await logAudit(
-      req,
-      'subscription.updated',
-      `Updated subscription status to ${updateData.status || 'unchanged'}`,
-      'subscription',
-      id,
-      existing,
-      updated
-    )
+    if (updateData.planId && (newPlan || planChangeApplyAtPeriodEnd)) {
+      try {
+        await query(
+          `
+          INSERT INTO subscription_change_log (subscription_id, from_plan_id, to_plan_id, changed_by_admin_id, reason)
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+          [
+            id,
+            existing.plan_id,
+            updateData.planId,
+            req.userData.id,
+            updateData.reason || (planChangeApplyAtPeriodEnd ? 'apply_at_period_end' : null),
+          ]
+        )
+      } catch (e) {
+        if (e.code !== '42P01') logger.error('subscription_change_log insert failed', e)
+      }
+    }
+
+    const statusChangeReason = updateData.reason || updateData.cancelReason
+    if (updateData.status === 'SUSPENDED') {
+      await logAudit(req, 'subscription.suspend', `Suspended subscription ${id}`, 'subscription', id, existing, updated, { target_tenant_id: existing.tenant_id, target_tenant_type: existing.tenant_type, reason: statusChangeReason })
+    } else if (updateData.status === 'ACTIVE' && existing.status === 'SUSPENDED') {
+      await logAudit(req, 'subscription.resume', `Resumed subscription ${id}`, 'subscription', id, existing, updated, { target_tenant_id: existing.tenant_id, target_tenant_type: existing.tenant_type, reason: statusChangeReason })
+    } else {
+      await logAudit(
+        req,
+        'subscription.updated',
+        `Updated subscription ${updateData.planId ? 'plan' : ''} ${updateData.status ? `status to ${updateData.status}` : 'unchanged'}`,
+        'subscription',
+        id,
+        existing,
+        updated,
+        { target_tenant_id: existing.tenant_id, target_tenant_type: existing.tenant_type }
+      )
+    }
 
     res.json({
       ok: true,
@@ -1208,13 +1286,20 @@ router.post('/tenants/:tenantType/:id/override-limit', async (req, res) => {
     const { id: tenantId, tenantType } = req.params
     const { limit_type, override_value, expiration_date, reason } = req.body
 
-    // Create override record
+    const { rows: existing } = await query(
+      `SELECT id FROM tenant_limit_override WHERE tenant_id = $1 AND tenant_type = $2 AND limit_type = $3`,
+      [tenantId, tenantType.toUpperCase(), limit_type]
+    )
+    const isUpdate = existing.length > 0
+
     const { rows: overrides } = await query(
       `
       INSERT INTO tenant_limit_override (
         tenant_id, tenant_type, limit_type, override_value, expiration_date, reason, created_by
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (tenant_id, tenant_type, limit_type)
+      DO UPDATE SET override_value = EXCLUDED.override_value, expiration_date = EXCLUDED.expiration_date, reason = EXCLUDED.reason, updated_at = now()
       RETURNING *
     `,
       [
@@ -1228,14 +1313,13 @@ router.post('/tenants/:tenantType/:id/override-limit', async (req, res) => {
       ]
     )
 
-    // Log audit
     await logAudit(
       req,
-      'OVERRIDE_LIMIT',
-      `Granted ${limit_type} override: ${override_value}`,
+      isUpdate ? 'override.update' : 'OVERRIDE_LIMIT',
+      isUpdate ? `Updated ${limit_type} override: ${override_value}` : `Granted ${limit_type} override: ${override_value}`,
       tenantType.toUpperCase(),
       tenantId,
-      null,
+      isUpdate ? existing[0] : null,
       { limit_type, override_value, expiration_date, reason }
     )
 
@@ -1403,6 +1487,142 @@ router.get('/tenants/restaurants/:id/usage', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurant usage' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// ========================================
+// HEALTH (Phase C1)
+// ========================================
+router.get('/health', async (req, res) => {
+  try {
+    let jobFailures = []
+    let webhookFailures = []
+    let emailFailures = []
+    let recentErrors = []
+    let dbPool = null
+
+    try {
+      const { rows } = await query(
+        `SELECT type, severity, source, payload, created_at FROM system_event WHERE severity = 'error' ORDER BY created_at DESC LIMIT 50`
+      )
+      recentErrors = rows.map((r) => ({
+        type: r.type,
+        source: r.source,
+        message: r.payload?.message,
+        created_at: r.created_at,
+      }))
+    } catch (e) {
+      if (e.code !== '42P01') throw e
+    }
+
+    if (pool && typeof pool.totalCount === 'number') {
+      dbPool = { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount }
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        jobFailures: jobFailures.length ? jobFailures : null,
+        webhookFailures: webhookFailures.length ? webhookFailures : null,
+        emailFailures: emailFailures.length ? emailFailures : null,
+        recentApiErrors: recentErrors,
+        dbPool,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Health endpoint error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get health' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// ========================================
+// FINANCIAL OVERVIEW (Phase C2)
+// ========================================
+router.get('/financial-overview', async (req, res) => {
+  try {
+    const [
+      gmvResult,
+      outstandingResult,
+      overdueResult,
+      revenueByPlanResult,
+      topTenantsRevenueResult,
+      topTenantsOverdueResult,
+    ] = await Promise.all([
+      query(
+        `SELECT COALESCE(SUM(total_amount), 0)::numeric as gmv FROM invoice WHERE status IN ('ISSUED', 'PARTIALLY_PAID', 'PAID', 'OVERDUE')`
+      ),
+      query(
+        `SELECT COALESCE(SUM(balance_due), 0)::numeric as outstanding FROM invoice WHERE status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE') AND balance_due > 0`
+      ),
+      query(
+        `SELECT COALESCE(SUM(balance_due), 0)::numeric as overdue FROM invoice WHERE status = 'OVERDUE' AND balance_due > 0`
+      ),
+      query(
+        `SELECT sp.name as plan_name, sp.type as tenant_type,
+         COUNT(s.id) as subscription_count,
+         COALESCE(SUM(CASE WHEN s.billing_cycle = 'MONTHLY' THEN sp.price_per_month ELSE sp.price_per_month * 12 END), 0)::numeric as mrr
+         FROM subscription s
+         JOIN subscription_plan sp ON sp.id = s.plan_id
+         WHERE s.status IN ('ACTIVE', 'TRIALING')
+         GROUP BY sp.id, sp.name, sp.type, sp.price_per_month`
+      ),
+      query(
+        `SELECT restaurant_id as tenant_id, 'RESTAURANT' as tenant_type,
+         COALESCE(SUM(total_amount), 0)::numeric as revenue
+         FROM invoice WHERE status IN ('PAID', 'PARTIALLY_PAID') AND restaurant_id IS NOT NULL
+         GROUP BY restaurant_id ORDER BY revenue DESC LIMIT 10`
+      ),
+      query(
+        `SELECT restaurant_id as tenant_id, 'RESTAURANT' as tenant_type,
+         COALESCE(SUM(balance_due), 0)::numeric as overdue_amount
+         FROM invoice WHERE status = 'OVERDUE' AND balance_due > 0 AND restaurant_id IS NOT NULL
+         GROUP BY restaurant_id ORDER BY overdue_amount DESC LIMIT 10`
+      ),
+    ])
+
+    const gmv = parseFloat(gmvResult.rows[0]?.gmv || 0)
+    const outstanding = parseFloat(outstandingResult.rows[0]?.outstanding || 0)
+    const overdue = parseFloat(overdueResult.rows[0]?.overdue || 0)
+    const mrrRows = revenueByPlanResult.rows || []
+    const mrr = mrrRows.reduce((sum, r) => sum + parseFloat(r.mrr || 0), 0)
+    const arr = mrr * 12
+
+    res.json({
+      ok: true,
+      data: {
+        gmv,
+        outstanding,
+        overdue,
+        revenueByPlan: mrrRows.map((r) => ({
+          planName: r.plan_name,
+          tenantType: r.tenant_type,
+          subscriptionCount: parseInt(r.subscription_count || 0),
+          mrr: parseFloat(r.mrr || 0),
+          arr: parseFloat(r.mrr || 0) * 12,
+        })),
+        mrr,
+        arr,
+        topTenantsByRevenue: topTenantsRevenueResult.rows || [],
+        topTenantsByOverdue: topTenantsOverdueResult.rows || [],
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Financial overview error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get financial overview' },
       requestId: req.requestId,
     })
   }

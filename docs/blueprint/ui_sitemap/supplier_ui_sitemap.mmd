@@ -1,0 +1,23 @@
+flowchart TB
+  Root["/"]
+  App["/app"]
+  Dashboard["/app/dashboard\nDashboardPage"]
+  Products["/app/products\nProductsPage"]
+  Orders["/app/orders\nOrdersPage"]
+  Fulfillment["/app/fulfillment\nFulfillmentPage"]
+  Inventory["/app/inventory\nInventoryPage"]
+  Restaurants["/app/restaurants\nRestaurantsPage"]
+  Chat["/app/chat\nChatPage"]
+  Invoices["/app/invoices\nInvoicesPage"]
+  Settings["/app/supplier-settings\nSupplierSettingsPage\nSubscriptionInfo"]
+
+  Root --> App
+  App --> Dashboard
+  App --> Products
+  App --> Orders
+  App --> Fulfillment
+  App --> Inventory
+  App --> Restaurants
+  App --> Chat
+  App --> Invoices
+  App --> Settings

@@ -48,6 +48,7 @@ vi.mock('../lib/subscription.js', () => ({
   checkLimit: vi
     .fn()
     .mockResolvedValue({ allowed: true, current: 0, limit: 100, isOverLimit: false }),
+  checkAndIncrementUsage: vi.fn().mockResolvedValue({ allowed: true }),
   incrementUsage: vi.fn().mockResolvedValue(true),
   isFeatureEnabled: vi.fn().mockResolvedValue(true),
 }))

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import FullCalendar, { type EventClickArg, type EventContentArg } from '@fullcalendar/react'
+import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
@@ -119,7 +119,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     })
   }, [])
 
-  const handleEventClick = useCallback((info: EventClickArg) => {
+  const handleEventClick = useCallback((info: { event: { startStr?: string; endStr?: string; extendedProps: unknown }; jsEvent?: { preventDefault: () => void } }) => {
     info.jsEvent?.preventDefault()
     const eventProps = info.event.extendedProps as OrdersCalendarEvent
     setSelectedEvent({
@@ -129,7 +129,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     })
   }, [])
 
-  const renderEventContent = useCallback((content: EventContentArg) => {
+  const renderEventContent = useCallback((content: { event: { id?: string; extendedProps: unknown }; view: { type: string } }) => {
     const event = content.event.extendedProps as OrdersCalendarEvent
     const statusKey = event.statusCategory || 'pending'
     const isTimeGridView = content.view.type.includes('timeGrid')
@@ -223,7 +223,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {isAdmin && (
-            <Select value={activeRole} onChange={(e) => handleRoleSwitch(e.target.value as 'RESTAURANT' | 'SUPPLIER')}>
+            <Select value={activeRole} onValueChange={(val) => handleRoleSwitch(val as 'RESTAURANT' | 'SUPPLIER')}>
               <SelectTrigger className="w-40">
                 <option value="RESTAURANT">Restaurant view</option>
                 <option value="SUPPLIER">Supplier view</option>
@@ -257,11 +257,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Select
           value={statusFilter}
-          onChange={(event) => {
-            setStatusFilter(event.target.value)
+          onValueChange={(val) => {
+            setStatusFilter(val)
             setPage(1)
           }}
-          disabled={filtersDisabled}
         >
           <SelectTrigger placeholder="All statuses">
             <option value="">All statuses</option>
@@ -275,11 +274,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
         <Select
           value={supplierFilter}
-          onChange={(event) => {
-            setSupplierFilter(event.target.value)
+          onValueChange={(val) => {
+            setSupplierFilter(val)
             setPage(1)
           }}
-          disabled={filtersDisabled}
         >
           <SelectTrigger placeholder={`All ${supplierLabel.toLowerCase()}s`}>
             <option value="">{`All ${supplierLabel.toLowerCase()}s`}</option>
@@ -293,11 +291,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
         <Select
           value={branchFilter}
-          onChange={(event) => {
-            setBranchFilter(event.target.value)
+          onValueChange={(val) => {
+            setBranchFilter(val)
             setPage(1)
           }}
-          disabled={filtersDisabled}
         >
           <SelectTrigger placeholder="All branches">
             <option value="">All branches</option>
@@ -311,11 +308,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
         <Select
           value={categoryFilter}
-          onChange={(event) => {
-            setCategoryFilter(event.target.value)
+          onValueChange={(val) => {
+            setCategoryFilter(val)
             setPage(1)
           }}
-          disabled={filtersDisabled}
         >
           <SelectTrigger placeholder="All categories">
             <option value="">All categories</option>

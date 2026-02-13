@@ -9,7 +9,13 @@ import {
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
-import { checkLimit, checkUsageWithWarning, incrementUsage } from '../lib/subscription.js'
+import {
+  checkAndIncrementUsage,
+  checkUsageWithWarning,
+  getTenantSubscription,
+  getRecommendedPlanNames,
+  buildLimitExceededPayload,
+} from '../lib/subscription.js'
 import { z } from 'zod'
 
 const router = express.Router()
@@ -574,29 +580,32 @@ router.post(
 
       if (tenantId && tenantType) {
         const usageCheck = await checkUsageWithWarning(tenantId, tenantType, 'chats_per_day')
-
-        if (usageCheck.isOverLimit && !usageCheck.isUnlimited) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'CHAT_LIMIT_EXCEEDED',
-              message: `Daily chat limit reached (${usageCheck.current}/${usageCheck.limit}). Upgrade your plan to send more messages.`,
-              details: {
-                current: usageCheck.current,
-                limit: usageCheck.limit,
-                usagePercent: usageCheck.usagePercent,
-                isWarning: usageCheck.isWarning,
-              },
-            },
-            requestId: req.requestId,
-          })
-        }
-
-        // Show warning at 80% but allow
         if (usageCheck.isWarning) {
           req.chatWarning = true
           req.chatWarningPercent = usageCheck.usagePercent
+        }
+        // Atomic check and reserve one chat slot (avoids race conditions)
+        const usageResult = await checkAndIncrementUsage(tenantId, tenantType, 'chats_per_day', 1)
+        if (!usageResult.allowed) {
+          const [subscription, recommendedPlans] = await Promise.all([
+            getTenantSubscription(tenantId, tenantType),
+            getRecommendedPlanNames(tenantType),
+          ])
+          const limitCheck = { current: usageResult.current, limit: usageResult.limit }
+          const err = buildLimitExceededPayload(
+            limitCheck,
+            'chats_per_day',
+            subscription?.plan_name || subscription?.plan_display_name,
+            recommendedPlans
+          )
+          err.name = 'CHAT_LIMIT_EXCEEDED'
+          err.message = `Daily chat limit reached (${usageResult.current}/${usageResult.limit}). Upgrade your plan to send more messages.`
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: err,
+            requestId: req.requestId,
+          })
         }
       }
 
@@ -719,10 +728,7 @@ router.post(
 
         const message = messages[0]
 
-        // Increment chat usage after successful message
-        if (tenantId && tenantType) {
-          await incrementUsage(tenantId, tenantType, 'chats_per_day', 1)
-        }
+        // Usage already reserved atomically in checkAndIncrementUsage above (no second increment)
 
         // Add attachments if any
         if (messageData.attachments && messageData.attachments.length > 0) {

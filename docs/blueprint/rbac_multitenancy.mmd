@@ -1,0 +1,25 @@
+flowchart LR
+  subgraph Roles
+    R[RESTAURANT]
+    S[SUPPLIER]
+    A[ADMIN]
+  end
+
+  subgraph TenantTypes
+    TT1[RESTAURANT]
+    TT2[SUPPLIER]
+  end
+
+  subgraph Context
+    TenantCtx[Tenant Context\ntenantId, tenantType, permissions]
+    AdminCtx[Admin Context\npermissions]
+  end
+
+  R --> TenantCtx
+  S --> TenantCtx
+  A --> AdminCtx
+  A --> Impersonation[Impersonation\nview as Restaurant/Supplier]
+
+  TenantCtx --> Subscription[Subscription / Entitlements]
+  Subscription --> Limits[Limits + Overrides]
+  Subscription --> Features[Feature Flags]

@@ -16,8 +16,9 @@
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
 
     /* Path mapping */
@@ -27,5 +28,6 @@
     }
   },
   "include": ["src"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "src/test"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

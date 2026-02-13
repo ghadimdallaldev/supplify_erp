@@ -10,7 +10,12 @@ import {
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
-import { checkLimit, incrementUsage } from '../lib/subscription.js'
+import {
+  checkAndIncrementUsage,
+  getTenantSubscription,
+  getRecommendedPlanNames,
+  buildLimitExceededPayload,
+} from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyOrderStatusChange } from '../services/notification.service.js'
 
@@ -898,26 +903,32 @@ router.post(
         })
       }
 
-      // Check plan limits before creating orders
+      // Atomic check and reserve usage slots before creating orders (avoids race conditions)
       if (orderStatus === 'PLACED') {
         const ordersToCreate = supplierGroups.size
-        const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')
-        const newTotal = limitCheck.current + ordersToCreate
-
-        if (!limitCheck.isUnlimited && limitCheck.limit !== null && newTotal > limitCheck.limit) {
+        const usageResult = await checkAndIncrementUsage(
+          restaurantId,
+          'RESTAURANT',
+          'orders_per_day',
+          ordersToCreate
+        )
+        if (!usageResult.allowed) {
+          const [subscription, recommendedPlans] = await Promise.all([
+            getTenantSubscription(restaurantId, 'RESTAURANT'),
+            getRecommendedPlanNames('RESTAURANT'),
+          ])
+          const limitCheck = { current: usageResult.current, limit: usageResult.limit }
+          const err = buildLimitExceededPayload(
+            limitCheck,
+            'orders_per_day',
+            subscription?.plan_name || subscription?.plan_display_name,
+            recommendedPlans
+          )
+          err.details.requested = ordersToCreate
           return res.status(403).json({
             ok: false,
             data: null,
-            error: {
-              name: 'LIMIT_EXCEEDED',
-              message: `Creating ${ordersToCreate} order(s) would exceed your daily limit of ${limitCheck.limit} orders. Current usage: ${limitCheck.current}/${limitCheck.limit}. Please upgrade your subscription to obtain more features and higher order limits.`,
-              details: {
-                current: limitCheck.current,
-                limit: limitCheck.limit,
-                requested: ordersToCreate,
-                meterType: 'orders_per_day',
-              },
-            },
+            error: err,
             requestId: req.requestId,
           })
         }
@@ -1055,14 +1066,7 @@ router.post(
         }
       }
 
-      // Track usage for each order created (only if PLACED, not DRAFT)
-      if (orderStatus === 'PLACED') {
-        try {
-          await incrementUsage(restaurantId, 'RESTAURANT', 'orders_per_day', result.length)
-        } catch (usageError) {
-          logger.error('Failed to track order usage', { error: usageError.message })
-        }
-      }
+      // Usage already reserved atomically in checkAndIncrementUsage above (no second increment)
 
       // Return single order if only one, otherwise return array
       res.status(201).json({

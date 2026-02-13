@@ -652,7 +652,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                           size="sm"
                           variant="ghost"
                           onClick={() => {
-                            toast.info('Edit product functionality coming soon')
+                            toast('Edit product functionality coming soon')
                           }}
                         >
                           Edit

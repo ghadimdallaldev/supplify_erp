@@ -104,7 +104,24 @@ const authLimiter = rateLimit({
   message: 'Too many authentication attempts, please try again later.',
 })
 
+// Stricter limits for sensitive endpoints (TODO: replace with Redis-backed limiter in production)
+const publicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200, // public reservations + staff self-service
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+const chatSendLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300, // chat send per IP
+  message: 'Too many messages sent, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 app.use('/auth', authLimiter)
+app.use('/api/public', publicLimiter)
 app.use(limiter)
 
 // Body parsing middleware
@@ -171,6 +188,7 @@ app.use('/api/orders/calendar', ordersCalendarRoutes)
 app.use('/api/orders', ordersRoutes)
 app.use('/api/files', filesRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/chat', chatSendLimiter)
 app.use('/api/chat', chatRoutes)
 app.use('/api/invoices', invoicesRoutes)
 app.use('/api/payments', paymentsRoutes)

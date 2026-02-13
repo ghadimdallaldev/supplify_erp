@@ -36,31 +36,20 @@ import {
   Clock,
   ClipboardSignature,
 } from 'lucide-react'
-import {
-  useAddDispatchStopMutation,
-  useCreateDispatchRouteMutation,
-  useGetDispatchBoardQuery,
-  useGetOrdersQuery,
-  useRemoveDispatchStopMutation,
-  useReorderDispatchStopsMutation,
-  useSubmitProofOfDeliveryMutation,
-  useUpdateDispatchRouteStatusMutation,
-  useUpdateDispatchStopStatusMutation,
-} from '../services/api'
+import { useGetOrdersQuery } from '../services/api'
 import { Link } from 'react-router-dom'
-import type {
-  DispatchBoard,
-  DispatchDriver,
-  DispatchOrderSummary,
-  DispatchRoute,
-  DispatchStop,
-} from '../types'
 import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 
 type ColumnId = 'unassigned' | `driver-${string}`
+
+type ColumnEntry = {
+  driver: DispatchDriver
+  route: DispatchRoute | null
+  stops: DispatchStop[]
+}
 
 type ActiveDragItem =
   | {
@@ -148,8 +137,8 @@ export function FulfillmentPage() {
   const shippedOrders = useMemo(() => {
     if (!ordersData?.orders) return []
     return ordersData.orders
-      .filter((order) => ['SHIPPED', 'ACKNOWLEDGED', 'PROCESSING'].includes(order.status))
-      .map((order) => {
+      .filter((order: { status: string }) => ['SHIPPED', 'ACKNOWLEDGED', 'PROCESSING'].includes(order.status))
+      .map((order: { id: string; status: string; restaurant_name?: string; total_amount?: number; items?: unknown[]; placed_at?: string; created_at?: string }) => {
         const restaurantName = order.restaurant_name || 'Restaurant'
         const totalAmount = Number(order.total_amount) || 0
         const itemCount = Array.isArray(order.items) ? order.items.length : 0
@@ -865,12 +854,12 @@ function DispatchColumn({
           </div>
           <div className="flex gap-1">
             {route.status === 'PLANNED' && (
-              <Button variant="outline" size="xs" onClick={() => onRouteStatusChange(route.id, 'IN_PROGRESS')}>
+              <Button variant="outline" size="sm" onClick={() => onRouteStatusChange(route.id, 'IN_PROGRESS')}>
                 Start
               </Button>
             )}
             {route.status === 'IN_PROGRESS' && (
-              <Button variant="outline" size="xs" onClick={() => onRouteStatusChange(route.id, 'COMPLETED')}>
+              <Button variant="outline" size="sm" onClick={() => onRouteStatusChange(route.id, 'COMPLETED')}>
                 Complete
               </Button>
             )}
@@ -946,19 +935,19 @@ function StopCard({
       {!compact && onStatusChange && (
         <div className="mt-3 flex flex-wrap gap-2">
           {stop.status === 'PLANNED' && (
-            <Button size="xs" variant="outline" onClick={() => onStatusChange(stop.id, 'OUT_FOR_DELIVERY')}>
+            <Button size="sm" variant="outline" onClick={() => onStatusChange(stop.id, 'OUT_FOR_DELIVERY')}>
               <Clock className="mr-1 h-3 w-3" />
               Out for delivery
             </Button>
           )}
           {stop.status === 'OUT_FOR_DELIVERY' && (
-            <Button size="xs" variant="outline" onClick={() => onStatusChange(stop.id, 'DELIVERED')}>
+            <Button size="sm" variant="outline" onClick={() => onStatusChange(stop.id, 'DELIVERED')}>
               <CheckCircle className="mr-1 h-3 w-3" />
               Delivered
             </Button>
           )}
           {stop.status === 'DELIVERED' && onCaptureProof && (
-            <Button size="xs" variant="outline" onClick={() => onCaptureProof(stop)}>
+            <Button size="sm" variant="outline" onClick={() => onCaptureProof(stop)}>
               <ClipboardSignature className="mr-1 h-3 w-3" />
               Proof
             </Button>

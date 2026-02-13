@@ -11,7 +11,7 @@ interface LogoUploadProps {
   getPresignedUrl: (params: { fileName: string; fileType: string; fileSize?: number }) => Promise<{ presignedUrl: string; fileKey: string; fileName: string; fileType: string }>
 }
 
-export function LogoUpload({ currentLogo, onUpload, entityId, entityName, getPresignedUrl }: LogoUploadProps) {
+export function LogoUpload({ currentLogo, onUpload, entityId: _entityId, entityName, getPresignedUrl }: LogoUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(currentLogo || null)
   const fileInputRef = useRef<HTMLInputElement>(null)

@@ -345,7 +345,7 @@ export function RestaurantInventoryPage() {
               className="px-3 py-2 border border-gray-300 rounded-md"
             >
               <option value="ALL">All Suppliers</option>
-              {[...new Set(inventory.map((item: any) => item.supplier_name))].map(supplier => (
+              {Array.from(new Set<string>(inventory.map((item: { supplier_name?: string }) => item.supplier_name).filter((s): s is string => Boolean(s)))).map((supplier) => (
                 <option key={supplier} value={supplier}>{supplier}</option>
               ))}
             </select>
@@ -769,7 +769,7 @@ export function RestaurantInventoryPage() {
             </Button>
             <Button 
               onClick={() => {
-                toast.info('Manual product addition coming soon')
+                toast('Manual product addition coming soon')
                 setShowAddProductDialog(false)
               }}
               disabled={!selectedProductId || !addQuantity}

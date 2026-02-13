@@ -2,11 +2,13 @@ import { configureStore } from '@reduxjs/toolkit'
 import { api } from '../services/api'
 import authReducer from '../features/auth/authSlice'
 import cartReducer from '../features/cart/cartSlice'
+import monetizationReducer from '../features/monetization/monetizationSlice'
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     cart: cartReducer,
+    monetization: monetizationReducer,
     [api.reducerPath]: api.reducer,
   },
   middleware: (getDefaultMiddleware) =>

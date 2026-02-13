@@ -1,0 +1,6 @@
+flowchart LR
+  Supplier[Supplier: products, inventory] --> Stock[Stock levels]
+  Restaurant[Restaurant: restaurant_inventory] --> ParLevels[Par levels]
+  Order[Order flow] --> Deduct[Deduct on place]
+  Receiving[Receiving] --> Update[Update received qty]
+  Limit[checkLimit\nproducts / restaurant_inventory_skus] --> Block[Block if over limit]

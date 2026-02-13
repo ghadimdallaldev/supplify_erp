@@ -8,6 +8,7 @@ import {
 } from '../lib/auth.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
+import { clearImpersonationCookie } from '../lib/impersonation.js'
 import { requireAuth, getRequestTenant } from '../lib/rbac.js'
 import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
 import { query } from '../lib/db.js'
@@ -262,8 +263,9 @@ router.post('/logout', requireAuth, async (req, res) => {
       await revokeToken(refreshToken)
     }
 
-    // Clear cookies
+    // Clear cookies (including impersonation so admin cannot remain impersonating after logout)
     clearAuthCookies(res)
+    clearImpersonationCookie(res)
 
     logger.info('User logged out', { userId: req.userData.id })
 
@@ -276,8 +278,9 @@ router.post('/logout', requireAuth, async (req, res) => {
   } catch (error) {
     logger.error('Logout error', { error: error.message })
 
-    // Clear cookies even if revocation fails
+    // Clear cookies even if revocation fails (including impersonation)
     clearAuthCookies(res)
+    clearImpersonationCookie(res)
 
     res.json({
       ok: true,

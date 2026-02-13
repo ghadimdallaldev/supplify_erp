@@ -1,4 +1,4 @@
-import { query } from './db.js'
+import { query, withTransaction } from './db.js'
 import { logger } from './logger.js'
 
 /**
@@ -32,6 +32,36 @@ async function ensureTenantSubscription(tenantId, tenantType) {
  */
 export async function getTenantSubscription(tenantId, tenantType) {
   try {
+    try {
+      const { rows: subRows } = await query(
+        `SELECT id, plan_id, pending_plan_id, pending_effective_at FROM subscription
+         WHERE tenant_id = $1 AND tenant_type = $2 AND status IN ('TRIALING', 'ACTIVE') ORDER BY created_at DESC LIMIT 1`,
+        [tenantId, tenantType]
+      )
+      if (subRows.length > 0) {
+        const sub = subRows[0]
+        if (sub.pending_plan_id && sub.pending_effective_at && new Date(sub.pending_effective_at) <= new Date()) {
+          const { rows: planRows } = await query(
+            'SELECT id, name, code FROM subscription_plan WHERE id = $1',
+            [sub.pending_plan_id]
+          )
+          if (planRows.length > 0) {
+            const newPlan = planRows[0]
+            const { rows: oldPlan } = await query(
+              'SELECT code FROM subscription_plan WHERE id = $1',
+              [sub.plan_id]
+            )
+            await query(
+              `UPDATE subscription SET plan_id = $1, plan_name = $2, previous_plan_code = $3, pending_plan_id = NULL, pending_effective_at = NULL, updated_at = now() WHERE id = $4`,
+              [sub.pending_plan_id, newPlan.name, oldPlan[0]?.code || null, sub.id]
+            )
+          }
+        }
+      }
+    } catch (e) {
+      // Skip if columns missing (migration not run) or any error in pending-apply logic
+    }
+
     let { rows } = await query(
       `
       SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code,
@@ -274,6 +304,88 @@ export async function checkLimit(tenantId, tenantType, meterType) {
       effectiveLimit: null,
     }
   }
+}
+
+/**
+ * Atomic check and increment for daily usage meters (orders_per_day, chats_per_day).
+ * Uses transaction + row lock to avoid race conditions. Use this instead of checkLimit + incrementUsage for these meters.
+ * @param {string} tenantId - Tenant ID
+ * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
+ * @param {string} meterType - e.g. 'orders_per_day', 'chats_per_day'
+ * @param {number} increment - Amount to add (default: 1)
+ * @returns {Promise<{ allowed: boolean, current?: number, limit?: number|null }>}
+ */
+export async function checkAndIncrementUsage(tenantId, tenantType, meterType, increment = 1) {
+  const subscription = await getTenantSubscription(tenantId, tenantType)
+  if (!subscription) {
+    return { allowed: false, current: 0, limit: 0 }
+  }
+  let limit = subscription.limits?.[meterType]
+  if (limit === -1 || limit === null || limit === undefined) {
+    const res = await withTransaction(async (client) => {
+      await client.query(
+        `
+        INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date)
+        VALUES ($1, $2, $3, 0, 'DAILY', CURRENT_DATE)
+        ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING
+      `,
+        [tenantId, tenantType, meterType]
+      )
+      await client.query(
+        `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now()
+         WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE`,
+        [tenantId, tenantType, meterType, increment]
+      )
+      return { allowed: true }
+    })
+    return res
+  }
+  let overrides = []
+  try {
+    const result = await query(
+      `SELECT override_value FROM tenant_limit_override
+       WHERE tenant_id = $1 AND tenant_type = $2 AND limit_type = $3
+         AND (expiration_date IS NULL OR expiration_date > now())`,
+      [tenantId, tenantType, meterType]
+    )
+    overrides = result.rows
+  } catch (e) {
+    if (e.code !== '42P01') throw e
+  }
+  if (overrides.length > 0) limit = parseInt(overrides[0].override_value)
+  else limit = parseInt(limit)
+  const effectiveLimit = limit
+
+  return withTransaction(async (client) => {
+    await client.query(
+      `
+      INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date, limit_value)
+      VALUES ($1, $2, $3, 0, 'DAILY', CURRENT_DATE, $4)
+      ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING
+    `,
+      [tenantId, tenantType, meterType, effectiveLimit]
+    )
+    const { rows } = await client.query(
+      `SELECT current_value FROM usage_meter
+       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE
+       FOR UPDATE`,
+      [tenantId, tenantType, meterType]
+    )
+    const current = rows.length > 0 ? parseInt(rows[0].current_value || 0) : 0
+    if (current + increment > effectiveLimit) {
+      throw { allowed: false, current, limit: effectiveLimit }
+    }
+    await client.query(
+      `UPDATE usage_meter SET current_value = current_value + $4, last_updated = now(),
+        is_over_limit = (current_value + $4) >= $5
+       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = CURRENT_DATE`,
+      [tenantId, tenantType, meterType, increment, effectiveLimit]
+    )
+    return { allowed: true, current: current + increment, limit: effectiveLimit }
+  }).catch((err) => {
+    if (err && typeof err === 'object' && 'allowed' in err) return err
+    throw err
+  })
 }
 
 /**
@@ -590,6 +702,62 @@ export async function decrementUsage(tenantId, tenantType, meterType, decrement 
   }
 }
 
+/** Default front-route for upgrade CTA (monetization UX) */
+const DEFAULT_UPGRADE_PATH = '/app/settings'
+
+/**
+ * Get recommended plan names for a tenant type (for error payloads).
+ * @param {string} tenantType - RESTAURANT | SUPPLIER
+ * @returns {Promise<string[]>} Plan names (e.g. ['Bronze', 'Gold', 'Platinum'])
+ */
+export async function getRecommendedPlanNames(tenantType) {
+  try {
+    const { rows } = await query(
+      `SELECT name FROM subscription_plan WHERE tenant_type = $1 AND code != 'free' AND is_active = true ORDER BY display_order, name`,
+      [tenantType]
+    )
+    return rows.map((r) => r.name)
+  } catch (e) {
+    if (e.code === '42703') return ['Bronze', 'Gold', 'Platinum']
+    return []
+  }
+}
+
+/**
+ * Build standardized LIMIT_EXCEEDED error payload for monetization UX.
+ */
+export function buildLimitExceededPayload(limitCheck, meterType, currentPlanName, recommendedPlans, upgradeUrl = DEFAULT_UPGRADE_PATH) {
+  return {
+    name: 'LIMIT_EXCEEDED',
+    message: `You have reached your plan limit for ${meterType}`,
+    details: {
+      limitKey: meterType,
+      limitValue: limitCheck.limit,
+      currentUsage: limitCheck.current,
+      currentPlan: currentPlanName || null,
+      recommendedPlans: recommendedPlans || [],
+      upgradeUrl: upgradeUrl || DEFAULT_UPGRADE_PATH,
+    },
+  }
+}
+
+/**
+ * Build standardized FEATURE_NOT_AVAILABLE error payload for monetization UX.
+ */
+export function buildFeatureNotAvailablePayload(featureKey, currentPlanName, requiredPlan, recommendedPlans, upgradeUrl = DEFAULT_UPGRADE_PATH) {
+  return {
+    name: 'FEATURE_NOT_AVAILABLE',
+    message: 'This feature is not available in your current plan',
+    details: {
+      featureKey,
+      currentPlan: currentPlanName || null,
+      requiredPlan: requiredPlan || null,
+      recommendedPlans: recommendedPlans || [],
+      upgradeUrl: upgradeUrl || DEFAULT_UPGRADE_PATH,
+    },
+  }
+}
+
 /**
  * Middleware factory for checking plan limits
  * @param {string} meterType - Type of meter to check
@@ -602,21 +770,22 @@ export function requireWithinLimit(meterType, getTenantId, getTenantType) {
       const tenantId = getTenantId(req)
       const tenantType = getTenantType(req)
 
-      const limitCheck = await checkLimit(tenantId, tenantType, meterType)
+      const [limitCheck, subscription] = await Promise.all([
+        checkLimit(tenantId, tenantType, meterType),
+        getTenantSubscription(tenantId, tenantType),
+      ])
 
       if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+        const recommendedPlans = await getRecommendedPlanNames(tenantType)
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'LIMIT_EXCEEDED',
-            message: `You have reached your plan limit for ${meterType}`,
-            details: {
-              current: limitCheck.current,
-              limit: limitCheck.limit,
-              meterType,
-            },
-          },
+          error: buildLimitExceededPayload(
+            limitCheck,
+            meterType,
+            subscription?.plan_name || subscription?.plan_display_name,
+            recommendedPlans
+          ),
           requestId: req.requestId,
         })
       }
@@ -642,19 +811,22 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
       const tenantId = getTenantId(req)
       const tenantType = getTenantType(req)
 
-      const isEnabled = await isFeatureEnabled(tenantId, tenantType, featureKey)
+      const [isEnabled, subscription] = await Promise.all([
+        isFeatureEnabled(tenantId, tenantType, featureKey),
+        getTenantSubscription(tenantId, tenantType),
+      ])
 
       if (!isEnabled) {
+        const recommendedPlans = await getRecommendedPlanNames(tenantType)
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FEATURE_NOT_AVAILABLE',
-            message: `This feature is not available in your current plan`,
-            details: {
-              featureKey,
-            },
-          },
+          error: buildFeatureNotAvailablePayload(
+            featureKey,
+            subscription?.plan_name || subscription?.plan_display_name,
+            null,
+            recommendedPlans
+          ),
           requestId: req.requestId,
         })
       }

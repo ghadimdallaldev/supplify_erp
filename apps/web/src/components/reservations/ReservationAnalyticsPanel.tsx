@@ -1,7 +1,7 @@
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts'
 import type { ReservationAnalyticsResponse } from '../../types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs'
 import { Badge } from '../ui/badge'
 
 interface ReservationAnalyticsPanelProps {

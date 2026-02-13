@@ -925,6 +925,10 @@ export interface PublicAvailabilitySlot {
   isAvailable: boolean
 }
 
+export interface PublicAvailabilityResponse {
+  slots: PublicAvailabilitySlot[]
+}
+
 export interface PublicReservationSummary {
   id: string
   restaurantId: string

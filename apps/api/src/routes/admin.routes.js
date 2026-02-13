@@ -1,5 +1,6 @@
 import express from 'express'
 import { requireAuth, requireRole, getRequestTenant } from '../lib/rbac.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { z } from 'zod'
@@ -249,7 +250,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
       message: 'Dashboard response',
       statsKeys: Object.keys(stats),
       userRole,
-      impersonating: !!tenant,
+      impersonating: !!getEffectiveTenant(req),
     })
 
     res.json({

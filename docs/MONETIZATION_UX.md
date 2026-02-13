@@ -1,0 +1,39 @@
+# Monetization UX (Phase B)
+
+Soft walls, upgrade nudges, and standardized API error payloads for plan/limit blocks.
+
+## B1) Standardized API error payloads
+
+When the API blocks a request due to plan or limits, it returns a consistent shape so the frontend can show upgrade modals and links.
+
+### FEATURE_NOT_AVAILABLE (403)
+
+- **details:** `featureKey`, `currentPlan`, `requiredPlan` (or null), `recommendedPlans` (string[]), `upgradeUrl` (or front-route).
+
+### LIMIT_EXCEEDED (403)
+
+- **details:** `limitKey`, `limitValue`, `currentUsage`, `currentPlan`, `recommendedPlans`, `upgradeUrl`; optionally `requested` for bulk operations.
+
+Backend helpers: `buildLimitExceededPayload`, `buildFeatureNotAvailablePayload` in `lib/subscription.js`. Routes (orders, chat, products, quick-lists, and middleware `requireWithinLimit` / `requireFeature`) use these so all 403s for plan/limit include the above fields.
+
+## B2) Frontend soft-wall components
+
+- **UpgradeModal** (`components/UpgradeModal.tsx`): Shown when the API returns `LIMIT_EXCEEDED` or `FEATURE_NOT_AVAILABLE`. Displays current plan, what’s blocked (limit or feature), recommended plans, and CTA “View plans & upgrade” (navigates to `upgradeUrl`, default `/app/settings`).
+- **LimitExceededBanner** (`components/LimitExceededBanner.tsx`): Inline banner for limit-reached messaging; can be used on specific pages.
+- **FeatureLockedCard** (`components/FeatureLockedCard.tsx`): Card with lock icon and “View plans” for feature-gated content.
+
+The global **UpgradeModal** is opened via Redux: when `baseQueryWithUnwrap` in `services/api.ts` sees `error.name === 'LIMIT_EXCEEDED' | 'FEATURE_NOT_AVAILABLE'`, it dispatches `showMonetizationBlock`; `Layout` renders `<UpgradeModal />`, which reads from `state.monetization`.
+
+**80% usage warning:** In `Layout`, when `useGetEntitlementsQuery` returns entitlements, any meter with usage ≥ 80% and &lt; 100% is computed; up to three are shown in a small amber “Usage near limit” banner with a “View usage” link to settings.
+
+## B3) Upgrade nudges and Usage card
+
+- **Blocked-event tracking:** When a limit or feature block occurs, the frontend stores a timestamp in `localStorage` under `supplify_monetization_blocked`. The `monetization` slice keeps a rolling count of blocks in the last 7 days.
+- **Proactive nudge:** If `blockedCountLast7d >= 3`, `Layout` shows a blue banner: “You’ve hit plan limits several times recently. Upgrade for higher limits and more features” with “View plans” to settings.
+- **Usage card in Settings:** In **SubscriptionInfo** (Settings / subscription tab), a “Near limit (top 3)” section lists the top three meters by usage percentage (≥ 50%, &lt; 100%) so users see the most at-risk limits first.
+
+## Files touched (Phase B)
+
+**API:** `lib/subscription.js` (buildLimitExceededPayload, buildFeatureNotAvailablePayload, getRecommendedPlanNames; requireWithinLimit/requireFeature use them); `routes/orders.routes.js`, `routes/chat.routes.js`, `routes/products.routes.js`, `routes/quick-lists.routes.js` (standardized error payloads).
+
+**Web:** `store/index.ts` (monetization reducer); `services/api.ts` (dispatch showMonetizationBlock on limit/feature error); `features/monetization/monetizationSlice.ts`; `components/UpgradeModal.tsx`, `components/LimitExceededBanner.tsx`, `components/FeatureLockedCard.tsx`; `components/Layout.tsx` (UpgradeModal, 80% banner, proactive nudge, refreshBlockedCount); `components/SubscriptionInfo.tsx` (top 3 near-limit usage card).

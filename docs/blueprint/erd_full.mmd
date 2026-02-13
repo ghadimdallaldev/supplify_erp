@@ -1,0 +1,75 @@
+erDiagram
+  subscription_plan ||--o{ subscription : "has"
+  subscription ||--o{ invoice : "links"
+  subscription ||--o{ subscription_change_log : "history"
+  subscription_plan {
+    uuid id PK
+    text code
+    text tenant_type
+    jsonb limits
+    jsonb features
+  }
+  subscription {
+    uuid id PK
+    uuid tenant_id
+    text tenant_type
+    uuid plan_id FK
+    text status
+    uuid pending_plan_id FK
+    timestamptz pending_effective_at
+    text previous_plan_code
+  }
+  subscription_change_log {
+    uuid id PK
+    uuid subscription_id FK
+    uuid from_plan_id FK
+    uuid to_plan_id FK
+    uuid changed_by_admin_id FK
+    text reason
+  }
+  tenant_limit_override {
+    uuid id PK
+    uuid tenant_id
+    text tenant_type
+    text limit_type
+    int override_value
+    timestamp expiration_date
+  }
+  usage_meter {
+    uuid id PK
+    uuid tenant_id
+    text tenant_type
+    text meter_type
+    int current_value
+    date period_start_date
+  }
+  audit_logs {
+    uuid id PK
+    text action_type
+    uuid actor_user_id
+    text tenant_type
+    uuid tenant_id
+    jsonb payload_json
+    text request_id
+  }
+  invoice {
+    uuid id PK
+    uuid restaurant_id FK
+    uuid supplier_id FK
+    numeric total_amount
+    numeric balance_due
+    text status
+    date due_date
+  }
+  customer_order {
+    uuid id PK
+    uuid restaurant_id FK
+    text status
+  }
+  app_user {
+    uuid id PK
+    text role
+  }
+
+  subscription }o--|| restaurant : "tenant"
+  subscription }o--|| supplier : "tenant"

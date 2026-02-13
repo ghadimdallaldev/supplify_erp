@@ -56,6 +56,7 @@ vi.mock('../lib/subscription.js', () => ({
     isWarning: false,
     usagePercent: 0,
   }),
+  checkAndIncrementUsage: vi.fn().mockResolvedValue({ allowed: true }),
   incrementUsage: vi.fn().mockResolvedValue(true),
 }))
 

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useGetMeQuery } from '../services/api'
 import { useAppDispatch } from '../hooks/redux'
 import { setUser, clearUser, setLoading } from '../features/auth/authSlice'
-import toast from 'react-hot-toast'
 import type { ReactNode } from 'react'
 
 interface AuthGuardProps {

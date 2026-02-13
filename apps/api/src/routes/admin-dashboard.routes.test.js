@@ -24,6 +24,7 @@ vi.mock('../lib/impersonation.js', () => ({
 }))
 
 const mockGetEntitlements = vi.fn()
+vi.mock('../lib/audit.js', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('../lib/subscription.js', () => ({
   getEntitlements: (...args) => mockGetEntitlements(...args),
   RESTAURANT_LIMIT_KEYS: [
@@ -239,6 +240,7 @@ describe('Admin Dashboard Routes', () => {
         .mockResolvedValueOnce({
           rows: [{ id: 'sub-1', tenant_id: 't1', tenant_type: 'RESTAURANT', plan_id: 'p1' }],
         })
+        .mockResolvedValueOnce({ rows: [{ code: 'free' }] })
         .mockResolvedValueOnce({
           rows: [{ id: planIdSupplier, name: 'Bronze', tenant_type: 'SUPPLIER' }],
         })
@@ -250,6 +252,56 @@ describe('Admin Dashboard Routes', () => {
 
       expect(res.body.ok).toBe(false)
       expect(res.body.error.message).toMatch(/Plan tenant_type must match/)
+    })
+
+    it('rejects downgrade when usage exceeds target plan unless force=true with reason', async () => {
+      const planIdBronze = 'a0000002-0001-4000-8000-000000000002'
+      query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'sub-1', tenant_id: 't1', tenant_type: 'RESTAURANT', plan_id: 'p-gold' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ code: 'gold' }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: planIdBronze, name: 'Bronze', tenant_type: 'RESTAURANT', limits: { orders_per_day: 10 } }],
+        })
+
+      mockGetEntitlements.mockResolvedValueOnce({
+        usage: { orders_per_day: 50 },
+        plan: { code: 'gold' },
+      })
+
+      const res = await request(app)
+        .patch('/api/admin-dashboard/subscriptions/sub-1')
+        .send({ planId: planIdBronze })
+        .expect(400)
+
+      expect(res.body.ok).toBe(false)
+      expect(res.body.error.name).toBe('LIMIT_EXCEEDED')
+    })
+
+    it('allows downgrade when force=true and reason provided', async () => {
+      const planIdBronze = 'a0000002-0001-4000-8000-000000000002'
+      query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'sub-1', tenant_id: 't1', tenant_type: 'RESTAURANT', plan_id: 'p-gold' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ code: 'gold' }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: planIdBronze, name: 'Bronze', tenant_type: 'RESTAURANT', limits: {} }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'sub-1', plan_id: planIdBronze, plan_name: 'Bronze', tenant_id: 't1', tenant_type: 'RESTAURANT' }],
+        })
+        .mockResolvedValue({ rows: [] })
+
+      mockGetEntitlements.mockResolvedValueOnce({ usage: { orders_per_day: 5 } })
+
+      const res = await request(app)
+        .patch('/api/admin-dashboard/subscriptions/sub-1')
+        .send({ planId: planIdBronze, force: true, reason: 'Customer requested downgrade' })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
     })
   })
 })

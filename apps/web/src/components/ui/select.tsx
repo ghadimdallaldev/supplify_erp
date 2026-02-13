@@ -82,7 +82,7 @@ SelectValue.displayName = 'SelectValue'
 const SelectContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<'div'>
->(({ className, children, ...props }, ref) => {
+>(({ className, children }) => {
   // For native select, this doesn't render anything - items go directly in SelectTrigger
   return null
 })
@@ -92,9 +92,9 @@ SelectContent.displayName = 'SelectContent'
 const SelectItem = React.forwardRef<
   HTMLOptionElement,
   React.ComponentProps<'option'>
->(({ className, children, ...props }, ref) => {
+>(({ className, children, ...rest }, ref) => {
   return (
-    <option ref={ref} className={cn(className)} {...props}>
+    <option ref={ref} className={cn(className)} {...rest}>
       {children}
     </option>
   )

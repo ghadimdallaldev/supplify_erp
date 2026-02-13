@@ -3,7 +3,13 @@ import { requireAuth, requireRole, resolveTenantContext, requirePermission } fro
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
-import { checkLimit, incrementUsage } from '../lib/subscription.js'
+import {
+  checkLimit,
+  incrementUsage,
+  getTenantSubscription,
+  getRecommendedPlanNames,
+  buildLimitExceededPayload,
+} from '../lib/subscription.js'
 import { z } from 'zod'
 
 const router = express.Router()
@@ -361,18 +367,20 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       // Check plan limits for suppliers
       const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
       if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+        const [subscription, recommendedPlans] = await Promise.all([
+          getTenantSubscription(supplierId, 'SUPPLIER'),
+          getRecommendedPlanNames('SUPPLIER'),
+        ])
+        const err = buildLimitExceededPayload(
+          limitCheck,
+          'supplier_products_skus',
+          subscription?.plan_name || subscription?.plan_display_name,
+          recommendedPlans
+        )
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'LIMIT_EXCEEDED',
-            message: `You have reached your plan limit for products (${limitCheck.limit})`,
-            details: {
-              current: limitCheck.current,
-              limit: limitCheck.limit,
-              meterType: 'products',
-            },
-          },
+          error: err,
           requestId: req.requestId,
         })
       }

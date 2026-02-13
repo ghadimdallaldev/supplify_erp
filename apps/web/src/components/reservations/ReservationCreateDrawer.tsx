@@ -122,7 +122,7 @@ export function ReservationCreateDrawer({ tables, branchId, onCreated }: Reserva
               <Label className="text-xs uppercase">Preferred table</Label>
               <Select
                 value={form.tableId}
-                onChange={(event) => setForm((prev) => ({ ...prev, tableId: event.target.value }))}
+                onChange={(event) => setForm((prev) => ({ ...prev, tableId: (event.target as HTMLInputElement).value }))}
               >
                 <SelectTrigger placeholder="Auto assign">
                   <option value="">Auto assign</option>

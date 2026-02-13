@@ -1,9 +1,17 @@
 import { logger } from '../lib/logger.js';
+import { writeSystemEvent } from '../lib/systemEvent.js';
 
 // Error handling middleware
 export function errorHandler(err, req, res, next) {
   const requestId = req.requestId || 'unknown';
-  
+
+  writeSystemEvent({
+    type: 'api_error',
+    severity: 'error',
+    source: req.url?.split('?')[0] || 'unknown',
+    payload: { requestId, method: req.method, message: err.message },
+  }).catch(() => {});
+
   // Log the error
   logger.error('Unhandled error:', {
     error: err.message,

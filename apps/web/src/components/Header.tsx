@@ -15,7 +15,7 @@ export function Header() {
   const [markAllAsRead] = useMarkAllNotificationsReadMutation()
   
   // Fetch notifications
-  const { data: notificationsData, refetch: refetchNotifications } = useGetNotificationsQuery(
+  const { data: notificationsData } = useGetNotificationsQuery(
     { limit: 10, offset: 0 },
     { 
       pollingInterval: 60000, // Poll every 60 seconds (reduced from 30)
@@ -24,7 +24,7 @@ export function Header() {
   )
   
   const notifications = notificationsData?.notifications || []
-  const unreadCount = notifications.filter(n => !n.is_read).length
+  const unreadCount = notifications.filter((n: { is_read?: boolean }) => !n.is_read).length
 
   const handleLogout = async () => {
     try {

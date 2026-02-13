@@ -173,20 +173,22 @@ async function checkWarehouseLimit(tenantId, currentUsage = null) {
 }
 
 /**
- * Create audit log entry
+ * Create audit log entry (uses admin_audit_log columns: old_value, new_value, metadata)
  */
 async function createAuditLog(action, details) {
   try {
     await query(`
-      INSERT INTO admin_audit_log (action_type, target_entity_type, target_entity_id, action_description, admin_user_id, changes_json)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO admin_audit_log (action_type, target_entity_type, target_entity_id, action_description, admin_user_id, old_value, new_value, metadata)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [
       action,
       details.entityType || 'TENANT',
       details.entityId,
       details.description,
       details.adminUserId || null,
-      JSON.stringify(details.changes || {})
+      details.oldValue ? JSON.stringify(details.oldValue) : null,
+      details.newValue ? JSON.stringify(details.newValue) : null,
+      JSON.stringify(details.changes || details.metadata || {})
     ]);
   } catch (error) {
     logger.error('Error creating audit log:', error);

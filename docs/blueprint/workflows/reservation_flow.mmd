@@ -1,0 +1,6 @@
+flowchart LR
+  Public[Public /reserve] --> Book[Book slot]
+  Book --> Confirm[Confirmation]
+  Staff[Staff board] --> Manage[Manage reservations]
+  Manage --> Book
+  Public --> ManageLink["/reserve/manage/:token"]

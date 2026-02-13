@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
+  api,
   useGetAdminOverviewQuery,
   useGetAdminPlansQuery,
   useGetAdminSubscriptionsQuery,
@@ -60,6 +61,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const { data: subscriptionsData, isLoading: subscriptionsLoading } =
     useGetAdminSubscriptionsQuery({})
   const { data: auditLogsData, isLoading: auditLoading } = useGetAdminAuditLogsQuery({})
+  const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery()
+  const { data: financeData, isLoading: financeLoading } =
+    (api as any).useGetAdminFinancialOverviewQuery()
 
   // Load tenant data
   const {
@@ -269,8 +273,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               <TabsTrigger value="plans">Plans</TabsTrigger>
               <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
               <TabsTrigger value="tenants">Tenants</TabsTrigger>
+              <TabsTrigger value="health">Health</TabsTrigger>
+              <TabsTrigger value="finance">Finance</TabsTrigger>
               <TabsTrigger value="usage">Usage</TabsTrigger>
-              <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+              <TabsTrigger value="audit">Audit</TabsTrigger>
             </>
           )}
 
@@ -362,7 +368,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <Badge variant={status === 'ACTIVE' ? 'default' : 'secondary'}>
                           {status}
                         </Badge>
-                        <span className="font-semibold">{count}</span>
+                        <span className="font-semibold">{String(count)}</span>
                       </div>
                     ))}
                   </div>
@@ -799,6 +805,91 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="health" className="space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">System Health</h2>
+          {healthLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {healthData?.dbPool && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>DB Pool</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm">Total: {healthData.dbPool.total} · Idle: {healthData.dbPool.idle} · Waiting: {healthData.dbPool.waiting}</p>
+                  </CardContent>
+                </Card>
+              )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent API Errors</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!healthData?.recentApiErrors?.length ? (
+                    <p className="text-sm text-gray-500">No recent errors</p>
+                  ) : (
+                    <ul className="text-sm space-y-1 max-h-64 overflow-auto">
+                      {healthData.recentApiErrors.map((e: any, i: number) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-red-600">{e.type}</span>
+                          <span>{e.source}</span>
+                          <span className="text-gray-500 truncate">{e.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="finance" className="space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">Financial Overview</h2>
+          {financeLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>GMV & Revenue</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="flex justify-between"><span>GMV</span><span className="font-semibold">${financeData?.gmv?.toFixed(2) ?? '0.00'}</span></p>
+                  <p className="flex justify-between"><span>Outstanding</span><span className="font-semibold">${financeData?.outstanding?.toFixed(2) ?? '0.00'}</span></p>
+                  <p className="flex justify-between"><span>Overdue</span><span className="font-semibold text-red-600">${financeData?.overdue?.toFixed(2) ?? '0.00'}</span></p>
+                  <p className="flex justify-between"><span>MRR</span><span className="font-semibold">${financeData?.mrr?.toFixed(2) ?? '0.00'}</span></p>
+                  <p className="flex justify-between"><span>ARR</span><span className="font-semibold">${financeData?.arr?.toFixed(2) ?? '0.00'}</span></p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue by Plan</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!financeData?.revenueByPlan?.length ? (
+                    <p className="text-sm text-gray-500">No data</p>
+                  ) : (
+                    <ul className="text-sm space-y-1">
+                      {financeData.revenueByPlan.map((r: any, i: number) => (
+                        <li key={i} className="flex justify-between">
+                          <span>{r.planName} ({r.tenantType})</span>
+                          <span>${r.mrr?.toFixed(2)} · {r.subscriptionCount} subs</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
         </TabsContent>

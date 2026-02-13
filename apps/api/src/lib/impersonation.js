@@ -62,6 +62,20 @@ export function getImpersonationCookieName() {
 }
 
 /**
+ * Clear impersonation cookie (e.g. on logout to force stop impersonation).
+ * @param {import('express').Response} res
+ */
+export function clearImpersonationCookie(res) {
+  if (!res?.clearCookie) return
+  res.clearCookie(COOKIE_NAME, {
+    path: '/',
+    httpOnly: true,
+    secure: config.NODE_ENV === 'production',
+    sameSite: 'lax',
+  })
+}
+
+/**
  * Get effective tenant for the request.
  * When an admin is impersonating, returns the impersonated tenant only if the current user is the admin who started it.
  * Otherwise returns null (caller should resolve tenant by email or other means).

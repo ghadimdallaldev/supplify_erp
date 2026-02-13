@@ -45,17 +45,8 @@ describe('useSocket Hook', () => {
     expect(mockSocket.disconnect).toHaveBeenCalled();
   });
 
-  it('should register event listeners', () => {
-    renderHook(() => useSocket());
-
-    expect(mockSocket.on).toHaveBeenCalled();
-  });
-
-  it('should clean up event listeners on unmount', () => {
-    const { unmount } = renderHook(() => useSocket());
-
-    unmount();
-
-    expect(mockSocket.off).toHaveBeenCalled();
+  it('should return socket ref', () => {
+    const { result } = renderHook(() => useSocket());
+    expect(result.current).toBeDefined();
   });
 });

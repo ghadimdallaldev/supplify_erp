@@ -417,10 +417,10 @@ export const staffApi = api.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.map((note) => ({ type: 'StaffPerformance', id: note.id })),
-              { type: 'StaffPerformance', id: 'LIST' },
+              ...result.map((note) => ({ type: 'StaffPerformance' as const, id: note.id })),
+              { type: 'StaffPerformance' as const, id: 'LIST' },
             ]
-          : [{ type: 'StaffPerformance', id: 'LIST' }],
+          : [{ type: 'StaffPerformance' as const, id: 'LIST' }],
     }),
     createStaffPerformanceNote: build.mutation<StaffPerformanceNote, CreatePerformanceNoteInput>({
       query: (body) => ({
@@ -437,10 +437,10 @@ export const staffApi = api.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.map((exportRow) => ({ type: 'StaffPayroll', id: exportRow.id })),
-              { type: 'StaffPayroll', id: 'LIST' },
+              ...result.map((exportRow) => ({ type: 'StaffPayroll' as const, id: exportRow.id })),
+              { type: 'StaffPayroll' as const, id: 'LIST' },
             ]
-          : [{ type: 'StaffPayroll', id: 'LIST' }],
+          : [{ type: 'StaffPayroll' as const, id: 'LIST' }],
     }),
     createStaffPayrollExport: build.mutation<StaffPayrollExport, CreatePayrollExportInput>({
       query: (body) => ({

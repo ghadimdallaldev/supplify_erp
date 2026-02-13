@@ -8,6 +8,7 @@ import type {
   ProductsResponse,
   Order,
   CreateOrderRequest,
+  CreateManualOrderRequest,
   UpdateOrderRequest,
   OrderFilters,
   OrdersResponse,
@@ -21,8 +22,6 @@ import type {
   CreatePriceRequest,
   Inventory,
   UpdateInventoryRequest,
-  DashboardStats,
-  AuditLog,
   AuditLogFilters,
   AuditLogsResponse,
   PresignedUrlRequest,
@@ -36,7 +35,6 @@ import type {
   SubscriptionPlanChangePreview,
   UsageMeter,
   PublicRestaurant,
-  PublicAvailabilitySlot,
   PublicAvailabilityResponse,
   PublicReservationSummary,
   StaffPortalSession,
@@ -49,7 +47,8 @@ import type {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 // Custom baseQuery to unwrap API response envelope
-const baseQueryWithUnwrap = async (args, api, extraOptions) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
     baseUrl: API_URL,
     credentials: 'include',
@@ -60,10 +59,11 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
   })(args, api, extraOptions)
 
   // Handle 401 Unauthorized errors (token expired or invalid)
-  if (result.error && (result.error.status === 401 || result.error.status === 'FETCH_ERROR')) {
+  const err = result.error as { status?: number | string; data?: unknown } | undefined
+  if (err && (err.status === 401 || err.status === 'FETCH_ERROR')) {
     // Check if it's an authentication error
-    const errorData = result.error.data
-    if (typeof errorData === 'object' && errorData?.error?.name === 'UNAUTHORIZED') {
+    const errorData = err.data
+    if (typeof errorData === 'object' && (errorData as { error?: { name?: string } })?.error?.name === 'UNAUTHORIZED') {
       // Token expired or invalid - redirect to login
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         // Clear any auth state
@@ -74,20 +74,35 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
   }
 
   // Unwrap the API response envelope { ok: true/false, data: ..., error: ... }
-  if (result.data && typeof result.data === 'object' && 'ok' in result.data) {
-    if (result.data.ok) {
+  const data = result.data as { ok?: boolean; data?: unknown; error?: { name?: string } } | undefined
+  if (data && typeof data === 'object' && 'ok' in data) {
+    if (data.ok) {
       // Return the actual data
-      return { ...result, data: result.data.data }
+      return { ...result, data: data.data }
     } else {
       // Check for authentication errors in the response
-      if (result.data.error?.name === 'UNAUTHORIZED' || result.data.error?.name === 'JWT_EXPIRED') {
+      if (data.error?.name === 'UNAUTHORIZED' || data.error?.name === 'JWT_EXPIRED') {
         // Redirect to login on auth errors
         if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
           window.location.href = '/login?expired=true'
         }
       }
-      // Return an error
-      return { ...result, error: { status: 'CUSTOM_ERROR', data: result.data.error } }
+      // Dispatch monetization soft-wall when blocked by plan/limit (Phase B)
+      const respErr = data.error
+      if (respErr?.name === 'LIMIT_EXCEEDED' || respErr?.name === 'FEATURE_NOT_AVAILABLE') {
+        try {
+          const { showMonetizationBlock } = await import(
+            /* @vite-ignore */ '../features/monetization/monetizationSlice'
+          )
+          api.dispatch(
+            showMonetizationBlock({
+              type: respErr.name === 'LIMIT_EXCEEDED' ? 'limit' : 'feature',
+              payload: ((respErr as { details?: unknown }).details || {}) as import('../features/monetization/monetizationSlice').LimitExceededPayload | import('../features/monetization/monetizationSlice').FeatureNotAvailablePayload,
+            })
+          )
+        } catch (_) {}
+      }
+      return { ...result, error: { status: 'CUSTOM_ERROR', data: respErr } }
     }
   }
 
@@ -96,7 +111,7 @@ const baseQueryWithUnwrap = async (args, api, extraOptions) => {
 
 export const api = createApi({
   reducerPath: 'api',
-  baseQuery: baseQueryWithUnwrap,
+  baseQuery: baseQueryWithUnwrap as any,
   tagTypes: [
     'User',
     'Product',
@@ -201,7 +216,7 @@ export const api = createApi({
     }),
     getOrder: builder.query<Order, string>({
       query: (id) => `/api/orders/${id}`,
-      providesTags: (result, error, id) => [{ type: 'Order', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Order', id }],
     }),
     createOrder: builder.mutation<Order, CreateOrderRequest>({
       query: (body) => ({
@@ -225,13 +240,11 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { id, data }) => {
-        const tags = [
+      invalidatesTags: (_result, _error, { id, data }) => {
+        const tags: Array<{ type: 'Order'; id: string } | 'Order' | 'Receiving'> = [
           { type: 'Order', id },
-          'Order', // Also invalidate all orders list
+          'Order',
         ]
-        // If status changed to COMPLETED, also invalidate receiving queries
-        // so restaurant's pending orders list updates immediately
         if (data?.status === 'COMPLETED') {
           tags.push('Receiving')
         }
@@ -243,7 +256,7 @@ export const api = createApi({
         url: `/api/orders/${id}/remind`,
         method: 'POST',
       }),
-      invalidatesTags: (result, error, id) => [{ type: 'Order', id }, 'Order', 'Notification'],
+      invalidatesTags: (_result, _error, id) => [{ type: 'Order', id }, 'Order', 'Notification'],
     }),
 
     // Supplier endpoints
@@ -332,7 +345,7 @@ export const api = createApi({
     }),
     getRestaurant: builder.query<Restaurant, string>({
       query: (id) => `/api/restaurants/${id}`,
-      providesTags: (result, error, id) => [{ type: 'Restaurant', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Restaurant', id }],
     }),
     getRestaurantMe: builder.query<{ restaurant: Restaurant }, void>({
       query: () => '/api/restaurants/me',
@@ -564,7 +577,7 @@ export const api = createApi({
     getPendingOrdersForReceiving: builder.query<any, void>({
       query: () => '/api/receiving/pending-orders',
       providesTags: ['Receiving'],
-      pollingInterval: 15000,
+      ...({ pollingInterval: 15000 } as { pollingInterval?: number }),
     }),
     getReceivingHistory: builder.query<any, void>({
       query: () => '/api/receiving/history',
@@ -1039,6 +1052,35 @@ export const api = createApi({
       }),
       providesTags: ['Admin'],
     }),
+    getAdminHealth: builder.query<
+      {
+        jobFailures: any[] | null
+        webhookFailures: any[] | null
+        emailFailures: any[] | null
+        recentApiErrors: any[]
+        dbPool: { total: number; idle: number; waiting: number } | null
+      },
+      void
+    >({
+      query: () => '/api/admin-dashboard/health',
+      providesTags: ['Admin'],
+    }),
+    getAdminFinancialOverview: builder.query<
+      {
+        gmv: number
+        outstanding: number
+        overdue: number
+        revenueByPlan: any[]
+        mrr: number
+        arr: number
+        topTenantsByRevenue: any[]
+        topTenantsByOverdue: any[]
+      },
+      void
+    >({
+      query: () => '/api/admin-dashboard/financial-overview',
+      providesTags: ['Admin'],
+    }),
     getAdminSuppliers: builder.query<{ suppliers: any[] }, void>({
       query: () => '/api/admin-dashboard/tenants/suppliers',
       providesTags: ['Admin'],
@@ -1206,4 +1248,5 @@ export const {
   useGetImpersonationStatusQuery,
   useStartImpersonationMutation,
   useStopImpersonationMutation,
-} = api
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+} = api as any

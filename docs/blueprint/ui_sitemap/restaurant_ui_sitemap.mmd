@@ -1,0 +1,35 @@
+flowchart TB
+  Root["/"]
+  App["/app"]
+  Dashboard["/app/dashboard\nDashboardPage"]
+  Orders["/app/orders\nOrdersPage"]
+  OrderDetail["/app/orders/:id\nOrderDetailPage"]
+  Cart["/app/cart\nCartPage"]
+  Products["/app/products\nProductsPage"]
+  QuickLists["/app/quick-lists\nQuickListsPage"]
+  RestaurantInventory["/app/restaurant-inventory\nRestaurantInventoryPage"]
+  Suppliers["/app/suppliers\nSuppliersPage"]
+  Receiving["/app/receiving\nReceivingPage"]
+  Reservations["/app/reservations\nReservationsPage"]
+  Staff["/app/staff\nStaffPage"]
+  Chat["/app/chat\nChatPage"]
+  Invoices["/app/invoices\nInvoicesPage"]
+  Settings["/app/settings\nSettingsPage\nSubscriptionInfo, Usage"]
+  Onboarding["/app/onboarding\nRestaurantOnboardingPage"]
+
+  Root --> App
+  App --> Dashboard
+  App --> Orders
+  Orders --> OrderDetail
+  App --> Cart
+  App --> Products
+  App --> QuickLists
+  App --> RestaurantInventory
+  App --> Suppliers
+  App --> Receiving
+  App --> Reservations
+  App --> Staff
+  App --> Chat
+  App --> Invoices
+  App --> Settings
+  App --> Onboarding

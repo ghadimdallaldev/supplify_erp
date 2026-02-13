@@ -54,7 +54,7 @@ export function SubscriptionInfo() {
 
   const limitEntries = Object.entries(limits).filter(
     ([_, limit]) => limit !== null && limit !== undefined
-  )
+  ) as [string, number][]
 
   return (
     <Card>
@@ -89,19 +89,51 @@ export function SubscriptionInfo() {
           )}
         </div>
 
-        {/* Usage */}
+        {/* Usage — top 3 near-limit highlighted */}
         <div className="space-y-4">
           <h4 className="font-semibold flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
             Usage
           </h4>
+          {(() => {
+            const withPct = limitEntries
+              .map(([limitKey, limit]) => {
+                const current = usage[limitKey] ?? 0
+                const effectiveLimit: number | null = limit === -1 ? null : limit
+                if (effectiveLimit === null) return null
+                const limitNum = effectiveLimit
+                const pct = limitNum > 0 ? (current / limitNum) * 100 : 0
+                return { limitKey, limit: limitNum, current, pct }
+              })
+              .filter((x): x is NonNullable<typeof x> => x !== null)
+            const topNearLimit = [...withPct]
+              .filter(({ pct }) => pct >= 50 && pct < 100)
+              .sort((a, b) => b.pct - a.pct)
+              .slice(0, 3)
+            if (topNearLimit.length > 0) {
+              return (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4">
+                  <p className="text-sm font-medium text-amber-800 mb-2">Near limit (top 3)</p>
+                  <ul className="space-y-1 text-sm text-amber-700">
+                    {topNearLimit.map(({ limitKey, current, limit, pct }) => (
+                      <li key={limitKey}>
+                        {LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')}: {current} / {limit} ({Math.round(pct)}%)
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            }
+            return null
+          })()}
 
           {limitEntries.map(([limitKey, limit]) => {
             const current = usage[limitKey] ?? 0
-            const effectiveLimit = limit === -1 ? null : limit
+            const effectiveLimit: number | null = limit === -1 ? null : limit
             if (effectiveLimit === null) return null
-            const pct = effectiveLimit > 0 ? (current / effectiveLimit) * 100 : 0
-            const isOver = current >= effectiveLimit
+            const limitNum = effectiveLimit
+            const pct = limitNum > 0 ? (current / limitNum) * 100 : 0
+            const isOver = current >= limitNum
             const isWarning = pct >= 80 && pct < 100
             const label = LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')
             return (
@@ -113,7 +145,7 @@ export function SubscriptionInfo() {
                       isOver ? 'text-red-600 font-medium' : isWarning ? 'text-amber-600' : ''
                     }
                   >
-                    {current} / {effectiveLimit}
+                    {current} / {limitNum}
                   </span>
                 </div>
                 <Progress
