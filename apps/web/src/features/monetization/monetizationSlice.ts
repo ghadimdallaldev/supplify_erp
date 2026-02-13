@@ -48,7 +48,7 @@ function pushBlockedTimestamp(): number[] {
   timestamps.push(now)
   try {
     localStorage.setItem(BLOCKED_KEY, JSON.stringify(timestamps))
-  } catch {
+  } catch (_) {
     // ignore localStorage errors (e.g. private mode)
   }
   return timestamps
