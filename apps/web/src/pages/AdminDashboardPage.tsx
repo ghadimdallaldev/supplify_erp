@@ -846,6 +846,93 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               </Card>
             </>
           )}
+
+          {/* Default Usage view when on main Admin Dashboard (not Supplier/Restaurant Admin) */}
+          {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
+            <>
+              <Card>
+                <CardHeader>
+                  <h3 className="text-xl font-bold text-gray-900">Platform usage overview</h3>
+                  <p className="text-sm text-gray-600">
+                    Aggregated usage across all suppliers and restaurants. Use Supplier Admin or
+                    Restaurant Admin for per-tenant detail.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Suppliers</span>
+                        <Building2 className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {suppliersData?.suppliers?.length ?? 0}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Total products:{' '}
+                        {suppliersData?.suppliers?.reduce(
+                          (sum, s) => sum + parseInt(s.product_count || 0),
+                          0
+                        ) ?? 0}
+                      </p>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Restaurants</span>
+                        <Users className="h-4 w-4 text-green-600" />
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {restaurantsData?.restaurants?.length ?? 0}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        30-day orders:{' '}
+                        {restaurantsData?.restaurants?.reduce(
+                          (sum, r) => sum + parseInt(r.orders_last_30d || 0),
+                          0
+                        ) ?? 0}
+                      </p>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Suppliers over limit</span>
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {suppliersData?.suppliers?.filter((s) => {
+                          const limit =
+                            s.plan_name === 'Free' ? 50 : s.plan_name === 'Bronze' ? 1000 : 10000
+                          return parseInt(s.product_count || 0) > limit
+                        }).length ?? 0}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Product limit exceeded</p>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Restaurant spend (30d)</span>
+                        <DollarSign className="h-4 w-4 text-green-600" />
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900">
+                        $
+                        {(
+                          restaurantsData?.restaurants?.reduce(
+                            (sum, r) => sum + parseFloat(r.total_spent || 0),
+                            0
+                          ) ?? 0
+                        ).toFixed(2)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Across all restaurants</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              {(suppliersLoading || restaurantsLoading) && (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading usage data…
+                </div>
+              )}
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="audit">
