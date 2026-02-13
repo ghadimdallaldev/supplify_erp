@@ -42,7 +42,6 @@ vi.mock('../lib/auth.js', () => ({
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: vi.fn(async (req, res, next) => {
-    // Simple mock - just set userData and continue
     req.userData = req.userData || {
       ...mockUser,
       id: 'user-1',
@@ -52,6 +51,11 @@ vi.mock('../lib/rbac.js', () => ({
       created_at: new Date(),
     }
     next()
+  }),
+  getRequestTenant: vi.fn().mockResolvedValue({
+    tenantId: 'restaurant-1',
+    tenantType: 'RESTAURANT',
+    tenantName: 'Test Restaurant',
   }),
   upsertUser: vi.fn().mockResolvedValue({
     id: 'user-1',
@@ -67,6 +71,11 @@ vi.mock('../lib/rbac.js', () => ({
   getUserBySub: vi
     .fn()
     .mockResolvedValue({ id: 'user-1', email: 'test@example.com', keycloak_sub: 'sub-123' }),
+}))
+
+vi.mock('../lib/permissions.js', () => ({
+  getRolesForUser: vi.fn().mockResolvedValue(['RESTAURANT_OWNER']),
+  getPermissionsForUser: vi.fn().mockResolvedValue(['SETTINGS_VIEW', 'ORDERS_VIEW']),
 }))
 
 // Import routes after mocks
@@ -299,6 +308,10 @@ describe('Auth Routes', () => {
       expect(response.body.ok).toBe(true)
       expect(response.body.data.email).toBe('test@example.com')
       expect(response.body.data.role).toBe('RESTAURANT')
+      expect(Array.isArray(response.body.data.tenantRoles)).toBe(true)
+      expect(Array.isArray(response.body.data.tenantPermissions)).toBe(true)
+      expect(response.body.data.tenantRoles).toContain('RESTAURANT_OWNER')
+      expect(response.body.data.tenantPermissions).toContain('SETTINGS_VIEW')
     })
   })
 

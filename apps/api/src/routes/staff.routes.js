@@ -1,6 +1,6 @@
 import express from 'express'
 import { z, ZodError } from 'zod'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getRestaurantIdByEmail } from '../lib/tenant.js'
@@ -444,7 +444,9 @@ function mapPayrollExportRow(row) {
   }
 }
 
-router.get('/members', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.use(requireAuth, resolveTenantContext, requirePermission('STAFF_VIEW'))
+
+router.get('/members', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await resolveRestaurantId(req)
     const { rows } = await query(

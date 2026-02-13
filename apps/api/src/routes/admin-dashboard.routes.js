@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { query } from '../lib/db.js'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireAuth, requireRole, resolveAdminContext, requirePermission } from '../lib/rbac.js'
 import { z } from 'zod'
 import { logger } from '../lib/logger.js'
 import { ZodError } from 'zod'
@@ -13,6 +13,8 @@ import {
 } from '../lib/impersonation.js'
 
 const router = Router()
+
+router.use(resolveAdminContext, requirePermission('ADMIN_ACCESS'))
 
 // ========================================
 // AUDIT LOGGING HELPERS
@@ -59,7 +61,7 @@ async function logAudit(
 // ========================================
 // OVERVIEW / DASHBOARD
 // ========================================
-router.get('/overview', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.get('/overview', async (req, res) => {
   try {
     // Get platform stats
     const [
@@ -147,7 +149,7 @@ router.get('/overview', requireAuth, requireRole(['ADMIN']), async (req, res) =>
 // ========================================
 // PLANS MANAGEMENT
 // ========================================
-router.get('/plans', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.get('/plans', async (req, res) => {
   try {
     const { rows: plans } = await query(`
       SELECT * FROM subscription_plan
@@ -189,7 +191,7 @@ const createPlanSchema = z.object({
   isActive: z.boolean().default(true),
 })
 
-router.post('/plans', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.post('/plans', async (req, res) => {
   try {
     const planData = createPlanSchema.parse(req.body)
 
@@ -265,7 +267,7 @@ const updatePlanSchema = z.object({
   isActive: z.boolean().optional(),
 })
 
-router.patch('/plans/:id', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.patch('/plans/:id', async (req, res) => {
   try {
     const { id } = req.params
     const updateData = updatePlanSchema.parse(req.body)
@@ -382,7 +384,7 @@ router.patch('/plans/:id', requireAuth, requireRole(['ADMIN']), async (req, res)
 // ========================================
 // SUBSCRIPTIONS MANAGEMENT
 // ========================================
-router.get('/subscriptions', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.get('/subscriptions', async (req, res) => {
   try {
     const { status, tenantType } = req.query
 
@@ -444,7 +446,7 @@ const updateSubscriptionSchema = z.object({
   cancelReason: z.string().optional(),
 })
 
-router.patch('/subscriptions/:id', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.patch('/subscriptions/:id', async (req, res) => {
   try {
     const { id } = req.params
     const updateData = updateSubscriptionSchema.parse(req.body)
@@ -538,7 +540,7 @@ router.patch('/subscriptions/:id', requireAuth, requireRole(['ADMIN']), async (r
 // ========================================
 // USAGE & QUOTAS
 // ========================================
-router.get('/usage/:tenantId', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.get('/usage/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params
     const { tenantType, period } = req.query
@@ -575,7 +577,7 @@ router.get('/usage/:tenantId', requireAuth, requireRole(['ADMIN']), async (req, 
 // ========================================
 // AUDIT LOGS
 // ========================================
-router.get('/audit-logs', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.get('/audit-logs', async (req, res) => {
   try {
     const { limit = 50, offset = 0, tenantId, actionType } = req.query
 
@@ -637,7 +639,7 @@ const impersonateSchema = z.object({
  * POST /api/admin-dashboard/impersonate
  * Start impersonating a tenant (Restaurant or Supplier). Cannot impersonate an admin.
  */
-router.post('/impersonate', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.post('/impersonate', async (req, res) => {
   try {
     const { tenantId, tenantType } = impersonateSchema.parse(req.body)
 
@@ -728,7 +730,7 @@ router.post('/impersonate', requireAuth, requireRole(['ADMIN']), async (req, res
  * POST /api/admin-dashboard/impersonate/stop
  * End impersonation and clear the cookie.
  */
-router.post('/impersonate/stop', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.post('/impersonate/stop', async (req, res) => {
   try {
     const ctx = req.impersonationContext
     // Clear with same options as setCookie so the browser actually removes it
@@ -773,7 +775,7 @@ router.post('/impersonate/stop', requireAuth, requireRole(['ADMIN']), async (req
  * GET /api/admin-dashboard/impersonate
  * Return current impersonation status (for UI banner).
  */
-router.get('/impersonate', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.get('/impersonate', async (req, res) => {
   try {
     const effective = getEffectiveTenant(req)
     if (!effective) {
@@ -814,7 +816,7 @@ router.get('/impersonate', requireAuth, requireRole(['ADMIN']), async (req, res)
 // ========================================
 
 // Get suppliers with detailed info
-router.get('/tenants/suppliers', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.get('/tenants/suppliers', async (req, res) => {
   try {
     const { rows: suppliers } = await query(`
       SELECT 
@@ -852,7 +854,7 @@ router.get('/tenants/suppliers', requireAuth, requireRole(['ADMIN']), async (req
 })
 
 // Get restaurants with detailed info
-router.get('/tenants/restaurants', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+router.get('/tenants/restaurants', async (req, res) => {
   try {
     const { rows: restaurants } = await query(`
       SELECT 
@@ -893,191 +895,171 @@ router.get('/tenants/restaurants', requireAuth, requireRole(['ADMIN']), async (r
  * POST /api/admin-dashboard/tenants/:id/override-limit
  * Manually override a tenant's limit (e.g., grant temporary increase)
  */
-router.post(
-  '/tenants/:tenantType/:id/override-limit',
-  requireAuth,
-  requireRole(['ADMIN']),
-  async (req, res) => {
-    try {
-      const { id: tenantId, tenantType } = req.params
-      const { limit_type, override_value, expiration_date, reason } = req.body
+router.post('/tenants/:tenantType/:id/override-limit', async (req, res) => {
+  try {
+    const { id: tenantId, tenantType } = req.params
+    const { limit_type, override_value, expiration_date, reason } = req.body
 
-      // Create override record
-      const { rows: overrides } = await query(
-        `
+    // Create override record
+    const { rows: overrides } = await query(
+      `
       INSERT INTO tenant_limit_override (
         tenant_id, tenant_type, limit_type, override_value, expiration_date, reason, created_by
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `,
-        [
-          tenantId,
-          tenantType.toUpperCase(),
-          limit_type,
-          override_value,
-          expiration_date || null,
-          reason || null,
-          req.userData.id,
-        ]
-      )
-
-      // Log audit
-      await logAudit(
-        req,
-        'OVERRIDE_LIMIT',
-        `Granted ${limit_type} override: ${override_value}`,
-        tenantType.toUpperCase(),
+      [
         tenantId,
-        null,
-        { limit_type, override_value, expiration_date, reason }
-      )
+        tenantType.toUpperCase(),
+        limit_type,
+        override_value,
+        expiration_date || null,
+        reason || null,
+        req.userData.id,
+      ]
+    )
 
-      res.json({
-        ok: true,
-        data: { override: overrides[0] },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Override limit error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to set override' },
-        requestId: req.requestId,
-      })
-    }
+    // Log audit
+    await logAudit(
+      req,
+      'OVERRIDE_LIMIT',
+      `Granted ${limit_type} override: ${override_value}`,
+      tenantType.toUpperCase(),
+      tenantId,
+      null,
+      { limit_type, override_value, expiration_date, reason }
+    )
+
+    res.json({
+      ok: true,
+      data: { override: overrides[0] },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Override limit error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to set override' },
+      requestId: req.requestId,
+    })
   }
-)
+})
 
 /**
  * DELETE /api/admin-dashboard/tenants/:id/override-limit/:overrideId
  * Remove a tenant limit override
  */
-router.delete(
-  '/tenants/:tenantType/:id/override-limit/:overrideId',
-  requireAuth,
-  requireRole(['ADMIN']),
-  async (req, res) => {
-    try {
-      const { overrideId } = req.params
+router.delete('/tenants/:tenantType/:id/override-limit/:overrideId', async (req, res) => {
+  try {
+    const { overrideId } = req.params
 
-      const { rows: deleted } = await query(
-        `
+    const { rows: deleted } = await query(
+      `
       DELETE FROM tenant_limit_override WHERE id = $1 RETURNING *
     `,
-        [overrideId]
-      )
+      [overrideId]
+    )
 
-      if (deleted.length === 0) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: { name: 'NOT_FOUND', message: 'Override not found' },
-          requestId: req.requestId,
-        })
-      }
-
-      // Log audit
-      await logAudit(
-        req,
-        'REMOVE_OVERRIDE',
-        `Removed limit override`,
-        deleted[0].tenant_type,
-        deleted[0].tenant_id,
-        deleted[0],
-        null
-      )
-
-      res.json({
-        ok: true,
-        data: { override: deleted[0] },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Remove override error:', error)
-      res.status(500).json({
+    if (deleted.length === 0) {
+      return res.status(404).json({
         ok: false,
         data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to remove override' },
+        error: { name: 'NOT_FOUND', message: 'Override not found' },
         requestId: req.requestId,
       })
     }
+
+    // Log audit
+    await logAudit(
+      req,
+      'REMOVE_OVERRIDE',
+      `Removed limit override`,
+      deleted[0].tenant_type,
+      deleted[0].tenant_id,
+      deleted[0],
+      null
+    )
+
+    res.json({
+      ok: true,
+      data: { override: deleted[0] },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Remove override error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to remove override' },
+      requestId: req.requestId,
+    })
   }
-)
+})
 
 // Get supplier usage details
-router.get(
-  '/tenants/suppliers/:id/usage',
-  requireAuth,
-  requireRole(['ADMIN']),
-  async (req, res) => {
-    try {
-      const { id } = req.params
+router.get('/tenants/suppliers/:id/usage', async (req, res) => {
+  try {
+    const { id } = req.params
 
-      const { rows: usage } = await query(
-        `
+    const { rows: usage } = await query(
+      `
       SELECT * FROM usage_meter
       WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER'
       ORDER BY meter_type, period_start_date DESC
     `,
-        [id]
-      )
+      [id]
+    )
 
-      res.json({
-        ok: true,
-        data: { usage },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Get supplier usage error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to get supplier usage' },
-        requestId: req.requestId,
-      })
-    }
+    res.json({
+      ok: true,
+      data: { usage },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get supplier usage error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get supplier usage' },
+      requestId: req.requestId,
+    })
   }
-)
+})
 
 // Get restaurant usage details
-router.get(
-  '/tenants/restaurants/:id/usage',
-  requireAuth,
-  requireRole(['ADMIN']),
-  async (req, res) => {
-    try {
-      const { id } = req.params
+router.get('/tenants/restaurants/:id/usage', async (req, res) => {
+  try {
+    const { id } = req.params
 
-      const { rows: usage } = await query(
-        `
+    const { rows: usage } = await query(
+      `
       SELECT * FROM usage_meter
       WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT'
       ORDER BY meter_type, period_start_date DESC
     `,
-        [id]
-      )
+      [id]
+    )
 
-      res.json({
-        ok: true,
-        data: { usage },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Get restaurant usage error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurant usage' },
-        requestId: req.requestId,
-      })
-    }
+    res.json({
+      ok: true,
+      data: { usage },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get restaurant usage error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurant usage' },
+      requestId: req.requestId,
+    })
   }
-)
+})
 
 export default router

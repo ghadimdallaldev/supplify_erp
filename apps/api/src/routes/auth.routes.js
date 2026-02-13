@@ -8,7 +8,8 @@ import {
 } from '../lib/auth.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
-import { requireAuth } from '../lib/rbac.js'
+import { requireAuth, getRequestTenant } from '../lib/rbac.js'
+import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -119,7 +120,7 @@ router.get('/callback', async (req, res) => {
   }
 })
 
-// Get current user info
+// Get current user info (includes tenant-scoped roles and permissions for RBAC)
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = req.userData
@@ -144,6 +145,21 @@ router.get('/me', requireAuth, async (req, res) => {
       }
     }
 
+    // Tenant-scoped RBAC: roles and permissions for current tenant (or admin scope)
+    let tenantRoles = []
+    let tenantPermissions = []
+    let adminRoles = []
+    let adminPermissions = []
+    const tenant = await getRequestTenant(req)
+    if (tenant) {
+      tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
+      tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
+    }
+    if (user.role === 'ADMIN') {
+      adminRoles = await getRolesForUser(user.id, null, 'ADMIN')
+      adminPermissions = await getPermissionsForUser(user.id, null, 'ADMIN')
+    }
+
     res.json({
       ok: true,
       data: {
@@ -152,6 +168,10 @@ router.get('/me', requireAuth, async (req, res) => {
         displayName: user.display_name,
         role: user.role,
         createdAt: user.created_at,
+        tenantRoles,
+        tenantPermissions,
+        adminRoles,
+        adminPermissions,
         ...additionalData,
       },
       error: null,

@@ -28,15 +28,30 @@ const navigation = [
   { name: 'Chat', href: '/app/chat', icon: MessageSquare },
 ]
 
-const restaurantNavigation = [
+const restaurantNavigation: {
+  name: string
+  href: string
+  icon: typeof List
+  permission?: string
+}[] = [
   { name: 'Quick Lists', href: '/app/quick-lists', icon: List },
   { name: 'Cart', href: '/app/cart', icon: ShoppingBag },
   { name: 'Suppliers', href: '/app/suppliers', icon: Building2 },
-  { name: 'Reservations', href: '/app/reservations', icon: CalendarDays },
-  { name: 'Staff', href: '/app/staff', icon: UserCircle2 },
-  { name: 'Inventory', href: '/app/restaurant-inventory', icon: Package2 },
+  {
+    name: 'Reservations',
+    href: '/app/reservations',
+    icon: CalendarDays,
+    permission: 'RESERVATIONS_VIEW',
+  },
+  { name: 'Staff', href: '/app/staff', icon: UserCircle2, permission: 'STAFF_VIEW' },
+  {
+    name: 'Inventory',
+    href: '/app/restaurant-inventory',
+    icon: Package2,
+    permission: 'INVENTORY_VIEW',
+  },
   { name: 'Receiving', href: '/app/receiving', icon: PackageCheck },
-  { name: 'Invoices', href: '/app/invoices', icon: FileText },
+  { name: 'Invoices', href: '/app/invoices', icon: FileText, permission: 'INVOICES_VIEW' },
 ]
 
 const adminNavigation = [
@@ -48,6 +63,7 @@ const adminNavigation = [
 export function Sidebar() {
   const location = useLocation()
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
   const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
     skip: user?.role !== 'ADMIN',
   })
@@ -61,18 +77,21 @@ export function Sidebar() {
     isAdmin && impersonation?.active && impersonation?.tenantType === 'SUPPLIER'
 
   // Build navigation: when impersonating, show that tenant's experience; else by role
-  let allNavigation: any[] = []
+  let allNavigation: { name: string; href: string; icon: any; permission?: string }[] = []
   if (isRestaurant || impersonatingRestaurant) {
-    allNavigation = [...navigation, ...restaurantNavigation]
+    allNavigation = [
+      ...navigation,
+      ...restaurantNavigation.filter((item) => !item.permission || can(item.permission)),
+    ]
   } else if (isAdmin && !impersonation?.active) {
-    allNavigation = [...adminNavigation]
+    allNavigation = can('ADMIN_ACCESS') ? [...adminNavigation] : []
   } else if (isSupplier || impersonatingSupplier) {
     allNavigation = [
       ...navigation,
       { name: 'Restaurants', href: '/app/restaurants', icon: Users },
       { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck },
-      { name: 'Invoices', href: '/app/invoices', icon: FileText },
-    ]
+      { name: 'Invoices', href: '/app/invoices', icon: FileText, permission: 'INVOICES_VIEW' },
+    ].filter((item) => !item.permission || can(item.permission))
   }
 
   return (
@@ -104,20 +123,22 @@ export function Sidebar() {
             )
           })}
 
-          <li>
-            <Link
-              to="/app/settings"
-              className={cn(
-                'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                location.pathname === '/app/settings'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-gray-700 hover:bg-gray-100'
-              )}
-            >
-              <Settings className="mr-3 h-5 w-5" />
-              Settings
-            </Link>
-          </li>
+          {can('SETTINGS_VIEW') && (
+            <li>
+              <Link
+                to="/app/settings"
+                className={cn(
+                  'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                  location.pathname === '/app/settings'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-gray-700 hover:bg-gray-100'
+                )}
+              >
+                <Settings className="mr-3 h-5 w-5" />
+                Settings
+              </Link>
+            </li>
+          )}
         </ul>
       </nav>
     </div>

@@ -1,11 +1,19 @@
 import express from 'express'
-import { requireAuth, requireRole, getRestaurantIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getRestaurantIdForRequest,
+  resolveTenantContext,
+  requirePermission,
+} from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 
 const router = express.Router()
+
+router.use(requireAuth, resolveTenantContext, requirePermission('INVENTORY_VIEW'))
 
 // Validation schemas
 const adjustInventorySchema = z.object({
@@ -24,7 +32,7 @@ const updateInventorySchema = z.object({
 })
 
 // Get restaurant inventory with products
-router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId = await getRestaurantIdForRequest(req)
     if (!restaurantId) {

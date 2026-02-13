@@ -1,6 +1,12 @@
 import express from 'express'
 import PDFDocument from 'pdfkit'
-import { requireAuth, requireRole, getRequestTenant } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getRequestTenant,
+  resolveTenantContext,
+  requirePermission,
+} from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
@@ -9,6 +15,8 @@ import { z } from 'zod'
 import { notifyOrderStatusChange } from '../services/notification.service.js'
 
 const router = express.Router()
+
+router.use(requireAuth, resolveTenantContext, requirePermission('ORDERS_VIEW'))
 
 /** Build PDF buffer for a packing slip */
 function buildPackingSlipPdf(packingSlip) {
@@ -524,7 +532,7 @@ async function handleOrderDelivery(orderId, userData, res) {
 }
 
 // List orders (role-aware)
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const params = orderListSchema.parse(req.query)
 

@@ -1,9 +1,12 @@
 import express from 'express'
 import { z } from 'zod'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { notifyReservationCreated, notifyReservationWaitlist } from '../services/notification.service.js'
+import {
+  notifyReservationCreated,
+  notifyReservationWaitlist,
+} from '../services/notification.service.js'
 
 const router = express.Router()
 
@@ -31,7 +34,7 @@ const upsertTablesSchema = z.object({
           })
           .optional(),
         isActive: z.boolean().optional(),
-      }),
+      })
     )
     .min(1),
 })
@@ -64,7 +67,7 @@ async function resolveRestaurantId(email) {
       SELECT id FROM restaurant
       WHERE contact_email = $1
     `,
-    [email],
+    [email]
   )
 
   if (!rows.length) {
@@ -89,7 +92,7 @@ async function fetchTables(restaurantId, branchId) {
         ${branchFilter}
       ORDER BY created_at
     `,
-    params,
+    params
   )
   return rows
 }
@@ -116,72 +119,65 @@ async function fetchReservations(restaurantId, branchId, dayStart) {
         ${branchFilter}
       ORDER BY r.scheduled_at
     `,
-    branchId ? [...params, branchId] : params,
+    branchId ? [...params, branchId] : params
   )
 
   return rows
 }
 
-router.get(
-  '/board',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const params = boardQuerySchema.parse(req.query)
-      const restaurantId = await resolveRestaurantId(req.userData.email)
-      const tables = await fetchTables(restaurantId, params.branchId)
-      const reservations = await fetchReservations(restaurantId, params.branchId, params.date)
+router.use(requireAuth, resolveTenantContext, requirePermission('RESERVATIONS_VIEW'))
 
-      const waitlist = await query(
-        `
+router.get('/board', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const params = boardQuerySchema.parse(req.query)
+    const restaurantId = await resolveRestaurantId(req.userData.email)
+    const tables = await fetchTables(restaurantId, params.branchId)
+    const reservations = await fetchReservations(restaurantId, params.branchId, params.date)
+
+    const waitlist = await query(
+      `
           SELECT *
           FROM reservation_waitlist
           WHERE restaurant_id = $1
             AND status IN ('WAITING','NOTIFIED')
           ORDER BY requested_at
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: {
-          day: params.date,
-          tables,
-          reservations,
-          waitlist: waitlist.rows,
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Reservation board fetch failed', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'BOARD_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
+    res.json({
+      ok: true,
+      data: {
+        day: params.date,
+        tables,
+        reservations,
+        waitlist: waitlist.rows,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Reservation board fetch failed', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'BOARD_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
-router.post(
-  '/tables',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = upsertTablesSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req.userData.email)
+router.post('/tables', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = upsertTablesSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req.userData.email)
 
-      const result = await withTransaction(async (client) => {
-        const upserted = []
-        for (const table of payload.tables) {
-          if (table.id) {
-            const { rows } = await client.query(
-              `
+    const result = await withTransaction(async (client) => {
+      const upserted = []
+      for (const table of payload.tables) {
+        if (table.id) {
+          const { rows } = await client.query(
+            `
                 UPDATE reservation_table
                 SET name = $1,
                     capacity = $2,
@@ -193,67 +189,68 @@ router.post(
                 WHERE id = $7 AND restaurant_id = $8
                 RETURNING *
               `,
-              [
-                table.name,
-                table.capacity,
-                table.branchId || null,
-                table.layout ? JSON.stringify(table.layout) : null,
-                table.position ? JSON.stringify(table.position) : null,
-                table.isActive ?? null,
-                table.id,
-                restaurantId,
-              ],
-            )
-            if (rows[0]) upserted.push(rows[0])
-          } else {
-            const { rows } = await client.query(
-              `
+            [
+              table.name,
+              table.capacity,
+              table.branchId || null,
+              table.layout ? JSON.stringify(table.layout) : null,
+              table.position ? JSON.stringify(table.position) : null,
+              table.isActive ?? null,
+              table.id,
+              restaurantId,
+            ]
+          )
+          if (rows[0]) upserted.push(rows[0])
+        } else {
+          const { rows } = await client.query(
+            `
                 INSERT INTO reservation_table (restaurant_id, branch_id, name, capacity, layout, position, is_active)
                 VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, COALESCE($7, TRUE))
                 RETURNING *
               `,
-              [
-                restaurantId,
-                table.branchId || null,
-                table.name,
-                table.capacity,
-                JSON.stringify(table.layout || {}),
-                JSON.stringify(
-                  table.position || {
-                    x: 0,
-                    y: 0,
-                  },
-                ),
-                table.isActive ?? true,
-              ],
-            )
-            upserted.push(rows[0])
-          }
+            [
+              restaurantId,
+              table.branchId || null,
+              table.name,
+              table.capacity,
+              JSON.stringify(table.layout || {}),
+              JSON.stringify(
+                table.position || {
+                  x: 0,
+                  y: 0,
+                }
+              ),
+              table.isActive ?? true,
+            ]
+          )
+          upserted.push(rows[0])
         }
-        return upserted
-      })
+      }
+      return upserted
+    })
 
-      res.json({
-        ok: true,
-        data: { tables: result },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Table upsert failed', { error: error.message, stack: error.stack })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'TABLE_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
+    res.json({
+      ok: true,
+      data: { tables: result },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Table upsert failed', { error: error.message, stack: error.stack })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'TABLE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 async function calculateAvailability(restaurantId, branchId, scheduledAt, durationMinutes, client) {
   const tables = await fetchTables(restaurantId, branchId)
-  const totalSeats = tables.filter((t) => t.is_active).reduce((sum, table) => sum + Number(table.capacity || 0), 0)
+  const totalSeats = tables
+    .filter((t) => t.is_active)
+    .reduce((sum, table) => sum + Number(table.capacity || 0), 0)
 
   const overlap = await client.query(
     `
@@ -264,7 +261,7 @@ async function calculateAvailability(restaurantId, branchId, scheduledAt, durati
         AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[]') &&
             tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[]')
     `,
-    [restaurantId, scheduledAt, durationMinutes],
+    [restaurantId, scheduledAt, durationMinutes]
   )
 
   const reservedSeats = overlap.rows.reduce((sum, row) => sum + Number(row.party_size || 0), 0)
@@ -278,37 +275,33 @@ async function calculateAvailability(restaurantId, branchId, scheduledAt, durati
   }
 }
 
-router.post(
-  '/',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const payload = reservationCreateSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req.userData.email)
-      const scheduledAt = new Date(payload.scheduledAt)
+router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const payload = reservationCreateSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req.userData.email)
+    const scheduledAt = new Date(payload.scheduledAt)
 
-      const reservation = await withTransaction(async (client) => {
-        const { totalSeats, utilization, tables } = await calculateAvailability(
-          restaurantId,
-          payload.branchId,
-          scheduledAt.toISOString(),
-          payload.durationMinutes,
-          client,
-        )
+    const reservation = await withTransaction(async (client) => {
+      const { totalSeats, utilization, tables } = await calculateAvailability(
+        restaurantId,
+        payload.branchId,
+        scheduledAt.toISOString(),
+        payload.durationMinutes,
+        client
+      )
 
-        if (!totalSeats) {
-          throw new Error('Please configure tables before creating reservations')
-        }
+      if (!totalSeats) {
+        throw new Error('Please configure tables before creating reservations')
+      }
 
-        let assignedTables = payload.tableIds || []
-        if (!assignedTables.length) {
-          const availableTables = tables
-            .filter((table) => table.is_active)
-            .sort((a, b) => Number(a.capacity) - Number(b.capacity))
+      let assignedTables = payload.tableIds || []
+      if (!assignedTables.length) {
+        const availableTables = tables
+          .filter((table) => table.is_active)
+          .sort((a, b) => Number(a.capacity) - Number(b.capacity))
 
-          const { rows: conflictRows } = await client.query(
-            `
+        const { rows: conflictRows } = await client.query(
+          `
               SELECT unnest(tables) as table_id
               FROM reservation
               WHERE restaurant_id = $1
@@ -316,24 +309,24 @@ router.post(
                 AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[]') &&
                     tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[]')
             `,
-            [restaurantId, scheduledAt.toISOString(), payload.durationMinutes],
-          )
-          const conflictingTableIds = new Set(conflictRows.map((row) => row.table_id))
-          let seatsAccumulated = 0
-          for (const table of availableTables) {
-            if (conflictingTableIds.has(table.id)) continue
-            assignedTables.push(table.id)
-            seatsAccumulated += Number(table.capacity)
-            if (seatsAccumulated >= payload.partySize) break
-          }
+          [restaurantId, scheduledAt.toISOString(), payload.durationMinutes]
+        )
+        const conflictingTableIds = new Set(conflictRows.map((row) => row.table_id))
+        let seatsAccumulated = 0
+        for (const table of availableTables) {
+          if (conflictingTableIds.has(table.id)) continue
+          assignedTables.push(table.id)
+          seatsAccumulated += Number(table.capacity)
+          if (seatsAccumulated >= payload.partySize) break
         }
+      }
 
-        const autoConfirm = utilization < 0.9
-        const status = autoConfirm ? 'CONFIRMED' : payload.allowWaitlist ? 'WAITLIST' : 'PENDING'
-        const waitlist = status === 'WAITLIST'
+      const autoConfirm = utilization < 0.9
+      const status = autoConfirm ? 'CONFIRMED' : payload.allowWaitlist ? 'WAITLIST' : 'PENDING'
+      const waitlist = status === 'WAITLIST'
 
-        const { rows } = await client.query(
-          `
+      const { rows } = await client.query(
+        `
             INSERT INTO reservation (
               restaurant_id,
               branch_id,
@@ -352,26 +345,26 @@ router.post(
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
           `,
-          [
-            restaurantId,
-            payload.branchId || null,
-            assignedTables,
-            status,
-            payload.customerName,
-            payload.customerPhone || null,
-            payload.partySize,
-            scheduledAt.toISOString(),
-            payload.durationMinutes,
-            payload.notes || null,
-            waitlist,
-            autoConfirm,
-            req.userData.id || null,
-          ],
-        )
+        [
+          restaurantId,
+          payload.branchId || null,
+          assignedTables,
+          status,
+          payload.customerName,
+          payload.customerPhone || null,
+          payload.partySize,
+          scheduledAt.toISOString(),
+          payload.durationMinutes,
+          payload.notes || null,
+          waitlist,
+          autoConfirm,
+          req.userData.id || null,
+        ]
+      )
 
-        if (waitlist) {
-          await client.query(
-            `
+      if (waitlist) {
+        await client.query(
+          `
               INSERT INTO reservation_waitlist (
                 restaurant_id,
                 branch_id,
@@ -383,68 +376,66 @@ router.post(
               )
               VALUES ($1, $2, $3, $4, $5, $6, $7)
             `,
-            [
-              restaurantId,
-              payload.branchId || null,
-              payload.customerName,
-              payload.customerPhone || null,
-              payload.partySize,
-              scheduledAt.toISOString(),
-              payload.notes || null,
-            ],
-          )
-        }
-
-        if (status === 'WAITLIST') {
-          logger.info('Reservation waitlisted - notification stub', {
-            customer: payload.customerName,
-            phone: payload.customerPhone,
+          [
             restaurantId,
-          })
-        }
-
-        return rows[0]
-      })
-
-      try {
-        await notifyReservationCreated(reservation)
-        if (reservation.waitlist) {
-          await notifyReservationWaitlist(reservation)
-        }
-      } catch (notifyError) {
-        logger.warn('Reservation notification failed', { error: notifyError.message, reservationId: reservation.id })
+            payload.branchId || null,
+            payload.customerName,
+            payload.customerPhone || null,
+            payload.partySize,
+            scheduledAt.toISOString(),
+            payload.notes || null,
+          ]
+        )
       }
 
-      res.status(201).json({
-        ok: true,
-        data: { reservation },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Reservation creation failed', { error: error.message, stack: error.stack })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'RESERVATION_CREATE_ERROR', message: error.message },
-        requestId: req.requestId,
+      if (status === 'WAITLIST') {
+        logger.info('Reservation waitlisted - notification stub', {
+          customer: payload.customerName,
+          phone: payload.customerPhone,
+          restaurantId,
+        })
+      }
+
+      return rows[0]
+    })
+
+    try {
+      await notifyReservationCreated(reservation)
+      if (reservation.waitlist) {
+        await notifyReservationWaitlist(reservation)
+      }
+    } catch (notifyError) {
+      logger.warn('Reservation notification failed', {
+        error: notifyError.message,
+        reservationId: reservation.id,
       })
     }
-  },
-)
 
-router.patch(
-  '/:id',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const { id } = req.params
-      const payload = reservationStatusSchema.parse(req.body)
-      const restaurantId = await resolveRestaurantId(req.userData.email)
+    res.status(201).json({
+      ok: true,
+      data: { reservation },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Reservation creation failed', { error: error.message, stack: error.stack })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'RESERVATION_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
-      const { rows } = await query(
-        `
+router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params
+    const payload = reservationStatusSchema.parse(req.body)
+    const restaurantId = await resolveRestaurantId(req.userData.email)
+
+    const { rows } = await query(
+      `
           UPDATE reservation
           SET status = $1,
               notes = COALESCE($2, notes),
@@ -453,57 +444,52 @@ router.patch(
           WHERE id = $3 AND restaurant_id = $4
           RETURNING *
         `,
-        [payload.status, payload.notes || null, id, restaurantId],
-      )
+      [payload.status, payload.notes || null, id, restaurantId]
+    )
 
-      if (!rows.length) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: { name: 'NOT_FOUND', message: 'Reservation not found' },
-          requestId: req.requestId,
-        })
-      }
-
-      res.json({
-        ok: true,
-        data: { reservation: rows[0] },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      res.status(400).json({
+    if (!rows.length) {
+      return res.status(404).json({
         ok: false,
         data: null,
-        error: { name: 'RESERVATION_UPDATE_ERROR', message: error.message },
+        error: { name: 'NOT_FOUND', message: 'Reservation not found' },
         requestId: req.requestId,
       })
     }
-  },
-)
 
-router.get(
-  '/analytics',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  async (req, res) => {
-    try {
-      const params = analyticsQuerySchema.parse(req.query)
-      const restaurantId = await resolveRestaurantId(req.userData.email)
+    res.json({
+      ok: true,
+      data: { reservation: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'RESERVATION_UPDATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
-      const rangeMultiplier = {
-        day: 1,
-        week: 7,
-        month: 30,
-      }
+router.get('/analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const params = analyticsQuerySchema.parse(req.query)
+    const restaurantId = await resolveRestaurantId(req.userData.email)
 
-      const daysBack = rangeMultiplier[params.range] || 7
-      const start = new Date()
-      start.setHours(0, 0, 0, 0)
-      start.setDate(start.getDate() - daysBack)
+    const rangeMultiplier = {
+      day: 1,
+      week: 7,
+      month: 30,
+    }
 
-      const { rows } = await query(
-        `
+    const daysBack = rangeMultiplier[params.range] || 7
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - daysBack)
+
+    const { rows } = await query(
+      `
           SELECT
             date_trunc('hour', scheduled_at) AS hour_slot,
             COUNT(*) FILTER (WHERE status = 'CONFIRMED') AS confirmed,
@@ -517,40 +503,40 @@ router.get(
           GROUP BY hour_slot
           ORDER BY hour_slot
         `,
-        params.branchId ? [restaurantId, start.toISOString(), params.branchId] : [restaurantId, start.toISOString()],
-      )
+      params.branchId
+        ? [restaurantId, start.toISOString(), params.branchId]
+        : [restaurantId, start.toISOString()]
+    )
 
-      const { rows: waitlistRows } = await query(
-        `
+    const { rows: waitlistRows } = await query(
+      `
           SELECT status, COUNT(*) AS total
           FROM reservation_waitlist
           WHERE restaurant_id = $1
           GROUP BY status
         `,
-        [restaurantId],
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: {
-          periodStart: start,
-          slots: rows,
-          waitlist: waitlistRows,
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Reservation analytics error', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'ANALYTICS_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-  },
-)
+    res.json({
+      ok: true,
+      data: {
+        periodStart: start,
+        slots: rows,
+        waitlist: waitlistRows,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Reservation analytics error', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'ANALYTICS_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
 
 export { router as reservationsRoutes }
-

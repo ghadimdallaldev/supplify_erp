@@ -1,8 +1,13 @@
 import express from 'express'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getRequestTenant,
+  resolveTenantContext,
+  requirePermission,
+} from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { getRequestTenant } from '../lib/rbac.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { checkLimit, checkUsageWithWarning, incrementUsage } from '../lib/subscription.js'
 import { z } from 'zod'
@@ -77,8 +82,10 @@ async function getOrCreateConversation(supplierId, restaurantId) {
   return conversation
 }
 
+router.use(requireAuth, resolveTenantContext, requirePermission('CHAT_VIEW'))
+
 // List conversations for current user
-router.get('/conversations', requireAuth, async (req, res) => {
+router.get('/conversations', async (req, res) => {
   try {
     let queryText
     let queryParams

@@ -1,15 +1,23 @@
 import express from 'express'
 const router = express.Router()
-import { requireAuth, requireRole, getRestaurantIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getRestaurantIdForRequest,
+  resolveTenantContext,
+  requirePermission,
+} from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkBranchLimit, createAuditLog } from '../lib/plan-enforcement.js'
+
+router.use(requireAuth, resolveTenantContext, requirePermission('SETTINGS_VIEW'))
 
 /**
  * GET /api/branches
  * Get all branches for authenticated restaurant
  */
-router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const restaurantId =
       (await getRestaurantIdForRequest(req)) ||

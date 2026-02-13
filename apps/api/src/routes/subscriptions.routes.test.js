@@ -17,6 +17,20 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   }),
   requireRole: vi.fn(() => (req, res, next) => next()),
+  resolveTenantContext: (req, res, next) => {
+    req.tenantContext = req.tenantContext || {
+      permissions: ['SUBSCRIPTIONS_VIEW'],
+      tenantId: 'rest-1',
+      tenantType: 'RESTAURANT',
+    }
+    next()
+  },
+  requirePermission: () => (req, res, next) => next(),
+  getRequestTenant: vi.fn().mockResolvedValue({
+    tenantId: 'rest-1',
+    tenantType: 'RESTAURANT',
+    tenantName: 'Test Restaurant',
+  }),
 }))
 
 const mockGetTenantSubscription = vi.fn()
@@ -79,11 +93,23 @@ describe('Subscriptions Routes', () => {
     })
 
     it('returns subscription for supplier when found', async () => {
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce({
+        tenantId: 'supp-1',
+        tenantType: 'SUPPLIER',
+        tenantName: 'Test Supplier',
+      })
+
       const appSupplier = express()
       appSupplier.use(express.json())
       appSupplier.use((req, res, next) => {
         req.requestId = 'test-request-id'
         req.userData = { ...mockSupplierUser, email: 'supplier@example.com' }
+        req.tenantContext = {
+          permissions: ['SUBSCRIPTIONS_VIEW'],
+          tenantId: 'supp-1',
+          tenantType: 'SUPPLIER',
+        }
         next()
       })
       appSupplier.use('/api/subscriptions', subscriptionsRoutes)

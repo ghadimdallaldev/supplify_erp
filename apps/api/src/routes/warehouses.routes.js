@@ -1,15 +1,23 @@
 import express from 'express'
 const router = express.Router()
-import { requireAuth, requireRole, getSupplierIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getSupplierIdForRequest,
+  resolveTenantContext,
+  requirePermission,
+} from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkWarehouseLimit, createAuditLog } from '../lib/plan-enforcement.js'
+
+router.use(requireAuth, resolveTenantContext, requirePermission('WAREHOUSES_VIEW'))
 
 /**
  * GET /api/warehouses
  * Get all warehouses for authenticated supplier
  */
-router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
+router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
     const supplierId =
       (await getSupplierIdForRequest(req)) ||

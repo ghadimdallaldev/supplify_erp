@@ -2,6 +2,7 @@ import { verifyToken, refreshAccessToken } from './auth.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { getEffectiveTenant } from './impersonation.js'
+import { getRolesForUser, getPermissionsForUser, hasPermission } from './permissions.js'
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -357,6 +358,104 @@ export async function getRestaurantIdForRequest(req) {
 export async function getSupplierIdForRequest(req) {
   const tenant = await getRequestTenant(req)
   return tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
+}
+
+/**
+ * Resolve tenant context and attach roles + permissions for the current user in that tenant.
+ * Sets req.tenantContext = { tenantId, tenantType, tenantName, roles[], permissions[] }.
+ * When admin is impersonating, context is for the impersonated tenant; permissions are still for the current user
+ * (admin with no user_role in tenant gets [] and is allowed via requirePermission special-case).
+ * Use after requireAuth on restaurant/supplier routes.
+ */
+export function resolveTenantContext(req, res, next) {
+  getRequestTenant(req)
+    .then(async (tenant) => {
+      if (!tenant) {
+        req.tenantContext = null
+        return next()
+      }
+      const roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+      const permissions = await getPermissionsForUser(
+        req.userData.id,
+        tenant.tenantId,
+        tenant.tenantType
+      )
+      req.tenantContext = {
+        tenantId: tenant.tenantId,
+        tenantType: tenant.tenantType,
+        tenantName: tenant.tenantName || '',
+        roles,
+        permissions,
+      }
+      next()
+    })
+    .catch((err) => {
+      logger.error('resolveTenantContext error', { error: err.message })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to resolve tenant context' },
+        requestId: req.requestId,
+      })
+    })
+}
+
+/**
+ * Resolve admin context and attach roles + permissions for the current user in ADMIN scope.
+ * Sets req.adminContext = { roles[], permissions[] }.
+ * Use after requireAuth and requireRole(['ADMIN']) on admin routes.
+ */
+export function resolveAdminContext(req, res, next) {
+  if (req.userData?.role !== 'ADMIN') {
+    req.adminContext = null
+    return next()
+  }
+  getRolesForUser(req.userData.id, null, 'ADMIN')
+    .then(async (roles) => {
+      const permissions = await getPermissionsForUser(req.userData.id, null, 'ADMIN')
+      req.adminContext = { roles, permissions }
+      next()
+    })
+    .catch((err) => {
+      logger.error('resolveAdminContext error', { error: err.message })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to resolve admin context' },
+        requestId: req.requestId,
+      })
+    })
+}
+
+/**
+ * Require a permission in tenant or admin context. Use after resolveTenantContext or resolveAdminContext.
+ * Allows access if:
+ * - tenantContext.permissions or adminContext.permissions includes the key (or broader _MANAGE), or
+ * - user is ADMIN and (impersonating a tenant, or on admin route with adminContext).
+ * @param {string} permissionKey - e.g. 'ORDERS_VIEW', 'SETTINGS_MANAGE'
+ */
+export function requirePermission(permissionKey) {
+  return (req, res, next) => {
+    const tenant = req.tenantContext
+    const admin = req.adminContext
+    const perms = tenant?.permissions ?? admin?.permissions ?? []
+    if (hasPermission(perms, permissionKey)) {
+      return next()
+    }
+    if (req.userData?.role === 'ADMIN') {
+      if (getEffectiveTenant(req)) return next()
+      if (!tenant && admin) return next()
+    }
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'FORBIDDEN',
+        message: `Missing permission: ${permissionKey}`,
+      },
+      requestId: req.requestId,
+    })
+  }
 }
 
 // Check if user owns resource (for suppliers/restaurants)

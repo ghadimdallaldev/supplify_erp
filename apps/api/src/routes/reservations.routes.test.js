@@ -15,13 +15,16 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   requireRole: () => (req, res, next) => next(),
+  resolveTenantContext: (req, res, next) => next(),
+  requirePermission: () => (req, res, next) => next(),
+  getRequestTenant: vi.fn().mockResolvedValue(null),
 }))
 
 const queryMock = vi.fn()
 const withTransactionMock = vi.fn((handler) =>
   handler({
     query: (...args) => queryMock(...args),
-  }),
+  })
 )
 
 vi.mock('../lib/db.js', () => ({
@@ -77,16 +80,13 @@ describe('reservations.routes', () => {
       })
       .mockResolvedValue({ rows: [] })
 
-    const response = await request(app)
-      .post('/api/reservations')
-      .send({
-        customerName: 'Test Guest',
-        partySize: 2,
-        scheduledAt: new Date().toISOString(),
-      })
+    const response = await request(app).post('/api/reservations').send({
+      customerName: 'Test Guest',
+      partySize: 2,
+      scheduledAt: new Date().toISOString(),
+    })
     expect(response.status).toBe(201)
 
     expect(response.body.data.reservation.status).toBe('CONFIRMED')
   })
 })
-

@@ -14,6 +14,11 @@ vi.mock('../lib/rbac.js', () => ({
     req.userData = { ...mockUser }
     next()
   },
+  getRequestTenant: vi.fn().mockResolvedValue({
+    tenantId: 'restaurant-1',
+    tenantType: 'RESTAURANT',
+    tenantName: 'Golden Fork Restaurant',
+  }),
 }))
 
 const queryMock = vi.fn()
@@ -57,15 +62,11 @@ describe('orders.calendar.routes', () => {
     getCacheMock.mockResolvedValue(null)
 
     queryMock
-      // Query 1: Get restaurant by email
-      .mockResolvedValueOnce({
-        rows: [{ id: 'restaurant-1', name: 'Golden Fork Restaurant' }],
-      })
-      // Query 2: Check if branch_id column exists
+      // Query 1: Check if branch_id column exists (tenant from getRequestTenant mock)
       .mockResolvedValueOnce({
         rows: [{ exists: true }],
       })
-      // Query 3: Get orders
+      // Query 2: Get orders
       .mockResolvedValueOnce({
         rows: [
           {
@@ -113,19 +114,25 @@ describe('orders.calendar.routes', () => {
 
     expect(response.body.ok).toBe(true)
     expect(response.body.data.events).toHaveLength(3)
-    expect(response.body.data.filters.statuses).toEqual(expect.arrayContaining(['DELIVERED', 'ISSUED']))
+    expect(response.body.data.filters.statuses).toEqual(
+      expect.arrayContaining(['DELIVERED', 'ISSUED'])
+    )
     expect(response.body.data.filters.suppliers).toContainEqual({
       id: 'supplier-1',
       name: 'Fresh Foods Co.',
     })
     expect(response.body.data.events[0].role).toBe('RESTAURANT')
-    expect(setCacheMock).toHaveBeenCalledWith(expect.stringContaining('orders-calendar'), expect.any(Object), 300)
+    expect(setCacheMock).toHaveBeenCalledWith(
+      expect.stringContaining('orders-calendar'),
+      expect.any(Object),
+      300
+    )
   })
 
   it('returns cached payload when available', async () => {
     mockUser.role = 'RESTAURANT'
     mockUser.email = 'orders@goldenfork.com'
-    
+
     const cachedData = {
       tenant: { id: 'restaurant-1', role: 'RESTAURANT' },
       events: [],
@@ -133,15 +140,11 @@ describe('orders.calendar.routes', () => {
       filters: { statuses: [], suppliers: [], branches: [], categories: [] },
     }
 
-    // Mock tenant query (happens before cache check)
-    queryMock.mockResolvedValueOnce({
-      rows: [{ id: 'restaurant-1', name: 'Golden Fork Restaurant' }],
-    })
-    // Mock branch column check query
+    // Tenant from getRequestTenant mock; branch column check is first query
     queryMock.mockResolvedValueOnce({
       rows: [{ exists: true }],
     })
-    
+
     // Mock cache to return data
     getCacheMock.mockResolvedValue(cachedData)
 
@@ -149,25 +152,28 @@ describe('orders.calendar.routes', () => {
     expect(response.body.ok).toBe(true)
     expect(response.body.data).toEqual(cachedData)
     expect(setCacheMock).not.toHaveBeenCalled()
-    // Tenant query and branch check should be made even when cache is hit (cache check happens after tenant lookup)
-    expect(queryMock).toHaveBeenCalledTimes(2)
+    // With getRequestTenant mocked, only branch column check runs before cache
+    expect(queryMock).toHaveBeenCalledTimes(1)
   })
 
   it('filters events by status for supplier users', async () => {
+    const rbac = await import('../lib/rbac.js')
+    vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce({
+      tenantId: 'supplier-1',
+      tenantType: 'SUPPLIER',
+      tenantName: 'Fresh Foods Co.',
+    })
+
     mockUser.role = 'SUPPLIER'
     mockUser.email = 'contact@freshfoods.com'
     getCacheMock.mockResolvedValue(null)
 
     queryMock
-      // Query 1: Get supplier by email
-      .mockResolvedValueOnce({
-        rows: [{ id: 'supplier-1', name: 'Fresh Foods Co.' }],
-      })
-      // Query 2: Check if branch_id column exists
+      // Query 1: Check if branch_id column exists (tenant from getRequestTenant mock)
       .mockResolvedValueOnce({
         rows: [{ exists: true }],
       })
-      // Query 3: Get orders
+      // Query 2: Get orders
       .mockResolvedValueOnce({
         rows: [
           {
@@ -187,11 +193,11 @@ describe('orders.calendar.routes', () => {
           },
         ],
       })
-      // Query 4: Get order count
+      // Query 3: Get order count
       .mockResolvedValueOnce({
         rows: [{ count: '1' }],
       })
-      // Query 5: Get invoices
+      // Query 4: Get invoices
       .mockResolvedValueOnce({
         rows: [
           {
@@ -226,4 +232,3 @@ describe('orders.calendar.routes', () => {
     })
   })
 })
-

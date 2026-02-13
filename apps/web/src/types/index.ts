@@ -5,6 +5,14 @@ export interface User {
   displayName: string
   role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT'
   createdAt: string
+  /** Tenant-scoped role codes (e.g. RESTAURANT_OWNER, SUPPLIER_STAFF) */
+  tenantRoles?: string[]
+  /** Tenant-scoped permission codes for RBAC nav gating */
+  tenantPermissions?: string[]
+  /** Admin role codes when user.role === 'ADMIN' */
+  adminRoles?: string[]
+  /** Admin permission codes for admin nav gating */
+  adminPermissions?: string[]
 }
 
 export interface UserWithDetails extends User {
