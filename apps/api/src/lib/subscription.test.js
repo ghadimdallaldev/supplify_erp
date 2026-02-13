@@ -124,13 +124,71 @@ describe('Subscription lib', () => {
       const result = await recommendPlan({ tenantId: 't1', tenantType: 'RESTAURANT' })
 
       expect(result.recommendedPlanCode).toBe('gold')
-      expect(result.reason).toBeDefined()
+      expect(result.recommendedPlanName).toBe('Gold')
+      expect(result.reasonCode).toBe('FREE_DEFAULT')
+      expect(result.reasonText).toBeDefined()
+      expect(result.evidence).toBeDefined()
+      expect(result.evidence.tenantType).toBe('RESTAURANT')
+      expect(result.evidence.currentPlanCode).toBe('free')
       expect(result.comparedToCurrent).toBeDefined()
-      expect(result.comparedToCurrent.upgrades).toBeDefined()
-      expect(result.comparedToCurrent.resolvesLimits).toBeDefined()
+      expect(Array.isArray(result.comparedToCurrent.resolvesLimits)).toBe(true)
+      expect(Array.isArray(result.comparedToCurrent.unlocksFeatures)).toBe(true)
     })
 
-    it('returns object with recommendedPlanCode, reason, comparedToCurrent', async () => {
+    it('returns CURRENT_BEST when on platinum', async () => {
+      const { recommendPlan } = await import('./subscription.js')
+      mockQuery.mockReset()
+      const subRow = {
+        id: 's1',
+        plan_id: 'p4',
+        plan_name: 'Platinum',
+        plan_code: 'platinum',
+        limits: { orders_per_day: -1 },
+        features: { reports: true },
+        tenant_type: 'RESTAURANT',
+        plan_tenant_type: 'RESTAURANT',
+        plan_price_per_month: 349,
+        plan_price_per_year: 3490,
+      }
+      const planRows = [
+        { code: 'free', name: 'Free', limits: {}, features: {} },
+        { code: 'bronze', name: 'Bronze', limits: {}, features: {} },
+        { code: 'gold', name: 'Gold', limits: {}, features: {} },
+        {
+          code: 'platinum',
+          name: 'Platinum',
+          limits: { orders_per_day: -1 },
+          features: { reports: true },
+        },
+      ]
+      mockQuery.mockImplementation((sql) => {
+        if (typeof sql !== 'string') return Promise.resolve({ rows: [] })
+        if (sql.includes('subscription s') && sql.includes('JOIN subscription_plan'))
+          return Promise.resolve({ rows: [subRow] })
+        if (sql.includes('tenant_limit_override')) return Promise.resolve({ rows: [] })
+        if (
+          sql.includes('meter_type') &&
+          sql.includes('current_value') &&
+          sql.includes('usage_meter')
+        )
+          return Promise.resolve({ rows: [] })
+        if (
+          sql.includes('subscription_plan') &&
+          sql.includes('tenant_type') &&
+          sql.includes('display_order')
+        )
+          return Promise.resolve({ rows: planRows })
+        return Promise.resolve({ rows: [{ c: 0, current_value: 0 }] })
+      })
+
+      const result = await recommendPlan({ tenantId: 'rest-1', tenantType: 'RESTAURANT' })
+
+      expect(result.recommendedPlanCode).toBe('platinum')
+      expect(result.reasonCode).toBe('CURRENT_BEST')
+      expect(result.evidence.currentPlanCode).toBe('platinum')
+    })
+
+    it('returns object with recommendedPlanCode, reasonCode, evidence, comparedToCurrent', async () => {
       const { recommendPlan } = await import('./subscription.js')
       mockQuery.mockReset()
       mockQuery
@@ -176,10 +234,17 @@ describe('Subscription lib', () => {
       const result = await recommendPlan({ tenantId: 'rest-1', tenantType: 'RESTAURANT' })
 
       expect(result).toHaveProperty('recommendedPlanCode')
-      expect(result).toHaveProperty('reason')
-      expect(result).toHaveProperty('comparedToCurrent')
-      expect(result.comparedToCurrent).toHaveProperty('upgrades')
+      expect(result).toHaveProperty('recommendedPlanName')
+      expect(result).toHaveProperty('reasonCode')
+      expect(result).toHaveProperty('reasonText')
+      expect(result).toHaveProperty('evidence')
+      expect(result.evidence).toHaveProperty('tenantType')
+      expect(result.evidence).toHaveProperty('currentPlanCode')
+      expect(result.evidence).toHaveProperty('blocked')
       expect(result.comparedToCurrent).toHaveProperty('resolvesLimits')
+      expect(result.comparedToCurrent).toHaveProperty('unlocksFeatures')
+      expect(Array.isArray(result.comparedToCurrent.resolvesLimits)).toBe(true)
+      expect(Array.isArray(result.comparedToCurrent.unlocksFeatures)).toBe(true)
     })
   })
 

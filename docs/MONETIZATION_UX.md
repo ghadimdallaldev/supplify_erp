@@ -37,3 +37,10 @@ The global **UpgradeModal** is opened via Redux: when `baseQueryWithUnwrap` in `
 **API:** `lib/subscription.js` (buildLimitExceededPayload, buildFeatureNotAvailablePayload, getRecommendedPlanNames; requireWithinLimit/requireFeature use them); `routes/orders.routes.js`, `routes/chat.routes.js`, `routes/products.routes.js`, `routes/quick-lists.routes.js` (standardized error payloads).
 
 **Web:** `store/index.ts` (monetization reducer); `services/api.ts` (dispatch showMonetizationBlock on limit/feature error); `features/monetization/monetizationSlice.ts`; `components/UpgradeModal.tsx`, `components/LimitExceededBanner.tsx`, `components/FeatureLockedCard.tsx`; `components/Layout.tsx` (UpgradeModal, 80% banner, proactive nudge, refreshBlockedCount); `components/SubscriptionInfo.tsx` (top 3 near-limit usage card).
+
+## Launch Polish (micro)
+
+- **Recommended badge:** `RecommendedBadge` component shows “Recommended” on the plan that matches GET /api/subscriptions/recommendation. Used in SubscriptionInfo (current plan) and UpgradeModal (comparison table header). Subtle style when reasonCode is CURRENT_BEST.
+- **Nav Upgrade CTA:** Single “Upgrade” button in Header; visible when plan is Free, or any usage ≥ 80%, or blocked events in last 7 days. Click opens UpgradeModal and records OPEN_UPGRADE with `metadata: { source: "nav_upgrade_cta", trigger: "free"|"near_limit"|"blocked" }`. Dot indicator when near-limit or blocked.
+- **Plan value copy:** `PLAN_SUBTITLES` in `lib/planComparison.ts` (Free: “Setup & Testing”, Bronze: “Starter”, Gold: “Most Popular”, Platinum: “Unlimited Ops”, Enterprise: “Custom Contract”). Shown as subtitles in UpgradeModal headers, SubscriptionInfo, and admin plan cards.
+- **Manual test notes:** docs/LAUNCH_POLISH.md.

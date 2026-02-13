@@ -1,9 +1,18 @@
-import { useGetEntitlementsQuery, useGetRecommendationQuery } from '../services/api'
+import { useAppDispatch } from '../hooks/redux'
+import { showMonetizationBlock } from '../features/monetization/monetizationSlice'
+import {
+  useGetEntitlementsQuery,
+  useGetRecommendationQuery,
+  useRecordConversionEventMutation,
+} from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
+import { Button } from './ui/button'
 import { Progress } from './ui/progress'
 import { Skeleton } from './ui/skeleton'
 import { AlertCircle, AlertTriangle, Infinity, TrendingUp } from 'lucide-react'
+import { RecommendedBadge } from './RecommendedBadge'
+import { getPlanSubtitle } from '../lib/planComparison'
 
 const LIMIT_LABELS: Record<string, string> = {
   branches: 'Branches',
@@ -50,7 +59,10 @@ function PlanRecommendationCta({ currentCode }: { currentCode: string }) {
 }
 
 export function SubscriptionInfo() {
+  const dispatch = useAppDispatch()
+  const [recordConversionEvent] = useRecordConversionEventMutation()
   const { data, isLoading, error } = useGetEntitlementsQuery()
+  const { data: recommendation } = useGetRecommendationQuery({})
 
   if (isLoading) {
     return (
@@ -108,7 +120,17 @@ export function SubscriptionInfo() {
         <div className="border rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className="font-semibold text-lg">{plan.name || 'Free'}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-lg">{plan.name || 'Free'}</h3>
+                <RecommendedBadge
+                  planCode={plan.code ?? 'free'}
+                  recommendedPlanCode={recommendation?.recommendedPlanCode}
+                  subtle={recommendation?.reasonCode === 'CURRENT_BEST'}
+                />
+              </div>
+              {getPlanSubtitle(plan.code) && (
+                <p className="text-sm text-gray-500">{getPlanSubtitle(plan.code)}</p>
+              )}
               <p className="text-sm text-gray-600">Current Plan</p>
             </div>
             <Badge variant="outline">
@@ -155,9 +177,37 @@ export function SubscriptionInfo() {
                   <p className="text-sm font-medium text-amber-800 mb-2">Near limit (top 3)</p>
                   <ul className="space-y-1 text-sm text-amber-700">
                     {topNearLimit.map(({ limitKey, current, limit, pct }) => (
-                      <li key={limitKey}>
-                        {LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')}: {current} / {limit}{' '}
-                        ({Math.round(pct)}%)
+                      <li key={limitKey} className="flex items-center justify-between gap-2">
+                        <span>
+                          {LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')}: {current} /{' '}
+                          {limit} ({Math.round(pct)}%)
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 text-amber-800 border-amber-300 hover:bg-amber-100"
+                          onClick={() => {
+                            recordConversionEvent({
+                              eventType: 'OPEN_UPGRADE',
+                              metadata: { source: 'near_limit', limitKey },
+                            }).catch(() => {})
+                            dispatch(
+                              showMonetizationBlock({
+                                type: 'limit',
+                                payload: {
+                                  limitKey,
+                                  limitValue: limit,
+                                  currentUsage: current,
+                                  currentPlan: e.plan?.name ?? null,
+                                  recommendedPlans: [],
+                                  upgradeUrl: '/app/settings',
+                                },
+                              })
+                            )
+                          }}
+                        >
+                          Upgrade
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -199,9 +249,37 @@ export function SubscriptionInfo() {
                   </div>
                 )}
                 {isWarning && !isOver && (
-                  <div className="flex items-center gap-2 text-sm text-amber-600">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    Near limit
+                  <div className="flex items-center justify-between gap-2 text-sm text-amber-600">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      Near limit
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-amber-800 border-amber-300 hover:bg-amber-100"
+                      onClick={() => {
+                        recordConversionEvent({
+                          eventType: 'OPEN_UPGRADE',
+                          metadata: { source: 'near_limit', limitKey },
+                        }).catch(() => {})
+                        dispatch(
+                          showMonetizationBlock({
+                            type: 'limit',
+                            payload: {
+                              limitKey,
+                              limitValue: limitNum,
+                              currentUsage: current,
+                              currentPlan: e.plan?.name ?? null,
+                              recommendedPlans: [],
+                              upgradeUrl: '/app/settings',
+                            },
+                          })
+                        )
+                      }}
+                    >
+                      Upgrade
+                    </Button>
                   </div>
                 )}
               </div>

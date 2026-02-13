@@ -64,6 +64,18 @@ vi.mock('../lib/subscription.js', () => ({
 const mockRecordConversionEvent = vi.fn()
 vi.mock('../lib/conversion-events.js', () => ({
   recordConversionEvent: (...args) => mockRecordConversionEvent(...args),
+  ALLOWED_TYPES: [
+    'VIEW_PLANS',
+    'BLOCKED_FEATURE',
+    'BLOCKED_LIMIT',
+    'OPEN_UPGRADE',
+    'UPGRADE_SUCCESS',
+    'CLICK_UPGRADE',
+    'CLOSE_UPGRADE_MODAL',
+    'DOWNGRADE_ATTEMPT_BLOCKED',
+    'RECOMMENDATION_SHOWN',
+    'RECOMMENDATION_CLICKED',
+  ],
 }))
 
 import { subscriptionsRoutes } from './subscriptions.routes.js'

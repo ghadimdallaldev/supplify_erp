@@ -892,8 +892,27 @@ export interface Entitlements {
 /** Plan recommendation from GET /api/subscriptions/recommendation */
 export interface PlanRecommendation {
   recommendedPlanCode: string
-  reason: string
-  comparedToCurrent: { upgrades: string[]; resolvesLimits: string[] }
+  recommendedPlanName?: string
+  reasonCode?: string
+  reasonText?: string
+  reason?: string
+  evidence?: {
+    tenantType: string
+    currentPlanCode: string
+    triggeredBy?: { type: string; key: string }
+    usage?: { key: string; value: number; limit: number; pct: number }
+    blocked?: { limitKeys: string[]; featureKeys: string[] }
+  }
+  comparedToCurrent: {
+    resolvesLimits: Array<{
+      limitKey: string
+      currentUsage?: number
+      currentLimit?: number | null
+      newLimit?: number | null
+    }>
+    unlocksFeatures?: string[]
+    upgrades?: string[]
+  }
 }
 
 /** Response from POST /api/admin-dashboard/subscriptions/:id/preview-change */

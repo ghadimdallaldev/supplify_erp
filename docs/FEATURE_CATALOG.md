@@ -270,11 +270,35 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ---
 
+## Revenue / Conversion (final polish)
+
+| feature_key                | display_name                        | applies_to | permissions_required | limit_key | backend_enforcement                                                                                                                                          | frontend_surfaces                                                                     | plan_availability                    |
+| -------------------------- | ----------------------------------- | ---------- | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------ |
+| recommendation_api         | Plan recommendation (explainable)   | MULTI      | —                    | —         | GET /api/subscriptions/recommendation recommendPlan() returns reasonCode, evidence, comparedToCurrent (resolvesLimits, unlocksFeatures)                      | UpgradeModal, SubscriptionInfo (PlanRecommendationCta)                                | Deterministic; Free→Gold default     |
+| subscription_plans_catalog | Plan catalog for tenant type        | MULTI      | —                    | —         | GET /api/subscriptions/plans (tenant_type from context)                                                                                                      | UpgradeModal comparison table                                                         | Self-serve plans only                |
+| upgrade_modal_comparison   | Upgrade modal plan comparison table | MULTI      | —                    | —         | — (frontend uses entitlements + recommendation + plans)                                                                                                      | UpgradeModal.tsx (Current / Recommended / Top columns; limits + features; sticky CTA) | apps/web/src/lib/planComparison.ts   |
+| conversion_events          | Funnel events (new types)           | MULTI      | —                    | —         | POST /api/subscriptions/conversion-event; types: CLICK_UPGRADE, CLOSE_UPGRADE_MODAL, DOWNGRADE_ATTEMPT_BLOCKED, RECOMMENDATION_SHOWN, RECOMMENDATION_CLICKED | UpgradeModal, Layout, SubscriptionInfo (recordConversionEvent)                        | conversion_event table               |
+| admin_conversion_dropoff   | Admin conversion drop-off stats     | ADMIN      | —                    | —         | GET /api/admin-dashboard/conversion-stats funnelDropOff 7d/30d, recommendationFunnel, countsPerEventType                                                     | AdminDashboardPage "Conversion drop-off" mini table                                   | —                                    |
+| near_limit_upgrade_cta     | Near-limit (≥80%) Upgrade CTA       | MULTI      | —                    | —         | — (frontend opens UpgradeModal, records OPEN_UPGRADE metadata source: near_limit, limitKey)                                                                  | Layout.tsx banner, SubscriptionInfo.tsx (Near limit block + per-row)                  | —                                    |
+| downgrade_blocked_event    | Downgrade attempt blocked (server)  | ADMIN      | —                    | —         | admin-dashboard.routes.js PATCH /subscriptions/:id returns 400 when usage exceeds target; recordConversionEvent DOWNGRADE_ATTEMPT_BLOCKED                    | — (backend only)                                                                      | —                                    |
+| recommended_badge          | Recommended badge on plan           | MULTI      | —                    | —         | — (frontend; uses GET /api/subscriptions/recommendation cache)                                                                                               | RecommendedBadge.tsx; SubscriptionInfo, UpgradeModal comparison header                | CURRENT_BEST → subtle style          |
+| nav_upgrade_cta            | Top-nav Upgrade button (contextual) | MULTI      | —                    | —         | — (frontend; OPEN_UPGRADE metadata source: nav_upgrade_cta, trigger: free\|near_limit\|blocked)                                                              | Header.tsx (visibility: Free or ≥80% usage or blockedCountLast7d ≥ 1)                 | Dot when urgency                     |
+| plan_subtitles             | Plan value copy (subtitles)         | MULTI      | —                    | —         | — (frontend constants PLAN_SUBTITLES in planComparison.ts)                                                                                                   | UpgradeModal headers, SubscriptionInfo, AdminDashboardPage plan cards                 | Free/Bronze/Gold/Platinum/Enterprise |
+
+**Flags**
+
+- Recommendation API: always returns a result; reasonCode one of FREE_DEFAULT, NEAR_LIMIT, LIMIT_EXCEEDED, FEATURE_BLOCKED, MULTIPLE_BLOCKS, CURRENT_BEST. Deterministic: lowest plan that resolves; Free with no issue → Gold.
+- Enterprise checklist: docs/sales/enterprise_checklist.md (discovery, sizing, integration, onboarding, contract template, timelines).
+- Launch Polish: docs/LAUNCH_POLISH.md (manual test notes for Recommended badge, nav Upgrade CTA, plan subtitles).
+
+---
+
 ## Implementation notes (recent)
 
 - **CORS (API):** Multiple dev origins supported via `WEB_ORIGINS` (default dev: localhost 5173–5175); production defaults to single `WEB_ORIGIN`. See apps/api/src/config/env.js, server.js, lib/socket.js.
 - **API exports (web):** Subscription/entitlements and plan-change preview hooks exported from apps/web/src/services/api.ts (useGetEntitlementsQuery, usePreviewSubscriptionPlanChangeMutation).
 - **Sidebar:** usePermissions imported from hooks/usePermissions; admin nav shown for any user with role ADMIN (no ADMIN_ACCESS gate in UI).
+- **Launch Polish (micro):** RecommendedBadge component (planComparison.ts PLAN_SUBTITLES); Header nav Upgrade CTA (visibility from entitlements + blockedCountLast7d); manual checks in docs/LAUNCH_POLISH.md.
 
 ---
 

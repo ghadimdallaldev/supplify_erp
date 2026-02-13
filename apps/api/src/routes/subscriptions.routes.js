@@ -15,7 +15,10 @@ import {
   getEntitlements,
   recommendPlan,
 } from '../lib/subscription.js'
-import { recordConversionEvent } from '../lib/conversion-events.js'
+import {
+  recordConversionEvent,
+  ALLOWED_TYPES as CONVERSION_ALLOWED_TYPES,
+} from '../lib/conversion-events.js'
 
 const router = express.Router()
 
@@ -230,6 +233,52 @@ router.get(
 )
 
 /**
+ * Get plan catalog for current tenant type (self-serve plans only; for upgrade modal comparison).
+ */
+router.get('/plans', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const tenant = await getRequestTenant(req)
+    if (!tenant) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Tenant not found' },
+        requestId: req.requestId,
+      })
+    }
+    let rows = []
+    try {
+      const result = await query(
+        `SELECT id, code, name, limits, features, price_per_month, price_per_year
+         FROM subscription_plan
+         WHERE tenant_type = $1 AND is_active = true
+         ORDER BY display_order NULLS LAST, name`,
+        [tenant.tenantType]
+      )
+      rows = result.rows.filter((p) => (p.code || '').toLowerCase() !== 'enterprise')
+    } catch (e) {
+      if (e.code !== '42P01') throw e
+    }
+    res.json({
+      ok: true,
+      data: {
+        plans: rows.map((p) => ({ ...p, limits: p.limits || {}, features: p.features || {} })),
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get subscription plans error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get plans' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
  * Get recommended plan for current tenant (usage, limits, optional blocked events).
  * Query: blocked (optional) e.g. "limit:orders_per_day" or "feature:reports" or comma-separated.
  */
@@ -310,11 +359,14 @@ router.post(
         })
       }
       const { eventType, metadata } = req.body || {}
-      if (!['VIEW_PLANS', 'OPEN_UPGRADE'].includes(eventType)) {
+      if (!CONVERSION_ALLOWED_TYPES.includes(eventType)) {
         return res.status(400).json({
           ok: false,
           data: null,
-          error: { name: 'BAD_REQUEST', message: 'eventType must be VIEW_PLANS or OPEN_UPGRADE' },
+          error: {
+            name: 'BAD_REQUEST',
+            message: `eventType must be one of: ${CONVERSION_ALLOWED_TYPES.join(', ')}`,
+          },
           requestId: req.requestId,
         })
       }

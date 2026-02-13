@@ -1034,9 +1034,24 @@ export const api = createApi({
       }),
       providesTags: ['Subscription'],
     }),
+    getSubscriptionPlans: builder.query<
+      {
+        plans: Array<{
+          id: string
+          code: string
+          name: string
+          limits: Record<string, unknown>
+          features: Record<string, unknown>
+        }>
+      },
+      void
+    >({
+      query: () => '/api/subscriptions/plans',
+      providesTags: ['Subscription'],
+    }),
     recordConversionEvent: builder.mutation<
       { recorded: boolean },
-      { eventType: 'VIEW_PLANS' | 'OPEN_UPGRADE'; metadata?: Record<string, unknown> }
+      { eventType: string; metadata?: Record<string, unknown> }
     >({
       query: (body) => ({
         url: '/api/subscriptions/conversion-event',
@@ -1060,6 +1075,25 @@ export const api = createApi({
         mostBlockedLimit: string | null
         blocksByFeature: Array<{ key: string; count: number }>
         blocksByLimit: Array<{ key: string; count: number }>
+        countsPerEventType?: { '7d': Record<string, number>; '30d': Record<string, number> }
+        funnelDropOff?: {
+          '7d': {
+            blocked: number
+            openUpgrade: number
+            clickUpgrade: number
+            upgradeSuccess: number
+          }
+          '30d': {
+            blocked: number
+            openUpgrade: number
+            clickUpgrade: number
+            upgradeSuccess: number
+          }
+        }
+        recommendationFunnel?: {
+          '7d': { shown: number; clicked: number; upgradeSuccess: number }
+          '30d': { shown: number; clicked: number; upgradeSuccess: number }
+        }
       },
       { days?: number }
     >({
@@ -1317,6 +1351,7 @@ export const {
   useGetCurrentSubscriptionQuery,
   useGetEntitlementsQuery,
   useGetRecommendationQuery,
+  useGetSubscriptionPlansQuery,
   useRecordConversionEventMutation,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,

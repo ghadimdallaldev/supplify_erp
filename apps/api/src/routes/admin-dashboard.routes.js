@@ -241,12 +241,31 @@ router.get('/conversion-stats', async (req, res) => {
     let totalUpgrades = 0
     let blocksByFeature = []
     let blocksByLimit = []
+    let countsPerEventType7d = {}
+    let countsPerEventType30d = {}
+    let funnelDropOff7d = { blocked: 0, openUpgrade: 0, clickUpgrade: 0, upgradeSuccess: 0 }
+    let funnelDropOff30d = { blocked: 0, openUpgrade: 0, clickUpgrade: 0, upgradeSuccess: 0 }
+    let recommendationFunnel7d = { shown: 0, clicked: 0, upgradeSuccess: 0 }
+    let recommendationFunnel30d = { shown: 0, clicked: 0, upgradeSuccess: 0 }
 
     try {
       const since = new Date()
       since.setDate(since.getDate() - days)
+      const since7 = new Date()
+      since7.setDate(since7.getDate() - 7)
 
-      const [blockCount, upgradeCount, byFeature, byLimit] = await Promise.all([
+      const [
+        blockCount,
+        upgradeCount,
+        byFeature,
+        byLimit,
+        perType7,
+        perType30,
+        funnel7,
+        funnel30,
+        rec7,
+        rec30,
+      ] = await Promise.all([
         query(
           `SELECT COUNT(*) as c FROM conversion_event WHERE event_type IN ('BLOCKED_FEATURE', 'BLOCKED_LIMIT') AND created_at >= $1`,
           [since]
@@ -263,6 +282,30 @@ router.get('/conversion-stats', async (req, res) => {
           `SELECT metadata_json->>'limitKey' as key, COUNT(*) as c FROM conversion_event WHERE event_type = 'BLOCKED_LIMIT' AND created_at >= $1 GROUP BY metadata_json->>'limitKey' ORDER BY c DESC LIMIT 5`,
           [since]
         ),
+        query(
+          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE created_at >= $1 GROUP BY event_type`,
+          [since7]
+        ),
+        query(
+          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE created_at >= $1 GROUP BY event_type`,
+          [since]
+        ),
+        query(
+          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE event_type IN ('BLOCKED_FEATURE', 'BLOCKED_LIMIT', 'OPEN_UPGRADE', 'CLICK_UPGRADE', 'UPGRADE_SUCCESS') AND created_at >= $1 GROUP BY event_type`,
+          [since7]
+        ),
+        query(
+          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE event_type IN ('BLOCKED_FEATURE', 'BLOCKED_LIMIT', 'OPEN_UPGRADE', 'CLICK_UPGRADE', 'UPGRADE_SUCCESS') AND created_at >= $1 GROUP BY event_type`,
+          [since]
+        ),
+        query(
+          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE event_type IN ('RECOMMENDATION_SHOWN', 'RECOMMENDATION_CLICKED', 'UPGRADE_SUCCESS') AND created_at >= $1 GROUP BY event_type`,
+          [since7]
+        ),
+        query(
+          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE event_type IN ('RECOMMENDATION_SHOWN', 'RECOMMENDATION_CLICKED', 'UPGRADE_SUCCESS') AND created_at >= $1 GROUP BY event_type`,
+          [since]
+        ),
       ])
 
       totalBlocks = parseInt(blockCount.rows[0]?.c || 0)
@@ -274,6 +317,43 @@ router.get('/conversion-stats', async (req, res) => {
       mostBlockedLimit = byLimit.rows[0]?.key || null
       blocksByFeature = byFeature.rows.map((r) => ({ key: r.key, count: parseInt(r.c) }))
       blocksByLimit = byLimit.rows.map((r) => ({ key: r.key, count: parseInt(r.c) }))
+
+      perType7.rows.forEach((r) => {
+        countsPerEventType7d[r.event_type] = parseInt(r.c)
+      })
+      perType30.rows.forEach((r) => {
+        countsPerEventType30d[r.event_type] = parseInt(r.c)
+      })
+
+      funnel7.rows.forEach((r) => {
+        const c = parseInt(r.c)
+        if (r.event_type === 'BLOCKED_FEATURE' || r.event_type === 'BLOCKED_LIMIT')
+          funnelDropOff7d.blocked += c
+        else if (r.event_type === 'OPEN_UPGRADE') funnelDropOff7d.openUpgrade = c
+        else if (r.event_type === 'CLICK_UPGRADE') funnelDropOff7d.clickUpgrade = c
+        else if (r.event_type === 'UPGRADE_SUCCESS') funnelDropOff7d.upgradeSuccess = c
+      })
+      funnel30.rows.forEach((r) => {
+        const c = parseInt(r.c)
+        if (r.event_type === 'BLOCKED_FEATURE' || r.event_type === 'BLOCKED_LIMIT')
+          funnelDropOff30d.blocked += c
+        else if (r.event_type === 'OPEN_UPGRADE') funnelDropOff30d.openUpgrade = c
+        else if (r.event_type === 'CLICK_UPGRADE') funnelDropOff30d.clickUpgrade = c
+        else if (r.event_type === 'UPGRADE_SUCCESS') funnelDropOff30d.upgradeSuccess = c
+      })
+
+      rec7.rows.forEach((r) => {
+        const c = parseInt(r.c)
+        if (r.event_type === 'RECOMMENDATION_SHOWN') recommendationFunnel7d.shown = c
+        else if (r.event_type === 'RECOMMENDATION_CLICKED') recommendationFunnel7d.clicked = c
+        else if (r.event_type === 'UPGRADE_SUCCESS') recommendationFunnel7d.upgradeSuccess = c
+      })
+      rec30.rows.forEach((r) => {
+        const c = parseInt(r.c)
+        if (r.event_type === 'RECOMMENDATION_SHOWN') recommendationFunnel30d.shown = c
+        else if (r.event_type === 'RECOMMENDATION_CLICKED') recommendationFunnel30d.clicked = c
+        else if (r.event_type === 'UPGRADE_SUCCESS') recommendationFunnel30d.upgradeSuccess = c
+      })
     } catch (e) {
       if (e.code !== '42P01') throw e
     }
@@ -289,6 +369,9 @@ router.get('/conversion-stats', async (req, res) => {
         mostBlockedLimit,
         blocksByFeature,
         blocksByLimit,
+        countsPerEventType: { '7d': countsPerEventType7d, '30d': countsPerEventType30d },
+        funnelDropOff: { '7d': funnelDropOff7d, '30d': funnelDropOff30d },
+        recommendationFunnel: { '7d': recommendationFunnel7d, '30d': recommendationFunnel30d },
       },
       error: null,
       requestId: req.requestId,
@@ -887,6 +970,15 @@ router.patch('/subscriptions/:id', async (req, res) => {
             }
           }
           if (willExceed.length > 0) {
+            recordConversionEvent(
+              existing.tenant_id,
+              existing.tenant_type,
+              'DOWNGRADE_ATTEMPT_BLOCKED',
+              {
+                limitKeys: willExceed.map((e) => e.limitKey),
+                targetPlanCode: newPlan.code,
+              }
+            ).catch(() => {})
             res.status(400).json({
               ok: false,
               data: null,

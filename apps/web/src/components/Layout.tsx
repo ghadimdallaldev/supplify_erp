@@ -5,7 +5,10 @@ import { Header } from './Header'
 import { ImpersonationBanner } from './ImpersonationBanner'
 import { UpgradeModal } from './UpgradeModal'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
-import { refreshBlockedCount } from '../features/monetization/monetizationSlice'
+import {
+  refreshBlockedCount,
+  showMonetizationBlock,
+} from '../features/monetization/monetizationSlice'
 import {
   useGetImpersonationStatusQuery,
   useGetEntitlementsQuery,
@@ -65,9 +68,9 @@ export function Layout() {
         <div className="flex-1 flex flex-col">
           <Header />
           {nearLimitKeys.length > 0 && (
-            <div className="mx-6 mt-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>
+            <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
                 Usage near limit:{' '}
                 {nearLimitKeys.map(({ key }) => key.replace(/_/g, ' ')).join(', ')}.{' '}
                 <button
@@ -78,6 +81,34 @@ export function Layout() {
                   View usage
                 </button>
               </span>
+              <button
+                type="button"
+                className="font-medium underline hover:no-underline shrink-0"
+                onClick={() => {
+                  const first = nearLimitKeys[0]
+                  if (first) {
+                    recordConversionEvent({
+                      eventType: 'OPEN_UPGRADE',
+                      metadata: { source: 'near_limit', limitKey: first.key },
+                    }).catch(() => {})
+                    dispatch(
+                      showMonetizationBlock({
+                        type: 'limit',
+                        payload: {
+                          limitKey: first.key,
+                          limitValue: first.limit,
+                          currentUsage: first.current,
+                          currentPlan: e?.plan?.name ?? null,
+                          recommendedPlans: [],
+                          upgradeUrl: '/app/settings',
+                        },
+                      })
+                    )
+                  }
+                }}
+              >
+                Upgrade
+              </button>
             </div>
           )}
           {blockedCountLast7d >= 3 && (

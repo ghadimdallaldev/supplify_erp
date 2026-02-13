@@ -5,12 +5,17 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
 
-const ALLOWED_TYPES = [
+export const ALLOWED_TYPES = [
   'VIEW_PLANS',
   'BLOCKED_FEATURE',
   'BLOCKED_LIMIT',
   'OPEN_UPGRADE',
   'UPGRADE_SUCCESS',
+  'CLICK_UPGRADE',
+  'CLOSE_UPGRADE_MODAL',
+  'DOWNGRADE_ATTEMPT_BLOCKED',
+  'RECOMMENDATION_SHOWN',
+  'RECOMMENDATION_CLICKED',
 ]
 
 /**

@@ -10,6 +10,16 @@ vi.mock('../services/api', async (importOriginal) => {
     useLogoutMutation: () => [vi.fn()],
     useGetNotificationsQuery: () => ({ data: { notifications: [] } }),
     useMarkAllNotificationsReadMutation: () => [vi.fn()],
+    useGetEntitlementsQuery: () => ({
+      data: {
+        entitlements: {
+          plan: { code: 'gold', name: 'Gold' },
+          limits: {},
+          usage: {},
+        },
+      },
+    }),
+    useRecordConversionEventMutation: () => [vi.fn().mockResolvedValue(undefined)],
   }
 })
 

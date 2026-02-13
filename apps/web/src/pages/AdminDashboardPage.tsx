@@ -42,6 +42,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { SubscriptionPlan } from '@/types'
+import { getPlanSubtitle } from '../lib/planComparison'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -391,39 +392,144 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 </Card>
 
                 {conversionStats && (
-                  <Card className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Conversion funnel (last {conversionStats.days}d)
-                    </h3>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Blocks (feature/limit)</span>
-                        <span className="font-semibold">{conversionStats.totalBlocks}</span>
+                  <>
+                    <Card className="p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Conversion funnel (last {conversionStats.days}d)
+                      </h3>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Blocks (feature/limit)</span>
+                          <span className="font-semibold">{conversionStats.totalBlocks}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Upgrades</span>
+                          <span className="font-semibold">{conversionStats.totalUpgrades}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span className="text-gray-600">Blocks → upgrades %</span>
+                          <span className="font-semibold">
+                            {conversionStats.blocksToUpgradesConversionPercent}%
+                          </span>
+                        </div>
+                        {conversionStats.mostBlockedFeature && (
+                          <p className="text-gray-600 pt-1">
+                            Most blocked feature:{' '}
+                            <span className="font-medium">
+                              {conversionStats.mostBlockedFeature}
+                            </span>
+                          </p>
+                        )}
+                        {conversionStats.mostBlockedLimit && (
+                          <p className="text-gray-600">
+                            Most blocked limit:{' '}
+                            <span className="font-medium">{conversionStats.mostBlockedLimit}</span>
+                          </p>
+                        )}
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Upgrades</span>
-                        <span className="font-semibold">{conversionStats.totalUpgrades}</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2">
-                        <span className="text-gray-600">Blocks → upgrades %</span>
-                        <span className="font-semibold">
-                          {conversionStats.blocksToUpgradesConversionPercent}%
-                        </span>
-                      </div>
-                      {conversionStats.mostBlockedFeature && (
-                        <p className="text-gray-600 pt-1">
-                          Most blocked feature:{' '}
-                          <span className="font-medium">{conversionStats.mostBlockedFeature}</span>
-                        </p>
-                      )}
-                      {conversionStats.mostBlockedLimit && (
-                        <p className="text-gray-600">
-                          Most blocked limit:{' '}
-                          <span className="font-medium">{conversionStats.mostBlockedLimit}</span>
-                        </p>
-                      )}
-                    </div>
-                  </Card>
+                    </Card>
+                    {conversionStats.funnelDropOff && (
+                      <Card className="p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Conversion drop-off
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b text-left text-gray-600">
+                                <th className="py-2 pr-4">Step</th>
+                                <th className="py-2 pr-4">7d</th>
+                                <th className="py-2">30d</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="py-2 pr-4">Blocked (feature/limit)</td>
+                                <td className="py-2 pr-4">
+                                  {conversionStats.funnelDropOff['7d'].blocked}
+                                </td>
+                                <td className="py-2">
+                                  {conversionStats.funnelDropOff['30d'].blocked}
+                                </td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 pr-4">Open upgrade</td>
+                                <td className="py-2 pr-4">
+                                  {conversionStats.funnelDropOff['7d'].openUpgrade}
+                                </td>
+                                <td className="py-2">
+                                  {conversionStats.funnelDropOff['30d'].openUpgrade}
+                                </td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 pr-4">Click upgrade</td>
+                                <td className="py-2 pr-4">
+                                  {conversionStats.funnelDropOff['7d'].clickUpgrade}
+                                </td>
+                                <td className="py-2">
+                                  {conversionStats.funnelDropOff['30d'].clickUpgrade}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 pr-4">Upgrade success</td>
+                                <td className="py-2 pr-4">
+                                  {conversionStats.funnelDropOff['7d'].upgradeSuccess}
+                                </td>
+                                <td className="py-2">
+                                  {conversionStats.funnelDropOff['30d'].upgradeSuccess}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        {conversionStats.recommendationFunnel && (
+                          <div className="mt-4 pt-4 border-t">
+                            <h4 className="font-medium text-gray-900 mb-2">
+                              Recommendation funnel
+                            </h4>
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b text-left text-gray-600">
+                                  <th className="py-1 pr-4">Step</th>
+                                  <th className="py-1 pr-4">7d</th>
+                                  <th className="py-1">30d</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-b">
+                                  <td className="py-1 pr-4">Recommendation shown</td>
+                                  <td className="py-1 pr-4">
+                                    {conversionStats.recommendationFunnel['7d'].shown}
+                                  </td>
+                                  <td className="py-1">
+                                    {conversionStats.recommendationFunnel['30d'].shown}
+                                  </td>
+                                </tr>
+                                <tr className="border-b">
+                                  <td className="py-1 pr-4">Recommendation clicked</td>
+                                  <td className="py-1 pr-4">
+                                    {conversionStats.recommendationFunnel['7d'].clicked}
+                                  </td>
+                                  <td className="py-1">
+                                    {conversionStats.recommendationFunnel['30d'].clicked}
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td className="py-1 pr-4">Upgrade success</td>
+                                  <td className="py-1 pr-4">
+                                    {conversionStats.recommendationFunnel['7d'].upgradeSuccess}
+                                  </td>
+                                  <td className="py-1">
+                                    {conversionStats.recommendationFunnel['30d'].upgradeSuccess}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </Card>
+                    )}
+                  </>
                 )}
               </div>
             </>
@@ -566,6 +672,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         {plan.tenant_type === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
                       </Badge>
                       {plan.code && <span className="text-xs text-gray-500">{plan.code}</span>}
+                      {plan.code && getPlanSubtitle(plan.code) ? (
+                        <span className="text-xs text-gray-500">
+                          · {getPlanSubtitle(plan.code)}
+                        </span>
+                      ) : null}
                     </div>
                     <Badge variant={plan.is_active ? 'default' : 'secondary'}>
                       {plan.is_active ? 'Active' : 'Inactive'}

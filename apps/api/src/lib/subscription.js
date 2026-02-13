@@ -725,80 +725,92 @@ export async function decrementUsage(tenantId, tenantType, meterType, decrement 
 /** Default front-route for upgrade CTA (monetization UX) */
 const DEFAULT_UPGRADE_PATH = '/app/settings'
 
-/** Plan codes in tier order (free < bronze < gold < platinum) */
+/** Plan codes in tier order (free < bronze < gold < platinum); exclude enterprise for self-serve */
 const PLAN_ORDER = ['free', 'bronze', 'gold', 'platinum']
 
+/** Reason codes for deterministic, explainable recommendations */
+const REASON_CODES = {
+  CURRENT_BEST: 'CURRENT_BEST',
+  FREE_DEFAULT: 'FREE_DEFAULT',
+  NEAR_LIMIT: 'NEAR_LIMIT',
+  LIMIT_EXCEEDED: 'LIMIT_EXCEEDED',
+  FEATURE_BLOCKED: 'FEATURE_BLOCKED',
+  MULTIPLE_BLOCKS: 'MULTIPLE_BLOCKS',
+}
+
 /**
- * Recommend a plan based on usage, limits, and optional blocked events.
- * Logic: usage > 80% or over limit → recommend next tier; feature blocked → recommend lowest plan that unlocks it;
- * multiple blocks → recommend highest common unlock. Gold is positioned as "default serious plan".
+ * Recommend a plan: deterministic, explainable. Always returns a result.
+ * Picks lowest plan that resolves the issue; Free with no issue → Gold. If current is best → CURRENT_BEST.
  * @param {Object} opts
  * @param {string} opts.tenantId - Tenant ID
  * @param {string} opts.tenantType - 'RESTAURANT' | 'SUPPLIER'
  * @param {Array<{type: string, key: string}>} [opts.blockedEvents] - Optional list of { type: 'FEATURE'|'LIMIT', key }
- * @returns {Promise<{ recommendedPlanCode: string, reason: string, comparedToCurrent: { upgrades: string[], resolvesLimits: string[] } }>}
+ * @returns {Promise<Object>} recommendation with recommendedPlanCode, recommendedPlanName, reasonCode, reasonText, evidence, comparedToCurrent
  */
 export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }) {
   const limitKeys =
     tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
   const entitlements = await getEntitlements(tenantId, tenantType)
+
+  const buildResponse = (
+    recommendedPlanCode,
+    recommendedPlanName,
+    reasonCode,
+    reasonText,
+    evidence,
+    comparedToCurrent
+  ) => ({
+    recommendedPlanCode,
+    recommendedPlanName: recommendedPlanName || recommendedPlanCode,
+    reasonCode,
+    reasonText,
+    evidence,
+    comparedToCurrent,
+    reason: reasonText,
+  })
+
   if (!entitlements) {
-    return {
-      recommendedPlanCode: 'gold',
-      reason: 'Upgrade to Gold to unlock full platform capabilities.',
-      comparedToCurrent: { upgrades: ['Full limits and features'], resolvesLimits: [] },
-    }
+    return buildResponse(
+      'gold',
+      'Gold',
+      REASON_CODES.FREE_DEFAULT,
+      'Upgrade to Gold to unlock full platform capabilities.',
+      { tenantType, currentPlanCode: 'free', blocked: { limitKeys: [], featureKeys: [] } },
+      { resolvesLimits: [], unlocksFeatures: [] }
+    )
   }
 
   const { plan, usage, limits, features } = entitlements
-  const currentCode = (plan?.code || 'free').toLowerCase()
+  const currentCode = (plan?.code || 'free').toLowerCase().replace('enterprise', 'platinum')
   const currentIndex = PLAN_ORDER.indexOf(currentCode)
-  if (currentIndex === -1) {
-    return {
-      recommendedPlanCode: 'gold',
-      reason: 'Gold is the recommended plan for serious usage.',
-      comparedToCurrent: { upgrades: [], resolvesLimits: [] },
-    }
-  }
-
-  const { rows: planRows } = await query(
+  const planRowsRaw = await query(
     `SELECT code, name, limits, features FROM subscription_plan WHERE tenant_type = $1 AND is_active = true ORDER BY display_order, name`,
     [tenantType]
   )
+  const planRows = planRowsRaw.rows.filter((p) => PLAN_ORDER.includes((p.code || '').toLowerCase()))
+  const planIndex = planRows.findIndex((p) => (p.code || '').toLowerCase() === currentCode)
+  const effectiveCurrentIndex = planIndex >= 0 ? planIndex : 0
 
-  const resolvesLimits = []
-  const upgrades = []
-  let minRecommendedIndex = currentIndex
+  const limitDetails = []
+  const blockedLimitKeys = []
+  const blockedFeatureKeys = []
+  let triggeredBy = null
+  let usageEvidence = null
+  const unlocksFeaturesSet = new Set()
 
   // Blocked events from API (e.g. after 403)
   for (const ev of blockedEvents) {
     if (ev.type === 'LIMIT' && limitKeys.includes(ev.key)) {
-      for (let i = currentIndex + 1; i < planRows.length; i++) {
-        const p = planRows[i]
-        const lim = p.limits?.[ev.key]
-        const cap = lim === -1 || lim === null ? 999999 : parseInt(lim)
-        if (cap > (limits[ev.key] || 0)) {
-          resolvesLimits.push(ev.key)
-          if (i > minRecommendedIndex) minRecommendedIndex = i
-          break
-        }
-      }
+      blockedLimitKeys.push(ev.key)
+      if (!triggeredBy) triggeredBy = { type: 'limit', key: ev.key }
     }
     if (ev.type === 'FEATURE' && ev.key) {
-      for (let i = currentIndex + 1; i < planRows.length; i++) {
-        const p = planRows[i]
-        const v = p.features?.[ev.key]
-        const enabled = typeof v === 'boolean' ? v : v && v !== 'false' && v !== 'disabled'
-        if (enabled) {
-          upgrades.push(`${ev.key} (${p.name})`)
-          if (i > minRecommendedIndex) minRecommendedIndex = i
-          break
-        }
-      }
+      blockedFeatureKeys.push(ev.key)
+      if (!triggeredBy) triggeredBy = { type: 'feature', key: ev.key }
     }
   }
 
-  // Usage > 80% or over limit → recommend next tier that raises that limit
+  // Usage > 80% or over limit → find lowest plan that raises that limit
   for (const key of limitKeys) {
     const used = usage[key] ?? 0
     const cap = limits[key]
@@ -806,71 +818,146 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
     const capNum = parseInt(cap)
     if (capNum <= 0) continue
     const pct = (used / capNum) * 100
-    if (used >= capNum || pct >= 80) {
-      for (let i = currentIndex + 1; i < planRows.length; i++) {
+    const isExceeded = used >= capNum
+    const isNear = pct >= 80 && !isExceeded
+    if (isExceeded || isNear) {
+      if (!blockedLimitKeys.includes(key)) blockedLimitKeys.push(key)
+      if (!usageEvidence) usageEvidence = { key, value: used, limit: capNum, pct: Math.round(pct) }
+      for (let i = effectiveCurrentIndex + 1; i < planRows.length; i++) {
         const p = planRows[i]
         const nextCap = p.limits?.[key]
         const nextVal = nextCap === -1 || nextCap === null ? 999999 : parseInt(nextCap)
         if (nextVal > capNum) {
-          if (!resolvesLimits.includes(key)) resolvesLimits.push(key)
-          if (i > minRecommendedIndex) minRecommendedIndex = i
+          limitDetails.push({
+            limitKey: key,
+            currentUsage: used,
+            currentLimit: capNum,
+            newLimit: nextVal === 999999 ? null : nextVal,
+          })
           break
         }
       }
     }
   }
 
-  // Feature not enabled but commonly desired
-  const featureKeys = ['reports', 'smart_reorder', 'multi_branch']
-  for (const fk of featureKeys) {
+  const featureKeysToCheck = ['reports', 'smart_reorder', 'multi_branch']
+  for (const fk of featureKeysToCheck) {
     if (features[fk]) continue
-    for (let i = currentIndex + 1; i < planRows.length; i++) {
+    blockedFeatureKeys.push(fk)
+    for (let i = effectiveCurrentIndex + 1; i < planRows.length; i++) {
       const p = planRows[i]
       const v = p.features?.[fk]
       const enabled = typeof v === 'boolean' ? v : v && v !== 'false' && v !== 'disabled'
-      if (enabled && !upgrades.some((u) => u.startsWith(fk))) {
-        upgrades.push(`${fk} (${p.name})`)
+      if (enabled) {
+        unlocksFeaturesSet.add(fk)
+        break
+      }
+    }
+  }
+
+  let minRecommendedIndex = effectiveCurrentIndex
+  for (const key of blockedLimitKeys) {
+    for (let i = effectiveCurrentIndex + 1; i < planRows.length; i++) {
+      const p = planRows[i]
+      const nextCap = p.limits?.[key]
+      const nextVal = nextCap === -1 || nextCap === null ? 999999 : parseInt(nextCap)
+      if (nextVal > (limits[key] || 0)) {
+        if (i > minRecommendedIndex) minRecommendedIndex = i
+        break
+      }
+    }
+  }
+  for (const fk of blockedFeatureKeys) {
+    for (let i = effectiveCurrentIndex + 1; i < planRows.length; i++) {
+      const p = planRows[i]
+      const v = p.features?.[fk]
+      const enabled = typeof v === 'boolean' ? v : v && v !== 'false' && v !== 'disabled'
+      if (enabled) {
         if (i > minRecommendedIndex) minRecommendedIndex = i
         break
       }
     }
   }
 
-  // At least one step up from current; if Free with no pressure, recommend Gold
   let recommendedIndex = minRecommendedIndex
-  if (currentCode === 'free' && minRecommendedIndex <= currentIndex) {
-    recommendedIndex = Math.min(PLAN_ORDER.indexOf('gold'), planRows.length - 1)
-    if (recommendedIndex < 0) recommendedIndex = 1
-    if (upgrades.length === 0) upgrades.push('Higher limits and key features (Gold)')
+  if (currentCode === 'free' && minRecommendedIndex <= effectiveCurrentIndex) {
+    const goldIdx = planRows.findIndex((p) => (p.code || '').toLowerCase() === 'gold')
+    recommendedIndex = goldIdx >= 0 ? goldIdx : Math.min(1, planRows.length - 1)
   }
-  if (recommendedIndex <= currentIndex && (resolvesLimits.length || upgrades.length))
-    recommendedIndex = currentIndex + 1
+  if (
+    recommendedIndex <= effectiveCurrentIndex &&
+    (blockedLimitKeys.length || blockedFeatureKeys.length)
+  )
+    recommendedIndex = effectiveCurrentIndex + 1
   if (recommendedIndex >= planRows.length) recommendedIndex = planRows.length - 1
-  if (recommendedIndex <= currentIndex) recommendedIndex = currentIndex + 1
+  if (recommendedIndex <= effectiveCurrentIndex) recommendedIndex = effectiveCurrentIndex + 1
   if (recommendedIndex >= planRows.length) recommendedIndex = planRows.length - 1
 
   const recommended = planRows[recommendedIndex]
-  const recommendedPlanCode = recommended?.code || 'gold'
-  let reason = 'Upgrade to get more capacity and features.'
-  if (resolvesLimits.length)
-    reason = `Your usage is at or near limits (${resolvesLimits.join(', ')}). Upgrading resolves these.`
-  else if (upgrades.length) reason = `Upgrade to unlock: ${upgrades.slice(0, 3).join('; ')}.`
-  else if (currentCode === 'free')
-    reason =
-      'Gold is the default plan for real daily usage—unlock more orders, branches, and reports.'
+  const recommendedPlanCode = (recommended?.code || 'gold').toLowerCase()
+  const recommendedPlanName = recommended?.name || 'Gold'
+  const isCurrentBest = recommendedPlanCode === currentCode
 
-  return {
-    recommendedPlanCode,
-    reason,
-    comparedToCurrent: {
-      upgrades: upgrades.length
-        ? upgrades
-        : recommendedIndex > currentIndex
-          ? ['Higher limits and features']
-          : [],
-      resolvesLimits,
+  const evidence = {
+    tenantType,
+    currentPlanCode: currentCode,
+    triggeredBy:
+      triggeredBy || (usageEvidence ? { type: 'limit', key: usageEvidence.key } : undefined),
+    usage: usageEvidence,
+    blocked: {
+      limitKeys: [...new Set(blockedLimitKeys)],
+      featureKeys: [...new Set(blockedFeatureKeys)],
     },
   }
+
+  const recommendedLimits = recommended?.limits || {}
+  const resolvesLimits = limitDetails.length
+    ? limitDetails
+    : blockedLimitKeys.map((key) => ({
+        limitKey: key,
+        currentUsage: usage[key] ?? 0,
+        currentLimit: limits[key] != null ? parseInt(limits[key]) : null,
+        newLimit:
+          recommendedLimits[key] === -1 || recommendedLimits[key] == null
+            ? null
+            : parseInt(recommendedLimits[key]),
+      }))
+  const unlocksFeatures = [...unlocksFeaturesSet]
+
+  let reasonCode = REASON_CODES.CURRENT_BEST
+  let reasonText = "You're on the best plan for your usage."
+  if (isCurrentBest) {
+    return buildResponse(currentCode, plan?.name || 'Current', reasonCode, reasonText, evidence, {
+      resolvesLimits: [],
+      unlocksFeatures: [],
+    })
+  }
+  const hasLimitExceeded = blockedLimitKeys.some((k) => (usage[k] ?? 0) >= (limits[k] ?? 0))
+  const hasNearLimit = usageEvidence && usageEvidence.pct >= 80 && !hasLimitExceeded
+  if (blockedLimitKeys.length && blockedFeatureKeys.length)
+    reasonCode = REASON_CODES.MULTIPLE_BLOCKS
+  else if (hasLimitExceeded) reasonCode = REASON_CODES.LIMIT_EXCEEDED
+  else if (hasNearLimit) reasonCode = REASON_CODES.NEAR_LIMIT
+  else if (blockedFeatureKeys.length) reasonCode = REASON_CODES.FEATURE_BLOCKED
+  else if (currentCode === 'free') reasonCode = REASON_CODES.FREE_DEFAULT
+
+  if (reasonCode === REASON_CODES.LIMIT_EXCEEDED)
+    reasonText = `Your usage is at or over limits (${blockedLimitKeys.join(', ')}). Upgrading resolves these.`
+  else if (reasonCode === REASON_CODES.NEAR_LIMIT)
+    reasonText = `You're near your limit for ${usageEvidence?.key || 'usage'}. Upgrade to avoid being blocked.`
+  else if (reasonCode === REASON_CODES.FEATURE_BLOCKED)
+    reasonText = `Upgrade to unlock: ${unlocksFeatures.slice(0, 3).join(', ')}.`
+  else if (reasonCode === REASON_CODES.MULTIPLE_BLOCKS)
+    reasonText = 'You have multiple limits and feature restrictions. Upgrading resolves them.'
+  else if (reasonCode === REASON_CODES.FREE_DEFAULT)
+    reasonText =
+      'Gold is the default plan for real daily usage—unlock more orders, branches, and reports.'
+  else reasonText = 'Upgrade to get more capacity and features.'
+
+  return buildResponse(recommendedPlanCode, recommendedPlanName, reasonCode, reasonText, evidence, {
+    resolvesLimits,
+    unlocksFeatures,
+  })
 }
 
 /**
