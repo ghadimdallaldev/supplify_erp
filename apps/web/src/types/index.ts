@@ -864,6 +864,38 @@ export interface Subscription {
   plan_features?: string[]
 }
 
+/** Canonical entitlements from GET /api/subscriptions/entitlements */
+export interface Entitlements {
+  tenantType: 'RESTAURANT' | 'SUPPLIER'
+  tenantId: string
+  plan: {
+    id: string
+    name: string
+    code: string
+    tenant_type: string
+    price_monthly: number | null
+    price_yearly: number | null
+  }
+  features: Record<string, boolean>
+  limits: Record<string, number | null>
+  baseLimits: Record<string, number | null>
+  overrides: Array<{
+    limitKey: string
+    value: number
+    reason: string | null
+    expiresAt: string | null
+  }>
+  usage: Record<string, number>
+  usageWindowMeta?: Record<string, { date?: string }>
+}
+
+/** Response from POST /api/admin-dashboard/subscriptions/:id/preview-change */
+export interface SubscriptionPlanChangePreview {
+  willExceed: Array<{ limitKey: string; usage: number; limit: number }>
+  featureDiff: { enabled: string[]; disabled: string[] }
+  recommendedActions: string[]
+}
+
 export interface UsageMeter {
   id: string
   tenant_id: string

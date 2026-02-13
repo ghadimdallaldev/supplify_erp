@@ -1,14 +1,23 @@
-import { useGetCurrentSubscriptionQuery, useGetSubscriptionUsageQuery } from '../services/api'
+import { useGetEntitlementsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Progress } from './ui/progress'
-import { AlertCircle, Infinity, TrendingUp } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Infinity, TrendingUp } from 'lucide-react'
+
+const LIMIT_LABELS: Record<string, string> = {
+  branches: 'Branches',
+  users: 'Users',
+  orders_per_day: 'Orders (Today)',
+  suppliers_per_restaurant: 'Suppliers',
+  restaurant_inventory_skus: 'Inventory SKUs',
+  warehouses: 'Warehouses',
+  supplier_products_skus: 'Products',
+  chats_per_day: 'Chats (Today)',
+  storage_mb: 'Storage (MB)',
+}
 
 export function SubscriptionInfo() {
-  const { data, isLoading, error } = useGetCurrentSubscriptionQuery()
-  const { data: productsUsage } = useGetSubscriptionUsageQuery('products')
-  const { data: ordersUsage } = useGetSubscriptionUsageQuery('orders_per_day')
-  const { data: chatsUsage } = useGetSubscriptionUsageQuery('chats_per_day')
+  const { data, isLoading, error } = useGetEntitlementsQuery()
 
   if (isLoading) {
     return (
@@ -21,7 +30,7 @@ export function SubscriptionInfo() {
     )
   }
 
-  if (error || !data?.subscription) {
+  if (error || !data?.entitlements) {
     return (
       <Card>
         <CardHeader>
@@ -35,47 +44,48 @@ export function SubscriptionInfo() {
     )
   }
 
-  const subscription = data.subscription
-  const limits = subscription.limits || {}
-  const features = subscription.features || {}
+  const e = data.entitlements
+  const plan = e.plan
+  const limits = e.limits
+  const usage = e.usage
+  const features = e.features
 
-  const getFeatureDisplay = (featureValue: any) => {
-    if (typeof featureValue === 'boolean') {
-      return featureValue ? 'Enabled' : 'Disabled'
-    }
-    if (typeof featureValue === 'string') {
-      return featureValue.split('_').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' ')
-    }
-    return 'N/A'
-  }
+  const getFeatureDisplay = (value: boolean) => (value ? 'Enabled' : 'Disabled')
 
-  const isUnlimited = (value: number) => value === -1
+  const limitEntries = Object.entries(limits).filter(
+    ([_, limit]) => limit !== null && limit !== undefined
+  )
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Subscription & Usage</CardTitle>
-        <CardDescription>Current plan limits and usage</CardDescription>
+        <CardDescription>
+          {e.tenantType === 'RESTAURANT' ? 'Restaurant' : 'Supplier'} plan limits and usage
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Plan Info */}
         <div className="border rounded-lg p-4">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className="font-semibold text-lg">{subscription.plan_name || 'Free'}</h3>
+              <h3 className="font-semibold text-lg">{plan.name || 'Free'}</h3>
               <p className="text-sm text-gray-600">Current Plan</p>
             </div>
-            <Badge variant={subscription.status === 'ACTIVE' ? 'default' : 'secondary'}>
-              {subscription.status}
+            <Badge variant="outline">
+              {e.tenantType === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
             </Badge>
           </div>
-          
-          {subscription.current_period_end && (
-            <div className="text-sm text-gray-600">
-              Renewal: {new Date(subscription.current_period_end).toLocaleDateString()}
-            </div>
+          {plan.price_monthly != null && (
+            <p className="text-sm text-gray-600">
+              ${plan.price_monthly}/mo
+              {plan.price_yearly != null && plan.price_yearly > 0 && ` · $${plan.price_yearly}/yr`}
+            </p>
+          )}
+          {e.overrides.length > 0 && (
+            <p className="text-xs text-amber-600 mt-2">
+              {e.overrides.length} limit override{e.overrides.length !== 1 ? 's' : ''} applied
+            </p>
           )}
         </div>
 
@@ -86,74 +96,47 @@ export function SubscriptionInfo() {
             Usage
           </h4>
 
-          {/* Products Usage */}
-          {productsUsage && !isUnlimited(limits.products || 0) && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Products</span>
-                <span className={productsUsage.isOverLimit ? 'text-red-600' : ''}>
-                  {productsUsage.current} / {limits.products}
-                </span>
-              </div>
-              <Progress 
-                value={limits.products > 0 ? (productsUsage.current / limits.products) * 100 : 0} 
-                className={productsUsage.isOverLimit ? 'bg-red-200' : ''}
-              />
-              {productsUsage.isOverLimit && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
-                  <AlertCircle className="w-4 h-4" />
-                  Limit exceeded
+          {limitEntries.map(([limitKey, limit]) => {
+            const current = usage[limitKey] ?? 0
+            const effectiveLimit = limit === -1 ? null : limit
+            if (effectiveLimit === null) return null
+            const pct = effectiveLimit > 0 ? (current / effectiveLimit) * 100 : 0
+            const isOver = current >= effectiveLimit
+            const isWarning = pct >= 80 && pct < 100
+            const label = LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')
+            return (
+              <div key={limitKey} className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>{label}</span>
+                  <span
+                    className={
+                      isOver ? 'text-red-600 font-medium' : isWarning ? 'text-amber-600' : ''
+                    }
+                  >
+                    {current} / {effectiveLimit}
+                  </span>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Orders Usage */}
-          {ordersUsage && !isUnlimited(limits.orders_per_day || 0) && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Orders (Today)</span>
-                <span className={ordersUsage.isOverLimit ? 'text-red-600' : ''}>
-                  {ordersUsage.current} / {limits.orders_per_day}
-                </span>
+                <Progress
+                  value={Math.min(pct, 100)}
+                  className={isOver ? 'bg-red-200' : isWarning ? 'bg-amber-100' : ''}
+                />
+                {isOver && (
+                  <div className="flex items-center gap-2 text-sm text-red-600">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    Limit exceeded
+                  </div>
+                )}
+                {isWarning && !isOver && (
+                  <div className="flex items-center gap-2 text-sm text-amber-600">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    Near limit
+                  </div>
+                )}
               </div>
-              <Progress 
-                value={limits.orders_per_day > 0 && ordersUsage.current > 0 ? (ordersUsage.current / limits.orders_per_day) * 100 : 0}
-                className={ordersUsage.isOverLimit ? 'bg-red-200' : ''}
-              />
-              {ordersUsage.isOverLimit && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
-                  <AlertCircle className="w-4 h-4" />
-                  Limit exceeded
-                </div>
-              )}
-            </div>
-          )}
+            )
+          })}
 
-          {/* Chats per day usage */}
-          {chatsUsage && !isUnlimited(limits.chats_per_day || 0) && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Chats (Today)</span>
-                <span className={chatsUsage.isOverLimit ? 'text-red-600' : ''}>
-                  {chatsUsage.current} / {limits.chats_per_day}
-                </span>
-              </div>
-              <Progress 
-                value={limits.chats_per_day > 0 && chatsUsage.current > 0 ? (chatsUsage.current / limits.chats_per_day) * 100 : 0}
-                className={chatsUsage.isOverLimit ? 'bg-red-200' : ''}
-              />
-              {chatsUsage.isOverLimit && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
-                  <AlertCircle className="w-4 h-4" />
-                  Limit exceeded
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Unlimited indicators */}
-          {(isUnlimited(limits.products || 0) || isUnlimited(limits.orders_per_day || 0) || isUnlimited(limits.chats_per_day || 0)) && (
+          {limitEntries.length === 0 && (
             <div className="flex items-center gap-2 text-sm text-green-600">
               <Infinity className="w-4 h-4" />
               Unlimited access on this plan
@@ -193,14 +176,11 @@ export function SubscriptionInfo() {
         </div>
 
         {/* Upgrade CTA */}
-        {subscription.plan_name === 'Free' && (
+        {plan.name === 'Free' && (
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm">
-            <p className="text-blue-800 font-medium mb-2">
-              💡 Upgrade to unlock more features
-            </p>
+            <p className="text-blue-800 font-medium mb-2">Upgrade to unlock more features</p>
             <p className="text-blue-700">
-              Bronze, Gold, and Platinum plans offer advanced features like unlimited products, 
-              priority support, analytics dashboards, and more.
+              Bronze, Gold, and Platinum plans offer advanced features, higher limits, and more.
             </p>
           </div>
         )}
@@ -208,4 +188,3 @@ export function SubscriptionInfo() {
     </Card>
   )
 }
-

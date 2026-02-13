@@ -32,6 +32,8 @@ import type {
   ReorderSuggestionsResponse,
   SubscriptionPlan,
   Subscription,
+  Entitlements,
+  SubscriptionPlanChangePreview,
   UsageMeter,
   PublicRestaurant,
   PublicAvailabilitySlot,
@@ -950,6 +952,10 @@ export const api = createApi({
       query: () => '/api/subscriptions/current',
       providesTags: ['Subscription'],
     }),
+    getEntitlements: builder.query<{ entitlements: Entitlements }, void>({
+      query: () => '/api/subscriptions/entitlements',
+      providesTags: ['Subscription'],
+    }),
     getSubscriptionUsage: builder.query<UsageMeter & { meterType: string }, string>({
       query: (meterType) => `/api/subscriptions/usage/${meterType}`,
       providesTags: ['Subscription'],
@@ -1002,6 +1008,17 @@ export const api = createApi({
         url: `/api/admin-dashboard/subscriptions/${id}`,
         method: 'PATCH',
         body: data,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    previewSubscriptionPlanChange: builder.mutation<
+      SubscriptionPlanChangePreview,
+      { subscriptionId: string; targetPlanId: string }
+    >({
+      query: ({ subscriptionId, targetPlanId }) => ({
+        url: `/api/admin-dashboard/subscriptions/${subscriptionId}/preview-change`,
+        method: 'POST',
+        body: { targetPlanId },
       }),
       invalidatesTags: ['Admin'],
     }),

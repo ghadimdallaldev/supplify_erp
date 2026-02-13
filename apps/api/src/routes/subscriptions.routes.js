@@ -8,11 +8,63 @@ import {
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { getTenantSubscription, isFeatureEnabled, checkLimit } from '../lib/subscription.js'
+import {
+  getTenantSubscription,
+  isFeatureEnabled,
+  checkLimit,
+  getEntitlements,
+} from '../lib/subscription.js'
 
 const router = express.Router()
 
 router.use(requireAuth, resolveTenantContext, requirePermission('SUBSCRIPTIONS_VIEW'))
+
+/**
+ * Get canonical entitlements (plan, limits with overrides, features, usage snapshot).
+ * Single endpoint for frontend subscription/usage UI.
+ */
+router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const tenant = await getRequestTenant(req)
+    if (!tenant) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message:
+            req.userData.role === 'RESTAURANT' ? 'Restaurant not found' : 'Supplier not found',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
+    if (!entitlements) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'No active subscription found' },
+        requestId: req.requestId,
+      })
+    }
+
+    res.json({
+      ok: true,
+      data: { entitlements },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get entitlements error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get entitlements' },
+      requestId: req.requestId,
+    })
+  }
+})
 
 /**
  * Get current user's subscription (restaurant or supplier; admin when impersonating)

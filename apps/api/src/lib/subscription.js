@@ -34,7 +34,8 @@ export async function getTenantSubscription(tenantId, tenantType) {
   try {
     let { rows } = await query(
       `
-      SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code
+      SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code,
+        sp.price_per_month as plan_price_per_month, sp.price_per_year as plan_price_per_year, sp.tenant_type as plan_tenant_type
       FROM subscription s
       JOIN subscription_plan sp ON sp.id = s.plan_id
       WHERE s.tenant_id = $1 
@@ -50,7 +51,8 @@ export async function getTenantSubscription(tenantId, tenantType) {
       await ensureTenantSubscription(tenantId, tenantType)
       const result = await query(
         `
-        SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code
+        SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code,
+          sp.price_per_month as plan_price_per_month, sp.price_per_year as plan_price_per_year, sp.tenant_type as plan_tenant_type
         FROM subscription s
         JOIN subscription_plan sp ON sp.id = s.plan_id
         WHERE s.tenant_id = $1 
@@ -320,6 +322,178 @@ export async function incrementUsage(tenantId, tenantType, meterType, increment 
 
 /** Fixed date for cumulative meters (e.g. storage_mb) - one row per tenant */
 const CUMULATIVE_PERIOD_DATE = '2000-01-01'
+
+/** Canonical limit keys per tenant type (from docs/SUBSCRIPTIONS.md) */
+export const RESTAURANT_LIMIT_KEYS = [
+  'branches',
+  'users',
+  'orders_per_day',
+  'suppliers_per_restaurant',
+  'restaurant_inventory_skus',
+  'chats_per_day',
+  'storage_mb',
+]
+export const SUPPLIER_LIMIT_KEYS = [
+  'warehouses',
+  'users',
+  'supplier_products_skus',
+  'chats_per_day',
+  'storage_mb',
+]
+
+/**
+ * Get usage snapshot for all relevant meter keys (batch queries).
+ * @param {string} tenantId
+ * @param {string} tenantType - 'RESTAURANT' | 'SUPPLIER'
+ * @returns {Promise<{ [meterKey]: number }>}
+ */
+async function getUsageSnapshot(tenantId, tenantType) {
+  const keys = tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
+  const usage = Object.fromEntries(keys.map((k) => [k, 0]))
+
+  if (tenantType === 'RESTAURANT') {
+    const [inv, orders, team, branches, suppliers, storage, meterRows] = await Promise.all([
+      query(
+        `SELECT COUNT(DISTINCT product_id) as c FROM restaurant_inventory WHERE restaurant_id = $1`,
+        [tenantId]
+      ),
+      query(
+        `SELECT COUNT(*) as c FROM customer_order WHERE restaurant_id = $1 AND status = 'PLACED' AND DATE(placed_at) = CURRENT_DATE`,
+        [tenantId]
+      ),
+      query(`SELECT COUNT(*) as c FROM restaurant_team WHERE restaurant_id = $1`, [tenantId]),
+      query(`SELECT COUNT(*) as c FROM branch WHERE tenant_id = $1 AND is_active = TRUE`, [
+        tenantId,
+      ]),
+      query(`SELECT COUNT(*) as c FROM supplier_follow WHERE restaurant_id = $1`, [tenantId]),
+      query(
+        `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND meter_type = 'storage_mb' AND period_start_date = $2`,
+        [tenantId, CUMULATIVE_PERIOD_DATE]
+      ),
+      query(
+        `SELECT meter_type, current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND period_start_date = CURRENT_DATE`,
+        [tenantId]
+      ),
+    ])
+    usage.restaurant_inventory_skus = parseInt(inv.rows[0]?.c || 0)
+    usage.orders_per_day = parseInt(orders.rows[0]?.c || 0)
+    usage.users = 1 + parseInt(team.rows[0]?.c || 0)
+    usage.branches = parseInt(branches.rows[0]?.c || 0)
+    usage.suppliers_per_restaurant = parseInt(suppliers.rows[0]?.c || 0)
+    usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
+    meterRows.rows.forEach((r) => {
+      if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
+    })
+  } else {
+    const [products, warehouses, storage, meterRows] = await Promise.all([
+      query(`SELECT COUNT(*) as c FROM product WHERE supplier_id = $1`, [tenantId]),
+      query(`SELECT COUNT(*) as c FROM warehouse WHERE tenant_id = $1 AND is_active = TRUE`, [
+        tenantId,
+      ]),
+      query(
+        `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND meter_type = 'storage_mb' AND period_start_date = $2`,
+        [tenantId, CUMULATIVE_PERIOD_DATE]
+      ),
+      query(
+        `SELECT meter_type, current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND period_start_date = CURRENT_DATE`,
+        [tenantId]
+      ),
+    ])
+    usage.supplier_products_skus = parseInt(products.rows[0]?.c || 0)
+    usage.warehouses = parseInt(warehouses.rows[0]?.c || 0)
+    usage.users = 1
+    usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
+    meterRows.rows.forEach((r) => {
+      if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
+    })
+  }
+
+  return usage
+}
+
+/**
+ * Get full entitlements for a tenant: plan, limits (with overrides), features, usage.
+ * Single canonical shape for frontend. Expired overrides are excluded.
+ * @param {string} tenantId
+ * @param {string} tenantType - 'RESTAURANT' | 'SUPPLIER'
+ * @returns {Promise<Object|null>} Entitlements object or null if no subscription
+ */
+export async function getEntitlements(tenantId, tenantType) {
+  const subscription = await getTenantSubscription(tenantId, tenantType)
+  if (!subscription) return null
+
+  const limitKeys = tenantType === 'RESTAURANT' ? RESTAURANT_LIMIT_KEYS : SUPPLIER_LIMIT_KEYS
+  const baseLimits = {}
+  limitKeys.forEach((k) => {
+    const v = subscription.limits?.[k]
+    baseLimits[k] = v === -1 || v === null || v === undefined ? null : parseInt(v)
+  })
+
+  let overrides = []
+  try {
+    const result = await query(
+      `SELECT limit_type as "limitKey", override_value as value, reason, expiration_date as "expiresAt"
+       FROM tenant_limit_override
+       WHERE tenant_id = $1 AND tenant_type = $2
+         AND (expiration_date IS NULL OR expiration_date > now())
+       ORDER BY limit_type`,
+      [tenantId, tenantType]
+    )
+    overrides = result.rows
+  } catch (e) {
+    if (e.code !== '42P01') throw e
+  }
+
+  const overrideByKey = Object.fromEntries(overrides.map((o) => [o.limitKey, o]))
+  const limits = { ...baseLimits }
+  overrides.forEach((o) => {
+    limits[o.limitKey] = o.value
+  })
+
+  const features = {}
+  if (subscription.features && typeof subscription.features === 'object') {
+    for (const [k, v] of Object.entries(subscription.features)) {
+      if (typeof v === 'boolean') features[k] = v
+      else if (typeof v === 'string') features[k] = v !== 'false' && v !== 'disabled' && v !== ''
+      else features[k] = !!v
+    }
+  }
+
+  const usage = await getUsageSnapshot(tenantId, tenantType)
+  const usageWindowMeta = {}
+  limitKeys.forEach((k) => {
+    if (k === 'orders_per_day' || k === 'chats_per_day')
+      usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
+  })
+
+  return {
+    tenantType,
+    tenantId,
+    plan: {
+      id: subscription.plan_id,
+      name: subscription.plan_name || subscription.plan_display_name,
+      code: subscription.plan_code,
+      tenant_type: subscription.plan_tenant_type || subscription.tenant_type || tenantType,
+      price_monthly:
+        subscription.plan_price_per_month != null
+          ? Number(subscription.plan_price_per_month)
+          : null,
+      price_yearly:
+        subscription.plan_price_per_year != null ? Number(subscription.plan_price_per_year) : null,
+    },
+    features,
+    limits,
+    baseLimits,
+    overrides: overrides.map((o) => ({
+      limitKey: o.limitKey,
+      value: o.value,
+      reason: o.reason || null,
+      expiresAt: o.expiresAt ? new Date(o.expiresAt).toISOString() : null,
+    })),
+    usage,
+    usageWindowMeta,
+  }
+}
 
 /**
  * Increment storage usage (cumulative, in MB).

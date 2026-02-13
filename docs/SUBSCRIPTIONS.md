@@ -44,6 +44,14 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 - **Plans tab:** Filter by tenant type (Restaurant / Supplier). Create plan requires **code** and **tenant_type**; only limits/features relevant to that type are shown when editing.
 - **Subscriptions:** When changing a tenant’s plan, the new plan’s `tenant_type` must match the subscription’s tenant (Restaurant vs Supplier).
 
+## Entitlements endpoint
+
+**GET /api/subscriptions/entitlements** (auth + SUBSCRIPTIONS_VIEW): returns canonical object with tenantType, tenantId, plan, features, limits (with overrides), baseLimits, overrides (non-expired only), usage, usageWindowMeta.
+
+## Plan change preview
+
+**POST /api/admin-dashboard/subscriptions/:id/preview-change** body `{ targetPlanId }` returns willExceed, featureDiff, recommendedActions. **PATCH .../subscriptions/:id** with `planId` (and optional `allowExceedance`) applies change; tenant_type must match; 400 LIMIT_EXCEEDED if usage exceeds target unless allowExceedance.
+
 ## Migration notes
 
 - Migration **0044** adds `subscription_plan.tenant_type`, normalizes limit keys, duplicates plans into RESTAURANT and SUPPLIER catalogs, and points existing subscriptions to the correct plan by tenant type.

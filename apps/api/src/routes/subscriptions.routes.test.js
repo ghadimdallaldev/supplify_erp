@@ -36,10 +36,12 @@ vi.mock('../lib/rbac.js', () => ({
 const mockGetTenantSubscription = vi.fn()
 const mockCheckLimit = vi.fn()
 const mockIsFeatureEnabled = vi.fn()
+const mockGetEntitlements = vi.fn()
 vi.mock('../lib/subscription.js', () => ({
   getTenantSubscription: (...args) => mockGetTenantSubscription(...args),
   checkLimit: (...args) => mockCheckLimit(...args),
   isFeatureEnabled: (...args) => mockIsFeatureEnabled(...args),
+  getEntitlements: (...args) => mockGetEntitlements(...args),
 }))
 
 import { subscriptionsRoutes } from './subscriptions.routes.js'
@@ -54,6 +56,7 @@ describe('Subscriptions Routes', () => {
     mockGetTenantSubscription.mockReset()
     mockCheckLimit.mockReset()
     mockIsFeatureEnabled.mockReset()
+    mockGetEntitlements.mockReset()
 
     app = express()
     app.use(express.json())
@@ -186,6 +189,48 @@ describe('Subscriptions Routes', () => {
       expect(res.body.ok).toBe(true)
       expect(res.body.data.featureKey).toBe('chat')
       expect(res.body.data.isEnabled).toBe(true)
+    })
+  })
+
+  describe('GET /api/subscriptions/entitlements', () => {
+    it('returns entitlements with plan, limits, overrides, usage', async () => {
+      const entitlements = {
+        tenantType: 'RESTAURANT',
+        tenantId: 'rest-1',
+        plan: {
+          id: 'plan-1',
+          name: 'Free',
+          code: 'free',
+          tenant_type: 'RESTAURANT',
+          price_monthly: 0,
+          price_yearly: null,
+        },
+        features: { chat: true, reports: false },
+        limits: { orders_per_day: 10, users: 1 },
+        baseLimits: { orders_per_day: 10, users: 1 },
+        overrides: [{ limitKey: 'orders_per_day', value: 20, reason: 'Promo', expiresAt: null }],
+        usage: { orders_per_day: 5, users: 1 },
+        usageWindowMeta: {},
+      }
+      mockGetEntitlements.mockResolvedValueOnce(entitlements)
+
+      const res = await request(app).get('/api/subscriptions/entitlements').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.entitlements).toBeDefined()
+      expect(res.body.data.entitlements.plan.name).toBe('Free')
+      expect(res.body.data.entitlements.overrides).toHaveLength(1)
+      expect(res.body.data.entitlements.overrides[0].limitKey).toBe('orders_per_day')
+      expect(res.body.data.entitlements.usage.orders_per_day).toBe(5)
+    })
+
+    it('returns 404 when no entitlements for tenant', async () => {
+      mockGetEntitlements.mockResolvedValueOnce(null)
+
+      const res = await request(app).get('/api/subscriptions/entitlements').expect(404)
+
+      expect(res.body.ok).toBe(false)
+      expect(res.body.error.name).toBe('NOT_FOUND')
     })
   })
 })

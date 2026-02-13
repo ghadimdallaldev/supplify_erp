@@ -11,6 +11,65 @@ import {
   getImpersonationCookieName,
   getEffectiveTenant,
 } from '../lib/impersonation.js'
+import { getEntitlements, RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } from '../lib/subscription.js'
+
+/** Allowed feature keys per tenant type (from plan features JSONB in use) */
+const RESTAURANT_FEATURE_KEYS = [
+  'chat',
+  'reports',
+  'smart_reorder',
+  'multi_branch',
+  'receiving_quality',
+  'finance_invoices',
+  'quick_lists',
+  'inventory_management',
+  'waste_tracking',
+  'approvals_budgets',
+  'notifications',
+  'api_integrations',
+  'support_sla',
+  'custom_branding',
+]
+const SUPPLIER_FEATURE_KEYS = [
+  'chat',
+  'reports',
+  'fulfillment_tools',
+  'quick_lists',
+  'inventory_management',
+  'notifications',
+  'api_integrations',
+  'support_sla',
+  'custom_branding',
+]
+
+function getAllowedLimitKeys(tenantType) {
+  return tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
+}
+function getAllowedFeatureKeys(tenantType) {
+  return tenantType === 'RESTAURANT' ? [...RESTAURANT_FEATURE_KEYS] : [...SUPPLIER_FEATURE_KEYS]
+}
+
+function validatePlanLimitsAndFeatures(limits, features, tenantType) {
+  const limitKeys = getAllowedLimitKeys(tenantType)
+  const featureKeys = getAllowedFeatureKeys(tenantType)
+  const unknownLimits = Object.keys(limits || {}).filter((k) => !limitKeys.includes(k))
+  const unknownFeatures = Object.keys(features || {}).filter((k) => !featureKeys.includes(k))
+  if (unknownLimits.length > 0 || unknownFeatures.length > 0) {
+    return {
+      valid: false,
+      message: `Unknown keys not allowed: limits: ${unknownLimits.join(', ') || 'none'}; features: ${unknownFeatures.join(', ') || 'none'}`,
+    }
+  }
+  for (const [k, v] of Object.entries(limits || {})) {
+    if (v !== null && v !== -1 && (typeof v !== 'number' || v < 0 || !Number.isInteger(v))) {
+      return {
+        valid: false,
+        message: `Limit ${k} must be a non-negative integer or null (-1 for unlimited)`,
+      }
+    }
+  }
+  return { valid: true }
+}
 
 const router = Router()
 
@@ -203,6 +262,19 @@ const createPlanSchema = z.object({
 router.post('/plans', async (req, res) => {
   try {
     const planData = createPlanSchema.parse(req.body)
+    const validation = validatePlanLimitsAndFeatures(
+      planData.limits,
+      planData.features,
+      planData.tenantType
+    )
+    if (!validation.valid) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: validation.message },
+        requestId: req.requestId,
+      })
+    }
     const planType = planData.tenantType === 'RESTAURANT' ? 'restaurant_only' : 'supplier_only'
 
     const {
@@ -300,6 +372,21 @@ router.patch('/plans/:id', async (req, res) => {
     }
 
     const existing = existingPlans[0]
+    const planTenantType = existing.tenant_type || 'RESTAURANT'
+
+    if (updateData.limits !== undefined || updateData.features !== undefined) {
+      const limits = updateData.limits !== undefined ? updateData.limits : existing.limits
+      const features = updateData.features !== undefined ? updateData.features : existing.features
+      const validation = validatePlanLimitsAndFeatures(limits, features, planTenantType)
+      if (!validation.valid) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: validation.message },
+          requestId: req.requestId,
+        })
+      }
+    }
 
     // Build update query dynamically
     const updates = []
@@ -457,6 +544,133 @@ const updateSubscriptionSchema = z.object({
   planId: z.string().uuid().optional(),
   status: z.enum(['TRIALING', 'ACTIVE', 'SUSPENDED', 'CANCELLED', 'PAST_DUE']).optional(),
   cancelReason: z.string().optional(),
+  allowExceedance: z.boolean().optional(),
+})
+
+/**
+ * POST /subscriptions/:id/preview-change
+ * Preview impact of changing subscription to target plan (usage vs limits, feature diff).
+ */
+router.post('/subscriptions/:id/preview-change', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { targetPlanId } = req.body
+    if (!targetPlanId || typeof targetPlanId !== 'string') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'targetPlanId is required' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows: subRows } = await query(
+      'SELECT s.*, sp.limits as current_limits, sp.features as current_features FROM subscription s JOIN subscription_plan sp ON sp.id = s.plan_id WHERE s.id = $1',
+      [id]
+    )
+    if (subRows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Subscription not found' },
+        requestId: req.requestId,
+      })
+    }
+    const sub = subRows[0]
+    const tenantId = sub.tenant_id
+    const tenantType = sub.tenant_type
+
+    const { rows: targetPlanRows } = await query(
+      'SELECT id, name, code, tenant_type, limits, features FROM subscription_plan WHERE id = $1',
+      [targetPlanId]
+    )
+    if (targetPlanRows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Target plan not found' },
+        requestId: req.requestId,
+      })
+    }
+    const targetPlan = targetPlanRows[0]
+    if (targetPlan.tenant_type !== tenantType) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Target plan tenant_type must match subscription (Restaurant vs Supplier)',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const entitlements = await getEntitlements(tenantId, tenantType)
+    if (!entitlements) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'No entitlements for tenant' },
+        requestId: req.requestId,
+      })
+    }
+
+    const limitKeys = tenantType === 'RESTAURANT' ? RESTAURANT_LIMIT_KEYS : SUPPLIER_LIMIT_KEYS
+    const targetLimits = targetPlan.limits || {}
+    const willExceed = []
+    for (const limitKey of limitKeys) {
+      const usage = entitlements.usage[limitKey] ?? 0
+      const rawLimit = targetLimits[limitKey]
+      const limit =
+        rawLimit === -1 || rawLimit === null || rawLimit === undefined ? null : parseInt(rawLimit)
+      if (limit !== null && usage > limit) {
+        willExceed.push({ limitKey, usage, limit })
+      }
+    }
+
+    const currentFeatures = sub.current_features || {}
+    const targetFeatures = targetPlan.features || {}
+    const featureKeys = new Set([...Object.keys(currentFeatures), ...Object.keys(targetFeatures)])
+    const toBool = (v) => {
+      if (typeof v === 'boolean') return v
+      if (typeof v === 'string') return v !== 'false' && v !== 'disabled' && v !== ''
+      return !!v
+    }
+    const enabled = []
+    const disabled = []
+    for (const key of featureKeys) {
+      const cur = toBool(currentFeatures[key])
+      const tgt = toBool(targetFeatures[key])
+      if (tgt && !cur) enabled.push(key)
+      else if (cur && !tgt) disabled.push(key)
+    }
+
+    const recommendedActions = []
+    if (willExceed.length > 0) {
+      recommendedActions.push(
+        `Current usage exceeds target plan limits for: ${willExceed.map((e) => `${e.limitKey} (${e.usage} > ${e.limit})`).join(', ')}. Reduce usage or choose a higher plan.`
+      )
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        willExceed,
+        featureDiff: { enabled, disabled },
+        recommendedActions,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Preview plan change error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to preview plan change' },
+      requestId: req.requestId,
+    })
+  }
 })
 
 router.patch('/subscriptions/:id', async (req, res) => {
@@ -483,7 +697,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
 
     if (updateData.planId) {
       const { rows: planRows } = await query(
-        'SELECT id, name, tenant_type FROM subscription_plan WHERE id = $1',
+        'SELECT id, name, tenant_type, limits FROM subscription_plan WHERE id = $1',
         [updateData.planId]
       )
       if (planRows.length === 0) {
@@ -507,6 +721,40 @@ router.patch('/subscriptions/:id', async (req, res) => {
           requestId: req.requestId,
         })
         return
+      }
+      if (!updateData.allowExceedance) {
+        const entitlements = await getEntitlements(existing.tenant_id, existing.tenant_type)
+        if (entitlements) {
+          const limitKeys =
+            existing.tenant_type === 'RESTAURANT' ? RESTAURANT_LIMIT_KEYS : SUPPLIER_LIMIT_KEYS
+          const targetLimits = newPlan.limits || {}
+          const willExceed = []
+          for (const limitKey of limitKeys) {
+            const usage = entitlements.usage[limitKey] ?? 0
+            const rawLimit = targetLimits[limitKey]
+            const limit =
+              rawLimit === -1 || rawLimit === null || rawLimit === undefined
+                ? null
+                : parseInt(rawLimit)
+            if (limit !== null && usage > limit) {
+              willExceed.push({ limitKey, usage, limit })
+            }
+          }
+          if (willExceed.length > 0) {
+            res.status(400).json({
+              ok: false,
+              data: null,
+              error: {
+                name: 'LIMIT_EXCEEDED',
+                message:
+                  'Current usage exceeds target plan limits. Use preview-change to see impact, or pass allowExceedance: true to force change.',
+                details: { willExceed },
+              },
+              requestId: req.requestId,
+            })
+            return
+          }
+        }
       }
       updates.push(`plan_id = $${paramIndex++}`)
       values.push(updateData.planId)
@@ -1027,6 +1275,44 @@ router.delete('/tenants/:tenantType/:id/override-limit/:overrideId', async (req,
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to remove override' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// Get tenant entitlements (plan, limits, overrides, usage) for admin tenant detail
+router.get('/tenants/:tenantType/:id/entitlements', async (req, res) => {
+  try {
+    const { tenantType, id } = req.params
+    if (!['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'tenantType must be RESTAURANT or SUPPLIER' },
+        requestId: req.requestId,
+      })
+    }
+    const entitlements = await getEntitlements(id, tenantType)
+    if (!entitlements) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'No active subscription for this tenant' },
+        requestId: req.requestId,
+      })
+    }
+    res.json({
+      ok: true,
+      data: { entitlements },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get tenant entitlements error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get tenant entitlements' },
       requestId: req.requestId,
     })
   }
