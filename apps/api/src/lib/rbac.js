@@ -1,6 +1,7 @@
 import { verifyToken, refreshAccessToken } from './auth.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
+import { getEffectiveTenant } from './impersonation.js'
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -312,6 +313,50 @@ export function requireRole(allowedRoles) {
 
     next()
   }
+}
+
+/**
+ * Get the tenant (restaurant or supplier) for this request.
+ * When admin is impersonating, returns the impersonated tenant.
+ * Otherwise for RESTAURANT/SUPPLIER resolves by contact_email.
+ * @param {import('express').Request} req
+ * @returns {Promise<{ tenantId: string, tenantType: string, tenantName: string } | null>}
+ */
+export async function getRequestTenant(req) {
+  if (!req.userData) return null
+  const effective = getEffectiveTenant(req)
+  if (effective) return effective
+  if (req.userData.role === 'SUPPLIER') {
+    const { rows } = await query('SELECT id, name FROM supplier WHERE contact_email = $1', [
+      req.userData.email,
+    ])
+    if (rows.length)
+      return { tenantId: rows[0].id, tenantType: 'SUPPLIER', tenantName: rows[0].name || '' }
+  }
+  if (req.userData.role === 'RESTAURANT') {
+    const { rows } = await query('SELECT id, name FROM restaurant WHERE contact_email = $1', [
+      req.userData.email,
+    ])
+    if (rows.length)
+      return { tenantId: rows[0].id, tenantType: 'RESTAURANT', tenantName: rows[0].name || '' }
+  }
+  return null
+}
+
+/**
+ * Get restaurant id for this request (from impersonation or from user email). Returns null if not a restaurant context.
+ */
+export async function getRestaurantIdForRequest(req) {
+  const tenant = await getRequestTenant(req)
+  return tenant?.tenantType === 'RESTAURANT' ? tenant.tenantId : null
+}
+
+/**
+ * Get supplier id for this request (from impersonation or from user email). Returns null if not a supplier context.
+ */
+export async function getSupplierIdForRequest(req) {
+  const tenant = await getRequestTenant(req)
+  return tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
 }
 
 // Check if user owns resource (for suppliers/restaurants)

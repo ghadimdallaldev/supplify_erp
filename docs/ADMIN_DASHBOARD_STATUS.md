@@ -32,13 +32,14 @@ Supplify’s admin area is a subscription-based operator console for managing te
 
 ## Impersonation (View as Tenant)
 
-| Feature                  | Status | Description                                                                                                                                                                                                         |
-| ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Start impersonation**  | ✅     | From Tenants tab: click **Impersonate** on a supplier or restaurant. Signed short-lived JWT cookie; configurable duration (`IMPERSONATION_MAX_DURATION_MINUTES`).                                                   |
-| **Impersonation banner** | ✅     | Amber banner at top of app: “You are impersonating [name]” with **Stop impersonating**; shows expiry.                                                                                                               |
-| **Stop impersonation**   | ✅     | Button in banner clears cookie and logs `IMPERSONATION_END`.                                                                                                                                                        |
-| **Security**             | ✅     | Cannot impersonate a user with Admin role; token includes admin user id so only that admin can use the session; start/stop audited in `admin_audit_log`.                                                            |
-| **API**                  | ✅     | `POST/GET /api/admin-dashboard/impersonate`, `POST /api/admin-dashboard/impersonate/stop`; middleware `impersonationContext` sets `req.impersonationContext`; `getEffectiveTenant(req)` for backend tenant scoping. |
+| Feature                  | Status | Description                                                                                                                                                                                                       |
+| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Start impersonation**  | ✅     | From Tenants tab: click **Impersonate** on a supplier or restaurant. Signed short-lived JWT cookie; configurable duration (`IMPERSONATION_MAX_DURATION_MINUTES`).                                                 |
+| **Impersonation banner** | ✅     | Amber banner at top of app: “You are impersonating [name]” with **Stop impersonating**; shows expiry.                                                                                                             |
+| **Stop impersonation**   | ✅     | Button in banner clears cookie and logs `IMPERSONATION_END`.                                                                                                                                                      |
+| **Security**             | ✅     | Cannot impersonate a user with Admin role; token includes admin user id so only that admin can use the session; start/stop audited in `admin_audit_log`.                                                          |
+| **API**                  | ✅     | `POST/GET /api/admin-dashboard/impersonate`, `POST /api/admin-dashboard/impersonate/stop`; middleware `impersonationContext` sets `req.impersonationContext`; `getRequestTenant(req)` for backend tenant scoping. |
+| **Orders calendar**      | ✅     | Calendar API uses request tenant when impersonating; no 404 when viewing as restaurant or supplier.                                                                                                               |
 
 ---
 

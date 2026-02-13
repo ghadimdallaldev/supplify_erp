@@ -1,6 +1,6 @@
 import express from 'express'
 import PDFDocument from 'pdfkit'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireAuth, requireRole, getRequestTenant } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
@@ -532,52 +532,28 @@ router.get('/', requireAuth, async (req, res) => {
     const queryParams = []
     let paramIndex = 1
 
-    // Role-based filtering
-    if (req.userData.role === 'RESTAURANT') {
-      // Restaurants see only their own orders
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'Restaurant record not found for user',
-          },
-          requestId: req.requestId,
-        })
-      }
-
+    // Role-based filtering (respects impersonation)
+    const tenant = await getRequestTenant(req)
+    if (tenant?.tenantType === 'RESTAURANT') {
       whereConditions.push(`o.restaurant_id = $${paramIndex}`)
-      queryParams.push(restaurants[0].id)
+      queryParams.push(tenant.tenantId)
       paramIndex++
-    } else if (req.userData.role === 'SUPPLIER') {
-      // Suppliers see orders that include their products
-      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
-
-      if (suppliers.length === 0) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'Supplier record not found for user',
-          },
-          requestId: req.requestId,
-        })
-      }
-
+    } else if (tenant?.tenantType === 'SUPPLIER') {
       whereConditions.push(`p.supplier_id = $${paramIndex}`)
-      queryParams.push(suppliers[0].id)
+      queryParams.push(tenant.tenantId)
       paramIndex++
+    } else if (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Restaurant/Supplier record not found for user',
+        },
+        requestId: req.requestId,
+      })
     }
-    // Admin sees all orders (no additional filter)
+    // Admin with no impersonation sees all orders
 
     // Status filter
     if (params.status) {
@@ -586,8 +562,8 @@ router.get('/', requireAuth, async (req, res) => {
       paramIndex++
     }
 
-    // Supplier filter (for admin)
-    if (params.supplier && req.userData.role === 'ADMIN') {
+    // Supplier filter (for admin when not impersonating)
+    if (params.supplier && req.userData.role === 'ADMIN' && !tenant) {
       whereConditions.push(`p.supplier_id = $${paramIndex}`)
       queryParams.push(params.supplier)
       paramIndex++
@@ -742,44 +718,53 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 
     const order = orders[0]
 
-    // Check access permissions
-    if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0 || restaurants[0].id !== order.restaurant_id) {
+    // Check access permissions (respects impersonation)
+    const tenant = await getRequestTenant(req)
+    if (tenant?.tenantType === 'RESTAURANT') {
+      if (order.restaurant_id !== tenant.tenantId) {
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
           requestId: req.requestId,
         })
       }
-    } else if (req.userData.role === 'SUPPLIER') {
-      // Check if supplier has items in this order
+    } else if (tenant?.tenantType === 'SUPPLIER') {
       const { rows: supplierItems } = await query(
-        `
-        SELECT 1 FROM order_item oi
-        JOIN supplier s ON s.id = oi.supplier_id
-        WHERE oi.order_id = $1 AND s.contact_email = $2
-        LIMIT 1
-      `,
-        [id, req.userData.email]
+        `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
+        [id, tenant.tenantId]
       )
-
       if (supplierItems.length === 0) {
         return res.status(403).json({
           ok: false,
           data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
+          requestId: req.requestId,
+        })
+      }
+    } else if (req.userData.role === 'RESTAURANT') {
+      const { rows: restaurants } = await query(
+        'SELECT id FROM restaurant WHERE contact_email = $1',
+        [req.userData.email]
+      )
+      if (restaurants.length === 0 || restaurants[0].id !== order.restaurant_id) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
+          requestId: req.requestId,
+        })
+      }
+    } else if (req.userData.role === 'SUPPLIER') {
+      const { rows: supplierItems } = await query(
+        `SELECT 1 FROM order_item oi JOIN supplier s ON s.id = oi.supplier_id WHERE oi.order_id = $1 AND s.contact_email = $2 LIMIT 1`,
+        [id, req.userData.email]
+      )
+      if (supplierItems.length === 0) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
           requestId: req.requestId,
         })
       }

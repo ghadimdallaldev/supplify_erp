@@ -1,90 +1,90 @@
-import express from 'express';
-import { requireAuth, requireRole } from '../lib/rbac.js';
-import { query } from '../lib/db.js';
-import { logger } from '../lib/logger.js';
-import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js';
-import { checkLimit, checkUsageWithWarning, incrementUsage } from '../lib/subscription.js';
-import { z } from 'zod';
+import express from 'express'
+import { requireAuth, requireRole } from '../lib/rbac.js'
+import { query } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
+import { getRequestTenant } from '../lib/rbac.js'
+import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
+import { checkLimit, checkUsageWithWarning, incrementUsage } from '../lib/subscription.js'
+import { z } from 'zod'
 
-const router = express.Router();
+const router = express.Router()
 
 // Validation schemas
 const createConversationSchema = z.object({
   supplierId: z.string().uuid(),
-});
+})
 
 const sendMessageSchema = z.object({
   content: z.string().min(1),
   messageType: z.enum(['TEXT', 'SYSTEM', 'ORDER_REFERENCE']).default('TEXT'),
   orderId: z.string().uuid().optional(),
   replyTo: z.string().uuid().optional(),
-  attachments: z.array(z.object({
-    fileUrl: z.string().url(),
-    fileType: z.string(),
-    fileName: z.string(),
-    fileSize: z.number().optional(),
-  })).optional(),
-});
+  attachments: z
+    .array(
+      z.object({
+        fileUrl: z.string().url(),
+        fileType: z.string(),
+        fileName: z.string(),
+        fileSize: z.number().optional(),
+      })
+    )
+    .optional(),
+})
 
 const quickReplySchema = z.object({
   title: z.string().min(1),
   content: z.string().min(1),
   category: z.string().optional(),
-});
+})
 
 // Helper: Get or create conversation between supplier and restaurant
 async function getOrCreateConversation(supplierId, restaurantId) {
-  let { rows: conversations } = await query(`
+  let { rows: conversations } = await query(
+    `
     SELECT * FROM conversation
     WHERE supplier_id = $1 AND restaurant_id = $2
-  `, [supplierId, restaurantId]);
-  
-  let conversation;
-  
+  `,
+    [supplierId, restaurantId]
+  )
+
+  let conversation
+
   if (conversations.length === 0) {
     // Create new conversation
-    const { rows: newConversations } = await query(`
+    const { rows: newConversations } = await query(
+      `
       INSERT INTO conversation (supplier_id, restaurant_id)
       VALUES ($1, $2)
       RETURNING *
-    `, [supplierId, restaurantId]);
-    
-    conversation = newConversations[0];
-    
+    `,
+      [supplierId, restaurantId]
+    )
+
+    conversation = newConversations[0]
+
     // Create participant records
-    await query(`
+    await query(
+      `
       INSERT INTO conversation_participant (conversation_id, participant_type, participant_id)
       VALUES ($1, 'SUPPLIER', $2), ($1, 'RESTAURANT', $3)
-    `, [conversation.id, supplierId, restaurantId]);
+    `,
+      [conversation.id, supplierId, restaurantId]
+    )
   } else {
-    conversation = conversations[0];
+    conversation = conversations[0]
   }
-  
-  return conversation;
+
+  return conversation
 }
 
 // List conversations for current user
 router.get('/conversations', requireAuth, async (req, res) => {
   try {
-    let queryText;
-    let queryParams;
-    
-    if (req.userData.role === 'SUPPLIER') {
-      // Get supplier's ID
-      const { rows: suppliers } = await query(
-        'SELECT id FROM supplier WHERE contact_email = $1',
-        [req.userData.email]
-      );
-      
-      if (suppliers.length === 0) {
-        return res.json({
-          ok: true,
-          data: { conversations: [] },
-          error: null,
-          requestId: req.requestId,
-        });
-      }
-      
+    let queryText
+    let queryParams
+
+    const tenant = await getRequestTenant(req)
+    if (tenant?.tenantType === 'SUPPLIER') {
       queryText = `
         SELECT 
           c.*,
@@ -103,24 +103,9 @@ router.get('/conversations', requireAuth, async (req, res) => {
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
         WHERE c.supplier_id = $1 AND cp.is_archived = false
         ORDER BY cp.is_pinned DESC, c.last_message_at DESC NULLS LAST
-      `;
-      queryParams = [suppliers[0].id];
-    } else if (req.userData.role === 'RESTAURANT') {
-      // Get restaurant's ID
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      );
-      
-      if (restaurants.length === 0) {
-        return res.json({
-          ok: true,
-          data: { conversations: [] },
-          error: null,
-          requestId: req.requestId,
-        });
-      }
-      
+      `
+      queryParams = [tenant.tenantId]
+    } else if (tenant?.tenantType === 'RESTAURANT') {
       queryText = `
         SELECT 
           c.*,
@@ -139,30 +124,27 @@ router.get('/conversations', requireAuth, async (req, res) => {
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
         WHERE c.restaurant_id = $1 AND cp.is_archived = false
         ORDER BY cp.is_pinned DESC, c.last_message_at DESC NULLS LAST
-      `;
-      queryParams = [restaurants[0].id];
+      `
+      queryParams = [tenant.tenantId]
     } else {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Only suppliers and restaurants can access conversations',
-        },
+      return res.json({
+        ok: true,
+        data: { conversations: [] },
+        error: null,
         requestId: req.requestId,
-      });
+      })
     }
-    
-    const { rows } = await query(queryText, queryParams);
-    
+
+    const { rows } = await query(queryText, queryParams)
+
     res.json({
       ok: true,
       data: { conversations: rows },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('List conversations error:', error);
+    logger.error('List conversations error:', error)
     res.status(500).json({
       ok: false,
       data: null,
@@ -171,14 +153,14 @@ router.get('/conversations', requireAuth, async (req, res) => {
         message: 'Failed to list conversations',
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 router.delete('/conversations/:conversationId', requireAuth, async (req, res) => {
   try {
-    const { conversationId } = req.params;
-    const role = req.userData.role;
+    const { conversationId } = req.params
+    const role = req.userData.role
 
     if (!['SUPPLIER', 'RESTAURANT', 'ADMIN'].includes(role)) {
       return res.status(403).json({
@@ -189,7 +171,7 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
           message: 'Only suppliers, restaurants, or admins can manage conversations',
         },
         requestId: req.requestId,
-      });
+      })
     }
 
     const { rows: conversations } = await query(
@@ -198,8 +180,8 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
         FROM conversation
         WHERE id = $1
       `,
-      [conversationId],
-    );
+      [conversationId]
+    )
 
     if (!conversations.length) {
       return res.status(404).json({
@@ -207,11 +189,11 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
         data: null,
         error: { name: 'NOT_FOUND', message: 'Conversation not found' },
         requestId: req.requestId,
-      });
+      })
     }
 
-    const conversation = conversations[0];
-    let participantTypeFilter = null;
+    const conversation = conversations[0]
+    let participantTypeFilter = null
 
     if (role === 'SUPPLIER') {
       const { rows: suppliers } = await query(
@@ -220,8 +202,8 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
           FROM supplier
           WHERE contact_email = $1
         `,
-        [req.userData.email],
-      );
+        [req.userData.email]
+      )
 
       if (!suppliers.length || suppliers[0].id !== conversation.supplier_id) {
         return res.status(403).json({
@@ -232,9 +214,9 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
             message: 'Conversation does not belong to this supplier',
           },
           requestId: req.requestId,
-        });
+        })
       }
-      participantTypeFilter = 'SUPPLIER';
+      participantTypeFilter = 'SUPPLIER'
     } else if (role === 'RESTAURANT') {
       const { rows: restaurants } = await query(
         `
@@ -242,8 +224,8 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
           FROM restaurant
           WHERE contact_email = $1
         `,
-        [req.userData.email],
-      );
+        [req.userData.email]
+      )
 
       if (!restaurants.length || restaurants[0].id !== conversation.restaurant_id) {
         return res.status(403).json({
@@ -254,12 +236,14 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
             message: 'Conversation does not belong to this restaurant',
           },
           requestId: req.requestId,
-        });
+        })
       }
-      participantTypeFilter = 'RESTAURANT';
+      participantTypeFilter = 'RESTAURANT'
     }
 
-    const updateParams = participantTypeFilter ? [conversationId, participantTypeFilter] : [conversationId];
+    const updateParams = participantTypeFilter
+      ? [conversationId, participantTypeFilter]
+      : [conversationId]
     const updateQuery = `
       UPDATE conversation_participant
       SET is_archived = true,
@@ -268,9 +252,9 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
       WHERE conversation_id = $1
         ${participantTypeFilter ? 'AND participant_type = $2' : ''}
       RETURNING id
-    `;
+    `
 
-    const { rowCount } = await query(updateQuery, updateParams);
+    const { rowCount } = await query(updateQuery, updateParams)
 
     if (rowCount === 0) {
       return res.status(404).json({
@@ -278,17 +262,17 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
         data: null,
         error: { name: 'NOT_FOUND', message: 'Conversation participant not found' },
         requestId: req.requestId,
-      });
+      })
     }
 
     // Admins can optionally hard-delete the conversation (including messages) by passing ?hard=true
     if (role === 'ADMIN' && req.query.hard === 'true') {
-      await query(`DELETE FROM conversation WHERE id = $1`, [conversationId]);
+      await query(`DELETE FROM conversation WHERE id = $1`, [conversationId])
     }
 
-    res.json({ ok: true, data: { archived: true }, error: null, requestId: req.requestId });
+    res.json({ ok: true, data: { archived: true }, error: null, requestId: req.requestId })
   } catch (error) {
-    logger.error('Delete conversation error:', error);
+    logger.error('Delete conversation error:', error)
     res.status(500).json({
       ok: false,
       data: null,
@@ -298,177 +282,184 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Get or create conversation
-router.post('/conversations', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT']), async (req, res) => {
-  try {
-    const { supplierId } = createConversationSchema.parse(req.body);
-    
-    let resolvedSupplierId = supplierId;
-    let resolvedRestaurantId;
-    
-    // Verify that the user has permission to create this conversation
-    if (req.userData.role === 'SUPPLIER') {
-      const { rows: suppliers } = await query(
-        'SELECT id FROM supplier WHERE contact_email = $1 AND id = $2',
-        [req.userData.email, supplierId]
-      );
-      
-      if (suppliers.length === 0) {
+router.post(
+  '/conversations',
+  requireAuth,
+  requireRole(['SUPPLIER', 'RESTAURANT']),
+  async (req, res) => {
+    try {
+      const { supplierId } = createConversationSchema.parse(req.body)
+
+      let resolvedSupplierId = supplierId
+      let resolvedRestaurantId
+
+      // Verify that the user has permission to create this conversation
+      if (req.userData.role === 'SUPPLIER') {
+        const { rows: suppliers } = await query(
+          'SELECT id FROM supplier WHERE contact_email = $1 AND id = $2',
+          [req.userData.email, supplierId]
+        )
+
+        if (suppliers.length === 0) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'You can only create conversations as yourself',
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        // For suppliers, they need to specify which restaurant to talk to
+        // But this endpoint is typically called by restaurants to talk to suppliers
+        // So we don't need to handle supplier creating conversations here
         return res.status(403).json({
           ok: false,
           data: null,
           error: {
-            name: 'FORBIDDEN',
-            message: 'You can only create conversations as yourself',
+            name: 'NOT_SUPPORTED',
+            message: 'Suppliers cannot create conversations this way',
           },
           requestId: req.requestId,
-        });
+        })
+      } else if (req.userData.role === 'RESTAURANT') {
+        const { rows: restaurants } = await query(
+          'SELECT id FROM restaurant WHERE contact_email = $1',
+          [req.userData.email]
+        )
+
+        if (restaurants.length === 0) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Restaurant not found',
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        // For restaurants, validate that they're trying to create a conversation with a valid supplier
+        const { rows: suppliers } = await query('SELECT id FROM supplier WHERE id = $1', [
+          supplierId,
+        ])
+
+        if (suppliers.length === 0) {
+          return res.status(404).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'NOT_FOUND',
+              message: 'Supplier not found',
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        // Use the resolved restaurant ID
+        resolvedRestaurantId = restaurants[0].id
+        resolvedSupplierId = supplierId
+
+        const conversation = await getOrCreateConversation(resolvedSupplierId, resolvedRestaurantId)
+
+        res.status(201).json({
+          ok: true,
+          data: { conversation },
+          error: null,
+          requestId: req.requestId,
+        })
+        return
       }
-      
-      // For suppliers, they need to specify which restaurant to talk to
-      // But this endpoint is typically called by restaurants to talk to suppliers
-      // So we don't need to handle supplier creating conversations here
-      return res.status(403).json({
+
+      // If we get here, the role is not supported
+      res.status(403).json({
         ok: false,
         data: null,
         error: {
           name: 'NOT_SUPPORTED',
-          message: 'Suppliers cannot create conversations this way',
+          message: 'Role not supported',
         },
         requestId: req.requestId,
-      });
-    } else if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      );
-      
-      if (restaurants.length === 0) {
-        return res.status(403).json({
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
           ok: false,
           data: null,
           error: {
-            name: 'FORBIDDEN',
-            message: 'Restaurant not found',
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid conversation data',
+            details: error.errors,
           },
           requestId: req.requestId,
-        });
+        })
       }
-      
-      // For restaurants, validate that they're trying to create a conversation with a valid supplier
-      const { rows: suppliers } = await query(
-        'SELECT id FROM supplier WHERE id = $1',
-        [supplierId]
-      );
-      
-      if (suppliers.length === 0) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'NOT_FOUND',
-            message: 'Supplier not found',
-          },
-          requestId: req.requestId,
-        });
-      }
-      
-      // Use the resolved restaurant ID
-      resolvedRestaurantId = restaurants[0].id;
-      resolvedSupplierId = supplierId;
-      
-      const conversation = await getOrCreateConversation(resolvedSupplierId, resolvedRestaurantId);
-      
-      res.status(201).json({
-        ok: true,
-        data: { conversation },
-        error: null,
-        requestId: req.requestId,
-      });
-      return;
-    }
-    
-    // If we get here, the role is not supported
-    res.status(403).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'NOT_SUPPORTED',
-        message: 'Role not supported',
-      },
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+
+      logger.error('Create conversation error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid conversation data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to create conversation',
         },
         requestId: req.requestId,
-      });
+      })
     }
-    
-    logger.error('Create conversation error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to create conversation',
-      },
-      requestId: req.requestId,
-    });
   }
-});
+)
 
 // Get conversation messages
 router.get('/conversations/:conversationId/messages', requireAuth, async (req, res, next) => {
   try {
-    const { conversationId } = req.params;
-    const { limit = '50', offset = '0' } = req.query;
-    
+    const { conversationId } = req.params
+    const { limit = '50', offset = '0' } = req.query
+
     // Verify conversation exists and current user is a participant (tenant scoping)
-    const { rows: conversations } = await query(`
+    const { rows: conversations } = await query(
+      `
       SELECT id, supplier_id, restaurant_id FROM conversation WHERE id = $1
-    `, [conversationId]);
-    
+    `,
+      [conversationId]
+    )
+
     if (conversations.length === 0) {
-      throw new NotFoundError('Conversation not found');
+      throw new NotFoundError('Conversation not found')
     }
 
-    const conversation = conversations[0];
-    const role = req.userData?.role;
+    const conversation = conversations[0]
+    const role = req.userData?.role
 
     if (role === 'RESTAURANT') {
       const { rows: restaurants } = await query(
         'SELECT id FROM restaurant WHERE contact_email = $1',
         [req.userData.email]
-      );
+      )
       if (restaurants.length === 0 || restaurants[0].id !== conversation.restaurant_id) {
-        throw new NotFoundError('Conversation not found');
+        throw new NotFoundError('Conversation not found')
       }
     } else if (role === 'SUPPLIER') {
-      const { rows: suppliers } = await query(
-        'SELECT id FROM supplier WHERE contact_email = $1',
-        [req.userData.email]
-      );
+      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
+        req.userData.email,
+      ])
       if (suppliers.length === 0 || suppliers[0].id !== conversation.supplier_id) {
-        throw new NotFoundError('Conversation not found');
+        throw new NotFoundError('Conversation not found')
       }
     } else if (role !== 'ADMIN') {
-      throw new NotFoundError('Conversation not found');
+      throw new NotFoundError('Conversation not found')
     }
-    
+
     // Get messages with reply information
-    const { rows: messages } = await query(`
+    const { rows: messages } = await query(
+      `
       SELECT 
         m.*,
         s.name as supplier_name,
@@ -486,46 +477,51 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
       WHERE m.conversation_id = $1
       ORDER BY m.created_at DESC
       LIMIT $2 OFFSET $3
-    `, [conversationId, limit, offset]);
-    
+    `,
+      [conversationId, limit, offset]
+    )
+
     // Get attachments for messages
-    const messageIds = messages.map(m => m.id);
-    let attachments = [];
-    
+    const messageIds = messages.map((m) => m.id)
+    let attachments = []
+
     if (messageIds.length > 0) {
-      const { rows: attRows } = await query(`
+      const { rows: attRows } = await query(
+        `
         SELECT * FROM message_attachment
         WHERE message_id = ANY($1)
-      `, [messageIds]);
-      attachments = attRows;
+      `,
+        [messageIds]
+      )
+      attachments = attRows
     }
-    
+
     // Group attachments by message_id
-    const attachmentsByMessage = {};
-    attachments.forEach(att => {
+    const attachmentsByMessage = {}
+    attachments.forEach((att) => {
       if (!attachmentsByMessage[att.message_id]) {
-        attachmentsByMessage[att.message_id] = [];
+        attachmentsByMessage[att.message_id] = []
       }
-      attachmentsByMessage[att.message_id].push(att);
-    });
-    
+      attachmentsByMessage[att.message_id].push(att)
+    })
+
     // Add attachments to messages
-    const messagesWithAttachments = messages.map(msg => ({
+    const messagesWithAttachments = messages.map((msg) => ({
       ...msg,
-      attachments: attachmentsByMessage[msg.id] || []
-    }));
-    
+      attachments: attachmentsByMessage[msg.id] || [],
+    }))
+
     res.json({
       ok: true,
       data: { messages: messagesWithAttachments.reverse() }, // Return in chronological order
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     if (error instanceof NotFoundError) {
-      return next(error);
+      return next(error)
     }
-    logger.error('Get messages error:', error);
+    logger.error('Get messages error:', error)
     res.status(500).json({
       ok: false,
       data: null,
@@ -534,200 +530,216 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
         message: 'Failed to get messages',
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Send a message
-router.post('/conversations/:conversationId/messages', requireAuth, requireRole(['SUPPLIER', 'RESTAURANT']), async (req, res) => {
-  try {
-    // Check daily chat limit before sending message
-    let tenantId, tenantType;
-    
-    if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      );
-      if (restaurants.length > 0) {
-        tenantId = restaurants[0].id;
-        tenantType = 'RESTAURANT';
-      }
-    } else if (req.userData.role === 'SUPPLIER') {
-      const { rows: suppliers } = await query(
-        'SELECT id FROM supplier WHERE contact_email = $1',
-        [req.userData.email]
-      );
-      if (suppliers.length > 0) {
-        tenantId = suppliers[0].id;
-        tenantType = 'SUPPLIER';
-      }
-    }
-
-    if (tenantId && tenantType) {
-      const usageCheck = await checkUsageWithWarning(tenantId, tenantType, 'chats_per_day');
-      
-      if (usageCheck.isOverLimit && !usageCheck.isUnlimited) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'CHAT_LIMIT_EXCEEDED',
-            message: `Daily chat limit reached (${usageCheck.current}/${usageCheck.limit}). Upgrade your plan to send more messages.`,
-            details: {
-              current: usageCheck.current,
-              limit: usageCheck.limit,
-              usagePercent: usageCheck.usagePercent,
-              isWarning: usageCheck.isWarning
-            }
-          },
-          requestId: req.requestId,
-        });
-      }
-      
-      // Show warning at 80% but allow
-      if (usageCheck.isWarning) {
-        req.chatWarning = true;
-        req.chatWarningPercent = usageCheck.usagePercent;
-      }
-    }
-
-    const { conversationId } = req.params;
-    const messageData = sendMessageSchema.parse(req.body);
-    
-    // Verify conversation and access
-    const { rows: conversations } = await query(`
-      SELECT * FROM conversation WHERE id = $1
-    `, [conversationId]);
-    
-    if (conversations.length === 0) {
-      throw new NotFoundError('Conversation not found');
-    }
-    
-    const conversation = conversations[0];
-    
-    // Get sender ID
-    let senderId;
-    if (req.userData.role === 'SUPPLIER') {
-      const { rows: suppliers } = await query(
-        'SELECT id FROM supplier WHERE contact_email = $1 AND id = $2',
-        [req.userData.email, conversation.supplier_id]
-      );
-      
-      if (suppliers.length === 0) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
-          requestId: req.requestId,
-        });
-      }
-      
-      senderId = suppliers[0].id;
-    } else if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1 AND id = $2',
-        [req.userData.email, conversation.restaurant_id]
-      );
-      
-      if (restaurants.length === 0) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
-          requestId: req.requestId,
-        });
-      }
-      
-      senderId = restaurants[0].id;
-    }
-    
-    // Verify reply_to message exists and is in the same conversation (before transaction)
-    if (messageData.replyTo) {
-      const { rows: replyMessages } = await query(`
-        SELECT id, conversation_id FROM message WHERE id = $1
-      `, [messageData.replyTo]);
-      
-      if (replyMessages.length === 0) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'Reply to message not found',
-          },
-          requestId: req.requestId,
-        });
-      }
-      
-      if (replyMessages[0].conversation_id !== conversationId) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'Reply to message must be in the same conversation',
-          },
-          requestId: req.requestId,
-        });
-      }
-    }
-    
-    // Start transaction
-    await query('BEGIN');
-    
+router.post(
+  '/conversations/:conversationId/messages',
+  requireAuth,
+  requireRole(['SUPPLIER', 'RESTAURANT']),
+  async (req, res) => {
     try {
-      
-      // Create message
-      const { rows: messages } = await query(`
+      // Check daily chat limit before sending message
+      let tenantId, tenantType
+
+      if (req.userData.role === 'RESTAURANT') {
+        const { rows: restaurants } = await query(
+          'SELECT id FROM restaurant WHERE contact_email = $1',
+          [req.userData.email]
+        )
+        if (restaurants.length > 0) {
+          tenantId = restaurants[0].id
+          tenantType = 'RESTAURANT'
+        }
+      } else if (req.userData.role === 'SUPPLIER') {
+        const { rows: suppliers } = await query(
+          'SELECT id FROM supplier WHERE contact_email = $1',
+          [req.userData.email]
+        )
+        if (suppliers.length > 0) {
+          tenantId = suppliers[0].id
+          tenantType = 'SUPPLIER'
+        }
+      }
+
+      if (tenantId && tenantType) {
+        const usageCheck = await checkUsageWithWarning(tenantId, tenantType, 'chats_per_day')
+
+        if (usageCheck.isOverLimit && !usageCheck.isUnlimited) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'CHAT_LIMIT_EXCEEDED',
+              message: `Daily chat limit reached (${usageCheck.current}/${usageCheck.limit}). Upgrade your plan to send more messages.`,
+              details: {
+                current: usageCheck.current,
+                limit: usageCheck.limit,
+                usagePercent: usageCheck.usagePercent,
+                isWarning: usageCheck.isWarning,
+              },
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        // Show warning at 80% but allow
+        if (usageCheck.isWarning) {
+          req.chatWarning = true
+          req.chatWarningPercent = usageCheck.usagePercent
+        }
+      }
+
+      const { conversationId } = req.params
+      const messageData = sendMessageSchema.parse(req.body)
+
+      // Verify conversation and access
+      const { rows: conversations } = await query(
+        `
+      SELECT * FROM conversation WHERE id = $1
+    `,
+        [conversationId]
+      )
+
+      if (conversations.length === 0) {
+        throw new NotFoundError('Conversation not found')
+      }
+
+      const conversation = conversations[0]
+
+      // Get sender ID
+      let senderId
+      if (req.userData.role === 'SUPPLIER') {
+        const { rows: suppliers } = await query(
+          'SELECT id FROM supplier WHERE contact_email = $1 AND id = $2',
+          [req.userData.email, conversation.supplier_id]
+        )
+
+        if (suppliers.length === 0) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied',
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        senderId = suppliers[0].id
+      } else if (req.userData.role === 'RESTAURANT') {
+        const { rows: restaurants } = await query(
+          'SELECT id FROM restaurant WHERE contact_email = $1 AND id = $2',
+          [req.userData.email, conversation.restaurant_id]
+        )
+
+        if (restaurants.length === 0) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied',
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        senderId = restaurants[0].id
+      }
+
+      // Verify reply_to message exists and is in the same conversation (before transaction)
+      if (messageData.replyTo) {
+        const { rows: replyMessages } = await query(
+          `
+        SELECT id, conversation_id FROM message WHERE id = $1
+      `,
+          [messageData.replyTo]
+        )
+
+        if (replyMessages.length === 0) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: 'Reply to message not found',
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        if (replyMessages[0].conversation_id !== conversationId) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: 'Reply to message must be in the same conversation',
+            },
+            requestId: req.requestId,
+          })
+        }
+      }
+
+      // Start transaction
+      await query('BEGIN')
+
+      try {
+        // Create message
+        const { rows: messages } = await query(
+          `
         INSERT INTO message (
           conversation_id, sender_type, sender_id, content, message_type, order_id, reply_to
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
-      `, [
-        conversationId,
-        req.userData.role,
-        senderId,
-        messageData.content,
-        messageData.messageType,
-        messageData.orderId || null,
-        messageData.replyTo || null,
-      ]);
-      
-      const message = messages[0];
-      
-      // Increment chat usage after successful message
-      if (tenantId && tenantType) {
-        await incrementUsage(tenantId, tenantType, 'chats_per_day', 1);
-      }
-      
-      // Add attachments if any
-      if (messageData.attachments && messageData.attachments.length > 0) {
-        for (const attachment of messageData.attachments) {
-          await query(`
+      `,
+          [
+            conversationId,
+            req.userData.role,
+            senderId,
+            messageData.content,
+            messageData.messageType,
+            messageData.orderId || null,
+            messageData.replyTo || null,
+          ]
+        )
+
+        const message = messages[0]
+
+        // Increment chat usage after successful message
+        if (tenantId && tenantType) {
+          await incrementUsage(tenantId, tenantType, 'chats_per_day', 1)
+        }
+
+        // Add attachments if any
+        if (messageData.attachments && messageData.attachments.length > 0) {
+          for (const attachment of messageData.attachments) {
+            await query(
+              `
             INSERT INTO message_attachment (message_id, file_url, file_type, file_name, file_size)
             VALUES ($1, $2, $3, $4, $5)
-          `, [
-            message.id,
-            attachment.fileUrl,
-            attachment.fileType,
-            attachment.fileName,
-            attachment.fileSize || null,
-          ]);
+          `,
+              [
+                message.id,
+                attachment.fileUrl,
+                attachment.fileType,
+                attachment.fileName,
+                attachment.fileSize || null,
+              ]
+            )
+          }
         }
-      }
-      
-      await query('COMMIT');
-      
-      // Fetch message with attachments
-      const { rows: fullMessages } = await query(`
+
+        await query('COMMIT')
+
+        // Fetch message with attachments
+        const { rows: fullMessages } = await query(
+          `
         SELECT 
           m.*,
           rm.content as reply_to_content,
@@ -749,89 +761,93 @@ router.post('/conversations/:conversationId/messages', requireAuth, requireRole(
         LEFT JOIN message_attachment ma ON ma.message_id = m.id
         WHERE m.id = $1
         GROUP BY m.id, rm.content, rm.sender_type
-      `, [message.id]);
-      
-      logger.info('Message sent', { 
-        messageId: message.id,
-        conversationId,
-        actor: req.userData.id 
-      });
-      
-      // Notify all clients in the conversation so they refetch messages (ensures persistence is visible)
-      try {
-        const { getIO } = await import('../lib/socket.js');
-        const io = getIO();
-        if (io) {
-          io.to(`conversation_${conversationId}`).emit('new_message', {
-            conversationId,
-            messageId: message.id,
-            senderId: senderId,
-            senderType: req.userData.role,
-            content: messageData.content,
-            timestamp: new Date().toISOString(),
-          });
+      `,
+          [message.id]
+        )
+
+        logger.info('Message sent', {
+          messageId: message.id,
+          conversationId,
+          actor: req.userData.id,
+        })
+
+        // Notify all clients in the conversation so they refetch messages (ensures persistence is visible)
+        try {
+          const { getIO } = await import('../lib/socket.js')
+          const io = getIO()
+          if (io) {
+            io.to(`conversation_${conversationId}`).emit('new_message', {
+              conversationId,
+              messageId: message.id,
+              senderId: senderId,
+              senderType: req.userData.role,
+              content: messageData.content,
+              timestamp: new Date().toISOString(),
+            })
+          }
+        } catch (socketError) {
+          logger.warn('Failed to emit new_message after send:', socketError)
         }
-      } catch (socketError) {
-        logger.warn('Failed to emit new_message after send:', socketError);
+
+        // Include warning in response if applicable
+        const responseData = { message: fullMessages[0] }
+        if (req.chatWarning) {
+          responseData.warning = {
+            message: `You've used ${req.chatWarningPercent.toFixed(0)}% of your daily chat limit. Consider upgrading your plan.`,
+            usagePercent: req.chatWarningPercent,
+          }
+        }
+
+        res.status(201).json({
+          ok: true,
+          data: responseData,
+          error: null,
+          requestId: req.requestId,
+        })
+      } catch (error) {
+        await query('ROLLBACK')
+        throw error
       }
-      
-      // Include warning in response if applicable
-      const responseData = { message: fullMessages[0] };
-      if (req.chatWarning) {
-        responseData.warning = {
-          message: `You've used ${req.chatWarningPercent.toFixed(0)}% of your daily chat limit. Consider upgrading your plan.`,
-          usagePercent: req.chatWarningPercent
-        };
-      }
-      
-      res.status(201).json({
-        ok: true,
-        data: responseData,
-        error: null,
-        requestId: req.requestId,
-      });
     } catch (error) {
-      await query('ROLLBACK');
-      throw error;
-    }
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid message data',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('Send message error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid message data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to send message',
+          details: error.message,
         },
         requestId: req.requestId,
-      });
+      })
     }
-    
-    logger.error('Send message error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to send message',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    });
   }
-});
+)
 
 // Mark conversation as read
 router.patch('/conversations/:conversationId/read', requireAuth, async (req, res) => {
   try {
-    const { conversationId } = req.params;
-    
+    const { conversationId } = req.params
+
     // Reset unread count
-    const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT';
-    
+    const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
+
     // Mark all unread messages in this conversation as read for the current participant
-    const { rows: updatedMessages } = await query(`
+    const { rows: updatedMessages } = await query(
+      `
       UPDATE message
       SET is_read = true,
           read_at = now(),
@@ -840,39 +856,44 @@ router.patch('/conversations/:conversationId/read', requireAuth, async (req, res
         AND sender_type != $2
         AND is_read = false
       RETURNING id
-    `, [conversationId, participantType]);
-    
-    await query(`
+    `,
+      [conversationId, participantType]
+    )
+
+    await query(
+      `
       UPDATE conversation_participant
       SET unread_count = 0,
           last_read_at = now(),
           updated_at = now()
       WHERE conversation_id = $1 AND participant_type = $2
-    `, [conversationId, participantType]);
-    
+    `,
+      [conversationId, participantType]
+    )
+
     // Emit socket event for real-time read receipt updates
     try {
-      const { getIO } = await import('../lib/socket.js');
-      const io = getIO();
+      const { getIO } = await import('../lib/socket.js')
+      const io = getIO()
       if (io && updatedMessages.length > 0) {
         io.to(`conversation_${conversationId}`).emit('messages_read_update', {
           conversationId,
-          messageIds: updatedMessages.map(m => m.id),
+          messageIds: updatedMessages.map((m) => m.id),
           timestamp: new Date().toISOString(),
-        });
+        })
       }
     } catch (socketError) {
-      logger.warn('Failed to emit read receipt updates:', socketError);
+      logger.warn('Failed to emit read receipt updates:', socketError)
     }
-    
+
     res.json({
       ok: true,
       data: { message: 'Conversation marked as read' },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Mark as read error:', error);
+    logger.error('Mark as read error:', error)
     res.status(500).json({
       ok: false,
       data: null,
@@ -881,20 +902,23 @@ router.patch('/conversations/:conversationId/read', requireAuth, async (req, res
         message: 'Failed to mark as read',
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Mark message as read
 router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
   try {
-    const { messageId } = req.params;
-    
+    const { messageId } = req.params
+
     // Verify message exists and get conversation
-    const { rows: messages } = await query(`
+    const { rows: messages } = await query(
+      `
       SELECT * FROM message WHERE id = $1
-    `, [messageId]);
-    
+    `,
+      [messageId]
+    )
+
     if (messages.length === 0) {
       return res.status(404).json({
         ok: false,
@@ -904,13 +928,13 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
           message: 'Message not found',
         },
         requestId: req.requestId,
-      });
+      })
     }
-    
-    const message = messages[0];
-    
+
+    const message = messages[0]
+
     // Only mark as read if the current user is the receiver (not the sender)
-    const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT';
+    const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
     if (message.sender_type === participantType) {
       // User is the sender, can't mark their own message as read
       return res.json({
@@ -918,41 +942,44 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
         data: { message: 'Message already read' },
         error: null,
         requestId: req.requestId,
-      });
+      })
     }
-    
+
     // Mark message as read
-    await query(`
+    await query(
+      `
       UPDATE message
       SET is_read = true,
           read_at = now(),
           updated_at = now()
       WHERE id = $1 AND is_read = false
-    `, [messageId]);
-    
+    `,
+      [messageId]
+    )
+
     // Emit socket event for real-time read receipt update
     try {
-      const { getIO } = await import('../lib/socket.js');
-      const io = getIO();
+      const { getIO } = await import('../lib/socket.js')
+      const io = getIO()
       if (io) {
         io.to(`conversation_${message.conversation_id}`).emit('message_read_update', {
           conversationId: message.conversation_id,
           messageId: messageId,
           timestamp: new Date().toISOString(),
-        });
+        })
       }
     } catch (socketError) {
-      logger.warn('Failed to emit read receipt update:', socketError);
+      logger.warn('Failed to emit read receipt update:', socketError)
     }
-    
+
     res.json({
       ok: true,
       data: { message: 'Message marked as read' },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Mark message as read error:', error);
+    logger.error('Mark message as read error:', error)
     res.status(500).json({
       ok: false,
       data: null,
@@ -961,41 +988,43 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
         message: 'Failed to mark message as read',
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Quick reply templates (for suppliers)
 router.get('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
   try {
-    const { rows: suppliers } = await query(
-      'SELECT id FROM supplier WHERE contact_email = $1',
-      [req.userData.email]
-    );
-    
+    const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
+      req.userData.email,
+    ])
+
     if (suppliers.length === 0) {
       return res.json({
         ok: true,
         data: { templates: [] },
         error: null,
         requestId: req.requestId,
-      });
+      })
     }
-    
-    const { rows } = await query(`
+
+    const { rows } = await query(
+      `
       SELECT * FROM quick_reply_template
       WHERE supplier_id = $1 AND is_active = true
       ORDER BY usage_count DESC, title ASC
-    `, [suppliers[0].id]);
-    
+    `,
+      [suppliers[0].id]
+    )
+
     res.json({
       ok: true,
       data: { templates: rows },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get quick replies error:', error);
+    logger.error('Get quick replies error:', error)
     res.status(500).json({
       ok: false,
       data: null,
@@ -1004,9 +1033,9 @@ router.get('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req,
         message: 'Failed to get quick replies',
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Create quick reply template
 // ========================================
@@ -1017,73 +1046,93 @@ router.get('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req,
  * POST /api/chat/conversations/:conversationId/admin-join
  * Admin joins a conversation to help resolve issues
  */
-router.post('/conversations/:conversationId/admin-join', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const conversationId = req.params.conversationId;
+router.post(
+  '/conversations/:conversationId/admin-join',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res) => {
+    try {
+      const conversationId = req.params.conversationId
 
-    // Verify conversation exists
-    const { rows: conversations } = await query(`
+      // Verify conversation exists
+      const { rows: conversations } = await query(
+        `
       SELECT * FROM conversation WHERE id = $1
-    `, [conversationId]);
+    `,
+        [conversationId]
+      )
 
-    if (conversations.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'Conversation not found' },
-        requestId: req.requestId,
-      });
-    }
+      if (conversations.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Conversation not found' },
+          requestId: req.requestId,
+        })
+      }
 
-    // Check if admin already in conversation
-    const { rows: existing } = await query(`
+      // Check if admin already in conversation
+      const { rows: existing } = await query(
+        `
       SELECT * FROM conversation_participant 
       WHERE conversation_id = $1 AND user_id = $2 AND role = 'ADMIN'
-    `, [conversationId, req.userData.id]);
+    `,
+        [conversationId, req.userData.id]
+      )
 
-    if (existing.length > 0) {
-      return res.json({
-        ok: true,
-        data: { message: 'Admin already in conversation' },
-        error: null,
-        requestId: req.requestId,
-      });
-    }
+      if (existing.length > 0) {
+        return res.json({
+          ok: true,
+          data: { message: 'Admin already in conversation' },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
 
-    // Add admin as participant
-    await query(`
+      // Add admin as participant
+      await query(
+        `
       INSERT INTO conversation_participant (conversation_id, user_id, role, joined_at)
       VALUES ($1, $2, 'ADMIN', now())
-    `, [conversationId, req.userData.id]);
+    `,
+        [conversationId, req.userData.id]
+      )
 
-    // Send system message
-    await query(`
+      // Send system message
+      await query(
+        `
       INSERT INTO message (conversation_id, sender_id, content, message_type, is_admin_message)
       VALUES ($1, $2, 'Admin joined the conversation', 'SYSTEM', true)
-    `, [conversationId, req.userData.id]);
+    `,
+        [conversationId, req.userData.id]
+      )
 
-    // Log audit
-    await query(`
+      // Log audit
+      await query(
+        `
       INSERT INTO admin_audit_log (action_type, target_entity_type, target_entity_id, action_description, admin_user_id)
       VALUES ('ADMIN_JOINED_CHAT', 'CONVERSATION', $1, 'Admin joined chat conversation', $2)
-    `, [conversationId, req.userData.id]);
+    `,
+        [conversationId, req.userData.id]
+      )
 
-    res.json({
-      ok: true,
-      data: { message: 'Admin joined conversation successfully' },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error('Admin join conversation error:', error);
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to join conversation' },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { message: 'Admin joined conversation successfully' },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Admin join conversation error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to join conversation' },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 /**
  * POST /api/chat/admin/start-conversation
@@ -1091,13 +1140,16 @@ router.post('/conversations/:conversationId/admin-join', requireAuth, requireRol
  */
 router.post('/admin/start-conversation', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
-    const { tenant_id, tenant_type, initial_message } = req.body;
+    const { tenant_id, tenant_type, initial_message } = req.body
 
     // Get tenant details
-    const tenantTable = tenant_type === 'RESTAURANT' ? 'restaurant' : 'supplier';
-    const { rows: tenants } = await query(`
+    const tenantTable = tenant_type === 'RESTAURANT' ? 'restaurant' : 'supplier'
+    const { rows: tenants } = await query(
+      `
       SELECT id, name, contact_email FROM ${tenantTable} WHERE id = $1
-    `, [tenant_id]);
+    `,
+      [tenant_id]
+    )
 
     if (tenants.length === 0) {
       return res.status(404).json({
@@ -1105,57 +1157,74 @@ router.post('/admin/start-conversation', requireAuth, requireRole(['ADMIN']), as
         data: null,
         error: { name: 'NOT_FOUND', message: 'Tenant not found' },
         requestId: req.requestId,
-      });
+      })
     }
 
     // Create conversation
-    const conversationData = tenant_type === 'RESTAURANT'
-      ? { restaurant_id: tenant_id, supplier_id: null }
-      : { supplier_id: tenant_id, restaurant_id: null };
+    const conversationData =
+      tenant_type === 'RESTAURANT'
+        ? { restaurant_id: tenant_id, supplier_id: null }
+        : { supplier_id: tenant_id, restaurant_id: null }
 
-    const { rows: newConversations } = await query(`
+    const { rows: newConversations } = await query(
+      `
       INSERT INTO conversation (supplier_id, restaurant_id, is_admin_conversation)
       VALUES ($1, $2, true)
       RETURNING *
-    `, [conversationData.supplier_id, conversationData.restaurant_id]);
+    `,
+      [conversationData.supplier_id, conversationData.restaurant_id]
+    )
 
-    const conversation = newConversations[0];
+    const conversation = newConversations[0]
 
     // Add admin as participant
-    await query(`
+    await query(
+      `
       INSERT INTO conversation_participant (conversation_id, user_id, role, joined_at)
       VALUES ($1, $2, 'ADMIN', now())
-    `, [conversation.id, req.userData.id]);
+    `,
+      [conversation.id, req.userData.id]
+    )
 
     // Send initial message
-    const { rows: messages } = await query(`
+    const { rows: messages } = await query(
+      `
       INSERT INTO message (conversation_id, sender_id, content, message_type, is_admin_message)
       VALUES ($1, $2, $3, 'TEXT', true)
       RETURNING *
-    `, [conversation.id, req.userData.id, initial_message || 'Hello, this is Supplify Admin. How can we help you?']);
+    `,
+      [
+        conversation.id,
+        req.userData.id,
+        initial_message || 'Hello, this is Supplify Admin. How can we help you?',
+      ]
+    )
 
     // Log audit
-    await query(`
+    await query(
+      `
       INSERT INTO admin_audit_log (action_type, target_entity_type, target_entity_id, action_description, admin_user_id)
       VALUES ('ADMIN_STARTED_CHAT', $1, $2, 'Admin started chat conversation with tenant', $3)
-    `, [tenant_type, tenant_id, req.userData.id]);
+    `,
+      [tenant_type, tenant_id, req.userData.id]
+    )
 
     res.status(201).json({
       ok: true,
       data: { conversation, initial_message: messages[0] },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Admin start conversation error:', error);
+    logger.error('Admin start conversation error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to start conversation' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 /**
  * GET /api/chat/admin/conversations
@@ -1163,17 +1232,18 @@ router.post('/admin/start-conversation', requireAuth, requireRole(['ADMIN']), as
  */
 router.get('/admin/conversations', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
-    const { status, tenant_type } = req.query;
+    const { status, tenant_type } = req.query
 
-    let whereClause = '1=1';
-    const params = [];
+    let whereClause = '1=1'
+    const params = []
 
     if (status) {
-      whereClause += ` AND c.status = $${params.length + 1}`;
-      params.push(status);
+      whereClause += ` AND c.status = $${params.length + 1}`
+      params.push(status)
     }
 
-    const { rows: conversations } = await query(`
+    const { rows: conversations } = await query(
+      `
       SELECT 
         c.*,
         CASE WHEN c.restaurant_id IS NOT NULL THEN r.name ELSE s.name END as tenant_name,
@@ -1189,55 +1259,54 @@ router.get('/admin/conversations', requireAuth, requireRole(['ADMIN']), async (r
       GROUP BY c.id, r.name, s.name, r.contact_email, s.contact_email
       ORDER BY last_message_at DESC NULLS LAST
       LIMIT 100
-    `, params);
+    `,
+      params
+    )
 
     res.json({
       ok: true,
       data: { conversations },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Admin get conversations error:', error);
+    logger.error('Admin get conversations error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get conversations' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 router.post('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
   try {
-    const templateData = quickReplySchema.parse(req.body);
-    
-    const { rows: suppliers } = await query(
-      'SELECT id FROM supplier WHERE contact_email = $1',
-      [req.userData.email]
-    );
-    
+    const templateData = quickReplySchema.parse(req.body)
+
+    const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
+      req.userData.email,
+    ])
+
     if (suppliers.length === 0) {
-      throw new ValidationError('Supplier not found');
+      throw new ValidationError('Supplier not found')
     }
-    
-    const { rows } = await query(`
+
+    const { rows } = await query(
+      `
       INSERT INTO quick_reply_template (supplier_id, title, content, category)
       VALUES ($1, $2, $3, $4)
       RETURNING *
-    `, [
-      suppliers[0].id,
-      templateData.title,
-      templateData.content,
-      templateData.category || null,
-    ]);
-    
+    `,
+      [suppliers[0].id, templateData.title, templateData.content, templateData.category || null]
+    )
+
     res.status(201).json({
       ok: true,
       data: { template: rows[0] },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -1249,10 +1318,10 @@ router.post('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req
           details: error.errors,
         },
         requestId: req.requestId,
-      });
+      })
     }
-    
-    logger.error('Create quick reply error:', error);
+
+    logger.error('Create quick reply error:', error)
     res.status(500).json({
       ok: false,
       data: null,
@@ -1261,8 +1330,8 @@ router.post('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req
         message: 'Failed to create quick reply',
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
-export { router as chatRoutes };
+export { router as chatRoutes }

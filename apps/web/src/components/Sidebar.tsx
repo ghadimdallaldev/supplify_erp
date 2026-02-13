@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '../lib/utils'
 import { useAppSelector } from '../hooks/redux'
+import { useGetImpersonationStatusQuery } from '../services/api'
 import {
   LayoutDashboard,
   Package,
@@ -47,26 +48,30 @@ const adminNavigation = [
 export function Sidebar() {
   const location = useLocation()
   const { user } = useAppSelector((state) => state.auth)
+  const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
+    skip: user?.role !== 'ADMIN',
+  })
 
   const isAdmin = user?.role === 'ADMIN'
   const isSupplier = user?.role === 'SUPPLIER'
   const isRestaurant = user?.role === 'RESTAURANT'
-  
-  // Build navigation based on role
+  const impersonatingRestaurant =
+    isAdmin && impersonation?.active && impersonation?.tenantType === 'RESTAURANT'
+  const impersonatingSupplier =
+    isAdmin && impersonation?.active && impersonation?.tenantType === 'SUPPLIER'
+
+  // Build navigation: when impersonating, show that tenant's experience; else by role
   let allNavigation: any[] = []
-  
-  if (isRestaurant) {
-    // Restaurants see base navigation + restaurant features
+  if (isRestaurant || impersonatingRestaurant) {
     allNavigation = [...navigation, ...restaurantNavigation]
-  } else if (isAdmin) {
-    // Admins ONLY see Admin Dashboard (no Dashboard, Products, Orders, Chat)
+  } else if (isAdmin && !impersonation?.active) {
     allNavigation = [...adminNavigation]
-  } else if (isSupplier) {
-    // Suppliers see Restaurants, Fulfillment, and Invoices (Products already in base nav)
-    allNavigation = [...navigation, 
+  } else if (isSupplier || impersonatingSupplier) {
+    allNavigation = [
+      ...navigation,
       { name: 'Restaurants', href: '/app/restaurants', icon: Users },
       { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck },
-      { name: 'Invoices', href: '/app/invoices', icon: FileText }
+      { name: 'Invoices', href: '/app/invoices', icon: FileText },
     ]
   }
 
@@ -76,7 +81,7 @@ export function Sidebar() {
         <h1 className="text-2xl font-bold text-primary">Supplify</h1>
         <p className="text-sm text-gray-600 mt-1">Marketplace</p>
       </div>
-      
+
       <nav className="px-4 pb-4">
         <ul className="space-y-2">
           {allNavigation.map((item) => {
@@ -98,7 +103,7 @@ export function Sidebar() {
               </li>
             )
           })}
-          
+
           <li>
             <Link
               to="/app/settings"

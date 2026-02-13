@@ -1,9 +1,9 @@
-import express from 'express';
-const router = express.Router();
-import { requireAuth, requireRole } from '../lib/rbac.js';
-import { query } from '../lib/db.js';
-import { logger } from '../lib/logger.js';
-import { checkBranchLimit, createAuditLog } from '../lib/plan-enforcement.js';
+import express from 'express'
+const router = express.Router()
+import { requireAuth, requireRole, getRestaurantIdForRequest } from '../lib/rbac.js'
+import { query } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
+import { checkBranchLimit, createAuditLog } from '../lib/plan-enforcement.js'
 
 /**
  * GET /api/branches
@@ -11,23 +11,9 @@ import { checkBranchLimit, createAuditLog } from '../lib/plan-enforcement.js';
  */
 router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
-
-    if (restaurants.length === 0 && req.userData.role !== 'ADMIN') {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'Restaurant not found' },
-        requestId: req.requestId,
-      });
-    }
-
-    const restaurantId = req.userData.role === 'ADMIN' 
-      ? req.query.restaurant_id 
-      : restaurants[0].id;
+    const restaurantId =
+      (await getRestaurantIdForRequest(req)) ||
+      (req.userData.role === 'ADMIN' ? req.query.restaurant_id : null)
 
     if (!restaurantId) {
       return res.status(400).json({
@@ -35,31 +21,34 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         data: null,
         error: { name: 'BAD_REQUEST', message: 'Restaurant ID required' },
         requestId: req.requestId,
-      });
+      })
     }
 
-    const { rows: branches } = await query(`
+    const { rows: branches } = await query(
+      `
       SELECT * FROM branch 
       WHERE tenant_id = $1 
       ORDER BY created_at DESC
-    `, [restaurantId]);
+    `,
+      [restaurantId]
+    )
 
     res.json({
       ok: true,
       data: { branches },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Get branches error:', error);
+    logger.error('Get branches error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get branches' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 /**
  * POST /api/branches
@@ -70,7 +59,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
     const { rows: restaurants } = await query(
       'SELECT id FROM restaurant WHERE contact_email = $1',
       [req.userData.email]
-    );
+    )
 
     if (restaurants.length === 0) {
       return res.status(404).json({
@@ -78,14 +67,14 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
         data: null,
         error: { name: 'NOT_FOUND', message: 'Restaurant not found' },
         requestId: req.requestId,
-      });
+      })
     }
 
-    const restaurantId = restaurants[0].id;
+    const restaurantId = restaurants[0].id
 
     // Check plan limits
-    const limitCheck = await checkBranchLimit(restaurantId);
-    
+    const limitCheck = await checkBranchLimit(restaurantId)
+
     if (!limitCheck.allowed) {
       return res.status(403).json({
         ok: false,
@@ -97,46 +86,58 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
             currentPlan: limitCheck.currentPlan,
             requiredPlan: limitCheck.requiredPlan,
             limit: limitCheck.limit,
-            current: limitCheck.current
-          }
+            current: limitCheck.current,
+          },
         },
         requestId: req.requestId,
-      });
+      })
     }
 
     // Create branch
-    const { name, code, address, contact_name, contact_email, contact_phone } = req.body;
+    const { name, code, address, contact_name, contact_email, contact_phone } = req.body
 
-    const { rows: newBranch } = await query(`
+    const { rows: newBranch } = await query(
+      `
       INSERT INTO branch (tenant_id, name, code, address, contact_name, contact_email, contact_phone)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
-    `, [restaurantId, name, code || null, address || null, contact_name || null, contact_email || null, contact_phone || null]);
+    `,
+      [
+        restaurantId,
+        name,
+        code || null,
+        address || null,
+        contact_name || null,
+        contact_email || null,
+        contact_phone || null,
+      ]
+    )
 
     // Create audit log
     await createAuditLog('CREATE_BRANCH', {
       entityType: 'BRANCH',
       entityId: newBranch[0].id,
       description: `Created branch: ${name}`,
-      changes: { name, code, address }
-    });
+      changes: { name, code, address },
+    })
 
     res.status(201).json({
       ok: true,
       data: { branch: newBranch[0] },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Create branch error:', error);
-    
-    if (error.code === '23505') { // Unique violation
+    logger.error('Create branch error:', error)
+
+    if (error.code === '23505') {
+      // Unique violation
       return res.status(409).json({
         ok: false,
         data: null,
         error: { name: 'DUPLICATE', message: 'Branch with this code already exists' },
         requestId: req.requestId,
-      });
+      })
     }
 
     res.status(500).json({
@@ -144,9 +145,9 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to create branch' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 /**
  * PUT /api/branches/:id
@@ -154,10 +155,11 @@ router.post('/', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
  */
 router.put('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const branchId = req.params.id;
-    const { name, address, contact_name, contact_email, contact_phone, is_active } = req.body;
+    const branchId = req.params.id
+    const { name, address, contact_name, contact_email, contact_phone, is_active } = req.body
 
-    const { rows: updatedBranch } = await query(`
+    const { rows: updatedBranch } = await query(
+      `
       UPDATE branch 
       SET name = COALESCE($1, name),
           address = COALESCE($2, address),
@@ -168,7 +170,9 @@ router.put('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
           updated_at = now()
       WHERE id = $7
       RETURNING *
-    `, [name, address, contact_name, contact_email, contact_phone, is_active, branchId]);
+    `,
+      [name, address, contact_name, contact_email, contact_phone, is_active, branchId]
+    )
 
     if (updatedBranch.length === 0) {
       return res.status(404).json({
@@ -176,7 +180,7 @@ router.put('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
         data: null,
         error: { name: 'NOT_FOUND', message: 'Branch not found' },
         requestId: req.requestId,
-      });
+      })
     }
 
     res.json({
@@ -184,17 +188,17 @@ router.put('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
       data: { branch: updatedBranch[0] },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Update branch error:', error);
+    logger.error('Update branch error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to update branch' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 /**
  * DELETE /api/branches/:id
@@ -202,11 +206,14 @@ router.put('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
  */
 router.delete('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const branchId = req.params.id;
+    const branchId = req.params.id
 
-    const { rows: deletedBranch } = await query(`
+    const { rows: deletedBranch } = await query(
+      `
       DELETE FROM branch WHERE id = $1 RETURNING *
-    `, [branchId]);
+    `,
+      [branchId]
+    )
 
     if (deletedBranch.length === 0) {
       return res.status(404).json({
@@ -214,7 +221,7 @@ router.delete('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (
         data: null,
         error: { name: 'NOT_FOUND', message: 'Branch not found' },
         requestId: req.requestId,
-      });
+      })
     }
 
     res.json({
@@ -222,17 +229,16 @@ router.delete('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (
       data: { branch: deletedBranch[0] },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error('Delete branch error:', error);
+    logger.error('Delete branch error:', error)
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to delete branch' },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
-export default router;
-
+export default router

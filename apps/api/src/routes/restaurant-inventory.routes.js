@@ -1,11 +1,11 @@
-import express from 'express';
-import { requireAuth, requireRole } from '../lib/rbac.js';
-import { query, withTransaction } from '../lib/db.js';
-import { logger } from '../lib/logger.js';
-import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js';
-import { z } from 'zod';
+import express from 'express'
+import { requireAuth, requireRole, getRestaurantIdForRequest } from '../lib/rbac.js'
+import { query, withTransaction } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
+import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { z } from 'zod'
 
-const router = express.Router();
+const router = express.Router()
 
 // Validation schemas
 const adjustInventorySchema = z.object({
@@ -13,30 +13,27 @@ const adjustInventorySchema = z.object({
   quantity: z.number().positive(),
   reason: z.string().optional(),
   unitCost: z.number().optional(),
-  wasteCategory: z.enum(['OVER_PRODUCTION', 'SPOILAGE', 'BREAKAGE', 'EXPIRED', 'OVERPORTIONING', 'OTHER']).optional(),
-});
+  wasteCategory: z
+    .enum(['OVER_PRODUCTION', 'SPOILAGE', 'BREAKAGE', 'EXPIRED', 'OVERPORTIONING', 'OTHER'])
+    .optional(),
+})
 
 const updateInventorySchema = z.object({
   quantity: z.number().min(0).optional(),
   lowStockThreshold: z.number().positive().optional(),
-});
+})
 
 // Get restaurant inventory with products
 router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
-
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      throw new ValidationError('Restaurant not found')
     }
 
-    const restaurantId = restaurants[0].id;
-
     // Main inventory query with smart reorder calculation
-    const { rows } = await query(`
+    const { rows } = await query(
+      `
       SELECT 
         ri.*,
         p.name as product_name,
@@ -97,20 +94,22 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
       LEFT JOIN branch b ON b.id = ri.branch_id
       WHERE ri.restaurant_id = $1
       ORDER BY ri.updated_at DESC, ri.created_at DESC
-    `, [restaurantId]);
+    `,
+      [restaurantId]
+    )
 
     res.json({
       ok: true,
       data: { inventory: rows },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error({ 
+    logger.error({
       message: 'Get restaurant inventory error',
       error: error.message,
-      stack: error.stack 
-    });
+      stack: error.stack,
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -120,26 +119,21 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Get all inventory movement history
 router.get('/history', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
-
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      throw new ValidationError('Restaurant not found')
     }
+    const { limit = '100' } = req.query
 
-    const restaurantId = restaurants[0].id;
-    const { limit = '100' } = req.query;
-
-    const { rows } = await query(`
+    const { rows } = await query(
+      `
       SELECT 
         iml.*,
         p.name as product_name,
@@ -149,20 +143,22 @@ router.get('/history', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
       WHERE iml.restaurant_id = $1
       ORDER BY iml.created_at DESC
       LIMIT $2
-    `, [restaurantId, limit]);
+    `,
+      [restaurantId, limit]
+    )
 
     res.json({
       ok: true,
       data: { history: rows },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error({ 
+    logger.error({
       message: 'Get inventory history error',
       error: error.message,
-      stack: error.stack 
-    });
+      stack: error.stack,
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -172,151 +168,173 @@ router.get('/history', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Get inventory history for a specific product
-router.get('/history/:productId', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { productId } = req.params;
+router.get(
+  '/history/:productId',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { productId } = req.params
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
-
-    const restaurantId = restaurants[0].id;
-
-    const { rows } = await query(`
+      const { rows } = await query(
+        `
       SELECT 
         iml.*
       FROM inventory_movement_log iml
       WHERE iml.restaurant_id = $1 AND iml.product_id = $2
       ORDER BY iml.created_at DESC
       LIMIT 100
-    `, [restaurantId, productId]);
+    `,
+        [restaurantId, productId]
+      )
 
-    res.json({
-      ok: true,
-      data: { history: rows },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error({ 
-      message: 'Get inventory history error',
-      error: error.message,
-      stack: error.stack 
-    });
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get history',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { history: rows },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Get inventory history error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get history',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Adjust inventory (for wastage, spoilage, etc.)
 router.post('/adjust', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { productId, ...data } = req.body;
-    const adjustmentData = adjustInventorySchema.parse(data);
+    const { productId, ...data } = req.body
+    const adjustmentData = adjustInventorySchema.parse(data)
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
-
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id;
 
     const result = await withTransaction(async (client) => {
       // Get current inventory
-      const { rows: inventory } = await client.query(`
+      const { rows: inventory } = await client.query(
+        `
         SELECT quantity FROM restaurant_inventory
         WHERE restaurant_id = $1 AND product_id = $2
         FOR UPDATE
-      `, [restaurantId, productId]);
+      `,
+        [restaurantId, productId]
+      )
 
       if (inventory.length === 0) {
-        throw new NotFoundError('Product not found in inventory');
+        throw new NotFoundError('Product not found in inventory')
       }
 
-      const balanceBefore = Number(inventory[0].quantity);
-      const balanceAfter = Math.max(0, balanceBefore - adjustmentData.quantity);
+      const balanceBefore = Number(inventory[0].quantity)
+      const balanceAfter = Math.max(0, balanceBefore - adjustmentData.quantity)
 
       // Calculate unit cost and total cost if provided
-      const unitCost = adjustmentData.unitCost || null;
-      const totalCost = unitCost ? unitCost * adjustmentData.quantity : null;
+      const unitCost = adjustmentData.unitCost || null
+      const totalCost = unitCost ? unitCost * adjustmentData.quantity : null
 
       // Create adjustment record
-      const { rows: [adjustment] } = await client.query(`
+      const {
+        rows: [adjustment],
+      } = await client.query(
+        `
         INSERT INTO inventory_adjustment (
           restaurant_id, product_id, adjustment_type, quantity, reason, 
           unit_cost, total_cost, waste_category, created_by
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
-      `, [
-        restaurantId, productId, adjustmentData.adjustmentType, 
-        adjustmentData.quantity, adjustmentData.reason || null,
-        unitCost, totalCost, adjustmentData.wasteCategory || null, req.userData.id
-      ]);
+      `,
+        [
+          restaurantId,
+          productId,
+          adjustmentData.adjustmentType,
+          adjustmentData.quantity,
+          adjustmentData.reason || null,
+          unitCost,
+          totalCost,
+          adjustmentData.wasteCategory || null,
+          req.userData.id,
+        ]
+      )
 
       // Update inventory
-      await client.query(`
+      await client.query(
+        `
         UPDATE restaurant_inventory
         SET quantity = $1, updated_at = now()
         WHERE restaurant_id = $2 AND product_id = $3
-      `, [balanceAfter, restaurantId, productId]);
+      `,
+        [balanceAfter, restaurantId, productId]
+      )
 
       // Log movement
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO inventory_movement_log (
           restaurant_id, product_id, type, quantity, 
           balance_before, balance_after, reason,
           reference_id, reference_type
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [
-        restaurantId, productId, adjustmentData.adjustmentType,
-        -adjustmentData.quantity, balanceBefore, balanceAfter,
-        adjustmentData.reason || null, adjustment.id, 'ADJUSTMENT'
-      ]);
+      `,
+        [
+          restaurantId,
+          productId,
+          adjustmentData.adjustmentType,
+          -adjustmentData.quantity,
+          balanceBefore,
+          balanceAfter,
+          adjustmentData.reason || null,
+          adjustment.id,
+          'ADJUSTMENT',
+        ]
+      )
 
-      return adjustment;
-    });
+      return adjustment
+    })
 
-    logger.info('Inventory adjusted', { 
+    logger.info('Inventory adjusted', {
       productId,
       adjustmentType: adjustmentData.adjustmentType,
       quantity: adjustmentData.quantity,
-      actor: req.userData.id 
-    });
+      actor: req.userData.id,
+    })
 
     res.status(201).json({
       ok: true,
       data: { adjustment: result },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error({ 
+    logger.error({
       message: 'Adjust inventory error',
       error: error.message,
-      stack: error.stack 
-    });
+      stack: error.stack,
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -326,80 +344,86 @@ router.post('/adjust', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 // Manually add inventory
 router.post('/add', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { productId, quantity, reason } = req.body;
+    const { productId, quantity, reason } = req.body
 
     if (!quantity || quantity <= 0) {
-      throw new ValidationError('Quantity must be positive');
+      throw new ValidationError('Quantity must be positive')
     }
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
-
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id;
 
     await withTransaction(async (client) => {
       // Get or create inventory
-      const { rows: inventory } = await client.query(`
+      const { rows: inventory } = await client.query(
+        `
         SELECT quantity FROM restaurant_inventory
         WHERE restaurant_id = $1 AND product_id = $2
-      `, [restaurantId, productId]);
+      `,
+        [restaurantId, productId]
+      )
 
-      const balanceBefore = inventory.length > 0 ? Number(inventory[0].quantity) : 0;
-      const balanceAfter = balanceBefore + quantity;
+      const balanceBefore = inventory.length > 0 ? Number(inventory[0].quantity) : 0
+      const balanceAfter = balanceBefore + quantity
 
       if (inventory.length > 0) {
-        await client.query(`
+        await client.query(
+          `
           UPDATE restaurant_inventory
           SET quantity = $1, updated_at = now()
           WHERE restaurant_id = $2 AND product_id = $3
-        `, [balanceAfter, restaurantId, productId]);
+        `,
+          [balanceAfter, restaurantId, productId]
+        )
       } else {
-        await client.query(`
+        await client.query(
+          `
           INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
           VALUES ($1, $2, $3, now())
-        `, [restaurantId, productId, quantity]);
+        `,
+          [restaurantId, productId, quantity]
+        )
       }
 
       // Log movement
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO inventory_movement_log (
           restaurant_id, product_id, type, quantity, 
           balance_before, balance_after, reason, reference_type
         ) VALUES ($1, $2, 'ADD', $3, $4, $5, $6, 'MANUAL_ADD')
-      `, [restaurantId, productId, quantity, balanceBefore, balanceAfter, reason || null]);
-    });
+      `,
+        [restaurantId, productId, quantity, balanceBefore, balanceAfter, reason || null]
+      )
+    })
 
-    logger.info('Inventory added', { 
+    logger.info('Inventory added', {
       productId,
       quantity,
-      actor: req.userData.id 
-    });
+      actor: req.userData.id,
+    })
 
     res.json({
       ok: true,
       data: { message: 'Inventory updated successfully' },
       error: null,
       requestId: req.requestId,
-    });
+    })
   } catch (error) {
-    logger.error({ 
+    logger.error({
       message: 'Add inventory error',
       error: error.message,
-      stack: error.stack 
-    });
+      stack: error.stack,
+    })
     res.status(500).json({
       ok: false,
       data: null,
@@ -409,37 +433,36 @@ router.post('/add', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (re
         details: error.message,
       },
       requestId: req.requestId,
-    });
+    })
   }
-});
+})
 
 /**
  * GET /api/restaurant-inventory/reorder-suggestions
- * 
+ *
  * Compute smart reorder suggestions for restaurant inventory based on:
  * - Historical usage rates (1/3/7/10/30/60/90 days)
  * - Average consumption between restocks
  * - Usage trends and seasonality detection
  * - Supplier lead times
  * - Last order size and frequency
- * 
+ *
  * Returns items that need reordering with suggested quantities and urgency levels
  */
-router.get('/reorder-suggestions', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+router.get(
+  '/reorder-suggestions',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
-
-    const restaurantId = restaurants[0].id;
-
-    // Get inventory with comprehensive usage analysis
-    const { rows } = await query(`
+      // Get inventory with comprehensive usage analysis
+      const { rows } = await query(
+        `
       WITH usage_stats AS (
         -- Calculate usage rates for different time periods
         SELECT 
@@ -711,43 +734,45 @@ router.get('/reorder-suggestions', requireAuth, requireRole(['RESTAURANT', 'ADMI
           ELSE 3
         END,
         ri.quantity ASC
-    `, [restaurantId]);
+    `,
+        [restaurantId]
+      )
 
-    res.json({
-      ok: true,
-      data: { suggestions: rows },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.warn('Reorder suggestions unavailable, returning empty set:', error.message);
-    return res.json({
-      ok: true,
-      data: { suggestions: [] },
-      error: null,
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: { suggestions: rows },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.warn('Reorder suggestions unavailable, returning empty set:', error.message)
+      return res.json({
+        ok: true,
+        data: { suggestions: [] },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
 // Get waste analytics for the restaurant
-router.get('/waste-analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { period = '30' } = req.query; // Default to last 30 days
-    
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    );
+router.get(
+  '/waste-analytics',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { period = '30' } = req.query // Default to last 30 days
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found');
-    }
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        throw new ValidationError('Restaurant not found')
+      }
 
-    const restaurantId = restaurants[0].id;
-
-    // Get waste analytics
-    const { rows: analytics } = await query(`
+      // Get waste analytics
+      const { rows: analytics } = await query(
+        `
       SELECT 
         p.id as product_id,
         p.name as product_name,
@@ -794,10 +819,13 @@ router.get('/waste-analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN'])
       HAVING SUM(ia.quantity) > 0
       ORDER BY total_waste_cost DESC NULLS LAST, total_waste_qty DESC
       LIMIT 50
-    `, [restaurantId]);
+    `,
+        [restaurantId]
+      )
 
-    // Get summary totals
-    const { rows: summary } = await query(`
+      // Get summary totals
+      const { rows: summary } = await query(
+        `
       SELECT 
         COUNT(*) as total_incidents,
         SUM(quantity) as total_waste_qty,
@@ -809,10 +837,13 @@ router.get('/waste-analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN'])
       WHERE restaurant_id = $1
         AND adjustment_type IN ('WASTAGE', 'SPOILAGE')
         AND created_at >= NOW() - INTERVAL '${period} days'
-    `, [restaurantId]);
+    `,
+        [restaurantId]
+      )
 
-    // Get waste trend (last 7 days daily breakdown)
-    const { rows: trend } = await query(`
+      // Get waste trend (last 7 days daily breakdown)
+      const { rows: trend } = await query(
+        `
       SELECT 
         DATE(created_at) as date,
         COUNT(*) as incidents,
@@ -824,37 +855,39 @@ router.get('/waste-analytics', requireAuth, requireRole(['RESTAURANT', 'ADMIN'])
         AND created_at >= NOW() - INTERVAL '7 days'
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at) ASC
-    `, [restaurantId]);
+    `,
+        [restaurantId]
+      )
 
-    res.json({
-      ok: true,
-      data: { 
-        analytics,
-        summary: summary[0] || {},
-        trend,
-        period: parseInt(period)
-      },
-      error: null,
-      requestId: req.requestId,
-    });
-  } catch (error) {
-    logger.error({
-      message: 'Get waste analytics error',
-      error: error.message,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get waste analytics',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    });
+      res.json({
+        ok: true,
+        data: {
+          analytics,
+          summary: summary[0] || {},
+          trend,
+          period: parseInt(period),
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Get waste analytics error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get waste analytics',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-});
+)
 
-export { router as restaurantInventoryRoutes };
-
+export { router as restaurantInventoryRoutes }

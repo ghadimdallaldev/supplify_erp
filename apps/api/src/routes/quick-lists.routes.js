@@ -1,5 +1,5 @@
 import express from 'express'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireAuth, requireRole, getRestaurantIdForRequest } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -76,16 +76,10 @@ const addItemSchema = z.object({
 // Get all quick lists for restaurant
 router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
 
     const { rows } = await query(
       `
@@ -161,16 +155,10 @@ router.get('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
   try {
     const { id } = req.params
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
 
     // Get quick list
     const { rows: lists } = await query(
@@ -242,16 +230,10 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
   try {
     const data = createQuickListSchema.parse(req.body)
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
 
     const result = await withTransaction(async (client) => {
       // Create quick list
@@ -356,16 +338,10 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
     const { id } = req.params
     const data = updateQuickListSchema.parse(req.body)
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
 
     const updateFields = []
     const updateValues = []
@@ -447,16 +423,10 @@ router.delete('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (
   try {
     const { id } = req.params
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
 
     const { rows } = await query(
       `
@@ -507,16 +477,10 @@ router.post('/:id/items', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
     const { id } = req.params
     const data = addItemSchema.parse(req.body)
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
 
     // Verify quick list belongs to restaurant
     const { rows: lists } = await query(
@@ -595,16 +559,10 @@ router.delete(
     try {
       const { id, itemId } = req.params
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
         throw new ValidationError('Restaurant not found')
       }
-
-      const restaurantId = restaurants[0].id
 
       // Verify quick list belongs to restaurant
       const { rows: lists } = await query(
@@ -673,16 +631,10 @@ router.post(
       const { id } = req.params
       const scheduleData = scheduleQuickListSchema.parse(req.body)
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
         throw new ValidationError('Restaurant not found')
       }
-
-      const restaurantId = restaurants[0].id
 
       // Verify quick list belongs to restaurant
       const { rows: lists } = await query(
@@ -896,16 +848,10 @@ router.delete(
     try {
       const { id } = req.params
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
         throw new ValidationError('Restaurant not found')
       }
-
-      const restaurantId = restaurants[0].id
 
       const { rows } = await query(
         `

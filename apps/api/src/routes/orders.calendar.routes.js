@@ -1,6 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
-import { requireAuth } from '../lib/rbac.js'
+import { requireAuth, getRequestTenant } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getCache, setCache } from '../lib/cache.js'
@@ -174,45 +174,51 @@ router.get('/', requireAuth, async (req, res) => {
       })
     }
 
-    const effectiveRole =
-      userRole === 'ADMIN'
-        ? params.role || 'RESTAURANT'
-        : userRole
+    // When admin is impersonating, use that tenant; otherwise resolve by role and email
+    const requestTenant = await getRequestTenant(req)
+    let effectiveRole = userRole === 'ADMIN' ? params.role || 'RESTAURANT' : userRole
+    let tenant
 
-    const email = req.userData?.email
-
-    if (!email) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'INVALID_USER',
-          message: 'User email is required to determine organization context',
-        },
-        requestId: req.requestId,
-      })
+    if (requestTenant) {
+      effectiveRole = requestTenant.tenantType
+      tenant = {
+        id: requestTenant.tenantId,
+        name: requestTenant.tenantName || requestTenant.tenantId,
+      }
+    } else {
+      const email = req.userData?.email
+      if (!email) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'INVALID_USER',
+            message: 'User email is required to determine organization context',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const tenantQuery =
+        effectiveRole === 'RESTAURANT'
+          ? 'SELECT id, name FROM restaurant WHERE contact_email = $1 LIMIT 1'
+          : 'SELECT id, name FROM supplier WHERE contact_email = $1 LIMIT 1'
+      const tenantResult = await query(tenantQuery, [email])
+      if (tenantResult.rows.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'TENANT_NOT_FOUND',
+            message:
+              effectiveRole === 'RESTAURANT'
+                ? 'Restaurant not found for user'
+                : 'Supplier not found for user',
+          },
+          requestId: req.requestId,
+        })
+      }
+      tenant = tenantResult.rows[0]
     }
-
-    const tenantQuery =
-      effectiveRole === 'RESTAURANT'
-        ? 'SELECT id, name FROM restaurant WHERE contact_email = $1 LIMIT 1'
-        : 'SELECT id, name FROM supplier WHERE contact_email = $1 LIMIT 1'
-
-    const tenantResult = await query(tenantQuery, [email])
-
-    if (tenantResult.rows.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'TENANT_NOT_FOUND',
-          message: effectiveRole === 'RESTAURANT' ? 'Restaurant not found for user' : 'Supplier not found for user',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    const tenant = tenantResult.rows[0]
     const startDate = params.start ? new Date(params.start) : null
     const endDate = params.end ? new Date(params.end) : null
 
@@ -224,7 +230,7 @@ router.get('/', requireAuth, async (req, res) => {
           WHERE table_name = 'customer_order'
             AND column_name = 'branch_id'
         ) AS exists
-      `,
+      `
     )
 
     const hasBranchColumn = branchColumnRows[0]?.exists === true
@@ -273,13 +279,13 @@ router.get('/', requireAuth, async (req, res) => {
       whereParts.push(`o.restaurant_id = ${addParam(tenant.id)}`)
     } else {
       whereParts.push(
-        `EXISTS (SELECT 1 FROM order_item oi_role WHERE oi_role.order_id = o.id AND oi_role.supplier_id = ${addParam(tenant.id)})`,
+        `EXISTS (SELECT 1 FROM order_item oi_role WHERE oi_role.order_id = o.id AND oi_role.supplier_id = ${addParam(tenant.id)})`
       )
     }
 
     if (params.supplier) {
       whereParts.push(
-        `EXISTS (SELECT 1 FROM order_item oi_sup WHERE oi_sup.order_id = o.id AND oi_sup.supplier_id = ${addParam(params.supplier)})`,
+        `EXISTS (SELECT 1 FROM order_item oi_sup WHERE oi_sup.order_id = o.id AND oi_sup.supplier_id = ${addParam(params.supplier)})`
       )
     }
 
@@ -295,7 +301,7 @@ router.get('/', requireAuth, async (req, res) => {
           JOIN product p_cat ON p_cat.id = oi_cat.product_id 
           WHERE oi_cat.order_id = o.id 
             AND LOWER(p_cat.category) = LOWER(${addParam(params.category)})
-        )`,
+        )`
       )
     }
 
@@ -388,7 +394,9 @@ router.get('/', requireAuth, async (req, res) => {
       invoiceWhereParts.push(`i.due_date <= ${addInvoiceParam(endDate.toISOString())}`)
     }
 
-    const invoiceWhereClause = invoiceWhereParts.length ? `WHERE ${invoiceWhereParts.join(' AND ')}` : ''
+    const invoiceWhereClause = invoiceWhereParts.length
+      ? `WHERE ${invoiceWhereParts.join(' AND ')}`
+      : ''
     const invoiceLimit = Math.min(params.pageSize * 6, 600)
     const invoiceParamsWithLimit = [...invoiceParams, invoiceLimit]
     const invoiceLimitPlaceholder = `$${invoiceParamsWithLimit.length}`
@@ -541,4 +549,3 @@ router.get('/', requireAuth, async (req, res) => {
 })
 
 export { router as ordersCalendarRoutes }
-
