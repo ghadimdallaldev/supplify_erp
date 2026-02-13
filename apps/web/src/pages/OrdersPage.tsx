@@ -1,14 +1,29 @@
 import { useState } from 'react'
-import { useGetOrdersQuery, useUpdateOrderMutation, useCreateManualOrderMutation, useGetRestaurantsQuery, useGetProductsQuery, useSendOrderReminderMutation } from '../services/api'
+import {
+  useGetOrdersQuery,
+  useUpdateOrderMutation,
+  useCreateManualOrderMutation,
+  useGetRestaurantsQuery,
+  useGetProductsQuery,
+  useSendOrderReminderMutation,
+} from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
+import { Skeleton } from '../components/ui/skeleton'
 import { Input } from '../components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
-import { 
-  ShoppingCart, 
+import {
+  ShoppingCart,
   Search,
   Package,
   Truck,
@@ -32,24 +47,35 @@ export function OrdersPage() {
   const [selectedRestaurant, setSelectedRestaurant] = useState('')
   const [orderNotes, setOrderNotes] = useState('')
   const [productSearch, setProductSearch] = useState('')
-  const [manualOrderItems, setManualOrderItems] = useState<Array<{ productId: string; quantity: number; notes?: string; productName?: string; price?: number }>>([])
+  const [manualOrderItems, setManualOrderItems] = useState<
+    Array<{
+      productId: string
+      quantity: number
+      notes?: string
+      productName?: string
+      price?: number
+    }>
+  >([])
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
-  
-  const { data, isLoading, error, refetch } = useGetOrdersQuery({
-    status: status || undefined,
-    limit: 100,
-    offset: 0,
-  }, {
-    // Refetch when component mounts or when query is invalidated
-    refetchOnMountOrArgChange: true,
-    // Auto-refresh lightly: when window regains focus or reconnects
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
-    // Poll every 20s to catch status changes without user action
-    pollingInterval: 20000,
-  })
-  
+
+  const { data, isLoading, error, refetch } = useGetOrdersQuery(
+    {
+      status: status || undefined,
+      limit: 100,
+      offset: 0,
+    },
+    {
+      // Refetch when component mounts or when query is invalidated
+      refetchOnMountOrArgChange: true,
+      // Auto-refresh lightly: when window regains focus or reconnects
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+      // Poll every 20s to catch status changes without user action
+      pollingInterval: 20000,
+    }
+  )
+
   const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
   const { data: productsData } = useGetProductsQuery({ limit: 1000 })
   const [updateOrder] = useUpdateOrderMutation()
@@ -57,32 +83,35 @@ export function OrdersPage() {
   const [sendReminder] = useSendOrderReminderMutation()
 
   const handleAddProductToOrder = (product: any) => {
-    const existingItem = manualOrderItems.find(item => item.productId === product.id)
+    const existingItem = manualOrderItems.find((item) => item.productId === product.id)
     if (existingItem) {
-      setManualOrderItems(manualOrderItems.map(item =>
-        item.productId === product.id
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ))
+      setManualOrderItems(
+        manualOrderItems.map((item) =>
+          item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        )
+      )
     } else {
-      setManualOrderItems([...manualOrderItems, {
-        productId: product.id,
-        quantity: 1,
-        productName: product.name,
-        price: product.price
-      }])
+      setManualOrderItems([
+        ...manualOrderItems,
+        {
+          productId: product.id,
+          quantity: 1,
+          productName: product.name,
+          price: product.price,
+        },
+      ])
     }
   }
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) {
-      setManualOrderItems(manualOrderItems.filter(item => item.productId !== productId))
+      setManualOrderItems(manualOrderItems.filter((item) => item.productId !== productId))
     } else {
-      setManualOrderItems(manualOrderItems.map(item =>
-        item.productId === productId
-          ? { ...item, quantity }
-          : item
-      ))
+      setManualOrderItems(
+        manualOrderItems.map((item) =>
+          item.productId === productId ? { ...item, quantity } : item
+        )
+      )
     }
   }
 
@@ -101,9 +130,9 @@ export function OrdersPage() {
       await createManualOrder({
         restaurant_id: selectedRestaurant,
         items: manualOrderItems,
-        notes: orderNotes
+        notes: orderNotes,
       }).unwrap()
-      
+
       toast.success('Order created successfully!')
       setShowManualOrderDialog(false)
       setShowProductSelection(false)
@@ -114,7 +143,7 @@ export function OrdersPage() {
     } catch (error: any) {
       const errorMessage = error?.data?.error?.message || 'Failed to create order'
       const errorName = error?.data?.error?.name
-      
+
       // For limit exceeded errors, show a more helpful message with upgrade suggestion
       if (errorName === 'LIMIT_EXCEEDED') {
         toast.error(errorMessage, {
@@ -123,22 +152,25 @@ export function OrdersPage() {
         })
         // Show additional toast with upgrade link
         setTimeout(() => {
-          toast((t) => (
-            <div className="flex items-center gap-3">
-              <span>💡 Want more orders? Upgrade your subscription!</span>
-              <button
-                onClick={() => {
-                  toast.dismiss(t.id)
-                  window.location.href = '/app/settings'
-                }}
-                className="px-3 py-1 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
-              >
-                View Plans
-              </button>
-            </div>
-          ), {
-            duration: 8000,
-          })
+          toast(
+            (t) => (
+              <div className="flex items-center gap-3">
+                <span>💡 Want more orders? Upgrade your subscription!</span>
+                <button
+                  onClick={() => {
+                    toast.dismiss(t.id)
+                    window.location.href = '/app/settings'
+                  }}
+                  className="px-3 py-1 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
+                >
+                  View Plans
+                </button>
+              </div>
+            ),
+            {
+              duration: 8000,
+            }
+          )
         }, 500)
       } else {
         toast.error(errorMessage)
@@ -146,9 +178,10 @@ export function OrdersPage() {
     }
   }
 
-  const filteredProducts = productsData?.products?.filter((product: any) =>
-    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(productSearch.toLowerCase())
+  const filteredProducts = productsData?.products?.filter(
+    (product: any) =>
+      product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.sku?.toLowerCase().includes(productSearch.toLowerCase())
   )
 
   const getStatusColor = (status: string) => {
@@ -201,18 +234,18 @@ export function OrdersPage() {
   }
 
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
-  
+
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     if (updatingOrderId === orderId) return // Prevent multiple clicks
-    
+
     try {
       setUpdatingOrderId(orderId) // Set immediately - button will be replaced by disabled button
       await updateOrder({ id: orderId, data: { status: newStatus } }).unwrap()
       toast.success(`Order status updated to ${newStatus}`)
-      
+
       // Refetch to get updated data
       const refetchResult = await refetch()
-      
+
       // For COMPLETED status, keep button disabled permanently (it will be replaced by disabled "Completed" button)
       // Don't clear updatingOrderId - let the component re-render with new order.status to show the correct button
       if (newStatus === 'COMPLETED') {
@@ -246,23 +279,45 @@ export function OrdersPage() {
 
   // Filter orders based on search and status
   const filteredOrders = data?.orders.filter((order: any) => {
-    const matchesSearch = search === '' || 
+    const matchesSearch =
+      search === '' ||
       order.id.toLowerCase().includes(search.toLowerCase()) ||
       order.restaurant_name?.toLowerCase().includes(search.toLowerCase())
-    
-    const matchesStatus = activeTab === 'all' || 
+
+    const matchesStatus =
+      activeTab === 'all' ||
       (activeTab === 'new' && order.status === 'PLACED') ||
-      (activeTab === 'processing' && ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)) ||
+      (activeTab === 'processing' &&
+        ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)) ||
       (activeTab === 'shipped' && order.status === 'SHIPPED') ||
-      (activeTab === 'completed' && ['RECEIVED_FULL','INVOICED','COMPLETED'].includes(order.status))
-    
+      (activeTab === 'completed' &&
+        ['RECEIVED_FULL', 'INVOICED', 'COMPLETED'].includes(order.status))
+
     return matchesSearch && matchesStatus
   })
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="space-y-6 p-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <Skeleton className="h-9 w-48 mb-2" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex gap-4">
+              <Skeleton className="h-10 flex-1" />
+              <Skeleton className="h-10 w-32" />
+            </div>
+          </CardContent>
+        </Card>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -286,8 +341,8 @@ export function OrdersPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Orders Inbox</h1>
           <p className="text-gray-600 mt-2">
-            {isSupplier 
-              ? 'Manage inbound orders from restaurants' 
+            {isSupplier
+              ? 'Manage inbound orders from restaurants'
               : 'Track your orders and their status'}
           </p>
         </div>
@@ -370,7 +425,10 @@ export function OrdersPage() {
                         <CardTitle className="text-lg">
                           Order #{order.id.slice(-8).toUpperCase()}
                         </CardTitle>
-                        <Badge variant={getStatusColor(order.status)} className="flex items-center gap-1">
+                        <Badge
+                          variant={getStatusColor(order.status)}
+                          className="flex items-center gap-1"
+                        >
                           {getStatusIcon(order.status)}
                           {order.status}
                         </Badge>
@@ -385,12 +443,17 @@ export function OrdersPage() {
                         </div>
                         {!isSupplier && order.status === 'DELIVERED' && (
                           <div className="mt-2 p-2 rounded bg-blue-50 text-blue-700 border border-blue-200 text-xs">
-                            Supplier marked this order as delivered. Please <Link to={`/app/receiving?order=${order.id}`} className="underline">receive this order</Link> to update inventory and generate an invoice.
+                            Supplier marked this order as delivered. Please{' '}
+                            <Link to={`/app/receiving?order=${order.id}`} className="underline">
+                              receive this order
+                            </Link>{' '}
+                            to update inventory and generate an invoice.
                           </div>
                         )}
                         {isSupplier && order.status === 'DELIVERED' && (
                           <div className="mt-2 p-2 rounded bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs">
-                            Awaiting restaurant receiving. You’ll see the invoice after they receive.
+                            Awaiting restaurant receiving. You’ll see the invoice after they
+                            receive.
                           </div>
                         )}
                       </div>
@@ -399,13 +462,12 @@ export function OrdersPage() {
                       <div className="text-2xl font-bold text-primary">
                         {typeof order.total_amount === 'number' && !isNaN(order.total_amount)
                           ? `$${order.total_amount.toFixed(2)}`
-                          : typeof order.total_amount === 'string' && !isNaN(parseFloat(order.total_amount))
-                          ? `$${parseFloat(order.total_amount).toFixed(2)}`
-                          : '$0.00'}
+                          : typeof order.total_amount === 'string' &&
+                              !isNaN(parseFloat(order.total_amount))
+                            ? `$${parseFloat(order.total_amount).toFixed(2)}`
+                            : '$0.00'}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        {order.items?.length || 0} items
-                      </div>
+                      <div className="text-sm text-gray-600">{order.items?.length || 0} items</div>
                     </div>
                   </div>
                 </CardHeader>
@@ -432,14 +494,14 @@ export function OrdersPage() {
                     <div className="flex gap-2">
                       {isSupplier && order.status === 'PLACED' && (
                         <>
-                          <Button 
+                          <Button
                             size="sm"
                             onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
                           >
                             Acknowledge
                           </Button>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
                           >
@@ -448,7 +510,7 @@ export function OrdersPage() {
                         </>
                       )}
                       {isSupplier && order.status === 'ACKNOWLEDGED' && (
-                        <Button 
+                        <Button
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
                         >
@@ -456,15 +518,12 @@ export function OrdersPage() {
                         </Button>
                       )}
                       {isSupplier && order.status === 'PROCESSING' && (
-                        <Button 
-                          size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
-                        >
+                        <Button size="sm" onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}>
                           Mark as Shipped
                         </Button>
                       )}
                       {isSupplier && order.status === 'SHIPPED' && updatingOrderId !== order.id && (
-                        <Button 
+                        <Button
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
                           disabled={false}
@@ -472,23 +531,24 @@ export function OrdersPage() {
                           Mark Delivered
                         </Button>
                       )}
-                      {isSupplier && (updatingOrderId === order.id || order.status === 'DELIVERED') && (
-                        <Button 
-                          size="sm"
-                          variant={order.status === 'DELIVERED' ? 'outline' : 'default'}
-                          disabled
-                          className="cursor-not-allowed opacity-75"
-                        >
-                          {updatingOrderId === order.id ? (
-                            <>Updating...</>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Delivered
-                            </>
-                          )}
-                        </Button>
-                      )}
+                      {isSupplier &&
+                        (updatingOrderId === order.id || order.status === 'DELIVERED') && (
+                          <Button
+                            size="sm"
+                            variant={order.status === 'DELIVERED' ? 'outline' : 'default'}
+                            disabled
+                            className="cursor-not-allowed opacity-75"
+                          >
+                            {updatingOrderId === order.id ? (
+                              <>Updating...</>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Delivered
+                              </>
+                            )}
+                          </Button>
+                        )}
                       {!isSupplier && order.status === 'PLACED' && (
                         <Button
                           variant="outline"
@@ -496,7 +556,9 @@ export function OrdersPage() {
                           onClick={() => handleSendReminder(order.id)}
                         >
                           <AlertCircle className="h-4 w-4 mr-1" />
-                          {order.reminder_count > 0 ? `Remind (${order.reminder_count})` : 'Send Reminder'}
+                          {order.reminder_count > 0
+                            ? `Remind (${order.reminder_count})`
+                            : 'Send Reminder'}
                         </Button>
                       )}
                       <Button variant="outline" size="sm" asChild>
@@ -519,9 +581,22 @@ export function OrdersPage() {
           </div>
 
           {(!filteredOrders || filteredOrders.length === 0) && (
-            <div className="text-center py-12">
+            <div className="text-center py-12 rounded-lg border border-dashed border-gray-300 bg-gray-50/50">
               <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No orders found</p>
+              <p className="text-gray-600 font-medium">No orders yet</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {!isSupplier
+                  ? 'Create your first order to get started.'
+                  : 'Orders from restaurants will appear here.'}
+              </p>
+              {!isSupplier && (
+                <Button asChild className="mt-4">
+                  <Link to="/app/cart">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create first order
+                  </Link>
+                </Button>
+              )}
             </div>
           )}
         </TabsContent>
@@ -629,7 +704,9 @@ export function OrdersPage() {
                 Cancel
               </Button>
               <Button
-                disabled={!selectedRestaurant || manualOrderItems.length === 0 || isCreatingManualOrder}
+                disabled={
+                  !selectedRestaurant || manualOrderItems.length === 0 || isCreatingManualOrder
+                }
                 onClick={handleCreateOrder}
               >
                 {isCreatingManualOrder ? 'Creating...' : 'Create Order'}
@@ -644,9 +721,7 @@ export function OrdersPage() {
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Select Products</DialogTitle>
-            <DialogDescription>
-              Search and add products to the order
-            </DialogDescription>
+            <DialogDescription>Search and add products to the order</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -689,9 +764,7 @@ export function OrdersPage() {
               ))}
 
               {(!filteredProducts || filteredProducts.length === 0) && (
-                <div className="text-center py-8 text-gray-500">
-                  No products found
-                </div>
+                <div className="text-center py-8 text-gray-500">No products found</div>
               )}
             </div>
           </div>

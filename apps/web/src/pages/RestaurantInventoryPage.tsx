@@ -3,11 +3,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { 
+import { Skeleton } from '../components/ui/skeleton'
+import {
   Package,
   TrendingDown,
   TrendingUp,
@@ -17,9 +25,16 @@ import {
   Pin,
   Download,
   Upload,
-  FileText
+  FileText,
+  ShoppingCart,
 } from 'lucide-react'
-import { useGetRestaurantInventoryQuery, useGetRestaurantInventoryHistoryQuery, useAddRestaurantInventoryMutation, useAdjustRestaurantInventoryMutation } from '../services/api'
+import { Link } from 'react-router-dom'
+import {
+  useGetRestaurantInventoryQuery,
+  useGetRestaurantInventoryHistoryQuery,
+  useAddRestaurantInventoryMutation,
+  useAdjustRestaurantInventoryMutation,
+} from '../services/api'
 import toast from 'react-hot-toast'
 
 export function RestaurantInventoryPage() {
@@ -41,7 +56,9 @@ export function RestaurantInventoryPage() {
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
 
   const { data, isLoading, error } = useGetRestaurantInventoryQuery()
-  const { data: historyData, isLoading: isLoadingHistory } = useGetRestaurantInventoryHistoryQuery({ limit: 50 })
+  const { data: historyData, isLoading: isLoadingHistory } = useGetRestaurantInventoryHistoryQuery({
+    limit: 50,
+  })
   const [addInventory] = useAddRestaurantInventoryMutation()
   const [adjustInventory] = useAdjustRestaurantInventoryMutation()
 
@@ -97,7 +114,7 @@ export function RestaurantInventoryPage() {
         }).unwrap()
         toast.success('Inventory adjusted successfully')
       }
-      
+
       setShowAdjustDialog(false)
       setAdjustingItem(null)
       setAdjustQuantity('')
@@ -119,10 +136,12 @@ export function RestaurantInventoryPage() {
           item.quantity,
           item.product_unit,
           status,
-          new Date(item.updated_at).toLocaleDateString()
+          new Date(item.updated_at).toLocaleDateString(),
         ]
-      })
-    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+      }),
+    ]
+      .map((row) => row.map((cell) => `"${cell}"`).join(','))
+      .join('\n')
 
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
@@ -143,8 +162,10 @@ export function RestaurantInventoryPage() {
       const text = e.target?.result as string
       // Parse CSV and update inventory
       const lines = text.split('\n')
-      const data = lines.slice(1).map(line => line.split(',').map(cell => cell.replace(/^"|"$/g, '')))
-      
+      const data = lines
+        .slice(1)
+        .map((line) => line.split(',').map((cell) => cell.replace(/^"|"$/g, '')))
+
       toast.success(`Processing ${data.length} inventory items from CSV...`)
       // TODO: Implement bulk update API call
       console.log('CSV data:', data)
@@ -160,26 +181,32 @@ export function RestaurantInventoryPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'IN_STOCK': return 'default'
-      case 'LOW_STOCK': return 'secondary'
-      case 'OUT_OF_STOCK': return 'destructive'
-      default: return 'secondary'
+      case 'IN_STOCK':
+        return 'default'
+      case 'LOW_STOCK':
+        return 'secondary'
+      case 'OUT_OF_STOCK':
+        return 'destructive'
+      default:
+        return 'secondary'
     }
   }
 
   const calculateReorderQuantity = (item: any) => {
     const { quantity, low_stock_threshold } = item
     if (!low_stock_threshold || quantity > low_stock_threshold) return 0
-    const suggested = (low_stock_threshold * 3) - quantity
+    const suggested = low_stock_threshold * 3 - quantity
     return Math.ceil(suggested)
   }
 
   const filteredInventory = inventory
     .filter((item: any) => {
-      const matchesSearch = item.product_name.toLowerCase().includes(search.toLowerCase()) ||
-                           item.product_sku.toLowerCase().includes(search.toLowerCase())
-      const matchesStatus = statusFilter === 'ALL' || 
-                            getStockStatus(item.quantity, item.low_stock_threshold) === statusFilter
+      const matchesSearch =
+        item.product_name.toLowerCase().includes(search.toLowerCase()) ||
+        item.product_sku.toLowerCase().includes(search.toLowerCase())
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        getStockStatus(item.quantity, item.low_stock_threshold) === statusFilter
       const matchesSupplier = supplierFilter === 'ALL' || item.supplier_name === supplierFilter
       const matchesCategory = categoryFilter === 'ALL' || item.product_category === categoryFilter
       return matchesSearch && matchesStatus && matchesSupplier && matchesCategory
@@ -194,15 +221,32 @@ export function RestaurantInventoryPage() {
 
   const summary = {
     total: inventory.length,
-    inStock: inventory.filter((item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'IN_STOCK').length,
-    lowStock: inventory.filter((item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'LOW_STOCK').length,
-    outOfStock: inventory.filter((item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'OUT_OF_STOCK').length
+    inStock: inventory.filter(
+      (item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'IN_STOCK'
+    ).length,
+    lowStock: inventory.filter(
+      (item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'LOW_STOCK'
+    ).length,
+    outOfStock: inventory.filter(
+      (item: any) => getStockStatus(item.quantity, item.low_stock_threshold) === 'OUT_OF_STOCK'
+    ).length,
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="space-y-6 p-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <Skeleton className="h-9 w-40 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
+        <Skeleton className="h-12 w-full rounded-lg" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -243,331 +287,366 @@ export function RestaurantInventoryPage() {
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-6">
-      {/* Inventory Trend Visualization */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Stock Trend Analysis</CardTitle>
-          <CardDescription>Visual overview of your inventory movements</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Total Movements</p>
-                <p className="text-2xl font-bold">{history.length}</p>
+          {/* Inventory Trend Visualization */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Trend Analysis</CardTitle>
+              <CardDescription>Visual overview of your inventory movements</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Movements</p>
+                    <p className="text-2xl font-bold">{history.length}</p>
+                  </div>
+                  <FileText className="h-8 w-8 text-blue-500" />
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <p className="text-sm text-gray-600">Recent Additions</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {
+                        history.filter(
+                          (h: any) =>
+                            h.type === 'ADD' &&
+                            new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                        ).length
+                      }
+                    </p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-green-500" />
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <p className="text-sm text-gray-600">Recent Subtractions</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {
+                        history.filter(
+                          (h: any) =>
+                            h.type === 'SUBTRACT' &&
+                            new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                        ).length
+                      }
+                    </p>
+                  </div>
+                  <TrendingDown className="h-8 w-8 text-red-500" />
+                </div>
               </div>
-              <FileText className="h-8 w-8 text-blue-500" />
-            </div>
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Recent Additions</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {history.filter((h: any) => h.type === 'ADD' && new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-green-500" />
-            </div>
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Recent Subtractions</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {history.filter((h: any) => h.type === 'SUBTRACT' && new Date(h.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}
-                </p>
-              </div>
-              <TrendingDown className="h-8 w-8 text-red-500" />
-            </div>
+            </CardContent>
+          </Card>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Products</p>
+                    <p className="text-2xl font-bold">{summary.total}</p>
+                  </div>
+                  <Package className="h-8 w-8 text-blue-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">In Stock</p>
+                    <p className="text-2xl font-bold">{summary.inStock}</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Low Stock</p>
+                    <p className="text-2xl font-bold">{summary.lowStock}</p>
+                  </div>
+                  <AlertCircle className="h-8 w-8 text-orange-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Out of Stock</p>
+                    <p className="text-2xl font-bold">{summary.outOfStock}</p>
+                  </div>
+                  <TrendingDown className="h-8 w-8 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Products</p>
-                <p className="text-2xl font-bold">{summary.total}</p>
-              </div>
-              <Package className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">In Stock</p>
-                <p className="text-2xl font-bold">{summary.inStock}</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Low Stock</p>
-                <p className="text-2xl font-bold">{summary.lowStock}</p>
-              </div>
-              <AlertCircle className="h-8 w-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Out of Stock</p>
-                <p className="text-2xl font-bold">{summary.outOfStock}</p>
-              </div>
-              <TrendingDown className="h-8 w-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-4 flex-wrap">
-            <div className="flex-1 min-w-64">
-              <Input
-                placeholder="Search products..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <select
-              value={supplierFilter}
-              onChange={(e) => setSupplierFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="ALL">All Suppliers</option>
-              {Array.from(new Set<string>(inventory.map((item: { supplier_name?: string }) => item.supplier_name).filter((s): s is string => Boolean(s)))).map((supplier) => (
-                <option key={supplier} value={supplier}>{supplier}</option>
-              ))}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="ALL">All Status</option>
-              <option value="IN_STOCK">In Stock</option>
-              <option value="LOW_STOCK">Low Stock</option>
-              <option value="OUT_OF_STOCK">Out of Stock</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Inventory Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Inventory Items</CardTitle>
-              <CardDescription>View and manage your stock levels</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportCSV}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-              <label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
+          {/* Filters */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex gap-4 flex-wrap">
+                <div className="flex-1 min-w-64">
+                  <Input
+                    placeholder="Search products..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <select
+                  value={supplierFilter}
+                  onChange={(e) => setSupplierFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md"
                 >
-                  <span>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import CSV
-                  </span>
-                </Button>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleImportCSV}
-                  className="hidden"
-                />
-              </label>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Suggested Reorder</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Updated</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredInventory.map((item: any) => {
-                  const status = getStockStatus(item.quantity, item.low_stock_threshold)
-                  const reorderQty = calculateReorderQuantity(item)
-                  return (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4">
-                        <div>
-                          <p className="font-medium text-gray-900">{item.product_name}</p>
-                          <p className="text-sm text-gray-500">{item.product_sku}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-900">{item.supplier_name}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{item.quantity}</span>
-                          <span className="text-sm text-gray-500">{item.product_unit}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        {reorderQty > 0 ? (
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-orange-600">{reorderQty}</span>
-                            <Badge variant="outline" className="text-xs">
-                              Suggested
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-xs"
-                              onClick={() => {
-                                toast.success('Adding to cart...', {
-                                  duration: 2000,
-                                })
-                                // TODO: Navigate to products page with search pre-filled
-                              }}
-                            >
-                              Order
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge variant={getStatusColor(status)}>
-                          {status.replace('_', ' ')}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-500">
-                        {new Date(item.updated_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex gap-2">
-                          <Button 
-                            variant={pinnedItems.has(item.product_id) ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handlePinToggle(item.product_id)}
-                            title={pinnedItems.has(item.product_id) ? "Unpin item" : "Pin to top"}
-                          >
-                            <Pin className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`} />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleOpenAdjustDialog(item, 'ADD')}
-                            title="Add inventory"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                            title="Reduce inventory"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
+                  <option value="ALL">All Suppliers</option>
+                  {Array.from(
+                    new Set<string>(
+                      inventory
+                        .map((item: { supplier_name?: string }) => item.supplier_name)
+                        .filter((s): s is string => Boolean(s))
+                    )
+                  ).map((supplier) => (
+                    <option key={supplier} value={supplier}>
+                      {supplier}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="ALL">All Status</option>
+                  <option value="IN_STOCK">In Stock</option>
+                  <option value="LOW_STOCK">Low Stock</option>
+                  <option value="OUT_OF_STOCK">Out of Stock</option>
+                </select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Inventory Table */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Inventory Items</CardTitle>
+                  <CardDescription>View and manage your stock levels</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
+                  <label>
+                    <Button variant="outline" size="sm" asChild>
+                      <span>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import CSV
+                      </span>
+                    </Button>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleImportCSV}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Product
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Supplier
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Quantity
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Suggested Reorder
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Last Updated
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredInventory.map((item: any) => {
+                      const status = getStockStatus(item.quantity, item.low_stock_threshold)
+                      const reorderQty = calculateReorderQuantity(item)
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-4">
+                            <div>
+                              <p className="font-medium text-gray-900">{item.product_name}</p>
+                              <p className="text-sm text-gray-500">{item.product_sku}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-900">{item.supplier_name}</td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">{item.quantity}</span>
+                              <span className="text-sm text-gray-500">{item.product_unit}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            {reorderQty > 0 ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-orange-600">{reorderQty}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  Suggested
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-xs"
+                                  onClick={() => {
+                                    toast.success('Adding to cart...', {
+                                      duration: 2000,
+                                    })
+                                    // TODO: Navigate to products page with search pre-filled
+                                  }}
+                                >
+                                  Order
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <Badge variant={getStatusColor(status)}>
+                              {status.replace('_', ' ')}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-500">
+                            {new Date(item.updated_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex gap-2">
+                              <Button
+                                variant={pinnedItems.has(item.product_id) ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => handlePinToggle(item.product_id)}
+                                title={
+                                  pinnedItems.has(item.product_id) ? 'Unpin item' : 'Pin to top'
+                                }
+                              >
+                                <Pin
+                                  className={`h-4 w-4 ${pinnedItems.has(item.product_id) ? 'fill-current' : ''}`}
+                                />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenAdjustDialog(item, 'ADD')}
+                                title="Add inventory"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
+                                title="Reduce inventory"
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-          {filteredInventory.length === 0 && (
-            <div className="text-center py-12">
-              <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No inventory items found</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              {filteredInventory.length === 0 && (
+                <div className="text-center py-12 rounded-lg border border-dashed border-gray-300 bg-gray-50/50">
+                  <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 font-medium">No inventory yet</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Place an order and receive goods to see inventory here.
+                  </p>
+                  <Button asChild className="mt-4">
+                    <Link to="/app/cart">
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Create first order
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Adjust Inventory Dialog */}
-      <Dialog open={showAdjustDialog} onOpenChange={setShowAdjustDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
-            </DialogTitle>
-            <DialogDescription>
-              {adjustType === 'ADD' 
-                ? `Add ${adjustingItem?.product_name} to your inventory`
-                : `Adjust inventory for ${adjustingItem?.product_name}`
-              }
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity *</Label>
-              <Input
-                id="quantity"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Enter quantity"
-                value={adjustQuantity}
-                onChange={(e) => setAdjustQuantity(e.target.value)}
-              />
-              <p className="text-sm text-gray-500">
-                Current quantity: {adjustingItem?.quantity} {adjustingItem?.product_unit}
-              </p>
-            </div>
+          {/* Adjust Inventory Dialog */}
+          <Dialog open={showAdjustDialog} onOpenChange={setShowAdjustDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
+                </DialogTitle>
+                <DialogDescription>
+                  {adjustType === 'ADD'
+                    ? `Add ${adjustingItem?.product_name} to your inventory`
+                    : `Adjust inventory for ${adjustingItem?.product_name}`}
+                </DialogDescription>
+              </DialogHeader>
 
-            <div className="space-y-2">
-              <Label htmlFor="reason">Reason</Label>
-              <Textarea
-                id="reason"
-                rows={3}
-                placeholder="Optional: reason for this adjustment..."
-                value={adjustReason}
-                onChange={(e) => setAdjustReason(e.target.value)}
-              />
-            </div>
-          </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">Quantity *</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter quantity"
+                    value={adjustQuantity}
+                    onChange={(e) => setAdjustQuantity(e.target.value)}
+                  />
+                  <p className="text-sm text-gray-500">
+                    Current quantity: {adjustingItem?.quantity} {adjustingItem?.product_unit}
+                  </p>
+                </div>
 
-          <DialogFooter>
-            <Button 
-              variant="outline"
-              onClick={() => setShowAdjustDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleAdjustInventory}>
-              {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                <div className="space-y-2">
+                  <Label htmlFor="reason">Reason</Label>
+                  <Textarea
+                    id="reason"
+                    rows={3}
+                    placeholder="Optional: reason for this adjustment..."
+                    value={adjustReason}
+                    onChange={(e) => setAdjustReason(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAdjustDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAdjustInventory}>
+                  {adjustType === 'ADD' ? 'Add Inventory' : 'Reduce Inventory'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="history" className="space-y-6">
@@ -583,7 +662,9 @@ export function RestaurantInventoryPage() {
                   <select
                     onChange={(e) => {
                       const val = e.target.value
-                      const table = document.getElementById('history-table-body') as HTMLTableSectionElement | null
+                      const table = document.getElementById(
+                        'history-table-body'
+                      ) as HTMLTableSectionElement | null
                       if (!table) return
                       const rows = Array.from(table.querySelectorAll('tr')) as HTMLTableRowElement[]
                       rows.forEach((row) => {
@@ -613,19 +694,40 @@ export function RestaurantInventoryPage() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance Before</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance After</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Product
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Type
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Source
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Quantity
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Balance Before
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Balance After
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Reason
+                        </th>
                       </tr>
                     </thead>
                     <tbody id="history-table-body" className="divide-y divide-gray-200">
                       {history.map((movement: any) => {
-                        const source = movement.reference_type === 'RECEIVING_REPORT' ? 'Order' : movement.reference_type === 'MANUAL_ADD' ? 'Manual' : (movement.reference_type || '—')
+                        const source =
+                          movement.reference_type === 'RECEIVING_REPORT'
+                            ? 'Order'
+                            : movement.reference_type === 'MANUAL_ADD'
+                              ? 'Manual'
+                              : movement.reference_type || '—'
                         const typeLabel = (() => {
                           const t = (movement.type || '').toUpperCase()
                           if (source === 'Order') return 'ADD'
@@ -637,29 +739,51 @@ export function RestaurantInventoryPage() {
                           return t || '—'
                         })()
                         return (
-                        <tr key={movement.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 text-sm text-gray-900">
-                            {new Date(movement.created_at).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-4">
-                            <div>
-                              <p className="font-medium text-gray-900">{movement.product_name}</p>
-                              <p className="text-sm text-gray-500">{movement.product_sku}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            <Badge variant={typeLabel === 'ADD' ? 'default' : typeLabel === 'ADJUST' ? 'secondary' : 'destructive'}>
-                              {typeLabel}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-4 text-sm text-gray-900" data-col="source" data-value={source}>{source}</td>
-                          <td className="px-4 py-4 text-sm text-gray-900">
-                            {movement.quantity > 0 ? '+' : ''}{movement.quantity}
-                          </td>
-                          <td className="px-4 py-4 text-sm text-gray-500">{movement.balance_before}</td>
-                          <td className="px-4 py-4 text-sm font-medium text-gray-900">{movement.balance_after}</td>
-                          <td className="px-4 py-4 text-sm text-gray-500">{movement.reason || '-'}</td>
-                        </tr>)
+                          <tr key={movement.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-4 text-sm text-gray-900">
+                              {new Date(movement.created_at).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div>
+                                <p className="font-medium text-gray-900">{movement.product_name}</p>
+                                <p className="text-sm text-gray-500">{movement.product_sku}</p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <Badge
+                                variant={
+                                  typeLabel === 'ADD'
+                                    ? 'default'
+                                    : typeLabel === 'ADJUST'
+                                      ? 'secondary'
+                                      : 'destructive'
+                                }
+                              >
+                                {typeLabel}
+                              </Badge>
+                            </td>
+                            <td
+                              className="px-4 py-4 text-sm text-gray-900"
+                              data-col="source"
+                              data-value={source}
+                            >
+                              {source}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-900">
+                              {movement.quantity > 0 ? '+' : ''}
+                              {movement.quantity}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-500">
+                              {movement.balance_before}
+                            </td>
+                            <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                              {movement.balance_after}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-500">
+                              {movement.reason || '-'}
+                            </td>
+                          </tr>
+                        )
                       })}
                     </tbody>
                   </table>
@@ -680,17 +804,34 @@ export function RestaurantInventoryPage() {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Total</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Source</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Change</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Product
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Current Total
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Unit
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Last Source
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Last Change
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {inventory.map((item: any) => {
-                      const lastMovement = history.find((m: any) => m.product_id === item.product_id);
-                      const source = lastMovement?.reference_type === 'RECEIVING_REPORT' ? 'Order' : lastMovement?.reference_type === 'MANUAL_ADD' ? 'Manual' : (lastMovement?.reference_type || '—')
+                      const lastMovement = history.find(
+                        (m: any) => m.product_id === item.product_id
+                      )
+                      const source =
+                        lastMovement?.reference_type === 'RECEIVING_REPORT'
+                          ? 'Order'
+                          : lastMovement?.reference_type === 'MANUAL_ADD'
+                            ? 'Manual'
+                            : lastMovement?.reference_type || '—'
                       return (
                         <tr key={item.id} className="hover:bg-gray-50">
                           <td className="px-4 py-4">
@@ -702,7 +843,11 @@ export function RestaurantInventoryPage() {
                           <td className="px-4 py-4 font-semibold">{item.quantity}</td>
                           <td className="px-4 py-4 text-sm text-gray-500">{item.product_unit}</td>
                           <td className="px-4 py-4 text-sm text-gray-900">{source}</td>
-                          <td className="px-4 py-4 text-sm text-gray-500">{lastMovement ? new Date(lastMovement.created_at).toLocaleString() : '—'}</td>
+                          <td className="px-4 py-4 text-sm text-gray-500">
+                            {lastMovement
+                              ? new Date(lastMovement.created_at).toLocaleString()
+                              : '—'}
+                          </td>
                         </tr>
                       )
                     })}
@@ -719,11 +864,9 @@ export function RestaurantInventoryPage() {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Add Product to Inventory</DialogTitle>
-            <DialogDescription>
-              Manually add a product to your inventory
-            </DialogDescription>
+            <DialogDescription>Manually add a product to your inventory</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="product">Select Product</Label>
@@ -753,21 +896,24 @@ export function RestaurantInventoryPage() {
 
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
               <p className="text-sm text-blue-800">
-                <strong>Tip:</strong> You can also add products by receiving orders 
-                or importing from a CSV file.
+                <strong>Tip:</strong> You can also add products by receiving orders or importing
+                from a CSV file.
               </p>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowAddProductDialog(false)
-              setSelectedProductId('')
-              setAddQuantity('')
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddProductDialog(false)
+                setSelectedProductId('')
+                setAddQuantity('')
+              }}
+            >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 toast('Manual product addition coming soon')
                 setShowAddProductDialog(false)
@@ -786,11 +932,9 @@ export function RestaurantInventoryPage() {
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Bulk Upload Inventory</DialogTitle>
-            <DialogDescription>
-              Import inventory items from a CSV or Excel file
-            </DialogDescription>
+            <DialogDescription>Import inventory items from a CSV or Excel file</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="file">Upload File</Label>
@@ -800,9 +944,7 @@ export function RestaurantInventoryPage() {
                 accept=".csv,.xlsx"
                 onChange={(e) => setBulkUploadFile(e.target.files?.[0] || null)}
               />
-              <p className="text-sm text-gray-500 mt-2">
-                Accepted formats: CSV, Excel (.xlsx)
-              </p>
+              <p className="text-sm text-gray-500 mt-2">Accepted formats: CSV, Excel (.xlsx)</p>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
@@ -819,9 +961,7 @@ export function RestaurantInventoryPage() {
 
             {bulkUploadFile && (
               <div className="border rounded-md p-3 bg-gray-50">
-                <p className="text-sm font-medium text-gray-700">
-                  Selected: {bulkUploadFile.name}
-                </p>
+                <p className="text-sm font-medium text-gray-700">Selected: {bulkUploadFile.name}</p>
                 <p className="text-xs text-gray-500">
                   Size: {(bulkUploadFile.size / 1024).toFixed(2)} KB
                 </p>
@@ -830,13 +970,16 @@ export function RestaurantInventoryPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowBulkUploadDialog(false)
-              setBulkUploadFile(null)
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBulkUploadDialog(false)
+                setBulkUploadFile(null)
+              }}
+            >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 toast.success('Bulk upload feature coming soon')
                 setShowBulkUploadDialog(false)

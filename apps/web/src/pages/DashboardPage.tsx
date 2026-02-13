@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
+import { Skeleton } from '../components/ui/skeleton'
 import {
   Package,
   ShoppingCart,
@@ -126,8 +127,25 @@ export function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="space-y-6">
+        <Skeleton className="h-32 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-64 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </div>
       </div>
     )
   }
@@ -303,6 +321,44 @@ export function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Post-onboarding: direct to first order or first product */}
+      {isRestaurant && (stats?.totalOrders ?? 0) === 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">You&apos;re all set</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Create your first order to start receiving from suppliers.
+              </p>
+            </div>
+            <Button asChild>
+              <Link to="/app/cart">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Create first order
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {isSupplier && (stats?.totalProducts ?? 0) === 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">You&apos;re all set</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Add your first product so restaurants can order from you.
+              </p>
+            </div>
+            <Button asChild>
+              <Link to="/app/products">
+                <Package className="h-4 w-4 mr-2" />
+                Create first product
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {kpis.map((kpi) => (

@@ -1,7 +1,8 @@
-import { useGetEntitlementsQuery } from '../services/api'
+import { useGetEntitlementsQuery, useGetRecommendationQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Progress } from './ui/progress'
+import { Skeleton } from './ui/skeleton'
 import { AlertCircle, AlertTriangle, Infinity, TrendingUp } from 'lucide-react'
 
 const LIMIT_LABELS: Record<string, string> = {
@@ -16,6 +17,38 @@ const LIMIT_LABELS: Record<string, string> = {
   storage_mb: 'Storage (MB)',
 }
 
+const PLAN_CODE_LABELS: Record<string, string> = {
+  free: 'Free',
+  bronze: 'Bronze',
+  gold: 'Gold',
+  platinum: 'Platinum',
+}
+
+function PlanRecommendationCta({ currentCode }: { currentCode: string }) {
+  const { data } = useGetRecommendationQuery({})
+  const rec = data?.recommendedPlanCode
+  const reason = data?.reason
+  const isRecommended = rec && rec !== currentCode?.toLowerCase()
+  if (!isRecommended) {
+    return (
+      <>
+        <p className="text-blue-800 font-medium mb-2">Upgrade to unlock more features</p>
+        <p className="text-blue-700">
+          Bronze, Gold, and Platinum plans offer advanced features, higher limits, and more.
+        </p>
+      </>
+    )
+  }
+  return (
+    <>
+      <p className="text-blue-800 font-medium mb-2 flex items-center gap-2">
+        Recommended: <span className="font-semibold">{PLAN_CODE_LABELS[rec] ?? rec}</span>
+      </p>
+      <p className="text-blue-700">{reason}</p>
+    </>
+  )
+}
+
 export function SubscriptionInfo() {
   const { data, isLoading, error } = useGetEntitlementsQuery()
 
@@ -26,6 +59,12 @@ export function SubscriptionInfo() {
           <CardTitle>Subscription</CardTitle>
           <CardDescription>Loading subscription details...</CardDescription>
         </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardContent>
       </Card>
     )
   }
@@ -117,7 +156,8 @@ export function SubscriptionInfo() {
                   <ul className="space-y-1 text-sm text-amber-700">
                     {topNearLimit.map(({ limitKey, current, limit, pct }) => (
                       <li key={limitKey}>
-                        {LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')}: {current} / {limit} ({Math.round(pct)}%)
+                        {LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')}: {current} / {limit}{' '}
+                        ({Math.round(pct)}%)
                       </li>
                     ))}
                   </ul>
@@ -207,13 +247,10 @@ export function SubscriptionInfo() {
           </div>
         </div>
 
-        {/* Upgrade CTA */}
-        {plan.name === 'Free' && (
+        {/* Upgrade CTA + Recommended plan */}
+        {(plan.name === 'Free' || plan.code !== 'platinum') && (
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm">
-            <p className="text-blue-800 font-medium mb-2">Upgrade to unlock more features</p>
-            <p className="text-blue-700">
-              Bronze, Gold, and Platinum plans offer advanced features, higher limits, and more.
-            </p>
+            <PlanRecommendationCta currentCode={plan.code} />
           </div>
         )}
       </CardContent>

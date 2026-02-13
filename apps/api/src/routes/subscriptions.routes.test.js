@@ -37,11 +37,33 @@ const mockGetTenantSubscription = vi.fn()
 const mockCheckLimit = vi.fn()
 const mockIsFeatureEnabled = vi.fn()
 const mockGetEntitlements = vi.fn()
+const mockRecommendPlan = vi.fn()
 vi.mock('../lib/subscription.js', () => ({
   getTenantSubscription: (...args) => mockGetTenantSubscription(...args),
   checkLimit: (...args) => mockCheckLimit(...args),
   isFeatureEnabled: (...args) => mockIsFeatureEnabled(...args),
   getEntitlements: (...args) => mockGetEntitlements(...args),
+  recommendPlan: (...args) => mockRecommendPlan(...args),
+  RESTAURANT_LIMIT_KEYS: [
+    'branches',
+    'users',
+    'orders_per_day',
+    'suppliers_per_restaurant',
+    'restaurant_inventory_skus',
+    'chats_per_day',
+    'storage_mb',
+  ],
+  SUPPLIER_LIMIT_KEYS: [
+    'warehouses',
+    'users',
+    'supplier_products_skus',
+    'chats_per_day',
+    'storage_mb',
+  ],
+}))
+const mockRecordConversionEvent = vi.fn()
+vi.mock('../lib/conversion-events.js', () => ({
+  recordConversionEvent: (...args) => mockRecordConversionEvent(...args),
 }))
 
 import { subscriptionsRoutes } from './subscriptions.routes.js'
@@ -57,6 +79,8 @@ describe('Subscriptions Routes', () => {
     mockCheckLimit.mockReset()
     mockIsFeatureEnabled.mockReset()
     mockGetEntitlements.mockReset()
+    mockRecommendPlan.mockReset()
+    mockRecordConversionEvent.mockReset()
 
     app = express()
     app.use(express.json())
@@ -224,13 +248,105 @@ describe('Subscriptions Routes', () => {
       expect(res.body.data.entitlements.usage.orders_per_day).toBe(5)
     })
 
-    it('returns 404 when no entitlements for tenant', async () => {
-      mockGetEntitlements.mockResolvedValueOnce(null)
+    it('returns synthetic Free entitlements when getEntitlements returns null', async () => {
+      mockGetEntitlements.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
 
-      const res = await request(app).get('/api/subscriptions/entitlements').expect(404)
+      const res = await request(app).get('/api/subscriptions/entitlements').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.entitlements).toBeDefined()
+      expect(res.body.data.entitlements.plan.name).toBe('Free')
+      expect(res.body.data.entitlements.plan.code).toBe('free')
+    })
+  })
+
+  describe('GET /api/subscriptions/recommendation', () => {
+    it('returns recommendation for tenant', async () => {
+      mockRecommendPlan.mockResolvedValueOnce({
+        recommendedPlanCode: 'gold',
+        reason: 'Upgrade to get more capacity.',
+        comparedToCurrent: { upgrades: ['Higher limits'], resolvesLimits: ['orders_per_day'] },
+      })
+
+      const res = await request(app).get('/api/subscriptions/recommendation').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.recommendedPlanCode).toBe('gold')
+      expect(res.body.data.reason).toBeDefined()
+      expect(res.body.data.comparedToCurrent.resolvesLimits).toContain('orders_per_day')
+    })
+
+    it('accepts blocked query param', async () => {
+      mockRecommendPlan.mockResolvedValueOnce({
+        recommendedPlanCode: 'gold',
+        reason: 'Unlock reports.',
+        comparedToCurrent: { upgrades: ['reports (Gold)'], resolvesLimits: [] },
+      })
+
+      await request(app)
+        .get('/api/subscriptions/recommendation?blocked=feature:reports')
+        .expect(200)
+
+      expect(mockRecommendPlan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 'rest-1',
+          tenantType: 'RESTAURANT',
+          blockedEvents: [{ type: 'FEATURE', key: 'reports' }],
+        })
+      )
+    })
+
+    it('returns 404 when tenant not found', async () => {
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce(null)
+
+      await request(app).get('/api/subscriptions/recommendation').expect(404)
+    })
+  })
+
+  describe('POST /api/subscriptions/conversion-event', () => {
+    it('records VIEW_PLANS and returns 200', async () => {
+      mockRecordConversionEvent.mockResolvedValueOnce(undefined)
+
+      const res = await request(app)
+        .post('/api/subscriptions/conversion-event')
+        .send({ eventType: 'VIEW_PLANS' })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.recorded).toBe(true)
+      expect(mockRecordConversionEvent).toHaveBeenCalledWith(
+        'rest-1',
+        'RESTAURANT',
+        'VIEW_PLANS',
+        {}
+      )
+    })
+
+    it('records OPEN_UPGRADE with metadata', async () => {
+      mockRecordConversionEvent.mockResolvedValueOnce(undefined)
+
+      await request(app)
+        .post('/api/subscriptions/conversion-event')
+        .send({ eventType: 'OPEN_UPGRADE', metadata: { source: 'modal' } })
+        .expect(200)
+
+      expect(mockRecordConversionEvent).toHaveBeenCalledWith(
+        'rest-1',
+        'RESTAURANT',
+        'OPEN_UPGRADE',
+        { source: 'modal' }
+      )
+    })
+
+    it('returns 400 for invalid eventType', async () => {
+      const res = await request(app)
+        .post('/api/subscriptions/conversion-event')
+        .send({ eventType: 'INVALID' })
+        .expect(400)
 
       expect(res.body.ok).toBe(false)
-      expect(res.body.error.name).toBe('NOT_FOUND')
+      expect(mockRecordConversionEvent).not.toHaveBeenCalled()
     })
   })
 })

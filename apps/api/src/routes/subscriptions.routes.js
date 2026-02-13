@@ -13,7 +13,9 @@ import {
   isFeatureEnabled,
   checkLimit,
   getEntitlements,
+  recommendPlan,
 } from '../lib/subscription.js'
+import { recordConversionEvent } from '../lib/conversion-events.js'
 
 const router = express.Router()
 
@@ -57,18 +59,18 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
           ? {
               branches: 0,
               users: 1,
-              orders_per_day: 10,
-              suppliers_per_restaurant: 2,
-              restaurant_inventory_skus: 50,
-              chats_per_day: 10,
-              storage_mb: 100,
+              orders_per_day: 3,
+              suppliers_per_restaurant: 1,
+              restaurant_inventory_skus: 15,
+              chats_per_day: 3,
+              storage_mb: 50,
             }
           : {
               warehouses: 0,
               users: 1,
-              supplier_products_skus: 50,
-              chats_per_day: 10,
-              storage_mb: 100,
+              supplier_products_skus: 15,
+              chats_per_day: 3,
+              storage_mb: 50,
             }
       const defaultLimits = Object.fromEntries(limitKeys.map((k) => [k, freeDefaults[k] ?? 0]))
       entitlements = {
@@ -221,6 +223,114 @@ router.get(
           name: 'INTERNAL_ERROR',
           message: 'Failed to get usage',
         },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+/**
+ * Get recommended plan for current tenant (usage, limits, optional blocked events).
+ * Query: blocked (optional) e.g. "limit:orders_per_day" or "feature:reports" or comma-separated.
+ */
+router.get(
+  '/recommendation',
+  requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const tenant = await getRequestTenant(req)
+      if (!tenant) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message:
+              req.userData.role === 'RESTAURANT' ? 'Restaurant not found' : 'Supplier not found',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const blockedParam = req.query.blocked
+      const blockedEvents = []
+      if (typeof blockedParam === 'string') {
+        blockedParam.split(',').forEach((part) => {
+          const [type, key] = part
+            .trim()
+            .split(':')
+            .map((s) => s?.trim())
+          if (type === 'limit' && key) blockedEvents.push({ type: 'LIMIT', key })
+          if (type === 'feature' && key) blockedEvents.push({ type: 'FEATURE', key })
+        })
+      }
+
+      const result = await recommendPlan({
+        tenantId: tenant.tenantId,
+        tenantType: tenant.tenantType,
+        blockedEvents,
+      })
+
+      res.json({
+        ok: true,
+        data: result,
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get recommendation error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get plan recommendation',
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+/**
+ * Record conversion funnel event (VIEW_PLANS, OPEN_UPGRADE). Frontend calls this when user opens plans or upgrade modal.
+ */
+router.post(
+  '/conversion-event',
+  requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const tenant = await getRequestTenant(req)
+      if (!tenant) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Tenant not found' },
+          requestId: req.requestId,
+        })
+      }
+      const { eventType, metadata } = req.body || {}
+      if (!['VIEW_PLANS', 'OPEN_UPGRADE'].includes(eventType)) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'BAD_REQUEST', message: 'eventType must be VIEW_PLANS or OPEN_UPGRADE' },
+          requestId: req.requestId,
+        })
+      }
+      await recordConversionEvent(tenant.tenantId, tenant.tenantType, eventType, metadata || {})
+      res.json({
+        ok: true,
+        data: { recorded: true },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Record conversion event error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to record event' },
         requestId: req.requestId,
       })
     }

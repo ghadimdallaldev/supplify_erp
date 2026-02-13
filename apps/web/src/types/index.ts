@@ -889,6 +889,13 @@ export interface Entitlements {
   usageWindowMeta?: Record<string, { date?: string }>
 }
 
+/** Plan recommendation from GET /api/subscriptions/recommendation */
+export interface PlanRecommendation {
+  recommendedPlanCode: string
+  reason: string
+  comparedToCurrent: { upgrades: string[]; resolvesLimits: string[] }
+}
+
 /** Response from POST /api/admin-dashboard/subscriptions/:id/preview-change */
 export interface SubscriptionPlanChangePreview {
   willExceed: Array<{ limitKey: string; usage: number; limit: number }>

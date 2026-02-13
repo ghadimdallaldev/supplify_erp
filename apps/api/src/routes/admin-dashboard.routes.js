@@ -13,6 +13,7 @@ import {
 } from '../lib/impersonation.js'
 import { getEntitlements, RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } from '../lib/subscription.js'
 import { writeAuditLog } from '../lib/audit.js'
+import { recordConversionEvent } from '../lib/conversion-events.js'
 
 /** Allowed feature keys per tenant type (from plan features JSONB in use) */
 const RESTAURANT_FEATURE_KEYS = [
@@ -126,7 +127,12 @@ async function logAudit(
       tenant_type: tenantType || undefined,
       tenant_id: tenantId || targetEntityId,
       target_id: targetEntityId,
-      payload_json: { description: actionDescription, old_value: oldValue, new_value: newValue, ...metadata },
+      payload_json: {
+        description: actionDescription,
+        old_value: oldValue,
+        new_value: newValue,
+        ...metadata,
+      },
     })
   } catch (error) {
     logger.error('Failed to log audit event:', error)
@@ -217,6 +223,82 @@ router.get('/overview', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get admin overview' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// ========================================
+// CONVERSION FUNNEL STATS (lightweight, no analytics vendor)
+// ========================================
+router.get('/conversion-stats', async (req, res) => {
+  try {
+    const days = Math.min(90, Math.max(1, parseInt(req.query.days, 10) || 30))
+    let blocksToUpgradesConversionPercent = 0
+    let mostBlockedFeature = null
+    let mostBlockedLimit = null
+    let totalBlocks = 0
+    let totalUpgrades = 0
+    let blocksByFeature = []
+    let blocksByLimit = []
+
+    try {
+      const since = new Date()
+      since.setDate(since.getDate() - days)
+
+      const [blockCount, upgradeCount, byFeature, byLimit] = await Promise.all([
+        query(
+          `SELECT COUNT(*) as c FROM conversion_event WHERE event_type IN ('BLOCKED_FEATURE', 'BLOCKED_LIMIT') AND created_at >= $1`,
+          [since]
+        ),
+        query(
+          `SELECT COUNT(*) as c FROM conversion_event WHERE event_type = 'UPGRADE_SUCCESS' AND created_at >= $1`,
+          [since]
+        ),
+        query(
+          `SELECT metadata_json->>'featureKey' as key, COUNT(*) as c FROM conversion_event WHERE event_type = 'BLOCKED_FEATURE' AND created_at >= $1 GROUP BY metadata_json->>'featureKey' ORDER BY c DESC LIMIT 5`,
+          [since]
+        ),
+        query(
+          `SELECT metadata_json->>'limitKey' as key, COUNT(*) as c FROM conversion_event WHERE event_type = 'BLOCKED_LIMIT' AND created_at >= $1 GROUP BY metadata_json->>'limitKey' ORDER BY c DESC LIMIT 5`,
+          [since]
+        ),
+      ])
+
+      totalBlocks = parseInt(blockCount.rows[0]?.c || 0)
+      totalUpgrades = parseInt(upgradeCount.rows[0]?.c || 0)
+      if (totalBlocks > 0) {
+        blocksToUpgradesConversionPercent = Math.round((totalUpgrades / totalBlocks) * 100)
+      }
+      mostBlockedFeature = byFeature.rows[0]?.key || null
+      mostBlockedLimit = byLimit.rows[0]?.key || null
+      blocksByFeature = byFeature.rows.map((r) => ({ key: r.key, count: parseInt(r.c) }))
+      blocksByLimit = byLimit.rows.map((r) => ({ key: r.key, count: parseInt(r.c) }))
+    } catch (e) {
+      if (e.code !== '42P01') throw e
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        days,
+        totalBlocks,
+        totalUpgrades,
+        blocksToUpgradesConversionPercent,
+        mostBlockedFeature,
+        mostBlockedLimit,
+        blocksByFeature,
+        blocksByLimit,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Conversion stats error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get conversion stats' },
       requestId: req.requestId,
     })
   }
@@ -747,10 +829,9 @@ router.patch('/subscriptions/:id', async (req, res) => {
     const existing = existingSubs[0]
     let existingPlanCode = null
     if (existing.plan_id) {
-      const { rows: oldPlan } = await query(
-        'SELECT code FROM subscription_plan WHERE id = $1',
-        [existing.plan_id]
-      )
+      const { rows: oldPlan } = await query('SELECT code FROM subscription_plan WHERE id = $1', [
+        existing.plan_id,
+      ])
       existingPlanCode = oldPlan[0]?.code || null
     }
 
@@ -822,7 +903,8 @@ router.patch('/subscriptions/:id', async (req, res) => {
         }
       }
       if (updateData.applyAtPeriodEnd === true) {
-        const effectiveAt = existing.current_period_end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        const effectiveAt =
+          existing.current_period_end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         updates.push(`pending_plan_id = $${paramIndex++}`)
         values.push(updateData.planId)
         updates.push(`pending_effective_at = $${paramIndex++}`)
@@ -886,13 +968,44 @@ router.patch('/subscriptions/:id', async (req, res) => {
       } catch (e) {
         if (e.code !== '42P01') logger.error('subscription_change_log insert failed', e)
       }
+      recordConversionEvent(existing.tenant_id, existing.tenant_type, 'UPGRADE_SUCCESS', {
+        from_plan_id: existing.plan_id,
+        to_plan_id: updateData.planId,
+        subscription_id: id,
+      }).catch(() => {})
     }
 
     const statusChangeReason = updateData.reason || updateData.cancelReason
     if (updateData.status === 'SUSPENDED') {
-      await logAudit(req, 'subscription.suspend', `Suspended subscription ${id}`, 'subscription', id, existing, updated, { target_tenant_id: existing.tenant_id, target_tenant_type: existing.tenant_type, reason: statusChangeReason })
+      await logAudit(
+        req,
+        'subscription.suspend',
+        `Suspended subscription ${id}`,
+        'subscription',
+        id,
+        existing,
+        updated,
+        {
+          target_tenant_id: existing.tenant_id,
+          target_tenant_type: existing.tenant_type,
+          reason: statusChangeReason,
+        }
+      )
     } else if (updateData.status === 'ACTIVE' && existing.status === 'SUSPENDED') {
-      await logAudit(req, 'subscription.resume', `Resumed subscription ${id}`, 'subscription', id, existing, updated, { target_tenant_id: existing.tenant_id, target_tenant_type: existing.tenant_type, reason: statusChangeReason })
+      await logAudit(
+        req,
+        'subscription.resume',
+        `Resumed subscription ${id}`,
+        'subscription',
+        id,
+        existing,
+        updated,
+        {
+          target_tenant_id: existing.tenant_id,
+          target_tenant_type: existing.tenant_type,
+          reason: statusChangeReason,
+        }
+      )
     } else {
       await logAudit(
         req,
@@ -1316,7 +1429,9 @@ router.post('/tenants/:tenantType/:id/override-limit', async (req, res) => {
     await logAudit(
       req,
       isUpdate ? 'override.update' : 'OVERRIDE_LIMIT',
-      isUpdate ? `Updated ${limit_type} override: ${override_value}` : `Granted ${limit_type} override: ${override_value}`,
+      isUpdate
+        ? `Updated ${limit_type} override: ${override_value}`
+        : `Granted ${limit_type} override: ${override_value}`,
       tenantType.toUpperCase(),
       tenantId,
       isUpdate ? existing[0] : null,

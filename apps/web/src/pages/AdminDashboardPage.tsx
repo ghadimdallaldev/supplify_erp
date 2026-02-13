@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   api,
   useGetAdminOverviewQuery,
+  useGetAdminConversionStatsQuery,
   useGetAdminPlansQuery,
   useGetAdminSubscriptionsQuery,
   useGetAdminAuditLogsQuery,
@@ -55,6 +56,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     undefined
   )
   const { data: overview, isLoading: overviewLoading } = useGetAdminOverviewQuery()
+  const { data: conversionStats } = useGetAdminConversionStatsQuery({ days: 30 })
   const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery(
     plansTenantFilter ? { tenant_type: plansTenantFilter } : {}
   )
@@ -62,8 +64,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     useGetAdminSubscriptionsQuery({})
   const { data: auditLogsData, isLoading: auditLoading } = useGetAdminAuditLogsQuery({})
   const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery()
-  const { data: financeData, isLoading: financeLoading } =
-    (api as any).useGetAdminFinancialOverviewQuery()
+  const { data: financeData, isLoading: financeLoading } = (
+    api as any
+  ).useGetAdminFinancialOverviewQuery()
 
   // Load tenant data
   const {
@@ -386,6 +389,42 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     )}
                   </div>
                 </Card>
+
+                {conversionStats && (
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Conversion funnel (last {conversionStats.days}d)
+                    </h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Blocks (feature/limit)</span>
+                        <span className="font-semibold">{conversionStats.totalBlocks}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Upgrades</span>
+                        <span className="font-semibold">{conversionStats.totalUpgrades}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="text-gray-600">Blocks → upgrades %</span>
+                        <span className="font-semibold">
+                          {conversionStats.blocksToUpgradesConversionPercent}%
+                        </span>
+                      </div>
+                      {conversionStats.mostBlockedFeature && (
+                        <p className="text-gray-600 pt-1">
+                          Most blocked feature:{' '}
+                          <span className="font-medium">{conversionStats.mostBlockedFeature}</span>
+                        </p>
+                      )}
+                      {conversionStats.mostBlockedLimit && (
+                        <p className="text-gray-600">
+                          Most blocked limit:{' '}
+                          <span className="font-medium">{conversionStats.mostBlockedLimit}</span>
+                        </p>
+                      )}
+                    </div>
+                  </Card>
+                )}
               </div>
             </>
           )}
@@ -823,7 +862,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     <CardTitle>DB Pool</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm">Total: {healthData.dbPool.total} · Idle: {healthData.dbPool.idle} · Waiting: {healthData.dbPool.waiting}</p>
+                    <p className="text-sm">
+                      Total: {healthData.dbPool.total} · Idle: {healthData.dbPool.idle} · Waiting:{' '}
+                      {healthData.dbPool.waiting}
+                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -864,11 +906,30 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   <CardTitle>GMV & Revenue</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <p className="flex justify-between"><span>GMV</span><span className="font-semibold">${financeData?.gmv?.toFixed(2) ?? '0.00'}</span></p>
-                  <p className="flex justify-between"><span>Outstanding</span><span className="font-semibold">${financeData?.outstanding?.toFixed(2) ?? '0.00'}</span></p>
-                  <p className="flex justify-between"><span>Overdue</span><span className="font-semibold text-red-600">${financeData?.overdue?.toFixed(2) ?? '0.00'}</span></p>
-                  <p className="flex justify-between"><span>MRR</span><span className="font-semibold">${financeData?.mrr?.toFixed(2) ?? '0.00'}</span></p>
-                  <p className="flex justify-between"><span>ARR</span><span className="font-semibold">${financeData?.arr?.toFixed(2) ?? '0.00'}</span></p>
+                  <p className="flex justify-between">
+                    <span>GMV</span>
+                    <span className="font-semibold">${financeData?.gmv?.toFixed(2) ?? '0.00'}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>Outstanding</span>
+                    <span className="font-semibold">
+                      ${financeData?.outstanding?.toFixed(2) ?? '0.00'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>Overdue</span>
+                    <span className="font-semibold text-red-600">
+                      ${financeData?.overdue?.toFixed(2) ?? '0.00'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>MRR</span>
+                    <span className="font-semibold">${financeData?.mrr?.toFixed(2) ?? '0.00'}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>ARR</span>
+                    <span className="font-semibold">${financeData?.arr?.toFixed(2) ?? '0.00'}</span>
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -882,8 +943,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     <ul className="text-sm space-y-1">
                       {financeData.revenueByPlan.map((r: any, i: number) => (
                         <li key={i} className="flex justify-between">
-                          <span>{r.planName} ({r.tenantType})</span>
-                          <span>${r.mrr?.toFixed(2)} · {r.subscriptionCount} subs</span>
+                          <span>
+                            {r.planName} ({r.tenantType})
+                          </span>
+                          <span>
+                            ${r.mrr?.toFixed(2)} · {r.subscriptionCount} subs
+                          </span>
                         </li>
                       ))}
                     </ul>

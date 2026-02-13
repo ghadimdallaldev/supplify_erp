@@ -13,10 +13,12 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 
 | Plan     | branches  | users     | orders_per_day | suppliers_per_restaurant | restaurant_inventory_skus | reservations | receiving | finance   |
 | -------- | --------- | --------- | -------------- | ------------------------ | ------------------------- | ------------ | --------- | --------- |
-| Free     | 0         | 1         | 10             | 2                        | 50                        | basic        | manual    | view      |
+| Free     | 0         | 1         | 3              | 1                        | 15                        | basic        | manual    | view      |
 | Bronze   | 1         | 3         | 100            | 10                       | 1,000                     | ✓            | photos    | record    |
 | Gold     | 3         | 10        | 500            | unlimited                | 10,000                    | ✓            | quality   | analytics |
 | Platinum | unlimited | unlimited | unlimited      | unlimited                | unlimited                 | ✓            | full      | advanced  |
+
+**Free plan:** Setup and testing only. Intentionally low limits (3 orders/day, 3 chats/day, 15 SKUs, 1 supplier) to demonstrate value and encourage upgrade. Gold is the default plan for serious usage.
 
 - **reservations:** Plan feature / reservation capabilities (from plan `features`).
 - **receiving:** Plan feature (e.g. `receiving_quality`: manual_only, photos_enabled, quality_scoring).
@@ -26,10 +28,12 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 
 | Plan     | warehouses | users     | supplier_products_skus | chats_per_day | storage_mb | fulfillment |
 | -------- | ---------- | --------- | ---------------------- | ------------- | ---------- | ----------- |
-| Free     | 0          | 1         | 50                     | 10            | 100        | basic       |
+| Free     | 0          | 1         | 15                     | 3             | 50         | basic       |
 | Bronze   | 1          | 3         | 1,000                  | 50            | 1,000      | manual      |
 | Gold     | 3          | 10        | 10,000                 | 200           | 5,000      | warehouse   |
 | Platinum | unlimited  | unlimited | unlimited              | unlimited     | 20,000     | full        |
+
+**Free plan:** Setup and testing only. Low limits (15 products, 3 chats/day, 50 MB storage, 0 warehouses) to encourage upgrade to Gold for real usage.
 
 - **fulfillment:** Plan feature (e.g. `fulfillment_tools`: basic_orders, manual_orders_invoices, warehouse_pick_pack, routing_full_suite). Can be gated by plan.
 
@@ -39,10 +43,14 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 - **Limits:** `requireWithinLimit(limitKey, usage)` and `checkLimit()` return **403** with error name **LIMIT_EXCEEDED** when usage exceeds the plan (or override) limit.
 - **Permissions:** Routes also enforce RBAC (e.g. ORDERS_CREATE, CHAT_SEND, INVENTORY_EDIT, RECEIVING_VIEW, RECEIVING_MANAGE, PAYMENTS_MANAGE, INVOICES_VIEW). See FEATURE_CATALOG.md.
 
+## Enterprise plan
+
+- **Enterprise** is a separate plan (`code = 'enterprise'`) for both RESTAURANT and SUPPLIER with unlimited or very high limits and full features. It has `requires_admin_assignment = true`: only an admin can assign it (no self-serve). See **docs/ENTERPRISE.md** for what enterprise gets, SLA options, custom contracts, and manual onboarding.
+
 ## Admin
 
-- **Plans tab:** Filter by tenant type (Restaurant / Supplier). Create plan requires **code** and **tenant_type**; only limits/features relevant to that type are shown when editing.
-- **Subscriptions:** When changing a tenant’s plan, the new plan’s `tenant_type` must match the subscription’s tenant (Restaurant vs Supplier).
+- **Plans tab:** Filter by tenant type (Restaurant / Supplier). Create plan requires **code** and **tenant_type**; only limits/features relevant to that type are shown when editing. Enterprise plan is visible and assignable when changing a tenant’s subscription.
+- **Subscriptions:** When changing a tenant’s plan, the new plan’s `tenant_type` must match the subscription’s tenant (Restaurant vs Supplier). Enterprise can only be assigned by admin.
 
 ## Entitlements endpoint
 

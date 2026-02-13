@@ -725,6 +725,154 @@ export async function decrementUsage(tenantId, tenantType, meterType, decrement 
 /** Default front-route for upgrade CTA (monetization UX) */
 const DEFAULT_UPGRADE_PATH = '/app/settings'
 
+/** Plan codes in tier order (free < bronze < gold < platinum) */
+const PLAN_ORDER = ['free', 'bronze', 'gold', 'platinum']
+
+/**
+ * Recommend a plan based on usage, limits, and optional blocked events.
+ * Logic: usage > 80% or over limit → recommend next tier; feature blocked → recommend lowest plan that unlocks it;
+ * multiple blocks → recommend highest common unlock. Gold is positioned as "default serious plan".
+ * @param {Object} opts
+ * @param {string} opts.tenantId - Tenant ID
+ * @param {string} opts.tenantType - 'RESTAURANT' | 'SUPPLIER'
+ * @param {Array<{type: string, key: string}>} [opts.blockedEvents] - Optional list of { type: 'FEATURE'|'LIMIT', key }
+ * @returns {Promise<{ recommendedPlanCode: string, reason: string, comparedToCurrent: { upgrades: string[], resolvesLimits: string[] } }>}
+ */
+export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }) {
+  const limitKeys =
+    tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
+  const entitlements = await getEntitlements(tenantId, tenantType)
+  if (!entitlements) {
+    return {
+      recommendedPlanCode: 'gold',
+      reason: 'Upgrade to Gold to unlock full platform capabilities.',
+      comparedToCurrent: { upgrades: ['Full limits and features'], resolvesLimits: [] },
+    }
+  }
+
+  const { plan, usage, limits, features } = entitlements
+  const currentCode = (plan?.code || 'free').toLowerCase()
+  const currentIndex = PLAN_ORDER.indexOf(currentCode)
+  if (currentIndex === -1) {
+    return {
+      recommendedPlanCode: 'gold',
+      reason: 'Gold is the recommended plan for serious usage.',
+      comparedToCurrent: { upgrades: [], resolvesLimits: [] },
+    }
+  }
+
+  const { rows: planRows } = await query(
+    `SELECT code, name, limits, features FROM subscription_plan WHERE tenant_type = $1 AND is_active = true ORDER BY display_order, name`,
+    [tenantType]
+  )
+
+  const resolvesLimits = []
+  const upgrades = []
+  let minRecommendedIndex = currentIndex
+
+  // Blocked events from API (e.g. after 403)
+  for (const ev of blockedEvents) {
+    if (ev.type === 'LIMIT' && limitKeys.includes(ev.key)) {
+      for (let i = currentIndex + 1; i < planRows.length; i++) {
+        const p = planRows[i]
+        const lim = p.limits?.[ev.key]
+        const cap = lim === -1 || lim === null ? 999999 : parseInt(lim)
+        if (cap > (limits[ev.key] || 0)) {
+          resolvesLimits.push(ev.key)
+          if (i > minRecommendedIndex) minRecommendedIndex = i
+          break
+        }
+      }
+    }
+    if (ev.type === 'FEATURE' && ev.key) {
+      for (let i = currentIndex + 1; i < planRows.length; i++) {
+        const p = planRows[i]
+        const v = p.features?.[ev.key]
+        const enabled = typeof v === 'boolean' ? v : v && v !== 'false' && v !== 'disabled'
+        if (enabled) {
+          upgrades.push(`${ev.key} (${p.name})`)
+          if (i > minRecommendedIndex) minRecommendedIndex = i
+          break
+        }
+      }
+    }
+  }
+
+  // Usage > 80% or over limit → recommend next tier that raises that limit
+  for (const key of limitKeys) {
+    const used = usage[key] ?? 0
+    const cap = limits[key]
+    if (cap == null || cap === -1) continue
+    const capNum = parseInt(cap)
+    if (capNum <= 0) continue
+    const pct = (used / capNum) * 100
+    if (used >= capNum || pct >= 80) {
+      for (let i = currentIndex + 1; i < planRows.length; i++) {
+        const p = planRows[i]
+        const nextCap = p.limits?.[key]
+        const nextVal = nextCap === -1 || nextCap === null ? 999999 : parseInt(nextCap)
+        if (nextVal > capNum) {
+          if (!resolvesLimits.includes(key)) resolvesLimits.push(key)
+          if (i > minRecommendedIndex) minRecommendedIndex = i
+          break
+        }
+      }
+    }
+  }
+
+  // Feature not enabled but commonly desired
+  const featureKeys = ['reports', 'smart_reorder', 'multi_branch']
+  for (const fk of featureKeys) {
+    if (features[fk]) continue
+    for (let i = currentIndex + 1; i < planRows.length; i++) {
+      const p = planRows[i]
+      const v = p.features?.[fk]
+      const enabled = typeof v === 'boolean' ? v : v && v !== 'false' && v !== 'disabled'
+      if (enabled && !upgrades.some((u) => u.startsWith(fk))) {
+        upgrades.push(`${fk} (${p.name})`)
+        if (i > minRecommendedIndex) minRecommendedIndex = i
+        break
+      }
+    }
+  }
+
+  // At least one step up from current; if Free with no pressure, recommend Gold
+  let recommendedIndex = minRecommendedIndex
+  if (currentCode === 'free' && minRecommendedIndex <= currentIndex) {
+    recommendedIndex = Math.min(PLAN_ORDER.indexOf('gold'), planRows.length - 1)
+    if (recommendedIndex < 0) recommendedIndex = 1
+    if (upgrades.length === 0) upgrades.push('Higher limits and key features (Gold)')
+  }
+  if (recommendedIndex <= currentIndex && (resolvesLimits.length || upgrades.length))
+    recommendedIndex = currentIndex + 1
+  if (recommendedIndex >= planRows.length) recommendedIndex = planRows.length - 1
+  if (recommendedIndex <= currentIndex) recommendedIndex = currentIndex + 1
+  if (recommendedIndex >= planRows.length) recommendedIndex = planRows.length - 1
+
+  const recommended = planRows[recommendedIndex]
+  const recommendedPlanCode = recommended?.code || 'gold'
+  let reason = 'Upgrade to get more capacity and features.'
+  if (resolvesLimits.length)
+    reason = `Your usage is at or near limits (${resolvesLimits.join(', ')}). Upgrading resolves these.`
+  else if (upgrades.length) reason = `Upgrade to unlock: ${upgrades.slice(0, 3).join('; ')}.`
+  else if (currentCode === 'free')
+    reason =
+      'Gold is the default plan for real daily usage—unlock more orders, branches, and reports.'
+
+  return {
+    recommendedPlanCode,
+    reason,
+    comparedToCurrent: {
+      upgrades: upgrades.length
+        ? upgrades
+        : recommendedIndex > currentIndex
+          ? ['Higher limits and features']
+          : [],
+      resolvesLimits,
+    },
+  }
+}
+
 /**
  * Get recommended plan names for a tenant type (for error payloads).
  * @param {string} tenantType - RESTAURANT | SUPPLIER
@@ -808,6 +956,12 @@ export function requireWithinLimit(meterType, getTenantId, getTenantType) {
       ])
 
       if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+        const { recordConversionEvent } = await import('./conversion-events.js')
+        recordConversionEvent(tenantId, tenantType, 'BLOCKED_LIMIT', {
+          limitKey: meterType,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+        }).catch(() => {})
         const recommendedPlans = await getRecommendedPlanNames(tenantType)
         return res.status(403).json({
           ok: false,
@@ -849,6 +1003,10 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
       ])
 
       if (!isEnabled) {
+        const { recordConversionEvent } = await import('./conversion-events.js')
+        recordConversionEvent(tenantId, tenantType, 'BLOCKED_FEATURE', { featureKey }).catch(
+          () => {}
+        )
         const recommendedPlans = await getRecommendedPlanNames(tenantType)
         return res.status(403).json({
           ok: false,

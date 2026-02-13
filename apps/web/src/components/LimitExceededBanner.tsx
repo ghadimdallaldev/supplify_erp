@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 import { Button } from './ui/button'
 import { useNavigate } from 'react-router-dom'
+import { getLimitUpgradeCopy } from '../lib/upgradeCopy'
 
 type LimitExceededBannerProps = {
   limitKey: string
@@ -35,14 +36,18 @@ export function LimitExceededBanner({
 }: LimitExceededBannerProps) {
   const navigate = useNavigate()
   const label = LIMIT_LABELS[limitKey] || limitKey.replace(/_/g, ' ')
+  const upgradeCopy = getLimitUpgradeCopy(limitKey)
+  const planToUnlock = upgradeCopy?.plan ?? recommendedPlans[0] ?? 'Gold'
+  const valueProp = upgradeCopy?.value
 
   return (
     <div
       className={`flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 ${className}`}
       role="alert"
+      title={valueProp ?? undefined}
     >
       <div className="flex items-center gap-3">
-        <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+        <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />
         <div>
           <p className="font-medium">Limit reached: {label}</p>
           <p className="text-sm text-amber-800">
@@ -54,6 +59,7 @@ export function LimitExceededBanner({
               Upgrade to {recommendedPlans.slice(0, 2).join(' or ')} for higher limits.
             </p>
           )}
+          {valueProp && <p className="text-xs text-amber-700 mt-1 max-w-md">{valueProp}</p>}
         </div>
       </div>
       <Button
@@ -61,6 +67,7 @@ export function LimitExceededBanner({
         variant="outline"
         className="border-amber-300 bg-white hover:bg-amber-100"
         onClick={() => navigate(upgradeUrl)}
+        title={valueProp ?? `Upgrade to ${planToUnlock} for higher ${label} limit`}
       >
         Upgrade
       </Button>

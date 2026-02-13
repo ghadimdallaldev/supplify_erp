@@ -6,7 +6,11 @@ import { ImpersonationBanner } from './ImpersonationBanner'
 import { UpgradeModal } from './UpgradeModal'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import { refreshBlockedCount } from '../features/monetization/monetizationSlice'
-import { useGetImpersonationStatusQuery, useGetEntitlementsQuery } from '../services/api'
+import {
+  useGetImpersonationStatusQuery,
+  useGetEntitlementsQuery,
+  useRecordConversionEventMutation,
+} from '../services/api'
 import { AlertTriangle } from 'lucide-react'
 
 export function Layout() {
@@ -24,6 +28,7 @@ export function Layout() {
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: user?.role === 'ADMIN' || !user,
   })
+  const [recordConversionEvent] = useRecordConversionEventMutation()
   const blockedCountLast7d = useAppSelector((state) => state.monetization.blockedCountLast7d)
 
   // When impersonating, if we're on an admin page, switch to tenant dashboard
@@ -63,7 +68,8 @@ export function Layout() {
             <div className="mx-6 mt-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>
-                Usage near limit: {nearLimitKeys.map(({ key }) => key.replace(/_/g, ' ')).join(', ')}.{' '}
+                Usage near limit:{' '}
+                {nearLimitKeys.map(({ key }) => key.replace(/_/g, ' ')).join(', ')}.{' '}
                 <button
                   type="button"
                   className="font-medium underline hover:no-underline"
@@ -77,12 +83,16 @@ export function Layout() {
           {blockedCountLast7d >= 3 && (
             <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
               <span>
-                You&apos;ve hit plan limits several times recently. Upgrade for higher limits and more features.
+                You&apos;ve hit plan limits several times recently. Upgrade for higher limits and
+                more features.
               </span>
               <button
                 type="button"
                 className="font-medium underline hover:no-underline"
-                onClick={() => navigate('/app/settings')}
+                onClick={() => {
+                  recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
+                  navigate('/app/settings')
+                }}
               >
                 View plans
               </button>

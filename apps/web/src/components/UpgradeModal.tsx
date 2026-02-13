@@ -1,15 +1,18 @@
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import { closeMonetizationModal } from '../features/monetization/monetizationSlice'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog'
+import { useGetRecommendationQuery, useRecordConversionEventMutation } from '../services/api'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useNavigate } from 'react-router-dom'
 import { Lock, TrendingUp } from 'lucide-react'
+import { useEffect } from 'react'
+
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Free',
+  bronze: 'Bronze',
+  gold: 'Gold',
+  platinum: 'Platinum',
+}
 
 const LIMIT_KEY_LABELS: Record<string, string> = {
   orders_per_day: 'Daily orders',
@@ -29,6 +32,21 @@ export function UpgradeModal() {
   const { open, type, payload } = useAppSelector((state) => state.monetization)
   const user = useAppSelector((state) => state.auth.user)
   const canUpgrade = true
+  const { data: recommendation } = useGetRecommendationQuery(
+    {
+      blocked:
+        type === 'limit' && payload && 'limitKey' in payload
+          ? `limit:${(payload as { limitKey: string }).limitKey}`
+          : type === 'feature' && payload && 'featureKey' in payload
+            ? `feature:${(payload as { featureKey: string }).featureKey}`
+            : undefined,
+    },
+    { skip: !open }
+  )
+  const [recordConversionEvent] = useRecordConversionEventMutation()
+  useEffect(() => {
+    if (open) recordConversionEvent({ eventType: 'OPEN_UPGRADE' }).catch(() => {})
+  }, [open, recordConversionEvent])
 
   const handleClose = () => dispatch(closeMonetizationModal())
   const handleUpgrade = () => {
@@ -65,22 +83,40 @@ export function UpgradeModal() {
             <p className="font-medium text-gray-700">Current plan: {currentPlan}</p>
             {type === 'limit' && 'limitKey' in payload && (
               <p className="mt-1 text-gray-600">
-                {LIMIT_KEY_LABELS[payload.limitKey] || payload.limitKey}: {payload.currentUsage} / {payload.limitValue}
+                {LIMIT_KEY_LABELS[payload.limitKey] || payload.limitKey}: {payload.currentUsage} /{' '}
+                {payload.limitValue}
               </p>
             )}
             {type === 'feature' && 'featureKey' in payload && (
               <p className="mt-1 text-gray-600">Feature: {payload.featureKey.replace(/_/g, ' ')}</p>
             )}
           </div>
-          {recommendedPlans.length > 0 && (
+          {(recommendation?.recommendedPlanCode || recommendedPlans.length > 0) && (
             <div>
-              <p className="text-sm font-medium text-gray-700">Upgrade to unlock:</p>
-              <p className="text-sm text-gray-600">{recommendedPlans.join(', ')}</p>
+              <p className="text-sm font-medium text-gray-700">
+                {recommendation?.recommendedPlanCode ? (
+                  <>
+                    Recommended:{' '}
+                    <span className="font-semibold">
+                      {PLAN_LABELS[recommendation.recommendedPlanCode] ??
+                        recommendation.recommendedPlanCode}
+                    </span>
+                  </>
+                ) : (
+                  'Upgrade to unlock:'
+                )}
+              </p>
+              {recommendation?.reason && (
+                <p className="text-sm text-gray-600 mt-1">{recommendation.reason}</p>
+              )}
+              {recommendedPlans.length > 0 && !recommendation?.recommendedPlanCode && (
+                <p className="text-sm text-gray-600">{recommendedPlans.join(', ')}</p>
+              )}
             </div>
           )}
           <div className="flex gap-2 pt-2">
             <Button onClick={handleUpgrade} className="flex-1">
-              {canUpgrade ? 'View plans & upgrade' : 'Contact admin'}
+              {canUpgrade ? 'Upgrade' : 'Contact admin'}
             </Button>
             <Button variant="outline" onClick={handleClose}>
               Dismiss

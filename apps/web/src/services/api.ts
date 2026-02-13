@@ -250,6 +250,24 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
+      async onQueryStarted({ id, data }, { dispatch, queryFulfilled }) {
+        if (data?.status == null) return
+        const patchResult = dispatch(
+          api.util.updateQueryData('getOrder', id, (draft) => {
+            Object.assign(draft, { status: data.status })
+          })
+        )
+        try {
+          const { data: updated } = await queryFulfilled
+          dispatch(
+            api.util.updateQueryData('getOrder', id, (draft) => {
+              Object.assign(draft, updated)
+            })
+          )
+        } catch {
+          patchResult.undo()
+        }
+      },
       invalidatesTags: (_result, _error, { id, data }) => {
         const tags: Array<{ type: 'Order'; id: string } | 'Order' | 'Receiving'> = [
           { type: 'Order', id },
@@ -502,6 +520,27 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      async onQueryStarted({ conversationId, content, ...rest }, { dispatch, queryFulfilled }) {
+        const tempId = `opt-${Date.now()}`
+        const optimisticMessage = {
+          id: tempId,
+          content,
+          ...rest,
+          created_at: new Date().toISOString(),
+          isOptimistic: true,
+        }
+        const patchResult = dispatch(
+          api.util.updateQueryData('getMessages', { conversationId }, (draft: any) => {
+            if (!draft?.messages) return
+            draft.messages = [...(draft.messages || []), optimisticMessage]
+          })
+        )
+        try {
+          await queryFulfilled
+        } catch {
+          patchResult.undo()
+        }
+      },
       invalidatesTags: ['Chat'],
     }),
     markConversationRead: builder.mutation<any, string>({
@@ -978,6 +1017,7 @@ export const api = createApi({
     getEntitlements: builder.query<{ entitlements: Entitlements }, void>({
       query: () => '/api/subscriptions/entitlements',
       providesTags: ['Subscription'],
+      keepUnusedDataFor: 5 * 60, // Cache 5 min per session to avoid repeated calls
     }),
     getSubscriptionUsage: builder.query<UsageMeter & { meterType: string }, string>({
       query: (meterType) => `/api/subscriptions/usage/${meterType}`,
@@ -987,10 +1027,46 @@ export const api = createApi({
       query: (featureKey) => `/api/subscriptions/features/${featureKey}`,
       providesTags: ['Subscription'],
     }),
+    getRecommendation: builder.query<import('../types').PlanRecommendation, { blocked?: string }>({
+      query: (params) => ({
+        url: '/api/subscriptions/recommendation',
+        params: params ?? {},
+      }),
+      providesTags: ['Subscription'],
+    }),
+    recordConversionEvent: builder.mutation<
+      { recorded: boolean },
+      { eventType: 'VIEW_PLANS' | 'OPEN_UPGRADE'; metadata?: Record<string, unknown> }
+    >({
+      query: (body) => ({
+        url: '/api/subscriptions/conversion-event',
+        method: 'POST',
+        body,
+      }),
+    }),
 
     // Admin Dashboard endpoints
     getAdminOverview: builder.query<any, void>({
       query: () => '/api/admin-dashboard/overview',
+      providesTags: ['Admin'],
+    }),
+    getAdminConversionStats: builder.query<
+      {
+        days: number
+        totalBlocks: number
+        totalUpgrades: number
+        blocksToUpgradesConversionPercent: number
+        mostBlockedFeature: string | null
+        mostBlockedLimit: string | null
+        blocksByFeature: Array<{ key: string; count: number }>
+        blocksByLimit: Array<{ key: string; count: number }>
+      },
+      { days?: number }
+    >({
+      query: (params) => ({
+        url: '/api/admin-dashboard/conversion-stats',
+        params: params ?? {},
+      }),
       providesTags: ['Admin'],
     }),
     getAdminPlans: builder.query<
@@ -1240,9 +1316,12 @@ export const {
   useSubmitStaffSelfSwapMutation,
   useGetCurrentSubscriptionQuery,
   useGetEntitlementsQuery,
+  useGetRecommendationQuery,
+  useRecordConversionEventMutation,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,
   useGetAdminOverviewQuery,
+  useGetAdminConversionStatsQuery,
   useGetAdminPlansQuery,
   useCreateAdminPlanMutation,
   useUpdateAdminPlanMutation,

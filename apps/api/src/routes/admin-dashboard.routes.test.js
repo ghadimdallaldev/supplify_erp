@@ -262,7 +262,14 @@ describe('Admin Dashboard Routes', () => {
         })
         .mockResolvedValueOnce({ rows: [{ code: 'gold' }] })
         .mockResolvedValueOnce({
-          rows: [{ id: planIdBronze, name: 'Bronze', tenant_type: 'RESTAURANT', limits: { orders_per_day: 10 } }],
+          rows: [
+            {
+              id: planIdBronze,
+              name: 'Bronze',
+              tenant_type: 'RESTAURANT',
+              limits: { orders_per_day: 10 },
+            },
+          ],
         })
 
       mockGetEntitlements.mockResolvedValueOnce({
@@ -290,7 +297,15 @@ describe('Admin Dashboard Routes', () => {
           rows: [{ id: planIdBronze, name: 'Bronze', tenant_type: 'RESTAURANT', limits: {} }],
         })
         .mockResolvedValueOnce({
-          rows: [{ id: 'sub-1', plan_id: planIdBronze, plan_name: 'Bronze', tenant_id: 't1', tenant_type: 'RESTAURANT' }],
+          rows: [
+            {
+              id: 'sub-1',
+              plan_id: planIdBronze,
+              plan_name: 'Bronze',
+              tenant_id: 't1',
+              tenant_type: 'RESTAURANT',
+            },
+          ],
         })
         .mockResolvedValue({ rows: [] })
 
@@ -302,6 +317,50 @@ describe('Admin Dashboard Routes', () => {
         .expect(200)
 
       expect(res.body.ok).toBe(true)
+    })
+  })
+
+  describe('GET /conversion-stats', () => {
+    it('returns conversion stats when conversion_event table exists', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [{ c: '25' }] })
+        .mockResolvedValueOnce({ rows: [{ c: '5' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            { key: 'reports', c: '10' },
+            { key: 'smart_reorder', c: '8' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            { key: 'orders_per_day', c: '12' },
+            { key: 'chats_per_day', c: '5' },
+          ],
+        })
+
+      const res = await request(app)
+        .get('/api/admin-dashboard/conversion-stats?days=30')
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.days).toBe(30)
+      expect(res.body.data.totalBlocks).toBe(25)
+      expect(res.body.data.totalUpgrades).toBe(5)
+      expect(res.body.data.blocksToUpgradesConversionPercent).toBe(20)
+      expect(res.body.data.mostBlockedFeature).toBe('reports')
+      expect(res.body.data.mostBlockedLimit).toBe('orders_per_day')
+    })
+
+    it('returns zero stats when table does not exist', async () => {
+      const err = new Error('relation "conversion_event" does not exist')
+      err.code = '42P01'
+      query.mockRejectedValueOnce(err)
+
+      const res = await request(app).get('/api/admin-dashboard/conversion-stats').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.totalBlocks).toBe(0)
+      expect(res.body.data.totalUpgrades).toBe(0)
     })
   })
 })

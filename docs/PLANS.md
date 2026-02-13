@@ -14,18 +14,18 @@ Supplify offers tiered subscription plans designed for **restaurants and supplie
 
 ### 🌟 Free Plan
 
-**Best for:** Small businesses getting started
+**Best for:** Setup and testing only — try the platform before upgrading
 
 **Pricing:** $0/month
 
-- 1 restaurant
-- Up to 2 supplier connections per restaurant
-- 50 products
-- 0 warehouses
+- 0 branches (single location only)
+- 1 supplier connection per restaurant
+- 15 products/SKUs in inventory
+- 0 warehouses (suppliers)
 - 1 user
-- 100 MB storage
-- 10 orders per day
-- 10 chats per day
+- 50 MB storage
+- 3 orders per day
+- 3 chats per day
 
 **Features:**
 
@@ -35,12 +35,12 @@ Supplify offers tiered subscription plans designed for **restaurants and supplie
 - No waste tracking
 - Manual receiving quality only
 - View-only finance invoices
-- Chat with 1 supplier only
+- Limited chat (3/day)
 - No reports
 - In-app notifications only
 - Community support
 
-**Use Case:** Solo restaurant exploring Supplify, testing core ordering workflows
+**Use Case:** Evaluate Supplify and place a few test orders. Upgrade to Gold for real daily usage.
 
 ---
 

@@ -14,7 +14,14 @@ describe('Subscription lib', () => {
       const { getTenantSubscription } = await import('./subscription.js')
       mockQuery
         .mockResolvedValueOnce({
-          rows: [{ id: 'sub-1', plan_id: 'plan-free', pending_plan_id: null, pending_effective_at: null }],
+          rows: [
+            {
+              id: 'sub-1',
+              plan_id: 'plan-free',
+              pending_plan_id: null,
+              pending_effective_at: null,
+            },
+          ],
         })
         .mockResolvedValueOnce({
           rows: [
@@ -104,6 +111,78 @@ describe('Subscription lib', () => {
     })
   })
 
+  describe('recommendPlan', () => {
+    it('returns gold when no entitlements (synthetic)', async () => {
+      const { recommendPlan } = await import('./subscription.js')
+      mockQuery.mockReset()
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValue({ rows: [] })
+
+      const result = await recommendPlan({ tenantId: 't1', tenantType: 'RESTAURANT' })
+
+      expect(result.recommendedPlanCode).toBe('gold')
+      expect(result.reason).toBeDefined()
+      expect(result.comparedToCurrent).toBeDefined()
+      expect(result.comparedToCurrent.upgrades).toBeDefined()
+      expect(result.comparedToCurrent.resolvesLimits).toBeDefined()
+    })
+
+    it('returns object with recommendedPlanCode, reason, comparedToCurrent', async () => {
+      const { recommendPlan } = await import('./subscription.js')
+      mockQuery.mockReset()
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [{ id: 's1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 's1',
+              plan_id: 'p1',
+              plan_name: 'Free',
+              plan_code: 'free',
+              limits: { orders_per_day: 3 },
+              features: { reports: false },
+              tenant_type: 'RESTAURANT',
+              plan_tenant_type: 'RESTAURANT',
+              plan_price_per_month: 0,
+              plan_price_per_year: null,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
+        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
+        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ current_value: 0 }] })
+        .mockResolvedValueOnce({
+          rows: [
+            { code: 'free', name: 'Free', limits: { orders_per_day: 3 }, features: {} },
+            { code: 'bronze', name: 'Bronze', limits: { orders_per_day: 100 }, features: {} },
+            { code: 'gold', name: 'Gold', limits: { orders_per_day: 500 }, features: {} },
+            { code: 'platinum', name: 'Platinum', limits: { orders_per_day: -1 }, features: {} },
+          ],
+        })
+
+      const result = await recommendPlan({ tenantId: 'rest-1', tenantType: 'RESTAURANT' })
+
+      expect(result).toHaveProperty('recommendedPlanCode')
+      expect(result).toHaveProperty('reason')
+      expect(result).toHaveProperty('comparedToCurrent')
+      expect(result.comparedToCurrent).toHaveProperty('upgrades')
+      expect(result.comparedToCurrent).toHaveProperty('resolvesLimits')
+    })
+  })
+
   describe('getEntitlements', () => {
     it('applies overrides to limits and excludes expired', async () => {
       const { getEntitlements } = await import('./subscription.js')
@@ -126,7 +205,11 @@ describe('Subscription lib', () => {
         })
         .mockResolvedValueOnce({
           rows: [
-            { limitKey: 'chats_per_day', value: 20, expiresAt: new Date(Date.now() + 86400000).toISOString() },
+            {
+              limitKey: 'chats_per_day',
+              value: 20,
+              expiresAt: new Date(Date.now() + 86400000).toISOString(),
+            },
           ],
         })
         .mockResolvedValueOnce({ rows: [{ c: 0 }] })

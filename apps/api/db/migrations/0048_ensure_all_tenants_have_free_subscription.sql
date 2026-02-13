@@ -7,7 +7,7 @@
 -- ========================================
 INSERT INTO subscription_plan (code, name, description, price_per_month, price_per_year, type, tenant_type, limits, features, trial_days, is_active, display_order)
 SELECT 'free', 'Free', 'Basic plan for small businesses', 0, 0, 'restaurant_and_supplier', 'RESTAURANT',
-  '{"branches": 0, "users": 1, "orders_per_day": 10, "suppliers_per_restaurant": 2, "restaurant_inventory_skus": 50, "chats_per_day": 10, "storage_mb": 100}'::jsonb,
+  '{"branches": 0, "users": 1, "orders_per_day": 3, "suppliers_per_restaurant": 1, "restaurant_inventory_skus": 15, "chats_per_day": 3, "storage_mb": 50}'::jsonb,
   '{"chat": true, "smart_reorder": false, "reports": false, "multi_branch": false}'::jsonb,
   0, true, 1
 WHERE NOT EXISTS (SELECT 1 FROM subscription_plan WHERE code = 'free' AND tenant_type = 'RESTAURANT');
@@ -17,7 +17,7 @@ WHERE NOT EXISTS (SELECT 1 FROM subscription_plan WHERE code = 'free' AND tenant
 -- ========================================
 INSERT INTO subscription_plan (code, name, description, price_per_month, price_per_year, type, tenant_type, limits, features, trial_days, is_active, display_order)
 SELECT 'free', 'Free', 'Basic plan for small businesses', 0, 0, 'restaurant_and_supplier', 'SUPPLIER',
-  '{"warehouses": 0, "users": 1, "supplier_products_skus": 50, "chats_per_day": 10, "storage_mb": 100}'::jsonb,
+  '{"warehouses": 0, "users": 1, "supplier_products_skus": 15, "chats_per_day": 3, "storage_mb": 50}'::jsonb,
   '{"chat": true, "smart_reorder": false, "reports": false}'::jsonb,
   0, true, 101
 WHERE NOT EXISTS (SELECT 1 FROM subscription_plan WHERE code = 'free' AND tenant_type = 'SUPPLIER');
