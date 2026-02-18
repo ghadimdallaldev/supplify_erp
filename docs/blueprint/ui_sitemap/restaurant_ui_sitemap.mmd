@@ -22,6 +22,7 @@ flowchart TB
   subgraph operations[" Inventory & Suppliers "]
     RestaurantInventory["/app/restaurant-inventory\nInventory"]
     Suppliers["/app/suppliers\nSuppliers"]
+    SupplierDetail["/app/suppliers/:id\nSupplier detail"]
     Receiving["/app/receiving\nReceiving"]
   end
 
@@ -48,6 +49,7 @@ flowchart TB
   App --> QuickLists
   App --> RestaurantInventory
   App --> Suppliers
+  App --> SupplierDetail
   App --> Receiving
   App --> Reservations
   App --> Staff
@@ -55,6 +57,7 @@ flowchart TB
   App --> Invoices
   App --> Settings
   Orders --> OrderDetail
+  Suppliers --> SupplierDetail
 
   classDef root fill:#fff3e0,stroke:#e65100,stroke-width:2px
   classDef app fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
