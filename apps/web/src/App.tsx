@@ -38,16 +38,20 @@ const router = createBrowserRouter(
       element: <LoginPage />,
     },
     {
-      path: '/reserve',
-      element: <PublicReservationPortal />,
-    },
-    {
       path: '/reserve/confirmation',
       element: <PublicReservationConfirmation />,
     },
     {
       path: '/reserve/manage/:token',
       element: <PublicReservationManage />,
+    },
+    {
+      path: '/reserve/:restaurantIdOrSlug',
+      element: <PublicReservationPortal />,
+    },
+    {
+      path: '/reserve',
+      element: <PublicReservationPortal />,
     },
     {
       path: '/staff',

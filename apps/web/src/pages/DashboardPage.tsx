@@ -296,7 +296,7 @@ export function DashboardPage() {
     : []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="dashboard-page">
       <div className="rounded-2xl p-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-sm">
         <h1 className="text-3xl font-bold">
           {isSupplier ? 'Supplier Dashboard' : isRestaurant ? 'Restaurant Dashboard' : 'Dashboard'}

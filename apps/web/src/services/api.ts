@@ -819,6 +819,12 @@ export const api = createApi({
         credentials: 'omit',
       }),
     }),
+    getPublicRestaurant: builder.query<PublicRestaurant, string>({
+      query: (idOrSlug) => ({
+        url: `/api/public/restaurants/${encodeURIComponent(idOrSlug)}`,
+        credentials: 'omit',
+      }),
+    }),
     getPublicReservationAvailability: builder.query<
       PublicAvailabilityResponse,
       { restaurantId: string; partySize: number; date: string }
@@ -1352,6 +1358,7 @@ export const {
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
   useGetPublicRestaurantsQuery,
+  useGetPublicRestaurantQuery,
   useGetPublicReservationAvailabilityQuery,
   useLazyGetPublicReservationAvailabilityQuery,
   useCreatePublicReservationMutation,

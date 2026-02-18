@@ -257,7 +257,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6" data-testid="admin-dashboard-page">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
         <p className="text-gray-600 mt-2">Manage subscriptions, plans, and tenant quotas</p>

@@ -1,5 +1,13 @@
 import { useState, useMemo } from 'react'
-import { useGetProductsQuery, useGetProductCategoriesQuery, useGetProductTagsQuery, useCreateProductMutation, useGeneratePresignedUrlMutation, useGetWarehousesQuery, useGetSuppliersQuery } from '../services/api'
+import {
+  useGetProductsQuery,
+  useGetProductCategoriesQuery,
+  useGetProductTagsQuery,
+  useCreateProductMutation,
+  useGeneratePresignedUrlMutation,
+  useGetWarehousesQuery,
+  useGetSuppliersQuery,
+} from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -58,61 +66,69 @@ export function ProductsPage() {
   const { user } = useAppSelector((state) => state.auth)
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
-  
+
   // Check if user is a supplier
   const isSupplier = user?.role === 'SUPPLIER'
-  
+
   // Fetch warehouses only for suppliers (warehouse selection in product creation)
   const { data: warehousesData } = useGetWarehousesQuery(undefined, {
-    skip: !isSupplier // Skip if not a supplier
+    skip: !isSupplier, // Skip if not a supplier
   })
-  
+
   // Fetch all suppliers for restaurants (for filter dropdown)
-  const { data: suppliersData } = useGetSuppliersQuery({ limit: 100 }, {
-    skip: isSupplier // Skip if supplier
-  })
-  
+  const { data: suppliersData } = useGetSuppliersQuery(
+    { limit: 100 },
+    {
+      skip: isSupplier, // Skip if supplier
+    }
+  )
+
   // Fetch categories and tags
   const { data: categoriesData } = useGetProductCategoriesQuery()
   const { data: tagsData } = useGetProductTagsQuery()
-  
+
   // Use API suppliers if available, otherwise fall back to unique suppliers from products
   const uniqueSuppliers = isSupplier
-    ? []  // Suppliers don't need supplier filter
-    : (suppliersData?.suppliers?.map(s => ({ name: s.name, email: s.contact_email })) || [])
-  
+    ? [] // Suppliers don't need supplier filter
+    : suppliersData?.suppliers?.map((s) => ({ name: s.name, email: s.contact_email })) || []
+
   // Build query params with all filters
-  const queryParams = useMemo(() => ({
-    q: search || undefined,
-    category: category || undefined,
-    categoryId: categoryId || undefined,
-    tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined,
-    minPrice: minPrice ? minPrice : undefined,
-    maxPrice: maxPrice ? maxPrice : undefined,
-    limit: 100, // Increase limit to show more products
-    offset: 0,
-  }), [search, category, categoryId, selectedTags, minPrice, maxPrice])
-  
+  const queryParams = useMemo(
+    () => ({
+      q: search || undefined,
+      category: category || undefined,
+      categoryId: categoryId || undefined,
+      tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined,
+      minPrice: minPrice ? minPrice : undefined,
+      maxPrice: maxPrice ? maxPrice : undefined,
+      limit: 100, // Increase limit to show more products
+      offset: 0,
+    }),
+    [search, category, categoryId, selectedTags, minPrice, maxPrice]
+  )
+
   const { data, isLoading, error } = useGetProductsQuery(queryParams)
-  
+
   // Filter products to show only supplier's products if user is a supplier
-  let filteredProducts = isSupplier 
-    ? data?.products.filter(p => p.supplier_email === user?.email)
+  let filteredProducts = isSupplier
+    ? data?.products.filter((p) => p.supplier_email === user?.email)
     : data?.products || []
-  
+
   // Apply supplier filter for restaurants (client-side filter for supplier name)
   if (!isSupplier && supplierFilter) {
-    filteredProducts = filteredProducts.filter(p => 
+    filteredProducts = filteredProducts.filter((p) =>
       p.supplier_name?.toLowerCase().includes(supplierFilter.toLowerCase())
     )
   }
 
   const handleAddToCart = (product: any) => {
-    dispatch(addItem({
-      productId: product.id,
-      product,
-      quantity: 1,
-    }))
+    dispatch(
+      addItem({
+        productId: product.id,
+        product,
+        quantity: 1,
+      })
+    )
     toast.success('Added to cart')
   }
 
@@ -133,7 +149,7 @@ export function ProductsPage() {
     }
 
     setProductImage(file)
-    
+
     // Create preview
     const reader = new FileReader()
     reader.onloadend = () => {
@@ -145,14 +161,14 @@ export function ProductsPage() {
   const handleSubmitProduct = async () => {
     try {
       let imageUrl = productForm.image_url
-      
+
       // Upload image if provided
       if (productImage) {
         try {
           // Get presigned URL
           const ext = productImage.name.split('.').pop()
           const fileName = `products/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`
-          
+
           const presignedResponse = await generatePresignedUrl({
             fileType: productImage.type,
             fileName,
@@ -220,7 +236,11 @@ export function ProductsPage() {
     if (!file) return
 
     // Validate file type
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
+    if (
+      !file.name.endsWith('.xlsx') &&
+      !file.name.endsWith('.xls') &&
+      !file.name.endsWith('.csv')
+    ) {
       toast.error('Please upload an Excel (.xlsx, .xls) or CSV file')
       return
     }
@@ -230,17 +250,17 @@ export function ProductsPage() {
     try {
       // Read file as text (for CSV) or use a library for Excel
       const text = await file.text()
-      
+
       // Parse CSV
-      const lines = text.split('\n').filter(line => line.trim())
+      const lines = text.split('\n').filter((line) => line.trim())
       if (lines.length < 2) {
         toast.error('File is empty or has no data rows')
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.trim())
-      const preview = lines.slice(1, 6).map(line => {
-        const values = line.split(',').map(v => v.trim())
+      const headers = lines[0].split(',').map((h) => h.trim())
+      const preview = lines.slice(1, 6).map((line) => {
+        const values = line.split(',').map((v) => v.trim())
         const row: any = {}
         headers.forEach((header, index) => {
           row[header] = values[index] || ''
@@ -261,24 +281,24 @@ export function ProductsPage() {
 
     try {
       const text = await uploadedFile.text()
-      const lines = text.split('\n').filter(line => line.trim())
-      
+      const lines = text.split('\n').filter((line) => line.trim())
+
       if (lines.length < 2) {
         toast.error('File is empty')
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-      
+      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase())
+
       // Map Excel columns to our product structure
       // Expected columns: Name, SKU, Description, Category, Unit, Price, InitialStock
-      const nameIndex = headers.findIndex(h => h.includes('name'))
-      const skuIndex = headers.findIndex(h => h.includes('sku'))
-      const descIndex = headers.findIndex(h => h.includes('description'))
-      const catIndex = headers.findIndex(h => h.includes('category'))
-      const unitIndex = headers.findIndex(h => h.includes('unit'))
-      const priceIndex = headers.findIndex(h => h.includes('price'))
-      const stockIndex = headers.findIndex(h => h.includes('stock') || h.includes('quantity'))
+      const nameIndex = headers.findIndex((h) => h.includes('name'))
+      const skuIndex = headers.findIndex((h) => h.includes('sku'))
+      const descIndex = headers.findIndex((h) => h.includes('description'))
+      const catIndex = headers.findIndex((h) => h.includes('category'))
+      const unitIndex = headers.findIndex((h) => h.includes('unit'))
+      const priceIndex = headers.findIndex((h) => h.includes('price'))
+      const stockIndex = headers.findIndex((h) => h.includes('stock') || h.includes('quantity'))
 
       if (nameIndex === -1 || skuIndex === -1) {
         toast.error('File must contain Name and SKU columns')
@@ -286,13 +306,13 @@ export function ProductsPage() {
       }
 
       // Create products in batches
-      const rows = lines.slice(1).filter(line => line.trim())
+      const rows = lines.slice(1).filter((line) => line.trim())
       let successCount = 0
       let errorCount = 0
 
       for (const row of rows) {
-        const values = row.split(',').map(v => v.trim())
-        
+        const values = row.split(',').map((v) => v.trim())
+
         try {
           await createProduct({
             name: values[nameIndex] || '',
@@ -329,19 +349,19 @@ Olive Oil,OO005,Extra virgin olive oil,Oils,bottle,12.99,40
 Whole Milk,WM006,Fresh whole milk,Dairy,liter,1.25,75
 Orange Juice,OJ007,Fresh squeezed orange juice,Beverages,liter,2.50,60
 French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
-    
+
     link.setAttribute('href', url)
     link.setAttribute('download', 'products-template.csv')
     link.style.visibility = 'hidden'
-    
+
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    
+
     toast.success('Example file downloaded!')
   }
 
@@ -362,12 +382,14 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="products-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Products</h1>
           <p className="text-gray-600 mt-2">
-            {isSupplier ? 'Manage your product catalog' : 'Browse and search products from suppliers'}
+            {isSupplier
+              ? 'Manage your product catalog'
+              : 'Browse and search products from suppliers'}
           </p>
         </div>
         <div className="flex space-x-2">
@@ -384,9 +406,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             </>
           ) : (
             <Button asChild>
-              <Link to="/app/cart">
-                View Cart
-              </Link>
+              <Link to="/app/cart">View Cart</Link>
             </Button>
           )}
         </div>
@@ -437,7 +457,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             ))}
           </select>
         </div>
-        
+
         {/* Tags Filter */}
         {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
           <div className="flex flex-col gap-2">
@@ -446,13 +466,11 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               {tagsData.tags.map((tag) => (
                 <Badge
                   key={tag}
-                  variant={selectedTags.includes(tag) ? "default" : "outline"}
+                  variant={selectedTags.includes(tag) ? 'default' : 'outline'}
                   className="cursor-pointer hover:bg-gray-100"
                   onClick={() => {
-                    setSelectedTags(prev => 
-                      prev.includes(tag) 
-                        ? prev.filter(t => t !== tag)
-                        : [...prev, tag]
+                    setSelectedTags((prev) =>
+                      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
                     )
                   }}
                 >
@@ -462,7 +480,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             </div>
           </div>
         )}
-        
+
         {/* Price Range Filter */}
         {!isSupplier && (
           <div className="flex gap-4 items-end">
@@ -506,44 +524,63 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             </div>
           </div>
         )}
-        
+
         {/* Filter Summary */}
-        {(supplierFilter || categoryId || category || selectedTags.length > 0 || minPrice || maxPrice) && !isSupplier && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-gray-600">Filtered by:</span>
-            {supplierFilter && (
-              <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => setSupplierFilter('')}>
-                Supplier: {supplierFilter} ×
-              </Badge>
-            )}
-            {(categoryId || category) && (
-              <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => {
-                setCategoryId('')
-                setCategory('')
-              }}>
-                Category: {categoriesData?.categories?.find(c => c.id === categoryId)?.name || category} ×
-              </Badge>
-            )}
-            {selectedTags.map((tag) => (
-              <Badge
-                key={tag}
-                variant="secondary"
-                className="cursor-pointer hover:bg-gray-300"
-                onClick={() => setSelectedTags(prev => prev.filter(t => t !== tag))}
-              >
-                Tag: {tag} ×
-              </Badge>
-            ))}
-            {(minPrice || maxPrice) && (
-              <Badge variant="secondary" className="cursor-pointer hover:bg-gray-300" onClick={() => {
-                setMinPrice('')
-                setMaxPrice('')
-              }}>
-                Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
-              </Badge>
-            )}
-          </div>
-        )}
+        {(supplierFilter ||
+          categoryId ||
+          category ||
+          selectedTags.length > 0 ||
+          minPrice ||
+          maxPrice) &&
+          !isSupplier && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-600">Filtered by:</span>
+              {supplierFilter && (
+                <Badge
+                  variant="secondary"
+                  className="cursor-pointer hover:bg-gray-300"
+                  onClick={() => setSupplierFilter('')}
+                >
+                  Supplier: {supplierFilter} ×
+                </Badge>
+              )}
+              {(categoryId || category) && (
+                <Badge
+                  variant="secondary"
+                  className="cursor-pointer hover:bg-gray-300"
+                  onClick={() => {
+                    setCategoryId('')
+                    setCategory('')
+                  }}
+                >
+                  Category:{' '}
+                  {categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category} ×
+                </Badge>
+              )}
+              {selectedTags.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="secondary"
+                  className="cursor-pointer hover:bg-gray-300"
+                  onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                >
+                  Tag: {tag} ×
+                </Badge>
+              ))}
+              {(minPrice || maxPrice) && (
+                <Badge
+                  variant="secondary"
+                  className="cursor-pointer hover:bg-gray-300"
+                  onClick={() => {
+                    setMinPrice('')
+                    setMaxPrice('')
+                  }}
+                >
+                  Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
+                </Badge>
+              )}
+            </div>
+          )}
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -560,7 +597,11 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
           </thead>
           <tbody className="divide-y divide-gray-200">
             {filteredProducts?.map((product) => (
-              <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+              <tr
+                key={product.id}
+                className="hover:bg-gray-50 transition-colors"
+                data-testid={`product-row-${product.id}`}
+              >
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -582,7 +623,9 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-col gap-1">
-                    <Badge variant="secondary">{product.category_name || product.category || 'N/A'}</Badge>
+                    <Badge variant="secondary">
+                      {product.category_name || product.category || 'N/A'}
+                    </Badge>
                     {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {product.tags.slice(0, 3).map((tag: string, idx: number) => (
@@ -608,18 +651,18 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                       <p className="font-semibold">
                         ${parseFloat(product.current_price).toFixed(2)}
                       </p>
-                      {product.unit && (
-                        <p className="text-xs text-gray-500">per {product.unit}</p>
-                      )}
+                      {product.unit && <p className="text-xs text-gray-500">per {product.unit}</p>}
                     </>
                   ) : (
                     <p className="text-sm text-gray-400">N/A</p>
                   )}
                 </td>
                 <td className="px-4 py-4">
-                  <p className={`text-sm font-medium ${
-                    parseFloat(product.available_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
+                  <p
+                    className={`text-sm font-medium ${
+                      parseFloat(product.available_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
+                    }`}
+                  >
                     {parseFloat(product.available_qty || 0).toFixed(2)} {product.unit || 'units'}
                   </p>
                 </td>
@@ -630,6 +673,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                         size="sm"
                         onClick={() => handleAddToCart(product)}
                         disabled={!product.available_qty || product.available_qty <= 0}
+                        data-testid={`product-add-to-cart-${product.id}`}
                       >
                         <Plus className="h-4 w-4 mr-1" />
                         Add to Cart
@@ -660,9 +704,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                       </>
                     )}
                     <Button variant="outline" size="sm" asChild>
-                      <Link to={`/app/products/${product.id}`}>
-                        View
-                      </Link>
+                      <Link to={`/app/products/${product.id}`}>View</Link>
                     </Button>
                   </div>
                 </td>
@@ -676,7 +718,9 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
         <div className="text-center py-12">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">
-            {isSupplier ? 'No products yet. Click "Add Product" to get started!' : 'No products found'}
+            {isSupplier
+              ? 'No products yet. Click "Add Product" to get started!'
+              : 'No products found'}
           </p>
         </div>
       )}
@@ -726,7 +770,9 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   id="category_id"
                   className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
                   value={productForm.category_id}
-                  onChange={(e) => setProductForm({ ...productForm, category_id: e.target.value, category: '' })}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, category_id: e.target.value, category: '' })
+                  }
                 >
                   <option value="">Select category</option>
                   {categoriesData?.categories?.map((cat) => (
@@ -801,7 +847,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 ))}
               </select>
             </div>
-            
+
             {/* Tags Input */}
             <div className="space-y-2">
               <Label htmlFor="tags">Tags (comma-separated)</Label>
@@ -815,7 +861,10 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                     if (e.key === 'Enter' && newTag.trim()) {
                       e.preventDefault()
                       if (!productForm.tags.includes(newTag.trim())) {
-                        setProductForm({ ...productForm, tags: [...productForm.tags, newTag.trim()] })
+                        setProductForm({
+                          ...productForm,
+                          tags: [...productForm.tags, newTag.trim()],
+                        })
                       }
                       setNewTag('')
                     }
@@ -842,7 +891,10 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                       variant="secondary"
                       className="cursor-pointer"
                       onClick={() => {
-                        setProductForm({ ...productForm, tags: productForm.tags.filter((_, i) => i !== index) })
+                        setProductForm({
+                          ...productForm,
+                          tags: productForm.tags.filter((_, i) => i !== index),
+                        })
                       }}
                     >
                       {tag} ×
@@ -872,7 +924,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 </div>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="productImage">Product Image</Label>
               <div className="flex items-center gap-4">
@@ -914,10 +966,11 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <br />
               <strong>Required columns:</strong> Name, SKU
               <br />
-              <strong>Optional columns:</strong> Description, Category, Unit, Price, Stock (or Quantity)
+              <strong>Optional columns:</strong> Description, Category, Unit, Price, Stock (or
+              Quantity)
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -939,9 +992,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 onChange={handleFileUpload}
                 className="cursor-pointer"
               />
-              <p className="text-sm text-gray-500">
-                Supported formats: CSV, Excel (.xlsx, .xls)
-              </p>
+              <p className="text-sm text-gray-500">Supported formats: CSV, Excel (.xlsx, .xls)</p>
             </div>
 
             {uploadedFile && (
@@ -997,15 +1048,18 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowBulkUpload(false)
-              setUploadedFile(null)
-              setUploadPreview([])
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBulkUpload(false)
+                setUploadedFile(null)
+                setUploadPreview([])
+              }}
+            >
               Cancel
             </Button>
-            <Button 
-              onClick={handleBulkSubmit} 
+            <Button
+              onClick={handleBulkSubmit}
               disabled={!uploadedFile || uploadPreview.length === 0 || isCreating}
             >
               {isCreating ? 'Uploading...' : 'Upload Products'}
@@ -1020,10 +1074,11 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
           <DialogHeader>
             <DialogTitle>Adjust Stock</DialogTitle>
             <DialogDescription>
-              {adjustmentType === 'ADD' ? 'Add' : 'Remove'} stock for {selectedProductForAdjustment?.name}
+              {adjustmentType === 'ADD' ? 'Add' : 'Remove'} stock for{' '}
+              {selectedProductForAdjustment?.name}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label>Adjustment Type</Label>
@@ -1095,11 +1150,17 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <div className="bg-gray-50 p-4 rounded-md">
                 <p className="text-sm font-medium text-gray-700">Current Stock</p>
                 <p className="text-lg font-semibold text-green-600">
-                  {parseFloat(selectedProductForAdjustment.available_qty || 0).toFixed(2)} {selectedProductForAdjustment.unit || 'units'}
+                  {parseFloat(selectedProductForAdjustment.available_qty || 0).toFixed(2)}{' '}
+                  {selectedProductForAdjustment.unit || 'units'}
                 </p>
                 {adjustmentQuantity && (
                   <p className="text-sm text-gray-600 mt-2">
-                    New Stock: {(parseFloat(selectedProductForAdjustment.available_qty || 0) + (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity)).toFixed(2)} {selectedProductForAdjustment.unit || 'units'}
+                    New Stock:{' '}
+                    {(
+                      parseFloat(selectedProductForAdjustment.available_qty || 0) +
+                      (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity)
+                    ).toFixed(2)}{' '}
+                    {selectedProductForAdjustment.unit || 'units'}
                   </p>
                 )}
               </div>
@@ -1107,18 +1168,23 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowInventoryAdjustment(false)
-              setSelectedProductForAdjustment(null)
-              setAdjustmentQuantity('')
-              setAdjustmentReason('')
-              setAdjustmentNotes('')
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowInventoryAdjustment(false)
+                setSelectedProductForAdjustment(null)
+                setAdjustmentQuantity('')
+                setAdjustmentReason('')
+                setAdjustmentNotes('')
+              }}
+            >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => {
-                toast.success(`Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`)
+                toast.success(
+                  `Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`
+                )
                 setShowInventoryAdjustment(false)
                 setSelectedProductForAdjustment(null)
                 setAdjustmentQuantity('')

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -8,7 +8,7 @@ import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
 import { toast } from 'react-hot-toast'
 import {
-  useGetPublicRestaurantsQuery,
+  useGetPublicRestaurantQuery,
   useLazyGetPublicReservationAvailabilityQuery,
   useCreatePublicReservationMutation,
 } from '../services/api'
@@ -18,17 +18,20 @@ function formatTime(isoString: string) {
 }
 
 export function PublicReservationPortal() {
-  const [searchParams] = useSearchParams()
+  const { restaurantIdOrSlug } = useParams<{ restaurantIdOrSlug?: string }>()
   const navigate = useNavigate()
-  const defaultRestaurant = searchParams.get('restaurantId') ?? ''
 
-  const { data: restaurants = [], isLoading: loadingRestaurants } = useGetPublicRestaurantsQuery()
+  const {
+    data: restaurant,
+    isLoading: loadingRestaurant,
+    isError: restaurantNotFound,
+  } = useGetPublicRestaurantQuery(restaurantIdOrSlug ?? '', { skip: !restaurantIdOrSlug })
   const [fetchAvailability, { data: availabilityData, isFetching: loadingAvailability }] =
     useLazyGetPublicReservationAvailabilityQuery()
-  const [createReservation, { isLoading: creatingReservation }] = useCreatePublicReservationMutation()
+  const [createReservation, { isLoading: creatingReservation }] =
+    useCreatePublicReservationMutation()
 
   const [form, setForm] = useState({
-    restaurantId: defaultRestaurant,
     partySize: 2,
     date: new Date().toISOString().slice(0, 10),
     selectedSlot: '',
@@ -41,14 +44,11 @@ export function PublicReservationPortal() {
   const slots = availabilityData?.slots ?? []
   const selectedSlotDetails = useMemo(
     () => slots.find((slot) => slot.startTime === form.selectedSlot),
-    [slots, form.selectedSlot],
+    [slots, form.selectedSlot]
   )
 
   const handleCheckAvailability = async () => {
-    if (!form.restaurantId) {
-      toast.error('Please select a restaurant')
-      return
-    }
+    if (!restaurant?.id) return
     if (!form.date) {
       toast.error('Please choose a date')
       return
@@ -56,26 +56,28 @@ export function PublicReservationPortal() {
 
     try {
       await fetchAvailability({
-        restaurantId: form.restaurantId,
+        restaurantId: restaurant.id,
         partySize: form.partySize,
         date: form.date,
       }).unwrap()
       toast.success('Availability refreshed')
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.data?.error?.message || 'Unable to check availability')
+      toast.error(
+        error?.data?.message || error?.data?.error?.message || 'Unable to check availability'
+      )
     }
   }
 
   const handleCreateReservation = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!form.restaurantId || !form.selectedSlot) {
+    if (!restaurant?.id || !form.selectedSlot) {
       toast.error('Please select a time slot')
       return
     }
 
     try {
       const response = await createReservation({
-        restaurantId: form.restaurantId,
+        restaurantId: restaurant.id,
         partySize: form.partySize,
         scheduledAt: form.selectedSlot,
         customerName: form.customerName,
@@ -88,39 +90,67 @@ export function PublicReservationPortal() {
       const reservation = response.reservation
       navigate(`/reserve/confirmation?token=${reservation.manageToken}`)
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.data?.error?.message || 'Unable to create reservation')
+      toast.error(
+        error?.data?.message || error?.data?.error?.message || 'Unable to create reservation'
+      )
     }
   }
 
-  const restaurantName =
-    restaurants.find((restaurant) => restaurant.id === form.restaurantId)?.name ?? 'your selected restaurant'
+  // No restaurant in URL – show “use your restaurant’s link” message
+  if (!restaurantIdOrSlug) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Reserve a table</CardTitle>
+            <CardDescription>
+              Use the reservation link provided by your restaurant. Each restaurant has its own
+              unique link.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
+  // Loading restaurant
+  if (loadingRestaurant) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
+        <Card className="max-w-md">
+          <CardContent className="py-8 text-center text-muted-foreground">Loading…</CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Restaurant not found
+  if (restaurantNotFound || !restaurant) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Restaurant not found</CardTitle>
+            <CardDescription>
+              This reservation link is invalid or the restaurant may have been removed.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
+  const restaurantName = restaurant.name
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 lg:flex-row">
         <Card className="w-full lg:w-2/5">
           <CardHeader>
-            <CardTitle>Book a table</CardTitle>
+            <CardTitle>Book a table at {restaurantName}</CardTitle>
             <CardDescription>Reserve a table in under a minute. No login required.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label>Restaurant</Label>
-              <select
-                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none"
-                value={form.restaurantId}
-                onChange={(event) => setForm((prev) => ({ ...prev, restaurantId: event.target.value, selectedSlot: '' }))}
-                disabled={loadingRestaurants}
-              >
-                <option value="">Select restaurant</option>
-                {restaurants.map((restaurant) => (
-                  <option key={restaurant.id} value={restaurant.id}>
-                    {restaurant.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Party size</Label>
@@ -130,7 +160,10 @@ export function PublicReservationPortal() {
                   max={50}
                   value={form.partySize}
                   onChange={(event) =>
-                    setForm((prev) => ({ ...prev, partySize: Number(event.target.value) || prev.partySize }))
+                    setForm((prev) => ({
+                      ...prev,
+                      partySize: Number(event.target.value) || prev.partySize,
+                    }))
                   }
                 />
               </div>
@@ -139,12 +172,18 @@ export function PublicReservationPortal() {
                 <Input
                   type="date"
                   value={form.date}
-                  onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value, selectedSlot: '' }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, date: event.target.value, selectedSlot: '' }))
+                  }
                 />
               </div>
             </div>
 
-            <Button variant="default" onClick={handleCheckAvailability} disabled={loadingAvailability || !form.restaurantId}>
+            <Button
+              variant="default"
+              onClick={handleCheckAvailability}
+              disabled={loadingAvailability}
+            >
               {loadingAvailability ? 'Checking…' : 'Check availability'}
             </Button>
 
@@ -152,7 +191,7 @@ export function PublicReservationPortal() {
               <Label>Available times</Label>
               {slots.length === 0 ? (
                 <p className="text-xs text-gray-500">
-                  Select a restaurant and date, then click “Check availability” to view open time slots.
+                  Choose a date, then click “Check availability” to view open time slots.
                 </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
@@ -172,7 +211,9 @@ export function PublicReservationPortal() {
                     >
                       <span className="font-medium">{formatTime(slot.startTime)}</span>
                       <span>Up to {slot.capacityAvailable} seats</span>
-                      {!slot.isAvailable ? <span className="text-[10px] uppercase text-red-500">Waitlist</span> : null}
+                      {!slot.isAvailable ? (
+                        <span className="text-[10px] uppercase text-red-500">Waitlist</span>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -195,7 +236,9 @@ export function PublicReservationPortal() {
                   <Label>Name</Label>
                   <Input
                     value={form.customerName}
-                    onChange={(event) => setForm((prev) => ({ ...prev, customerName: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, customerName: event.target.value }))
+                    }
                     required
                   />
                 </div>
@@ -204,7 +247,9 @@ export function PublicReservationPortal() {
                   <Input
                     type="email"
                     value={form.customerEmail}
-                    onChange={(event) => setForm((prev) => ({ ...prev, customerEmail: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, customerEmail: event.target.value }))
+                    }
                     placeholder="Optional"
                   />
                 </div>
@@ -212,7 +257,9 @@ export function PublicReservationPortal() {
                   <Label>Phone</Label>
                   <Input
                     value={form.customerPhone}
-                    onChange={(event) => setForm((prev) => ({ ...prev, customerPhone: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, customerPhone: event.target.value }))
+                    }
                     placeholder="Optional"
                   />
                 </div>
@@ -243,15 +290,15 @@ export function PublicReservationPortal() {
 
               <Button
                 type="submit"
-                disabled={creatingReservation || !form.selectedSlot || !form.restaurantId}
+                disabled={creatingReservation || !form.selectedSlot}
                 className="w-full"
               >
                 {creatingReservation ? 'Reserving…' : 'Confirm reservation'}
               </Button>
 
               <p className="text-xs text-gray-500">
-                By completing this booking you agree to receive reservation updates for this visit. To modify or
-                cancel, use the confirmation link sent after booking.
+                By completing this booking you agree to receive reservation updates for this visit.
+                To modify or cancel, use the confirmation link sent after booking.
               </p>
             </form>
           </CardContent>
@@ -262,4 +309,3 @@ export function PublicReservationPortal() {
 }
 
 export default PublicReservationPortal
-

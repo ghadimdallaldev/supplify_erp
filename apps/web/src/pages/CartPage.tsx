@@ -6,10 +6,24 @@ import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
 import { ShoppingCart, Trash2, Plus, Minus, Save, Calendar, FileText } from 'lucide-react'
 import { useAppDispatch } from '../hooks/redux'
-import { updateQuantity, removeItem, clearCart, saveDraft, loadDraft, deleteDraft } from '../features/cart/cartSlice'
+import {
+  updateQuantity,
+  removeItem,
+  clearCart,
+  saveDraft,
+  loadDraft,
+  deleteDraft,
+} from '../features/cart/cartSlice'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
 
@@ -18,12 +32,12 @@ export function CartPage() {
   const dispatch = useAppDispatch()
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [createOrder] = useCreateOrderMutation()
-  
+
   // Draft management
   const [showSaveDraft, setShowSaveDraft] = useState(false)
   const [showLoadDraft, setShowLoadDraft] = useState(false)
   const [draftName, setDraftName] = useState('')
-  
+
   // Order details
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState('')
@@ -73,20 +87,20 @@ export function CartPage() {
   const handleConfirmOrder = async () => {
     setIsPlacingOrder(true)
     try {
-      const items = groups.flatMap(group => 
-        group.items.map(item => ({
+      const items = groups.flatMap((group) =>
+        group.items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
           notes: item.notes,
         }))
       )
 
-      await createOrder({ 
+      await createOrder({
         items,
         deliveryDate: deliveryDate || undefined,
         notes: deliveryNotes || undefined,
       }).unwrap()
-      
+
       dispatch(clearCart())
       setShowOrderDetails(false)
       setDeliveryDate('')
@@ -96,7 +110,7 @@ export function CartPage() {
       // Show the actual error message from the API
       const errorMessage = error?.data?.error?.message || error?.message || 'Failed to place order'
       const errorName = error?.data?.error?.name
-      
+
       // For limit exceeded errors, show a more helpful message with upgrade suggestion
       if (errorName === 'LIMIT_EXCEEDED') {
         toast.error(errorMessage, {
@@ -105,22 +119,25 @@ export function CartPage() {
         })
         // Show additional toast with upgrade link
         setTimeout(() => {
-          toast((t) => (
-            <div className="flex items-center gap-3">
-              <span>💡 Want more orders? Upgrade your subscription!</span>
-              <button
-                onClick={() => {
-                  toast.dismiss(t.id)
-                  window.location.href = '/app/settings'
-                }}
-                className="px-3 py-1 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
-              >
-                View Plans
-              </button>
-            </div>
-          ), {
-            duration: 8000,
-          })
+          toast(
+            (t) => (
+              <div className="flex items-center gap-3">
+                <span>💡 Want more orders? Upgrade your subscription!</span>
+                <button
+                  onClick={() => {
+                    toast.dismiss(t.id)
+                    window.location.href = '/app/settings'
+                  }}
+                  className="px-3 py-1 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
+                >
+                  View Plans
+                </button>
+              </div>
+            ),
+            {
+              duration: 8000,
+            }
+          )
         }, 500)
       } else {
         toast.error(errorMessage)
@@ -137,7 +154,7 @@ export function CartPage() {
           <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
           <p className="text-gray-600 mt-2">Your cart is empty</p>
         </div>
-        
+
         <div className="text-center py-12">
           <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">No items in your cart</p>
@@ -150,20 +167,15 @@ export function CartPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="cart-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
-          <p className="text-gray-600 mt-2">
-            Review your order before placing it
-          </p>
+          <p className="text-gray-600 mt-2">Review your order before placing it</p>
         </div>
         <div className="flex space-x-2">
           {drafts.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => setShowLoadDraft(true)}
-            >
+            <Button variant="outline" onClick={() => setShowLoadDraft(true)}>
               Load Draft
             </Button>
           )}
@@ -175,10 +187,7 @@ export function CartPage() {
             <Save className="h-4 w-4 mr-2" />
             Save Draft
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => dispatch(clearCart())}
-          >
+          <Button variant="outline" onClick={() => dispatch(clearCart())}>
             Clear Cart
           </Button>
         </div>
@@ -191,9 +200,7 @@ export function CartPage() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>{group.supplierName}</span>
-                  <Badge variant="secondary">
-                    ${group.subtotal.toFixed(2)}
-                  </Badge>
+                  <Badge variant="secondary">${group.subtotal.toFixed(2)}</Badge>
                 </CardTitle>
                 <CardDescription>
                   {group.items.length} item{group.items.length !== 1 ? 's' : ''}
@@ -201,7 +208,11 @@ export function CartPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {group.items.map((item) => (
-                  <div key={item.productId} className="flex items-center space-x-4 p-4 border rounded-lg">
+                  <div
+                    key={item.productId}
+                    className="flex items-center space-x-4 p-4 border rounded-lg"
+                    data-testid={`cart-item-row-${item.productId}`}
+                  >
                     <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
                       {item.product.image_url ? (
                         <img
@@ -213,15 +224,19 @@ export function CartPage() {
                         <ShoppingCart className="h-6 w-6 text-gray-400" />
                       )}
                     </div>
-                    
+
                     <div className="flex-1">
                       <h4 className="font-medium">{item.product.name}</h4>
                       <p className="text-sm text-gray-600">SKU: {item.product.sku}</p>
                       <p className="text-sm text-gray-600">
-                        ${typeof item.product.current_price === 'number' ? item.product.current_price.toFixed(2) : item.product.current_price || 'N/A'} per {item.product.unit || 'unit'}
+                        $
+                        {typeof item.product.current_price === 'number'
+                          ? item.product.current_price.toFixed(2)
+                          : item.product.current_price || 'N/A'}{' '}
+                        per {item.product.unit || 'unit'}
                       </p>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"
@@ -240,17 +255,23 @@ export function CartPage() {
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
-                    
+
                     <div className="text-right">
                       <p className="font-medium">
-                        ${(typeof item.product.current_price === 'number' ? item.product.current_price : parseFloat(String(item.product.current_price ?? '')) || 0) * item.quantity}
+                        $
+                        {(typeof item.product.current_price === 'number'
+                          ? item.product.current_price
+                          : parseFloat(String(item.product.current_price ?? '')) || 0) *
+                          item.quantity}
                       </p>
                     </div>
-                    
+
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => { if (item.productId) handleRemoveItem(item.productId) }}
+                      onClick={() => {
+                        if (item.productId) handleRemoveItem(item.productId)
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -289,6 +310,7 @@ export function CartPage() {
             disabled={isPlacingOrder}
             className="w-full"
             size="lg"
+            data-testid="cart-place-order"
           >
             {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
           </Button>
@@ -300,9 +322,7 @@ export function CartPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save Cart as Draft</DialogTitle>
-            <DialogDescription>
-              Save your current cart to load it later
-            </DialogDescription>
+            <DialogDescription>Save your current cart to load it later</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -329,16 +349,17 @@ export function CartPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Load Draft</DialogTitle>
-            <DialogDescription>
-              Select a saved draft to load into your cart
-            </DialogDescription>
+            <DialogDescription>Select a saved draft to load into your cart</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {drafts.length === 0 ? (
               <p className="text-sm text-gray-600">No saved drafts</p>
             ) : (
               drafts.map((draft) => (
-                <div key={draft.id} className="flex items-center justify-between border rounded-lg p-4">
+                <div
+                  key={draft.id}
+                  className="flex items-center justify-between border rounded-lg p-4"
+                >
                   <div>
                     <p className="font-medium">{draft.name}</p>
                     <p className="text-sm text-gray-600">
@@ -370,9 +391,7 @@ export function CartPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
-            <DialogDescription>
-              Add delivery information and notes
-            </DialogDescription>
+            <DialogDescription>Add delivery information and notes</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">

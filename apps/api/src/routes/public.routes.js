@@ -62,6 +62,15 @@ const staffSelfSwapSchema = z.object({
   reason: z.string().optional(),
 })
 
+const publicWaitlistSchema = z.object({
+  restaurantId: z.string().uuid(),
+  partySize: z.number().min(1).max(50),
+  desiredAt: z.string().optional(),
+  customerName: z.string().min(1),
+  customerPhone: z.string().optional(),
+  notes: z.string().optional(),
+})
+
 async function fetchActiveTables(restaurantId) {
   const { rows } = await query(
     `
@@ -220,11 +229,54 @@ function mapTimeEntryRow(row) {
   }
 }
 
+function isUuid(str) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return typeof str === 'string' && uuidRegex.test(str)
+}
+
+router.get('/restaurants/:idOrSlug', async (req, res) => {
+  try {
+    const { idOrSlug } = req.params
+    const byId = isUuid(idOrSlug)
+
+    const { rows } = await query(
+      byId
+        ? `SELECT id, slug, name, contact_email, phone, created_at FROM restaurant WHERE id = $1`
+        : `SELECT id, slug, name, contact_email, phone, created_at FROM restaurant WHERE slug = $1`,
+      [idOrSlug]
+    )
+
+    if (!rows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'RESTAURANT_NOT_FOUND', message: 'Restaurant not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    res.json({
+      ok: true,
+      data: rows[0],
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Public restaurant fetch failed', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'PUBLIC_RESTAURANT_ERROR', message: 'Unable to load restaurant' },
+      requestId: req.requestId,
+    })
+  }
+})
+
 router.get('/restaurants', async (req, res) => {
   try {
     const { rows } = await query(
       `
-        SELECT id, name, contact_email, created_at
+        SELECT id, slug, name, contact_email, created_at
         FROM restaurant
         ORDER BY name ASC
       `
@@ -377,6 +429,79 @@ router.post('/reservations', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'PUBLIC_RESERVATION_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/reservations/waitlist', async (req, res) => {
+  try {
+    const payload = publicWaitlistSchema.parse(req.body)
+
+    const preferredTime = payload.desiredAt ? new Date(payload.desiredAt) : null
+    if (payload.desiredAt && preferredTime && Number.isNaN(preferredTime.getTime())) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_DATE', message: 'Invalid preferred time' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows } = await query(
+      `
+        INSERT INTO reservation_waitlist (
+          restaurant_id,
+          customer_name,
+          customer_phone,
+          party_size,
+          preferred_time,
+          notes,
+          status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, 'WAITING')
+        RETURNING id, restaurant_id, customer_name, party_size, status
+      `,
+      [
+        payload.restaurantId,
+        payload.customerName,
+        payload.customerPhone ?? null,
+        payload.partySize,
+        preferredTime ? preferredTime.toISOString() : null,
+        payload.notes ?? null,
+      ]
+    )
+
+    const waitlist = rows[0]
+
+    try {
+      await notifyReservationWaitlist({
+        id: waitlist.id,
+        restaurant_id: waitlist.restaurant_id,
+        customer_name: waitlist.customer_name,
+        party_size: waitlist.party_size,
+        scheduled_at: null,
+        status: waitlist.status,
+      })
+    } catch (notificationError) {
+      logger.warn('Public waitlist notification failed', { error: notificationError.message })
+    }
+
+    res.status(201).json({
+      ok: true,
+      data: {
+        message:
+          "You've been added to the waitlist. We'll contact you when a table becomes available.",
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Public waitlist creation failed', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'PUBLIC_WAITLIST_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }

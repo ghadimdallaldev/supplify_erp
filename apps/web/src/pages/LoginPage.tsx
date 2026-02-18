@@ -105,7 +105,10 @@ export function LoginPage() {
       </div>
 
       {/* Right side - Login Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-gray-50 via-white to-gray-50">
+      <div
+        className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-gray-50 via-white to-gray-50"
+        data-testid="login-page"
+      >
         <div className="w-full max-w-md space-y-8">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
@@ -138,6 +141,7 @@ export function LoginPage() {
               )}
 
               <Button
+                data-testid="login-button"
                 onClick={handleLogin}
                 disabled={isLoading}
                 className="w-full h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all"

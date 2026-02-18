@@ -106,7 +106,7 @@ export function Header() {
   }
 
   return (
-    <header className="bg-white shadow-sm border-b">
+    <header className="bg-white shadow-sm border-b" data-testid="header">
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
@@ -220,6 +220,7 @@ export function Header() {
             </div>
 
             <Button
+              data-testid="logout-button"
               variant="outline"
               size="sm"
               onClick={handleLogout}

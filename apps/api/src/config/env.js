@@ -39,4 +39,6 @@ export const config = {
   S3_ACCESS_KEY: process.env.S3_ACCESS_KEY || 'minioadmin',
   S3_SECRET_KEY: process.env.S3_SECRET_KEY || 'minioadmin',
   REDIS_URL: process.env.REDIS_URL || '',
+  /** Test-only: secret for E2E reset-seed endpoint. When set, POST /api/e2e/reset-seed is enabled. */
+  E2E_SECRET: process.env.E2E_SECRET || '',
 }

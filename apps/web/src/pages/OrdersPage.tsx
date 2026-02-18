@@ -336,7 +336,7 @@ export function OrdersPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" data-testid="orders-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Orders Inbox</h1>
@@ -355,7 +355,7 @@ export function OrdersPage() {
           )}
           {!isSupplier && (
             <Button asChild>
-              <Link to="/app/cart">
+              <Link to="/app/cart" data-testid="orders-create-new-order">
                 <Plus className="h-4 w-4 mr-2" />
                 Create New Order
               </Link>
@@ -417,7 +417,11 @@ export function OrdersPage() {
         <TabsContent value={activeTab} className="space-y-4">
           <div className="space-y-4">
             {filteredOrders?.map((order: any) => (
-              <Card key={order.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={order.id}
+                className="hover:shadow-md transition-shadow"
+                data-testid={`order-row-${order.id}`}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -497,6 +501,7 @@ export function OrdersPage() {
                           <Button
                             size="sm"
                             onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
+                            data-testid={`order-${order.id}-acknowledge`}
                           >
                             Acknowledge
                           </Button>
@@ -504,6 +509,7 @@ export function OrdersPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
+                            data-testid={`order-${order.id}-decline`}
                           >
                             Decline
                           </Button>
@@ -513,12 +519,17 @@ export function OrdersPage() {
                         <Button
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
+                          data-testid={`order-${order.id}-start-processing`}
                         >
                           Start Processing
                         </Button>
                       )}
                       {isSupplier && order.status === 'PROCESSING' && (
-                        <Button size="sm" onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}>
+                        <Button
+                          size="sm"
+                          onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
+                          data-testid={`order-${order.id}-ship`}
+                        >
                           Mark as Shipped
                         </Button>
                       )}
@@ -527,6 +538,7 @@ export function OrdersPage() {
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
                           disabled={false}
+                          data-testid={`order-${order.id}-deliver`}
                         >
                           Mark Delivered
                         </Button>

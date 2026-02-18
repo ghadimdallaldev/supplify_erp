@@ -97,7 +97,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="w-64 bg-white shadow-sm border-r">
+    <div className="w-64 bg-white shadow-sm border-r" data-testid="sidebar">
       <div className="p-6">
         <h1 className="text-2xl font-bold text-primary">Supplify</h1>
         <p className="text-sm text-gray-600 mt-1">Marketplace</p>
@@ -110,6 +110,7 @@ export function Sidebar() {
             return (
               <li key={item.name}>
                 <Link
+                  data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
                   to={item.href}
                   className={cn(
                     'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
@@ -133,6 +134,7 @@ export function Sidebar() {
             impersonatingSupplier) && (
             <li>
               <Link
+                data-testid="nav-settings"
                 to="/app/settings"
                 className={cn(
                   'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
