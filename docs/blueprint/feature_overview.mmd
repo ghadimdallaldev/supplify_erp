@@ -93,10 +93,10 @@ flowchart TB
   subgraph Other[" Files, Notifications, Analytics "]
     FileUpload[File upload\nstorage_mb]
     Notifications[Notifications]
-    Dashboard[Dashboard\nrole-aware, KPIs]
+    Dashboard[Dashboard\nrole-aware, KPIs, charts]
     Reports[Reports / analytics]
-    ReservationAnalytics[Reservation analytics]
-    InvoiceAnalytics[Invoice analytics]
+    ReservationAnalytics[Reservation analytics\nslots, waitlist]
+    InvoiceAnalytics[Invoice analytics\naggregates, time-series points]
   end
 
   Supplify --> Orders

@@ -4,39 +4,39 @@ flowchart TB
   App["/app"]
 
   subgraph core[" Core "]
-    Dashboard["/dashboard\nDashboard"]
-    Onboarding["/onboarding\nOnboarding"]
+    Dashboard["/app/dashboard\nDashboard"]
+    Onboarding["/app/onboarding\nOnboarding"]
   end
 
   subgraph commerce[" Orders & Cart "]
-    Orders["/orders\nOrders"]
-    OrderDetail["/orders/:id\nOrder details"]
-    Cart["/cart\nCart"]
+    Orders["/app/orders\nOrders"]
+    OrderDetail["/app/orders/:id\nOrder details"]
+    Cart["/app/cart\nCart"]
   end
 
   subgraph catalog[" Catalog & Lists "]
-    Products["/products\nProducts"]
-    QuickLists["/quick-lists\nQuick lists"]
+    Products["/app/products\nProducts"]
+    QuickLists["/app/quick-lists\nQuick lists"]
   end
 
   subgraph operations[" Inventory & Suppliers "]
-    RestaurantInventory["/restaurant-inventory\nInventory"]
-    Suppliers["/suppliers\nSuppliers"]
-    Receiving["/receiving\nReceiving"]
+    RestaurantInventory["/app/restaurant-inventory\nInventory"]
+    Suppliers["/app/suppliers\nSuppliers"]
+    Receiving["/app/receiving\nReceiving"]
   end
 
   subgraph people[" People & Bookings "]
-    Reservations["/reservations\nReservations"]
-    Staff["/staff\nStaff"]
+    Reservations["/app/reservations\nReservations"]
+    Staff["/app/staff\nStaff"]
   end
 
   subgraph comms[" Comms & Billing "]
-    Chat["/chat\nChat"]
-    Invoices["/invoices\nInvoices"]
+    Chat["/app/chat\nChat"]
+    Invoices["/app/invoices\nInvoices"]
   end
 
   subgraph account[" Account "]
-    Settings["/settings\nSettings\nSubscription, Usage"]
+    Settings["/app/settings\nSettings\nSubscription, Usage"]
   end
 
   Root --> App

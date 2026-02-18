@@ -180,13 +180,21 @@ erDiagram
     uuid branch_id FK
     text guest_name
     text status
-    timestamptz slot_at
+    timestamptz scheduled_at
   }
   reservation_table {
     uuid id PK
     uuid branch_id FK
     text name
     int capacity
+  }
+  reservation_waitlist {
+    uuid id PK
+    uuid restaurant_id FK
+    uuid branch_id FK
+    text customer_name
+    text status
+    timestamptz requested_at
   }
   staff_member {
     uuid id PK
@@ -265,6 +273,8 @@ erDiagram
   restaurant ||--o{ reservation : "has"
   branch ||--o{ reservation : "at"
   branch ||--o{ reservation_table : "tables"
+  restaurant ||--o{ reservation_waitlist : "waitlist"
+  branch ||--o| reservation_waitlist : "at"
   restaurant ||--o{ staff_member : "employs"
   app_user ||--o| staff_member : "linked"
   staff_member ||--o{ staff_shift : "shifts"

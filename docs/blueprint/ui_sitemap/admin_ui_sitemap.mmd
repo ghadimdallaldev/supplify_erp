@@ -2,6 +2,12 @@
 flowchart TB
   Admin["/app/admin\nAdmin"]
 
+  subgraph routes[" Routes "]
+    AdminRoot["/app/admin\nOverview tab"]
+    AdminSuppliers["/app/admin/suppliers\nTenants: Suppliers"]
+    AdminRestaurants["/app/admin/restaurants\nTenants: Restaurants"]
+  end
+
   subgraph overview[" Overview "]
     Overview["Overview"]
   end
@@ -29,6 +35,9 @@ flowchart TB
     Impersonation["Impersonation\nStart/stop, banner"]
   end
 
+  Admin --> AdminRoot
+  Admin --> AdminSuppliers
+  Admin --> AdminRestaurants
   Admin --> Overview
   Admin --> Plans
   Admin --> Subscriptions

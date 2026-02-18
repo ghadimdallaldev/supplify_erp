@@ -7,7 +7,7 @@ flowchart TB
 
   subgraph API["API Routes"]
     subgraph Catalog[" Catalog & Pricing "]
-      Products["/api/products"]
+      Products["/api/products\nlist, categories, tags"]
       Prices["/api/prices"]
       RestaurantPricing["/api/restaurant-pricing\nmy-pricing"]
     end
@@ -42,7 +42,7 @@ flowchart TB
       RestaurantOnboarding["/api/restaurant-onboarding\nteam, invite, users limit"]
     end
     subgraph Reservations[" Reservations & Staff "]
-      Reservations["/api/reservations\nboard, tables"]
+      Reservations["/api/reservations\nboard, tables, analytics"]
       Staff["/api/staff\nmembers, shifts, PTO, swap"]
     end
     subgraph Admin[" Admin "]

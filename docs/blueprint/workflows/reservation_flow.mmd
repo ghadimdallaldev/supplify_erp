@@ -4,3 +4,4 @@ flowchart LR
   Staff[Staff board] --> Manage[Manage reservations]
   Manage --> Book
   Public --> ManageLink["/reserve/manage/:token"]
+  Staff --> Analytics[GET /api/reservations/analytics\nslots, waitlist by range]

@@ -175,9 +175,31 @@ router.get(
         [restaurantId, periodDays]
       )
 
+      // Time-series points for Spend Trend chart (daily totals by invoice_date)
+      const { rows: pointsRows } = await query(
+        `
+      SELECT 
+        invoice_date::text AS date,
+        COALESCE(SUM(total_amount), 0)::numeric AS total
+      FROM invoice i
+      WHERE i.restaurant_id = $1
+        AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
+      GROUP BY invoice_date
+      ORDER BY invoice_date
+    `,
+        [restaurantId, periodDays]
+      )
+      const points = (pointsRows || []).map((r) => ({
+        date: r.date,
+        total: parseFloat(r.total) || 0,
+      }))
+
       return res.json({
         ok: true,
-        data: { analytics: analytics[0] || {} },
+        data: {
+          analytics: analytics[0] || {},
+          points,
+        },
         error: null,
         requestId: req.requestId,
       })
@@ -185,7 +207,7 @@ router.get(
       logger.warn('Invoice analytics unavailable, returning empty analytics:', error.message)
       return res.json({
         ok: true,
-        data: { analytics: {} },
+        data: { analytics: {}, points: [] },
         error: null,
         requestId: req.requestId,
       })
@@ -784,9 +806,31 @@ router.get(
         [restaurantId, periodDays]
       )
 
+      // Time-series points for Spend Trend chart (daily totals by invoice_date)
+      const { rows: pointsRows } = await query(
+        `
+      SELECT 
+        invoice_date::text AS date,
+        COALESCE(SUM(total_amount), 0)::numeric AS total
+      FROM invoice i
+      WHERE i.restaurant_id = $1
+        AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
+      GROUP BY invoice_date
+      ORDER BY invoice_date
+    `,
+        [restaurantId, periodDays]
+      )
+      const points = (pointsRows || []).map((r) => ({
+        date: r.date,
+        total: parseFloat(r.total) || 0,
+      }))
+
       return res.json({
         ok: true,
-        data: { analytics: analytics[0] || {} },
+        data: {
+          analytics: analytics[0] || {},
+          points,
+        },
         error: null,
         requestId: req.requestId,
       })
@@ -794,7 +838,7 @@ router.get(
       logger.warn('Invoice analytics unavailable, returning empty analytics:', error.message)
       return res.json({
         ok: true,
-        data: { analytics: {} },
+        data: { analytics: {}, points: [] },
         error: null,
         requestId: req.requestId,
       })

@@ -447,12 +447,7 @@ export const api = createApi({
     getDashboardStats: builder.query<any, void>({
       query: () => '/api/admin/dashboard',
       providesTags: ['User'],
-      transformResponse: (response: any) => {
-        console.log('Dashboard transformResponse - raw response:', response)
-        const stats = response?.stats || {}
-        console.log('Dashboard transformResponse - extracted stats:', stats)
-        return stats
-      },
+      transformResponse: (response: any) => response?.stats || {},
     }),
     getAuditLogs: builder.query<AuditLogsResponse, AuditLogFilters>({
       query: (params) => ({
