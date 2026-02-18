@@ -1,0 +1,123 @@
+version: "3.9"
+
+name: supplify
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: supplify-postgres
+    env_file:
+      - /opt/supplify/env/.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-supplify}
+      POSTGRES_USER: ${POSTGRES_USER:-supplify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - supplify_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-supplify} -d ${POSTGRES_DB:-supplify} -h 127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    labels:
+      - "autoheal=true"
+    networks:
+      - supplify_net
+
+  backend:
+    # TODO: replace with your real backend image (or build context)
+    image: ${BACKEND_IMAGE:-supplify-backend:prod}
+    container_name: supplify-backend
+    env_file:
+      - /opt/supplify/env/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      PORT: ${BACKEND_PORT:-3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${BACKEND_PORT:-3000}/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    labels:
+      - "autoheal=true"
+    networks:
+      - supplify_net
+
+  frontend:
+    # TODO: replace with your real frontend image (or build context)
+    image: ${FRONTEND_IMAGE:-supplify-frontend:prod}
+    container_name: supplify-frontend
+    env_file:
+      - /opt/supplify/env/.env
+    environment:
+      NODE_ENV: production
+      PORT: ${FRONTEND_PORT:-3001}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3001}:${FRONTEND_PORT:-3001}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${FRONTEND_PORT:-3001}/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    labels:
+      - "autoheal=true"
+    networks:
+      - supplify_net
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: supplify-autoheal
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 10
+      AUTOHEAL_START_PERIOD: 30
+      AUTOHEAL_DEFAULT_STOP_TIMEOUT: 10
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  backup:
+    image: postgres:16-alpine
+    container_name: supplify-backup
+    env_file:
+      - /opt/supplify/env/.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-supplify}
+      POSTGRES_USER: ${POSTGRES_USER:-supplify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-supplify}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    volumes:
+      - /opt/supplify/backups:/backups
+    entrypoint: ["/bin/sh", "-lc"]
+    command: >
+      "apk add --no-cache bash tzdata aws-cli >/dev/null 2>&1 || true;
+       echo 'Backup container ready. Use host scripts to trigger backups.'; tail -f /dev/null"
+    restart: unless-stopped
+    networks:
+      - supplify_net
+
+volumes:
+  supplify_pgdata:
+
+networks:
+  supplify_net:
+    driver: bridge
