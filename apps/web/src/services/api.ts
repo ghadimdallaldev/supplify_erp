@@ -41,6 +41,7 @@ import type {
   StaffPortalDashboard,
   StaffPtoRequest,
   StaffShiftSwap,
+  StaffTimeEntry,
   PublicReservationDetails,
 } from '../types'
 
@@ -960,6 +961,29 @@ export const api = createApi({
         credentials: 'omit',
       }),
     }),
+    getStaffPortalTimeEntries: builder.query<StaffTimeEntry[], { token: string }>({
+      query: ({ token }) => ({
+        url: '/api/public/staff/time-entries',
+        params: { token },
+        credentials: 'omit',
+      }),
+    }),
+    staffPortalCheckIn: builder.mutation<StaffTimeEntry, { token: string; note?: string }>({
+      query: (body) => ({
+        url: '/api/public/staff/check-in',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+    }),
+    staffPortalCheckOut: builder.mutation<StaffTimeEntry, { token: string; id: string }>({
+      query: ({ token, id }) => ({
+        url: `/api/public/staff/time-entries/${id}/check-out`,
+        method: 'POST',
+        body: { token },
+        credentials: 'omit',
+      }),
+    }),
     getStaffSelfDashboard: builder.query<StaffPortalDashboard, void>({
       query: () => ({
         url: '/api/staff/self/dashboard',
@@ -1338,6 +1362,9 @@ export const {
   useRequestStaffPortalLinkMutation,
   useCreateStaffPortalSessionMutation,
   useGetStaffPortalDashboardQuery,
+  useGetStaffPortalTimeEntriesQuery,
+  useStaffPortalCheckInMutation,
+  useStaffPortalCheckOutMutation,
   useSubmitStaffPortalPtoMutation,
   useSubmitStaffPortalSwapMutation,
   useGetStaffSelfDashboardQuery,

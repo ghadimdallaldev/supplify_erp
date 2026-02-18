@@ -129,11 +129,11 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ## Staff
 
-| feature_key        | display_name                              | applies_to           | permissions_required | limit_key | backend_enforcement                                                                                           | frontend_surfaces                                        | plan_availability |
-| ------------------ | ----------------------------------------- | -------------------- | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------------- |
-| staff_management   | Staff members, shifts, PTO, etc.          | RESTAURANT           | STAFF_VIEW           | —         | apps/api/src/routes/staff.routes.js router.use(requirePermission('STAFF_VIEW'))                               | StaffPage.tsx                                            | UNKNOWN           |
-| staff_self_service | Staff self-service (PTO, swap, dashboard) | MULTI (public token) | —                    | —         | apps/api/src/routes/public.routes.js staff link request, session, PTO, swap                                   | StaffSelfServiceLogin.tsx, StaffSelfServiceDashboard.tsx | UNKNOWN           |
-| users_limit        | Restaurant team / users limit             | RESTAURANT           | —                    | users     | apps/api/src/routes/restaurant-onboarding.routes.js checkLimit(restaurantId, 'RESTAURANT', 'users') on invite | RestaurantOnboardingPage (onboarding/invite)             | UNKNOWN           |
+| feature_key        | display_name                                            | applies_to           | permissions_required | limit_key | backend_enforcement                                                                                           | frontend_surfaces                                        | plan_availability |
+| ------------------ | ------------------------------------------------------- | -------------------- | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------------- |
+| staff_management   | Staff members, shifts, PTO, etc.                        | RESTAURANT           | STAFF_VIEW           | —         | apps/api/src/routes/staff.routes.js router.use(requirePermission('STAFF_VIEW'))                               | StaffPage.tsx                                            | UNKNOWN           |
+| staff_self_service | Staff self-service (PTO, swap, dashboard, clock in/out) | MULTI (public token) | —                    | —         | apps/api/src/routes/public.routes.js staff link, session, PTO, swap, time-entries, check-in, check-out        | StaffSelfServiceLogin.tsx, StaffSelfServiceDashboard.tsx | UNKNOWN           |
+| users_limit        | Restaurant team / users limit                           | RESTAURANT           | —                    | users     | apps/api/src/routes/restaurant-onboarding.routes.js checkLimit(restaurantId, 'RESTAURANT', 'users') on invite | RestaurantOnboardingPage (onboarding/invite)             | UNKNOWN           |
 
 ---
 
@@ -226,9 +226,9 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ## Integrations
 
-| feature_key | display_name                  | applies_to     | permissions_required | limit_key | backend_enforcement                                        | frontend_surfaces                           | plan_availability |
-| ----------- | ----------------------------- | -------------- | -------------------- | --------- | ---------------------------------------------------------- | ------------------------------------------- | ----------------- |
-| public_api  | Public reservation/staff APIs | MULTI (public) | —                    | —         | public.routes.js (reserve, staff link, session, PTO, swap) | PublicReservationPortal, StaffSelfService\* | UNKNOWN           |
+| feature_key | display_name                  | applies_to     | permissions_required | limit_key | backend_enforcement                                                                           | frontend_surfaces                           | plan_availability |
+| ----------- | ----------------------------- | -------------- | -------------------- | --------- | --------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------- |
+| public_api  | Public reservation/staff APIs | MULTI (public) | —                    | —         | public.routes.js (reserve, staff link, session, PTO, swap, time-entries, check-in, check-out) | PublicReservationPortal, StaffSelfService\* | UNKNOWN           |
 
 ---
 

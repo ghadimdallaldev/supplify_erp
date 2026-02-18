@@ -2,7 +2,12 @@ import express from 'express'
 import { z } from 'zod'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { notifyReservationCreated, notifyReservationWaitlist, notifyStaffPtoRequest, notifyStaffSwapRequest } from '../services/notification.service.js'
+import {
+  notifyReservationCreated,
+  notifyReservationWaitlist,
+  notifyStaffPtoRequest,
+  notifyStaffSwapRequest,
+} from '../services/notification.service.js'
 import { notifyOrderStatusChange } from '../services/notification.service.js'
 
 const router = express.Router()
@@ -64,7 +69,7 @@ async function fetchActiveTables(restaurantId) {
       FROM reservation_table
       WHERE restaurant_id = $1
     `,
-    [restaurantId],
+    [restaurantId]
   )
   return rows.filter((table) => table.is_active)
 }
@@ -77,13 +82,18 @@ async function fetchReservationByToken(token) {
       WHERE public_token = $1
         AND public_token_expires_at > now()
     `,
-    [token],
+    [token]
   )
   return rows[0] ?? null
 }
 
 async function fetchReservationsForWindow(restaurantId, dayStart, dayEnd, excludeReservationId) {
-  const params = [restaurantId, ACTIVE_RESERVATION_STATUSES, dayStart.toISOString(), dayEnd.toISOString()]
+  const params = [
+    restaurantId,
+    ACTIVE_RESERVATION_STATUSES,
+    dayStart.toISOString(),
+    dayEnd.toISOString(),
+  ]
   let exclusionClause = ''
   if (excludeReservationId) {
     exclusionClause = 'AND id <> $5'
@@ -98,12 +108,16 @@ async function fetchReservationsForWindow(restaurantId, dayStart, dayEnd, exclud
         AND scheduled_at BETWEEN $3 AND $4
         ${exclusionClause}
     `,
-    params,
+    params
   )
   return rows
 }
 
-function buildTimeSlots(date, openingHour = DEFAULT_OPENING_HOUR, closingHour = DEFAULT_CLOSING_HOUR) {
+function buildTimeSlots(
+  date,
+  openingHour = DEFAULT_OPENING_HOUR,
+  closingHour = DEFAULT_CLOSING_HOUR
+) {
   const slots = []
   const start = new Date(date)
   start.setHours(openingHour, 0, 0, 0)
@@ -134,7 +148,12 @@ async function calculateSlotAvailability(restaurantId, date, partySize, excludeR
   const dayEnd = new Date(dayStart)
   dayEnd.setDate(dayEnd.getDate() + 1)
 
-  const reservations = await fetchReservationsForWindow(restaurantId, dayStart, dayEnd, excludeReservationId)
+  const reservations = await fetchReservationsForWindow(
+    restaurantId,
+    dayStart,
+    dayEnd,
+    excludeReservationId
+  )
   const slots = buildTimeSlots(date)
 
   return slots.map((slot) => {
@@ -145,7 +164,10 @@ async function calculateSlotAvailability(restaurantId, date, partySize, excludeR
       return resStart < slot.end && resEnd > slot.start
     })
 
-    const seatsUsed = overlapping.reduce((sum, reservation) => sum + Number(reservation.party_size || 0), 0)
+    const seatsUsed = overlapping.reduce(
+      (sum, reservation) => sum + Number(reservation.party_size || 0),
+      0
+    )
     const capacityAvailable = totalCapacity - seatsUsed
 
     return {
@@ -166,12 +188,36 @@ async function ensureStaffSession(token) {
       WHERE sps.session_token = $1
         AND sps.expires_at > now()
     `,
-    [token],
+    [token]
   )
   if (!rows.length) {
     return null
   }
   return rows[0]
+}
+
+function mapTimeEntryRow(row) {
+  return {
+    id: row.id,
+    restaurantId: row.restaurant_id,
+    staffId: row.staff_id,
+    clockInAt: row.clock_in_at,
+    clockOutAt: row.clock_out_at,
+    clockInMethod: row.clock_in_method,
+    clockOutMethod: row.clock_out_method,
+    breakMinutes: row.break_minutes != null ? Number(row.break_minutes) : null,
+    note: row.note,
+    status: row.status,
+    staff: row.staff_id
+      ? {
+          id: row.staff_id,
+          name: row.staff_name,
+          role: row.staff_role,
+        }
+      : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
 }
 
 router.get('/restaurants', async (req, res) => {
@@ -181,7 +227,7 @@ router.get('/restaurants', async (req, res) => {
         SELECT id, name, contact_email, created_at
         FROM restaurant
         ORDER BY name ASC
-      `,
+      `
     )
     res.json({
       ok: true,
@@ -252,8 +298,14 @@ router.post('/reservations', async (req, res) => {
       })
     }
 
-    const slots = await calculateSlotAvailability(payload.restaurantId, scheduledAt, payload.partySize)
-    const matchingSlot = slots.find((slot) => slot.isAvailable && slot.startTime === scheduledAt.toISOString())
+    const slots = await calculateSlotAvailability(
+      payload.restaurantId,
+      scheduledAt,
+      payload.partySize
+    )
+    const matchingSlot = slots.find(
+      (slot) => slot.isAvailable && slot.startTime === scheduledAt.toISOString()
+    )
     if (!matchingSlot) {
       return res.status(409).json({
         ok: false,
@@ -292,7 +344,7 @@ router.post('/reservations', async (req, res) => {
         scheduledAt.toISOString(),
         payload.durationMinutes,
         payload.notes ?? null,
-      ],
+      ]
     )
 
     const reservation = rows[0]
@@ -339,7 +391,7 @@ router.post('/staff/request-link', async (req, res) => {
         FROM staff_member
         WHERE email = $1
       `,
-      [payload.email],
+      [payload.email]
     )
 
     if (!rows.length) {
@@ -359,7 +411,7 @@ router.post('/staff/request-link', async (req, res) => {
         VALUES ($1, $2)
         RETURNING session_token, expires_at
       `,
-      [staff.id, expiresAt.toISOString()],
+      [staff.id, expiresAt.toISOString()]
     )
 
     res.json({
@@ -435,14 +487,21 @@ router.get('/staff/dashboard', async (req, res) => {
     const staffId = session.staff_id
     const restaurantId = session.restaurant_id
 
-    const [staffInfoResult, shiftsResult, ptoResult, swapsResult, announcementsResult, documentsResult] = await Promise.all([
+    const [
+      staffInfoResult,
+      shiftsResult,
+      ptoResult,
+      swapsResult,
+      announcementsResult,
+      documentsResult,
+    ] = await Promise.all([
       query(
         `
           SELECT id, display_name, role, email, phone
           FROM staff_member
           WHERE id = $1
         `,
-        [staffId],
+        [staffId]
       ),
       query(
         `
@@ -454,7 +513,7 @@ router.get('/staff/dashboard', async (req, res) => {
           ORDER BY shift_date, starts_at
           LIMIT 10
         `,
-        [restaurantId, staffId],
+        [restaurantId, staffId]
       ),
       query(
         `
@@ -464,7 +523,7 @@ router.get('/staff/dashboard', async (req, res) => {
           ORDER BY created_at DESC
           LIMIT 10
         `,
-        [staffId],
+        [staffId]
       ),
       query(
         `
@@ -474,7 +533,7 @@ router.get('/staff/dashboard', async (req, res) => {
           ORDER BY created_at DESC
           LIMIT 10
         `,
-        [staffId],
+        [staffId]
       ),
       query(
         `
@@ -488,7 +547,7 @@ router.get('/staff/dashboard', async (req, res) => {
           ORDER BY a.published_at DESC
           LIMIT 5
         `,
-        [staffId, restaurantId],
+        [staffId, restaurantId]
       ),
       query(
         `
@@ -498,7 +557,7 @@ router.get('/staff/dashboard', async (req, res) => {
           ORDER BY uploaded_at DESC
           LIMIT 10
         `,
-        [restaurantId, staffId],
+        [restaurantId, staffId]
       ),
     ])
 
@@ -525,6 +584,176 @@ router.get('/staff/dashboard', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'STAFF_DASHBOARD_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/staff/time-entries', async (req, res) => {
+  try {
+    const params = staffDashboardSchema.parse({ token: req.query.token })
+    const session = await ensureStaffSession(params.token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const start = new Date()
+    start.setDate(start.getDate() - 30)
+    const startStr = start.toISOString()
+    const { rows } = await query(
+      `
+        SELECT te.*, sm.display_name AS staff_name, sm.role AS staff_role
+        FROM staff_time_entry te
+        JOIN staff_member sm ON sm.id = te.staff_id
+        WHERE te.restaurant_id = $1 AND te.staff_id = $2 AND te.clock_in_at >= $3
+        ORDER BY te.clock_in_at DESC
+        LIMIT 50
+      `,
+      [session.restaurant_id, session.staff_id, startStr]
+    )
+    res.json({
+      ok: true,
+      data: rows.map(mapTimeEntryRow),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Staff time-entries fetch failed', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'STAFF_TIME_ENTRIES_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/staff/check-in', async (req, res) => {
+  try {
+    const payload = z
+      .object({ token: z.string().uuid(), note: z.string().optional() })
+      .parse(req.body)
+    const session = await ensureStaffSession(payload.token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const { rows: openRows } = await query(
+      `
+        SELECT id FROM staff_time_entry
+        WHERE restaurant_id = $1 AND staff_id = $2 AND clock_out_at IS NULL
+        LIMIT 1
+      `,
+      [session.restaurant_id, session.staff_id]
+    )
+    if (openRows.length) {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'TIME_ENTRY_OPEN_EXISTS',
+          message: 'You already have an open time entry. Clock out first.',
+        },
+        requestId: req.requestId,
+      })
+    }
+    const clockInAt = new Date().toISOString()
+    const { rows } = await query(
+      `
+        INSERT INTO staff_time_entry (
+          restaurant_id, staff_id, clock_in_at, clock_in_method, note, created_by, updated_by
+        )
+        VALUES ($1, $2, $3, 'portal', $4, NULL, NULL)
+        RETURNING *
+      `,
+      [session.restaurant_id, session.staff_id, clockInAt, payload.note ?? null]
+    )
+    const entry = rows[0]
+    const { rows: staffRows } = await query(
+      `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
+      [entry.staff_id]
+    )
+    if (staffRows.length) {
+      entry.staff_name = staffRows[0].staff_name
+      entry.staff_role = staffRows[0].staff_role
+    }
+    res.status(201).json({
+      ok: true,
+      data: mapTimeEntryRow(entry),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Staff portal check-in failed', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'TIME_ENTRY_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/staff/time-entries/:id/check-out', async (req, res) => {
+  try {
+    const payload = z.object({ token: z.string().uuid() }).parse(req.body)
+    const session = await ensureStaffSession(payload.token)
+    if (!session) {
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_SESSION', message: 'Session expired or invalid' },
+        requestId: req.requestId,
+      })
+    }
+    const entryId = req.params.id
+    const clockOutAt = new Date().toISOString()
+    const { rows } = await query(
+      `
+        UPDATE staff_time_entry
+        SET clock_out_at = $3, clock_out_method = 'portal', updated_at = now()
+        WHERE id = $1 AND restaurant_id = $2 AND staff_id = $4 AND clock_out_at IS NULL
+        RETURNING *
+      `,
+      [entryId, session.restaurant_id, clockOutAt, session.staff_id]
+    )
+    if (!rows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Time entry not found or already closed' },
+        requestId: req.requestId,
+      })
+    }
+    const entry = rows[0]
+    const { rows: staffRows } = await query(
+      `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
+      [entry.staff_id]
+    )
+    if (staffRows.length) {
+      entry.staff_name = staffRows[0].staff_name
+      entry.staff_role = staffRows[0].staff_role
+    }
+    res.json({
+      ok: true,
+      data: mapTimeEntryRow(entry),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Staff portal check-out failed', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'TIME_ENTRY_UPDATE_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }
@@ -567,7 +796,7 @@ router.post('/staff/pto', async (req, res) => {
         payload.endDate,
         payload.hoursRequested ?? null,
         payload.reason ?? null,
-      ],
+      ]
     )
 
     try {
@@ -625,7 +854,7 @@ router.post('/staff/swaps', async (req, res) => {
         session.staff_id,
         payload.proposedCoverId ?? null,
         payload.reason ?? null,
-      ],
+      ]
     )
 
     try {
@@ -726,7 +955,7 @@ router.post('/reservations/manage/cancel', async (req, res) => {
         WHERE id = $1
         RETURNING *
       `,
-      [reservation.id],
+      [reservation.id]
     )
 
     res.json({
@@ -755,7 +984,10 @@ router.post('/reservations/manage/reschedule', async (req, res) => {
       return res.status(400).json({
         ok: false,
         data: null,
-        error: { name: 'RESERVATION_RESCHEDULE_ERROR', message: 'Reservation token and new time are required' },
+        error: {
+          name: 'RESERVATION_RESCHEDULE_ERROR',
+          message: 'Reservation token and new time are required',
+        },
         requestId: req.requestId,
       })
     }
@@ -779,8 +1011,15 @@ router.post('/reservations/manage/reschedule', async (req, res) => {
       })
     }
 
-    const slots = await calculateSlotAvailability(reservation.restaurant_id, newDate, reservation.party_size, reservation.id)
-    const matchingSlot = slots.find((slot) => slot.isAvailable && slot.startTime === newDate.toISOString())
+    const slots = await calculateSlotAvailability(
+      reservation.restaurant_id,
+      newDate,
+      reservation.party_size,
+      reservation.id
+    )
+    const matchingSlot = slots.find(
+      (slot) => slot.isAvailable && slot.startTime === newDate.toISOString()
+    )
     if (!matchingSlot) {
       return res.status(409).json({
         ok: false,
@@ -799,7 +1038,7 @@ router.post('/reservations/manage/reschedule', async (req, res) => {
         WHERE id = $1
         RETURNING *
       `,
-      [reservation.id, newDate.toISOString(), reservation.duration_minutes ?? 90],
+      [reservation.id, newDate.toISOString(), reservation.duration_minutes ?? 90]
     )
 
     res.json({
@@ -822,4 +1061,3 @@ router.post('/reservations/manage/reschedule', async (req, res) => {
 })
 
 export { router as publicRoutes }
-

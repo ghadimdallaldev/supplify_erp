@@ -21,6 +21,7 @@ This document outlines the comprehensive test suite created for the Supplify pla
 - ✅ `chat.routes.test.js` - Chat/messaging
 - ✅ `reservations.routes.test.js` - Existing tests
 - ✅ `orders.calendar.routes.test.js` - Existing tests
+- ✅ `public.routes.test.js` - Staff portal time-entries, check-in, check-out (token auth)
 
 #### Services Tests
 

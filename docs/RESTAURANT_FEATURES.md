@@ -1,6 +1,7 @@
 # Restaurant Features - Complete Implementation Summary
 
 ## 🎯 Overview
+
 Supplify provides comprehensive restaurant procurement and inventory management, enabling restaurants to discover suppliers, place orders, manage inventory, track waste, and handle finances - ALL with real-time database data, NO mock data.
 
 ---
@@ -8,6 +9,7 @@ Supplify provides comprehensive restaurant procurement and inventory management,
 ## 📋 Navigation & Access
 
 ### Restaurant Dashboard Sidebar Includes:
+
 1. **Dashboard** - Overview of business metrics
 2. **Quick Lists** - Create and schedule recurring orders
 3. **Cart** - Shopping cart for orders
@@ -53,6 +55,7 @@ The Staff App brings single-location labour management directly into Supplify:
 ---
 
 ## 👥 Staff Roster & Scheduling
+
 - Visual weekly grid to plan kitchen, floor, and cashier coverage per branch
 - Assign roles to shifts and optionally send WhatsApp or in-app alerts
 - Mobile-friendly check-in/out to capture attendance in real time
@@ -89,6 +92,7 @@ Display Smart Suggestions:
 ```
 
 **Key Features:**
+
 - Historical usage analysis (1, 3, 7, 10, 30, 60, 90 days)
 - Average consumption between restocks
 - Seasonality and trend detection
@@ -105,6 +109,7 @@ Display Smart Suggestions:
 ### **2. QUICK LISTS & RECURRING ORDERS FLOW**
 
 #### A. Create Quick List
+
 ```
 Navigate to Quick Lists → Click "Create Quick List"
     ↓
@@ -125,6 +130,7 @@ Click list to add products
 ```
 
 #### B. Schedule Recurring Order
+
 ```
 Click Quick List → "Schedule Recurring Order"
     ↓
@@ -150,6 +156,7 @@ Badge shows "Scheduled" on Quick List card
 ```
 
 **Scheduling Frequencies Available:**
+
 - `DAILY` - Every day at preferred time
 - `WEEKLY` - Once per week on selected day (radio-like, one day only)
 - `WEEKLY_3X` - Three times per week on selected days (default: Mon, Wed, Fri)
@@ -157,6 +164,7 @@ Badge shows "Scheduled" on Quick List card
 - `MONTHLY` - Once per month
 
 **Database Schema:**
+
 ```sql
 ALTER TABLE quick_list ADD COLUMN supplier_id UUID REFERENCES supplier(id);
 ALTER TABLE quick_list ADD COLUMN is_scheduled BOOLEAN DEFAULT false;
@@ -170,6 +178,7 @@ ALTER TABLE quick_list ADD COLUMN auto_create_order BOOLEAN DEFAULT true;
 ```
 
 #### C. Order from Quick List
+
 ```
 Click Quick List card → "Order Now"
     ↓
@@ -189,6 +198,7 @@ Review & place order (standard cart flow)
 ### **3. WASTE & SPOILAGE TRACKING FLOW**
 
 #### A. Record Waste/Adjustment
+
 ```
 Navigate to Inventory → Select Product → "Adjust"
     ↓
@@ -219,6 +229,7 @@ Inventory updated in real-time
 ```
 
 #### B. View Waste Analytics
+
 ```
 Navigate to Inventory → "Waste Analytics" tab
     ↓
@@ -240,6 +251,7 @@ Display Waste Dashboard:
 ```
 
 **Database Enhancements:**
+
 ```sql
 ALTER TABLE inventory_adjustment ADD COLUMN unit_cost NUMERIC(14,3);
 ALTER TABLE inventory_adjustment ADD COLUMN total_cost NUMERIC(14,3);
@@ -247,6 +259,7 @@ ALTER TABLE inventory_adjustment ADD COLUMN waste_category TEXT CHECK (waste_cat
 ```
 
 **API Endpoints:**
+
 - `POST /api/restaurant-inventory/adjust` - Record waste/adjustment
 - `GET /api/restaurant-inventory/waste-analytics` - Get waste analytics
 
@@ -255,6 +268,7 @@ ALTER TABLE inventory_adjustment ADD COLUMN waste_category TEXT CHECK (waste_cat
 ### **4. RESTAURANT INVENTORY MANAGEMENT FLOW**
 
 #### A. View Inventory
+
 ```
 Navigate to Inventory
     ↓
@@ -274,6 +288,7 @@ Display Inventory Table:
 ```
 
 #### B. Receive Stock
+
 ```
 Order DELIVERED from supplier
     ↓
@@ -303,6 +318,7 @@ Inventory updated in real-time
 ```
 
 #### C. Inventory History
+
 ```
 Click Product → "View History"
     ↓
@@ -324,6 +340,7 @@ Display Timeline:
 ### **5. FINANCE & INVOICING FLOW**
 
 #### A. View Invoices
+
 ```
 Navigate to Invoices
     ↓
@@ -347,6 +364,7 @@ Display Invoice List:
 ```
 
 #### B. View Invoice Details
+
 ```
 Click Invoice Card
     ↓
@@ -365,6 +383,7 @@ Invoice Detail Dialog:
 ```
 
 #### C. Record Payment
+
 ```
 Click Invoice → "Record Payment"
     ↓
@@ -387,6 +406,7 @@ Invoice list refreshed
 ```
 
 #### D. Overdue Alerts
+
 ```
 [API Call] GET /api/restaurant-finance/overdue
   - Get invoices with due_date < CURRENT_DATE
@@ -401,6 +421,7 @@ Display Overdue List:
 ```
 
 #### E. Expense Analytics
+
 ```
 [API Call] GET /api/restaurant-finance/expenses?period=30
   - Aggregate expenses by supplier
@@ -414,6 +435,7 @@ Display Expense Dashboard:
 ```
 
 #### F. Supplier Statement
+
 ```
 [API Call] GET /api/restaurant-finance/suppliers/:id/statement?startDate=&endDate=
   - Get all invoices for supplier in date range
@@ -431,6 +453,7 @@ Display Account Statement:
 ### **6. RECEIVING & QUALITY CONTROL FLOW**
 
 #### A. Match Delivery with Order
+
 ```
 Navigate to Receiving
     ↓
@@ -448,6 +471,7 @@ Click "Receive" button
 ```
 
 #### B. Receive Items
+
 ```
 Receiving Form Opens:
   - Products from order
@@ -476,6 +500,7 @@ Generate Receiving Report:
 ```
 
 #### C. Receiving History
+
 ```
 [API Call] GET /api/receiving/history
   - Get all receiving_log records
@@ -499,6 +524,7 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Create & Manage Quick Lists
+
 - Create named lists (e.g., "Weekly Produce")
 - Add products to lists with quantities
 - Edit list items
@@ -506,30 +532,31 @@ Display History:
 - View list with current prices
 
 #### ✅ Recurring Order Scheduling
+
 - **Frequencies Available:**
   - Daily - Every day at preferred time
   - Once per week - Single day selection (radio-like)
   - Three times per week - Multiple days (default: Mon, Wed, Fri)
   - Biweekly - Every 2 weeks on selected days
   - Monthly - Once per month
-  
 - **Scheduling Features:**
   - Select days of week (checkbox grid)
   - Set preferred time (HH:MM)
   - Auto-create order toggle
   - Next execution date calculation
   - Status: ACTIVE / PAUSED
-  
 - **Navigation Restrictions:**
   - Once per week: Only ONE day selectable (replaces current)
   - Other frequencies: Multiple days selectable
 
 #### ✅ One-Click Ordering
+
 - "Order Now" adds all items to cart
 - Fetches current prices in real-time
 - Direct navigation to cart
 
 ### API Endpoints:
+
 - `GET /api/quick-lists` - List all quick lists
 - `GET /api/quick-lists/:id` - Get quick list details
 - `POST /api/quick-lists` - Create quick list
@@ -546,23 +573,27 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Historical Usage Analysis
+
 - 1-day, 3-day, 7-day, 10-day usage rates
 - 30-day, 60-day, 90-day usage analysis
 - Average consumption between restocks (window function)
 - Usage trend detection (last 15 days vs previous 15 days)
 
 #### ✅ Lead Time & Order Analysis
+
 - Supplier lead times integration
 - Last order size and frequency
 - Days since last restock
 
 #### ✅ Smart Suggestions
+
 - Days of stock remaining calculation
 - Suggested reorder quantity
 - Urgency level (URGENT/HIGH/MEDIUM/LOW)
 - Confidence score (0-100)
 
 ### API Endpoint:
+
 - `GET /api/restaurant-inventory/reorder-suggestions` - Get smart suggestions
 
 ---
@@ -572,6 +603,7 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Waste Recording
+
 - Record adjustments (WASTAGE, SPOILAGE, COUNT_CORRECTION, OTHER)
 - Quantity tracking
 - Unit cost and total cost calculation
@@ -584,6 +616,7 @@ Display History:
   - OTHER
 
 #### ✅ Waste Analytics
+
 - Aggregate waste by product
 - Total waste quantity and cost
 - Wastage vs Spoilage breakdown
@@ -593,6 +626,7 @@ Display History:
 - Filter by period (7/14/30 days)
 
 ### API Endpoints:
+
 - `POST /api/restaurant-inventory/adjust` - Record waste/adjustment
 - `GET /api/restaurant-inventory/waste-analytics` - Get waste analytics
 
@@ -603,6 +637,7 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Inventory Display
+
 - Product-centric view
 - Current stock quantities
 - Supplier names
@@ -611,18 +646,21 @@ Display History:
 - Branch tracking (if multi-branch)
 
 #### ✅ Inventory Actions
+
 - **Pin Items** - Pin important items to top
 - **Adjust Inventory** - Record waste/adjustments
 - **View History** - Timeline of inventory movements
 - **CSV Import/Export**
 
 #### ✅ Inventory History
+
 - **Receive Stock** - Auto-update on receiving
 - Movement types: ADD, SUBTRACT, RECEIVED, WASTAGE
 - Balance before/after tracking
 - Reference tracking (order_id, adjustment_id)
 
 ### API Endpoints:
+
 - `GET /api/restaurant-inventory` - Get inventory with products
 - `GET /api/restaurant-inventory/history` - Get all movement history
 - `GET /api/restaurant-inventory/history/:productId` - Get product history
@@ -637,6 +675,7 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Receiving Process
+
 - Match deliveries with orders
 - Record received quantities
 - Quality status tracking:
@@ -646,6 +685,7 @@ Display History:
   - SHORTAGE
 
 #### ✅ Receiving Features
+
 - Photo attachments
 - Notes and discrepancies
 - Auto-update inventory on receiving
@@ -653,6 +693,7 @@ Display History:
 - Receiving reports
 
 ### API Endpoints:
+
 - `GET /api/receiving/pending-orders` - Get orders awaiting receiving
 - `POST /api/receiving/receive` - Record receiving
 - `GET /api/receiving/history` - Get receiving history
@@ -665,6 +706,7 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Invoice Viewing
+
 - View all invoices from suppliers
 - Filter by status (ALL, ISSUED, PARTIALLY_PAID, PAID, OVERDUE, VOID)
 - Search by invoice number or supplier name
@@ -679,6 +721,7 @@ Display History:
   - Status badge
 
 #### ✅ Invoice Details
+
 - View full invoice with line items
 - Subtotal, tax, total
 - Payment history
@@ -686,6 +729,7 @@ Display History:
 - Download PDF (planned)
 
 #### ✅ Payment Recording
+
 - Record payments with:
   - Payment date
   - Payment method (CASH, CHECK, BANK_TRANSFER, CREDIT_CARD, ACH, OTHER)
@@ -695,24 +739,28 @@ Display History:
 - Update invoice status
 
 #### ✅ Overdue Tracking
+
 - View overdue invoices
 - Days overdue calculation
 - Amount due per invoice
 - Total overdue amount
 
 #### ✅ Expense Analytics
+
 - By Supplier: Invoice count, total spent, total paid, outstanding
 - By Category: Total spent per category
 - Monthly trend: 12-month spending chart
 - Period filtering (7/14/30 days)
 
 #### ✅ Supplier Statements
+
 - View account statement per supplier
 - Opening/closing balance
 - Total charges & payments
 - Invoice list with dates
 
 ### API Endpoints:
+
 - `GET /api/restaurant-finance/invoices` - List invoices (with filters)
 - `GET /api/restaurant-finance/invoices/:id` - Get invoice details
 - `POST /api/restaurant-finance/invoices/:id/pay` - Record payment
@@ -727,6 +775,7 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Shopping Cart
+
 - Add products to cart
 - Multi-supplier carts
 - Quantity adjustments
@@ -734,12 +783,14 @@ Display History:
 - View cart total
 
 #### ✅ Order Placement
+
 - Place orders from cart
 - Select delivery date
 - Add special instructions
 - Review order before placing
 
 #### ✅ Order Tracking
+
 - View order status
 - Status transitions: PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → COMPLETED
 - View order details
@@ -748,6 +799,7 @@ Display History:
 - **Packing Slip**: Download packing slip data (JSON format, PDF planned)
 
 #### ✅ Order Reminders
+
 - Send reminders to suppliers for unacknowledged orders
 - Reminder button available on orders with status PLACED
 - Reminder count tracking (shows number of reminders sent)
@@ -763,6 +815,7 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Conversations
+
 - 1:1 chat with suppliers
 - View all conversations
 - Last message preview
@@ -770,6 +823,7 @@ Display History:
 - Timestamp display
 
 #### ✅ Messaging
+
 - Send/receive messages
 - View message history
 - Real-time updates (planned)
@@ -782,12 +836,14 @@ Display History:
 ### Features Implemented:
 
 #### ✅ Browse Suppliers
+
 - List all suppliers
 - View supplier profiles
 - Search suppliers
 - Filter by category
 
 #### ✅ Supplier Details
+
 - Company information
 - Product catalog
 - Contact information
@@ -800,12 +856,14 @@ Display History:
 ### Features Planned:
 
 #### 🔄 Restaurant Profile Setup
+
 - Business information
 - Contact details
 - Operating hours
 - Delivery instructions
 
 #### 🔄 Multi-Branch Support
+
 - Create/edit branches
 - Assign team members
 - Consolidated reporting
@@ -815,6 +873,7 @@ Display History:
 ## 🧑‍🍽️ PUBLIC RESERVATION PORTAL
 
 ### Highlights
+
 - Guest-facing `/reserve` experience with responsive design
 - Self-service availability search by date, time, and party size
 - Live capacity checks against active tables and bookings
@@ -824,12 +883,14 @@ Display History:
 - Tokenized management URL for cancellations or updates (no login required)
 
 ### Guest Flow
+
 1. Select restaurant, date, and party size
 2. Preview open time slots with live capacity indicators
 3. Provide contact details and optional notes
 4. Receive confirmation + management token for future changes
 
 ### Operational Impact
+
 - Reservations flow directly into the restaurant’s reservations board
 - Notifications fire for new bookings and waitlist events
 - Works even when restaurant accounts are offline—guests can self-serve
@@ -839,6 +900,7 @@ Display History:
 ## 👥 STAFF SELF-SERVICE PORTAL
 
 ### Highlights
+
 - Dedicated `/staff` login via passwordless magic link
 - Personal dashboard with upcoming shifts, announcements, and documents
 - Submit PTO requests, log shift swaps, and review history
@@ -846,12 +908,14 @@ Display History:
 - Secure session tokens (12-hour expiry) with audit-ready trails
 
 ### Staff Flow
+
 1. Request a secure link using work email
 2. Open the dashboard to review shifts and key updates
 3. Submit PTO or swap requests that sync with manager tools
 4. Access training docs, policies, and acknowledgment resources
 
 ### Operational Impact
+
 - Reduces manager overhead for simple requests
 - Keeps team in sync with announcements and staffing changes
 - Extends Supplify beyond the back office into the front-of-house team
@@ -861,6 +925,7 @@ Display History:
 ## 🔐 AUTHENTICATION & AUTHORIZATION
 
 ### Restaurant Role Access:
+
 - **Can Access**:
   - Dashboard
   - Quick Lists & Scheduling
@@ -882,6 +947,7 @@ Display History:
 ## 📊 KEY INTEGRATIONS
 
 ### Order → Receiving → Inventory → Finance:
+
 1. **Order Placed** → Cart items create order
 2. **Order Shipped** → Supplier ships order
 3. **Order Delivered** → Auto-appears in Receiving
@@ -891,6 +957,7 @@ Display History:
 7. **Invoice Paid** → Record payment, update balance
 
 ### Smart Reorder Suggestions → Quick Lists:
+
 1. **View Reorder Suggestions** → Identify items needing reorder
 2. **Add to Quick List** → Create/update recurring lists
 3. **Schedule Recurring Order** → Automate future orders
@@ -901,6 +968,7 @@ Display History:
 ## ✅ IMPLEMENTATION STATUS
 
 ### Fully Implemented ✅:
+
 1. ✅ Authentication & Authorization
 2. ✅ Product Browsing
 3. ✅ Shopping Cart & Orders
@@ -921,9 +989,10 @@ Display History:
 18. ✅ **Extended Session Timeout** - 1 hour session (was 5 minutes)
 19. ✅ **Order Reminders** - Send reminders to suppliers for unacknowledged orders
 20. ✅ **Public Reservation Portal** - Guest self-service booking with live availability
-21. ✅ **Staff Self-Service Portal** - Passwordless access for schedules, PTO, swaps, docs
+21. ✅ **Staff Self-Service Portal** - Passwordless access for schedules, PTO, swaps, docs, and **clock in/out** with recent time entries
 
 ### Partially Implemented 🔄:
+
 1. 🔄 Supplier Discovery (needs follow/block functionality)
 2. 🔄 Multi-Branch Support (schema exists, UI planned)
 3. 🔄 PDF Export for invoices (planned)
@@ -935,18 +1004,21 @@ Display History:
 ## 🚀 KEY DIFFERENTIATORS
 
 ### Real-Time Data
+
 - **NO mock data** - All features query live database
 - Instant updates on all changes
 - Accurate calculations (waste costs, overdue amounts)
 - Real supplier data, real inventory, real invoices
 
 ### Smart Features
+
 - **AI-powered reorder suggestions** - Analyze historical patterns
 - **Automatic scheduling** - Calculate next execution dates
 - **Waste analytics** - Track costs and trends
 - **Urgency detection** - Prioritize critical items
 
 ### Comprehensive Tracking
+
 - **Complete audit trail** - All movements logged
 - **Payment history** - Track every payment
 - **Receiving history** - All deliveries documented
@@ -958,6 +1030,7 @@ Display History:
 **Version**: 2.1.0
 **Status**: Production Ready
 **Latest Changes**:
+
 - Order status workflow: ACKNOWLEDGED → PROCESSING → SHIPPED → COMPLETED
 - Draft order functionality
 - Notification system with bell icon
@@ -965,6 +1038,7 @@ Display History:
 - Database migration: order status enum updated
 
 ## Order lifecycle (restaurant)
+
 - PLACED → supplier acknowledges and fulfills
 - DELIVERED → supplier marked delivered; Restaurant should perform Receiving
 - RECEIVED_FULL / RECEIVED_PARTIAL → created by Receiving; updates inventory
