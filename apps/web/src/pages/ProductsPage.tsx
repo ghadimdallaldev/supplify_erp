@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { formatPrice, formatNumber } from '../utils/format'
+import { Skeleton } from '../components/ui/skeleton'
 
 export function ProductsPage() {
   const [search, setSearch] = useState('')
@@ -366,34 +367,27 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
     toast.success('Example file downloaded!')
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
   if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-600">Failed to load products</p>
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+        <p className="text-red-700 font-medium">Failed to load products</p>
+        <p className="text-sm text-red-600 mt-1">Please try again or contact support.</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6" data-testid="products-page">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4" data-testid="products-page">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
             {isSupplier
               ? 'Manage your product catalog'
               : 'Browse and search products from suppliers'}
           </p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex gap-2">
           {isSupplier ? (
             <>
               <Button onClick={() => setShowAddProduct(true)}>
@@ -406,23 +400,23 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               </Button>
             </>
           ) : (
-            <Button asChild>
+            <Button asChild variant="outline">
               <Link to="/app/cart">View Cart</Link>
             </Button>
           )}
         </div>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex space-x-4">
-          <div className="flex-1">
+      <div className="sticky top-0 z-10 -mx-6 px-6 py-3 bg-gray-50/95 backdrop-blur border-b border-gray-200 flex flex-col gap-4">
+        <div className="flex flex-wrap gap-3">
+          <div className="flex-1 min-w-[200px]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search products..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-white"
               />
             </div>
           </div>
@@ -584,7 +578,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
           )}
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="mt-4 border rounded-lg overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
@@ -597,132 +591,173 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filteredProducts?.map((product) => (
-              <tr
-                key={product.id}
-                className="hover:bg-gray-50 transition-colors"
-                data-testid={`product-row-${product.id}`}
-              >
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-6 w-6 text-gray-400" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{product.name}</p>
-                      <p className="text-sm text-gray-500 truncate">{product.sku}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-4">
-                  <div className="flex flex-col gap-1">
-                    <Badge variant="secondary">
-                      {product.category_name || product.category || 'N/A'}
-                    </Badge>
-                    {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {product.tags.slice(0, 3).map((tag: string, idx: number) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {product.tags.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{product.tags.length - 3}
-                          </Badge>
+            {isLoading
+              ? Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-12 w-12 rounded" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-6 w-16" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-24" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-14" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-10" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-9 w-16" />
+                    </td>
+                  </tr>
+                ))
+              : filteredProducts?.map((product) => (
+                  <tr
+                    key={product.id}
+                    className="hover:bg-gray-50 transition-colors"
+                    data-testid={`product-row-${product.id}`}
+                  >
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {product.image_url ? (
+                            <img
+                              src={product.image_url}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Package className="h-6 w-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 truncate">{product.name}</p>
+                          <p className="text-sm text-gray-500 truncate">{product.sku}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="secondary">
+                          {product.category_name || product.category || 'N/A'}
+                        </Badge>
+                        {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {product.tags.slice(0, 3).map((tag: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {product.tags.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{product.tags.length - 3}
+                              </Badge>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-4">
-                  <p className="text-sm text-gray-600">{product.supplier_name || 'N/A'}</p>
-                </td>
-                <td className="px-4 py-4">
-                  {product.current_price ? (
-                    <>
-                      <p className="font-semibold">
-                        {formatPrice(product.current_price)}
-                      </p>
-                      {product.unit && <p className="text-xs text-gray-500">per {product.unit}</p>}
-                    </>
-                  ) : (
-                    <p className="text-sm text-gray-400">N/A</p>
-                  )}
-                </td>
-                <td className="px-4 py-4">
-                  <p
-                    className={`text-sm font-medium ${
-                      parseFloat(product.available_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
-                    }`}
-                  >
-                    {formatNumber(product.available_qty, { maximumFractionDigits: 2 })} {product.unit || 'units'}
-                  </p>
-                </td>
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-2">
-                    {!isSupplier && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleAddToCart(product)}
-                        disabled={!product.available_qty || product.available_qty <= 0}
-                        data-testid={`product-add-to-cart-${product.id}`}
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="text-sm text-gray-600">{product.supplier_name || 'N/A'}</p>
+                    </td>
+                    <td className="px-4 py-4">
+                      {product.current_price ? (
+                        <>
+                          <p className="font-semibold">{formatPrice(product.current_price)}</p>
+                          {product.unit && (
+                            <p className="text-xs text-gray-500">per {product.unit}</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-400">N/A</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <p
+                        className={`text-sm font-medium ${
+                          parseFloat(product.available_qty || 0) > 0
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }`}
                       >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add to Cart
-                      </Button>
-                    )}
-                    {isSupplier && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedProductForAdjustment(product)
-                            setShowInventoryAdjustment(true)
-                          }}
-                        >
-                          <TrendingUp className="h-4 w-4 mr-1" />
-                          Adjust Stock
+                        {formatNumber(product.available_qty, { maximumFractionDigits: 2 })}{' '}
+                        {product.unit || 'units'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        {!isSupplier && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddToCart(product)}
+                            disabled={!product.available_qty || product.available_qty <= 0}
+                            data-testid={`product-add-to-cart-${product.id}`}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add to Cart
+                          </Button>
+                        )}
+                        {isSupplier && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedProductForAdjustment(product)
+                                setShowInventoryAdjustment(true)
+                              }}
+                            >
+                              <TrendingUp className="h-4 w-4 mr-1" />
+                              Adjust Stock
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                toast('Edit product functionality coming soon')
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          </>
+                        )}
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/app/products/${product.id}`}>View</Link>
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            toast('Edit product functionality coming soon')
-                          }}
-                        >
-                          Edit
-                        </Button>
-                      </>
-                    )}
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/app/products/${product.id}`}>View</Link>
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
           </tbody>
         </table>
       </div>
 
-      {filteredProducts?.length === 0 && (
-        <div className="text-center py-12">
+      {!isLoading && filteredProducts?.length === 0 && (
+        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/50 py-12 text-center">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">
-            {isSupplier
-              ? 'No products yet. Click "Add Product" to get started!'
-              : 'No products found'}
+          <p className="text-gray-600 font-medium">
+            {isSupplier ? 'No products yet' : 'No products match your filters'}
           </p>
+          <p className="text-sm text-gray-500 mt-1">
+            {isSupplier
+              ? 'Click "Add Product" to add your first item to the catalog.'
+              : 'Try adjusting search or filters.'}
+          </p>
+          {isSupplier && (
+            <Button className="mt-4" onClick={() => setShowAddProduct(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </Button>
+          )}
         </div>
       )}
 
@@ -1151,7 +1186,9 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <div className="bg-gray-50 p-4 rounded-md">
                 <p className="text-sm font-medium text-gray-700">Current Stock</p>
                 <p className="text-lg font-semibold text-green-600">
-                  {formatNumber(selectedProductForAdjustment.available_qty, { maximumFractionDigits: 2 })}{' '}
+                  {formatNumber(selectedProductForAdjustment.available_qty, {
+                    maximumFractionDigits: 2,
+                  })}{' '}
                   {selectedProductForAdjustment.unit || 'units'}
                 </p>
                 {adjustmentQuantity && (

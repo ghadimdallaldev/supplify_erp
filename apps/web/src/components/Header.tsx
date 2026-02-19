@@ -9,17 +9,19 @@ import {
 } from '../services/api'
 import { showMonetizationBlock } from '../features/monetization/monetizationSlice'
 import { Button } from './ui/button'
-import { LogOut, User, Bell, X, TrendingUp } from 'lucide-react'
+import { LogOut, User, Bell, X, TrendingUp, ShoppingBag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Badge } from './ui/badge'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 export function Header() {
   const { user } = useAppSelector((state) => state.auth)
+  const cartItemCount = useAppSelector((state) => state.cart.items.length)
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
+  const showCart = user?.role === 'RESTAURANT'
   const [logout] = useLogoutMutation()
   const [showNotifications, setShowNotifications] = useState(false)
-  const navigate = useNavigate()
   const [markAllAsRead] = useMarkAllNotificationsReadMutation()
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
@@ -123,6 +125,20 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
+            {showCart && (
+              <Link
+                to="/app/cart"
+                className="relative inline-flex items-center justify-center rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                aria-label={`Cart with ${cartItemCount} items`}
+              >
+                <ShoppingBag className="h-5 w-5" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
+                    {cartItemCount > 99 ? '99+' : cartItemCount}
+                  </span>
+                )}
+              </Link>
+            )}
             {showUpgrade && (
               <Button
                 variant={hasUrgency ? 'default' : 'outline'}

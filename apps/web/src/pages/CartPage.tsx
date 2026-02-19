@@ -152,14 +152,16 @@ export function CartPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
-          <p className="text-gray-600 mt-2">Your cart is empty</p>
+          <h1 className="text-2xl font-bold text-gray-900">Shopping Cart</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Your cart is empty</p>
         </div>
-
-        <div className="text-center py-12">
-          <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">No items in your cart</p>
-          <Button asChild>
+        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/50 py-16 text-center">
+          <ShoppingCart className="h-14 w-14 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">No items in your cart</p>
+          <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+            Add products from the catalog, then come back here to place your order.
+          </p>
+          <Button asChild className="mt-6">
             <a href="/app/products">Browse Products</a>
           </Button>
         </div>
@@ -283,21 +285,21 @@ export function CartPage() {
           ))}
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sticky top-20 self-start">
           <Card>
-            <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Order Summary</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Subtotal</span>
-                <span>${formatPrice(total)}</span>
+                <span className="font-medium">${formatPrice(total)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Tax</span>
                 <span>$0.00</span>
               </div>
-              <div className="border-t pt-4">
+              <div className="border-t pt-3">
                 <div className="flex items-center justify-between font-semibold text-lg">
                   <span>Total</span>
                   <span>${formatPrice(total)}</span>
@@ -305,7 +307,6 @@ export function CartPage() {
               </div>
             </CardContent>
           </Card>
-
           <Button
             onClick={handlePlaceOrder}
             disabled={isPlacingOrder}

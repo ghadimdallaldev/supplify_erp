@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
+import { KPICard } from '../components/KPICard'
+import { OrderStatusPill } from '../components/OrderStatusPill'
 import {
   Package,
   ShoppingCart,
@@ -297,29 +299,33 @@ export function DashboardPage() {
     : []
 
   return (
-    <div className="space-y-6" data-testid="dashboard-page">
-      <div className="rounded-2xl p-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-sm">
-        <h1 className="text-3xl font-bold">
-          {isSupplier ? 'Supplier Dashboard' : isRestaurant ? 'Restaurant Dashboard' : 'Dashboard'}
-        </h1>
-        <p className="mt-2 opacity-90">Clear, visual insights tailored to your role</p>
-        {(hasRevenue || hasSpend) && (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {hasRevenue && (
-              <div className="rounded-xl bg-white/10 p-4">
-                <p className="text-xs uppercase tracking-wide opacity-80">Revenue</p>
-                <p className="text-lg font-semibold">
-                  {formatCurrency(stats.totalRevenue)}
-                </p>
-              </div>
-            )}
-            {hasSpend && (
-              <div className="rounded-xl bg-white/10 p-4">
-                <p className="text-xs uppercase tracking-wide opacity-80">Total Spent</p>
-                <p className="text-lg font-semibold">{formatCurrency(stats.totalSpent)}</p>
-              </div>
-            )}
-          </div>
+    <div className="space-y-8" data-testid="dashboard-page">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isSupplier
+              ? 'Supplier Dashboard'
+              : isRestaurant
+                ? 'Restaurant Dashboard'
+                : 'Dashboard'}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">Daily snapshot and quick actions</p>
+        </div>
+        {isRestaurant && (
+          <Button asChild size="lg" className="shrink-0">
+            <Link to="/app/cart">
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Create Order
+            </Link>
+          </Button>
+        )}
+        {isSupplier && (
+          <Button asChild size="lg" variant="outline" className="shrink-0">
+            <Link to="/app/orders">
+              <Package className="h-4 w-4 mr-2" />
+              View Orders
+            </Link>
+          </Button>
         )}
       </div>
 
@@ -361,21 +367,15 @@ export function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {kpis.map((kpi) => (
-          <Card
+          <KPICard
             key={kpi.title}
-            className="transition-transform hover:shadow-md hover:-translate-y-0.5"
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
-              <kpi.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpi.value}</div>
-              <p className="text-xs text-muted-foreground">{kpi.description}</p>
-            </CardContent>
-          </Card>
+            title={kpi.title}
+            value={kpi.value}
+            description={kpi.description}
+            icon={kpi.icon}
+          />
         ))}
       </div>
 
@@ -384,60 +384,47 @@ export function DashboardPage() {
       <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
         <div className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Recent Orders</CardTitle>
               <CardDescription>
                 Last 5 orders {isSupplier ? 'from your customers' : 'you placed'}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-4 h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={recentOrderData}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="amountGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
-                    <Tooltip cursor={{ stroke: '#6366f1', strokeWidth: 1 }} />
-                    <Area
-                      type="monotone"
-                      dataKey="amount"
-                      stroke="#6366f1"
-                      fillOpacity={1}
-                      fill="url(#amountGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="divide-y">
+              <div className="divide-y divide-gray-100">
                 {recentOrders?.orders?.length ? (
-                  recentOrders.orders.map((o: any) => (
-                    <a
+                  recentOrders.orders.slice(0, 5).map((o: any) => (
+                    <Link
                       key={o.id}
-                      href={`/app/orders/${o.id}`}
-                      className="flex items-center justify-between py-3 hover:bg-gray-50 rounded-md px-2 transition-colors"
+                      to={`/app/orders/${o.id}`}
+                      className="flex items-center justify-between py-3 hover:bg-gray-50 rounded-md px-2 -mx-2 transition-colors"
                     >
-                      <div>
-                        <p className="text-sm font-medium">Order #{o.id.slice(0, 8)}</p>
-                        <p className="text-xs text-gray-500">{o.status}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          #{o.id.slice(-8).toUpperCase()}
+                          {o.restaurant_name && (
+                            <span className="text-gray-500 font-normal">
+                              {' '}
+                              · {o.restaurant_name}
+                            </span>
+                          )}
+                        </p>
+                        <OrderStatusPill status={o.status} className="mt-1" />
                       </div>
-                      <div className="text-sm font-semibold">
+                      <div className="text-sm font-semibold text-gray-900 shrink-0 ml-3">
                         {formatCurrency(o.total_amount)}
                       </div>
-                    </a>
+                    </Link>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground py-2">No recent orders</p>
+                  <p className="text-sm text-gray-500 py-6 text-center">No recent orders</p>
                 )}
               </div>
+              {recentOrders?.orders?.length ? (
+                <Button variant="ghost" size="sm" className="w-full mt-2" asChild>
+                  <Link to="/app/orders">View all orders</Link>
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -546,6 +533,41 @@ export function DashboardPage() {
         </div>
 
         <div className="space-y-6">
+          {isSupplier &&
+            (() => {
+              const requiringAction = (recentOrders?.orders || []).filter(
+                (o: any) => o.status === 'PLACED'
+              )
+              return requiringAction.length > 0 ? (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Orders Requiring Action</CardTitle>
+                    <CardDescription>Awaiting your acknowledgment</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {requiringAction.slice(0, 5).map((o: any) => (
+                        <Link
+                          key={o.id}
+                          to={`/app/orders/${o.id}`}
+                          className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
+                        >
+                          <span className="text-sm font-medium truncate">
+                            #{o.id.slice(-8).toUpperCase()} · {o.restaurant_name}
+                          </span>
+                          <span className="text-sm font-semibold text-amber-700">
+                            {formatCurrency(o.total_amount)}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full mt-3" asChild>
+                      <Link to="/app/orders">View all</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : null
+            })()}
           <Card>
             <CardHeader>
               <CardTitle>Orders Trend</CardTitle>

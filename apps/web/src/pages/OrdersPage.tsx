@@ -22,22 +22,12 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
-import {
-  ShoppingCart,
-  Search,
-  Package,
-  Truck,
-  FileText,
-  CheckCircle,
-  Clock,
-  Filter,
-  Plus,
-  AlertCircle,
-} from 'lucide-react'
+import { ShoppingCart, Search, Plus, AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
+import { OrderStatusPill } from '../components/OrderStatusPill'
 
 export function OrdersPage() {
   const [status, setStatus] = useState('')
@@ -185,55 +175,6 @@ export function OrdersPage() {
       product.sku?.toLowerCase().includes(productSearch.toLowerCase())
   )
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PLACED':
-        return 'default'
-      case 'ACKNOWLEDGED':
-        return 'secondary'
-      case 'PROCESSING':
-        return 'default'
-      case 'SHIPPED':
-        return 'default'
-      case 'DELIVERED':
-        return 'secondary'
-      case 'RECEIVED_PARTIAL':
-        return 'secondary'
-      case 'RECEIVED_FULL':
-        return 'default'
-      case 'INVOICED':
-        return 'default'
-      case 'COMPLETED':
-        return 'default'
-      case 'CANCELLED':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ACKNOWLEDGED':
-        return <CheckCircle className="h-4 w-4" />
-      case 'PROCESSING':
-        return <Package className="h-4 w-4" />
-      case 'SHIPPED':
-        return <Truck className="h-4 w-4" />
-      case 'DELIVERED':
-        return <Truck className="h-4 w-4" />
-      case 'RECEIVED_PARTIAL':
-      case 'RECEIVED_FULL':
-        return <CheckCircle className="h-4 w-4" />
-      case 'INVOICED':
-        return <FileText className="h-4 w-4" />
-      case 'COMPLETED':
-        return <CheckCircle className="h-4 w-4" />
-      default:
-        return <Clock className="h-4 w-4" />
-    }
-  }
-
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
@@ -337,11 +278,11 @@ export function OrdersPage() {
   }
 
   return (
-    <div className="space-y-6 p-6" data-testid="orders-page">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4" data-testid="orders-page">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Orders Inbox</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
             {isSupplier
               ? 'Manage inbound orders from restaurants'
               : 'Track your orders and their status'}
@@ -365,233 +306,186 @@ export function OrdersPage() {
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search by order ID or restaurant..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-2">
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">All Statuses</option>
-                <option value="PLACED">Placed</option>
-                <option value="ACKNOWLEDGED">Acknowledged</option>
-                <option value="PROCESSING">Processing</option>
-                <option value="SHIPPED">Shipped</option>
-                <option value="DELIVERED">Delivered</option>
-                <option value="RECEIVED_PARTIAL">Received (Partial)</option>
-                <option value="RECEIVED_FULL">Received (Full)</option>
-                <option value="INVOICED">Invoiced</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
-              <Button variant="outline">
-                <Filter className="h-4 w-4 mr-2" />
-                More Filters
-              </Button>
-            </div>
+      {/* Sticky filters */}
+      <div className="sticky top-0 z-10 -mx-6 px-6 py-3 bg-gray-50/95 backdrop-blur border-b border-gray-200">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by order ID or restaurant..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 bg-white"
+            />
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="h-10 rounded-md border border-gray-300 bg-white px-3 text-sm"
+            >
+              <option value="">All Statuses</option>
+              <option value="PLACED">Placed</option>
+              <option value="ACKNOWLEDGED">Acknowledged</option>
+              <option value="PROCESSING">Processing</option>
+              <option value="SHIPPED">Shipped</option>
+              <option value="DELIVERED">Delivered</option>
+              <option value="RECEIVED_PARTIAL">Received (Partial)</option>
+              <option value="RECEIVED_FULL">Received (Full)</option>
+              <option value="INVOICED">Invoiced</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="bg-white">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="new">New</TabsTrigger>
+                <TabsTrigger value="processing">Processing</TabsTrigger>
+                <TabsTrigger value="shipped">Shipped</TabsTrigger>
+                <TabsTrigger value="completed">Completed</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
+      </div>
 
-      {/* Order Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All Orders</TabsTrigger>
-          <TabsTrigger value="new">New (Needs Action)</TabsTrigger>
-          <TabsTrigger value="processing">Processing</TabsTrigger>
-          <TabsTrigger value="shipped">Shipped</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={activeTab} className="space-y-4">
-          <div className="space-y-4">
-            {filteredOrders?.map((order: any) => (
-              <Card
-                key={order.id}
-                className="hover:shadow-md transition-shadow"
-                data-testid={`order-row-${order.id}`}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <CardTitle className="text-lg">
-                          Order #{order.id.slice(-8).toUpperCase()}
-                        </CardTitle>
-                        <Badge
-                          variant={getStatusColor(order.status)}
-                          className="flex items-center gap-1"
-                        >
-                          {getStatusIcon(order.status)}
-                          {order.status}
-                        </Badge>
-                        {order.status === 'PLACED' && isSupplier && (
-                          <Badge variant="destructive">Action Required</Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <div>Restaurant: {order.restaurant_name}</div>
-                        <div>
-                          Placed: {new Date(order.placed_at || order.created_at).toLocaleString()}
-                        </div>
-                        {!isSupplier && order.status === 'DELIVERED' && (
-                          <div className="mt-2 p-2 rounded bg-blue-50 text-blue-700 border border-blue-200 text-xs">
-                            Supplier marked this order as delivered. Please{' '}
-                            <Link to={`/app/receiving?order=${order.id}`} className="underline">
-                              receive this order
-                            </Link>{' '}
-                            to update inventory and generate an invoice.
-                          </div>
-                        )}
-                        {isSupplier && order.status === 'DELIVERED' && (
-                          <div className="mt-2 p-2 rounded bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs">
-                            Awaiting restaurant receiving. You’ll see the invoice after they
-                            receive.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">
-                        {`$${formatPrice(order.total_amount)}`}
-                      </div>
-                      <div className="text-sm text-gray-600">{order.items?.length || 0} items</div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    {/* Order Items Preview */}
-                    <div className="flex-1">
-                      <div className="text-sm text-gray-600 mb-2">Items:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {order.items?.slice(0, 3).map((item: any, idx: number) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {item.product_name} × {item.quantity}
-                          </Badge>
-                        ))}
-                        {order.items && order.items.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{order.items.length - 3} more
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      {isSupplier && order.status === 'PLACED' && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
-                            data-testid={`order-${order.id}-acknowledge`}
-                          >
-                            Acknowledge
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
-                            data-testid={`order-${order.id}-decline`}
-                          >
-                            Decline
-                          </Button>
-                        </>
-                      )}
-                      {isSupplier && order.status === 'ACKNOWLEDGED' && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
-                          data-testid={`order-${order.id}-start-processing`}
-                        >
-                          Start Processing
-                        </Button>
-                      )}
-                      {isSupplier && order.status === 'PROCESSING' && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
-                          data-testid={`order-${order.id}-ship`}
-                        >
-                          Mark as Shipped
-                        </Button>
-                      )}
-                      {isSupplier && order.status === 'SHIPPED' && updatingOrderId !== order.id && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
-                          disabled={false}
-                          data-testid={`order-${order.id}-deliver`}
-                        >
-                          Mark Delivered
-                        </Button>
-                      )}
-                      {isSupplier &&
-                        (updatingOrderId === order.id || order.status === 'DELIVERED') && (
-                          <Button
-                            size="sm"
-                            variant={order.status === 'DELIVERED' ? 'outline' : 'default'}
-                            disabled
-                            className="cursor-not-allowed opacity-75"
-                          >
-                            {updatingOrderId === order.id ? (
-                              <>Updating...</>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Delivered
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      {!isSupplier && order.status === 'PLACED' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSendReminder(order.id)}
-                        >
-                          <AlertCircle className="h-4 w-4 mr-1" />
-                          {order.reminder_count > 0
-                            ? `Remind (${order.reminder_count})`
-                            : 'Send Reminder'}
-                        </Button>
-                      )}
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/app/orders/${order.id}`}>
-                          <FileText className="h-4 w-4 mr-1" />
-                          View Details
-                        </Link>
+      <Tabs value={activeTab} className="space-y-4">
+        <TabsContent value={activeTab} className="space-y-3 mt-4">
+          {filteredOrders?.map((order: any) => (
+            <Card
+              key={order.id}
+              className="hover:shadow-md transition-shadow overflow-hidden"
+              data-testid={`order-row-${order.id}`}
+            >
+              {/* Top row: ID + name | Status | Primary action */}
+              <div className="flex flex-wrap items-center gap-3 p-4 border-b border-gray-100">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-gray-900">
+                    #{order.id.slice(-8).toUpperCase()}
+                    <span className="text-gray-500 font-normal ml-1">
+                      {order.restaurant_name || order.supplier_name || ''}
+                    </span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {new Date(order.placed_at || order.created_at).toLocaleString()}
+                    {order.items?.length != null && ` · ${order.items.length} items`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <OrderStatusPill status={order.status} />
+                  {order.status === 'PLACED' && isSupplier && (
+                    <Badge variant="destructive" className="text-xs">
+                      Action required
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isSupplier && order.status === 'PLACED' && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleStatusUpdate(order.id, 'ACKNOWLEDGED')}
+                        data-testid={`order-${order.id}-acknowledge`}
+                      >
+                        Acknowledge
                       </Button>
-                      {isSupplier && (
-                        <Button variant="outline" size="sm">
-                          <Package className="h-4 w-4 mr-1" />
-                          Packing Slip
-                        </Button>
-                      )}
-                    </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
+                        data-testid={`order-${order.id}-decline`}
+                      >
+                        Decline
+                      </Button>
+                    </>
+                  )}
+                  {isSupplier && order.status === 'ACKNOWLEDGED' && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
+                      data-testid={`order-${order.id}-start-processing`}
+                    >
+                      Start Processing
+                    </Button>
+                  )}
+                  {isSupplier && order.status === 'PROCESSING' && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
+                      data-testid={`order-${order.id}-ship`}
+                    >
+                      Mark Shipped
+                    </Button>
+                  )}
+                  {isSupplier && order.status === 'SHIPPED' && updatingOrderId !== order.id && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
+                      data-testid={`order-${order.id}-deliver`}
+                    >
+                      Mark Delivered
+                    </Button>
+                  )}
+                  {isSupplier && (updatingOrderId === order.id || order.status === 'DELIVERED') && (
+                    <Button size="sm" variant="outline" disabled className="opacity-75">
+                      {updatingOrderId === order.id ? 'Updating...' : 'Delivered'}
+                    </Button>
+                  )}
+                  {!isSupplier && order.status === 'PLACED' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSendReminder(order.id)}
+                    >
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      {order.reminder_count > 0 ? `Remind (${order.reminder_count})` : 'Remind'}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/app/orders/${order.id}`}>View</Link>
+                  </Button>
+                </div>
+              </div>
+              {/* Details row */}
+              <CardContent className="p-4 pt-0">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap gap-2">
+                    {order.items?.slice(0, 3).map((item: any, idx: number) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        {item.product_name} × {item.quantity}
+                      </Badge>
+                    ))}
+                    {order.items?.length > 3 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{order.items.length - 3} more
+                      </Badge>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {formatPrice(order.total_amount)}
+                  </div>
+                </div>
+                {!isSupplier && order.status === 'DELIVERED' && (
+                  <div className="mt-3 p-2 rounded bg-blue-50 text-blue-700 border border-blue-200 text-xs">
+                    Supplier marked as delivered.{' '}
+                    <Link to={`/app/receiving?order=${order.id}`} className="underline">
+                      Receive this order
+                    </Link>
+                  </div>
+                )}
+                {isSupplier && order.status === 'DELIVERED' && (
+                  <div className="mt-3 p-2 rounded bg-amber-50 text-amber-800 border border-amber-200 text-xs">
+                    Awaiting restaurant receiving.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
 
           {(!filteredOrders || filteredOrders.length === 0) && (
             <div className="text-center py-12 rounded-lg border border-dashed border-gray-300 bg-gray-50/50">
               <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 font-medium">No orders yet</p>
+              <p className="text-gray-600 font-medium">No orders match your filters</p>
               <p className="text-sm text-gray-500 mt-1">
                 {!isSupplier
                   ? 'Create your first order to get started.'
@@ -610,7 +504,6 @@ export function OrdersPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Manual Order Creation Dialog */}
       {isSupplier && (
         <Dialog open={showManualOrderDialog} onOpenChange={setShowManualOrderDialog}>
           <DialogContent className="max-w-2xl">
