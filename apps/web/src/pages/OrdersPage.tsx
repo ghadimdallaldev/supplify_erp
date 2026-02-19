@@ -37,6 +37,7 @@ import {
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import toast from 'react-hot-toast'
+import { formatPrice } from '../utils/format'
 
 export function OrdersPage() {
   const [status, setStatus] = useState('')
@@ -464,12 +465,7 @@ export function OrdersPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-primary">
-                        {typeof order.total_amount === 'number' && !isNaN(order.total_amount)
-                          ? `$${order.total_amount.toFixed(2)}`
-                          : typeof order.total_amount === 'string' &&
-                              !isNaN(parseFloat(order.total_amount))
-                            ? `$${parseFloat(order.total_amount).toFixed(2)}`
-                            : '$0.00'}
+                        {`$${formatPrice(order.total_amount)}`}
                       </div>
                       <div className="text-sm text-gray-600">{order.items?.length || 0} items</div>
                     </div>
@@ -666,7 +662,7 @@ export function OrdersPage() {
                       <div key={item.productId} className="flex items-center justify-between p-3">
                         <div className="flex-1">
                           <p className="font-medium">{item.productName}</p>
-                          <p className="text-sm text-gray-600">${item.price?.toFixed(2)} each</p>
+                          <p className="text-sm text-gray-600">${formatPrice(item.price)} each</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
@@ -759,7 +755,7 @@ export function OrdersPage() {
                     <p className="font-medium">{product.name}</p>
                     <p className="text-sm text-gray-600">{product.sku}</p>
                     <p className="text-sm font-semibold text-green-600">
-                      ${product.price?.toFixed(2)} / {product.unit}
+                      ${formatPrice(product.price)} / {product.unit}
                     </p>
                   </div>
                   <Button

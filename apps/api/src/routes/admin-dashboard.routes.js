@@ -396,21 +396,42 @@ router.get('/plans', async (req, res) => {
     let plans
 
     try {
-      const plansQuery =
+      // Deduplicate by (code, tenant_type): keep one row per plan code per tenant type (prefer active, then by id)
+      const tenantFilter =
         tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType)
-          ? `SELECT * FROM subscription_plan WHERE tenant_type = $1 ORDER BY display_order, name`
-          : `SELECT * FROM subscription_plan ORDER BY tenant_type, display_order, name`
+          ? 'WHERE tenant_type = $1'
+          : ''
       const plansParams =
         tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType) ? [tenantType] : []
-      const result = await query(plansQuery, plansParams)
+      const result = await query(
+        `
+        SELECT * FROM (
+          SELECT DISTINCT ON (code, tenant_type) *
+          FROM subscription_plan
+          ${tenantFilter}
+          ORDER BY code, tenant_type, is_active DESC NULLS LAST, id
+        ) deduped
+        ORDER BY tenant_type, display_order NULLS LAST, name`,
+        plansParams
+      )
       plans = result.rows
     } catch (queryErr) {
       if (
         queryErr.code === '42703' ||
         /tenant_type|column.*does not exist/i.test(queryErr.message)
       ) {
-        const { rows } = await query(`SELECT * FROM subscription_plan ORDER BY display_order, name`)
+        const { rows } = await query(
+          `SELECT * FROM subscription_plan ORDER BY display_order NULLS LAST, name`
+        )
         plans = rows.map((p) => ({ ...p, tenant_type: p.tenant_type || 'RESTAURANT' }))
+        // Dedupe by (code, tenant_type) in JS when column may be missing
+        const seen = new Set()
+        plans = plans.filter((p) => {
+          const key = `${p.code}|${p.tenant_type || 'RESTAURANT'}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
         if (tenantType && ['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
           plans = plans.filter((p) => (p.tenant_type || 'RESTAURANT') === tenantType)
         }
@@ -709,21 +730,28 @@ router.get('/subscriptions', async (req, res) => {
       params.push(tenantType)
     }
 
+    // One subscription per tenant: prefer ACTIVE, then TRIALING, then most recent
     const { rows: subscriptions } = await query(
       `
-      SELECT s.*,
+      SELECT sub.*,
         sp.price_per_month, sp.price_per_year, sp.limits as plan_limits, sp.features as plan_features,
         COALESCE(
-          CASE WHEN s.tenant_type = 'SUPPLIER' THEN su.name ELSE NULL END,
-          CASE WHEN s.tenant_type = 'RESTAURANT' THEN r.name ELSE NULL END
+          CASE WHEN sub.tenant_type = 'SUPPLIER' THEN su.name ELSE NULL END,
+          CASE WHEN sub.tenant_type = 'RESTAURANT' THEN r.name ELSE NULL END
         ) as tenant_name,
         COALESCE(su.contact_email, r.contact_email) as tenant_email
-      FROM subscription s
-      JOIN subscription_plan sp ON sp.id = s.plan_id
-      LEFT JOIN supplier su ON (s.tenant_id = su.id AND s.tenant_type = 'SUPPLIER')
-      LEFT JOIN restaurant r ON (s.tenant_id = r.id AND s.tenant_type = 'RESTAURANT')
-      ${whereClause}
-      ORDER BY s.created_at DESC
+      FROM (
+        SELECT DISTINCT ON (s.tenant_id, s.tenant_type) s.*
+        FROM subscription s
+        ${whereClause}
+        ORDER BY s.tenant_id, s.tenant_type,
+          CASE s.status WHEN 'ACTIVE' THEN 1 WHEN 'TRIALING' THEN 2 ELSE 3 END,
+          s.created_at DESC
+      ) sub
+      JOIN subscription_plan sp ON sp.id = sub.plan_id
+      LEFT JOIN supplier su ON (sub.tenant_id = su.id AND sub.tenant_type = 'SUPPLIER')
+      LEFT JOIN restaurant r ON (sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT')
+      ORDER BY sub.created_at DESC
     `,
       params
     )

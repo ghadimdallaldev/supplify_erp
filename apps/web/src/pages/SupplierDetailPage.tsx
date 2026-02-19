@@ -7,6 +7,7 @@ import { Building2, Mail, Phone, MapPin, Package, MessageSquare, Heart, Shopping
 import { useAppSelector } from '../hooks/redux'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { formatCurrency, formatPrice } from '../utils/format'
 
 export function SupplierDetailPage() {
   const { id } = useParams()
@@ -165,7 +166,7 @@ export function SupplierDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Spent</p>
-                  <p className="text-2xl font-bold text-gray-900">${stats.totalSpent.toFixed(0)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalSpent, { maximumFractionDigits: 0 })}</p>
                 </div>
                 <DollarSign className="h-8 w-8 text-green-500" />
               </div>
@@ -176,7 +177,7 @@ export function SupplierDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                  <p className="text-2xl font-bold text-gray-900">${stats.averageOrderValue.toFixed(0)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.averageOrderValue, { maximumFractionDigits: 0 })}</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-purple-500" />
               </div>
@@ -300,7 +301,7 @@ export function SupplierDetailPage() {
             </div>
             {supplier.avg_price > 0 && (
               <div>
-                <p className="text-2xl font-bold text-green-600">${parseFloat(supplier.avg_price).toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-600">{formatPrice(supplier.avg_price)}</p>
                 <p className="text-sm text-gray-600">Average product price</p>
               </div>
             )}
@@ -360,7 +361,7 @@ export function SupplierDetailPage() {
                   <p className="text-sm text-gray-600 mb-2">{product.sku}</p>
                   <div className="flex items-center justify-between">
                     <p className="font-semibold">
-                      ${product.current_price ? parseFloat(product.current_price).toFixed(2) : 'N/A'}
+                      {product.current_price ? formatPrice(product.current_price) : 'N/A'}
                     </p>
                     <p className="text-sm text-gray-600">
                       Stock: {product.available_qty || 0}

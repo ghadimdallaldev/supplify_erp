@@ -26,6 +26,7 @@ import {
 } from '../features/cart/cartSlice'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
+import { formatPrice } from '../utils/format'
 
 export function CartPage() {
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
@@ -200,7 +201,7 @@ export function CartPage() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>{group.supplierName}</span>
-                  <Badge variant="secondary">${group.subtotal.toFixed(2)}</Badge>
+                  <Badge variant="secondary">${formatPrice(group.subtotal)}</Badge>
                 </CardTitle>
                 <CardDescription>
                   {group.items.length} item{group.items.length !== 1 ? 's' : ''}
@@ -231,7 +232,7 @@ export function CartPage() {
                       <p className="text-sm text-gray-600">
                         $
                         {typeof item.product.current_price === 'number'
-                          ? item.product.current_price.toFixed(2)
+                          ? formatPrice(item.product.current_price)
                           : item.product.current_price || 'N/A'}{' '}
                         per {item.product.unit || 'unit'}
                       </p>
@@ -290,7 +291,7 @@ export function CartPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Subtotal</span>
-                <span>${total.toFixed(2)}</span>
+                <span>${formatPrice(total)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Tax</span>
@@ -299,7 +300,7 @@ export function CartPage() {
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between font-semibold text-lg">
                   <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>${formatPrice(total)}</span>
                 </div>
               </div>
             </CardContent>

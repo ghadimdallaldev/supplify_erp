@@ -45,8 +45,8 @@ export function LoginPage() {
   const demoAccounts = [
     {
       role: 'Admin',
-      email: 'supplifyadmin@supplify.com',
-      password: 'Supplify2025!',
+      email: 'admin@supplify.com',
+      password: 'SupplifyAdmin1!',
       color: 'bg-purple-100 text-purple-800',
     },
     {

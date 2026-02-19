@@ -13,8 +13,8 @@
  * Requires: DATABASE_URL (or default postgresql://postgres:postgres@localhost:5432/supplify)
  *
  * After running:
- * - Ensure Keycloak has exactly the users you want (e.g. run seed:demo-users once).
- * - Login: Admin = supplifyadmin@supplify.com, Restaurant = restaurant@supplify.com,
+ * - Run seed:demo-users so Keycloak has exactly 1 admin, 1 restaurant, 1 supplier.
+ * - Login: Admin = admin@supplify.com, Restaurant = restaurant@supplify.com,
  *   Supplier = supplier@supplify.com (passwords from seed:demo-users).
  */
 import 'dotenv/config'
@@ -120,12 +120,13 @@ async function main() {
     await deleteAllTenantData(client)
     await runSeed(client)
     await client.query('COMMIT')
-    console.log('✅ Done. You now have:')
-    console.log('   • 1 Admin (supplifyadmin@supplify.com / admin@supplify.com)')
-    console.log('   • 1 Restaurant (Golden Fork – restaurant@supplify.com)')
-    console.log('   • 1 Supplier (Fresh Foods Co. – supplier@supplify.com)')
+    console.log('✅ Done. You now have 1 admin, 1 restaurant, 1 supplier:')
+    console.log('   • Admin:      admin@supplify.com')
+    console.log('   • Restaurant: Golden Fork – restaurant@supplify.com')
+    console.log('   • Supplier:   Fresh Foods Co. – supplier@supplify.com')
+    console.log('   • Each tenant has an ACTIVE Free subscription.')
     console.log(
-      '\n   Run seed:demo-users if Keycloak users are missing, then use docs/MANUAL_TEST_CHECKLIST.md to test all features.'
+      '\n   Run seed:demo-users so Keycloak has exactly these 3 users, then use docs/MANUAL_TEST_CHECKLIST.md to test.'
     )
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})

@@ -17,6 +17,7 @@ import Papa from 'papaparse'
 import { LogoUpload } from '../components/LogoUpload'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { useAppSelector } from '../hooks/redux'
+import { formatCurrency } from '../utils/format'
 import { 
   useGetSupplierMeQuery, 
   useUpdateSupplierMutation, 
@@ -393,7 +394,7 @@ export function SupplierSettingsPage() {
               <div>
                 <p className="text-sm font-medium text-purple-700">Total Revenue</p>
                 <p className="text-2xl font-bold text-purple-900">
-                  ${Number(statistics.totalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(statistics.totalRevenue)}
                 </p>
                 <p className="text-xs text-purple-600 mt-1">All-time</p>
               </div>

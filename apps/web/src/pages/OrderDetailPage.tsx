@@ -25,18 +25,9 @@ import {
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import toast from 'react-hot-toast'
+import { formatPrice } from '../utils/format'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
-
-const formatPrice = (price: any): string => {
-  if (typeof price === 'number' && !isNaN(price)) {
-    return price.toFixed(2)
-  }
-  if (typeof price === 'string' && !isNaN(parseFloat(price))) {
-    return parseFloat(price).toFixed(2)
-  }
-  return '0.00'
-}
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -500,13 +491,13 @@ export function OrderDetailPage() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-2xl font-bold">${parseFloat(invoice.total_amount || 0).toFixed(2)}</p>
+                              <p className="text-2xl font-bold">${formatPrice(invoice.total_amount)}</p>
                               <p className={`text-sm font-semibold ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                Balance: ${remaining.toFixed(2)}
+                                Balance: ${formatPrice(remaining)}
                               </p>
-                              {parseFloat(invoice.total_paid || 0) > 0 && (
+                              {parseFloat(String(invoice.total_paid || 0)) > 0 && (
                                 <p className="text-xs text-green-600">
-                                  Paid: ${parseFloat(invoice.total_paid || 0).toFixed(2)}
+                                  Paid: ${formatPrice(invoice.total_paid)}
                                 </p>
                               )}
                             </div>

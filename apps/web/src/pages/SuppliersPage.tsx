@@ -12,6 +12,7 @@ import {
 import { useAppSelector } from '../hooks/redux'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { formatPrice } from '../utils/format'
 
 export function SuppliersPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -363,7 +364,7 @@ export function SuppliersPage() {
                         <span className="text-xs font-medium text-green-700">Avg Price</span>
                       </div>
                       <p className="text-xl font-bold text-green-900">
-                        ${parseFloat(supplier.avg_price).toFixed(2)}
+                        ${formatPrice(supplier.avg_price)}
                       </p>
                     </div>
                   )}
@@ -506,7 +507,7 @@ export function SuppliersPage() {
                         {supplier.avg_price > 0 && (
                           <span className="flex items-center gap-1">
                             <TrendingUp className="h-4 w-4" />
-                            Avg: ${parseFloat(supplier.avg_price).toFixed(2)}
+                            Avg: ${formatPrice(supplier.avg_price)}
                           </span>
                         )}
                         {supplier.address_json && (

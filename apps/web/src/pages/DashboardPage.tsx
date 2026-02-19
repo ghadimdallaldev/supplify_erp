@@ -42,6 +42,7 @@ import {
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { CalendarView } from '../components/CalendarView'
+import { formatCurrency } from '../utils/format'
 
 export function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -189,7 +190,7 @@ export function DashboardPage() {
     if (typeof stats?.totalRevenue === 'number') {
       kpis.push({
         title: 'Revenue',
-        value: `$${Number(stats.totalRevenue).toLocaleString()}`,
+        value: formatCurrency(stats.totalRevenue),
         icon: DollarSign,
         description: 'All-time',
       })
@@ -228,7 +229,7 @@ export function DashboardPage() {
     if (typeof stats?.totalSpent === 'number') {
       kpis.push({
         title: 'Total Spent',
-        value: `$${stats.totalSpent.toFixed(2)}`,
+        value: formatCurrency(stats.totalSpent),
         icon: DollarSign,
         description: 'All-time',
       })
@@ -308,14 +309,14 @@ export function DashboardPage() {
               <div className="rounded-xl bg-white/10 p-4">
                 <p className="text-xs uppercase tracking-wide opacity-80">Revenue</p>
                 <p className="text-lg font-semibold">
-                  ${Number(stats.totalRevenue).toLocaleString()}
+                  {formatCurrency(stats.totalRevenue)}
                 </p>
               </div>
             )}
             {hasSpend && (
               <div className="rounded-xl bg-white/10 p-4">
                 <p className="text-xs uppercase tracking-wide opacity-80">Total Spent</p>
-                <p className="text-lg font-semibold">${stats.totalSpent.toFixed(2)}</p>
+                <p className="text-lg font-semibold">{formatCurrency(stats.totalSpent)}</p>
               </div>
             )}
           </div>
@@ -429,7 +430,7 @@ export function DashboardPage() {
                         <p className="text-xs text-gray-500">{o.status}</p>
                       </div>
                       <div className="text-sm font-semibold">
-                        ${o.total_amount?.toFixed ? o.total_amount.toFixed(2) : o.total_amount}
+                        {formatCurrency(o.total_amount)}
                       </div>
                     </a>
                   ))

@@ -5,6 +5,7 @@ import {
   getUserInfo,
   revokeToken,
   refreshAccessToken,
+  getKeycloakLogoutUrl,
 } from '../lib/auth.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
@@ -257,8 +258,12 @@ router.post('/refresh', async (req, res) => {
   }
 })
 
-// Logout
+// Logout: revoke tokens, clear cookies and session, return Keycloak logout URL so frontend
+// can redirect the user to clear Keycloak SSO session (user must re-enter credentials next login).
 router.post('/logout', requireAuth, async (req, res) => {
+  const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+  const postLogoutRedirectUri = `${webOrigin}/login`
+
   try {
     const accessToken = req.cookies.access_token
     const refreshToken = req.cookies.refresh_token
@@ -271,28 +276,56 @@ router.post('/logout', requireAuth, async (req, res) => {
       await revokeToken(refreshToken)
     }
 
-    // Clear cookies (including impersonation so admin cannot remain impersonating after logout)
+    // Clear cookies (same path/sameSite as set so browser actually removes them)
     clearAuthCookies(res)
     clearImpersonationCookie(res)
 
-    logger.info('User logged out', { userId: req.userData.id })
+    // Destroy Express session so session cookie is cleared
+    await new Promise((resolve, reject) => {
+      req.session.destroy((err) => {
+        if (err) reject(err)
+        else resolve()
+      })
+    })
+
+    // Keycloak logout URL: redirect user there to clear Keycloak SSO session
+    let keycloakLogoutUrl = null
+    try {
+      keycloakLogoutUrl = await getKeycloakLogoutUrl(postLogoutRedirectUri)
+    } catch (e) {
+      logger.warn('Could not build Keycloak logout URL', { error: e.message })
+    }
+
+    logger.info('User logged out', { userId: req.userData?.id })
 
     res.json({
       ok: true,
-      data: { message: 'Logged out successfully' },
+      data: {
+        message: 'Logged out successfully',
+        keycloakLogoutUrl: keycloakLogoutUrl || undefined,
+      },
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
     logger.error('Logout error', { error: error.message })
 
-    // Clear cookies even if revocation fails (including impersonation)
+    // Clear cookies and session even if revocation or destroy fails
     clearAuthCookies(res)
     clearImpersonationCookie(res)
+    req.session.destroy(() => {})
+
+    let keycloakLogoutUrl = null
+    try {
+      keycloakLogoutUrl = await getKeycloakLogoutUrl(postLogoutRedirectUri)
+    } catch (_) {}
 
     res.json({
       ok: true,
-      data: { message: 'Logged out successfully' },
+      data: {
+        message: 'Logged out successfully',
+        keycloakLogoutUrl: keycloakLogoutUrl || undefined,
+      },
       error: null,
       requestId: req.requestId,
     })

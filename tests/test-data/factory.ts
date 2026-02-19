@@ -11,10 +11,11 @@ export const TEST_ORG_IDS = {
 /** Order ID used by E2E reset-seed for orders_basic and orders_delivered. */
 export const E2E_ORDER_ID = 'e2e00001-0001-4001-8001-000000000001'
 
+/** Align with seed:demo-users: 1 admin, 1 restaurant, 1 supplier. */
 export const DEMO_USER_EMAILS = {
-  admin: process.env.E2E_ADMIN_EMAIL || 'supplifyadmin@supplify.com',
-  restaurant: process.env.E2E_RESTAURANT_EMAIL || 'restaurant-1@test.com',
-  supplier: process.env.E2E_SUPPLIER_EMAIL || 'contact-0@supplier0.test',
+  admin: process.env.E2E_ADMIN_EMAIL || 'admin@supplify.com',
+  restaurant: process.env.E2E_RESTAURANT_EMAIL || 'restaurant@supplify.com',
+  supplier: process.env.E2E_SUPPLIER_EMAIL || 'supplier@supplify.com',
 } as const
 
 export interface SeededData {

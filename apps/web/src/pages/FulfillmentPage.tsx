@@ -24,6 +24,7 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Input } from '../components/ui/input'
+import { formatPrice } from '../utils/format'
 import {
   Package,
   MapPin,
@@ -474,7 +475,7 @@ export function FulfillmentPage() {
                           <div className="text-sm text-gray-600 space-y-1">
                             <p>Restaurant: {order.restaurantName}</p>
                             <p>
-                              Items: {order.itemCount} | Total: ${order.totalAmount.toFixed(2)}
+                              Items: {order.itemCount} | Total: {formatPrice(order.totalAmount)}
                             </p>
                             <p>Placed: {new Date(order.placedAt).toLocaleDateString()}</p>
                           </div>
@@ -573,7 +574,7 @@ export function FulfillmentPage() {
                             <div className="text-sm text-gray-600 space-y-1 mt-1">
                               <p>Restaurant: {order.restaurantName}</p>
                               <p>
-                                Items: {order.itemCount} | Total: ${order.totalAmount.toFixed(2)}
+                                Items: {order.itemCount} | Total: {formatPrice(order.totalAmount)}
                               </p>
                               <p>Status: {order.status}</p>
                             </div>
@@ -890,7 +891,7 @@ function OrderCard({ order, compact = false }: { order: DispatchOrderSummary; co
       <p className="text-sm font-semibold text-gray-900">{order.restaurant_name}</p>
       <p className="text-xs text-gray-500 mb-2">Order #{order.id.slice(0, 6).toUpperCase()}</p>
       <div className="flex items-center justify-between text-xs text-gray-600">
-        <span>${order.total_amount.toLocaleString()}</span>
+        <span>{formatPrice(order.total_amount)}</span>
         <span>{order.item_count} items</span>
       </div>
     </div>
@@ -929,7 +930,7 @@ function StopCard({
       </div>
       <p className="text-xs text-gray-500 mb-2">Order #{stop.order_id.slice(0, 6).toUpperCase()}</p>
       <div className="flex items-center justify-between text-xs text-gray-600">
-        <span>${(stop.total_amount ?? 0).toLocaleString()}</span>
+        <span>{formatPrice(stop.total_amount)}</span>
         {stop.eta_seconds ? <span>{Math.round(stop.eta_seconds / 60)} min eta</span> : null}
       </div>
       {!compact && onStatusChange && (

@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { useGetPendingOrdersForReceivingQuery, useCreateReceivingReportMutation, useGetReceivingHistoryQuery } from '../services/api'
 import toast from 'react-hot-toast'
+import { formatPrice } from '../utils/format'
 
 export function ReceivingPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -362,7 +363,7 @@ export function ReceivingPage() {
                             <p className="font-medium">{item.product_name}</p>
                             <p className="text-sm text-muted-foreground">{item.sku} • Qty: {item.ordered_quantity} {item.unit}</p>
                           </div>
-                          <p className="font-medium">${typeof item.unit_price === 'number' ? item.unit_price.toFixed(2) : parseFloat(item.unit_price || 0).toFixed(2)}</p>
+                          <p className="font-medium">{formatPrice(item.unit_price)}</p>
                         </div>
                       ))}
                     </div>
@@ -425,7 +426,7 @@ export function ReceivingPage() {
                       </div>
                       <div>
                         <p className="text-muted-foreground">Total Cost</p>
-                        <p className="font-semibold">${parseFloat(report.total_actual_cost || 0).toFixed(2)}</p>
+                        <p className="font-semibold">{formatPrice(report.total_actual_cost)}</p>
                       </div>
                     </div>
                     {report.delivery_notes && (

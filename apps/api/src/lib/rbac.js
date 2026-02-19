@@ -38,10 +38,12 @@ export function setAuthCookies(res, accessToken, refreshToken) {
   })
 }
 
-// Clear auth cookies
+// Clear auth cookies (same path/sameSite as setAuthCookies so browser actually removes them)
 export function clearAuthCookies(res) {
-  res.clearCookie('access_token')
-  res.clearCookie('refresh_token')
+  const isProduction = process.env.NODE_ENV === 'production'
+  const opts = { path: '/', sameSite: 'lax', ...(isProduction && { secure: true }) }
+  res.clearCookie('access_token', opts)
+  res.clearCookie('refresh_token', opts)
 }
 
 // Get user from database by Keycloak sub

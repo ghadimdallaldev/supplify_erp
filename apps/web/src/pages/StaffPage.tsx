@@ -46,6 +46,7 @@ import {
   useCreateStaffPayrollExportMutation,
 } from '../services/staffApi'
 import type { StaffMember, StaffPtoRequest, StaffShiftSwap } from '../types'
+import { formatPrice } from '../utils/format'
 
 interface StaffFormState {
   firstName: string
@@ -853,7 +854,7 @@ export function StaffPage() {
                             <div className="space-y-1">
                               <p>
                                 Wage: {member.wageType.toLowerCase()}{' '}
-                                {member.wageRate ? `· ${member.wageRate.toFixed(2)}` : ''}
+                                {member.wageRate ? `· ${formatPrice(member.wageRate)}` : ''}
                               </p>
                               {member.hireDate ? (
                                 <p>Hired {format(parseISO(member.hireDate), 'MMM d, yyyy')}</p>

@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import { useAppDispatch } from '../hooks/redux'
 import { addItem } from '../features/cart/cartSlice'
 import toast from 'react-hot-toast'
+import { formatPrice } from '../utils/format'
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -112,11 +113,7 @@ export function ProductDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {typeof product.current_price === 'number' && !isNaN(product.current_price) 
-                  ? `$${product.current_price.toFixed(2)}` 
-                  : typeof product.current_price === 'string' && !isNaN(parseFloat(product.current_price))
-                  ? `$${parseFloat(product.current_price).toFixed(2)}`
-                  : 'N/A'}
+                {formatPrice(product.current_price) || 'N/A'}
               </div>
               <p className="text-sm text-gray-600 mt-1">
                 {product.currency || 'USD'} per {product.unit || 'unit'}

@@ -17,15 +17,8 @@ const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM || 'Supplify'
 const ADMIN_USERNAME = process.env.KEYCLOAK_ADMIN_USERNAME || 'admin'
 const ADMIN_PASSWORD = process.env.KEYCLOAK_ADMIN_PASSWORD || 'admin'
 
+// Exactly 1 admin, 1 supplier, 1 restaurant for testing (align with reduce-to-single-tenant + seed.sql)
 const DEMO_USERS = [
-  {
-    username: 'supplifyadmin',
-    email: 'supplifyadmin@supplify.com',
-    firstName: 'Supplify',
-    lastName: 'Admin',
-    password: 'Supplify2025!',
-    realmRole: 'admin',
-  },
   {
     username: 'admin',
     email: 'admin@supplify.com',
@@ -210,9 +203,8 @@ async function main() {
       }
     }
 
-    console.log('\n✅ Demo users ready. Sign in with Keycloak using:')
-    console.log('   Admin:      supplifyadmin@supplify.com / Supplify2025!')
-    console.log('   (or)        admin@supplify.com / SupplifyAdmin1!')
+    console.log('\n✅ Demo users ready (1 admin, 1 supplier, 1 restaurant). Sign in with Keycloak:')
+    console.log('   Admin:      admin@supplify.com / SupplifyAdmin1!')
     console.log('   Supplier:   supplier@supplify.com / SupplifySupplier1!')
     console.log('   Restaurant: restaurant@supplify.com / SupplifyRestaurant1!')
   } catch (err) {

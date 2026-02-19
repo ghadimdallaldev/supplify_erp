@@ -8,6 +8,7 @@ import { useAppSelector } from '../hooks/redux'
 import { Building2, Mail, Phone, MapPin, ArrowLeft, Pin, ShoppingCart, DollarSign, TrendingUp, Package, Calendar, Activity } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import { formatPrice } from '../utils/format'
 
 export function RestaurantDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -185,7 +186,7 @@ export function RestaurantDetailPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${typeof stats.totalSpent === 'number' ? stats.totalSpent.toFixed(2) : '0.00'}</div>
+            <div className="text-2xl font-bold">{formatPrice(stats.totalSpent)}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Lifetime value
             </p>
@@ -198,7 +199,7 @@ export function RestaurantDetailPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${typeof stats.averageOrderValue === 'number' ? stats.averageOrderValue.toFixed(2) : '0.00'}</div>
+            <div className="text-2xl font-bold">{formatPrice(stats.averageOrderValue)}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Per order
             </p>
@@ -243,7 +244,7 @@ export function RestaurantDetailPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{typeof product.totalQuantity === 'number' ? product.totalQuantity : 0} units</p>
-                    <p className="text-sm text-gray-500">${typeof product.totalRevenue === 'number' ? product.totalRevenue.toFixed(2) : '0.00'}</p>
+                    <p className="text-sm text-gray-500">{formatPrice(product.totalRevenue)}</p>
                   </div>
                 </div>
               ))
@@ -284,9 +285,7 @@ export function RestaurantDetailPage() {
                   <Badge variant={order.status === 'COMPLETED' ? 'default' : 'secondary'}>
                     {order.status}
                   </Badge>
-                  <p className="text-sm font-medium mt-1">${typeof order.total_amount === 'number' 
-                    ? order.total_amount.toFixed(2) 
-                    : parseFloat(order.total_amount || 0).toFixed(2)}</p>
+                  <p className="text-sm font-medium mt-1">{formatPrice(order.total_amount)}</p>
                 </div>
               </div>
             ))}

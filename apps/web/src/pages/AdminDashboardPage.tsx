@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,7 @@ import {
 import toast from 'react-hot-toast'
 import type { SubscriptionPlan } from '@/types'
 import { getPlanSubtitle } from '../lib/planComparison'
+import { formatCurrency } from '@/utils/format'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -51,8 +52,13 @@ interface AdminDashboardPageProps {
 export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPageProps) {
   // Default to 'tenants' tab for supplier/restaurant admin views, otherwise use initialTab
   const defaultTab =
-    initialTab === 'suppliers' || initialTab === 'restaurants' ? 'tenants' : initialTab
+    initialTab === 'suppliers' || initialTab === 'restaurants' ? 'tenants' : (initialTab || 'overview')
   const [selectedTab, setSelectedTab] = useState(defaultTab)
+
+  // Sync selected tab when route changes (e.g. sidebar: Admin Dashboard → Supplier Admin)
+  useEffect(() => {
+    setSelectedTab(defaultTab)
+  }, [defaultTab])
   const [plansTenantFilter, setPlansTenantFilter] = useState<'RESTAURANT' | 'SUPPLIER' | undefined>(
     undefined
   )
@@ -63,6 +69,20 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   )
   const { data: subscriptionsData, isLoading: subscriptionsLoading } =
     useGetAdminSubscriptionsQuery({})
+
+  // Deduplicate plans by (code, tenant_type) and subscriptions by (tenant_id, tenant_type) for display
+  const plans =
+    plansData?.plans?.filter(
+      (p, i, arr) =>
+        arr.findIndex(
+          (x) => x.code === p.code && (x.tenant_type || 'RESTAURANT') === (p.tenant_type || 'RESTAURANT')
+        ) === i
+    ) ?? []
+  const subscriptions =
+    subscriptionsData?.subscriptions?.filter(
+      (s, i, arr) =>
+        arr.findIndex((x) => x.tenant_id === s.tenant_id && x.tenant_type === s.tenant_type) === i
+    ) ?? []
   const { data: auditLogsData, isLoading: auditLoading } = useGetAdminAuditLogsQuery({})
   const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery()
   const { data: financeData, isLoading: financeLoading } = (
@@ -203,6 +223,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     setChangePlanForce(false)
   }
 
+  const hasPreviewContent = (preview: typeof changePlanPreview) =>
+    preview &&
+    (preview.willExceed?.length > 0 ||
+      preview.featureDiff?.enabled?.length > 0 ||
+      preview.featureDiff?.disabled?.length > 0 ||
+      (preview.recommendedActions?.length ?? 0) > 0)
+
   const runPreviewPlanChange = async () => {
     if (!changePlanModal?.targetPlanId) return
     try {
@@ -268,7 +295,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           className={
             initialTab === 'suppliers' || initialTab === 'restaurants'
               ? 'grid w-full grid-cols-3'
-              : 'grid w-full grid-cols-6'
+              : 'grid w-full grid-cols-8'
           }
         >
           {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
@@ -331,13 +358,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     <div className="flex justify-between">
                       <span className="text-gray-600">MRR:</span>
                       <span className="font-semibold">
-                        ${overview?.revenue?.mrr?.toFixed(2) || '0.00'}
+                        {formatCurrency(overview?.revenue?.mrr)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">ARR:</span>
                       <span className="font-semibold">
-                        ${overview?.revenue?.arr?.toFixed(2) || '0.00'}
+                        {formatCurrency(overview?.revenue?.arr)}
                       </span>
                     </div>
                   </div>
@@ -663,7 +690,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {plansData?.plans?.map((plan) => (
+              {plans.map((plan) => (
                 <Card key={plan.id} className="p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -902,7 +929,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   </tr>
                 </thead>
                 <tbody>
-                  {subscriptionsData?.subscriptions?.map((sub) => (
+                  {subscriptions.map((sub) => (
                     <tr key={sub.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">
                         <div>
@@ -1019,27 +1046,23 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <CardContent className="space-y-2">
                   <p className="flex justify-between">
                     <span>GMV</span>
-                    <span className="font-semibold">${financeData?.gmv?.toFixed(2) ?? '0.00'}</span>
+                    <span className="font-semibold">{formatCurrency(financeData?.gmv)}</span>
                   </p>
                   <p className="flex justify-between">
                     <span>Outstanding</span>
-                    <span className="font-semibold">
-                      ${financeData?.outstanding?.toFixed(2) ?? '0.00'}
-                    </span>
+                    <span className="font-semibold">{formatCurrency(financeData?.outstanding)}</span>
                   </p>
                   <p className="flex justify-between">
                     <span>Overdue</span>
-                    <span className="font-semibold text-red-600">
-                      ${financeData?.overdue?.toFixed(2) ?? '0.00'}
-                    </span>
+                    <span className="font-semibold text-red-600">{formatCurrency(financeData?.overdue)}</span>
                   </p>
                   <p className="flex justify-between">
                     <span>MRR</span>
-                    <span className="font-semibold">${financeData?.mrr?.toFixed(2) ?? '0.00'}</span>
+                    <span className="font-semibold">{formatCurrency(financeData?.mrr)}</span>
                   </p>
                   <p className="flex justify-between">
                     <span>ARR</span>
-                    <span className="font-semibold">${financeData?.arr?.toFixed(2) ?? '0.00'}</span>
+                    <span className="font-semibold">{formatCurrency(financeData?.arr)}</span>
                   </p>
                 </CardContent>
               </Card>
@@ -1058,7 +1081,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                             {r.planName} ({r.tenantType})
                           </span>
                           <span>
-                            ${r.mrr?.toFixed(2)} · {r.subscriptionCount} subs
+                            {formatCurrency(r.mrr)} · {r.subscriptionCount} subs
                           </span>
                         </li>
                       ))}
@@ -1173,7 +1196,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                     {supplier.warehouse_count || 0}
                                   </td>
                                   <td className="py-3 px-4 text-gray-600">
-                                    ${parseFloat(supplier.total_revenue || 0).toFixed(2)}
+                                    {formatCurrency(supplier.total_revenue)}
                                   </td>
                                   <td className="py-3 px-4 flex gap-2">
                                     <Button
@@ -1199,8 +1222,48 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                       <UserCog className="h-4 w-4 mr-1" />
                                       Impersonate
                                     </Button>
-                                    <Button size="sm" variant="outline">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      title="Change plan"
+                                      onClick={() => {
+                                        const subId = (supplier as { subscription_id?: string })
+                                          .subscription_id
+                                        if (!subId) {
+                                          toast.error(
+                                            'No active subscription for this supplier. Assign a plan from the Subscriptions tab.'
+                                          )
+                                          return
+                                        }
+                                        openChangePlanModal({
+                                          id: subId,
+                                          tenant_type: 'SUPPLIER',
+                                          tenant_name: supplier.name,
+                                        })
+                                      }}
+                                    >
                                       <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const subId = (supplier as { subscription_id?: string })
+                                          .subscription_id
+                                        if (!subId) {
+                                          toast.error(
+                                            'No active subscription for this supplier. Assign a plan from the Subscriptions tab.'
+                                          )
+                                          return
+                                        }
+                                        openChangePlanModal({
+                                          id: subId,
+                                          tenant_type: 'SUPPLIER',
+                                          tenant_name: supplier.name,
+                                        })
+                                      }}
+                                    >
+                                      Change plan
                                     </Button>
                                   </td>
                                 </tr>
@@ -1295,7 +1358,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                     {restaurant.orders_last_30d || 0}
                                   </td>
                                   <td className="py-3 px-4 text-gray-600">
-                                    ${parseFloat(restaurant.total_spent || 0).toFixed(2)}
+                                    {formatCurrency(restaurant.total_spent)}
                                   </td>
                                   <td className="py-3 px-4 flex gap-2">
                                     <Button
@@ -1321,8 +1384,48 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                       <UserCog className="h-4 w-4 mr-1" />
                                       Impersonate
                                     </Button>
-                                    <Button size="sm" variant="outline">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      title="Change plan"
+                                      onClick={() => {
+                                        const subId = (restaurant as { subscription_id?: string })
+                                          .subscription_id
+                                        if (!subId) {
+                                          toast.error(
+                                            'No active subscription for this restaurant. Assign a plan from the Subscriptions tab.'
+                                          )
+                                          return
+                                        }
+                                        openChangePlanModal({
+                                          id: subId,
+                                          tenant_type: 'RESTAURANT',
+                                          tenant_name: restaurant.name,
+                                        })
+                                      }}
+                                    >
                                       <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const subId = (restaurant as { subscription_id?: string })
+                                          .subscription_id
+                                        if (!subId) {
+                                          toast.error(
+                                            'No active subscription for this restaurant. Assign a plan from the Subscriptions tab.'
+                                          )
+                                          return
+                                        }
+                                        openChangePlanModal({
+                                          id: subId,
+                                          tenant_type: 'RESTAURANT',
+                                          tenant_name: restaurant.name,
+                                        })
+                                      }}
+                                    >
+                                      Change plan
                                     </Button>
                                   </td>
                                 </tr>
@@ -1489,10 +1592,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <DollarSign className="h-4 w-4 text-green-600" />
                       </div>
                       <p className="text-2xl font-bold text-gray-900">
-                        $
-                        {restaurantsData?.restaurants
-                          ?.reduce((sum, r) => sum + parseFloat(r.total_spent || 0), 0)
-                          .toFixed(2) || '0.00'}
+                        {formatCurrency(
+                          restaurantsData?.restaurants?.reduce(
+                            (sum, r) => sum + parseFloat(r.total_spent || 0),
+                            0
+                          )
+                        )}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Across all restaurants</p>
                     </div>
@@ -1598,13 +1703,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <DollarSign className="h-4 w-4 text-green-600" />
                       </div>
                       <p className="text-2xl font-bold text-gray-900">
-                        $
-                        {(
+                        {formatCurrency(
                           restaurantsData?.restaurants?.reduce(
                             (sum, r) => sum + parseFloat(r.total_spent || 0),
                             0
-                          ) ?? 0
-                        ).toFixed(2)}
+                          )
+                        )}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Across all restaurants</p>
                     </div>
@@ -1674,8 +1778,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   }
                 >
                   <option value="">Select plan</option>
-                  {plansData?.plans
-                    ?.filter((p) => p.tenant_type === changePlanModal.tenantType)
+                  {plans
+                    .filter((p) => p.tenant_type === changePlanModal.tenantType)
                     .map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.code})
@@ -1693,11 +1797,16 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               </Button>
               {changePlanPreview && (
                 <div className="border rounded-lg p-4 space-y-3 text-sm">
-                  {changePlanPreview.willExceed.length > 0 && (
+                  {!hasPreviewContent(changePlanPreview) && (
+                    <p className="text-gray-600">
+                      No impact: usage is within target plan limits; no feature changes.
+                    </p>
+                  )}
+                  {(changePlanPreview.willExceed?.length ?? 0) > 0 && (
                     <div>
                       <p className="font-semibold text-amber-700">Usage would exceed limits:</p>
                       <ul className="list-disc pl-4 mt-1">
-                        {changePlanPreview.willExceed.map((e) => (
+                        {changePlanPreview.willExceed!.map((e) => (
                           <li key={e.limitKey}>
                             {e.limitKey}: {e.usage} &gt; {e.limit}
                           </li>
@@ -1705,28 +1814,28 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       </ul>
                     </div>
                   )}
-                  {(changePlanPreview.featureDiff.enabled.length > 0 ||
-                    changePlanPreview.featureDiff.disabled.length > 0) && (
+                  {((changePlanPreview.featureDiff?.enabled?.length ?? 0) > 0 ||
+                    (changePlanPreview.featureDiff?.disabled?.length ?? 0) > 0) && (
                     <div>
                       <p className="font-semibold text-gray-700">Feature changes:</p>
-                      {changePlanPreview.featureDiff.enabled.length > 0 && (
+                      {(changePlanPreview.featureDiff?.enabled?.length ?? 0) > 0 && (
                         <p className="text-green-600">
-                          Enabled: {changePlanPreview.featureDiff.enabled.join(', ')}
+                          Enabled: {changePlanPreview.featureDiff!.enabled!.join(', ')}
                         </p>
                       )}
-                      {changePlanPreview.featureDiff.disabled.length > 0 && (
+                      {(changePlanPreview.featureDiff?.disabled?.length ?? 0) > 0 && (
                         <p className="text-amber-600">
-                          Disabled: {changePlanPreview.featureDiff.disabled.join(', ')}
+                          Disabled: {changePlanPreview.featureDiff!.disabled!.join(', ')}
                         </p>
                       )}
                     </div>
                   )}
-                  {changePlanPreview.recommendedActions.length > 0 && (
+                  {(changePlanPreview.recommendedActions?.length ?? 0) > 0 && (
                     <p className="text-gray-600">
-                      {changePlanPreview.recommendedActions.join(' ')}
+                      {changePlanPreview.recommendedActions!.join(' ')}
                     </p>
                   )}
-                  {changePlanPreview.willExceed.length > 0 && (
+                  {(changePlanPreview.willExceed?.length ?? 0) > 0 && (
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"

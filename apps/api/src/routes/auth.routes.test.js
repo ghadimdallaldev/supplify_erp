@@ -38,6 +38,7 @@ vi.mock('../lib/auth.js', () => ({
     access_token: 'new-access-token',
     refresh_token: 'new-refresh-token',
   }),
+  getKeycloakLogoutUrl: vi.fn().mockResolvedValue('https://keycloak.example.com/logout?post_logout_redirect_uri=...'),
 }))
 
 vi.mock('../lib/rbac.js', () => ({
@@ -98,6 +99,9 @@ describe('Auth Routes', () => {
     app.use((req, res, next) => {
       req.session = {}
       req.session.save = (callback) => {
+        if (callback) callback(null)
+      }
+      req.session.destroy = (callback) => {
         if (callback) callback(null)
       }
       req.requestId = 'test-request-id'

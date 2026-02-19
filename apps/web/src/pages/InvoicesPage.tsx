@@ -27,6 +27,7 @@ import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { useAppSelector } from '../hooks/redux'
+import { formatCurrency, formatPrice } from '../utils/format'
 import { 
   useGetRestaurantInvoicesQuery, 
   useGetRestaurantInvoiceQuery, 
@@ -250,7 +251,7 @@ export function InvoicesPage() {
               <div>
                 <p className="text-sm text-gray-600">Outstanding</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  ${stats.totalOutstanding.toFixed(2)}
+                  {formatPrice(stats.totalOutstanding)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {stats.unpaid} unpaid invoices
@@ -271,7 +272,7 @@ export function InvoicesPage() {
                 </p>
                 <p className="text-xs text-red-600 mt-1">
                   {overdueData?.summary?.totalOverdue 
-                    ? `$${parseFloat(overdueData.summary.totalOverdue).toFixed(2)}`
+                    ? formatPrice(overdueData.summary.totalOverdue)
                     : 'All current'
                   }
                 </p>
@@ -287,7 +288,7 @@ export function InvoicesPage() {
               <div>
                 <p className="text-sm text-gray-600">Total Paid</p>
                 <p className="text-2xl font-bold text-green-600">
-                  ${stats.totalPaid.toFixed(2)}
+                  {formatPrice(stats.totalPaid)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {analytics.paid_count || 0} paid invoices
@@ -325,7 +326,7 @@ export function InvoicesPage() {
                 <div>
                   <p className="text-sm text-gray-600">Total Paid (30d)</p>
                   <p className="text-xl font-semibold text-green-600">
-                    ${parseFloat(analytics.total_paid_amount || 0).toFixed(2)}
+                    {formatPrice(analytics.total_paid_amount)}
                   </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-green-400" />
@@ -339,7 +340,7 @@ export function InvoicesPage() {
                 <div>
                   <p className="text-sm text-gray-600">Outstanding (30d)</p>
                   <p className="text-xl font-semibold text-orange-600">
-                    ${parseFloat(analytics.total_outstanding || 0).toFixed(2)}
+                    {formatPrice(analytics.total_outstanding)}
                   </p>
                 </div>
                 <TrendingDown className="h-8 w-8 text-orange-400" />
@@ -437,13 +438,13 @@ export function InvoicesPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-semibold">${parseFloat(invoice.total_amount || 0).toFixed(2)}</p>
+                      <p className="text-lg font-semibold">{formatPrice(invoice.total_amount)}</p>
                       <p className={`text-sm ${remaining > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}`}>
-                        Balance: ${remaining.toFixed(2)}
+                        Balance: {formatPrice(remaining)}
                       </p>
                       {parseFloat(invoice.total_paid || 0) > 0 && (
                         <p className="text-xs text-green-600">
-                          Paid: ${parseFloat(invoice.total_paid || 0).toFixed(2)}
+                          Paid: {formatPrice(invoice.total_paid)}
                         </p>
                       )}
                       {isRestaurant && remaining > 0 && (
@@ -619,17 +620,17 @@ export function InvoicesPage() {
                                 <td className="py-3 px-4">{item.description}</td>
                                 <td className="py-3 px-4 text-sm text-gray-600">{item.sku || 'N/A'}</td>
                                 <td className="py-3 px-4 text-right">{item.quantity}</td>
-                                <td className="py-3 px-4 text-right">${parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                                <td className="py-3 px-4 text-right">{formatPrice(item.unit_price)}</td>
                                 <td className="py-3 px-4 text-right">
                                   {parseFloat(item.tax_amount || 0) > 0 && (
                                     <span className="text-xs text-gray-500">
-                                      ${parseFloat(item.tax_amount || 0).toFixed(2)}
+                                      {formatPrice(item.tax_amount)}
                                       {item.tax_rate && ` (${item.tax_rate}%)`}
                                     </span>
                                   )}
                                 </td>
                                 <td className="py-3 px-4 text-right font-medium">
-                                  ${parseFloat(item.line_total || 0).toFixed(2)}
+                                  {formatPrice(item.line_total)}
                                 </td>
                               </tr>
                             ))}
@@ -643,30 +644,30 @@ export function InvoicesPage() {
                       <div className="space-y-2 border rounded-lg p-4 bg-gray-50">
                         <div className="flex justify-between">
                           <span className="text-gray-600">Subtotal</span>
-                          <span>${parseFloat(invoiceDetail.invoice.subtotal || 0).toFixed(2)}</span>
+                          <span>{formatPrice(invoiceDetail.invoice.subtotal)}</span>
                         </div>
                         {parseFloat(invoiceDetail.invoice.tax_amount || 0) > 0 && (
                           <div className="flex justify-between">
                             <span className="text-gray-600">
                               Tax {invoiceDetail.invoice.tax_rate ? `(${invoiceDetail.invoice.tax_rate}%)` : ''}
                             </span>
-                            <span>${parseFloat(invoiceDetail.invoice.tax_amount || 0).toFixed(2)}</span>
+                            <span>{formatPrice(invoiceDetail.invoice.tax_amount)}</span>
                           </div>
                         )}
                         <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
                           <span>Total</span>
-                          <span>${parseFloat(invoiceDetail.invoice.total_amount || 0).toFixed(2)}</span>
+                          <span>{formatPrice(invoiceDetail.invoice.total_amount)}</span>
                         </div>
                         {parseFloat(invoiceDetail.invoice.total_paid || 0) > 0 && (
                           <div className="flex justify-between text-green-600 border-t pt-2 mt-2">
                             <span>Paid</span>
-                            <span>-${parseFloat(invoiceDetail.invoice.total_paid || 0).toFixed(2)}</span>
+                            <span>-{formatPrice(invoiceDetail.invoice.total_paid)}</span>
                           </div>
                         )}
                         {remainingBalance > 0 && (
                           <div className="flex justify-between font-semibold text-lg text-red-600 border-t pt-2 mt-2">
                             <span>Balance Due</span>
-                            <span>${remainingBalance.toFixed(2)}</span>
+                            <span>{formatPrice(remainingBalance)}</span>
                           </div>
                         )}
                         {remainingBalance === 0 && (
@@ -716,7 +717,7 @@ export function InvoicesPage() {
                             </div>
                             <div className="text-right">
                               <p className="text-lg font-semibold text-green-600">
-                                ${parseFloat(payment.payment_amount || 0).toFixed(2)}
+                                {formatPrice(payment.payment_amount)}
                               </p>
                               <Badge variant="outline" className="mt-1">
                                 {payment.status}
@@ -737,7 +738,7 @@ export function InvoicesPage() {
                           </div>
                           <div className="text-right">
                             <p className="text-2xl font-bold text-red-600">
-                              ${remainingBalance.toFixed(2)}
+                              {formatPrice(remainingBalance)}
                             </p>
                           </div>
                         </div>
@@ -836,7 +837,7 @@ export function InvoicesPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-blue-600">Remaining Balance</p>
-                      <p className="text-2xl font-bold text-blue-900">${remainingBalance.toFixed(2)}</p>
+                      <p className="text-2xl font-bold text-blue-900">{formatPrice(remainingBalance)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -860,7 +861,7 @@ export function InvoicesPage() {
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <p className="text-sm text-green-800">
                       <CheckCircle className="h-4 w-4 inline mr-2" />
-                      Paying full remaining balance: <strong>${remainingBalance.toFixed(2)}</strong>
+                      Paying full remaining balance: <strong>{formatPrice(remainingBalance)}</strong>
                     </p>
                   </div>
                   
@@ -931,7 +932,7 @@ export function InvoicesPage() {
                       step="0.01"
                       min="0.01"
                       max={remainingBalance}
-                      placeholder={`Max: $${remainingBalance.toFixed(2)}`}
+                      placeholder={`Max: ${formatPrice(remainingBalance)}`}
                       value={paymentAmount || ''}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value)
@@ -943,7 +944,7 @@ export function InvoicesPage() {
                       }}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Remaining after payment: ${(remainingBalance - paymentAmount).toFixed(2)}
+                      Remaining after payment: {formatPrice(remainingBalance - paymentAmount)}
                     </p>
                   </div>
                   
@@ -1010,7 +1011,7 @@ export function InvoicesPage() {
                         <SelectTrigger placeholder="Select credit note...">
                           {creditNotes.map((cn: any) => (
                             <SelectItem key={cn.id} value={cn.id}>
-                              {cn.credit_note_number} - ${parseFloat(cn.remaining_amount || 0).toFixed(2)} available
+                              {cn.credit_note_number} - {formatPrice(cn.remaining_amount)} available
                             </SelectItem>
                           ))}
                         </SelectTrigger>
@@ -1059,7 +1060,7 @@ export function InvoicesPage() {
                           <SelectTrigger placeholder="Select credit note...">
                             {creditNotes.map((cn: any) => (
                               <SelectItem key={cn.id} value={cn.id}>
-                                {cn.credit_note_number} - ${parseFloat(cn.remaining_amount || 0).toFixed(2)} available
+                                {cn.credit_note_number} - {formatPrice(cn.remaining_amount)} available
                                 {cn.reason && ` (${cn.reason})`}
                               </SelectItem>
                             ))}
@@ -1088,7 +1089,7 @@ export function InvoicesPage() {
                             }}
                           />
                           <p className="text-xs text-gray-500 mt-1">
-                            Available: ${parseFloat(creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0).toFixed(2)}
+                            Available: {formatPrice(creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount)}
                           </p>
                         </div>
                       )}
@@ -1155,23 +1156,23 @@ export function InvoicesPage() {
                       {paymentAmount > 0 && (
                         <div className="flex justify-between">
                           <span className="text-gray-600">Cash Payment</span>
-                          <span className="font-medium">${paymentAmount.toFixed(2)}</span>
+                          <span className="font-medium">{formatPrice(paymentAmount)}</span>
                         </div>
                       )}
                       {creditAmount > 0 && (
                         <div className="flex justify-between">
                           <span className="text-gray-600">Credit Applied</span>
-                          <span className="font-medium text-green-700">${creditAmount.toFixed(2)}</span>
+                          <span className="font-medium text-green-700">{formatPrice(creditAmount)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-semibold text-lg border-t pt-2">
                         <span>Total Payment</span>
-                        <span className="text-green-700">${(paymentAmount + creditAmount).toFixed(2)}</span>
+                        <span className="text-green-700">{formatPrice(paymentAmount + creditAmount)}</span>
                       </div>
                       <div className="flex justify-between text-sm border-t pt-2">
                         <span>New Balance</span>
                         <span className={remainingBalance - paymentAmount - creditAmount > 0 ? 'text-orange-600' : 'text-green-600'}>
-                          ${(remainingBalance - paymentAmount - creditAmount).toFixed(2)}
+                          {formatPrice(remainingBalance - paymentAmount - creditAmount)}
                         </span>
                       </div>
                     </div>

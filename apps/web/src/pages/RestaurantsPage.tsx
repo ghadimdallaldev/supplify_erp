@@ -12,6 +12,7 @@ import {
   Users, Store, Clock, Sparkles, ArrowUpDown, Package
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { formatCurrency, formatPrice } from '../utils/format'
 
 export function RestaurantsPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -348,7 +349,7 @@ export function RestaurantsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">${typeof stats.totalRevenue === 'number' ? stats.totalRevenue.toFixed(0) : '0'}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue, { maximumFractionDigits: 0 })}</p>
                 </div>
                 <DollarSign className="h-8 w-8 text-purple-500" />
               </div>
@@ -359,7 +360,7 @@ export function RestaurantsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                  <p className="text-2xl font-bold text-gray-900">${typeof stats.avgOrderValue === 'number' ? stats.avgOrderValue.toFixed(0) : '0'}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.avgOrderValue, { maximumFractionDigits: 0 })}</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-orange-500" />
               </div>
@@ -555,7 +556,7 @@ export function RestaurantsPage() {
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 text-gray-600">
                       <DollarSign className="h-4 w-4" />
-                      <p className="text-xl font-bold">${typeof restaurant.totalSpent === 'number' ? restaurant.totalSpent.toFixed(0) : parseFloat(restaurant.totalSpent || 0).toFixed(0)}</p>
+                      <p className="text-xl font-bold">{formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}</p>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Revenue</p>
                   </div>
@@ -584,9 +585,7 @@ export function RestaurantsPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Order #{restaurant.latestOrder.id.substring(0, 8)}</span>
                       <span className="font-semibold text-gray-900">
-                        ${typeof restaurant.latestOrder.total_amount === 'number' 
-                          ? restaurant.latestOrder.total_amount.toFixed(2) 
-                          : parseFloat(restaurant.latestOrder.total_amount || '0').toFixed(2)}
+                        {formatPrice(restaurant.latestOrder.total_amount)}
                       </span>
                     </div>
                   </div>
@@ -673,7 +672,7 @@ export function RestaurantsPage() {
                       <p className="text-xs text-gray-500">Orders</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl font-bold text-gray-900">${(restaurant.totalSpent || 0).toFixed(0)}</p>
+                      <p className="text-xl font-bold text-gray-900">{formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}</p>
                       <p className="text-xs text-gray-500">Revenue</p>
                     </div>
                     <div className="text-center">

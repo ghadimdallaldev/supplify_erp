@@ -27,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
+import { formatPrice, formatNumber } from '../utils/format'
 
 export function ProductsPage() {
   const [search, setSearch] = useState('')
@@ -649,7 +650,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   {product.current_price ? (
                     <>
                       <p className="font-semibold">
-                        ${parseFloat(product.current_price).toFixed(2)}
+                        {formatPrice(product.current_price)}
                       </p>
                       {product.unit && <p className="text-xs text-gray-500">per {product.unit}</p>}
                     </>
@@ -663,7 +664,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                       parseFloat(product.available_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
                     }`}
                   >
-                    {parseFloat(product.available_qty || 0).toFixed(2)} {product.unit || 'units'}
+                    {formatNumber(product.available_qty, { maximumFractionDigits: 2 })} {product.unit || 'units'}
                   </p>
                 </td>
                 <td className="px-4 py-4">
@@ -999,7 +1000,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <div className="space-y-2">
                 <Label>File: {uploadedFile.name}</Label>
                 <p className="text-sm text-gray-600">
-                  Size: {(uploadedFile.size / 1024).toFixed(2)} KB
+                  Size: {formatNumber(uploadedFile.size / 1024, { maximumFractionDigits: 2 })} KB
                 </p>
               </div>
             )}
@@ -1150,16 +1151,17 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <div className="bg-gray-50 p-4 rounded-md">
                 <p className="text-sm font-medium text-gray-700">Current Stock</p>
                 <p className="text-lg font-semibold text-green-600">
-                  {parseFloat(selectedProductForAdjustment.available_qty || 0).toFixed(2)}{' '}
+                  {formatNumber(selectedProductForAdjustment.available_qty, { maximumFractionDigits: 2 })}{' '}
                   {selectedProductForAdjustment.unit || 'units'}
                 </p>
                 {adjustmentQuantity && (
                   <p className="text-sm text-gray-600 mt-2">
                     New Stock:{' '}
-                    {(
-                      parseFloat(selectedProductForAdjustment.available_qty || 0) +
-                      (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity)
-                    ).toFixed(2)}{' '}
+                    {formatNumber(
+                      parseFloat(String(selectedProductForAdjustment.available_qty || 0)) +
+                        (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity),
+                      { maximumFractionDigits: 2 }
+                    )}{' '}
                     {selectedProductForAdjustment.unit || 'units'}
                   </p>
                 )}

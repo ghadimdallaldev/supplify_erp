@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Warehouse, Package, AlertTriangle, TrendingUp, TrendingDown, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useGetInventoryListQuery, useGetWarehousesQuery } from '../services/api'
+import { formatNumber } from '../utils/format'
 
 export function InventoryPage() {
   const [showAdjustment, setShowAdjustment] = useState(false)
@@ -170,7 +171,7 @@ export function InventoryPage() {
                         )}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <span className="font-medium">{(parseFloat(item.available_qty || 0) + parseFloat(item.reserved_qty || 0)).toFixed(2)}</span>
+                        <span className="font-medium">{formatNumber(parseFloat(String(item.available_qty || 0)) + parseFloat(String(item.reserved_qty || 0)), { maximumFractionDigits: 2 })}</span>
                       </td>
                       <td className="py-3 px-4 text-right">
                         <span className="text-orange-600">{item.reserved_qty || 0}</span>
@@ -283,7 +284,7 @@ export function InventoryPage() {
                                     </div>
                                   </td>
                                   <td className="py-2 px-4 text-right">
-                                    <span className="text-sm">{(parseFloat(item.available_qty || 0) + parseFloat(item.reserved_qty || 0)).toFixed(2)}</span>
+                                    <span className="text-sm">{formatNumber(parseFloat(String(item.available_qty || 0)) + parseFloat(String(item.reserved_qty || 0)), { maximumFractionDigits: 2 })}</span>
                                   </td>
                                   <td className="py-2 px-4 text-right">
                                     <span className="text-sm text-orange-600">{item.reserved_qty || 0}</span>

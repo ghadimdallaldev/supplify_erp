@@ -31,6 +31,7 @@ import toast from 'react-hot-toast'
 import { useAppDispatch } from '../hooks/redux'
 import { addItem } from '../features/cart/cartSlice'
 import { useNavigate } from 'react-router-dom'
+import { formatPrice } from '../utils/format'
 
 export function QuickListsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -807,7 +808,7 @@ export function QuickListsPage() {
                     <p className="font-medium">{product.name}</p>
                     <p className="text-sm text-gray-600">{product.sku}</p>
                     <p className="text-sm font-semibold text-green-600">
-                      ${product.price?.toFixed(2)} / {product.unit}
+                      {formatPrice(product.price)} / {product.unit}
                     </p>
                   </div>
                   <Button
@@ -1089,7 +1090,7 @@ export function QuickListsPage() {
                               <p className="font-semibold">Qty: {item.quantity}</p>
                               {product?.price && (
                                 <p className="text-sm text-gray-600">
-                                  ${(product.price * item.quantity).toFixed(2)}
+                                  {formatPrice(Number(product.price) * item.quantity)}
                                 </p>
                               )}
                             </div>

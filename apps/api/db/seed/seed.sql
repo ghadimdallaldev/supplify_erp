@@ -1,9 +1,9 @@
 -- Seed data for Supplify v2
 
--- Insert admin user
+-- Single admin user (1 admin, 1 restaurant, 1 supplier for testing; Keycloak: run seed:demo-users)
 INSERT INTO app_user (keycloak_sub, email, display_name, role) VALUES 
 ('admin-sub', 'admin@supplify.com', 'Admin User', 'ADMIN')
-ON CONFLICT (keycloak_sub) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET keycloak_sub = EXCLUDED.keycloak_sub, display_name = EXCLUDED.display_name, role = EXCLUDED.role;
 
 -- Insert sample supplier (contact_email must match Keycloak user for /auth/me)
 INSERT INTO supplier (id, name, slug, vat_no, contact_email, phone, address_json) VALUES 
@@ -63,29 +63,18 @@ INSERT INTO reservation (
 ('550e8400-e29b-41d4-a716-446655440002', 'PENDING', 'Chen Liu', '+971502220000', 6, NOW() + interval '5 hour', 120, ARRAY[(SELECT id FROM reservation_table WHERE name = 'Table 3' LIMIT 1)], NULL, FALSE, FALSE)
 ON CONFLICT (id) DO NOTHING;
 
--- Insert sample branch for the restaurant
-INSERT INTO branch (id, tenant_id, name, code, address, contact_name, contact_email, contact_phone, is_active)
+-- Insert sample branch for the restaurant (restaurant_id for 0015 NOT NULL; tenant_id/address for 0023)
+INSERT INTO branch (id, restaurant_id, tenant_id, name, code, address, is_active)
 VALUES (
   '770e8400-e29b-41d4-a716-4466554400aa',
+  '550e8400-e29b-41d4-a716-446655440002',
   '550e8400-e29b-41d4-a716-446655440002',
   'Dubai Marina Branch',
   'DXB-MARINA',
   '{"street": "456 Marina Walk", "city": "Dubai", "region": "Dubai", "country": "UAE"}',
-  'Sara Malik',
-  'sara.malik@goldenfork.com',
-  '+971507654322',
   true
 )
 ON CONFLICT (id) DO NOTHING;
-
--- Insert sample users
-INSERT INTO app_user (keycloak_sub, email, display_name, role) VALUES
-('restaurant-sub', 'orders@goldenfork.com', 'Golden Fork Ops', 'RESTAURANT')
-ON CONFLICT (keycloak_sub) DO NOTHING;
-
-INSERT INTO app_user (keycloak_sub, email, display_name, role) VALUES
-('supplier-sub', 'contact@freshfoods.com', 'Fresh Foods Account', 'SUPPLIER')
-ON CONFLICT (keycloak_sub) DO NOTHING;
 
 -- Insert sample orders to drive the calendar experience
 INSERT INTO customer_order (id, restaurant_id, status, total_amount, currency, placed_at, created_at, updated_at, branch_id)
@@ -450,3 +439,18 @@ ON CONFLICT (id) DO NOTHING;
 -- Ensure demo supplier/restaurant contact emails match Keycloak users (for /auth/me)
 UPDATE supplier SET contact_email = 'supplier@supplify.com' WHERE slug = 'fresh-foods-co';
 UPDATE restaurant SET contact_email = 'restaurant@supplify.com' WHERE slug = 'golden-fork-restaurant';
+
+-- Assign Free subscription to the single restaurant and supplier (for limit/feature enforcement after reduce-to-single-tenant)
+INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
+SELECT r.id, 'RESTAURANT', sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + interval '1 month'
+FROM restaurant r
+JOIN (SELECT id, name FROM subscription_plan WHERE code = 'free' AND tenant_type = 'RESTAURANT' AND is_active = true LIMIT 1) sp ON true
+WHERE r.slug = 'golden-fork-restaurant'
+AND NOT EXISTS (SELECT 1 FROM subscription s WHERE s.tenant_id = r.id AND s.tenant_type = 'RESTAURANT');
+
+INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
+SELECT s.id, 'SUPPLIER', sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + interval '1 month'
+FROM supplier s
+JOIN (SELECT id, name FROM subscription_plan WHERE code = 'free' AND tenant_type = 'SUPPLIER' AND is_active = true LIMIT 1) sp ON true
+WHERE s.slug = 'fresh-foods-co'
+AND NOT EXISTS (SELECT 1 FROM subscription sub WHERE sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER');

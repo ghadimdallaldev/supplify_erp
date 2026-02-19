@@ -35,6 +35,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAppSelector } from '../hooks/redux'
+import { formatCurrency } from '../utils/format'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { LogoUpload } from '../components/LogoUpload'
 import { 
@@ -338,7 +339,7 @@ export function RestaurantOnboardingPage() {
               <div>
                 <p className="text-sm font-medium text-purple-700">Total Spent</p>
                 <p className="text-2xl font-bold text-purple-900">
-                  ${Number(statistics.totalSpent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(statistics.totalSpent)}
                 </p>
                 <p className="text-xs text-purple-600 mt-1">All-time</p>
               </div>

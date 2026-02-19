@@ -10,6 +10,7 @@ import { MessageSquare, Send, Clock, Building2, Search, X, Reply, ChevronDown, P
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { format, isToday, isYesterday } from 'date-fns'
+import { formatPrice } from '../utils/format'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -895,7 +896,7 @@ export function ChatPage() {
                         <div className="flex-1">
                           <div className="text-sm font-medium">Order #{selectedOrder.id.slice(0, 8)}</div>
                           <div className="text-xs text-muted-foreground">
-                            {selectedOrder.total_amount ? `$${parseFloat(selectedOrder.total_amount).toFixed(2)}` : 'View details'}
+                            {selectedOrder.total_amount ? formatPrice(selectedOrder.total_amount) : 'View details'}
                           </div>
                         </div>
                         <Button
@@ -1014,7 +1015,7 @@ export function ChatPage() {
                           >
                             <div className="font-medium">Order #{order.id.slice(0, 8)}</div>
                             <div className="text-xs text-muted-foreground">
-                              {order.total_amount ? `$${parseFloat(order.total_amount).toFixed(2)}` : 'No amount'} • {order.status}
+                              {order.total_amount ? formatPrice(order.total_amount) : 'No amount'} • {order.status}
                             </div>
                           </button>
                         ))}

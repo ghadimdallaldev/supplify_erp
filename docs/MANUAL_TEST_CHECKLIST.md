@@ -13,14 +13,19 @@ Use this checklist to test **every** feature of the application with a single ad
 
 - [ ] **Keycloak demo users** (if not already created)  
        From repo root: `pnpm run seed:demo-users`  
-       Logins:
-  - **Admin:** `supplifyadmin@supplify.com` / `Supplify2025!` (or `admin@supplify.com` / `SupplifyAdmin1!`)
+       Logins (exactly 1 admin, 1 restaurant, 1 supplier):
+  - **Admin:** `admin@supplify.com` / `SupplifyAdmin1!`
   - **Restaurant:** `restaurant@supplify.com` / `SupplifyRestaurant1!`
   - **Supplier:** `supplier@supplify.com` / `SupplifySupplier1!`
 
 - [ ] **API and Web** running (e.g. `pnpm dev` from monorepo or run api + web separately).
 
 - [ ] **Keycloak** running (e.g. port 8080) if using real auth.
+
+**Notes:**  
+- **Numbers:** All currency and numeric values should be dynamic (from API) and consistently formatted (app uses `formatCurrency` / `formatPrice` from `@/utils/format`).  
+- **Tiers & features:** Plan features and limits are enforced by the API (`requireFeature`, `checkLimit`). Changing a tenant’s plan in Admin → Subscriptions updates what is enabled; Enterprise has the full feature set.  
+- **Impersonation:** Admin can start from Tenant Management (Impersonate button); stop via the amber “Stop impersonating” banner.
 
 ---
 
@@ -266,7 +271,7 @@ Use this checklist to test **every** feature of the application with a single ad
 
 ## 18. Admin role – dashboard & tabs
 
-- [ ] **Logout; login as admin** (`supplifyadmin@supplify.com`).
+- [ ] **Logout; login as admin** (`admin@supplify.com`).
 
 - [ ] **Sidebar**
   - [ ] **Only** Admin Dashboard, Supplier Admin, Restaurant Admin (and Settings if shown).
@@ -342,7 +347,7 @@ Use this checklist to test **every** feature of the application with a single ad
 
 | Role       | Email                      | Password             |
 | ---------- | -------------------------- | -------------------- |
-| Admin      | supplifyadmin@supplify.com | Supplify2025!        |
+| Admin      | admin@supplify.com         | SupplifyAdmin1!      |
 | Admin      | admin@supplify.com         | SupplifyAdmin1!      |
 | Restaurant | restaurant@supplify.com    | SupplifyRestaurant1! |
 | Supplier   | supplier@supplify.com      | SupplifySupplier1!   |

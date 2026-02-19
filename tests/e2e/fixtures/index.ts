@@ -80,7 +80,7 @@ const E2E_AUTH_PAYLOADS: Record<
       'ADMIN_GROWTH',
     ],
     displayName: 'Admin',
-    email: 'supplifyadmin@supplify.com',
+    email: 'admin@supplify.com',
   },
 }
 

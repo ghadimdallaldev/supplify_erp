@@ -161,7 +161,10 @@ export const api = createApi({
       // Cache for 5 minutes to reduce requests
       keepUnusedDataFor: 300,
     }),
-    logout: builder.mutation<void, void>({
+    logout: builder.mutation<
+      { message?: string; keycloakLogoutUrl?: string },
+      void
+    >({
       query: () => ({
         url: '/auth/logout',
         method: 'POST',

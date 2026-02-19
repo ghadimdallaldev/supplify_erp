@@ -36,6 +36,7 @@ import {
   useAdjustRestaurantInventoryMutation,
 } from '../services/api'
 import toast from 'react-hot-toast'
+import { formatNumber } from '../utils/format'
 
 export function RestaurantInventoryPage() {
   const [search, setSearch] = useState('')
@@ -963,7 +964,7 @@ export function RestaurantInventoryPage() {
               <div className="border rounded-md p-3 bg-gray-50">
                 <p className="text-sm font-medium text-gray-700">Selected: {bulkUploadFile.name}</p>
                 <p className="text-xs text-gray-500">
-                  Size: {(bulkUploadFile.size / 1024).toFixed(2)} KB
+                  Size: {formatNumber(bulkUploadFile.size / 1024, { maximumFractionDigits: 2 })} KB
                 </p>
               </div>
             )}

@@ -98,9 +98,14 @@ export function Header() {
 
   const handleLogout = async () => {
     try {
-      await logout().unwrap()
+      const data = await logout().unwrap()
       toast.success('Logged out successfully')
-      window.location.href = '/login'
+      // Redirect to Keycloak logout so SSO session is cleared; then Keycloak redirects back to /login
+      if (data?.keycloakLogoutUrl) {
+        window.location.href = data.keycloakLogoutUrl
+      } else {
+        window.location.href = '/login'
+      }
     } catch (error) {
       toast.error('Logout failed')
     }
