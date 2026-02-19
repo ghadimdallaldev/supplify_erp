@@ -135,6 +135,86 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.ok).toBe(false)
       expect(res.body.error.message).toMatch(/tenant_type must match/)
     })
+
+    it('upgrading to Enterprise (full features) does not list standard features as disabled', async () => {
+      const platinumSupplierFeatures = {
+        chat: true,
+        smart_reorder: true,
+        reports: true,
+        fulfillment_tools: 'routing_full_suite',
+        quick_lists: 'full_schedule',
+        inventory_management: 'multi_branch_tracking',
+        waste_tracking: 'analytics_dashboard',
+        receiving_quality: 'quality_scoring',
+        finance_invoices: 'expense_analytics',
+        notifications: 'email_and_sms',
+        api_integrations: 'api_key_access',
+        support_sla: 'priority_24h',
+        custom_branding: 'logo_colors',
+      }
+      const enterpriseSupplierFeatures = {
+        ...platinumSupplierFeatures,
+        quick_lists: 'ai_smart_automation',
+        inventory_management: 'lot_expiry_tracking',
+        waste_tracking: 'cost_percentage_vs_sales',
+        receiving_quality: 'supplier_performance_reports',
+        finance_invoices: 'advanced_finance_dashboard',
+        approvals_budgets: 'multi_level_approvals',
+        feature_flags_access: 'all_experimental',
+        support_sla: 'dedicated_same_day',
+        custom_branding: true,
+      }
+      query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-1',
+              tenant_id: 'tenant-1',
+              tenant_type: 'SUPPLIER',
+              current_limits: {},
+              current_features: platinumSupplierFeatures,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'plan-enterprise',
+              name: 'Enterprise',
+              code: 'enterprise',
+              tenant_type: 'SUPPLIER',
+              limits: { warehouses: -1, users: -1 },
+              features: enterpriseSupplierFeatures,
+            },
+          ],
+        })
+      mockGetEntitlements.mockResolvedValueOnce({
+        tenantType: 'SUPPLIER',
+        tenantId: 'tenant-1',
+        usage: {},
+        plan: {},
+        limits: {},
+        baseLimits: {},
+        overrides: [],
+        features: {},
+      })
+
+      const res = await request(app)
+        .post('/api/admin-dashboard/subscriptions/sub-1/preview-change')
+        .send({ targetPlanId: 'plan-enterprise' })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      const { enabled, disabled } = res.body.data.featureDiff
+      expect(disabled).not.toContain('quick_lists')
+      expect(disabled).not.toContain('waste_tracking')
+      expect(disabled).not.toContain('finance_invoices')
+      expect(disabled).not.toContain('receiving_quality')
+      expect(disabled).not.toContain('inventory_management')
+      expect(disabled).not.toContain('approvals_budgets')
+      expect(disabled).not.toContain('feature_flags_access')
+      expect(enabled.some((k) => ['custom_branding', 'approvals_budgets', 'feature_flags_access'].includes(k))).toBe(true)
+    })
   })
 
   describe('GET /plans', () => {
