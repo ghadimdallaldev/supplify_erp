@@ -9,13 +9,13 @@ export const TEST_USERS = {
     role: 'ADMIN' as const,
   },
   restaurant: {
-    email: process.env.E2E_RESTAURANT_EMAIL || 'restaurant@supplify.com',
-    password: process.env.E2E_RESTAURANT_PASSWORD || 'SupplifyRestaurant1!',
+    email: process.env.E2E_RESTAURANT_EMAIL || 'restaurant-1@test.com',
+    password: process.env.E2E_RESTAURANT_PASSWORD || 'Supplify1!',
     role: 'RESTAURANT' as const,
   },
   supplier: {
-    email: process.env.E2E_SUPPLIER_EMAIL || 'supplier@supplify.com',
-    password: process.env.E2E_SUPPLIER_PASSWORD || 'SupplifySupplier1!',
+    email: process.env.E2E_SUPPLIER_EMAIL || 'contact-0@supplier0.test',
+    password: process.env.E2E_SUPPLIER_PASSWORD || 'Supplify1!',
     role: 'SUPPLIER' as const,
   },
 } as const

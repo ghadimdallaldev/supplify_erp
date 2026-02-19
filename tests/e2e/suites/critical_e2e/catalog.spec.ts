@@ -1,15 +1,21 @@
 import { test, expect } from '../../fixtures'
 import { resetAndSeed } from '../../utils/seed'
-import { webReachable, authAvailable } from '../../utils/reachability'
+import { webReachable, requireAuthSuite } from '../../utils/reachability'
+
+const auth = requireAuthSuite()
 
 test.describe('Catalog', () => {
+  test.beforeAll(async () => {
+    await auth.init()
+  })
+
   test.beforeEach(async ({ request }) => {
     await resetAndSeed(request, { scenario: 'catalog_basic' })
   })
 
   test('restaurant can open products page', async ({ productsPage }) => {
     test.skip(!webReachable(), 'Web app not running')
-    test.skip(!authAvailable(), 'Keycloak/auth not available')
+    auth.requireAuth()
     test.skip(test.info().project.name !== 'critical_e2e_restaurant', 'Restaurant-only')
     await productsPage.goto()
     await productsPage.expectProductsPageLoaded()
@@ -17,7 +23,7 @@ test.describe('Catalog', () => {
 
   test('supplier can open products page', async ({ productsPage }) => {
     test.skip(!webReachable(), 'Web app not running')
-    test.skip(!authAvailable(), 'Keycloak/auth not available')
+    auth.requireAuth()
     test.skip(test.info().project.name !== 'critical_e2e_supplier', 'Supplier-only')
     await productsPage.goto()
     await productsPage.expectProductsPageLoaded()
@@ -29,7 +35,7 @@ test.describe('Catalog', () => {
     cartPage,
   }) => {
     test.skip(!webReachable(), 'Web app not running')
-    test.skip(!authAvailable(), 'Keycloak/auth not available')
+    auth.requireAuth()
     test.skip(test.info().project.name !== 'critical_e2e_restaurant', 'Restaurant-only')
     await productsPage.goto()
     await productsPage.expectProductsPageLoaded()
@@ -38,6 +44,7 @@ test.describe('Catalog', () => {
     const testId = await addButton.getAttribute('data-testid')
     const productId = testId?.replace('product-add-to-cart-', '') ?? ''
     await addButton.click()
+    await expect(page.getByText('Added to cart')).toBeVisible({ timeout: 5000 })
     await page.goto('/app/cart', { waitUntil: 'domcontentloaded' })
     await cartPage.expectCartPageLoaded()
     if (productId) {

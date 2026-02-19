@@ -9,7 +9,10 @@ import type {
 
 export const reservationsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getReservationBoard: build.query<ReservationBoardResponse, { date?: string; branchId?: string }>({
+    getReservationBoard: build.query<
+      ReservationBoardResponse,
+      { date?: string; branchId?: string }
+    >({
       query: ({ date, branchId }) => ({
         url: '/api/reservations/board',
         params: {
@@ -21,7 +24,18 @@ export const reservationsApi = api.injectEndpoints({
     }),
     saveReservationTables: build.mutation<
       { tables: ReservationTable[] },
-      { branchId?: string; tables: Array<Partial<ReservationTable> & { name: string; capacity: number; table_type?: string; position?: Record<string, unknown>; is_active?: boolean }> }
+      {
+        branchId?: string
+        tables: Array<
+          Partial<ReservationTable> & {
+            name: string
+            capacity: number
+            table_type?: string
+            position?: Record<string, unknown>
+            is_active?: boolean
+          }
+        >
+      }
     >({
       query: ({ branchId, tables }) => ({
         url: '/api/reservations/tables',
@@ -40,14 +54,21 @@ export const reservationsApi = api.injectEndpoints({
         body,
       }),
     }),
-    updateReservationStatus: build.mutation<{ reservation: Reservation }, { id: string; status: ReservationStatus; cancellationReason?: string }>({
-      query: ({ id, ...data }) => ({
-        url: `/api/reservations/${id}/status`,
+    updateReservationStatus: build.mutation<
+      { reservation: Reservation },
+      { id: string; status: ReservationStatus; notes?: string }
+    >({
+      query: ({ id, status, notes }) => ({
+        url: `/api/reservations/${id}`,
         method: 'PATCH',
-        body: data,
+        body: { status, ...(notes != null && { notes }) },
       }),
+      invalidatesTags: [{ type: 'Reservation' as const, id: 'BOARD' }],
     }),
-    getReservationAnalytics: build.query<ReservationAnalyticsResponse, { range?: 'day' | 'week' | 'month'; branchId?: string }>({
+    getReservationAnalytics: build.query<
+      ReservationAnalyticsResponse,
+      { range?: 'day' | 'week' | 'month'; branchId?: string }
+    >({
       query: ({ range, branchId }) => ({
         url: '/api/reservations/analytics',
         params: {

@@ -1,33 +1,41 @@
 import { test, expect } from '../../fixtures'
-import { webReachable, authAvailable } from '../../utils/reachability'
+import { webReachable, requireAuthSuite } from '../../utils/reachability'
+
+const auth = requireAuthSuite()
 
 test.describe('RBAC', () => {
-  test('restaurant_manager cannot access admin UI', async ({ page }) => {
+  test.beforeAll(async () => {
+    await auth.init()
+  })
+
+  test('restaurant_manager cannot access admin UI', async ({ page, authStub }) => {
     test.skip(!webReachable(), 'Web app not running')
-    test.skip(!authAvailable(), 'Keycloak/auth not available')
+    auth.requireAuth()
     test.skip(
       test.info().project.name !== 'critical_e2e_restaurant',
       'Run only as restaurant project'
     )
-    await page.goto('/app/admin', { waitUntil: 'domcontentloaded' })
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' })
     await page.waitForLoadState('networkidle').catch(() => {})
-    const adminVisible = await page
-      .getByTestId('admin-dashboard-page')
+    await page.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 15000 })
+    const adminNavVisible = await page
+      .getByTestId('nav-admin-dashboard')
       .isVisible()
       .catch(() => false)
-    expect(adminVisible).toBe(false)
+    expect(adminNavVisible).toBe(false)
   })
 
-  test('supplier cannot access admin UI', async ({ page }) => {
+  test('supplier cannot access admin UI', async ({ page, authStub }) => {
     test.skip(!webReachable(), 'Web app not running')
-    test.skip(!authAvailable(), 'Keycloak/auth not available')
+    auth.requireAuth()
     test.skip(test.info().project.name !== 'critical_e2e_supplier', 'Run only as supplier project')
-    await page.goto('/app/admin', { waitUntil: 'domcontentloaded' })
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' })
     await page.waitForLoadState('networkidle').catch(() => {})
-    const adminVisible = await page
-      .getByTestId('admin-dashboard-page')
+    await page.getByTestId('sidebar').waitFor({ state: 'visible', timeout: 15000 })
+    const adminNavVisible = await page
+      .getByTestId('nav-admin-dashboard')
       .isVisible()
       .catch(() => false)
-    expect(adminVisible).toBe(false)
+    expect(adminNavVisible).toBe(false)
   })
 })

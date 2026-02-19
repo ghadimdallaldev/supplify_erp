@@ -42,7 +42,8 @@ export function Header() {
     .filter(({ pct }) => pct >= 80 && pct < 100)
     .slice(0, 3)
   const showUpgrade =
-    planCode === 'free' || nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1
+    user?.role !== 'ADMIN' &&
+    (planCode === 'free' || nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1)
   const hasUrgency = nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1
 
   const handleNavUpgrade = () => {

@@ -24,6 +24,7 @@
     "seed:quick-lists": "node scripts/seed-quick-lists.js",
     "seed:chats": "node scripts/seed-chats.js",
     "seed:demo-users": "node scripts/seed-demo-users.js",
+    "reduce-to-single-tenant": "node scripts/reduce-to-single-tenant.js",
     "db:reset": "node scripts/reset.js",
     "db:init-subs": "node scripts/initialize-subscriptions.js",
     "openapi:gen": "node scripts/generate-openapi.js"

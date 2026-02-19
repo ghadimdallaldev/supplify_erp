@@ -15,6 +15,7 @@ export default defineConfig({
   reporter: [['html', { outputFolder: 'playwright-report', open: 'never' }], ['list']],
   use: {
     baseURL,
+    ignoreHTTPSErrors: true, // required for local HTTPS Keycloak
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -43,7 +44,10 @@ export default defineConfig({
     },
     {
       name: 'nightly',
-      use: { ...devices['Desktop Chrome'], storageState: path.join(authDir, 'restaurant.json') },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'nightly-restaurant.json'),
+      },
       testMatch: /suites\/nightly\/.*\.spec\.ts/,
     },
     {

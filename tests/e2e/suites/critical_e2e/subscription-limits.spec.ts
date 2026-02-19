@@ -1,8 +1,14 @@
 import { test, expect } from '../../fixtures'
 import { resetAndSeed } from '../../utils/seed'
-import { webReachable, authAvailable } from '../../utils/reachability'
+import { webReachable, requireAuthSuite } from '../../utils/reachability'
+
+const auth = requireAuthSuite()
 
 test.describe('Subscription limits', () => {
+  test.beforeAll(async () => {
+    await auth.init()
+  })
+
   test.beforeEach(async ({ request }) => {
     await resetAndSeed(request, { scenario: 'subscription_limits_basic' })
   })
@@ -11,7 +17,7 @@ test.describe('Subscription limits', () => {
     dashboardPage,
   }) => {
     test.skip(!webReachable(), 'Web app not running')
-    test.skip(!authAvailable(), 'Keycloak/auth not available')
+    auth.requireAuth()
     await dashboardPage.goto()
     await dashboardPage.expectDashboardLoaded()
     await expect(dashboardPage.sidebar).toBeVisible()

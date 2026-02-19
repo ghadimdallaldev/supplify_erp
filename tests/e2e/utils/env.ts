@@ -18,16 +18,23 @@ function readProbedUrl(fileName: string): string | null {
   return null
 }
 
-export const baseURL =
+const rawBaseURL =
   process.env.PLAYWRIGHT_BASE_URL ||
   process.env.WEB_ORIGIN ||
   readProbedUrl('.web-base-url') ||
   'http://localhost:5173'
-export const apiURL =
+const rawApiURL =
   process.env.PLAYWRIGHT_API_URL ||
   process.env.VITE_API_URL ||
   readProbedUrl('.api-base-url') ||
-  'http://127.0.0.1:4000'
+  'http://localhost:4000'
+
+// Use same host (localhost) for web and API so auth cookies set by the API are sent when the app calls the API
+export const baseURL = rawBaseURL
+export const apiURL =
+  rawBaseURL.includes('localhost') && rawApiURL.includes('127.0.0.1')
+    ? rawApiURL.replace('127.0.0.1', 'localhost')
+    : rawApiURL
 
 export function getBaseURL(): string {
   return baseURL

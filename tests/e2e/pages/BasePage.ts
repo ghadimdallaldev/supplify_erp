@@ -18,4 +18,17 @@ export class BasePage {
     await this.page.waitForLoadState('domcontentloaded')
     await this.page.waitForLoadState('networkidle').catch(() => {})
   }
+
+  /**
+   * Call at start of expect*PageLoaded: fail immediately if session expired or redirected to login,
+   * instead of waiting full timeout for a missing test ID. Improves failure visibility.
+   */
+  async assertNotLoginOrExpired(): Promise<void> {
+    const url = this.page.url()
+    if (url.includes('/login') || url.includes('expired=true')) {
+      throw new Error(
+        `Page load check failed: session expired or redirected to login. Current URL: ${url}. Re-run auth setup or use valid storageState.`
+      )
+    }
+  }
 }

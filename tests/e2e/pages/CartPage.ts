@@ -23,6 +23,20 @@ export class CartPage extends BasePage {
   }
 
   async expectCartPageLoaded(): Promise<void> {
-    await this.pageContainer.waitFor({ state: 'visible', timeout: 15000 })
+    await this.assertNotLoginOrExpired()
+    const url = this.page.url()
+    // eslint-disable-next-line no-console
+    console.log('[CartPage] expectCartPageLoaded URL:', url)
+    const combined = this.getByTestId('cart-page').or(
+      this.page.getByRole('heading', { name: /cart/i })
+    )
+    await combined
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {
+        // eslint-disable-next-line no-console
+        console.log('[CartPage] expectCartPageLoaded failed; URL:', url)
+        throw new Error(`Cart page did not load. URL: ${url}`)
+      })
   }
 }

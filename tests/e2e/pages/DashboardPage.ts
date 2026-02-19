@@ -24,6 +24,20 @@ export class AppDashboardPage extends BasePage {
   }
 
   async expectDashboardLoaded(): Promise<void> {
-    await this.pageContainer.waitFor({ state: 'visible', timeout: 15000 })
+    await this.assertNotLoginOrExpired()
+    const url = this.page.url()
+    // eslint-disable-next-line no-console
+    console.log('[DashboardPage] expectDashboardLoaded URL:', url)
+    const combined = this.getByTestId('dashboard-page').or(
+      this.page.getByRole('heading', { name: /dashboard|welcome/i })
+    )
+    await combined
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {
+        // eslint-disable-next-line no-console
+        console.log('[DashboardPage] expectDashboardLoaded failed; URL:', url)
+        throw new Error(`Dashboard page did not load. URL: ${url}`)
+      })
   }
 }

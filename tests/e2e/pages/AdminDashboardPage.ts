@@ -15,6 +15,7 @@ export class AdminDashboardPage extends BasePage {
   }
 
   async expectAdminDashboardLoaded(): Promise<void> {
+    await this.assertNotLoginOrExpired()
     await this.pageContainer.waitFor({ state: 'visible', timeout: 15000 })
   }
 }

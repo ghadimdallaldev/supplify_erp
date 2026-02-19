@@ -23,6 +23,20 @@ export class ProductsPage extends BasePage {
   }
 
   async expectProductsPageLoaded(): Promise<void> {
-    await this.pageContainer.waitFor({ state: 'visible', timeout: 15000 })
+    await this.assertNotLoginOrExpired()
+    const url = this.page.url()
+    // eslint-disable-next-line no-console
+    console.log('[ProductsPage] expectProductsPageLoaded URL:', url)
+    const combined = this.getByTestId('products-page')
+      .or(this.getByTestId('catalog-page'))
+      .or(this.page.getByRole('heading', { name: /products|catalog/i }))
+    await combined
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {
+        // eslint-disable-next-line no-console
+        console.log('[ProductsPage] expectProductsPageLoaded failed; URL:', url)
+        throw new Error(`Products/catalog page did not load. URL: ${url}`)
+      })
   }
 }

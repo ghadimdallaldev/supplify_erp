@@ -86,7 +86,6 @@ export function UpgradeModal() {
   }, [open, recommendation?.recommendedPlanCode, recordConversionEvent])
 
   const handleClose = () => {
-    closedWithoutUpgrade.current = true
     recordConversionEvent({ eventType: 'CLOSE_UPGRADE_MODAL' }).catch(() => {})
     dispatch(closeMonetizationModal())
   }

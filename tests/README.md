@@ -30,7 +30,7 @@
    pnpm exec playwright test --config=tests/playwright.config.ts --project=api
    ```
 
-**Auth**: `globalSetup` (`e2e/auth.setup.ts`) logs in as admin, restaurant, and supplier (Keycloak) and saves `e2e/.auth/*.json`. Ensure Keycloak and demo users exist or auth-dependent projects will fail.
+**Auth**: `globalSetup` (`e2e/auth.setup.ts`) logs in as admin, restaurant, and supplier (Keycloak) and saves `e2e/.auth/*.json`. Ensure Keycloak and demo users exist or auth-dependent projects will fail. For auth to work, API and web must use the **same host** (e.g. both `localhost`): set `VITE_API_URL=http://localhost:4000` and run API on `localhost:4000` so cookies set during login are sent when the app calls the API.
 
 ## Run in CI
 

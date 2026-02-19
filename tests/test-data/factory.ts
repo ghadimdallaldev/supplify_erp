@@ -13,8 +13,8 @@ export const E2E_ORDER_ID = 'e2e00001-0001-4001-8001-000000000001'
 
 export const DEMO_USER_EMAILS = {
   admin: process.env.E2E_ADMIN_EMAIL || 'supplifyadmin@supplify.com',
-  restaurant: process.env.E2E_RESTAURANT_EMAIL || 'restaurant@supplify.com',
-  supplier: process.env.E2E_SUPPLIER_EMAIL || 'supplier@supplify.com',
+  restaurant: process.env.E2E_RESTAURANT_EMAIL || 'restaurant-1@test.com',
+  supplier: process.env.E2E_SUPPLIER_EMAIL || 'contact-0@supplier0.test',
 } as const
 
 export interface SeededData {

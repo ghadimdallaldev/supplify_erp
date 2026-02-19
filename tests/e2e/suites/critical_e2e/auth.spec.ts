@@ -1,10 +1,16 @@
 import { test, expect } from '../../fixtures'
-import { webReachable, authAvailable } from '../../utils/reachability'
+import { webReachable, requireAuthSuite } from '../../utils/reachability'
+
+const auth = requireAuthSuite()
 
 test.describe('Auth', () => {
+  test.beforeAll(async () => {
+    await auth.init()
+  })
+
   test('session persistence: authenticated user sees sidebar', async ({ dashboardPage }) => {
     test.skip(!webReachable(), 'Web app not running')
-    test.skip(!authAvailable(), 'Keycloak/auth not available')
+    auth.requireAuth()
     await dashboardPage.goto()
     await dashboardPage.expectDashboardLoaded()
     await expect(dashboardPage.sidebar).toBeVisible()
@@ -12,7 +18,7 @@ test.describe('Auth', () => {
 
   test('logout clears session and shows login', async ({ page, dashboardPage }) => {
     test.skip(!webReachable(), 'Web app not running')
-    test.skip(!authAvailable(), 'Keycloak/auth not available')
+    auth.requireAuth()
     await dashboardPage.goto()
     await dashboardPage.expectDashboardLoaded()
     await page.getByTestId('logout-button').click()

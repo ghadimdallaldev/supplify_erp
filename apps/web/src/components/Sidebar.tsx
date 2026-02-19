@@ -69,13 +69,19 @@ export function Sidebar() {
     skip: user?.role !== 'ADMIN',
   })
 
-  const isAdmin = user?.role === 'ADMIN'
+  const isPlatformAdmin =
+    user?.role === 'ADMIN' &&
+    Array.isArray(user?.adminPermissions) &&
+    user.adminPermissions.length > 0 &&
+    (user.adminPermissions.includes('ADMIN_ACCESS') ||
+      user.adminPermissions.includes('ADMIN_TENANTS'))
+  const isAdmin = isPlatformAdmin
   const isSupplier = user?.role === 'SUPPLIER'
   const isRestaurant = user?.role === 'RESTAURANT'
   const impersonatingRestaurant =
-    isAdmin && impersonation?.active && impersonation?.tenantType === 'RESTAURANT'
+    isPlatformAdmin && impersonation?.active && impersonation?.tenantType === 'RESTAURANT'
   const impersonatingSupplier =
-    isAdmin && impersonation?.active && impersonation?.tenantType === 'SUPPLIER'
+    isPlatformAdmin && impersonation?.active && impersonation?.tenantType === 'SUPPLIER'
 
   // Build navigation: when impersonating, show that tenant's experience; else by role
   let allNavigation: { name: string; href: string; icon: any; permission?: string }[] = []
@@ -84,8 +90,8 @@ export function Sidebar() {
       ...navigation,
       ...restaurantNavigation.filter((item) => !item.permission || can(item.permission)),
     ]
-  } else if (isAdmin && !impersonation?.active) {
-    // Show admin nav for any ADMIN role; API still enforces ADMIN_ACCESS on routes
+  } else if (isPlatformAdmin && !impersonation?.active) {
+    // Show admin nav only when user has admin role AND admin permissions (never for supplier/restaurant)
     allNavigation = [...adminNavigation]
   } else if (isSupplier || impersonatingSupplier) {
     allNavigation = [
@@ -127,7 +133,7 @@ export function Sidebar() {
           })}
 
           {(can('SETTINGS_VIEW') ||
-            (isAdmin && !impersonation?.active) ||
+            (isPlatformAdmin && !impersonation?.active) ||
             isRestaurant ||
             impersonatingRestaurant ||
             isSupplier ||
