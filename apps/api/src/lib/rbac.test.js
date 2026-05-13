@@ -139,6 +139,59 @@ describe('RBAC Utilities', () => {
     })
   })
 
+  describe('upsertUser', () => {
+    it('updates existing user matched by email when keycloak_sub differs (seed placeholder)', async () => {
+      const { query } = await import('./db.js')
+      const linkedUser = {
+        id: 'user-admin',
+        keycloak_sub: 'real-keycloak-uuid',
+        email: 'admin@supplify.com',
+        display_name: 'Admin User',
+        role: 'ADMIN',
+      }
+      query.mockResolvedValueOnce({ rows: [linkedUser] })
+
+      const user = await upsertUser(
+        {
+          sub: 'real-keycloak-uuid',
+          email: 'admin@supplify.com',
+          given_name: 'Admin',
+          family_name: 'User',
+        },
+        ['admin']
+      )
+
+      expect(user).toEqual(linkedUser)
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2)'),
+        ['real-keycloak-uuid', 'admin@supplify.com', 'Admin User', 'ADMIN']
+      )
+    })
+
+    it('inserts new user when no row matches sub or email', async () => {
+      const { query } = await import('./db.js')
+      const newUser = {
+        id: 'user-new',
+        keycloak_sub: 'sub-new',
+        email: 'new@example.com',
+        display_name: 'New User',
+        role: 'RESTAURANT',
+      }
+      query.mockResolvedValueOnce({ rows: [newUser] })
+
+      const user = await upsertUser(
+        { sub: 'sub-new', email: 'new@example.com', given_name: 'New', family_name: 'User' },
+        []
+      )
+
+      expect(user).toEqual(newUser)
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO app_user'),
+        ['sub-new', 'new@example.com', 'New User', 'RESTAURANT']
+      )
+    })
+  })
+
   describe('getUserBySub', () => {
     it('should return user by Keycloak sub', async () => {
       const { query } = await import('./db.js')

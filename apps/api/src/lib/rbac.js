@@ -83,17 +83,29 @@ export async function upsertUser(userInfo, roles = []) {
       else role = 'RESTAURANT'
     }
 
+    // Match by keycloak_sub or email so seeded placeholder subs (e.g. admin-sub) link on first login
     const result = await query(
       `
-      INSERT INTO app_user (keycloak_sub, email, display_name, role)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (keycloak_sub) 
-      DO UPDATE SET 
-        email = EXCLUDED.email,
-        display_name = EXCLUDED.display_name,
-        role = EXCLUDED.role,
-        updated_at = now()
-      RETURNING *
+      WITH updated AS (
+        UPDATE app_user
+        SET
+          keycloak_sub = $1,
+          email = $2,
+          display_name = $3,
+          role = $4,
+          updated_at = now()
+        WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2)
+        RETURNING *
+      ),
+      inserted AS (
+        INSERT INTO app_user (keycloak_sub, email, display_name, role)
+        SELECT $1, $2, $3, $4
+        WHERE NOT EXISTS (SELECT 1 FROM updated)
+        RETURNING *
+      )
+      SELECT * FROM updated
+      UNION ALL
+      SELECT * FROM inserted
     `,
       [sub, email, displayName, role]
     )
