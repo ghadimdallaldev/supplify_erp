@@ -1,6 +1,9 @@
 -- Migration: 0020_notifications.sql
 -- Description: Notification system with user preferences for suppliers and restaurants
 
+-- 0015 created a restaurant-scoped stub; replace with user-scoped schema
+DROP TABLE IF EXISTS notification_preferences CASCADE;
+
 -- Notification preferences table for users to control what notifications they receive
 CREATE TABLE IF NOT EXISTS notification_preferences (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -120,12 +123,12 @@ CREATE TABLE IF NOT EXISTS restaurant_contact_info (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_notification_preferences_user ON notification_preferences(user_id, user_type);
-CREATE INDEX idx_notification_log_user ON notification_log(user_id, user_type, is_read);
-CREATE INDEX idx_notification_log_created ON notification_log(created_at DESC);
-CREATE INDEX idx_notification_log_reference ON notification_log(reference_id, reference_type);
-CREATE INDEX idx_supplier_contact_supplier ON supplier_contact_info(supplier_id);
-CREATE INDEX idx_restaurant_contact_restaurant ON restaurant_contact_info(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_user ON notification_preferences(user_id, user_type);
+CREATE INDEX IF NOT EXISTS idx_notification_log_user ON notification_log(user_id, user_type, is_read);
+CREATE INDEX IF NOT EXISTS idx_notification_log_created ON notification_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notification_log_reference ON notification_log(reference_id, reference_type);
+CREATE INDEX IF NOT EXISTS idx_supplier_contact_supplier ON supplier_contact_info(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_restaurant_contact_restaurant ON restaurant_contact_info(restaurant_id);
 
 -- Grant permissions
 GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO api_user;

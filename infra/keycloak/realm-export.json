@@ -14,8 +14,13 @@
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
       "secret": "changeme",
-      "redirectUris": ["http://localhost:4000/auth/callback"],
-      "webOrigins": ["http://localhost:4000"],
+      "redirectUris": [
+        "http://localhost/auth/callback",
+        "http://localhost:4000/auth/callback",
+        "http://localhost:5173/auth/callback",
+        "http://localhost:8180/auth/callback"
+      ],
+      "webOrigins": ["+"],
       "protocol": "openid-connect",
       "attributes": {
         "access.token.lifespan": "3600",
@@ -29,8 +34,13 @@
       "clientId": "supplify-web",
       "enabled": true,
       "publicClient": true,
-      "redirectUris": ["http://localhost:4000/auth/callback"],
-      "webOrigins": ["http://localhost:4000", "http://localhost:5173"],
+      "redirectUris": [
+        "http://localhost/auth/callback",
+        "http://localhost:4000/auth/callback",
+        "http://localhost:5173/auth/callback",
+        "http://localhost:8180/auth/callback"
+      ],
+      "webOrigins": ["+"],
       "protocol": "openid-connect",
       "attributes": { "pkce.code.challenge.method": "S256" },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],

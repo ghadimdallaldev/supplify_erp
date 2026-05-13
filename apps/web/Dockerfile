@@ -18,6 +18,7 @@ RUN pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM base AS builder
+RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
@@ -26,7 +27,11 @@ COPY . .
 WORKDIR /app/apps/web
 
 ARG VITE_API_URL=http://localhost:4000
+ARG VITE_KEYCLOAK_URL=http://localhost:8080
+ARG VITE_KEYCLOAK_REALM=Supplify
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
+ENV VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM
 
 # Build the application
 RUN pnpm build
