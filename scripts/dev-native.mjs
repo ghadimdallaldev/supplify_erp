@@ -6,7 +6,6 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { getRepoRoot } from './lib/docker-env.mjs'
-import { getPnpmArgs, runPnpm } from './lib/pnpm.mjs'
 
 const root = getRepoRoot()
 const skipInfra = process.argv.includes('--no-infra')
@@ -40,14 +39,9 @@ function dockerHealthy(name) {
 }
 
 async function main() {
-  if (!getPnpmArgs(['--version'])) {
-    console.error('pnpm is not available. Run: npm install -g pnpm')
-    process.exit(1)
-  }
-
   if (!existsSync(path.join(root, 'node_modules'))) {
     console.log('Installing dependencies (first run)…')
-    const inst = runPnpm(['install'], { cwd: root })
+    const inst = run('node', ['scripts/pnpm-run.mjs', 'install'])
     if (inst.status !== 0) process.exit(inst.status ?? 1)
   }
 
@@ -70,7 +64,7 @@ async function main() {
 
   if (!skipMigrate) {
     console.log('Running migrations…')
-    runPnpm(['db:migrate'], { cwd: root })
+    run('node', ['apps/api/scripts/migrate.js'])
   }
 
   console.log('\nStarting API (watch) + web (Vite HMR)…')
@@ -78,9 +72,7 @@ async function main() {
   console.log('  API:  http://localhost:4000')
   console.log('  Auth: http://localhost:5173/auth/login\n')
 
-  const devArgs = getPnpmArgs(['run', 'dev:apps'])
-  const [cmd, ...args] = devArgs
-  const child = spawn(cmd, args, {
+  const child = spawn('node', ['scripts/dev-apps.mjs'], {
     stdio: 'inherit',
     shell: true,
     cwd: root,
