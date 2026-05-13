@@ -8,13 +8,14 @@ import { OrdersModule } from './orders/orders.module';
 import { AuthModule } from './auth/auth.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
-      playground: true,
+      playground: process.env.NODE_ENV !== 'production',
       context: ({ req }) => ({ req }),
       subscriptions: {
         'graphql-ws': true,
@@ -92,6 +93,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     SubscriptionsModule,
     DashboardModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}
 

@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   swcMinify: true,
   eslint: {
@@ -13,7 +14,11 @@ const nextConfig = {
     optimizePackageImports: ['@/components'],
   },
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      { protocol: 'http', hostname: 'localhost' },
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
+    ],
     formats: ['image/webp'],
   },
   // Performance optimizations

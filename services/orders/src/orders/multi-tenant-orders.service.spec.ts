@@ -36,6 +36,7 @@ describe('MultiTenantOrdersService', () => {
     emitOrderPreparing: jest.fn(),
     emitOrderDispatched: jest.fn(),
     emitOrderCancelled: jest.fn(),
+    emitOrderDelivered: jest.fn(),
     emitOrderDeliveredEnhanced: jest.fn(),
   };
 
@@ -317,7 +318,7 @@ describe('MultiTenantOrdersService', () => {
       const result = await service.supplierMarkDelivered(mockDeliveredDto);
 
       expect(result.status).toBe('DELIVERED');
-      expect(mockEventsService.emitOrderDeliveredEnhanced).toHaveBeenCalledWith({
+      expect(mockEventsService.emitOrderDelivered).toHaveBeenCalledWith({
         clientId: 'test-client',
         orderId: 'test-order',
         restaurantId: 'test-restaurant',

@@ -1,0 +1,29 @@
+# CI/CD entrypoint — build with:
+#   docker build -f services/catalog/Dockerfile --build-arg SERVICE_PATH=services/catalog --build-arg SERVICE_NAME=@supplify/catalog .
+ARG SERVICE_PATH=services/catalog
+ARG SERVICE_NAME=@supplify/catalog
+FROM node:20-alpine AS builder
+ARG SERVICE_PATH
+ARG SERVICE_NAME
+RUN apk add --no-cache libc6-compat openssl python3 make g++
+RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps ./apps
+COPY services ./services
+COPY packages ./packages
+RUN pnpm install --frozen-lockfile
+RUN pnpm -r --filter "./packages/*" build || true
+RUN if [ -f "${SERVICE_PATH}/prisma/schema.prisma" ]; then cd "${SERVICE_PATH}" && npx prisma generate; fi
+RUN pnpm --filter "${SERVICE_NAME}" build
+FROM node:20-alpine AS runner
+ARG SERVICE_PATH
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/${SERVICE_PATH} ./service
+WORKDIR /app/service
+CMD ["node", "dist/main.js"]

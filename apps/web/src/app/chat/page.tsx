@@ -19,7 +19,9 @@ export default function ChatPage() {
 
   // Connect to WebSocket
   useEffect(() => {
-    const newSocket = io('http://localhost:3011/chat', {
+    const chatWsUrl =
+      process.env.NEXT_PUBLIC_CHAT_WS_URL || 'http://localhost:3011/chat';
+    const newSocket = io(chatWsUrl, {
       auth: {
         userId: 'user_123', // From auth context
         orgType: 'RESTAURANT', // From auth context

@@ -31,6 +31,19 @@ describe('FefoService', () => {
     it('should select batch with earliest expiry first (FEFO)', async () => {
       const batches = [
         {
+          id: '2',
+          itemId: 'item-1',
+          locationId: 'loc-1',
+          qtyOnHandBase: 15,
+          expiryDate: addDays(new Date(), 2), // Earlier expiry — returned first by DB orderBy
+          lotCode: 'LOT-B',
+          supplierId: 'sup-1',
+          lastUnitCost: 2.6,
+          status: BatchStatus.OK,
+          createdAt: new Date('2024-01-02'),
+          updatedAt: new Date(),
+        },
+        {
           id: '1',
           itemId: 'item-1',
           locationId: 'loc-1',
@@ -41,19 +54,6 @@ describe('FefoService', () => {
           lastUnitCost: 2.5,
           status: BatchStatus.OK,
           createdAt: new Date('2024-01-01'),
-          updatedAt: new Date(),
-        },
-        {
-          id: '2',
-          itemId: 'item-1',
-          locationId: 'loc-1',
-          qtyOnHandBase: 15,
-          expiryDate: addDays(new Date(), 2), // Earlier expiry
-          lotCode: 'LOT-B',
-          supplierId: 'sup-1',
-          lastUnitCost: 2.6,
-          status: BatchStatus.OK,
-          createdAt: new Date('2024-01-02'),
           updatedAt: new Date(),
         },
       ];
@@ -70,6 +70,19 @@ describe('FefoService', () => {
     it('should use FIFO when expiry dates are null', async () => {
       const batches = [
         {
+          id: '2',
+          itemId: 'item-1',
+          locationId: 'loc-1',
+          qtyOnHandBase: 15,
+          expiryDate: null,
+          lotCode: 'LOT-B',
+          supplierId: 'sup-1',
+          lastUnitCost: 2.6,
+          status: BatchStatus.OK,
+          createdAt: new Date('2024-01-01'), // Earlier creation date — returned first by DB orderBy
+          updatedAt: new Date(),
+        },
+        {
           id: '1',
           itemId: 'item-1',
           locationId: 'loc-1',
@@ -80,19 +93,6 @@ describe('FefoService', () => {
           lastUnitCost: 2.5,
           status: BatchStatus.OK,
           createdAt: new Date('2024-01-02'),
-          updatedAt: new Date(),
-        },
-        {
-          id: '2',
-          itemId: 'item-1',
-          locationId: 'loc-1',
-          qtyOnHandBase: 15,
-          expiryDate: null,
-          lotCode: 'LOT-B',
-          supplierId: 'sup-1',
-          lastUnitCost: 2.6,
-          status: BatchStatus.OK,
-          createdAt: new Date('2024-01-01'), // Earlier creation date
           updatedAt: new Date(),
         },
       ];

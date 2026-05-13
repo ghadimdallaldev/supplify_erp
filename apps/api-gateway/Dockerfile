@@ -1,0 +1,23 @@
+# CI/CD entrypoint — build context is repo root.
+FROM node:20-alpine AS builder
+RUN apk add --no-cache libc6-compat openssl
+RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api-gateway ./apps/api-gateway
+COPY packages ./packages
+RUN pnpm install --frozen-lockfile
+RUN pnpm -r --filter "./packages/*" build || true
+RUN pnpm --filter @supplify/api-gateway build
+FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl wget
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/api-gateway ./apps/api-gateway
+WORKDIR /app/apps/api-gateway
+EXPOSE 4000
+CMD ["node", "dist/main.js"]

@@ -46,6 +46,11 @@ export function validateEntitlements(data: unknown) {
  * Validate overrides (partial entitlements)
  */
 export function validateOverrides(data: unknown) {
-  return EntitlementsSchema.partial().partial({ features: true, limits: true }).parse(data);
+  return z
+    .object({
+      features: FeatureFlagsSchema.partial().optional(),
+      limits: LimitCapsSchema.partial().optional(),
+    })
+    .parse(data);
 }
 

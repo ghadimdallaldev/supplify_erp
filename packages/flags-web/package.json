@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "jest"
+    "test": "jest --config jest.config.js"
   },
   "peerDependencies": {
     "react": "^18.0.0",

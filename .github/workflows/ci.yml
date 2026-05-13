@@ -51,7 +51,7 @@ jobs:
         run: pnpm format:check
 
       - name: Run tests
-        run: pnpm test
+        run: node scripts/run-unit-tests.js
 
   build:
     runs-on: ubuntu-latest

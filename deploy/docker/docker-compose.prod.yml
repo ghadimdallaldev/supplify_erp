@@ -1,0 +1,496 @@
+# Supplify production stack — run on any EC2 instance with Docker.
+# Usage (from repo root):
+#   cp deploy/docker/.env.production.example deploy/docker/.env
+#   # edit deploy/docker/.env
+#   ./deploy/ec2/deploy.sh
+
+name: supplify-prod
+
+x-app-env: &app-env
+  env_file: .env
+  networks:
+    - supplify
+  restart: unless-stopped
+
+x-nest-build: &nest-build
+  context: ../..
+  dockerfile: deploy/docker/Dockerfile.nest
+
+x-nest-depends: &nest-depends
+  postgres:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+services:
+  # ── Reverse proxy (only public-facing port) ─────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: supplify-nginx
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+      - api-gateway
+      - keycloak
+    <<: *app-env
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/nginx-health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Data stores ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: supplify-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-supplify}
+      POSTGRES_USER: ${POSTGRES_USER:-supplify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../infra/docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-supplify}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    <<: *app-env
+
+  redis:
+    image: redis:7-alpine
+    container_name: supplify-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    <<: *app-env
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: supplify-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: supplify
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    <<: *app-env
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: supplify-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'false'
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:9200/_cluster/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    <<: *app-env
+
+  # ── Keycloak ────────────────────────────────────────────────────────────────
+  keycloak-db:
+    image: postgres:15-alpine
+    container_name: supplify-keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U keycloak']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    <<: *app-env
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    container_name: supplify-keycloak
+    command: start --import-realm --proxy=edge --http-enabled=true
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME: ${KC_HOSTNAME}
+      KC_HOSTNAME_STRICT: ${KC_HOSTNAME_STRICT:-false}
+      KC_HTTP_ENABLED: 'true'
+      KC_PROXY: edge
+      KC_HEALTH_ENABLED: 'true'
+    volumes:
+      - ../../infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    <<: *app-env
+
+  # ── DB migrations (run once, then exit) ───────────────────────────────────
+  migrate:
+    image: node:20-alpine
+    container_name: supplify-migrate
+    working_dir: /app
+    volumes:
+      - ../..:/app
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    entrypoint: /bin/sh
+    command: /app/deploy/scripts/migrate.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - supplify
+    restart: 'no'
+
+  # ── Application tier ──────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.api-gateway
+    container_name: supplify-api-gateway
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      REDIS_URL: ${REDIS_URL}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_GATEWAY_URL: ${NEXT_PUBLIC_API_GATEWAY_URL}
+        NEXT_PUBLIC_KEYCLOAK_URL: ${NEXT_PUBLIC_KEYCLOAK_URL}
+        NEXT_PUBLIC_KEYCLOAK_REALM: ${NEXT_PUBLIC_KEYCLOAK_REALM}
+        NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${NEXT_PUBLIC_KEYCLOAK_CLIENT_ID}
+        NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL}
+    container_name: supplify-web
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      CHAT_SERVICE_URL: ${CHAT_SERVICE_URL}
+      INVENTORY_SERVICE_URL: ${INVENTORY_SERVICE_URL}
+      ORDERS_SERVICE_URL: ${ORDERS_SERVICE_URL}
+    depends_on:
+      - api-gateway
+    <<: *app-env
+
+  # ── Microservices (RabbitMQ + HTTP) ─────────────────────────────────────────
+  catalog:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/catalog
+        SERVICE_NAME: '@supplify/catalog'
+    container_name: supplify-catalog
+    environment:
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      REDIS_URL: ${REDIS_URL}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  orders:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/orders
+        SERVICE_NAME: '@supplify/orders'
+    container_name: supplify-orders
+    environment:
+      PORT: 3002
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  restaurants:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/restaurants
+        SERVICE_NAME: '@supplify/restaurants'
+    container_name: supplify-restaurants
+    environment:
+      PORT: 3003
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  suppliers:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/suppliers
+        SERVICE_NAME: '@supplify/suppliers'
+    container_name: supplify-suppliers
+    environment:
+      PORT: 3004
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  inventory:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/inventory
+        SERVICE_NAME: '@supplify/inventory'
+    container_name: supplify-inventory
+    environment:
+      PORT: 3005
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  loyalty:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/loyalty
+        SERVICE_NAME: '@supplify/loyalty'
+    container_name: supplify-loyalty
+    environment:
+      PORT: 3009
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  promotions:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/promotions
+        SERVICE_NAME: '@supplify/promotions'
+    container_name: supplify-promotions
+    environment:
+      PORT: 3014
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  subscriptions:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/subscriptions
+        SERVICE_NAME: '@supplify/subscriptions'
+    container_name: supplify-subscriptions
+    environment:
+      PORT: 3006
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  notifications:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/notifications
+        SERVICE_NAME: '@supplify/notifications'
+    container_name: supplify-notifications
+    environment:
+      PORT: 3007
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  analytics:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/analytics
+        SERVICE_NAME: '@supplify/analytics'
+    container_name: supplify-analytics
+    environment:
+      PORT: 3008
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  flags:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/flags
+        SERVICE_NAME: '@supplify/flags'
+    container_name: supplify-flags
+    environment:
+      PORT: 3015
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  auth-proxy:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/auth-proxy
+        SERVICE_NAME: '@supplify/auth-proxy'
+    container_name: supplify-auth-proxy
+    environment:
+      PORT: 3010
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  chat:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/chat
+        SERVICE_NAME: '@supplify/chat'
+    container_name: supplify-chat
+    environment:
+      PORT: 3011
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  search:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/search
+        SERVICE_NAME: '@supplify/search'
+    container_name: supplify-search
+    environment:
+      PORT: 3012
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    <<: *app-env
+
+  invoicing:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/invoicing
+        SERVICE_NAME: '@supplify/invoicing'
+    container_name: supplify-invoicing
+    environment:
+      PORT: 3013
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      <<: *nest-depends
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+  recommendations:
+    build:
+      <<: *nest-build
+      args:
+        SERVICE_PATH: services/recommendations
+        SERVICE_NAME: '@supplify/recommendations'
+    container_name: supplify-recommendations
+    environment:
+      PORT: 3016
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    <<: *app-env
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  elasticsearch_data:
+  keycloak_db_data:
+
+networks:
+  supplify:
+    driver: bridge

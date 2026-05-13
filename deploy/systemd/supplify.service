@@ -1,0 +1,16 @@
+[Unit]
+Description=Supplify Production Stack (Docker Compose)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/supplify
+ExecStart=/opt/supplify/deploy/ec2/deploy.sh
+ExecStop=/usr/bin/docker compose -f /opt/supplify/deploy/docker/docker-compose.prod.yml --env-file /opt/supplify/deploy/docker/.env down
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

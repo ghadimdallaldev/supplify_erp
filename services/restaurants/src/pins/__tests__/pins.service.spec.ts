@@ -31,7 +31,12 @@ describe('PinsService', () => {
               count: jest.fn(),
               aggregate: jest.fn(),
             },
-            $transaction: jest.fn((callback) => callback(prisma)),
+            $transaction: jest.fn(async (arg) => {
+              if (typeof arg === 'function') {
+                return arg(prisma);
+              }
+              return Promise.all(arg);
+            }),
           },
         },
       ],

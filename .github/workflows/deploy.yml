@@ -46,12 +46,24 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: supplify
           IMAGE_TAG: ${{ github.sha }}
+          NEXT_PUBLIC_API_GATEWAY_URL: ${{ vars.PUBLIC_URL }}/graphql
+          NEXT_PUBLIC_KEYCLOAK_URL: ${{ vars.PUBLIC_URL }}/auth
+          NEXT_PUBLIC_KEYCLOAK_REALM: Supplify
+          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: supplify-web
+          NEXT_PUBLIC_CHAT_WS_URL: ${{ vars.PUBLIC_URL }}/chat
         run: |
-          # Build and push API Gateway
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-gateway:$IMAGE_TAG -f apps/api-gateway/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-gateway:$IMAGE_TAG
 
-          # Build and push services (example for catalog)
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-web:$IMAGE_TAG \
+            --build-arg NEXT_PUBLIC_API_GATEWAY_URL="$NEXT_PUBLIC_API_GATEWAY_URL" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_URL="$NEXT_PUBLIC_KEYCLOAK_URL" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_REALM="$NEXT_PUBLIC_KEYCLOAK_REALM" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_CLIENT_ID="$NEXT_PUBLIC_KEYCLOAK_CLIENT_ID" \
+            --build-arg NEXT_PUBLIC_CHAT_WS_URL="$NEXT_PUBLIC_CHAT_WS_URL" \
+            -f apps/web/Dockerfile .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-web:$IMAGE_TAG
+
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-catalog:$IMAGE_TAG -f services/catalog/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-catalog:$IMAGE_TAG
 

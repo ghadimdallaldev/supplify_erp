@@ -78,7 +78,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const newSocket = io('http://localhost:3011/chat', {
+        const chatWsUrl =
+          process.env.NEXT_PUBLIC_CHAT_WS_URL || 'http://localhost:3011/chat';
+        const newSocket = io(chatWsUrl, {
           auth: {
             userId: 'golden-fork', // This should come from auth context
             orgType: 'RESTAURANT', // This should come from auth context
