@@ -5,7 +5,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"pnpm --filter @supplify/api dev\" \"pnpm --filter @supplify/web dev\"",
+    "dev": "node scripts/dev-native.mjs",
+    "dev:apps": "concurrently -n api,web -c blue,green \"pnpm --filter @supplify/api dev\" \"pnpm --filter @supplify/web dev\"",
+    "dev:docker": "node scripts/run-local.mjs up",
     "build": "pnpm --filter @supplify/api build && pnpm --filter @supplify/web build",
     "typecheck": "pnpm --filter @supplify/web type-check",
     "lint": "pnpm --filter @supplify/api lint && pnpm --filter @supplify/web lint",
@@ -42,7 +44,8 @@
     "deploy:staging": "bash deploy/scripts/deploy-staging.sh",
     "deploy:prod": "bash deploy/scripts/deploy-prod.sh",
     "local:up": "node scripts/run-local.mjs up",
-    "local:dev": "node scripts/run-local.mjs up",
+    "local:dev": "node scripts/dev-native.mjs",
+    "local:infra": "node scripts/dev-infra.mjs",
     "local:down": "node scripts/run-local.mjs down",
     "local:logs": "node scripts/run-local.mjs logs",
     "local:status": "node scripts/run-local.mjs status",
@@ -54,6 +57,7 @@
     "docker:prod:up": "docker compose --env-file deploy/env/.env.prod -f deploy/docker-compose.prod.yml up -d",
     "docker:prod:down": "docker compose --env-file deploy/env/.env.prod -f deploy/docker-compose.prod.yml down",
     "docker:prod:logs": "docker compose --env-file deploy/env/.env.prod -f deploy/docker-compose.prod.yml logs -f",
+    "setup": "node scripts/ensure-pnpm.mjs && pnpm install",
     "prepare": "husky install"
   },
   "devDependencies": {

@@ -2,7 +2,24 @@
 
 A modern restaurant & F&B supplier marketplace built with React, Node.js, and PostgreSQL.
 
-## Quick Start (Docker — recommended)
+## Quick Start (native dev — recommended for coding)
+
+Hot reload without rebuilding Docker images:
+
+```cmd
+pnpm setup
+pnpm dev
+```
+
+- **Web:** http://localhost:5173 (Vite HMR)
+- **API:** http://localhost:4000 (`node --watch`)
+- **Infra:** Postgres, Redis, MinIO, Keycloak stay in Docker (`pnpm local:infra` starts them once)
+
+After code changes, save the file — no `docker compose build` needed.
+
+`pnpm dev` enables **pnpm via corepack** if missing, syncs `apps/api/.env` from `docker/.env`, runs migrations, then starts API + web.
+
+## Quick Start (full Docker stack)
 
 One command from the repo root (Windows CMD, PowerShell, or Git Bash):
 
@@ -21,7 +38,8 @@ scripts\run-local.cmd seed
 | Command | Purpose |
 |---------|---------|
 | `scripts\run-local.cmd up` | Start stack + tail API logs |
-| `scripts\run-local.cmd seed` | SQL migrations + seed data + Keycloak demo users |
+| `scripts\run-local.cmd dev` | Same as `pnpm dev` (infra + native API/web) |
+| `scripts\run-local.cmd infra` | Docker infra only (no API/web images) |
 | `scripts\run-local.cmd down` | Stop stack |
 | `scripts\run-local.cmd ps` | Container status + HTTP health checks |
 

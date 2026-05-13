@@ -176,9 +176,9 @@ if ($cmd -eq "up") {
         else { $upArgs += $a }
     }
 
-    $buildArgs = @("up", "-d", "--build")
+    $buildArgs = @("up", "-d", "--build", "--profile", "full")
     if ($upArgs -contains "--no-build") {
-        $buildArgs = @("up", "-d")
+        $buildArgs = @("up", "-d", "--profile", "full")
         $upArgs = $upArgs | Where-Object { $_ -ne "--no-build" }
     }
 
@@ -255,18 +255,32 @@ elseif ($cmd -eq "status") {
         }
     }
 }
+elseif ($cmd -eq "infra") {
+    Ensure-Env
+    node (Join-Path $RepoRoot "scripts\dev-infra.mjs")
+}
+elseif ($cmd -eq "dev") {
+    Ensure-Env
+    node (Join-Path $RepoRoot "scripts\dev-native.mjs") @RemainingArgs
+}
 elseif ($cmd -eq "seed") {
     Ensure-Env
+    node (Join-Path $RepoRoot "scripts\ensure-native-env.mjs")
     docker inspect supplify-api *> $null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "API container is not running. Run: scripts\run-local.cmd up"
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Running SQL migrations (Docker API)..."
+        docker exec supplify-api node apps/api/scripts/run-migration.js
+        Write-Host "Running database seed..."
+        docker exec supplify-api node apps/api/scripts/seed.js
+        Write-Host "Syncing Keycloak demo users..."
+        docker exec -e KEYCLOAK_BASE_URL=http://keycloak:8080 -e KEYCLOAK_ADMIN_PASSWORD=admin supplify-api node apps/api/scripts/seed-demo-users.js
+    } else {
+        Write-Host "API container not running — seeding via host Node/pnpm..."
+        node (Join-Path $RepoRoot "scripts\dev-infra.mjs")
+        npx --yes pnpm@8.15.0 db:migrate
+        npx --yes pnpm@8.15.0 db:seed
+        npx --yes pnpm@8.15.0 seed:demo-users
     }
-    Write-Host "Running SQL migrations..."
-    docker exec supplify-api node apps/api/scripts/run-migration.js
-    Write-Host "Running database seed (restaurant, supplier, products)..."
-    docker exec supplify-api node apps/api/scripts/seed.js
-    Write-Host "Syncing Keycloak demo users..."
-    docker exec -e KEYCLOAK_BASE_URL=http://keycloak:8080 -e KEYCLOAK_ADMIN_PASSWORD=admin supplify-api node apps/api/scripts/seed-demo-users.js
     Write-Host "Bootstrap finished. Log in as restaurant@supplify.com / SupplifyRestaurant1!"
 }
 elseif ($cmd -eq "restart") {

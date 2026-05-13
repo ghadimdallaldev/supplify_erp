@@ -47,7 +47,9 @@ import type {
   PublicReservationDetails,
 } from '../types'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API_URL =
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.DEV ? '' : 'http://localhost:4000')
 
 // Custom baseQuery to unwrap API response envelope
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

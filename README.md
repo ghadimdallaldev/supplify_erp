@@ -5,11 +5,11 @@ Restaurant & F&B supplier marketplace — monorepo (`apps/api`, `apps/web`).
 ## Quick start
 
 ```cmd
-scripts\run-local.cmd up
-scripts\run-local.cmd seed
+pnpm setup
+pnpm dev
 ```
 
-Open **http://localhost** and sign in with a seeded user (e.g. `restaurant@supplify.com`).
+Open **http://localhost:5173** (native dev) or use full Docker below.
 
 ## Documentation
 

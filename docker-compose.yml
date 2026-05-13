@@ -1,6 +1,7 @@
-# Full Supplify stack — infra + API + web behind nginx.
-# Quick start:  pnpm local:up   or   ./scripts/run-local.sh
-# App:    http://localhost          Keycloak: http://localhost:8180  (realm: Supplify)
+# Infra + API + web behind nginx (full Docker stack).
+# Native dev (hot reload):  pnpm setup && pnpm dev
+# Infra only:               pnpm local:infra
+# Full Docker:              pnpm dev:docker  or  scripts/run-local.cmd up
 
 name: supplify
 
@@ -160,6 +161,7 @@ services:
       - supplify
 
   migrate:
+    profiles: ["full"]
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -190,6 +192,7 @@ services:
       - supplify
 
   api:
+    profiles: ["full"]
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -224,6 +227,7 @@ services:
       - supplify
 
   web:
+    profiles: ["full"]
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -247,6 +251,7 @@ services:
       - supplify
 
   nginx:
+    profiles: ["full"]
     image: nginx:alpine
     container_name: supplify-nginx
     ports:

@@ -146,8 +146,8 @@ cmd_up() {
   done
 
   ensure_env
-  echo "Starting Supplify stack..."
-  dc up -d "${build_flag[@]}"
+  echo "Starting Supplify stack (Docker full profile)..."
+  dc up -d "${build_flag[@]}" --profile full
 
   echo ""
   echo "Waiting for core services..."
@@ -258,6 +258,14 @@ main() {
       ;;
     seed)
       cmd_seed
+      ;;
+    infra)
+      ensure_env
+      node "$REPO_ROOT/scripts/dev-infra.mjs"
+      ;;
+    dev)
+      ensure_env
+      node "$REPO_ROOT/scripts/dev-native.mjs" "$@"
       ;;
     restart)
       ensure_env
