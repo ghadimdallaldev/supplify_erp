@@ -9,8 +9,11 @@ UPDATE customer_order SET status = 'COMPLETED' WHERE status = 'FULFILLING';
 UPDATE customer_order SET status = 'ACKNOWLEDGED' WHERE status = 'CONFIRMED';
 -- Keep PLACED as is, don't change to PROCESSING
 
--- Step 3: Drop old enum and create new one
-DROP TYPE IF EXISTS order_status;
+-- Drop default before dropping enum (default expression depends on order_status type)
+ALTER TABLE customer_order ALTER COLUMN status DROP DEFAULT;
+
+-- Step 3: Drop old enum and create new one (CASCADE for any stray dependencies)
+DROP TYPE IF EXISTS order_status CASCADE;
 
 -- Step 4: Create new enum with correct values
 CREATE TYPE order_status AS ENUM ('DRAFT', 'PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED');

@@ -2,7 +2,34 @@
 
 A modern restaurant & F&B supplier marketplace built with React, Node.js, and PostgreSQL.
 
-## Quick Start
+## Quick Start (Docker — recommended)
+
+One command from the repo root (Windows CMD, PowerShell, or Git Bash):
+
+```cmd
+scripts\run-local.cmd up
+```
+
+This starts Postgres, Redis, MinIO, Keycloak, nginx, API, and web. The app is at **http://localhost** (nginx fronts everything). API logs stream by default; use `--no-logs` to detach.
+
+Bootstrap database + demo users:
+
+```cmd
+scripts\run-local.cmd seed
+```
+
+| Command | Purpose |
+|---------|---------|
+| `scripts\run-local.cmd up` | Start stack + tail API logs |
+| `scripts\run-local.cmd seed` | SQL migrations + seed data + Keycloak demo users |
+| `scripts\run-local.cmd down` | Stop stack |
+| `scripts\run-local.cmd ps` | Container status + HTTP health checks |
+
+**Demo logins** (after seed): `restaurant@supplify.com`, `supplier@supplify.com`, `admin@supplify.com` — passwords from `apps/api/scripts/seed-demo-users.js`.
+
+**Keycloak admin**: http://localhost:8180/admin (`admin` / `admin`, master realm). App realm: **Supplify**.
+
+## Quick Start (native dev)
 
 1. **Install dependencies**
 
@@ -13,7 +40,7 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
 2. **Start infrastructure**
 
    ```bash
-   docker compose up -d
+   docker compose up -d postgres redis minio keycloak
    ```
 
 3. **Setup database**
@@ -29,22 +56,40 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
    pnpm dev
    ```
 
-5. **Access the application**
-   - Web App: http://localhost:5173
+5. **Access**
+   - Web (Vite dev): http://localhost:5173
    - API: http://localhost:4000
-   - Keycloak: http://localhost:8080
-   - MinIO: http://localhost:9001
+   - Full stack via nginx: http://localhost
 
 ## Architecture
 
 - **Frontend**: React + Vite + TypeScript + Tailwind + shadcn/ui
 - **Backend**: Node.js + Express + JavaScript (ESM)
-- **Database**: PostgreSQL with raw SQL and migrations
-- **Authentication**: Keycloak OIDC with server-side token handling
+- **Database**: PostgreSQL with numbered SQL migrations (`apps/api/db/migrations/`)
+- **Authentication**: Keycloak OIDC; browser uses `KEYCLOAK_PUBLIC_URL`, API uses internal `KEYCLOAK_BASE_URL`
 - **Storage**: MinIO for file uploads
-- **State Management**: RTK Query
-- **FOH Experience**: Reservations cockpit with drag-and-drop status board, full-width floor builder, and guest flow analytics
-- **Labour Management**: Staff App delivering team directory, shift scheduling, and time clock flows (single-location focus)
+- **Proxy**: nginx on port 80 — `/` → web, `/api/*` and `/auth/*` → API
+- **FOH**: Reservations cockpit (floor plan, board, guest flow)
+- **Labour**: Staff app (directory, shifts, time clock, PTO, swaps)
+
+## Feature areas
+
+| Area | API prefix | Notes |
+|------|------------|--------|
+| Orders | `/api/orders` | Placement, status, reminders, calendar |
+| Chat | `/api/chat` | Conversations, messages, Socket.IO |
+| Reservations | `/api/reservations` | Tables, board, bookings |
+| Staff / shifts | `/api/staff` | Members, shifts, time entries |
+| Admin | `/api/admin-dashboard` | Plans, limits, impersonation, **feature toggles** |
+
+Subscription **plans** define default features; admins can override globally or per tenant — see [admin-feature-flags.md](./admin-feature-flags.md).
+
+## Documentation
+
+- [Database migrations](./database-migrations.md) — running, troubleshooting, fresh DB
+- [Admin feature toggles](./admin-feature-flags.md) — global and per-tenant flags
+- [Deploy](../deploy/README.md) — production Docker on EC2
+- [Tests](../tests/README.md) — unit and E2E
 
 ## Development
 
@@ -59,7 +104,7 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
 - `pnpm test` - Run all tests in watch mode
 - `pnpm test:ci` - Run all tests once (for CI)
 - `pnpm e2e` - Run end-to-end tests
-- `pnpm db:migrate` - Run database migrations
+- `pnpm db:migrate` - Run database migrations (SQL + runtime schema checks)
 - `pnpm db:seed` - Seed database with sample data
 - `pnpm db:reset` - Reset database (drop, migrate, seed)
 - `pnpm openapi:gen` - Generate OpenAPI client for web app
@@ -73,12 +118,14 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
+For Docker, root `.env` is created automatically by `run-local.cmd` from defaults.
+
 ## Authentication
 
 The application uses Keycloak for authentication with server-side OIDC flow:
 
 1. User visits `/auth/login`
-2. Server redirects to Keycloak
+2. Server redirects to Keycloak (public URL, e.g. `http://localhost:8180`)
 3. User authenticates with Keycloak
 4. Keycloak redirects to `/auth/callback`
 5. Server exchanges code for tokens and sets HTTP-only cookies
@@ -86,33 +133,19 @@ The application uses Keycloak for authentication with server-side OIDC flow:
 
 ## Database
 
-The application uses PostgreSQL with a custom migration system:
-
-- Migrations are stored in `apps/api/db/migrations/`
-- Each migration is a timestamped SQL file
-- Run migrations with `pnpm db:migrate`
-- Seed data with `pnpm db:seed`
+- Migrations: `apps/api/db/migrations/*.sql` (tracked in `schema_migrations`)
+- Runner: `apps/api/scripts/run-migration.js`
+- See [database-migrations.md](./database-migrations.md) for troubleshooting
 
 ## API
 
 The API follows RESTful conventions with:
 
-- Response envelope format: `{ ok: boolean, data: any, error: any, requestId: string }`
-- Role-based access control (RBAC)
-- Audit logging for all operations
+- Response envelope: `{ ok, data, error, requestId }`
+- Role-based access control (RBAC) and subscription `requireFeature` gates
+- Audit logging for admin operations
 - Input validation with Zod
 - Rate limiting and CSRF protection
-
-## Staff App Snapshot
-
-Supplify now bundles a lightweight Staff App tailored for single-location restaurants:
-
-- **Directory** – maintain active/inactive staff with wage context and hire dates.
-- **Scheduling** – create shifts with assigned roles, view upcoming coverage, and keep notes.
-- **Time Clock** – browser-based check-in/out with break capture and audit-friendly time entries.
-- **Progressive Phases** – PTO, swaps, announcements, documents, and payroll exports build on this foundation.
-
-All data lives under the restaurant tenant so it’s ready for multi-location expansion in later phases.
 
 ## CI/CD Automation
 

@@ -132,31 +132,8 @@ export async function getTenantSubscription(tenantId, tenantType) {
  * @returns {Promise<boolean>} Whether feature is enabled
  */
 export async function isFeatureEnabled(tenantId, tenantType, featureKey) {
-  try {
-    // Get tenant's subscription and check plan features
-    const subscription = await getTenantSubscription(tenantId, tenantType)
-    if (subscription && subscription.features) {
-      const featureValue = subscription.features[featureKey]
-      if (featureValue !== undefined) {
-        // If it's a boolean, return it
-        if (typeof featureValue === 'boolean') {
-          return featureValue
-        }
-        // If it's a string (e.g., "enabled", "disabled"), check truthiness
-        if (typeof featureValue === 'string') {
-          return featureValue !== 'false' && featureValue !== 'disabled' && featureValue !== ''
-        }
-        // If it exists in features (truthy), return true
-        return featureValue ? true : false
-      }
-    }
-
-    // No subscription or feature not found in plan = disabled
-    return false
-  } catch (error) {
-    logger.error('Check feature enabled error:', error)
-    return false // Default to disabled on error
-  }
+  const { isFeatureEnabledForTenant } = await import('./feature-flags.js')
+  return isFeatureEnabledForTenant(tenantId, tenantType, featureKey)
 }
 
 /**

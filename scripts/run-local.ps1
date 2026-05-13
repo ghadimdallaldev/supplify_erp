@@ -3,7 +3,8 @@
 #   .\scripts\run-local.ps1
 #   .\scripts\run-local.ps1 up
 #   .\scripts\run-local.ps1 down
-#   .\scripts\run-local.ps1 logs
+#   .\scripts\run-local.ps1 up --logs   # start then stream all container logs
+#   .\scripts\run-local.ps1 logs api    # follow one service only
 #   .\scripts\run-local.ps1 status
 #   .\scripts\run-local.ps1 seed
 
@@ -164,9 +165,26 @@ if ($cmd -eq "stop") { $cmd = "down" }
 if ($cmd -eq "ps") { $cmd = "status" }
 
 if ($cmd -eq "up") {
+    $followLogs = $true
+    $logServices = @("api")
+    $upArgs = @()
+    foreach ($a in $RemainingArgs) {
+        if ($a -in "--logs", "-f", "--follow") { $followLogs = $true }
+        elseif ($a -eq "--no-logs") { $followLogs = $false }
+        elseif ($a -eq "--all-logs") { $logServices = @() }
+        elseif ($a -in "api", "web", "nginx", "keycloak", "postgres", "redis", "minio") { $logServices = @($a) }
+        else { $upArgs += $a }
+    }
+
+    $buildArgs = @("up", "-d", "--build")
+    if ($upArgs -contains "--no-build") {
+        $buildArgs = @("up", "-d")
+        $upArgs = $upArgs | Where-Object { $_ -ne "--no-build" }
+    }
+
     Ensure-Env
     Write-Host "Starting Supplify stack..."
-    Invoke-Dc @("up", "-d", "--build")
+    Invoke-Dc $buildArgs
 
     Write-Host ""
     Write-Host "Waiting for core services..."
@@ -195,6 +213,17 @@ if ($cmd -eq "up") {
     if (-not (Test-HttpOk "$AppUrl/health")) {
         Write-Host ""
         Write-Host "WARN: $AppUrl/health did not respond yet - stack may still be warming up."
+    }
+
+    if ($followLogs) {
+        Write-Host ""
+        Write-Host "Following API logs (Ctrl+C stops watching; app keeps running)..."
+        Write-Host "  Tip: scripts\run-local.cmd up --all-logs  for every service"
+        if ($logServices.Count -gt 0) {
+            Invoke-Dc (@("logs", "-f") + $logServices)
+        } else {
+            Invoke-Dc @("logs", "-f")
+        }
     }
 }
 elseif ($cmd -eq "down") {
@@ -232,9 +261,13 @@ elseif ($cmd -eq "seed") {
     if ($LASTEXITCODE -ne 0) {
         Write-Error "API container is not running. Run: scripts\run-local.cmd up"
     }
-    Write-Host "Running database seed in supplify-api..."
+    Write-Host "Running SQL migrations..."
+    docker exec supplify-api node apps/api/scripts/run-migration.js
+    Write-Host "Running database seed (restaurant, supplier, products)..."
     docker exec supplify-api node apps/api/scripts/seed.js
-    Write-Host "Seed finished."
+    Write-Host "Syncing Keycloak demo users..."
+    docker exec -e KEYCLOAK_BASE_URL=http://keycloak:8080 -e KEYCLOAK_ADMIN_PASSWORD=admin supplify-api node apps/api/scripts/seed-demo-users.js
+    Write-Host "Bootstrap finished. Log in as restaurant@supplify.com / SupplifyRestaurant1!"
 }
 elseif ($cmd -eq "restart") {
     Ensure-Env

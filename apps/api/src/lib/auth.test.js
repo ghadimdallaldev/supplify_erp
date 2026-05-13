@@ -17,6 +17,7 @@ vi.mock('axios', () => ({
 vi.mock('../config/env.js', () => ({
   config: {
     KEYCLOAK_BASE_URL: 'http://keycloak.example.com',
+    KEYCLOAK_PUBLIC_URL: 'http://keycloak.example.com',
     KEYCLOAK_REALM: 'Supplify',
     KEYCLOAK_CLIENT_ID: 'supplify-api',
     KEYCLOAK_CLIENT_SECRET: 'secret',

@@ -49,8 +49,8 @@ CREATE INDEX idx_restaurant_pricing_active ON restaurant_pricing(is_active, supp
 -- Add foreign key constraint to pricing table (if needed)
 -- Note: This allows linking standard prices with restaurant-specific prices
 
--- Grant permissions
-GRANT SELECT, INSERT, UPDATE, DELETE ON restaurant_pricing TO api_user;
+-- Grant permissions (optional legacy role; app connects as postgres in Docker/local)
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON restaurant_pricing TO api_user;
 
 -- Create updated_at trigger for restaurant_pricing
 CREATE OR REPLACE FUNCTION update_restaurant_pricing_updated_at()

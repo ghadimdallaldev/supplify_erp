@@ -443,4 +443,50 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.data.totalUpgrades).toBe(0)
     })
   })
+
+  describe('GET /feature-flags', () => {
+    it('returns global feature flags', async () => {
+      query.mockResolvedValueOnce({
+        rows: [
+          {
+            feature_key: 'reports',
+            feature_name: 'Reports',
+            description: null,
+            global_override: null,
+            updated_at: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      })
+
+      const res = await request(app).get('/api/admin-dashboard/feature-flags').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.flags).toHaveLength(1)
+      expect(res.body.data.flags[0].featureKey).toBe('reports')
+    })
+  })
+
+  describe('PATCH /feature-flags/:featureKey', () => {
+    it('updates global feature override', async () => {
+      query.mockResolvedValueOnce({
+        rows: [
+          {
+            feature_key: 'chat',
+            feature_name: 'Chat',
+            description: null,
+            global_override: false,
+            updated_at: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      })
+
+      const res = await request(app)
+        .patch('/api/admin-dashboard/feature-flags/chat')
+        .send({ mode: 'off' })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.flag.globalOverride).toBe(false)
+    })
+  })
 })

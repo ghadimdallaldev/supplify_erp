@@ -7,7 +7,7 @@ import { logger } from '../src/lib/logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SEED_FILE = join(__dirname, 'db', 'seed', 'seed.sql');
+const SEED_FILE = join(__dirname, '..', 'db', 'seed', 'seed.sql');
 
 async function seedDatabase() {
   try {

@@ -195,8 +195,8 @@ describe('RBAC Utilities', () => {
     it('should clear auth cookies', () => {
       clearAuthCookies(res)
 
-      expect(res.clearCookie).toHaveBeenCalledWith('access_token')
-      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token')
+      expect(res.clearCookie).toHaveBeenCalledWith('access_token', expect.objectContaining({ path: '/' }))
+      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', expect.objectContaining({ path: '/' }))
     })
   })
 

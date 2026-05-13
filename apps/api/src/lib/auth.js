@@ -26,7 +26,7 @@ export async function getKeycloakConfig() {
   }
 
   const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM } = getKeycloakValues()
-  const WELL_KNOWN_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid_configuration`
+  const WELL_KNOWN_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration`
 
   logger.debug('Fetching Keycloak config', { url: WELL_KNOWN_URL })
 
@@ -212,11 +212,36 @@ export async function verifyToken(token) {
   }
 }
 
-// Get user info from Keycloak
-export async function getUserInfo(accessToken) {
+function claimsFromJwt(jwt) {
+  const parts = jwt.split('.')
+  if (parts.length < 2) return null
   try {
-    const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM } = getKeycloakValues()
-    const USERINFO_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo`
+    return JSON.parse(Buffer.from(parts[1], 'base64url').toString())
+  } catch {
+    return null
+  }
+}
+
+function userInfoFromClaims(payload) {
+  if (!payload?.sub) return null
+  const email = payload.email || payload.preferred_username
+  if (!email) return null
+  return {
+    sub: payload.sub,
+    email,
+    given_name: payload.given_name,
+    family_name: payload.family_name,
+    preferred_username: payload.preferred_username,
+  }
+}
+
+// Get user info from Keycloak (falls back to ID/access token claims if userinfo is unavailable)
+export async function getUserInfo(accessToken, idToken = null) {
+  try {
+    const config = await getKeycloakConfig()
+    const USERINFO_URL =
+      config.userinfo_endpoint ||
+      `${getKeycloakValues().KEYCLOAK_BASE_URL}/realms/${getKeycloakValues().KEYCLOAK_REALM}/protocol/openid-connect/userinfo`
 
     const response = await axios.get(USERINFO_URL, {
       headers: {
@@ -227,8 +252,23 @@ export async function getUserInfo(accessToken) {
 
     return response.data
   } catch (error) {
-    logger.error('Error getting user info:', error.message)
-    throw error
+    const status = error.response?.status
+    const body = error.response?.data
+    logger.warn('Keycloak userinfo failed, using token claims', {
+      message: error.message,
+      status,
+      body,
+    })
+
+    if (idToken) {
+      const fromId = userInfoFromClaims(claimsFromJwt(idToken))
+      if (fromId) return fromId
+    }
+
+    const fromAccess = userInfoFromClaims(claimsFromJwt(accessToken))
+    if (fromAccess) return fromAccess
+
+    throw new Error(`Userinfo unavailable and token missing sub/email (status: ${status ?? 'unknown'})`)
   }
 }
 

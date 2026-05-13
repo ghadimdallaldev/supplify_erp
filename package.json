@@ -42,6 +42,7 @@
     "deploy:staging": "bash deploy/scripts/deploy-staging.sh",
     "deploy:prod": "bash deploy/scripts/deploy-prod.sh",
     "local:up": "node scripts/run-local.mjs up",
+    "local:dev": "node scripts/run-local.mjs up",
     "local:down": "node scripts/run-local.mjs down",
     "local:logs": "node scripts/run-local.mjs logs",
     "local:status": "node scripts/run-local.mjs status",

@@ -50,6 +50,6 @@ CREATE TABLE notification_preferences (
 
 CREATE INDEX idx_notification_preferences_user ON notification_preferences(user_id, user_type);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO api_user;
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO api_user;
 
 COMMENT ON TABLE notification_preferences IS 'User preferences for notification channels and types (user_id = app_user.id)';

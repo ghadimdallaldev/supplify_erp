@@ -5,7 +5,8 @@
 #   ./scripts/run-local.sh          # up --build (default)
 #   ./scripts/run-local.sh up       # same
 #   ./scripts/run-local.sh down     # stop and remove containers
-#   ./scripts/run-local.sh logs     # follow all logs (optional service name)
+#   ./scripts/run-local.sh up --logs   # start then stream all container logs
+#   ./scripts/run-local.sh logs api    # follow one service only
 #   ./scripts/run-local.sh status   # container + HTTP health summary
 #   ./scripts/run-local.sh seed     # run DB seed in the api container
 #
@@ -129,11 +130,20 @@ http_ok() {
 }
 
 cmd_up() {
+  local follow_logs=1
   local build_flag=(--build)
-  if [[ "${1:-}" == "--no-build" ]]; then
-    build_flag=()
-    shift || true
-  fi
+  local log_services=(api)
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --logs|-f|--follow) follow_logs=1; shift ;;
+      --no-logs) follow_logs=0; shift ;;
+      --all-logs) log_services=(); shift ;;
+      --no-build) build_flag=(); shift ;;
+      api|web|nginx|keycloak|postgres|redis|minio) log_services=("$1"); shift ;;
+      *) shift ;;
+    esac
+  done
 
   ensure_env
   echo "Starting Supplify stack..."
@@ -167,6 +177,17 @@ cmd_up() {
     echo ""
     echo "WARN: ${APP_URL}/health did not respond yet — stack may still be warming up."
     echo "     Check: ./scripts/run-local.sh status"
+  fi
+
+  if [[ "$follow_logs" -eq 1 ]]; then
+    echo ""
+    echo "Following API logs (Ctrl+C stops watching; app keeps running)..."
+    echo "  Tip: ./scripts/run-local.sh up --all-logs  for every service"
+    if [[ ${#log_services[@]} -gt 0 ]]; then
+      dc logs -f "${log_services[@]}"
+    else
+      dc logs -f
+    fi
   fi
 }
 
@@ -208,9 +229,14 @@ cmd_seed() {
     echo "API container is not running. Start the stack first: ./scripts/run-local.sh up"
     exit 1
   fi
-  echo "Running database seed in supplify-api..."
+  echo "Running SQL migrations..."
+  docker exec supplify-api node apps/api/scripts/run-migration.js
+  echo "Running database seed (restaurant, supplier, products)..."
   docker exec supplify-api node apps/api/scripts/seed.js
-  echo "Seed finished."
+  echo "Syncing Keycloak demo users..."
+  docker exec -e KEYCLOAK_BASE_URL=http://keycloak:8080 -e KEYCLOAK_ADMIN_PASSWORD=admin \
+    supplify-api node apps/api/scripts/seed-demo-users.js
+  echo "Bootstrap finished."
 }
 
 main() {

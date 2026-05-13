@@ -93,7 +93,7 @@ router.get('/callback', async (req, res) => {
     const tokens = await exchangeCodeForTokens(code, redirectUri)
 
     // Get user info from Keycloak
-    const userInfo = await getUserInfo(tokens.access_token)
+    const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
 
     // Decode the access token to get roles from realm_access and resource_access
     const tokenParts = tokens.access_token.split('.')

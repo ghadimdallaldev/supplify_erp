@@ -130,11 +130,11 @@ CREATE INDEX IF NOT EXISTS idx_notification_log_reference ON notification_log(re
 CREATE INDEX IF NOT EXISTS idx_supplier_contact_supplier ON supplier_contact_info(supplier_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_contact_restaurant ON restaurant_contact_info(restaurant_id);
 
--- Grant permissions
-GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO api_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON notification_log TO api_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON supplier_contact_info TO api_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON restaurant_contact_info TO api_user;
+-- Grant permissions (optional legacy role; app connects as postgres in Docker/local)
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO api_user;
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON notification_log TO api_user;
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON supplier_contact_info TO api_user;
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON restaurant_contact_info TO api_user;
 
 -- Create updated_at trigger for notification_preferences
 CREATE OR REPLACE FUNCTION update_notification_preferences_updated_at()

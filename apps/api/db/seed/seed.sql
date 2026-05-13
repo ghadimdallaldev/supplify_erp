@@ -440,17 +440,17 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE supplier SET contact_email = 'supplier@supplify.com' WHERE slug = 'fresh-foods-co';
 UPDATE restaurant SET contact_email = 'restaurant@supplify.com' WHERE slug = 'golden-fork-restaurant';
 
--- Assign Free subscription to the single restaurant and supplier (for limit/feature enforcement after reduce-to-single-tenant)
+-- Assign Gold subscription to demo tenants (local dev: unlocks smart_reorder, reports, etc.)
 INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
 SELECT r.id, 'RESTAURANT', sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + interval '1 month'
 FROM restaurant r
-JOIN (SELECT id, name FROM subscription_plan WHERE code = 'free' AND tenant_type = 'RESTAURANT' AND is_active = true LIMIT 1) sp ON true
+JOIN (SELECT id, name FROM subscription_plan WHERE code = 'gold' AND tenant_type = 'RESTAURANT' AND is_active = true LIMIT 1) sp ON true
 WHERE r.slug = 'golden-fork-restaurant'
 AND NOT EXISTS (SELECT 1 FROM subscription s WHERE s.tenant_id = r.id AND s.tenant_type = 'RESTAURANT');
 
 INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
 SELECT s.id, 'SUPPLIER', sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + interval '1 month'
 FROM supplier s
-JOIN (SELECT id, name FROM subscription_plan WHERE code = 'free' AND tenant_type = 'SUPPLIER' AND is_active = true LIMIT 1) sp ON true
+JOIN (SELECT id, name FROM subscription_plan WHERE code = 'gold' AND tenant_type = 'SUPPLIER' AND is_active = true LIMIT 1) sp ON true
 WHERE s.slug = 'fresh-foods-co'
 AND NOT EXISTS (SELECT 1 FROM subscription sub WHERE sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER');
