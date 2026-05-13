@@ -11,7 +11,7 @@ ENV_EXAMPLE="$REPO_ROOT/deploy/env/.env.dev.example"
 COMPOSE_FILE="$REPO_ROOT/deploy/docker-compose.dev.yml"
 BACKEND_IMAGE="supplify-backend:dev"
 FRONTEND_IMAGE="supplify-frontend:dev"
-COMPOSE_CMD="docker compose --env-file $ENV_FILE -f $COMPOSE_FILE"
+COMPOSE_CMD=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 
 # shellcheck source=_common.sh
 source "$SCRIPT_DIR/_common.sh"
@@ -30,7 +30,7 @@ ensure_swap
 # ── Phase 2: Environment setup ───────────────────────────────────────────────
 echo ""
 echo "▶ Phase 2: Environment setup"
-mkdir -p "$REPO_ROOT/deploy/env" "${BACKUP_DIR:-/opt/supplify/backups-dev}"
+mkdir -p "$REPO_ROOT/deploy/env"
 
 if [ ! -f "$ENV_FILE" ]; then
   cp "$ENV_EXAMPLE" "$ENV_FILE"
@@ -42,7 +42,12 @@ if [ ! -f "$ENV_FILE" ]; then
   KC_PASS=$(gen_secret)
 
   # Auto-detect public IP from EC2 metadata, fall back to hostname -I
-  PUBLIC_IP=$(curl -sf --max-time 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null \
+  IMDS_TOKEN=$(curl -sf --max-time 2 -X PUT \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" \
+    http://169.254.169.254/latest/api/token 2>/dev/null || true)
+  PUBLIC_IP=$(curl -sf --max-time 3 \
+    ${IMDS_TOKEN:+-H "X-aws-ec2-metadata-token: $IMDS_TOKEN"} \
+    http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null \
     || hostname -I 2>/dev/null | awk '{print $1}' \
     || echo "localhost")
 
@@ -71,7 +76,9 @@ sed -i \
   "$ENV_FILE"
 
 # Load env for use in this script
-set -a && source "$ENV_FILE" && set +a
+set -a
+source "$ENV_FILE"
+set +a
 
 if [ "${PUBLIC_URL:-http://localhost}" = "http://localhost" ]; then
   echo "  WARN: PUBLIC_URL is http://localhost — Keycloak logins will not work from a browser."
@@ -99,7 +106,7 @@ docker build -t "$FRONTEND_IMAGE" -f apps/web/Dockerfile \
 # ── Phase 4: Start infrastructure ────────────────────────────────────────────
 echo ""
 echo "▶ Phase 4: Starting infrastructure (postgres, redis, minio, keycloak)"
-$COMPOSE_CMD up -d postgres redis minio keycloak
+"${COMPOSE_CMD[@]}" up -d postgres redis minio keycloak
 
 wait_healthy "supplify-dev-postgres" 60 3
 wait_healthy "supplify-dev-redis"    30 3
@@ -111,18 +118,18 @@ echo ""
 echo "▶ Phase 5: Initialising MinIO, Keycloak, and running migrations"
 
 echo "  Running minio-init..."
-$COMPOSE_CMD run --rm minio-init
+"${COMPOSE_CMD[@]}" run --rm minio-init
 
 echo "  Running keycloak-init (this can take 2–3 minutes on first boot)..."
-$COMPOSE_CMD run --rm keycloak-init
+"${COMPOSE_CMD[@]}" run --rm keycloak-init
 
 echo "  Running database migrations (54 SQL files + runtime migrators)..."
-$COMPOSE_CMD run --rm migrate
+"${COMPOSE_CMD[@]}" run --rm migrate
 
 # ── Phase 6: Start application ───────────────────────────────────────────────
 echo ""
 echo "▶ Phase 6: Starting application (backend, frontend, nginx, autoheal, backup)"
-$COMPOSE_CMD up -d backend frontend nginx autoheal backup
+"${COMPOSE_CMD[@]}" up -d backend frontend nginx autoheal backup
 
 echo ""
 echo "  Waiting for backend to be healthy..."
@@ -143,4 +150,4 @@ echo "  Logs:   docker compose --env-file $ENV_FILE -f $COMPOSE_FILE logs -f"
 echo "  Stop:   docker compose --env-file $ENV_FILE -f $COMPOSE_FILE down"
 echo ""
 echo "Streaming logs for 20 seconds (Ctrl-C to stop)..."
-timeout 20 $COMPOSE_CMD logs -f --tail=10 2>/dev/null || true
+timeout 20 "${COMPOSE_CMD[@]}" logs -f --tail=10 || true
