@@ -1,0 +1,252 @@
+# Run the full Supplify stack locally via Docker Compose (Windows / PowerShell).
+# Usage:
+#   .\scripts\run-local.ps1
+#   .\scripts\run-local.ps1 up
+#   .\scripts\run-local.ps1 down
+#   .\scripts\run-local.ps1 logs
+#   .\scripts\run-local.ps1 status
+#   .\scripts\run-local.ps1 seed
+
+param(
+    [Parameter(Position = 0)]
+    [string]$Command = "up",
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$RemainingArgs
+)
+
+$ErrorActionPreference = "Stop"
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+$EnvFile = Join-Path $RepoRoot "docker\.env"
+$EnvExample = Join-Path $RepoRoot "docker\.env.example"
+$ComposeFile = Join-Path $RepoRoot "docker-compose.yml"
+
+function Invoke-Dc {
+    param([string[]]$ComposeArgs)
+    & docker compose --env-file $EnvFile -f $ComposeFile @ComposeArgs
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
+function Read-EnvFile {
+    $vars = @{}
+    if (-not (Test-Path $EnvFile)) { return $vars }
+    Get-Content $EnvFile | ForEach-Object {
+        if ($_ -match '^\s*#' -or $_ -notmatch '=') { return }
+        $k, $v = $_ -split '=', 2
+        $vars[$k.Trim()] = $v.Trim()
+    }
+    return $vars
+}
+
+function Get-EnvVal {
+    param([hashtable]$Vars, [string]$Key, [string]$Default)
+    if ($Vars.ContainsKey($Key) -and $Vars[$Key]) { return $Vars[$Key] }
+    return $Default
+}
+
+function Set-EnvVal {
+    param([string]$Key, [string]$Value)
+    $lines = @()
+    $found = $false
+    if (Test-Path $EnvFile) {
+        $lines = Get-Content $EnvFile
+        $lines = $lines | ForEach-Object {
+            if ($_ -match "^$([regex]::Escape($Key))=") {
+                $found = $true
+                "$Key=$Value"
+            } else { $_ }
+        }
+    }
+    if (-not $found) { $lines += "$Key=$Value" }
+    $lines | Set-Content -Path $EnvFile -Encoding utf8
+}
+
+function Test-PortInUse {
+    param([int]$Port)
+    try {
+        $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        return $null -ne $conn
+    } catch {
+        $r = Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue
+        return $r.TcpTestSucceeded
+    }
+}
+
+function Test-OurContainerOnPort {
+    param([int]$Port, [string]$Name)
+    $ports = docker ps --filter "name=^/${Name}$" --format "{{.Ports}}" 2>$null
+    return $ports -match ":${Port}->"
+}
+
+function Wait-Healthy {
+    param([string]$Container, [int]$Max = 60, [int]$SleepSec = 3)
+    Write-Host -NoNewline "Waiting for $Container to be healthy"
+    for ($i = 1; $i -le $Max; $i++) {
+        $status = docker inspect --format "{{.State.Health.Status}}" $Container 2>$null
+        if ($status -eq "healthy") {
+            Write-Host " OK"
+            return $true
+        }
+        Write-Host -NoNewline "."
+        Start-Sleep -Seconds $SleepSec
+    }
+    Write-Host " TIMEOUT"
+    docker logs $Container --tail 20 2>&1
+    return $false
+}
+
+function Test-HttpOk {
+    param([string]$Url)
+    try {
+        $r = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
+        return $r.StatusCode -ge 200 -and $r.StatusCode -lt 400
+    } catch { return $false }
+}
+
+function Ensure-Env {
+    if (-not (Test-Path $EnvFile)) {
+        if (-not (Test-Path $EnvExample)) {
+            Write-Error "Missing $EnvExample"
+        }
+        Copy-Item $EnvExample $EnvFile
+        Write-Host "Created $EnvFile from example."
+    }
+
+    $vars = Read-EnvFile
+    $changed = $false
+
+    $pgPort = [int](Get-EnvVal $vars "POSTGRES_PORT" "5432")
+    if ((Test-PortInUse $pgPort) -and -not (Test-OurContainerOnPort $pgPort "supplify-postgres")) {
+        Write-Host "Port $pgPort is busy - using 5433 for Postgres."
+        Set-EnvVal "POSTGRES_PORT" "5433"
+        $changed = $true
+    }
+
+    $appPort = [int](Get-EnvVal $vars "APP_PORT" "80")
+    if ((Test-PortInUse $appPort) -and -not (Test-OurContainerOnPort $appPort "supplify-nginx")) {
+        Write-Host "Port $appPort is busy - using 8080 for the app (nginx)."
+        Set-EnvVal "APP_PORT" "8080"
+        Set-EnvVal "VITE_API_URL" "http://localhost:8080"
+        Set-EnvVal "WEB_ORIGIN" "http://localhost:8080"
+        $changed = $true
+    }
+
+    $kcPort = [int](Get-EnvVal $vars "KEYCLOAK_PORT" "8180")
+    if ((Test-PortInUse $kcPort) -and -not (Test-OurContainerOnPort $kcPort "supplify-keycloak")) {
+        Write-Host "Port $kcPort is busy - using 8181 for Keycloak."
+        Set-EnvVal "KEYCLOAK_PORT" "8181"
+        Set-EnvVal "VITE_KEYCLOAK_URL" "http://localhost:8181"
+        $changed = $true
+    }
+
+    if ($changed) { $script:vars = Read-EnvFile } else { $script:vars = $vars }
+}
+
+function Get-Urls {
+    $v = Read-EnvFile
+    $script:AppUrl = Get-EnvVal $v "WEB_ORIGIN" "http://localhost"
+    $kc = Get-EnvVal $v "KEYCLOAK_PORT" "8180"
+    $script:KcUrl = "http://localhost:$kc"
+    $minio = Get-EnvVal $v "MINIO_CONSOLE_PORT" "9001"
+    $script:MinioUrl = "http://localhost:$minio"
+}
+
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Write-Error "Docker is not installed or not on PATH."
+}
+docker compose version *> $null
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Docker Compose plugin is required."
+}
+
+$cmd = $Command.ToLower()
+if ($cmd -eq "start") { $cmd = "up" }
+if ($cmd -eq "stop") { $cmd = "down" }
+if ($cmd -eq "ps") { $cmd = "status" }
+
+if ($cmd -eq "up") {
+    Ensure-Env
+    Write-Host "Starting Supplify stack..."
+    Invoke-Dc @("up", "-d", "--build")
+
+    Write-Host ""
+    Write-Host "Waiting for core services..."
+    [void](Wait-Healthy "supplify-postgres" 40 3)
+    [void](Wait-Healthy "supplify-redis" 30 2)
+    Wait-Healthy "supplify-api" 60 5 | Out-Null
+    Wait-Healthy "supplify-web" 40 3 | Out-Null
+    Wait-Healthy "supplify-nginx" 30 3 | Out-Null
+
+    Get-Urls
+    Write-Host ""
+    Write-Host "=========================================================="
+    Write-Host "  Supplify is running locally"
+    Write-Host "=========================================================="
+    Write-Host "  App (nginx):     $AppUrl"
+    Write-Host "  API health:      $AppUrl/health"
+    Write-Host "  Keycloak:        $KcUrl  (realm: Supplify)"
+    Write-Host "  Keycloak admin:  $KcUrl/admin"
+    Write-Host "  MinIO console:   $MinioUrl"
+    Write-Host ""
+    Write-Host "  Logs:    scripts\run-local.cmd logs"
+    Write-Host "  Stop:    scripts\run-local.cmd down"
+    Write-Host "  Seed DB: scripts\run-local.cmd seed"
+    Write-Host "=========================================================="
+
+    if (-not (Test-HttpOk "$AppUrl/health")) {
+        Write-Host ""
+        Write-Host "WARN: $AppUrl/health did not respond yet - stack may still be warming up."
+    }
+}
+elseif ($cmd -eq "down") {
+    Ensure-Env
+    Invoke-Dc (@("down") + $RemainingArgs)
+    Write-Host "Stack stopped."
+}
+elseif ($cmd -eq "logs") {
+    Ensure-Env
+    Invoke-Dc (@("logs", "-f") + $RemainingArgs)
+}
+elseif ($cmd -eq "status") {
+    Ensure-Env
+    Get-Urls
+    Write-Host "Containers:"
+    Invoke-Dc @("ps")
+    Write-Host ""
+    Write-Host "HTTP checks:"
+    foreach ($pair in @(
+        @("nginx", "$AppUrl/nginx-health"),
+        @("api", "$AppUrl/health"),
+        @("keycloak", "$KcUrl/realms/Supplify")
+    )) {
+        $label, $url = $pair
+        if (Test-HttpOk $url) {
+            Write-Host "  ${label}: OK  ($url)"
+        } else {
+            Write-Host "  ${label}: not ready  ($url)"
+        }
+    }
+}
+elseif ($cmd -eq "seed") {
+    Ensure-Env
+    docker inspect supplify-api *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "API container is not running. Run: scripts\run-local.cmd up"
+    }
+    Write-Host "Running database seed in supplify-api..."
+    docker exec supplify-api node apps/api/scripts/seed.js
+    Write-Host "Seed finished."
+}
+elseif ($cmd -eq "restart") {
+    Ensure-Env
+    Invoke-Dc (@("restart") + $RemainingArgs)
+}
+elseif ($cmd -eq "build") {
+    Ensure-Env
+    Invoke-Dc (@("build") + $RemainingArgs)
+}
+elseif ($cmd -eq "help" -or $cmd -eq "-h" -or $cmd -eq "--help") {
+    Get-Content $PSCommandPath | Select-Object -Skip 1 -First 8
+}
+else {
+    Write-Error "Unknown command: $Command. Run: scripts\run-local.cmd help"
+}

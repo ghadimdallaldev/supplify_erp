@@ -8,8 +8,8 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/supplify
 Environment=SUPPLIFY_ENV=dev
-ExecStart=/usr/bin/docker compose --env-file /opt/supplify/env/.env.dev -f /opt/supplify/deploy/docker-compose.dev.yml up -d
-ExecStop=/usr/bin/docker compose --env-file /opt/supplify/env/.env.dev -f /opt/supplify/deploy/docker-compose.dev.yml down
+ExecStart=/usr/bin/docker compose --env-file /opt/supplify/deploy/env/.env.dev -f /opt/supplify/deploy/docker-compose.dev.yml up -d
+ExecStop=/usr/bin/docker compose --env-file /opt/supplify/deploy/env/.env.dev -f /opt/supplify/deploy/docker-compose.dev.yml down
 TimeoutStartSec=0
 
 [Install]

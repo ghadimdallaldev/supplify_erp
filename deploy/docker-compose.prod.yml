@@ -202,6 +202,7 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost}
       SESSION_SECRET: ${SESSION_SECRET}
       KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8180}
       KEYCLOAK_REALM: Supplify
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-supplify-api}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}

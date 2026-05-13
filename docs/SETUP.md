@@ -254,8 +254,11 @@ pnpm build
 docker build -t supplify-api apps/api
 docker build -t supplify-web apps/web
 
-# Run with docker-compose.prod.yml
-docker compose -f docker-compose.prod.yml up -d
+# One-command deploy on EC2 (or run compose after copying deploy/env/.env.prod.example)
+./deploy/scripts/deploy-prod.sh
+
+# Or manually with deploy compose
+docker compose --env-file deploy/env/.env.prod -f deploy/docker-compose.prod.yml up -d --build
 ```
 
 ## 🤝 Contributing

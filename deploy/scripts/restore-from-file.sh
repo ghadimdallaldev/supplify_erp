@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 env_arg="${1:-}"
-if [[ "$env_arg" == "dev" || "$env_arg" == "preprod" || "$env_arg" == "prod" ]]; then export SUPPLIFY_ENV="$env_arg"; shift; fi
+if [[ "$env_arg" == "dev" || "$env_arg" == "staging" || "$env_arg" == "prod" ]]; then export SUPPLIFY_ENV="$env_arg"; shift; fi
 source "$(dirname "$0")/common.sh"
 require docker
 ensure_paths
 
 file="${1:-}"
 if [[ -z "$file" || ! -f "$file" ]]; then
-  echo "Usage: restore-from-file.sh [dev|preprod|prod] /path/to/backup_xxx.dump"
+  echo "Usage: restore-from-file.sh [dev|staging|prod] /path/to/backup_xxx.dump"
   exit 1
 fi
 

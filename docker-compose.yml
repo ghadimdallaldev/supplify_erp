@@ -1,5 +1,5 @@
 # Full Supplify stack — infra + API + web behind nginx.
-# Usage:  cp docker/.env.example docker/.env   then   docker compose up -d --build
+# Quick start:  pnpm local:up   or   ./scripts/run-local.sh
 # App:    http://localhost          Keycloak: http://localhost:8180  (realm: Supplify)
 
 name: supplify
@@ -10,6 +10,7 @@ x-api-environment: &api-environment
   DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-supplify}
   SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me}
   KEYCLOAK_BASE_URL: http://keycloak:8080
+  KEYCLOAK_PUBLIC_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8180}
   KEYCLOAK_REALM: Supplify
   KEYCLOAK_CLIENT_ID: supplify-api
   KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}

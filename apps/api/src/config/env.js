@@ -23,6 +23,9 @@ export const config = {
     ? parseInt(process.env.DATABASE_STATEMENT_TIMEOUT, 10)
     : undefined,
   KEYCLOAK_BASE_URL: process.env.KEYCLOAK_BASE_URL || 'http://localhost:8080',
+  /** Browser-facing Keycloak URL (login/logout redirects). Defaults to KEYCLOAK_BASE_URL. */
+  KEYCLOAK_PUBLIC_URL:
+    process.env.KEYCLOAK_PUBLIC_URL || process.env.KEYCLOAK_BASE_URL || 'http://localhost:8080',
   KEYCLOAK_REALM: process.env.KEYCLOAK_REALM || 'Supplify',
   KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID || 'supplify-api',
   KEYCLOAK_CLIENT_SECRET: process.env.KEYCLOAK_CLIENT_SECRET || 'changeme',

@@ -12,6 +12,7 @@ let keycloakConfig = null
 function getKeycloakValues() {
   return {
     KEYCLOAK_BASE_URL: config.KEYCLOAK_BASE_URL,
+    KEYCLOAK_PUBLIC_URL: config.KEYCLOAK_PUBLIC_URL,
     KEYCLOAK_REALM: config.KEYCLOAK_REALM,
     KEYCLOAK_CLIENT_ID: config.KEYCLOAK_CLIENT_ID,
     KEYCLOAK_CLIENT_SECRET: config.KEYCLOAK_CLIENT_SECRET,
@@ -259,10 +260,9 @@ export async function revokeToken(token) {
 
 // Generate authorization URL
 export async function getAuthorizationUrl(redirectUri, state) {
-  const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID } = getKeycloakValues()
+  const { KEYCLOAK_PUBLIC_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID } = getKeycloakValues()
 
-  // Construct authorization endpoint directly
-  const authorizationEndpoint = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth`
+  const authorizationEndpoint = `${KEYCLOAK_PUBLIC_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth`
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -280,11 +280,8 @@ export async function getAuthorizationUrl(redirectUri, state) {
  * to clear Keycloak's SSO session. After logout, Keycloak redirects to postLogoutRedirectUri.
  */
 export async function getKeycloakLogoutUrl(postLogoutRedirectUri) {
-  const config = await getKeycloakConfig()
-  const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID } = getKeycloakValues()
-  const endSession =
-    config.end_session_endpoint ||
-    `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/logout`
+  const { KEYCLOAK_PUBLIC_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID } = getKeycloakValues()
+  const endSession = `${KEYCLOAK_PUBLIC_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/logout`
   const params = new URLSearchParams({
     post_logout_redirect_uri: postLogoutRedirectUri,
     client_id: KEYCLOAK_CLIENT_ID,
