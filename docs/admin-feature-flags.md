@@ -65,7 +65,10 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 ## UI
 
-No admin UI ships yet; use the API (or a future settings screen) when you need operational toggles.
+**Admin Dashboard → Features** tab (`/app/admin`, select **Features** in the tab bar):
+
+- **Global feature flags** — inherit / on / off per feature key
+- **Per-tenant overrides** — pick restaurant or supplier, force on/off or clear override
 
 ## Related
 

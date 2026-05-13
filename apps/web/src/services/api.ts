@@ -32,6 +32,8 @@ import type {
   SubscriptionPlan,
   Subscription,
   Entitlements,
+  AdminFeatureFlag,
+  EffectiveFeature,
   SubscriptionPlanChangePreview,
   UsageMeter,
   PublicRestaurant,
@@ -138,6 +140,8 @@ export const api = createApi({
     'Notification',
     'Subscription',
     'Admin',
+    'AdminFeatureFlags',
+    'AdminTenantFeatures',
     'Reservation',
     'OrdersCalendar',
     'QuickList',
@@ -1277,6 +1281,62 @@ export const api = createApi({
       }),
       invalidatesTags: ['Admin', 'User'],
     }),
+    getAdminFeatureFlags: builder.query<{ flags: AdminFeatureFlag[] }, void>({
+      query: () => '/api/admin-dashboard/feature-flags',
+      providesTags: ['AdminFeatureFlags'],
+    }),
+    updateAdminFeatureFlag: builder.mutation<
+      { flag: AdminFeatureFlag },
+      { featureKey: string; mode: 'inherit' | 'on' | 'off' }
+    >({
+      query: ({ featureKey, mode }) => ({
+        url: `/api/admin-dashboard/feature-flags/${featureKey}`,
+        method: 'PATCH',
+        body: { mode },
+      }),
+      invalidatesTags: ['AdminFeatureFlags', 'AdminTenantFeatures'],
+    }),
+    getTenantFeatureOverrides: builder.query<
+      { overrides: unknown[]; effectiveFeatures: EffectiveFeature[] },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string }
+    >({
+      query: ({ tenantType, tenantId }) =>
+        `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/feature-overrides`,
+      providesTags: (_r, _e, arg) => [
+        { type: 'AdminTenantFeatures' as const, id: `${arg.tenantType}:${arg.tenantId}` },
+      ],
+    }),
+    setTenantFeatureOverride: builder.mutation<
+      unknown,
+      {
+        tenantType: 'RESTAURANT' | 'SUPPLIER'
+        tenantId: string
+        featureKey: string
+        enabled: boolean
+        reason?: string
+      }
+    >({
+      query: ({ tenantType, tenantId, featureKey, enabled, reason }) => ({
+        url: `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/feature-overrides/${featureKey}`,
+        method: 'PUT',
+        body: { enabled, reason },
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'AdminTenantFeatures', id: `${arg.tenantType}:${arg.tenantId}` },
+      ],
+    }),
+    clearTenantFeatureOverride: builder.mutation<
+      unknown,
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string; featureKey: string }
+    >({
+      query: ({ tenantType, tenantId, featureKey }) => ({
+        url: `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/feature-overrides/${featureKey}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'AdminTenantFeatures', id: `${arg.tenantType}:${arg.tenantId}` },
+      ],
+    }),
   }),
 })
 
@@ -1404,5 +1464,10 @@ export const {
   useGetImpersonationStatusQuery,
   useStartImpersonationMutation,
   useStopImpersonationMutation,
+  useGetAdminFeatureFlagsQuery,
+  useUpdateAdminFeatureFlagMutation,
+  useGetTenantFeatureOverridesQuery,
+  useSetTenantFeatureOverrideMutation,
+  useClearTenantFeatureOverrideMutation,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } = api as any

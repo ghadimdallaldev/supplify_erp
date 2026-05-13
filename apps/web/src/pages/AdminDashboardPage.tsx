@@ -44,6 +44,7 @@ import toast from 'react-hot-toast'
 import type { SubscriptionPlan } from '@/types'
 import { getPlanSubtitle } from '../lib/planComparison'
 import { formatCurrency } from '@/utils/format'
+import { AdminFeatureFlagsPanel } from '@/components/admin/AdminFeatureFlagsPanel'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -295,7 +296,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           className={
             initialTab === 'suppliers' || initialTab === 'restaurants'
               ? 'grid w-full grid-cols-3'
-              : 'grid w-full grid-cols-8'
+              : 'grid w-full grid-cols-9'
           }
         >
           {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
@@ -307,6 +308,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               <TabsTrigger value="health">Health</TabsTrigger>
               <TabsTrigger value="finance">Finance</TabsTrigger>
               <TabsTrigger value="usage">Usage</TabsTrigger>
+              <TabsTrigger value="features">Features</TabsTrigger>
               <TabsTrigger value="audit">Audit</TabsTrigger>
             </>
           )}
@@ -1723,6 +1725,19 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               )}
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="features">
+          <AdminFeatureFlagsPanel
+            restaurants={(restaurantsData?.restaurants ?? []).map((r: { id: string; name: string }) => ({
+              id: r.id,
+              name: r.name,
+            }))}
+            suppliers={(suppliersData?.suppliers ?? []).map((s: { id: string; name: string }) => ({
+              id: s.id,
+              name: s.name,
+            }))}
+          />
         </TabsContent>
 
         <TabsContent value="audit">

@@ -864,7 +864,6 @@ export interface Subscription {
   plan_features?: string[]
 }
 
-/** Canonical entitlements from GET /api/subscriptions/entitlements */
 export interface Entitlements {
   tenantType: 'RESTAURANT' | 'SUPPLIER'
   tenantId: string
@@ -887,6 +886,23 @@ export interface Entitlements {
   }>
   usage: Record<string, number>
   usageWindowMeta?: Record<string, { date?: string }>
+}
+
+export interface AdminFeatureFlag {
+  featureKey: string
+  featureName: string
+  description: string | null
+  globalOverride: boolean | null
+  updatedAt: string
+}
+
+export interface EffectiveFeature {
+  featureKey: string
+  featureName: string
+  enabled: boolean
+  source: 'tenant_override' | 'global' | 'plan' | 'default'
+  planValue: unknown
+  tenantOverride: { enabled: boolean; reason: string | null } | null
 }
 
 /** Plan recommendation from GET /api/subscriptions/recommendation */
