@@ -1,0 +1,41 @@
+# Deploy dev branch to an EC2 dev/staging box (docker-compose.dev.yml).
+#
+# Secrets (environment "dev" recommended):
+#   EC2_HOST, EC2_USER, EC2_SSH_KEY
+#   EC2_DEPLOY_PATH (optional, default /opt/supplify)
+#   EC2_DEPLOY_BRANCH (optional, default dev)
+#
+name: Deploy EC2 Dev
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ec2-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH deploy to EC2 (dev)
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 45m
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.EC2_DEPLOY_PATH || '/opt/supplify' }}"
+            BRANCH="${{ secrets.EC2_DEPLOY_BRANCH || 'dev' }}"
+            cd "$DEPLOY_PATH"
+            git fetch origin
+            git checkout "$BRANCH"
+            git pull origin "$BRANCH"
+            sudo ./deploy/scripts/deploy-dev.sh
