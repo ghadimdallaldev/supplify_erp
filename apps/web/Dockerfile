@@ -25,6 +25,9 @@ COPY . .
 
 WORKDIR /app/apps/web
 
+ARG VITE_API_URL=http://localhost:4000
+ENV VITE_API_URL=$VITE_API_URL
+
 # Build the application
 RUN pnpm build
 

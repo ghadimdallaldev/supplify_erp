@@ -25,8 +25,23 @@ services:
     networks:
       - supplify_net
 
+  migrate:
+    image: ${BACKEND_IMAGE:-supplify-backend:prod}
+    container_name: supplify-migrate
+    env_file:
+      - /opt/supplify/env/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["node", "apps/api/scripts/run-migration.js"]
+    restart: "no"
+    networks:
+      - supplify_net
+
   backend:
-    # TODO: replace with your real backend image (or build context)
     image: ${BACKEND_IMAGE:-supplify-backend:prod}
     container_name: supplify-backend
     env_file:
@@ -34,14 +49,15 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL}
-      PORT: ${BACKEND_PORT:-3000}
+      PORT: ${BACKEND_PORT:-4000}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost}
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+    expose:
+      - "${BACKEND_PORT:-4000}"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${BACKEND_PORT:-3000}/health >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${BACKEND_PORT:-4000}/health >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -52,21 +68,42 @@ services:
       - supplify_net
 
   frontend:
-    # TODO: replace with your real frontend image (or build context)
     image: ${FRONTEND_IMAGE:-supplify-frontend:prod}
     container_name: supplify-frontend
     env_file:
       - /opt/supplify/env/.env
     environment:
       NODE_ENV: production
-      PORT: ${FRONTEND_PORT:-3001}
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "${FRONTEND_PORT:-3001}:${FRONTEND_PORT:-3001}"
+    expose:
+      - "80"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${FRONTEND_PORT:-3001}/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    labels:
+      - "autoheal=true"
+    networks:
+      - supplify_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: supplify-nginx
+    volumes:
+      - /opt/supplify/deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/nginx-health >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12

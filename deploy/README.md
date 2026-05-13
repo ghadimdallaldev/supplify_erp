@@ -116,6 +116,28 @@ docker compose --env-file /opt/supplify/env/.env.preprod -f deploy/docker-compos
 
 Containers are named e.g. `supplify-postgres`, `supplify-dev-postgres`, `supplify-preprod-postgres`, so all three envs can run on the same host.
 
+## EC2 production (first-time server setup)
+
+For a fresh AWS EC2 instance (Amazon Linux 2023 or Ubuntu):
+
+```bash
+# On the instance (as root or with sudo)
+export SUPPLIFY_REPO="https://github.com/ghadimdallaldev/supplify_erp.git"
+export SUPPLIFY_DIR="/opt/supplify"
+git clone --branch dev "$SUPPLIFY_REPO" "$SUPPLIFY_DIR"
+sudo "$SUPPLIFY_DIR/deploy/ec2/bootstrap.sh"
+cd "$SUPPLIFY_DIR" && ./deploy/ec2/deploy.sh
+```
+
+Or paste `deploy/ec2/user-data.example.sh` into EC2 **User data** at launch.
+
+Bootstrap installs Docker, creates `/opt/supplify/env/.env` from `deploy/env/.env.example`, and enables the `supplify` systemd unit. Deploy builds `apps/api` and `apps/web` images, runs SQL migrations, and starts the stack behind nginx on port 80.
+
+From your laptop (after SSH):
+
+- `pnpm deploy:bootstrap` — run bootstrap on the server (if repo already cloned)
+- `pnpm deploy:prod` — build images and start production stack
+
 ## Note: building from this repo
 
-The API Dockerfile exposes port 4000 and the web app uses nginx on port 80. If you build images from this repo, set in the env file: `BACKEND_PORT=4000` and `FRONTEND_PORT=80` (and adjust dev/preprod ports if needed), and ensure the frontend healthcheck matches (e.g. `http://127.0.0.1:80/`).
+Production compose uses internal port **4000** for the API and **80** for the static frontend container. Nginx listens on **HTTP_PORT** (default 80) and proxies `/api`, `/auth`, and WebSocket traffic to the backend. Set `VITE_API_URL` and `PUBLIC_URL` to your public URL when building the frontend image on EC2.
