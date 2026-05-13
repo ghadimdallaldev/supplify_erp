@@ -15,12 +15,13 @@ Open **http://localhost:5173** (native dev) or use full Docker below.
 
 Full guide: **[docs/README.md](docs/README.md)**
 
-| Topic | Doc |
-|-------|-----|
-| Local Docker workflow | [docs/README.md](docs/README.md) |
-| Database migrations | [docs/database-migrations.md](docs/database-migrations.md) |
+| Topic                 | Doc                                                        |
+| --------------------- | ---------------------------------------------------------- |
+| **Feature catalog**   | [docs/features.md](docs/features.md)                       |
+| Local Docker workflow | [docs/README.md](docs/README.md)                           |
+| Database migrations   | [docs/database-migrations.md](docs/database-migrations.md) |
 | Admin feature toggles | [docs/admin-feature-flags.md](docs/admin-feature-flags.md) |
-| Production deploy | [deploy/README.md](deploy/README.md) |
+| Production deploy     | [deploy/README.md](deploy/README.md)                       |
 
 ## Scripts
 

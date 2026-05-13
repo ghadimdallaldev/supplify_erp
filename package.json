@@ -14,7 +14,7 @@
     "lint:fix": "pnpm --filter @supplify/api lint:fix && pnpm --filter @supplify/web lint:fix",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "test": "pnpm --filter @supplify/api test && pnpm --filter @supplify/web test",
-    "test:ci": "pnpm --filter @supplify/api test:run && pnpm --filter @supplify/web test:run",
+    "test:ci": "node scripts/pnpm-run.mjs --filter @supplify/api test:run && node scripts/pnpm-run.mjs --filter @supplify/web test:run",
     "e2e": "pnpm --filter @supplify/api test:e2e",
     "e2e:playwright": "node tests/scripts/probe-urls.mjs && playwright test --config=tests/playwright.config.ts",
     "test:coverage-map": "node tests/scripts/check-coverage-map.mjs",

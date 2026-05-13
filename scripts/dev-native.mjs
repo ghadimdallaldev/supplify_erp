@@ -64,7 +64,11 @@ async function main() {
 
   if (!skipMigrate) {
     console.log('Running migrations…')
-    run('node', ['apps/api/scripts/migrate.js'])
+    const mig = run('node', ['apps/api/scripts/migrate.js'])
+    if (mig.status !== 0) {
+      console.error('Migrations failed — is Postgres running? Try: npm run local:infra')
+      process.exit(mig.status ?? 1)
+    }
   }
 
   console.log('\nStarting API (watch) + web (Vite HMR)…')

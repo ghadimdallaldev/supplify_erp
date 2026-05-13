@@ -35,13 +35,13 @@ Bootstrap database + demo users:
 scripts\run-local.cmd seed
 ```
 
-| Command | Purpose |
-|---------|---------|
-| `scripts\run-local.cmd up` | Start stack + tail API logs |
-| `scripts\run-local.cmd dev` | Same as `pnpm dev` (infra + native API/web) |
-| `scripts\run-local.cmd infra` | Docker infra only (no API/web images) |
-| `scripts\run-local.cmd down` | Stop stack |
-| `scripts\run-local.cmd ps` | Container status + HTTP health checks |
+| Command                       | Purpose                                     |
+| ----------------------------- | ------------------------------------------- |
+| `scripts\run-local.cmd up`    | Start stack + tail API logs                 |
+| `scripts\run-local.cmd dev`   | Same as `pnpm dev` (infra + native API/web) |
+| `scripts\run-local.cmd infra` | Docker infra only (no API/web images)       |
+| `scripts\run-local.cmd down`  | Stop stack                                  |
+| `scripts\run-local.cmd ps`    | Container status + HTTP health checks       |
 
 **Demo logins** (after seed): `restaurant@supplify.com`, `supplier@supplify.com`, `admin@supplify.com` — passwords from `apps/api/scripts/seed-demo-users.js`.
 
@@ -92,18 +92,21 @@ scripts\run-local.cmd seed
 
 ## Feature areas
 
-| Area | API prefix | Notes |
-|------|------------|--------|
-| Orders | `/api/orders` | Placement, status, reminders, calendar |
-| Chat | `/api/chat` | Conversations, messages, Socket.IO |
-| Reservations | `/api/reservations` | Tables, board, bookings |
-| Staff / shifts | `/api/staff` | Members, shifts, time entries |
-| Admin | `/api/admin-dashboard` | Plans, limits, impersonation, **feature toggles** |
+Full catalog, routes, roles, and verification steps: **[features.md](./features.md)**.
+
+| Area           | API prefix             | Notes                                             |
+| -------------- | ---------------------- | ------------------------------------------------- |
+| Orders         | `/api/orders`          | Placement, status, reminders, calendar            |
+| Chat           | `/api/chat`            | Conversations, messages, Socket.IO                |
+| Reservations   | `/api/reservations`    | Tables, board, bookings                           |
+| Staff / shifts | `/api/staff`           | Members, shifts, time entries                     |
+| Admin          | `/api/admin-dashboard` | Plans, limits, impersonation, **feature toggles** |
 
 Subscription **plans** define default features; admins can override globally or per tenant — see [admin-feature-flags.md](./admin-feature-flags.md).
 
 ## Documentation
 
+- [Feature catalog & verification](./features.md) — all product areas, routes, smoke checks
 - [Database migrations](./database-migrations.md) — running, troubleshooting, fresh DB
 - [Admin feature toggles](./admin-feature-flags.md) — global and per-tenant flags
 - [Deploy](../deploy/README.md) — production Docker on EC2
