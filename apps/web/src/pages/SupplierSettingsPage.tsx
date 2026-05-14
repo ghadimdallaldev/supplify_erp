@@ -17,8 +17,10 @@ import toast from 'react-hot-toast'
 import Papa from 'papaparse'
 import { LogoUpload } from '../components/LogoUpload'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
-import { useAppSelector } from '../hooks/redux'
+import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
+import { canAddWarehouses } from '../lib/planLimits'
+import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { 
   useGetSupplierMeQuery, 
   useUpdateSupplierMutation, 
@@ -29,6 +31,7 @@ import {
   useGetDashboardStatsQuery,
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
+  useGetEntitlementsQuery,
 } from '../services/api'
 
 const SUPPLIER_NOTIFICATION_DEFAULTS = {
@@ -52,6 +55,7 @@ const SUPPLIER_NOTIFICATION_FIELDS: Array<{ key: keyof typeof SUPPLIER_NOTIFICAT
 ]
 
 export function SupplierSettingsPage() {
+  const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('profile')
@@ -74,6 +78,10 @@ export function SupplierSettingsPage() {
   const [notificationPrefs, setNotificationPrefs] = useState(SUPPLIER_NOTIFICATION_DEFAULTS)
   const { data: notificationPrefsData, isLoading: isLoadingNotificationPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
   const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
+  const entitlements = entitlementsData?.entitlements
+  // Main warehouse placeholder counts as one location under plan limits.
+  const canAddWarehouse = canAddWarehouses(entitlements, 1)
   
   const supplier = supplierData?.supplier
   
@@ -249,6 +257,14 @@ export function SupplierSettingsPage() {
   })
 
   const handleAddWarehouse = () => {
+    if (!canAddWarehouse) {
+      toast.error('Additional warehouses are not included on your current plan. Upgrade to add more.')
+      openBrowseUpgrade(dispatch, {
+        currentPlan: entitlements?.plan?.name ?? null,
+        upgradeUrl: '/app/settings?tab=plan',
+      })
+      return
+    }
     // TODO: Implement API call to add warehouse
     console.log('Adding warehouse:', warehouseForm)
     toast.success('Warehouse added successfully!')
@@ -793,13 +809,31 @@ export function SupplierSettingsPage() {
                   </CardTitle>
                   <CardDescription>Manage your warehouse locations</CardDescription>
                 </div>
-                <Button onClick={() => setShowAddWarehouse(true)}>
+                <Button
+                  disabled={!canAddWarehouse}
+                  onClick={() => {
+                    if (!canAddWarehouse) {
+                      openBrowseUpgrade(dispatch, {
+                        currentPlan: entitlements?.plan?.name ?? null,
+                        upgradeUrl: '/app/settings?tab=plan',
+                      })
+                      return
+                    }
+                    setShowAddWarehouse(true)
+                  }}
+                >
                   <Warehouse className="h-4 w-4 mr-2" />
                   Add Warehouse
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {!canAddWarehouse && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Additional warehouses are not available on the Free plan. Upgrade to Bronze or
+                  higher to add warehouse locations.
+                </div>
+              )}
               <div className="space-y-4">
                 <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">

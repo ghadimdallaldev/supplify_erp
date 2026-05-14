@@ -48,7 +48,11 @@ import {
   useGetDashboardStatsQuery,
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
+  useGetEntitlementsQuery,
 } from '../services/api'
+import { canAddBranches } from '../lib/planLimits'
+import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
+import { useAppDispatch } from '../hooks/redux'
 
 const DEFAULT_NOTIFICATION_PREFS = {
   emailEnabled: true,
@@ -91,6 +95,7 @@ const CATEGORY_FIELDS: PreferenceField[] = [
 ]
 
 export function RestaurantOnboardingPage() {
+  const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const [searchParams] = useSearchParams()
   const { data: restaurantData, isLoading: isLoadingRestaurant, refetch: refetchRestaurant } = useGetRestaurantMeQuery()
@@ -221,11 +226,14 @@ export function RestaurantOnboardingPage() {
   const [branches, setBranches] = useState<any[]>([])
   const [newMember, setNewMember] = useState({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
   const [newBranch, setNewBranch] = useState({ name: '', phone: '', address: '', deliveryInstructions: '' })
+  const entitlements = entitlementsData?.entitlements
+  const canAddBranch = canAddBranches(entitlements, branches.length)
   
   // Notification preferences
   const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
   const { data: notificationPrefsData, isLoading: isLoadingPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
   const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
 
   useEffect(() => {
     const prefs = notificationPrefsData?.preferences
@@ -261,6 +269,14 @@ export function RestaurantOnboardingPage() {
   }
 
   const handleAddBranch = () => {
+    if (!canAddBranch) {
+      toast.error('Branches are not included on your current plan. Upgrade to add locations.')
+      openBrowseUpgrade(dispatch, {
+        currentPlan: entitlements?.plan?.name ?? null,
+        upgradeUrl: '/app/settings?tab=subscription',
+      })
+      return
+    }
     if (!newBranch.name) {
       toast.error('Please fill in branch name')
       return
@@ -671,13 +687,31 @@ export function RestaurantOnboardingPage() {
                   <CardTitle>Branches</CardTitle>
                   <CardDescription>Manage your restaurant branches</CardDescription>
                 </div>
-                <Button onClick={() => setShowAddBranchDialog(true)}>
+                <Button
+                  disabled={!canAddBranch}
+                  onClick={() => {
+                    if (!canAddBranch) {
+                      openBrowseUpgrade(dispatch, {
+                        currentPlan: entitlements?.plan?.name ?? null,
+                        upgradeUrl: '/app/settings?tab=subscription',
+                      })
+                      return
+                    }
+                    setShowAddBranchDialog(true)
+                  }}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Branch
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {!canAddBranch && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Multi-branch is not available on the Free plan. Upgrade to Gold or higher to add
+                  branches.
+                </motion.div>
+              )}
               {branches.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
                   <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
