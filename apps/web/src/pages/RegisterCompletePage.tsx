@@ -18,7 +18,7 @@ export function RegisterCompletePage() {
   const { data: status, isLoading: statusLoading, error: statusError } = useGetRegisterStatusQuery()
   const [completeRegistration, { isLoading: submitting }] = useCompleteRegistrationMutation()
 
-  const [accountType, setAccountType] = useState<AccountType>('RESTAURANT')
+  const [accountType, setAccountType] = useState<AccountType | null>(null)
   const [businessName, setBusinessName] = useState('')
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +38,10 @@ export function RegisterCompletePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    if (!accountType) {
+      setError('Please choose whether you are a restaurant or a supplier.')
+      return
+    }
     try {
       await completeRegistration({
         accountType,
@@ -134,7 +138,7 @@ export function RegisterCompletePage() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" className="w-full" disabled={submitting || !accountType}>
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

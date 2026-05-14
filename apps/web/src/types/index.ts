@@ -3,7 +3,7 @@ export interface User {
   id: string
   email: string
   displayName: string
-  role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT'
+  role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'PENDING'
   createdAt: string
   /** Tenant-scoped role codes (e.g. RESTAURANT_OWNER, SUPPLIER_STAFF) */
   tenantRoles?: string[]

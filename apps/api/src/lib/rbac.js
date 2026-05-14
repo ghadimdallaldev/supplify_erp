@@ -69,19 +69,25 @@ export async function upsertUser(userInfo, roles = []) {
     const rolesLower = (roles || []).map((r) => String(r).toLowerCase())
     const hasRole = (name) => rolesLower.includes(name.toLowerCase())
 
-    // Determine role from Keycloak roles (admin > supplier > restaurant)
-    let role = 'RESTAURANT' // default
+    // Role from Keycloak or seeded demo emails only — self-signup stays PENDING until /register/complete.
+    let explicitRole = null
     if (hasRole('admin')) {
-      role = 'ADMIN'
+      explicitRole = 'ADMIN'
     } else if (hasRole('supplier')) {
-      role = 'SUPPLIER'
+      explicitRole = 'SUPPLIER'
+    } else if (hasRole('restaurant')) {
+      explicitRole = 'RESTAURANT'
     } else {
       const emailLower = (email || '').toLowerCase()
-      if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com')
-        role = 'ADMIN'
-      else if (emailLower === 'supplier@supplify.com') role = 'SUPPLIER'
-      else role = 'RESTAURANT'
+      if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
+        explicitRole = 'ADMIN'
+      } else if (emailLower === 'supplier@supplify.com') {
+        explicitRole = 'SUPPLIER'
+      } else if (emailLower === 'restaurant@supplify.com') {
+        explicitRole = 'RESTAURANT'
+      }
     }
+    const insertRole = explicitRole || 'PENDING'
 
     // Match by keycloak_sub or email so seeded placeholder subs (e.g. admin-sub) link on first login
     const result = await query(
@@ -92,14 +98,14 @@ export async function upsertUser(userInfo, roles = []) {
           keycloak_sub = $1,
           email = $2,
           display_name = $3,
-          role = $4,
+          role = COALESCE($4, role),
           updated_at = now()
         WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2)
         RETURNING *
       ),
       inserted AS (
         INSERT INTO app_user (keycloak_sub, email, display_name, role)
-        SELECT $1, $2, $3, $4
+        SELECT $1, $2, $3, $5
         WHERE NOT EXISTS (SELECT 1 FROM updated)
         RETURNING *
       )
@@ -107,10 +113,10 @@ export async function upsertUser(userInfo, roles = []) {
       UNION ALL
       SELECT * FROM inserted
     `,
-      [sub, email, displayName, role]
+      [sub, email, displayName, explicitRole, insertRole]
     )
 
-    logger.debug('User upserted', { userId: result.rows[0]?.id, role })
+    logger.debug('User upserted', { userId: result.rows[0]?.id, role: result.rows[0]?.role })
     return result.rows[0]
   } catch (error) {
     logger.error('Error upserting user', { error: error.message })
@@ -374,6 +380,7 @@ export async function assignDefaultRoleForTenant(userId, tenantId, tenantType) {
  */
 export async function getRequestTenant(req) {
   if (!req.userData) return null
+  if (req.userData.role === 'PENDING') return null
   const effective = getEffectiveTenant(req)
   if (effective) return effective
   const email = (req.userData.email || '').trim().toLowerCase()

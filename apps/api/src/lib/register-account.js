@@ -41,23 +41,15 @@ async function assignFreeSubscription(client, tenantId, tenantType) {
 
 export async function userNeedsTenantSetup(user) {
   if (!user || user.role === 'ADMIN') return false
+  if (user.role === 'PENDING') return true
   const email = (user.email || '').trim().toLowerCase()
   if (!email) return true
-  if (user.role === 'SUPPLIER') {
-    const { rows } = await query(
-      'SELECT id FROM supplier WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1',
-      [email]
-    )
-    return rows.length === 0
-  }
-  if (user.role === 'RESTAURANT') {
-    const { rows } = await query(
-      'SELECT id FROM restaurant WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1',
-      [email]
-    )
-    return rows.length === 0
-  }
-  return true
+
+  const [{ rows: restaurants }, { rows: suppliers }] = await Promise.all([
+    query('SELECT id FROM restaurant WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1', [email]),
+    query('SELECT id FROM supplier WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1', [email]),
+  ])
+  return restaurants.length === 0 && suppliers.length === 0
 }
 
 /**

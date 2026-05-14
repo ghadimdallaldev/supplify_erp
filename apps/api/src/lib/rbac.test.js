@@ -164,7 +164,7 @@ describe('RBAC Utilities', () => {
       expect(user).toEqual(linkedUser)
       expect(query).toHaveBeenCalledWith(
         expect.stringContaining('WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2)'),
-        ['real-keycloak-uuid', 'admin@supplify.com', 'Admin User', 'ADMIN']
+        ['real-keycloak-uuid', 'admin@supplify.com', 'Admin User', 'ADMIN', 'ADMIN']
       )
     })
 
@@ -175,7 +175,7 @@ describe('RBAC Utilities', () => {
         keycloak_sub: 'sub-new',
         email: 'new@example.com',
         display_name: 'New User',
-        role: 'RESTAURANT',
+        role: 'PENDING',
       }
       query.mockResolvedValueOnce({ rows: [newUser] })
 
@@ -187,7 +187,7 @@ describe('RBAC Utilities', () => {
       expect(user).toEqual(newUser)
       expect(query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO app_user'),
-        ['sub-new', 'new@example.com', 'New User', 'RESTAURANT']
+        ['sub-new', 'new@example.com', 'New User', null, 'PENDING']
       )
     })
   })
