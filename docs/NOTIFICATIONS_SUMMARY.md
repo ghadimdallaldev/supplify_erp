@@ -1,202 +1,119 @@
 # Notification System - Complete Summary
 
-## 📧 Contact Information Setup
+## Delivery channels
 
-**Test Contact Info:**
-- Email: mdallalghadi@gmail.com
-- SMS: 0096176911906
+| Channel | Implementation | Notes |
+|---------|----------------|-------|
+| **Email** | [nodemailer](https://nodemailer.com/) over SMTP | Configure `SMTP_*` env vars on the API |
+| **WhatsApp** | `wa.me` deep links | Opens WhatsApp with a pre-filled message; not server-push |
+| **In-app** | `notification_log` table | Bell icon in header; supports “Open in WhatsApp” when link present |
+| **Push** | Disabled | Planned for a later release |
 
-**Setup Script:** `apps/api/scripts/setup-notification-simple.js`
-**Test Script:** `apps/api/scripts/send-test-notification.js`
+### SMTP environment variables
 
-## 🔔 Notification Triggers
-
-### 1️⃣ ORDER NOTIFICATIONS
-
-#### Restaurant Notifications:
-
-| Event | When | Notification |
-|-------|------|-------------|
-| Order Acknowledged | Supplier acknowledges order | "Your order #123 has been acknowledged by Supplier Name" |
-| Order Processing | Supplier starts processing | "Your order #123 is being prepared for shipping" |
-| Order Shipped | Supplier ships order | "Your order #123 has been shipped" |
-| Order Delivered | Supplier marks as delivered | "Your order #123 has been delivered" |
-
-#### Supplier Notifications:
-
-| Event | When | Notification |
-|-------|------|-------------|
-| New Order Placed | Restaurant places order | "New order from Restaurant Name - Order #123 for $125.50" |
-| Order Cancelled | Restaurant cancels order | "Order #123 from Restaurant Name has been cancelled" |
-
----
-
-### 2️⃣ INVOICE NOTIFICATIONS
-
-#### Restaurant Notifications:
-
-| Event | When | Notification |
-|-------|------|-------------|
-| Invoice Issued | Supplier creates invoice after delivery | "Invoice INV-2024-10-001 for $1250.00 due 2024-11-30" |
-
----
-
-### 3️⃣ PAYMENT NOTIFICATIONS
-
-#### Supplier Notifications:
-
-| Event | When | Notification |
-|-------|------|-------------|
-| Payment Received | Restaurant pays invoice | "Payment of $1250.00 received for invoice INV-2024-10-001" |
-
----
-
-### 4️⃣ INVENTORY NOTIFICATIONS (Restaurant Only)
-
-| Event | When | Notification |
-|-------|------|-------------|
-| Low Stock | Inventory below threshold | "Tomatoes is below threshold. Current: 10kg, Threshold: 20kg" |
-| Out of Stock | Inventory reaches zero | "Product is out of stock" |
-
----
-
-### 5️⃣ CHAT NOTIFICATIONS (Both Parties)
-
-| Event | When | Notification |
-|-------|------|-------------|
-| Message Received | New chat message | "New message from [Party Name]" |
-
----
-
-## 📊 Notification Channels
-
-### Active Channels:
-- ✅ **Email** - Sends to configured email (mdallalghadi@gmail.com)
-- ✅ **SMS** - Sends to configured phone (0096176911906)
-- ✅ **In-App** - Stored in database for UI display
-- ❌ **Push** - Disabled for now
-
-### Console Output:
-```
-📧 EMAIL: To: mdallalghadi@gmail.com, Subject: Order Shipped
-Body: Your order #ABC123 has been shipped
-
-📱 SMS: To: 0096176911906, Message: Your order #ABC123 has been shipped
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-user
+SMTP_PASS=your-password
+SMTP_FROM=notifications@yourdomain.com
 ```
 
+If SMTP is not configured, emails are logged only (safe for local dev).
+
+### WhatsApp behavior
+
+When **WhatsApp** is enabled in preferences and a phone number exists:
+
+1. The API builds `https://wa.me/{digits}?text={encoded message}`
+2. The link is stored in `notification_log.metadata.whatsappUrl`
+3. The in-app notification shows **Open in WhatsApp**
+
+Guest reservation confirmations:
+
+- **Email** → sent to `customer_email` when provided
+- **Phone** → returns a `wa.me` link for staff to message the guest (one tap from notifications)
+
 ---
 
-## 🎯 How to Test
+## Notification triggers
 
-### Test 1: Order Notification
-1. Log in as **Restaurant**
-2. Place an order
-3. Check console logs - **Supplier** should receive notification
+### Orders
 
-### Test 2: Order Status Update
-1. Log in as **Supplier**
-2. Update order to "SHIPPED"
-3. Check console logs - **Restaurant** should receive notification
+| Event | Recipient | Category key |
+|-------|-----------|--------------|
+| Order placed / cancelled | Supplier | `PLACED`, `CANCELLED` |
+| Acknowledged, processing, shipped, delivered | Restaurant | matching status |
 
-### Test 3: Payment Notification
-1. Log in as **Supplier**
-2. Record payment on invoice
-3. Check console logs - **Supplier** should receive notification about payment
+### Reservations
 
-### Test 4: Direct Test
-```bash
-node apps/api/scripts/send-test-notification.js
+| Event | Recipient |
+|-------|-----------|
+| New reservation | Restaurant owner |
+| Waitlist | Restaurant owner |
+| Confirmed / waitlist (guest) | Guest email + WhatsApp link |
+
+### Other
+
+- Invoices issued → restaurant
+- Payments received → supplier
+- Low stock → restaurant / supplier
+- Chat messages → counterparty
+- Staff PTO / shift swap → restaurant manager
+- Scheduled orders → restaurant
+
+Preference toggles map to `notify_*` keys (e.g. `notify_order_new`, `notify_reservation_created`). Disabled toggles skip delivery.
+
+---
+
+## API endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/notifications` | List notifications |
+| GET | `/api/notifications/preferences` | Read preferences |
+| PATCH | `/api/notifications/preferences` | Update preferences (`emailEnabled`, `whatsappEnabled`, `inAppEnabled`, …) |
+| POST | `/api/notifications/:id/read` | Mark one read |
+| POST | `/api/notifications/read-all` | Mark all read |
+| POST | `/api/notifications/test` | Send test notification |
+
+---
+
+## Flow
+
+```
+Event (order, reservation, invoice, …)
+    ↓
+Load preferences + contact info (profile / contact_info sync)
+    ↓
+Category enabled? → if no, skip
+    ↓
+Insert notification_log (in-app)
+    ↓
+Email via nodemailer (if emailEnabled + email)
+WhatsApp link in metadata (if whatsappEnabled + phone)
+    ↓
+Update log with delivery results
 ```
 
 ---
 
-## 🔧 Integration Points
+## Testing
 
-### Files Modified:
-1. `apps/api/src/services/notification.service.js`
-   - Core notification service
-   - Email/SMS/Push/In-App support
-   - Helper functions for common notifications
+**Unit tests**
 
-2. `apps/api/src/routes/orders.routes.js`
-   - Order status changes trigger notifications
-   - Notifies both parties appropriately
+- `apps/api/src/services/notification.service.test.js`
+- `apps/api/src/lib/whatsapp.test.js`
 
-3. `apps/api/src/routes/invoices.routes.js`
-   - Invoice creation triggers notification to restaurant
+**Manual**
 
-4. `apps/api/src/routes/payments.routes.js`
-   - Payment recording triggers notification to supplier
-
-5. `apps/api/src/routes/notifications.routes.js`
-   - API endpoints for notification management
+1. Set SMTP env vars (or rely on log-only mode)
+2. Settings → Notifications → toggle Email / WhatsApp / types → Save
+3. Trigger an order or reservation
+4. Check bell icon; use **Open in WhatsApp** when shown
 
 ---
 
-## 📝 Notification Flow
-
-```
-Event Occurs (Order Status Change, Invoice Created, etc.)
-    ↓
-Check User Preferences
-    ↓
-Enabled? → YES
-    ↓
-Get Contact Info
-    ↓
-Send via Enabled Channels:
-  - Email (if email_enabled && email exists)
-  - SMS (if sms_enabled && phone exists)
-  - In-App (always enabled)
-  - Push (disabled for now)
-    ↓
-Log to notification_log table
-    ↓
-Update Database with Send Results
-```
-
----
-
-## 🎨 Future Enhancements
-
-### To Integrate:
-1. **Real Email Service** (SendGrid, AWS SES)
-2. **Real SMS Service** (Twilio, Nexmo)
-3. **Push Notifications** (FCM, APNS)
-4. **Notification Center UI**
-5. **Email Templates** (HTML formatting)
-6. **Notification Preferences UI**
-7. **Unread Badge**
-
----
-
-## ✅ Current Status
-
-**Fully Functional:**
-- ✅ Database schema
-- ✅ Notification logging
-- ✅ Email & SMS console output
-- ✅ Order status notifications
-- ✅ Invoice notifications
-- ✅ Payment notifications
-- ✅ User preferences system
-- ✅ Contact info management
-- ✅ API endpoints
-
-**Needs Integration:**
-- 🔄 Real email service (SendGrid/SES)
-- 🔄 Real SMS service (Twilio)
-- 🔄 Push notifications
-- 🔄 UI components (notification center, preferences)
-
----
-
-**Last Updated:** Current Date
-**Version:** 1.0.0
-**Status:** Production Ready (with test logging)
-
-## Order/Invoice notifications
-- On DELIVERED (supplier action): notify restaurant to receive
-- On RECEIVED_*: notify supplier that receiving is completed; invoice is created
-- On invoice overdue: notify restaurant (and optionally supplier for visibility)
-
+**Last updated:** May 2026  
+**Version:** 2.0.0 (nodemailer + wa.me)

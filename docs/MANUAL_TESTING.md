@@ -834,7 +834,7 @@ This document provides a comprehensive manual testing checklist for all features
 #### TC-NOTIF-002: Notification Preferences
 - [ ] Navigate to Settings → Notifications
 - [ ] Toggle email notifications
-- [ ] Toggle SMS notifications
+- [ ] Toggle WhatsApp notifications (opens wa.me link from bell when enabled)
 - [ ] Toggle in-app notifications
 - [ ] Toggle specific notification types
 - [ ] Verify preferences save

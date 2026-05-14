@@ -115,7 +115,7 @@ Supplify offers tiered subscription plans designed for **restaurants and supplie
 - **Multi-branch support**
 - Warehouse pick & pack
 - Add-on toggles
-- Email + SMS notifications
+- Email + WhatsApp (wa.me) + in-app notifications
 - API key access
 - 24-hour priority support
 - Logo & color customization

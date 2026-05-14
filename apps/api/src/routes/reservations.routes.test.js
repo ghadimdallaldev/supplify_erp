@@ -32,6 +32,16 @@ vi.mock('../lib/db.js', () => ({
   withTransaction: (handler) => withTransactionMock(handler),
 }))
 
+vi.mock('../lib/subscription.js', () => ({
+  requireFeature: () => (req, res, next) => next(),
+}))
+
+vi.mock('../services/notification.service.js', () => ({
+  notifyReservationCreated: vi.fn().mockResolvedValue(null),
+  notifyReservationWaitlist: vi.fn().mockResolvedValue(null),
+  notifyGuestReservationConfirmation: vi.fn().mockResolvedValue({ email: true, whatsapp: false }),
+}))
+
 describe('reservations.routes', () => {
   let app
 
@@ -88,5 +98,29 @@ describe('reservations.routes', () => {
     expect(response.status).toBe(201)
 
     expect(response.body.data.reservation.status).toBe('CONFIRMED')
+  })
+
+  it('returns guest intelligence summary', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            customer_name: 'Repeat Guest',
+            customer_phone: '+96170000000',
+            customer_email: null,
+            visit_count: '3',
+            last_visit: '2026-05-10T12:00:00.000Z',
+            total_covers: '8',
+            upcoming_count: '1',
+          },
+        ],
+      })
+
+    const response = await request(app).get('/api/reservations/guest-intelligence').expect(200)
+
+    expect(response.body.ok).toBe(true)
+    expect(response.body.data.vipGuests.length).toBe(1)
+    expect(response.body.data.followUps.length).toBeGreaterThan(0)
   })
 })

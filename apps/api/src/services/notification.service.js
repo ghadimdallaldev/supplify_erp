@@ -92,6 +92,19 @@ const CATEGORY_PREF_MAP = {
   test: 'notify_system_updates',
 };
 
+function readPref(prefs, snakeKey) {
+  if (!prefs || !snakeKey) return undefined;
+  const camelKey = snakeKey.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+  if (prefs[camelKey] !== undefined) return prefs[camelKey];
+  return prefs[snakeKey];
+}
+
+function isPrefEnabled(prefs, snakeKey, defaultValue = true) {
+  const value = readPref(prefs, snakeKey);
+  if (value === undefined) return defaultValue;
+  return value !== false;
+}
+
 function resolvePreferenceKey(notificationCategory) {
   const normalized = String(notificationCategory || '')
     .toLowerCase()
@@ -265,15 +278,15 @@ export async function sendNotification({
 
     // Determine which channels to send to (push/SMS disabled; WhatsApp preferred for phone)
     const channels = {
-      email: prefs.email_enabled && contact?.email,
-      whatsapp: prefs.whatsapp_enabled && contact?.phone,
+      email: isPrefEnabled(prefs, 'email_enabled') && contact?.email,
+      whatsapp: isPrefEnabled(prefs, 'whatsapp_enabled') && contact?.phone,
       sms: false,
       push: false,
-      inApp: prefs.in_app_enabled,
+      inApp: isPrefEnabled(prefs, 'in_app_enabled'),
     };
 
     const preferenceKey = resolvePreferenceKey(notificationCategory);
-    const shouldSend = preferenceKey ? prefs[preferenceKey] !== false : true;
+    const shouldSend = preferenceKey ? isPrefEnabled(prefs, preferenceKey) : true;
     if (!shouldSend) {
       logger.info('Notification skipped due to user preference', { userId, notificationCategory });
       return null;

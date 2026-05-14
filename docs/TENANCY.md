@@ -36,11 +36,64 @@ Suppliers are the sellers providing products to restaurants. They:
 
 ---
 
-## Branches (Restaurant Multi-Location)
+## Branches (linked accounts)
 
-### What is a Branch?
+### What is a branch?
 
-A **branch** is a physical location or unit within a restaurant chain or group.
+A **branch** is a **separate restaurant or supplier account** linked to your primary organization—not a sub-location row inside one tenant.
+
+Each branch account has its own:
+
+- Orders, inventory, reservations, catalog (as applicable)
+- Subscription (starts on Free for the new account)
+- Data isolation from other branch accounts
+
+The same owner signs in once and **switches accounts** from the header dropdown.
+
+### Plan-based limits
+
+Linked branch accounts count against the **parent** plan `branches` limit:
+
+| Plan | Linked branch accounts |
+|------|------------------------|
+| Free | 0 (primary account only) |
+| Bronze | 0–1 (single account) |
+| Gold | 2–3 (see plan catalog) |
+| Platinum | Unlimited |
+
+Free tier **cannot** create branch accounts. Paid tiers with `multi_branch` can.
+
+### Creating a branch account
+
+**Restaurants:** Settings → Branches → Add branch account  
+**Suppliers:** Settings → Branches → Add branch account
+
+1. Enter branch name, phone, address
+2. System creates a new tenant + `tenant_account_link` row
+3. Switch to the new account from the header
+
+### Switching accounts
+
+- Header **account switcher** (when 2+ accounts exist)
+- `POST /api/branches/switch` sets an `active_tenant_token` cookie
+- All API data scopes to the active account
+
+### API
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/branches` | List primary + linked accounts |
+| POST | `/api/branches` | Create linked branch account (paid + `multi_branch`) |
+| POST | `/api/branches/switch` | Set active account |
+| DELETE | `/api/branches/:childTenantId` | Unlink branch account |
+
+### Legacy `branch` table
+
+The older `branch` table (sub-locations within one tenant) remains in the schema for reservations/inventory references but **product behavior** uses linked accounts for multi-location restaurants and suppliers.
+
+---
+
+## Branches (legacy sub-location model — deprecated in UI)
 
 **Examples:**
 - "Joe's Pizza Downtown" (main branch)

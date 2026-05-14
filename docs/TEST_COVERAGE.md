@@ -19,16 +19,19 @@ This document outlines the comprehensive test suite created for the Supplify pla
 - ✅ `restaurants.routes.test.js` - Restaurant operations
 - ✅ `invoices.routes.test.js` - Invoice management
 - ✅ `chat.routes.test.js` - Chat/messaging
-- ✅ `reservations.routes.test.js` - Existing tests
+- ✅ `reservations.routes.test.js` - Board, create, guest intelligence
+- ✅ `branches.routes.test.js` - Linked branch accounts (list, create, switch, delete)
 - ✅ `orders.calendar.routes.test.js` - Existing tests
 - ✅ `public.routes.test.js` - Staff portal time-entries, check-in, check-out (token auth)
 
 #### Services Tests
 
-- ✅ `notification.service.test.js` - Notification service
+- ✅ `notification.service.test.js` - Email (nodemailer), WhatsApp links, guest confirmation, preference toggles
 - ✅ `scheduled-orders.service.test.js` - Scheduled orders processing
 
 #### Library Tests
+
+- ✅ `whatsapp.test.js` - wa.me URL builder
 
 - ✅ `db.test.js` - Database utilities (query, transactions)
 - ✅ `rbac.test.js` - Role-based access control
@@ -48,6 +51,7 @@ This document outlines the comprehensive test suite created for the Supplify pla
 
 - ✅ `components/AuthGuard.test.tsx` - Authentication guard
 - ✅ `components/Header.test.tsx` - Header component
+- ✅ `utils/clipboard.test.ts` - Reservation booking link copy helper
 - ✅ `components/ui/button.test.tsx` - Button UI component
 
 #### Hook Tests
