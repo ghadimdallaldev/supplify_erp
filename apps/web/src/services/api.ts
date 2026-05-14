@@ -147,6 +147,7 @@ export const api = createApi({
     'Reservation',
     'OrdersCalendar',
     'QuickList',
+    'Fulfillment',
     'StaffMember',
     'StaffShift',
     'StaffTimeEntry',
@@ -177,6 +178,25 @@ export const api = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+    getRegisterStatus: builder.query<{ needsSetup: boolean }, void>({
+      query: () => '/api/register/status',
+      transformResponse: (response: { data?: { needsSetup?: boolean } }) => ({
+        needsSetup: Boolean(response?.data?.needsSetup),
+      }),
+    }),
+    completeRegistration: builder.mutation<
+      { tenantType: string; tenant: unknown },
+      { accountType: 'RESTAURANT' | 'SUPPLIER'; businessName: string; phone?: string }
+    >({
+      query: (body) => ({
+        url: '/api/register/complete',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (response: { data?: { tenantType: string; tenant: unknown } }) =>
+        response.data as { tenantType: string; tenant: unknown },
+      invalidatesTags: ['User'],
+    }),
 
     // Product endpoints
     getProducts: builder.query<ProductsResponse, ProductFilters>({
@@ -194,6 +214,7 @@ export const api = createApi({
           slug: string
           description?: string
           display_order: number
+          product_count?: number
         }>
       },
       void
@@ -295,6 +316,85 @@ export const api = createApi({
         method: 'POST',
       }),
       invalidatesTags: (_result, _error, id) => [{ type: 'Order', id }, 'Order', 'Notification'],
+    }),
+
+    getFulfillmentBoard: builder.query<
+      {
+        drivers: Array<{
+          id: string
+          name: string
+          phone?: string | null
+          vehicle?: string | null
+          status: string
+          activeRoute?: unknown
+        }>
+        routes: Array<unknown>
+        unassignedOrders: Array<{
+          id: string
+          status: string
+          total_amount: number
+          created_at: string
+          restaurant_name: string
+          item_count: number
+        }>
+        stats: { pending: number; outForDelivery: number; deliveredToday: number }
+      },
+      void
+    >({
+      query: () => '/api/fulfillment/board',
+      providesTags: ['Fulfillment'],
+    }),
+    getFulfillmentWaves: builder.query<
+      {
+        waves: Array<{
+          id: string
+          waveNumber: string
+          scheduledDate: string
+          status: string
+          orderCount: number
+        }>
+      },
+      void
+    >({
+      query: () => '/api/fulfillment/waves',
+      providesTags: ['Fulfillment'],
+    }),
+    getFulfillmentRoutes: builder.query<
+      {
+        routes: Array<{
+          id: string
+          routeNumber: string
+          driver: string
+          vehicle: string
+          status: string
+          stops: number
+          scheduledDate?: string
+        }>
+      },
+      void
+    >({
+      query: () => '/api/fulfillment/routes',
+      providesTags: ['Fulfillment'],
+    }),
+    getFulfillmentExceptions: builder.query<
+      {
+        exceptions: Array<{
+          id: string
+          orderId: string
+          orderLabel: string
+          exceptionType: string
+          productName?: string | null
+          quantityExpected?: number | null
+          quantityActual?: number | null
+          damageDescription?: string | null
+          notes?: string | null
+          createdAt: string
+        }>
+      },
+      void
+    >({
+      query: () => '/api/fulfillment/exceptions',
+      providesTags: ['Fulfillment'],
     }),
 
     // Supplier endpoints
@@ -1344,6 +1444,8 @@ export const api = createApi({
 
 export const {
   useGetMeQuery,
+  useGetRegisterStatusQuery,
+  useCompleteRegistrationMutation,
   useLogoutMutation,
   useGetProductsQuery,
   useGetProductCategoriesQuery,
@@ -1357,6 +1459,10 @@ export const {
   useCreateManualOrderMutation,
   useUpdateOrderMutation,
   useSendOrderReminderMutation,
+  useGetFulfillmentBoardQuery,
+  useGetFulfillmentWavesQuery,
+  useGetFulfillmentRoutesQuery,
+  useGetFulfillmentExceptionsQuery,
   useGetSuppliersQuery,
   useGetSupplierQuery,
   useGetSupplierStatisticsQuery,

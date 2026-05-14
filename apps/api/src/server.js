@@ -15,6 +15,7 @@ import { errorHandler } from './middlewares/errorHandler.js'
 import { csrfProtection } from './middlewares/csrf.js'
 import { initializeSocket } from './lib/socket.js'
 import { authRoutes } from './routes/auth.routes.js'
+import { registerRoutes } from './routes/register.routes.js'
 import { productsRoutes } from './routes/products.routes.js'
 import { pricesRoutes } from './routes/prices.routes.js'
 import { inventoryRoutes } from './routes/inventory.routes.js'
@@ -44,6 +45,7 @@ import { ensureReservationsSchema, ensureStaffAppSchema } from './lib/migrator.j
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { e2eRoutes } from './routes/e2e.routes.js'
+import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 
 if (config.NODE_ENV !== 'test') {
   try {
@@ -179,7 +181,10 @@ app.get('/health', (req, res) => {
 })
 
 // API routes
+app.use('/auth', authLimiter)
 app.use('/auth', authRoutes)
+app.use('/api/register', authLimiter)
+app.use('/api/register', registerRoutes)
 app.use('/api/products', productsRoutes)
 app.use('/api/prices', pricesRoutes)
 app.use('/api/inventory', inventoryRoutes)
@@ -210,6 +215,7 @@ if (config.E2E_SECRET) {
 }
 app.use('/api/branches', branchesRoutes)
 app.use('/api/warehouses', warehousesRoutes)
+app.use('/api/fulfillment', fulfillmentRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {

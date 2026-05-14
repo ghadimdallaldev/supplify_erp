@@ -30,6 +30,7 @@ import { PublicReservationConfirmation } from './pages/PublicReservationConfirma
 import { PublicReservationManage } from './pages/PublicReservationManage'
 import { StaffSelfServiceLogin } from './pages/StaffSelfServiceLogin'
 import { StaffSelfServiceDashboard } from './pages/StaffSelfServiceDashboard'
+import { RegisterCompletePage } from './pages/RegisterCompletePage'
 
 const router = createBrowserRouter(
   [
@@ -56,6 +57,10 @@ const router = createBrowserRouter(
     {
       path: '/staff',
       element: <StaffSelfServiceLogin />,
+    },
+    {
+      path: '/register/complete',
+      element: <RegisterCompletePage />,
     },
     {
       path: '/staff/dashboard',

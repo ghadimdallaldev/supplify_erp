@@ -29,6 +29,27 @@ import { formatPrice } from '../utils/format'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
+function formatAddressLines(address?: Record<string, string | undefined> | null): string[] {
+  if (!address || typeof address !== 'object') return []
+  const lines: string[] = []
+  if (address.street) lines.push(address.street)
+  const cityLine = [address.city, address.region, address.postalCode || address.zip]
+    .filter(Boolean)
+    .join(', ')
+  if (cityLine) lines.push(cityLine)
+  if (address.country) lines.push(address.country)
+  return lines
+}
+
+function formatOperatingHours(hours: unknown): string | null {
+  if (!hours || typeof hours !== 'object') return null
+  const entries = Object.entries(hours as Record<string, { open?: string; close?: string }>)
+  if (!entries.length) return null
+  return entries
+    .map(([day, window]) => `${day}: ${window?.open ?? '—'} – ${window?.close ?? '—'}`)
+    .join('; ')
+}
+
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAppSelector((state) => state.auth)
@@ -151,6 +172,12 @@ export function OrderDetailPage() {
   }
 
   const order = data.order
+  const deliveryAddress = (order as any).branch_address ?? (order as any).restaurant_address
+  const deliveryInstructions =
+    (order as any).branch_delivery_instructions ?? (order as any).restaurant_delivery_instructions
+  const deliveryPhone = (order as any).branch_phone ?? (order as any).restaurant_phone
+  const addressLines = formatAddressLines(deliveryAddress)
+  const operatingHoursLabel = formatOperatingHours((order as any).restaurant_operating_hours)
 
   return (
     <div className="space-y-6 p-6">
@@ -575,11 +602,11 @@ export function OrderDetailPage() {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-600">Warehouse Location</p>
-                          <p className="font-medium">{item.location || 'A-12-B'}</p>
+                          <p className="font-medium">{item.location_code || 'Not assigned'}</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-600">Lot/Expiry</p>
-                          <p className="text-sm">LOT-{idx + 1} • Exp: 2024-12-31</p>
+                          <p className="text-sm">—</p>
                         </div>
                       </div>
                       {item.picking_notes && (
@@ -610,16 +637,18 @@ export function OrderDetailPage() {
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-1">Delivery Time Window</p>
-                    <p className="text-sm">Monday - Friday, 9:00 AM - 5:00 PM</p>
+                    <p className="text-sm">{operatingHoursLabel || 'Not specified'}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-1">Access Instructions</p>
-                    <p className="text-sm">Use back entrance. Ring doorbell. Contact: John (555-0123)</p>
+                    <p className="text-sm">{deliveryInstructions || 'Not specified'}</p>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Special Requirements</p>
-                    <p className="text-sm">Please refrigerate perishables immediately upon arrival.</p>
-                  </div>
+                  {deliveryPhone && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Contact</p>
+                      <p className="text-sm">{deliveryPhone}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -633,13 +662,20 @@ export function OrderDetailPage() {
                 <CardContent>
                   <div className="space-y-2">
                     <p className="font-medium">{order.restaurant_name}</p>
-                    <p className="text-sm text-gray-600">
-                      123 Restaurant Street
-                      <br />
-                      Food City, FC 12345
-                      <br />
-                      United States
-                    </p>
+                    {(order as any).branch_name && (
+                      <p className="text-sm text-gray-600">Branch: {(order as any).branch_name}</p>
+                    )}
+                    {addressLines.length > 0 ? (
+                      <p className="text-sm text-gray-600">
+                        {addressLines.map((line) => (
+                          <span key={line} className="block">
+                            {line}
+                          </span>
+                        ))}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500">No delivery address on file</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -685,9 +721,15 @@ export function OrderDetailPage() {
                     <div>
                       <p className="text-sm font-bold text-gray-600 mb-2">SHIP TO:</p>
                       <p className="font-semibold">{order.restaurant_name}</p>
-                      <p className="text-sm">123 Restaurant Street</p>
-                      <p className="text-sm">Food City, FC 12345</p>
-                      <p className="text-sm">United States</p>
+                      {addressLines.length > 0 ? (
+                        addressLines.map((line) => (
+                          <p key={line} className="text-sm">
+                            {line}
+                          </p>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500">No delivery address on file</p>
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-bold text-gray-600 mb-2">ORDER DETAILS:</p>

@@ -37,7 +37,7 @@ import {
   Clock,
   ClipboardSignature,
 } from 'lucide-react'
-import { useGetOrdersQuery } from '../services/api'
+import { useGetOrdersQuery, useGetFulfillmentBoardQuery, useGetFulfillmentWavesQuery, useGetFulfillmentRoutesQuery, useGetFulfillmentExceptionsQuery } from '../services/api'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
@@ -128,6 +128,15 @@ export function FulfillmentPage() {
   const [activeDrag, setActiveDrag] = useState<ActiveDragItem | null>(null)
 
   const { data: ordersData } = useGetOrdersQuery({ limit: 1000, offset: 0 })
+  const { data: boardResponse, isLoading: boardLoading } = useGetFulfillmentBoardQuery()
+  const { data: wavesResponse } = useGetFulfillmentWavesQuery()
+  const { data: routesResponse } = useGetFulfillmentRoutesQuery()
+  const { data: exceptionsResponse } = useGetFulfillmentExceptionsQuery()
+
+  const boardData = (boardResponse as DispatchBoard | undefined) ?? null
+  const waves = wavesResponse?.waves ?? []
+  const routeSummaries = routesResponse?.routes ?? []
+  const exceptions = exceptionsResponse?.exceptions ?? []
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -159,126 +168,6 @@ export function FulfillmentPage() {
         }
       })
   }, [ordersData])
-
-  const unassignedOrders = useMemo<DispatchOrderSummary[]>(() => {
-    return shippedOrders.map((order) => ({
-      id: order.id,
-      status: order.status,
-      total_amount: order.total_amount,
-      created_at: order.placedAt,
-      restaurant_name: order.restaurant_name,
-      item_count: order.item_count,
-    }))
-  }, [shippedOrders])
-
-  const boardData = useMemo<DispatchBoard>(() => {
-    const routes: DispatchRoute[] = [
-      {
-        id: 'route-1',
-        route_number: 'R-2024-101',
-        driver_id: 'driver-1',
-        status: 'IN_PROGRESS',
-        scheduled_date: new Date().toISOString(),
-        stops: [
-          {
-            id: 'stop-101',
-            route_id: 'route-1',
-            order_id: 'ORD-301',
-            restaurant_name: 'Downtown Deli',
-            total_amount: 320,
-            status: 'OUT_FOR_DELIVERY',
-            eta_seconds: 1800,
-          },
-          {
-            id: 'stop-102',
-            route_id: 'route-1',
-            order_id: 'ORD-302',
-            restaurant_name: 'Urban Eats',
-            total_amount: 245,
-            status: 'PLANNED',
-          },
-        ],
-      },
-      {
-        id: 'route-2',
-        route_number: 'R-2024-205',
-        driver_id: 'driver-2',
-        status: 'PLANNED',
-        scheduled_date: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString(),
-        stops: [
-          {
-            id: 'stop-201',
-            route_id: 'route-2',
-            order_id: 'ORD-401',
-            restaurant_name: 'Metro Burger',
-            total_amount: 180,
-            status: 'PLANNED',
-          },
-        ],
-      },
-    ]
-
-    const drivers: DispatchDriver[] = [
-      {
-        id: 'driver-1',
-        name: 'Mike Driver',
-        phone: '+971 50 123 4567',
-        vehicle: 'Sprinter Van 01',
-        status: 'ACTIVE',
-        activeRoute: routes[0],
-      },
-      {
-        id: 'driver-2',
-        name: 'Sarah Driver',
-        phone: '+971 50 987 6543',
-        vehicle: 'Refrigerated Van 12',
-        status: 'ACTIVE',
-        activeRoute: routes[1],
-      },
-      {
-        id: 'driver-3',
-        name: 'Hassan Ali',
-        phone: '+971 55 222 3344',
-        vehicle: 'Bike Courier 3',
-        status: 'OFFSHIFT',
-        activeRoute: null,
-      },
-    ]
-
-    const stats = {
-      pending: unassignedOrders.length,
-      outForDelivery: routes.reduce(
-        (sum, route) => sum + route.stops.filter((stop) => stop.status === 'OUT_FOR_DELIVERY').length,
-        0,
-      ),
-      deliveredToday: 4,
-    }
-
-    return {
-      drivers,
-      routes,
-      unassignedOrders,
-      stats,
-    }
-  }, [unassignedOrders])
-
-  const boardLoading = false
-
-  const waves = [
-    {
-      id: '1',
-      waveNumber: 'W-2024-001',
-      scheduledDate: '2024-12-28',
-      status: 'PICKING',
-      orderCount: shippedOrders.length || 0,
-    },
-    { id: '2', waveNumber: 'W-2024-002', scheduledDate: '2024-12-29', status: 'PENDING', orderCount: 0 },
-  ]
-
-  const routeSummaries = [
-    { id: '1', routeNumber: 'R-2024-01', driver: 'Mike Driver', vehicle: 'Van-001', status: 'IN_PROGRESS', stops: 8 },
-    { id: '2', routeNumber: 'R-2024-02', driver: 'Sarah Driver', vehicle: 'Van-002', status: 'PLANNED', stops: 5 },
-  ]
 
   const columnData = useMemo(() => {
     const map = new Map<ColumnId, ColumnEntry>()
@@ -398,7 +287,9 @@ export function FulfillmentPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {waves.map((wave) => (
+                {waves.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">No delivery waves scheduled yet.</div>
+                ) : waves.map((wave) => (
                   <div key={wave.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -513,7 +404,9 @@ export function FulfillmentPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {routeSummaries.map((route) => (
+                {routeSummaries.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">No delivery routes planned yet.</div>
+                ) : routeSummaries.map((route) => (
                   <div key={route.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -603,19 +496,32 @@ export function FulfillmentPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold">ORD-125 - Short Delivery</h4>
-                      <div className="text-sm text-gray-600 space-y-1 mt-1">
-                        <p>Type: Short Quantity</p>
-                        <p>Product: Organic Tomatoes</p>
-                        <p>Expected: 10kg, Actual: 8kg</p>
+                {exceptions.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">No delivery exceptions recorded.</div>
+                ) : (
+                  exceptions.map((ex) => (
+                    <div key={ex.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold">
+                            {ex.orderLabel} — {ex.exceptionType.replace(/_/g, ' ')}
+                          </h4>
+                          <div className="text-sm text-gray-600 space-y-1 mt-1">
+                            {ex.productName && <p>Product: {ex.productName}</p>}
+                            {(ex.quantityExpected != null || ex.quantityActual != null) && (
+                              <p>
+                                Expected: {ex.quantityExpected ?? '—'}, Actual: {ex.quantityActual ?? '—'}
+                              </p>
+                            )}
+                            {ex.damageDescription && <p>{ex.damageDescription}</p>}
+                            {ex.notes && <p>{ex.notes}</p>}
+                          </div>
+                        </div>
+                        <Badge variant="destructive">Exception</Badge>
                       </div>
                     </div>
-                    <Badge variant="destructive">Exception</Badge>
-                  </div>
-                </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

@@ -293,7 +293,7 @@ export function DashboardPage() {
   const categoryDist = Array.isArray(productCategories?.categories)
     ? productCategories.categories
         .slice(0, 8)
-        .map((c: any) => ({ name: c.name, value: c.display_order || 1 }))
+        .map((c: any) => ({ name: c.name, value: c.product_count ?? 0 }))
     : []
 
   return (

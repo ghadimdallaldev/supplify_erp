@@ -32,6 +32,8 @@ export const config = {
   KEYCLOAK_REALM: process.env.KEYCLOAK_REALM || 'Supplify',
   KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID || 'supplify-api',
   KEYCLOAK_CLIENT_SECRET: process.env.KEYCLOAK_CLIENT_SECRET || 'changeme',
+  KEYCLOAK_ADMIN: process.env.KEYCLOAK_ADMIN || 'admin',
+  KEYCLOAK_ADMIN_PASSWORD: process.env.KEYCLOAK_ADMIN_PASSWORD || '',
   SESSION_SECRET: process.env.SESSION_SECRET || 'supersecret',
   /** Secret for signing impersonation tokens (defaults to SESSION_SECRET). */
   IMPERSONATION_SECRET:

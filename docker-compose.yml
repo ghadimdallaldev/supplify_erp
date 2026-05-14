@@ -129,30 +129,14 @@ services:
     container_name: supplify-keycloak-init
     entrypoint:
       - /bin/bash
-      - -ec
-      - |
-        echo "Waiting for Keycloak..."
-        for i in $$(seq 1 90); do
-          if /opt/keycloak/bin/kcadm.sh config credentials \
-            --server http://keycloak:8080 \
-            --realm master \
-            --user "$${KEYCLOAK_ADMIN}" \
-            --password "$${KEYCLOAK_ADMIN_PASSWORD}" >/dev/null 2>&1; then
-            break
-          fi
-          sleep 2
-        done
-        if /opt/keycloak/bin/kcadm.sh get realms/Supplify >/dev/null 2>&1; then
-          echo "Realm Supplify already exists"
-          exit 0
-        fi
-        /opt/keycloak/bin/kcadm.sh create realms -f /import/realm-export.json
-        echo "Realm Supplify created"
+      - /scripts/keycloak-init.sh
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
     volumes:
       - ./infra/keycloak/realm-export.json:/import/realm-export.json:ro
+      - ./deploy/scripts/keycloak-init.sh:/scripts/keycloak-init.sh:ro
     depends_on:
       keycloak:
         condition: service_started

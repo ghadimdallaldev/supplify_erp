@@ -717,9 +717,18 @@ router.get('/:id', requireAuth, async (req, res, next) => {
       SELECT 
         o.*,
         r.name as restaurant_name,
-        r.slug as restaurant_slug
+        r.slug as restaurant_slug,
+        r.address_json as restaurant_address,
+        r.delivery_instructions as restaurant_delivery_instructions,
+        r.phone as restaurant_phone,
+        r.operating_hours as restaurant_operating_hours,
+        b.name as branch_name,
+        b.address_json as branch_address,
+        b.delivery_instructions as branch_delivery_instructions,
+        b.phone as branch_phone
       FROM customer_order o
       JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN branch b ON b.id = o.branch_id
       WHERE o.id = $1
     `,
       [id]
@@ -791,10 +800,20 @@ router.get('/:id', requireAuth, async (req, res, next) => {
         p.name as product_name,
         p.sku as product_sku,
         s.name as supplier_name,
-        s.slug as supplier_slug
+        s.slug as supplier_slug,
+        pick.location_code
       FROM order_item oi
       JOIN product p ON p.id = oi.product_id
       JOIN supplier s ON s.id = oi.supplier_id
+      LEFT JOIN LATERAL (
+        SELECT pli.location_code
+        FROM pick_list pl
+        JOIN pick_list_item pli ON pli.pick_list_id = pl.id
+        WHERE pl.order_id = oi.order_id
+          AND pli.product_id = oi.product_id
+        ORDER BY pl.created_at DESC
+        LIMIT 1
+      ) pick ON true
       WHERE oi.order_id = $1
       ORDER BY s.name, p.name
     `,

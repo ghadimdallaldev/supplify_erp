@@ -315,6 +315,23 @@ export async function getAuthorizationUrl(redirectUri, state) {
   return `${authorizationEndpoint}?${params.toString()}`
 }
 
+/** Keycloak hosted registration (same OAuth redirect as login, via /registrations). */
+export async function getRegistrationUrl(redirectUri, state) {
+  const { KEYCLOAK_PUBLIC_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID } = getKeycloakValues()
+
+  const registrationEndpoint = `${KEYCLOAK_PUBLIC_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/registrations`
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: KEYCLOAK_CLIENT_ID,
+    redirect_uri: redirectUri,
+    scope: 'openid profile email',
+    state,
+  })
+
+  return `${registrationEndpoint}?${params.toString()}`
+}
+
 /**
  * Build Keycloak end_session (logout) URL so the user's browser is redirected there
  * to clear Keycloak's SSO session. After logout, Keycloak redirects to postLogoutRedirectUri.

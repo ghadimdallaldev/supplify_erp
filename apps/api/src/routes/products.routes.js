@@ -5,6 +5,7 @@ import {
   resolveTenantContext,
   resolveAdminContext,
   requirePermission,
+  getRequestTenant,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -92,12 +93,28 @@ const productListSchema = z.object({
 // Get product categories
 router.get('/categories', async (req, res) => {
   try {
-    const { rows: categories } = await query(`
-      SELECT id, name, slug, description, display_order
-      FROM product_category
-      WHERE is_active = true
-      ORDER BY display_order, name
-    `)
+    const tenant = await getRequestTenant(req)
+    const supplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
+
+    const { rows: categories } = await query(
+      `
+      SELECT
+        pc.id,
+        pc.name,
+        pc.slug,
+        pc.description,
+        pc.display_order,
+        COUNT(p.id)::int AS product_count
+      FROM product_category pc
+      LEFT JOIN product p ON p.category_id = pc.id
+        AND ($1::uuid IS NULL OR p.supplier_id = $1)
+      WHERE pc.is_active = true
+      GROUP BY pc.id
+      HAVING ($1::uuid IS NULL OR COUNT(p.id) > 0)
+      ORDER BY product_count DESC, pc.display_order, pc.name
+      `,
+      [supplierId]
+    )
 
     return res.json({ ok: true, data: { categories }, error: null, requestId: req.requestId })
   } catch (error) {

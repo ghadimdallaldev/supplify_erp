@@ -1,0 +1,114 @@
+import express from 'express'
+import { z } from 'zod'
+import { requireAuth } from '../lib/rbac.js'
+import { completeTenantRegistration, userNeedsTenantSetup } from '../lib/register-account.js'
+import { logger } from '../lib/logger.js'
+import { ValidationError } from '../middlewares/errorHandler.js'
+
+const router = express.Router()
+
+const completeSchema = z.object({
+  accountType: z.enum(['RESTAURANT', 'SUPPLIER']),
+  businessName: z.string().min(2).max(200),
+  phone: z.string().max(30).optional(),
+})
+
+router.get('/status', requireAuth, async (req, res) => {
+  try {
+    const needsSetup = await userNeedsTenantSetup(req.userData)
+    res.json({
+      ok: true,
+      data: { needsSetup },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Register status error', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to check registration status' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/complete', requireAuth, async (req, res) => {
+  try {
+    const body = completeSchema.parse(req.body)
+    const user = req.userData
+
+    const needsSetup = await userNeedsTenantSetup(user)
+    if (!needsSetup) {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: { name: 'CONFLICT', message: 'Organization profile is already set up' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { tenant, tenantType } = await completeTenantRegistration({
+      userId: user.id,
+      keycloakSub: user.keycloak_sub,
+      email: user.email,
+      accountType: body.accountType,
+      businessName: body.businessName,
+      phone: body.phone,
+    })
+
+    logger.info('Tenant registration completed', {
+      userId: user.id,
+      tenantType,
+      tenantId: tenant.id,
+    })
+
+    res.status(201).json({
+      ok: true,
+      data: {
+        tenantType,
+        tenant,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Invalid registration data',
+          details: error.errors,
+        },
+        requestId: req.requestId,
+      })
+    }
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    if (error.name === 'ConflictError') {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: { name: 'CONFLICT', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Register complete error', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to complete registration' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+export { router as registerRoutes }

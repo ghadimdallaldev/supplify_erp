@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useGetMeQuery } from '../services/api'
+import { useGetMeQuery, useGetRegisterStatusQuery } from '../services/api'
 import { useAppDispatch } from '../hooks/redux'
 import { setUser, clearUser, setLoading } from '../features/auth/authSlice'
 import type { ReactNode } from 'react'
@@ -16,7 +16,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const { data, error, isLoading } = useGetMeQuery(undefined, {
     refetchOnMountOrArgChange: false,
     refetchOnFocus: false,
-    refetchOnReconnect: true, // Only refetch on reconnect
+    refetchOnReconnect: true,
+  })
+  const { data: registerStatus } = useGetRegisterStatusQuery(undefined, {
+    skip: !data,
   })
 
   useEffect(() => {
@@ -29,8 +32,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
     } else if (data) {
       dispatch(setUser(data))
       dispatch(setLoading(false))
+      if (registerStatus?.needsSetup) {
+        navigate('/register/complete')
+      }
     }
-  }, [data, error, isLoading, dispatch, navigate])
+  }, [data, error, isLoading, registerStatus, dispatch, navigate])
 
   if (isLoading) {
     return (

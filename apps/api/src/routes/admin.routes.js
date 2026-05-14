@@ -140,6 +140,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         { rows: pendingOrders },
         { rows: completedOrders },
         { rows: totalRevenue },
+        { rows: totalRestaurants },
       ] = await Promise.all([
         query('SELECT COUNT(*) as count FROM product WHERE supplier_id = $1', [supplierId]),
         query('SELECT COUNT(*) as count FROM order_item WHERE supplier_id = $1', [supplierId]),
@@ -170,6 +171,15 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         `,
           [supplierId]
         ),
+        query(
+          `
+          SELECT COUNT(DISTINCT o.restaurant_id) as count
+          FROM order_item oi
+          JOIN customer_order o ON o.id = oi.order_id
+          WHERE oi.supplier_id = $1
+        `,
+          [supplierId]
+        ),
       ])
       stats = {
         totalProducts: parseInt(totalProducts[0].count),
@@ -177,6 +187,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         pendingOrders: parseInt(pendingOrders[0].count),
         completedOrders: parseInt(completedOrders[0].count),
         totalRevenue: parseFloat(totalRevenue[0].total),
+        totalRestaurants: parseInt(totalRestaurants[0].count),
       }
     } else if (tenant?.tenantType === 'RESTAURANT') {
       const restaurantId = tenant.tenantId

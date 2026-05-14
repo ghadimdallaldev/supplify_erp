@@ -120,40 +120,10 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
     entrypoint:
       - /bin/bash
-      - -ec
-      - |
-        echo "Waiting for Keycloak admin API..."
-        for i in $$(seq 1 90); do
-          if /opt/keycloak/bin/kcadm.sh config credentials \
-            --server http://keycloak:8080 \
-            --realm master \
-            --user "$${KEYCLOAK_ADMIN}" \
-            --password "$${KEYCLOAK_ADMIN_PASSWORD}" >/dev/null 2>&1; then
-            echo "Keycloak ready"
-            break
-          fi
-          [ "$$i" -eq 90 ] && { echo "Timeout waiting for Keycloak"; exit 1; }
-          sleep 2
-        done
-        if /opt/keycloak/bin/kcadm.sh get realms/Supplify >/dev/null 2>&1; then
-          echo "Realm Supplify already exists"
-        else
-          /opt/keycloak/bin/kcadm.sh create realms -f /import/realm-export.json
-          echo "Realm Supplify created"
-        fi
-        if [ -n "$${PUBLIC_URL:-}" ] && [ "$${PUBLIC_URL}" != "http://localhost" ]; then
-          CLIENT_UUID=$$(/opt/keycloak/bin/kcadm.sh get clients -r Supplify \
-            -q clientId=supplify-web --fields id 2>/dev/null | \
-            sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p' | head -1)
-          if [ -n "$$CLIENT_UUID" ]; then
-            /opt/keycloak/bin/kcadm.sh update "clients/$${CLIENT_UUID}" -r Supplify \
-              -s "redirectUris=[\"$${PUBLIC_URL}/*\",\"http://localhost/*\",\"http://localhost:5173/*\"]" \
-              -s "webOrigins=[\"$${PUBLIC_URL}\",\"http://localhost\",\"http://localhost:5173\"]"
-            echo "Updated Keycloak redirect URIs for $${PUBLIC_URL}"
-          fi
-        fi
+      - /scripts/keycloak-init.sh
     volumes:
       - ../infra/keycloak/realm-export.json:/import/realm-export.json:ro
+      - ./scripts/keycloak-init.sh:/scripts/keycloak-init.sh:ro
     depends_on:
       keycloak:
         condition: service_started

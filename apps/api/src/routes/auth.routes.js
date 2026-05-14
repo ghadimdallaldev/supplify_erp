@@ -1,12 +1,14 @@
 import express from 'express'
 import {
   getAuthorizationUrl,
+  getRegistrationUrl,
   exchangeCodeForTokens,
   getUserInfo,
   revokeToken,
   refreshAccessToken,
   getKeycloakLogoutUrl,
 } from '../lib/auth.js'
+import { userNeedsTenantSetup } from '../lib/register-account.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
 import { clearImpersonationCookie } from '../lib/impersonation.js'
@@ -50,6 +52,31 @@ router.get('/login', async (req, res) => {
         name: 'INTERNAL_ERROR',
         message: 'Login failed',
       },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// Redirect to Keycloak self-registration (hosted signup form)
+router.get('/register', async (req, res) => {
+  try {
+    const state = randomBytes(32).toString('hex')
+    req.session.oauthState = state
+    req.session.save((err) => {
+      if (err) logger.error('Error saving session', { error: err.message })
+    })
+
+    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`
+    const registrationUrl = await getRegistrationUrl(redirectUri, state)
+
+    logger.info('Registration initiated')
+    res.redirect(registrationUrl)
+  } catch (error) {
+    logger.error('Registration redirect error', { error: error.message })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Registration redirect failed' },
       requestId: req.requestId,
     })
   }
@@ -112,8 +139,9 @@ router.get('/callback', async (req, res) => {
 
     logger.info('User authenticated', { userId: user.id, role: user.role })
 
-    // Redirect to application
-    const redirectUrl = `${process.env.WEB_ORIGIN || 'http://localhost:5173'}/app`
+    const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+    const needsSetup = await userNeedsTenantSetup(user)
+    const redirectUrl = needsSetup ? `${webOrigin}/register/complete` : `${webOrigin}/app`
     res.redirect(redirectUrl)
   } catch (error) {
     logger.error('Callback error', { error: error.message })

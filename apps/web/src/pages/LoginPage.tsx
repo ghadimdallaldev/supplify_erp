@@ -35,6 +35,11 @@ export function LoginPage() {
     window.location.href = `${API_URL}/auth/login`
   }
 
+  const handleSignup = () => {
+    setIsLoading(true)
+    window.location.href = `${API_URL}/auth/register`
+  }
+
   const features = [
     { icon: ShoppingCart, title: 'Order Management', desc: 'Streamlined ordering process' },
     { icon: Truck, title: 'Fulfillment', desc: 'Track deliveries in real-time' },
@@ -159,6 +164,18 @@ export function LoginPage() {
                   </>
                 )}
               </Button>
+
+              <p className="text-center text-sm text-muted-foreground">
+                Don&apos;t have an account?{' '}
+                <button
+                  type="button"
+                  onClick={handleSignup}
+                  disabled={isLoading}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Create account
+                </button>
+              </p>
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
