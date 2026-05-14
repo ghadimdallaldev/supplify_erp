@@ -11,6 +11,7 @@ import { logger } from './lib/logger.js'
 import { pool } from './lib/db.js'
 import { requestContext } from './middlewares/requestContext.js'
 import { impersonationContext } from './middlewares/impersonationContext.js'
+import { activeTenantContext } from './middlewares/activeTenantContext.js'
 import { errorHandler } from './middlewares/errorHandler.js'
 import { csrfProtection } from './middlewares/csrf.js'
 import { initializeSocket } from './lib/socket.js'
@@ -160,6 +161,7 @@ app.use(requestContext)
 
 // Impersonation: read signed cookie and set req.impersonationContext when admin is "viewing as" a tenant
 app.use(impersonationContext)
+app.use(activeTenantContext)
 
 // CSRF protection for state-changing operations (skip for public APIs)
 const csrfBypassPrefixes = ['/api/public']

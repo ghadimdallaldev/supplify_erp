@@ -1,107 +1,121 @@
 import express from 'express'
-const router = express.Router()
 import {
   requireAuth,
   requireRole,
   getRestaurantIdForRequest,
+  getSupplierIdForRequest,
   resolveTenantContext,
   requirePermission,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { checkBranchLimit, createAuditLog } from '../lib/plan-enforcement.js'
+import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
 import { requireFeature } from '../lib/subscription.js'
+import {
+  listLinkedAccounts,
+  createLinkedBranchAccount,
+  removeLinkedBranchAccount,
+} from '../lib/linked-accounts.js'
+import {
+  createActiveTenantToken,
+  getActiveTenantCookieName,
+  getPrimaryTenantForUser,
+  userCanAccessTenant,
+} from '../lib/tenant-switch.js'
+import { config } from '../config/env.js'
+
+const router = express.Router()
 
 router.use(requireAuth, resolveTenantContext, requirePermission('SETTINGS_VIEW'))
 
+async function resolveParentTenant(req) {
+  if (req.userData.role === 'ADMIN') {
+    const restaurantId = req.query.restaurant_id
+    const supplierId = req.query.supplier_id
+    if (restaurantId) return { parentId: restaurantId, parentType: 'RESTAURANT' }
+    if (supplierId) return { parentId: supplierId, parentType: 'SUPPLIER' }
+    return null
+  }
+
+  const restaurantId = await getRestaurantIdForRequest(req)
+  if (restaurantId) return { parentId: restaurantId, parentType: 'RESTAURANT' }
+
+  const supplierId = await getSupplierIdForRequest(req)
+  if (supplierId) return { parentId: supplierId, parentType: 'SUPPLIER' }
+
+  return null
+}
+
 /**
  * GET /api/branches
- * Get all branches for authenticated restaurant
+ * List primary account + linked branch accounts (each branch is its own tenant).
  */
-router.get(
-  '/',
-  requireRole(['RESTAURANT', 'ADMIN']),
-  requireFeature(
-    'multi_branch',
-    (req) => req.tenantContext?.tenantId,
-    (req) => req.tenantContext?.tenantType
-  ),
-  async (req, res) => {
-    try {
-      const restaurantId =
-        (await getRestaurantIdForRequest(req)) ||
-        (req.userData.role === 'ADMIN' ? req.query.restaurant_id : null)
-
-      if (!restaurantId) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: { name: 'BAD_REQUEST', message: 'Restaurant ID required' },
-          requestId: req.requestId,
-        })
-      }
-
-      const { rows: branches } = await query(
-        `
-      SELECT * FROM branch 
-      WHERE tenant_id = $1 
-      ORDER BY created_at DESC
-    `,
-        [restaurantId]
-      )
-
-      res.json({
-        ok: true,
-        data: { branches },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Get branches error:', error)
-      res.status(500).json({
+router.get('/', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
+  try {
+    const parent = await resolveParentTenant(req)
+    if (!parent) {
+      return res.status(400).json({
         ok: false,
         data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to get branches' },
+        error: { name: 'BAD_REQUEST', message: 'Tenant context required' },
         requestId: req.requestId,
       })
     }
+
+    const { primary, linked } = await listLinkedAccounts(parent.parentId, parent.parentType)
+    const activeTenantId = req.activeTenantContext?.tenantId || req.tenantContext?.tenantId || primary?.id
+
+    res.json({
+      ok: true,
+      data: {
+        accounts: primary ? [{ ...primary, tenantType: parent.parentType }, ...linked] : linked,
+        branches: linked,
+        primaryAccountId: primary?.id ?? null,
+        activeAccountId: activeTenantId,
+        tenantType: parent.parentType,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get linked accounts error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get branch accounts' },
+      requestId: req.requestId,
+    })
   }
-)
+})
 
 /**
  * POST /api/branches
- * Create a new branch
+ * Create a new linked branch account (separate restaurant/supplier tenant).
  */
 router.post(
   '/',
-  requireAuth,
-  requireRole(['RESTAURANT']),
+  requireRole(['RESTAURANT', 'SUPPLIER']),
   requireFeature(
     'multi_branch',
     (req) => req.tenantContext?.tenantId,
-    (req) => req.tenantContext?.tenantType
+    (req) => req.tenantContext?.tenantType,
   ),
   async (req, res) => {
     try {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        return res.status(404).json({
+      const parent = await resolveParentTenant(req)
+      if (!parent) {
+        return res.status(400).json({
           ok: false,
           data: null,
-          error: { name: 'NOT_FOUND', message: 'Restaurant not found' },
+          error: { name: 'BAD_REQUEST', message: 'Tenant context required' },
           requestId: req.requestId,
         })
       }
 
-      const restaurantId = restaurants[0].id
+      const primary = await getPrimaryTenantForUser(req.userData.email, parent.parentType)
+      const parentId = primary?.id || parent.parentId
 
-      // Check plan limits
-      const limitCheck = await checkBranchLimit(restaurantId)
-
+      const limitCheck = await checkLinkedAccountLimit(parentId, parent.parentType)
       if (!limitCheck.allowed) {
         return res.status(403).json({
           ok: false,
@@ -109,161 +123,187 @@ router.post(
           error: {
             name: 'BRANCH_LIMIT_REACHED',
             message: limitCheck.reason,
-            details: {
-              currentPlan: limitCheck.currentPlan,
-              requiredPlan: limitCheck.requiredPlan,
-              limit: limitCheck.limit,
-              current: limitCheck.current,
-            },
+            details: limitCheck,
           },
           requestId: req.requestId,
         })
       }
 
-      // Create branch
-      const { name, code, address, contact_name, contact_email, contact_phone } = req.body
-
-      const { rows: newBranch } = await query(
-        `
-      INSERT INTO branch (tenant_id, name, code, address, contact_name, contact_email, contact_phone)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *
-    `,
-        [
-          restaurantId,
-          name,
-          code || null,
-          address || null,
-          contact_name || null,
-          contact_email || null,
-          contact_phone || null,
-        ]
-      )
-
-      // Create audit log
-      await createAuditLog('CREATE_BRANCH', {
-        entityType: 'BRANCH',
-        entityId: newBranch[0].id,
-        description: `Created branch: ${name}`,
-        changes: { name, code, address },
-      })
-
-      res.status(201).json({
-        ok: true,
-        data: { branch: newBranch[0] },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Create branch error:', error)
-
-      if (error.code === '23505') {
-        // Unique violation
-        return res.status(409).json({
+      const { name, phone, address, contact_phone } = req.body
+      const branchName = name || req.body.branchName
+      if (!branchName) {
+        return res.status(400).json({
           ok: false,
           data: null,
-          error: { name: 'DUPLICATE', message: 'Branch with this code already exists' },
+          error: { name: 'VALIDATION_ERROR', message: 'Branch name is required' },
           requestId: req.requestId,
         })
       }
 
+      const tenant = await createLinkedBranchAccount({
+        parentTenantId: parentId,
+        parentTenantType: parent.parentType,
+        userId: req.userData.id,
+        ownerEmail: req.userData.email,
+        branchName,
+        phone: phone || contact_phone || null,
+        address: typeof address === 'string' ? { street: address } : address || null,
+      })
+
+      await createAuditLog('CREATE_BRANCH_ACCOUNT', {
+        entityType: parent.parentType,
+        entityId: tenant.id,
+        description: `Created linked branch account: ${branchName}`,
+        changes: { branchName, parentId },
+      })
+
+      res.status(201).json({
+        ok: true,
+        data: { branch: tenant, account: tenant },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Create linked branch account error:', error)
       res.status(500).json({
         ok: false,
         data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to create branch' },
+        error: { name: 'INTERNAL_ERROR', message: error.message || 'Failed to create branch account' },
         requestId: req.requestId,
       })
     }
-  }
+  },
 )
 
 /**
- * PUT /api/branches/:id
- * Update a branch
+ * POST /api/branches/switch
+ * Switch active tenant context (primary or linked branch account).
  */
-router.put('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.post('/switch', requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res) => {
   try {
-    const branchId = req.params.id
-    const { name, address, contact_name, contact_email, contact_phone, is_active } = req.body
+    const { tenantId, tenantType } = req.body
+    const roleType = req.userData.role
 
-    const { rows: updatedBranch } = await query(
-      `
-      UPDATE branch 
-      SET name = COALESCE($1, name),
-          address = COALESCE($2, address),
-          contact_name = COALESCE($3, contact_name),
-          contact_email = COALESCE($4, contact_email),
-          contact_phone = COALESCE($5, contact_phone),
-          is_active = COALESCE($6, is_active),
-          updated_at = now()
-      WHERE id = $7
-      RETURNING *
-    `,
-      [name, address, contact_name, contact_email, contact_phone, is_active, branchId]
-    )
-
-    if (updatedBranch.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+    if (!tenantId) {
+      res.clearCookie(getActiveTenantCookieName(), {
+        path: '/',
+        httpOnly: true,
+        secure: config.NODE_ENV === 'production',
+        sameSite: 'lax',
+      })
+      return res.json({
+        ok: true,
+        data: { activeAccountId: null, cleared: true },
+        error: null,
         requestId: req.requestId,
       })
     }
 
+    const resolvedType = tenantType || roleType
+    const allowed = await userCanAccessTenant(
+      req.userData.id,
+      req.userData.email,
+      tenantId,
+      resolvedType,
+    )
+    if (!allowed) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'You do not have access to this account' },
+        requestId: req.requestId,
+      })
+    }
+
+    const table = resolvedType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+    const { rows } = await query(`SELECT id, name FROM ${table} WHERE id = $1`, [tenantId])
+    if (!rows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Account not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const token = await createActiveTenantToken({
+      userId: req.userData.id,
+      tenantId,
+      tenantType: resolvedType,
+      tenantName: rows[0].name,
+    })
+
+    res.cookie(getActiveTenantCookieName(), token, {
+      httpOnly: true,
+      secure: config.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
+    })
+
     res.json({
       ok: true,
-      data: { branch: updatedBranch[0] },
+      data: { activeAccountId: tenantId, tenantName: rows[0].name, tenantType: resolvedType },
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
-    logger.error('Update branch error:', error)
+    logger.error('Switch branch account error:', error)
     res.status(500).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to update branch' },
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to switch account' },
       requestId: req.requestId,
     })
   }
 })
 
 /**
- * DELETE /api/branches/:id
- * Delete a branch
+ * DELETE /api/branches/:childTenantId
+ * Unlink a branch account from the parent (does not delete tenant data).
  */
-router.delete('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.delete('/:childTenantId', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
-    const branchId = req.params.id
+    const parent = await resolveParentTenant(req)
+    if (!parent) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'BAD_REQUEST', message: 'Tenant context required' },
+        requestId: req.requestId,
+      })
+    }
 
-    const { rows: deletedBranch } = await query(
-      `
-      DELETE FROM branch WHERE id = $1 RETURNING *
-    `,
-      [branchId]
-    )
+    const primary = await getPrimaryTenantForUser(req.userData.email, parent.parentType)
+    const parentId = primary?.id || parent.parentId
 
-    if (deletedBranch.length === 0) {
+    const removed = await removeLinkedBranchAccount({
+      parentTenantId: parentId,
+      parentTenantType: parent.parentType,
+      childTenantId: req.params.childTenantId,
+    })
+
+    if (!removed) {
       return res.status(404).json({
         ok: false,
         data: null,
-        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+        error: { name: 'NOT_FOUND', message: 'Linked branch account not found' },
         requestId: req.requestId,
       })
     }
 
     res.json({
       ok: true,
-      data: { branch: deletedBranch[0] },
+      data: { removed: true, childTenantId: req.params.childTenantId },
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
-    logger.error('Delete branch error:', error)
+    logger.error('Delete linked branch account error:', error)
     res.status(500).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to delete branch' },
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to remove branch account' },
       requestId: req.requestId,
     })
   }

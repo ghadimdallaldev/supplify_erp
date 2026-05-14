@@ -72,10 +72,25 @@ export const reservationsApi = api.injectEndpoints({
       query: ({ range, branchId }) => ({
         url: '/api/reservations/analytics',
         params: {
-          period: range,
+          range,
           branchId,
         },
       }),
+    }),
+    getGuestIntelligence: build.query<
+      {
+        recentGuests: Array<Record<string, unknown>>
+        repeatGuests: Array<Record<string, unknown>>
+        vipGuests: Array<Record<string, unknown>>
+        followUps: Array<Record<string, unknown>>
+      },
+      { branchId?: string }
+    >({
+      query: ({ branchId }) => ({
+        url: '/api/reservations/guest-intelligence',
+        params: { branchId },
+      }),
+      providesTags: [{ type: 'Reservation' as const, id: 'GUESTS' }],
     }),
   }),
   overrideExisting: false,
@@ -87,4 +102,5 @@ export const {
   useCreateReservationMutation,
   useUpdateReservationStatusMutation,
   useGetReservationAnalyticsQuery,
+  useGetGuestIntelligenceQuery,
 } = reservationsApi

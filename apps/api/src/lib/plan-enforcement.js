@@ -34,11 +34,12 @@ async function checkBranchLimit(tenantId, currentUsage = null) {
     const limits = subscription.plan_limits || {};
     const branchLimit = limits.branches !== undefined ? parseInt(limits.branches) : -1;
 
-    // Get current branch count
+    // Get current linked branch account count (each branch is a separate tenant)
     let branchCount = currentUsage?.branches_count;
     if (branchCount === undefined || branchCount === null) {
       const { rows: countRows } = await query(`
-        SELECT COUNT(*) as count FROM branch WHERE tenant_id = $1 AND is_active = TRUE
+        SELECT COUNT(*) as count FROM tenant_account_link
+        WHERE parent_tenant_id = $1 AND parent_tenant_type = 'RESTAURANT'
       `, [tenantId]);
       branchCount = parseInt(countRows[0]?.count || 0);
     }
@@ -172,6 +173,89 @@ async function checkWarehouseLimit(tenantId, currentUsage = null) {
   }
 }
 
+/** Linked branch accounts for suppliers (same model as restaurant branches). */
+async function checkLinkedAccountLimit(tenantId, tenantType, currentUsage = null) {
+  if (tenantType === 'RESTAURANT') {
+    return checkBranchLimit(tenantId, currentUsage);
+  }
+
+  try {
+    const { rows: subscriptionRows } = await query(`
+      SELECT s.*, sp.limits as plan_limits, sp.code as plan_code, sp.name as plan_name
+      FROM subscription s
+      JOIN subscription_plan sp ON sp.id = s.plan_id
+      WHERE s.tenant_id = $1 
+        AND s.tenant_type = 'SUPPLIER'
+        AND s.status IN ('ACTIVE', 'TRIALING')
+      ORDER BY s.created_at DESC
+      LIMIT 1
+    `, [tenantId]);
+
+    if (subscriptionRows.length === 0) {
+      return {
+        allowed: false,
+        reason: 'No active subscription found. Please subscribe to a plan.',
+        currentPlan: 'None',
+      };
+    }
+
+    const subscription = subscriptionRows[0];
+    const limits = subscription.plan_limits || {};
+    const branchLimit = limits.branches !== undefined
+      ? parseInt(limits.branches, 10)
+      : limits.warehouses !== undefined
+        ? parseInt(limits.warehouses, 10)
+        : 0;
+
+    let branchCount = currentUsage?.branches_count;
+    if (branchCount === undefined || branchCount === null) {
+      const { rows: countRows } = await query(`
+        SELECT COUNT(*) as count FROM tenant_account_link
+        WHERE parent_tenant_id = $1 AND parent_tenant_type = 'SUPPLIER'
+      `, [tenantId]);
+      branchCount = parseInt(countRows[0]?.count || 0, 10);
+    }
+
+    if (branchLimit === -1) {
+      return { allowed: true, reason: null, currentPlan: subscription.plan_name, limit: -1, current: branchCount };
+    }
+
+    if (branchLimit === 0 || !limits.multi_branch) {
+      return {
+        allowed: false,
+        reason: 'Branch accounts are not available on your current plan. Upgrade to add locations.',
+        currentPlan: subscription.plan_name,
+        requiredPlan: 'Gold',
+        limit: branchLimit,
+        current: branchCount,
+      };
+    }
+
+    if (branchCount < branchLimit) {
+      return {
+        allowed: true,
+        reason: null,
+        currentPlan: subscription.plan_name,
+        limit: branchLimit,
+        current: branchCount,
+        remaining: branchLimit - branchCount,
+      };
+    }
+
+    return {
+      allowed: false,
+      reason: `Branch account limit reached. You have ${branchCount}/${branchLimit} on ${subscription.plan_name}.`,
+      currentPlan: subscription.plan_name,
+      requiredPlan: 'Gold',
+      limit: branchLimit,
+      current: branchCount,
+    };
+  } catch (error) {
+    logger.error('Error checking linked account limit:', error);
+    return { allowed: false, reason: 'Unable to verify plan limits. Please try again.', error: error.message };
+  }
+}
+
 /**
  * Create audit log entry (uses admin_audit_log columns: old_value, new_value, metadata)
  */
@@ -199,6 +283,7 @@ async function createAuditLog(action, details) {
 export {
   checkBranchLimit,
   checkWarehouseLimit,
+  checkLinkedAccountLimit,
   createAuditLog
 };
 

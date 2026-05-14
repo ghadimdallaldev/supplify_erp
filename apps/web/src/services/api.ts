@@ -141,6 +141,7 @@ export const api = createApi({
     'Receiving',
     'RestaurantFinance',
     'Notification',
+    'Branch',
     'Subscription',
     'Admin',
     'AdminFeatureFlags',
@@ -889,6 +890,46 @@ export const api = createApi({
     }),
 
     // Notification endpoints
+    getBranches: builder.query<{ branches: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/branches',
+      providesTags: ['Branch'],
+    }),
+    createBranch: builder.mutation<any, Record<string, unknown>>({
+      query: (body) => ({
+        url: '/api/branches',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Branch'],
+    }),
+    updateBranch: builder.mutation<any, { id: string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({
+        url: `/api/branches/${id}`,
+        method: 'PUT',
+        body: data,
+      }),
+      invalidatesTags: ['Branch'],
+    }),
+    deleteBranch: builder.mutation<any, string>({
+      query: (id) => ({
+        url: `/api/branches/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Branch'],
+    }),
+    switchBranchAccount: builder.mutation<
+      { activeAccountId: string | null; tenantName?: string },
+      { tenantId: string | null; tenantType?: string }
+    >({
+      query: (body) => ({
+        url: '/api/branches/switch',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Branch', 'Restaurant', 'Supplier', 'Order', 'Reservation', 'Notification'],
+    }),
+
+    // Notification endpoints
     getNotifications: builder.query<any, any>({
       query: (params) => ({
         url: '/api/notifications',
@@ -1528,6 +1569,11 @@ export const {
   useGetNotificationsQuery,
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
+  useGetBranchesQuery,
+  useCreateBranchMutation,
+  useUpdateBranchMutation,
+  useDeleteBranchMutation,
+  useSwitchBranchAccountMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
   useGetPublicRestaurantsQuery,

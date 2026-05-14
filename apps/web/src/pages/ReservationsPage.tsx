@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   useGetReservationBoardQuery,
   useGetReservationAnalyticsQuery,
+  useGetGuestIntelligenceQuery,
 } from '../services/reservationsApi'
 import { useGetRestaurantMeQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -10,10 +11,11 @@ import { ReservationBoard } from '../components/reservations/ReservationBoard'
 import { ReservationTableBuilder } from '../components/reservations/ReservationTableBuilder'
 import { ReservationAnalyticsPanel } from '../components/reservations/ReservationAnalyticsPanel'
 import { ReservationCreateDrawer } from '../components/reservations/ReservationCreateDrawer'
-import { CalendarDays, Loader2, Link2, Copy } from 'lucide-react'
+import { CalendarDays, Loader2, Link2, Copy, Star, Users, Sparkles } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { toast } from 'react-hot-toast'
+import { copyToClipboard } from '../utils/clipboard'
 
 export function ReservationsPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -27,8 +29,8 @@ export function ReservationsPage() {
   const {
     data: analytics,
     refetch: refetchAnalytics,
-    isLoading: analyticsLoading,
   } = useGetReservationAnalyticsQuery({ range })
+  const { data: guestIntel, isLoading: guestIntelLoading } = useGetGuestIntelligenceQuery({})
   const { data: restaurantMe } = useGetRestaurantMeQuery()
 
   const bookingLink = useMemo(() => {
@@ -36,7 +38,8 @@ export function ReservationsPage() {
     if (!restaurant?.id) return null
     const base = typeof window !== 'undefined' ? window.location.origin : ''
     const segment = restaurant.slug || restaurant.id
-    return `${base}/reserve/${segment}`
+    const branchQuery = ''
+    return `${base}/reserve/${segment}${branchQuery}`
   }, [restaurantMe?.restaurant])
 
   const tables = boardData?.tables ?? []
@@ -70,12 +73,14 @@ export function ReservationsPage() {
     refetchAnalytics()
   }
 
-  const handleCopyBookingLink = () => {
+  const handleCopyBookingLink = async () => {
     if (!bookingLink) return
-    navigator.clipboard.writeText(bookingLink).then(
-      () => toast.success('Booking link copied to clipboard'),
-      () => toast.error('Could not copy link')
-    )
+    const copied = await copyToClipboard(bookingLink)
+    if (copied) {
+      toast.success('Booking link copied to clipboard')
+    } else {
+      toast.error('Could not copy link — try selecting and copying manually')
+    }
   }
 
   return (
@@ -116,7 +121,7 @@ export function ReservationsPage() {
             </CardTitle>
             <CardDescription>
               Share this link so clients can book a table online. They’ll see availability and get a
-              confirmation.
+              confirmation by email or WhatsApp when contact details are provided.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -206,17 +211,82 @@ export function ReservationsPage() {
           <CardHeader>
             <CardTitle>Guest intelligence</CardTitle>
             <CardDescription>
-              Snapshot of recent guests and smart follow-ups (coming soon).
+              Repeat guests, loyalty moments, and smart follow-ups for your location.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-gray-500">
-            <p>We’ll surface repeat guests, loyalty moments, and VIP nudges here.</p>
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-xs text-gray-400">
-              <p>
-                ✨ Heads up: SMS and WhatsApp confirmations trigger automatically for confirmed
-                seats (configure from Settings soon).
-              </p>
-            </div>
+          <CardContent className="space-y-4 text-sm text-gray-600">
+            {guestIntelLoading ? (
+              <div className="flex items-center gap-2 text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading guest insights…
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <Users className="h-4 w-4" />
+                      Recent guests
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">
+                      {guestIntel?.recentGuests?.length ?? 0}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <Sparkles className="h-4 w-4" />
+                      Repeat guests
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">
+                      {guestIntel?.repeatGuests?.length ?? 0}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                      <Star className="h-4 w-4" />
+                      VIP guests
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-amber-900">
+                      {guestIntel?.vipGuests?.length ?? 0}
+                    </p>
+                  </div>
+                </div>
+
+                {(guestIntel?.followUps?.length ?? 0) > 0 ? (
+                  <div className="space-y-2">
+                    <p className="font-medium text-gray-900">Suggested follow-ups</p>
+                    {guestIntel?.followUps?.map((guest, index) => (
+                      <div
+                        key={`${guest.customer_name}-${index}`}
+                        className="flex flex-col gap-1 rounded-xl border border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">{String(guest.customer_name)}</p>
+                          <p className="text-xs text-gray-500">
+                            {Number(guest.visit_count)} visits · last{' '}
+                            {guest.last_visit
+                              ? new Date(String(guest.last_visit)).toLocaleDateString()
+                              : '—'}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="w-fit">
+                          {String(guest.suggestion)}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">
+                    Book more reservations to unlock repeat-guest and VIP insights.
+                  </p>
+                )}
+
+                <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-800">
+                  Email and WhatsApp confirmations are sent automatically for confirmed seats when
+                  guests provide contact details. Configure your channels in Settings → Notifications.
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

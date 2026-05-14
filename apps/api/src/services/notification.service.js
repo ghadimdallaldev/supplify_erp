@@ -1,119 +1,32 @@
 import { query } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
+import { sendMail } from './mailer.service.js';
+import { buildWhatsAppUrl } from '../lib/whatsapp.js';
 
 /**
- * Notification Service
- * Handles sending notifications via email, SMS, push, and in-app
+ * Notification Service — email via nodemailer (SMTP), WhatsApp via wa.me deep links.
  */
 
-// Email service implementation
 const emailService = {
   async send(email, subject, html, text) {
-    logger.info('Email sent', { to: process.env.NODE_ENV === 'development' ? email : '[REDACTED]', subject });
-    
-    // Check if SendGrid is configured
-    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL) {
-      try {
-        // Import SendGrid dynamically (only if installed)
-        const sgMail = await import('@sendgrid/mail').catch(() => null);
-        
-        if (sgMail) {
-          sgMail.default.setApiKey(process.env.SENDGRID_API_KEY);
-          
-          const msg = {
-            to: email,
-            from: process.env.SENDGRID_FROM_EMAIL,
-            subject: subject,
-            text: text,
-            html: html,
-          };
-          
-          await sgMail.default.send(msg);
-          logger.info('Email sent via SendGrid');
-          return true;
-        }
-      } catch (error) {
-        logger.error('SendGrid error', { error: error.message });
-      }
+    if (!email) return false;
+    try {
+      await sendMail({ to: email, subject, text, html });
+      return true;
+    } catch (error) {
+      logger.error('Email send failed', { error: error.message });
+      return false;
     }
-    logger.debug('Email fallback (no SendGrid)', { subject });
-    return true;
-  }
-};
-
-// SMS service implementation
-const smsService = {
-  async send(phone, message) {
-    logger.info('SMS sent', { to: process.env.NODE_ENV === 'development' ? phone : '[REDACTED]' });
-    
-    // Check if Twilio is configured
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
-      try {
-        // Import Twilio dynamically (only if installed)
-        const twilio = await import('twilio').catch(() => null);
-        
-        if (twilio) {
-          const client = twilio.default(
-            process.env.TWILIO_ACCOUNT_SID,
-            process.env.TWILIO_AUTH_TOKEN
-          );
-          
-          await client.messages.create({
-            body: message,
-            to: phone,
-            from: process.env.TWILIO_PHONE_NUMBER,
-          });
-          
-          logger.info('SMS sent via Twilio');
-          return true;
-        }
-      } catch (error) {
-        logger.error('Twilio error', { error: error.message });
-      }
-    }
-    logger.debug('SMS fallback (no Twilio)');
-    return true;
-  }
+  },
 };
 
 const whatsappService = {
-  async send(phone, message) {
-    logger.info('WhatsApp message', { to: process.env.NODE_ENV === 'development' ? phone : '[REDACTED]' });
-
-    if (
-      process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      (process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER)
-    ) {
-      try {
-        const twilio = await import('twilio').catch(() => null);
-
-        if (twilio) {
-          const client = twilio.default(
-            process.env.TWILIO_ACCOUNT_SID,
-            process.env.TWILIO_AUTH_TOKEN
-          );
-
-          const baseFrom = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER;
-          const from = baseFrom.startsWith('whatsapp:') ? baseFrom : `whatsapp:${baseFrom}`;
-          const to = phone.startsWith('whatsapp:') ? phone : `whatsapp:${phone}`;
-
-          await client.messages.create({
-            body: message,
-            to,
-            from,
-          });
-
-          logger.info('WhatsApp message sent via Twilio');
-          return true;
-        }
-      } catch (error) {
-        logger.error('Twilio WhatsApp error', { error: error.message });
-      }
-    }
-    logger.debug('WhatsApp fallback (no Twilio)');
-    return true;
-  }
+  /**
+   * Returns a wa.me URL (does not send server-side). Caller stores link in metadata / in-app UI.
+   */
+  buildLink(phone, message) {
+    return buildWhatsAppUrl(phone, message);
+  },
 };
 
 // Push notifications disabled for now
@@ -121,7 +34,8 @@ const whatsappService = {
 
 const DEFAULT_NOTIFICATION_PREFS = {
   email_enabled: true,
-  sms_enabled: true,
+  sms_enabled: false,
+  whatsapp_enabled: false,
   push_enabled: false,
   in_app_enabled: true,
   notify_order_new: true,
@@ -147,6 +61,51 @@ const DEFAULT_NOTIFICATION_PREFS = {
   notify_staff_document: true,
   notify_scheduled_order: true,
 };
+
+const CATEGORY_PREF_MAP = {
+  placed: 'notify_order_new',
+  acknowledged: 'notify_order_acknowledged',
+  processing: 'notify_order_processing',
+  shipped: 'notify_order_shipped',
+  delivered: 'notify_order_delivered',
+  completed: 'notify_order_delivered',
+  cancelled: 'notify_order_cancelled',
+  order_new: 'notify_order_new',
+  orders: 'notify_order_new',
+  message_received: 'notify_message_received',
+  invoice_issued: 'notify_invoice_issued',
+  invoice_overdue: 'notify_invoice_overdue',
+  payment_received: 'notify_payment_received',
+  low_stock: 'notify_low_stock',
+  inventory_alerts: 'notify_low_stock',
+  out_of_stock: 'notify_out_of_stock',
+  system_updates: 'notify_system_updates',
+  promotions: 'notify_promotions',
+  reservation_created: 'notify_reservation_created',
+  reservation_waitlist: 'notify_reservation_waitlist',
+  staff_pto: 'notify_staff_pto',
+  staff_swap: 'notify_staff_swap',
+  staff_clock: 'notify_staff_clock',
+  staff_announcement: 'notify_staff_announcement',
+  staff_document: 'notify_staff_document',
+  scheduled_order: 'notify_scheduled_order',
+  test: 'notify_system_updates',
+};
+
+function resolvePreferenceKey(notificationCategory) {
+  const normalized = String(notificationCategory || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  if (CATEGORY_PREF_MAP[normalized]) {
+    return CATEGORY_PREF_MAP[normalized];
+  }
+  const directKey = `notify_${normalized}`;
+  if (DEFAULT_NOTIFICATION_PREFS[directKey] !== undefined) {
+    return directKey;
+  }
+  return null;
+}
 
 async function getRestaurantUserContext(restaurantId) {
   const { rows } = await query(
@@ -222,28 +181,66 @@ export async function getUserPreferences(userId, userType) {
 }
 
 /**
- * Get user contact information
+ * Get user contact information (syncs from tenant profile when missing)
  */
 export async function getUserContactInfo(userId, userType) {
-  // userId is the Keycloak user ID from app_user table
-  // We need to get the supplier_id or restaurant_id from app_user email
-  let tableName = userType === 'SUPPLIER' ? 'supplier_contact_info' : 'restaurant_contact_info';
-  let idTable = userType === 'SUPPLIER' ? 'supplier' : 'restaurant';
-  let idColumn = userType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id';
+  const idTable = userType === 'SUPPLIER' ? 'supplier' : 'restaurant';
+  const idColumn = userType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id';
+  const contactTable = userType === 'SUPPLIER' ? 'supplier_contact_info' : 'restaurant_contact_info';
 
-  const { rows } = await query(`
-    SELECT ci.* 
-    FROM ${tableName} ci
-    JOIN ${idTable} s ON s.id = ci.${idColumn}
-    JOIN app_user u ON u.email = s.contact_email
-    WHERE u.id = $1
-  `, [userId]);
+  const { rows: tenantRows } = await query(
+    `
+      SELECT s.id AS tenant_id, s.contact_email AS email, s.phone
+      FROM ${idTable} s
+      JOIN app_user u ON u.email = s.contact_email
+      WHERE u.id = $1
+    `,
+    [userId],
+  );
 
-  return rows[0] || {
-    email: null,
-    phone: null,
-    email_verified: false,
-    phone_verified: false,
+  if (!tenantRows.length) {
+    return {
+      email: null,
+      phone: null,
+      email_verified: false,
+      phone_verified: false,
+    };
+  }
+
+  const tenant = tenantRows[0];
+  const { rows } = await query(
+    `SELECT * FROM ${contactTable} WHERE ${idColumn} = $1`,
+    [tenant.tenant_id],
+  );
+
+  if (rows.length) {
+    return {
+      email: rows[0].email || tenant.email,
+      phone: rows[0].phone || tenant.phone,
+      email_verified: rows[0].email_verified ?? false,
+      phone_verified: rows[0].phone_verified ?? false,
+    };
+  }
+
+  if (tenant.email || tenant.phone) {
+    await query(
+      `
+        INSERT INTO ${contactTable} (${idColumn}, email, phone, email_verified, phone_verified)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (${idColumn}) DO UPDATE
+        SET email = COALESCE(EXCLUDED.email, ${contactTable}.email),
+            phone = COALESCE(EXCLUDED.phone, ${contactTable}.phone),
+            updated_at = now()
+      `,
+      [tenant.tenant_id, tenant.email, tenant.phone, !!tenant.email, !!tenant.phone],
+    );
+  }
+
+  return {
+    email: tenant.email || null,
+    phone: tenant.phone || null,
+    email_verified: !!tenant.email,
+    phone_verified: !!tenant.phone,
   };
 }
 
@@ -266,18 +263,17 @@ export async function sendNotification({
     const prefs = await getUserPreferences(userId, userType);
     const contact = await getUserContactInfo(userId, userType);
 
-    // Determine which channels to send to (push disabled for now)
+    // Determine which channels to send to (push/SMS disabled; WhatsApp preferred for phone)
     const channels = {
       email: prefs.email_enabled && contact?.email,
-      sms: prefs.sms_enabled && contact?.phone,
-      push: false, // Disabled for now
+      whatsapp: prefs.whatsapp_enabled && contact?.phone,
+      sms: false,
+      push: false,
       inApp: prefs.in_app_enabled,
     };
 
-    // Check if this notification type is enabled
-    const notificationKey = `notify_${notificationCategory.toLowerCase()}`;
-    // If the preference key doesn't exist, default to true (send notification)
-    const shouldSend = prefs[notificationKey] !== undefined ? prefs[notificationKey] : true;
+    const preferenceKey = resolvePreferenceKey(notificationCategory);
+    const shouldSend = preferenceKey ? prefs[preferenceKey] !== false : true;
     if (!shouldSend) {
       logger.info('Notification skipped due to user preference', { userId, notificationCategory });
       return null;
@@ -307,7 +303,6 @@ export async function sendNotification({
       !!channels.inApp, // Convert to boolean
     ]);
 
-    // Send via enabled channels
     const results = {
       email: false,
       sms: false,
@@ -315,22 +310,29 @@ export async function sendNotification({
       inApp: true,
     };
 
+    const metadataPayload = metadata && typeof metadata === 'object' ? { ...metadata } : {};
+
     if (channels.email && contact?.email) {
       try {
-        await emailService.send(contact.email, title, null, message);
-        results.email = true;
+        results.email = await emailService.send(contact.email, title, null, message);
       } catch (error) {
         logger.error('Email send failed', { error: error.message });
       }
     }
 
-    if (channels.sms && contact?.phone) {
-      try {
-        await smsService.send(contact.phone, message);
+    if (channels.whatsapp && contact?.phone) {
+      const whatsappUrl = whatsappService.buildLink(contact.phone, message);
+      if (whatsappUrl) {
+        metadataPayload.whatsappUrl = whatsappUrl;
         results.sms = true;
-      } catch (error) {
-        logger.error('SMS send failed', { error: error.message });
       }
+    }
+
+    if (Object.keys(metadataPayload).length) {
+      await query(`UPDATE notification_log SET metadata = $1 WHERE id = $2`, [
+        JSON.stringify(metadataPayload),
+        notification.id,
+      ]);
     }
 
     // Push notifications disabled for now
@@ -416,7 +418,60 @@ export async function sendWhatsAppMessage(phone, message) {
   if (!phone) {
     throw new Error('WhatsApp phone is required');
   }
-  return whatsappService.send(phone, message);
+  return whatsappService.buildLink(phone, message);
+}
+
+function formatReservationTime(scheduledAt) {
+  if (!scheduledAt) return 'your scheduled time';
+  return new Date(scheduledAt).toLocaleString();
+}
+
+/**
+ * Notify a guest about their reservation (email and/or WhatsApp based on contact provided).
+ */
+export async function notifyGuestReservationConfirmation(reservation, restaurantName) {
+  const customerName = reservation.customer_name || reservation.customerName || 'Guest';
+  const customerPhone = reservation.customer_phone || reservation.customerPhone || null;
+  const customerEmail = reservation.customer_email || reservation.customerEmail || null;
+  const partySize = reservation.party_size || reservation.partySize || 0;
+  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt;
+  const status = reservation.status || 'CONFIRMED';
+  const venue = restaurantName || 'the restaurant';
+
+  if (!customerPhone && !customerEmail) {
+    return { email: false, whatsapp: false };
+  }
+
+  const timeLabel = formatReservationTime(scheduledAt);
+  const title =
+    status === 'WAITLIST'
+      ? `Waitlist update at ${venue}`
+      : `Reservation confirmed at ${venue}`;
+  const message =
+    status === 'WAITLIST'
+      ? `Hi ${customerName}, you're on the waitlist at ${venue} for ${partySize} guests around ${timeLabel}. We'll message you when a table opens.`
+      : `Hi ${customerName}, your table for ${partySize} at ${venue} is confirmed for ${timeLabel}. See you soon!`;
+
+  const results = { email: false, whatsapp: false };
+
+  if (customerEmail) {
+    try {
+      await emailService.send(customerEmail, title, null, message);
+      results.email = true;
+    } catch (error) {
+      logger.error('Guest reservation email failed', { error: error.message });
+    }
+  }
+
+  if (customerPhone) {
+    const guestWhatsAppUrl = whatsappService.buildLink(customerPhone, message);
+    if (guestWhatsAppUrl) {
+      results.whatsapp = true;
+      results.whatsappUrl = guestWhatsAppUrl;
+    }
+  }
+
+  return results;
 }
 
 /**

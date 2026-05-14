@@ -31,7 +31,8 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Bell
+  Bell,
+  MessageCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -49,14 +50,18 @@ import {
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
   useGetEntitlementsQuery,
+  useGetBranchesQuery,
+  useCreateBranchMutation,
+  useDeleteBranchMutation,
 } from '../services/api'
+import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
 import { canAddBranches } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch } from '../hooks/redux'
 
 const DEFAULT_NOTIFICATION_PREFS = {
   emailEnabled: true,
-  smsEnabled: false,
+  whatsappEnabled: false,
   inAppEnabled: true,
   notifyOrderNew: true,
   notifyMessageReceived: true,
@@ -77,8 +82,8 @@ interface PreferenceField {
 }
 
 const CHANNEL_FIELDS: PreferenceField[] = [
-  { key: 'emailEnabled', label: 'Email', description: 'Receive alerts via email', icon: Mail },
-  { key: 'smsEnabled', label: 'SMS', description: 'Receive SMS messages', icon: Phone },
+  { key: 'emailEnabled', label: 'Email', description: 'Receive important alerts via email', icon: Mail },
+  { key: 'whatsappEnabled', label: 'WhatsApp', description: 'Receive alerts on WhatsApp (phone required in profile)', icon: MessageCircle },
   { key: 'inAppEnabled', label: 'In-app', description: 'Show alerts inside Supplify', icon: Bell },
 ]
 
@@ -223,17 +228,21 @@ export function RestaurantOnboardingPage() {
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false)
   const [showAddBranchDialog, setShowAddBranchDialog] = useState(false)
   const [teamMembers, setTeamMembers] = useState<any[]>([])
-  const [branches, setBranches] = useState<any[]>([])
   const [newMember, setNewMember] = useState({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
   const [newBranch, setNewBranch] = useState({ name: '', phone: '', address: '', deliveryInstructions: '' })
+
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
+  const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(undefined, { skip: !user?.id })
+  const [createBranch, { isLoading: isCreatingBranch }] = useCreateBranchMutation()
+  const [deleteBranch] = useDeleteBranchMutation()
+  const branches = branchesData?.branches ?? []
   const canAddBranch = canAddBranches(entitlements, branches.length)
   
   // Notification preferences
   const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
   const { data: notificationPrefsData, isLoading: isLoadingPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
   const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
-  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
 
   useEffect(() => {
     const prefs = notificationPrefsData?.preferences
@@ -241,7 +250,7 @@ export function RestaurantOnboardingPage() {
       setNotificationPrefs((previous) => ({
         ...previous,
         emailEnabled: prefs.emailEnabled ?? previous.emailEnabled,
-        smsEnabled: prefs.smsEnabled ?? previous.smsEnabled,
+        whatsappEnabled: prefs.whatsappEnabled ?? prefs.smsEnabled ?? previous.whatsappEnabled,
         inAppEnabled: prefs.inAppEnabled ?? previous.inAppEnabled,
         notifyOrderNew: prefs.notifyOrderNew ?? previous.notifyOrderNew,
         notifyMessageReceived: prefs.notifyMessageReceived ?? previous.notifyMessageReceived,
@@ -268,7 +277,7 @@ export function RestaurantOnboardingPage() {
     toast.success('Team member added!')
   }
 
-  const handleAddBranch = () => {
+  const handleAddBranch = async () => {
     if (!canAddBranch) {
       toast.error('Branches are not included on your current plan. Upgrade to add locations.')
       openBrowseUpgrade(dispatch, {
@@ -281,11 +290,20 @@ export function RestaurantOnboardingPage() {
       toast.error('Please fill in branch name')
       return
     }
-    
-    setBranches([...branches, { ...newBranch, id: Date.now() }])
-    setNewBranch({ name: '', phone: '', address: '', deliveryInstructions: '' })
-    setShowAddBranchDialog(false)
-    toast.success('Branch added!')
+
+    try {
+      await createBranch({
+        name: newBranch.name,
+        contact_phone: newBranch.phone || null,
+        address: newBranch.address ? { street: newBranch.address } : null,
+      }).unwrap()
+      setNewBranch({ name: '', phone: '', address: '', deliveryInstructions: '' })
+      setShowAddBranchDialog(false)
+      refetchBranches()
+      toast.success('Branch added!')
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to add branch')
+    }
   }
 
   const handleToggleNotification = (key: keyof typeof DEFAULT_NOTIFICATION_PREFS) => {
@@ -684,8 +702,11 @@ export function RestaurantOnboardingPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Branches</CardTitle>
-                  <CardDescription>Manage your restaurant branches</CardDescription>
+                  <CardTitle>Branch accounts</CardTitle>
+                  <CardDescription>
+                    Each branch is a separate account with its own orders, inventory, and settings.
+                    Switch between them from the header after creating one.
+                  </CardDescription>
                 </div>
                 <Button
                   disabled={!canAddBranch}
@@ -708,40 +729,49 @@ export function RestaurantOnboardingPage() {
             <CardContent>
               {!canAddBranch && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  Multi-branch is not available on the Free plan. Upgrade to Gold or higher to add
-                  branches.
-                </motion.div>
+                  Multi-branch accounts are not available on the Free plan. Upgrade to Gold or higher to
+                  add separate location accounts.
+                </div>
               )}
               {branches.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
                   <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No branches added yet</p>
-                  <p className="text-sm text-gray-500 mt-2">Add multiple locations for your restaurant</p>
+                  <p className="text-gray-600">No branch accounts yet</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Add a new account for each additional location (paid plans only)
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {branches.map((branch) => (
+                  {branches.map((branch: any) => (
                     <div key={branch.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex-1">
                         <p className="font-medium mb-2">{branch.name}</p>
                         <div className="flex items-center gap-4 text-sm text-gray-600">
-                          {branch.phone && (
+                          {branch.contact_phone && (
                             <span className="flex items-center gap-1">
                               <Phone className="h-3 w-3" />
-                              {branch.phone}
+                              {branch.contact_phone}
                             </span>
                           )}
                           {branch.address && (
                             <span className="flex items-center gap-1">
                               <MapPin className="h-3 w-3" />
-                              {branch.address}
+                              {typeof branch.address === 'string'
+                                ? branch.address
+                                : branch.address?.street || JSON.stringify(branch.address)}
                             </span>
                           )}
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => {
-                        setBranches(branches.filter(b => b.id !== branch.id))
-                        toast.success('Branch removed')
+                      <Button variant="ghost" size="sm" onClick={async () => {
+                        try {
+                          await deleteBranch(branch.id).unwrap()
+                          refetchBranches()
+                          toast.success('Branch removed')
+                        } catch (error: any) {
+                          toast.error(error?.data?.error?.message || 'Failed to remove branch')
+                        }
                       }}>
                         <Trash2 className="h-4 w-4" />
                       </Button>

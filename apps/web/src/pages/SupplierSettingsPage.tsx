@@ -16,6 +16,7 @@ import {
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
 import { LogoUpload } from '../components/LogoUpload'
+import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
@@ -36,7 +37,7 @@ import {
 
 const SUPPLIER_NOTIFICATION_DEFAULTS = {
   emailEnabled: true,
-  smsEnabled: false,
+  whatsappEnabled: false,
   inAppEnabled: true,
   notifyOrderNew: true,
   notifyMessageReceived: true,
@@ -46,7 +47,7 @@ const SUPPLIER_NOTIFICATION_DEFAULTS = {
 
 const SUPPLIER_NOTIFICATION_FIELDS: Array<{ key: keyof typeof SUPPLIER_NOTIFICATION_DEFAULTS; label: string; description: string }> = [
   { key: 'emailEnabled', label: 'Email notifications', description: 'Receive important updates via email.' },
-  { key: 'smsEnabled', label: 'SMS notifications', description: 'Get critical alerts by SMS.' },
+  { key: 'whatsappEnabled', label: 'WhatsApp notifications', description: 'Get alerts on WhatsApp when your phone is on file.' },
   { key: 'inAppEnabled', label: 'In-app notifications', description: 'Show alerts inside Supplify.' },
   { key: 'notifyOrderNew', label: 'New orders', description: 'Be notified when restaurants place orders.' },
   { key: 'notifyMessageReceived', label: 'Chat messages', description: 'Receive pings for new chat messages.' },
@@ -109,7 +110,7 @@ export function SupplierSettingsPage() {
       setNotificationPrefs((prev) => ({
         ...prev,
         emailEnabled: prefs.emailEnabled ?? prev.emailEnabled,
-        smsEnabled: prefs.smsEnabled ?? prev.smsEnabled,
+        whatsappEnabled: prefs.whatsappEnabled ?? prefs.smsEnabled ?? prev.whatsappEnabled,
         inAppEnabled: prefs.inAppEnabled ?? prev.inAppEnabled,
         notifyOrderNew: prefs.notifyOrderNew ?? prev.notifyOrderNew,
         notifyMessageReceived: prefs.notifyMessageReceived ?? prev.notifyMessageReceived,
@@ -442,6 +443,7 @@ export function SupplierSettingsPage() {
           <TabsTrigger value="business">Business</TabsTrigger>
           <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
           <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>
+          <TabsTrigger value="branches">Branches</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="plan">Plan & usage</TabsTrigger>
         </TabsList>
@@ -865,6 +867,10 @@ export function SupplierSettingsPage() {
         <TabsContent value="plan" className="space-y-4">
           <SubscriptionInfo />
         </TabsContent>
+        <TabsContent value="branches" className="space-y-4">
+          <BranchAccountsPanel entityLabel="supplier location" />
+        </TabsContent>
+
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>

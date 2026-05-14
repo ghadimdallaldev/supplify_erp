@@ -5,6 +5,7 @@ import { logger } from '../lib/logger.js'
 import {
   notifyReservationCreated,
   notifyReservationWaitlist,
+  notifyGuestReservationConfirmation,
   notifyStaffPtoRequest,
   notifyStaffSwapRequest,
 } from '../services/notification.service.js'
@@ -375,6 +376,7 @@ router.post('/reservations', async (req, res) => {
           status,
           customer_name,
           customer_phone,
+          customer_email,
           party_size,
           scheduled_at,
           duration_minutes,
@@ -384,7 +386,7 @@ router.post('/reservations', async (req, res) => {
           public_token,
           public_token_expires_at
         )
-        VALUES ($1, $2, 'CONFIRMED', $3, $4, $5, $6, $7, $8, false, true, gen_random_uuid(), now() + interval '180 days')
+        VALUES ($1, $2, 'CONFIRMED', $3, $4, $5, $6, $7, $8, $9, false, true, gen_random_uuid(), now() + interval '180 days')
         RETURNING *
       `,
       [
@@ -392,6 +394,7 @@ router.post('/reservations', async (req, res) => {
         [], // tables assigned during host flow
         payload.customerName,
         payload.customerPhone ?? null,
+        payload.customerEmail ?? null,
         payload.partySize,
         scheduledAt.toISOString(),
         payload.durationMinutes,
@@ -403,6 +406,11 @@ router.post('/reservations', async (req, res) => {
 
     try {
       await notifyReservationCreated(reservation)
+      const { rows: restaurantRows } = await query(
+        'SELECT name FROM restaurant WHERE id = $1',
+        [payload.restaurantId]
+      )
+      await notifyGuestReservationConfirmation(reservation, restaurantRows[0]?.name)
     } catch (notificationError) {
       logger.warn('Public reservation notification failed', { error: notificationError.message })
     }

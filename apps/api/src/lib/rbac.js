@@ -2,6 +2,7 @@ import { verifyToken, refreshAccessToken } from './auth.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { getEffectiveTenant } from './impersonation.js'
+import { getActiveTenantFromRequest, getPrimaryTenantForUser } from './tenant-switch.js'
 import { getRolesForUser, getPermissionsForUser, hasPermission } from './permissions.js'
 
 // Extract token from cookie
@@ -383,23 +384,23 @@ export async function getRequestTenant(req) {
   if (req.userData.role === 'PENDING') return null
   const effective = getEffectiveTenant(req)
   if (effective) return effective
+
+  const active = await getActiveTenantFromRequest(req)
+  if (active) return active
+
   const email = (req.userData.email || '').trim().toLowerCase()
   if (!email) return null
   if (req.userData.role === 'SUPPLIER') {
-    const { rows } = await query(
-      'SELECT id, name FROM supplier WHERE LOWER(TRIM(contact_email)) = $1',
-      [email]
-    )
-    if (rows.length)
-      return { tenantId: rows[0].id, tenantType: 'SUPPLIER', tenantName: rows[0].name || '' }
+    const primary = await getPrimaryTenantForUser(email, 'SUPPLIER')
+    if (primary) {
+      return { tenantId: primary.id, tenantType: 'SUPPLIER', tenantName: primary.name || '' }
+    }
   }
   if (req.userData.role === 'RESTAURANT') {
-    const { rows } = await query(
-      'SELECT id, name FROM restaurant WHERE LOWER(TRIM(contact_email)) = $1',
-      [email]
-    )
-    if (rows.length)
-      return { tenantId: rows[0].id, tenantType: 'RESTAURANT', tenantName: rows[0].name || '' }
+    const primary = await getPrimaryTenantForUser(email, 'RESTAURANT')
+    if (primary) {
+      return { tenantId: primary.id, tenantType: 'RESTAURANT', tenantName: primary.name || '' }
+    }
   }
   return null
 }

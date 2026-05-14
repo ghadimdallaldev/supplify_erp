@@ -49,4 +49,5 @@ export const config = {
   REDIS_URL: process.env.REDIS_URL || '',
   /** Test-only: secret for E2E reset-seed endpoint. When set, POST /api/e2e/reset-seed is enabled. */
   E2E_SECRET: process.env.E2E_SECRET || '',
+  SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@supplify.local',
 }

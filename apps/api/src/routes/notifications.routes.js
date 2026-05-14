@@ -13,6 +13,7 @@ const updatePreferencesSchema = z.object({
   // Channels
   emailEnabled: z.boolean().optional(),
   smsEnabled: z.boolean().optional(),
+  whatsappEnabled: z.boolean().optional(),
   pushEnabled: z.boolean().optional(),
   inAppEnabled: z.boolean().optional(),
   

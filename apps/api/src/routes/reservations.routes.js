@@ -7,6 +7,7 @@ import { logger } from '../lib/logger.js'
 import {
   notifyReservationCreated,
   notifyReservationWaitlist,
+  notifyGuestReservationConfirmation,
 } from '../services/notification.service.js'
 
 const router = express.Router()
@@ -43,6 +44,7 @@ const upsertTablesSchema = z.object({
 const reservationCreateSchema = z.object({
   customerName: z.string().min(1),
   customerPhone: z.string().optional(),
+  customerEmail: z.string().email().optional(),
   partySize: z.number().min(1),
   scheduledAt: z.string(),
   durationMinutes: z.number().min(30).max(240).default(90),
@@ -335,6 +337,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
               status,
               customer_name,
               customer_phone,
+              customer_email,
               party_size,
               scheduled_at,
               duration_minutes,
@@ -343,7 +346,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
               auto_confirmed,
               created_by
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             RETURNING *
           `,
         [
@@ -353,6 +356,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
           status,
           payload.customerName,
           payload.customerPhone || null,
+          payload.customerEmail || null,
           payload.partySize,
           scheduledAt.toISOString(),
           payload.durationMinutes,
@@ -404,6 +408,13 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
       await notifyReservationCreated(reservation)
       if (reservation.waitlist) {
         await notifyReservationWaitlist(reservation)
+      }
+      if (reservation.status === 'CONFIRMED' || reservation.status === 'WAITLIST') {
+        const { rows: restaurantRows } = await query(
+          'SELECT name FROM restaurant WHERE id = $1',
+          [restaurantId]
+        )
+        await notifyGuestReservationConfirmation(reservation, restaurantRows[0]?.name)
       }
     } catch (notifyError) {
       logger.warn('Reservation notification failed', {
@@ -457,9 +468,26 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
       })
     }
 
+    const reservation = rows[0]
+
+    if (payload.status === 'CONFIRMED' || payload.status === 'WAITLIST') {
+      try {
+        const { rows: restaurantRows } = await query(
+          'SELECT name FROM restaurant WHERE id = $1',
+          [restaurantId]
+        )
+        await notifyGuestReservationConfirmation(reservation, restaurantRows[0]?.name)
+      } catch (notifyError) {
+        logger.warn('Guest reservation notification failed', {
+          error: notifyError.message,
+          reservationId: reservation.id,
+        })
+      }
+    }
+
     res.json({
       ok: true,
-      data: { reservation: rows[0] },
+      data: { reservation },
       error: null,
       requestId: req.requestId,
     })
@@ -472,6 +500,81 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
     })
   }
 })
+
+router.get(
+  '/guest-intelligence',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const branchId = req.query.branchId
+      const restaurantId = await resolveRestaurantId(req.userData.email)
+
+      const params = [restaurantId]
+      let branchFilter = ''
+      if (branchId) {
+        params.push(branchId)
+        branchFilter = 'AND (branch_id = $2 OR branch_id IS NULL)'
+      }
+
+      const { rows: guests } = await query(
+        `
+          SELECT
+            customer_name,
+            customer_phone,
+            customer_email,
+            COUNT(*) FILTER (WHERE status NOT IN ('CANCELLED')) AS visit_count,
+            MAX(scheduled_at) FILTER (WHERE status NOT IN ('CANCELLED')) AS last_visit,
+            SUM(party_size) FILTER (WHERE status NOT IN ('CANCELLED')) AS total_covers,
+            COUNT(*) FILTER (WHERE status = 'CONFIRMED' AND scheduled_at >= now()) AS upcoming_count
+          FROM reservation
+          WHERE restaurant_id = $1
+            ${branchFilter}
+          GROUP BY customer_name, customer_phone, customer_email
+          HAVING COUNT(*) FILTER (WHERE status NOT IN ('CANCELLED')) > 0
+          ORDER BY visit_count DESC, last_visit DESC NULLS LAST
+          LIMIT 25
+        `,
+        params
+      )
+
+      const repeatGuests = guests.filter((g) => Number(g.visit_count) >= 2)
+      const vipGuests = guests.filter((g) => Number(g.visit_count) >= 3)
+      const followUps = guests
+        .filter((g) => Number(g.upcoming_count) > 0 || Number(g.visit_count) >= 2)
+        .slice(0, 8)
+        .map((g) => ({
+          ...g,
+          suggestion:
+            Number(g.visit_count) >= 3
+              ? 'VIP — consider a welcome perk or priority seating.'
+              : Number(g.upcoming_count) > 0
+                ? 'Upcoming visit — send a confirmation reminder.'
+                : 'Repeat guest — thank them on their next visit.',
+        }))
+
+      res.json({
+        ok: true,
+        data: {
+          recentGuests: guests.slice(0, 10),
+          repeatGuests: repeatGuests.slice(0, 10),
+          vipGuests: vipGuests.slice(0, 5),
+          followUps,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Guest intelligence error', { error: error.message })
+      res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'GUEST_INTELLIGENCE_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
 
 router.get(
   '/analytics',

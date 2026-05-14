@@ -11,6 +11,7 @@ import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
 import { LogOut, User, Bell, X, TrendingUp } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { BranchSwitcher } from './BranchSwitcher'
 import { Badge } from './ui/badge'
 import { useNavigate } from 'react-router-dom'
 
@@ -98,6 +99,7 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <BranchSwitcher />
             {showUpgrade && (
               <Button
                 variant={hasUrgency ? 'default' : 'outline'}
@@ -182,6 +184,24 @@ export function Header() {
                               <p className="text-xs text-gray-400 mt-1">
                                 {new Date(notification.created_at).toLocaleString()}
                               </p>
+                              {(() => {
+                                const meta =
+                                  typeof notification.metadata === 'string'
+                                    ? JSON.parse(notification.metadata || '{}')
+                                    : notification.metadata || {}
+                                const whatsappUrl = meta?.whatsappUrl
+                                return whatsappUrl ? (
+                                  <a
+                                    href={whatsappUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-2 inline-flex text-xs font-medium text-emerald-700 hover:underline"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
+                                    Open in WhatsApp
+                                  </a>
+                                ) : null
+                              })()}
                             </div>
                             {!notification.is_read && (
                               <div className="ml-2 h-2 w-2 bg-blue-500 rounded-full"></div>

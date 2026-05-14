@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { ImpersonationBanner } from './ImpersonationBanner'
 import { UpgradeModal } from './UpgradeModal'
+import { BranchProvider } from '../contexts/BranchContext'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import {
   refreshBlockedCount,
@@ -60,6 +61,7 @@ export function Layout() {
     .slice(0, 3)
 
   return (
+    <BranchProvider>
     <div className="min-h-screen bg-gray-50">
       <ImpersonationBanner />
       <UpgradeModal />
@@ -135,5 +137,6 @@ export function Layout() {
         </div>
       </div>
     </div>
+    </BranchProvider>
   )
 }

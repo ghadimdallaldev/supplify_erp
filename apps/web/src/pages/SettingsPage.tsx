@@ -14,7 +14,7 @@ import toast from 'react-hot-toast'
 
 const DEFAULT_NOTIFICATION_PREFS = {
   emailEnabled: true,
-  smsEnabled: false,
+  whatsappEnabled: false,
   inAppEnabled: true,
   notifyOrderNew: true,
   notifyMessageReceived: true,
@@ -38,9 +38,9 @@ const NOTIFICATION_FIELDS: Array<{
     description: 'Receive important updates via email.',
   },
   {
-    key: 'smsEnabled',
-    label: 'SMS notifications',
-    description: 'Get critical alerts by SMS when enabled.',
+    key: 'whatsappEnabled',
+    label: 'WhatsApp notifications',
+    description: 'Get important alerts on WhatsApp when your phone is on file.',
   },
   {
     key: 'inAppEnabled',
@@ -76,7 +76,7 @@ export function SettingsPage() {
       setNotificationPrefs((previous) => ({
         ...previous,
         emailEnabled: prefs.emailEnabled ?? previous.emailEnabled,
-        smsEnabled: prefs.smsEnabled ?? previous.smsEnabled,
+        whatsappEnabled: prefs.whatsappEnabled ?? prefs.smsEnabled ?? previous.whatsappEnabled,
         inAppEnabled: prefs.inAppEnabled ?? previous.inAppEnabled,
         notifyOrderNew: prefs.notifyOrderNew ?? previous.notifyOrderNew,
         notifyMessageReceived: prefs.notifyMessageReceived ?? previous.notifyMessageReceived,
