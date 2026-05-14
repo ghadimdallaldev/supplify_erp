@@ -129,6 +129,7 @@ export const api = createApi({
   baseQuery: baseQueryWithUnwrap as any,
   tagTypes: [
     'User',
+    'RegisterStatus',
     'Product',
     'Order',
     'Supplier',
@@ -180,6 +181,7 @@ export const api = createApi({
     }),
     getRegisterStatus: builder.query<{ needsSetup: boolean }, void>({
       query: () => '/api/register/status',
+      providesTags: ['RegisterStatus'],
       transformResponse: (response: { data?: { needsSetup?: boolean } }) => ({
         needsSetup: Boolean(response?.data?.needsSetup),
       }),
@@ -195,7 +197,7 @@ export const api = createApi({
       }),
       transformResponse: (response: { data?: { tenantType: string; tenant: unknown } }) =>
         response.data as { tenantType: string; tenant: unknown },
-      invalidatesTags: ['User'],
+      invalidatesTags: ['User', 'RegisterStatus'],
     }),
 
     // Product endpoints

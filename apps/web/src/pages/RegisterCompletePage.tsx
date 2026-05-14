@@ -7,15 +7,39 @@ import { Label } from '../components/ui/label'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import {
   useCompleteRegistrationMutation,
+  useGetMeQuery,
   useGetRegisterStatusQuery,
 } from '../services/api'
 import { Building2, Loader2, Store, Truck } from 'lucide-react'
+import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
 
 type AccountType = 'RESTAURANT' | 'SUPPLIER'
 
+function isUnauthorized(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    (error as FetchBaseQueryError).status === 401
+  )
+}
+
 export function RegisterCompletePage() {
   const navigate = useNavigate()
-  const { data: status, isLoading: statusLoading, error: statusError } = useGetRegisterStatusQuery()
+  const { data: user, isLoading: userLoading, error: userError } = useGetMeQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+  })
+  const {
+    data: status,
+    isLoading: statusLoading,
+    isError: statusIsError,
+    error: statusError,
+  } = useGetRegisterStatusQuery(undefined, {
+    skip: !user,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+  })
   const [completeRegistration, { isLoading: submitting }] = useCompleteRegistrationMutation()
 
   const [accountType, setAccountType] = useState<AccountType | null>(null)
@@ -23,17 +47,21 @@ export function RegisterCompletePage() {
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  // Only leave this page when the account is fully provisioned (not PENDING).
   useEffect(() => {
-    if (status && !status.needsSetup) {
-      navigate('/app', { replace: true })
+    if (!user || user.role === 'PENDING' || user.role === 'ADMIN') return
+    if (user.role === 'RESTAURANT' || user.role === 'SUPPLIER') {
+      if (status?.needsSetup === false) {
+        navigate('/app', { replace: true })
+      }
     }
-  }, [status, navigate])
+  }, [user, status, navigate])
 
   useEffect(() => {
-    if (statusError) {
+    if (isUnauthorized(userError) || isUnauthorized(statusError)) {
       navigate('/login', { replace: true })
     }
-  }, [statusError, navigate])
+  }, [userError, statusError, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,7 +85,14 @@ export function RegisterCompletePage() {
     }
   }
 
-  if (statusLoading) {
+  const loadError =
+    statusIsError && !isUnauthorized(statusError)
+      ? 'Could not verify registration status. Refresh the page or try again in a moment.'
+      : null
+
+  const showSpinner = userLoading || !user || (statusLoading && !status)
+
+  if (showSpinner) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -76,9 +111,9 @@ export function RegisterCompletePage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
+            {(error || loadError) && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{error || loadError}</AlertDescription>
               </Alert>
             )}
 
