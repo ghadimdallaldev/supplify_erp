@@ -43,7 +43,8 @@ export function Header() {
     .slice(0, 3)
   const showUpgrade =
     user?.role !== 'ADMIN' &&
-    (planCode === 'free' || nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1)
+    user?.role !== 'PENDING' &&
+    (nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1)
   const hasUrgency = nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1
 
   const handleNavUpgrade = () => {
@@ -69,18 +70,7 @@ export function Header() {
         })
       )
     } else {
-      dispatch(
-        showMonetizationBlock({
-          type: 'feature',
-          payload: {
-            featureKey: 'upgrade_prompt',
-            currentPlan: e?.plan?.name ?? null,
-            requiredPlan: null,
-            recommendedPlans: [],
-            upgradeUrl: '/app/settings',
-          },
-        })
-      )
+      navigate('/app/settings')
     }
   }
 

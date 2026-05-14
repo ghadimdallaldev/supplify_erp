@@ -33,6 +33,24 @@ function formatLimit(val: number | null | undefined): string {
   return String(val)
 }
 
+function toLimitNum(val: unknown): number | null {
+  if (val == null) return null
+  const n = Number(val)
+  return Number.isFinite(n) ? n : null
+}
+
+function isBetterLimit(premium: number | null, current: number | null): boolean {
+  if (premium == null) return false
+  if (current == null) return premium > 0 || premium === -1
+  if (premium === -1) return current !== -1
+  if (current === -1) return false
+  return premium > current
+}
+
+function isBetterFeature(premium: boolean, current: boolean): boolean {
+  return premium && !current
+}
+
 export function UpgradeModal() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
@@ -63,10 +81,6 @@ export function UpgradeModal() {
   const topCode = topPlan?.code?.toLowerCase() ?? 'platinum'
   const currentPlanRow = plans.find((p) => (p.code || '').toLowerCase() === currentCode)
   const recommendedPlanRow = plans.find((p) => (p.code || '').toLowerCase() === recommendedCode)
-  const resolvesLimitKeys = new Set(
-    recommendation?.comparedToCurrent?.resolvesLimits?.map((r) => r.limitKey) ?? []
-  )
-  const unlocksFeatureKeys = new Set(recommendation?.comparedToCurrent?.unlocksFeatures ?? [])
 
   useEffect(() => {
     if (open)
@@ -110,6 +124,11 @@ export function UpgradeModal() {
 
   if (!payload) return null
 
+  const isBrowseUpgrade =
+    type === 'feature' &&
+    'featureKey' in payload &&
+    (payload as { featureKey: string }).featureKey === 'upgrade_prompt'
+
   const currentPlanName =
     (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
   const recommendedPlans = (payload as { recommendedPlans?: string[] }).recommendedPlans ?? []
@@ -129,15 +148,23 @@ export function UpgradeModal() {
           <DialogTitle className="flex items-center gap-2">
             {type === 'limit' ? (
               <TrendingUp className="h-5 w-5 text-amber-600" />
+            ) : isBrowseUpgrade ? (
+              <TrendingUp className="h-5 w-5 text-primary" />
             ) : (
               <Lock className="h-5 w-5 text-amber-600" />
             )}
-            {type === 'limit' ? 'Limit reached' : 'Feature not available'}
+            {type === 'limit'
+              ? 'Limit reached'
+              : isBrowseUpgrade
+                ? 'Upgrade your plan'
+                : 'Feature not available'}
           </DialogTitle>
           <DialogDescription>
             {type === 'limit'
               ? `You've reached your plan limit. Upgrade to get more.`
-              : `This feature isn't included in your current plan.`}
+              : isBrowseUpgrade
+                ? 'Compare plans and choose what fits your business.'
+                : `This feature isn't included in your current plan.`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -149,7 +176,7 @@ export function UpgradeModal() {
                 {payload.limitValue}
               </p>
             )}
-            {type === 'feature' && 'featureKey' in payload && (
+            {type === 'feature' && 'featureKey' in payload && !isBrowseUpgrade && (
               <p className="mt-1 text-gray-600">Feature: {payload.featureKey.replace(/_/g, ' ')}</p>
             )}
           </div>
@@ -215,23 +242,23 @@ export function UpgradeModal() {
               </div>
               {limitKeys.map((key) => {
                 const cur = currentPlanRow?.limits?.[key] ?? entitlements.limits?.[key]
-                const curNum = cur === -1 || cur === null ? null : Number(cur)
+                const curNum = toLimitNum(cur)
                 const rec = recommendedPlanRow?.limits?.[key]
-                const recNum = rec === -1 || rec === null ? null : Number(rec)
+                const recNum = toLimitNum(rec)
                 const top = topPlan?.limits?.[key]
-                const topNum = top === -1 || top === null ? null : Number(top)
-                const isHighlight =
-                  resolvesLimitKeys.has(key) &&
-                  recNum != null &&
-                  (curNum == null || recNum > curNum)
+                const topNum = toLimitNum(top)
+                const recHighlight = isBetterLimit(recNum, curNum)
+                const topHighlight = isBetterLimit(topNum, curNum)
                 return (
                   <div key={key} className="grid grid-cols-4 text-sm border-b last:border-b-0">
                     <div className="p-2 text-gray-600">{LIMIT_KEY_LABELS[key] ?? key}</div>
                     <div className="p-2">{formatLimit(curNum)}</div>
-                    <div className={`p-2 ${isHighlight ? 'bg-green-50 font-medium' : ''}`}>
+                    <div className={`p-2 ${recHighlight ? 'bg-green-50 font-medium text-green-900' : ''}`}>
                       {formatLimit(recNum)}
                     </div>
-                    <div className="p-2">{formatLimit(topNum)}</div>
+                    <div className={`p-2 ${topHighlight ? 'bg-green-50 font-medium text-green-900' : ''}`}>
+                      {formatLimit(topNum)}
+                    </div>
                   </div>
                 )
               })}
@@ -242,21 +269,24 @@ export function UpgradeModal() {
                 const recVal = typeof rec === 'boolean' ? rec : rec !== 'false' && !!rec
                 const top = topPlan?.features?.[key]
                 const topVal = typeof top === 'boolean' ? top : top !== 'false' && !!top
-                const isHighlight = unlocksFeatureKeys.has(key) && recVal && !curVal
+                const recHighlight = isBetterFeature(recVal, curVal)
+                const topHighlight = isBetterFeature(topVal, curVal)
                 return (
                   <div key={key} className="grid grid-cols-4 text-sm border-b last:border-b-0">
                     <div className="p-2 text-gray-600">{FEATURE_KEY_LABELS[key] ?? key}</div>
                     <div className="p-2">{curVal ? 'Yes' : 'No'}</div>
-                    <div className={`p-2 ${isHighlight ? 'bg-green-50 font-medium' : ''}`}>
+                    <div className={`p-2 ${recHighlight ? 'bg-green-50 font-medium text-green-900' : ''}`}>
                       {recVal ? 'Yes' : 'No'}
                     </div>
-                    <div className="p-2">{topVal ? 'Yes' : 'No'}</div>
+                    <div className={`p-2 ${topHighlight ? 'bg-green-50 font-medium text-green-900' : ''}`}>
+                      {topVal ? 'Yes' : 'No'}
+                    </div>
                   </div>
                 )
               })}
               <div className="grid grid-cols-4 text-xs text-gray-500 bg-gray-50 border-t px-2 py-1">
                 <div className="p-1 col-span-4">
-                  Green = increased limit or unlocked feature in Recommended
+                  Green = higher limit or unlocked feature vs your current plan
                 </div>
               </div>
             </div>
