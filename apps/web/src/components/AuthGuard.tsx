@@ -32,8 +32,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     } else if (data) {
       dispatch(setUser(data))
       dispatch(setLoading(false))
-      if (registerStatus?.needsSetup) {
-        navigate('/register/complete')
+      if (data.role === 'PENDING' || registerStatus?.needsSetup) {
+        navigate('/register/complete', { replace: true })
       }
     }
   }, [data, error, isLoading, registerStatus, dispatch, navigate])
@@ -41,13 +41,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
       </div>
     )
   }
 
   if (error) {
     return null
+  }
+
+  if (data?.role === 'PENDING') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
+      </div>
+    )
   }
 
   return <>{children}</>
