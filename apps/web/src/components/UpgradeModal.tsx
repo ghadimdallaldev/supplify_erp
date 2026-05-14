@@ -1,5 +1,5 @@
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
-import { closeMonetizationModal } from '../features/monetization/monetizationSlice'
+import { closeMonetizationModal, resetMonetizationModal } from '../features/monetization/monetizationSlice'
 import {
   useGetRecommendationQuery,
   useGetEntitlementsQuery,
@@ -8,9 +8,9 @@ import {
 } from '../services/api'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Lock, TrendingUp } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   getLimitKeys,
   getFeatureKeys,
@@ -51,10 +51,29 @@ function isBetterFeature(premium: boolean, current: boolean): boolean {
   return premium && !current
 }
 
+const UPGRADE_SUPPORT_EMAIL =
+  import.meta.env.VITE_UPGRADE_SUPPORT_EMAIL || 'admin@supplify.com'
+
+function normalizeUpgradePath(url: string): string {
+  return url.startsWith('/') ? url : `/app/${url}`
+}
+
+function isOnUpgradeDestination(currentPath: string, currentSearch: string, target: string): boolean {
+  const [targetPath, targetQuery] = target.split('?')
+  if (currentPath !== targetPath) return false
+  if (!targetQuery) return currentPath.startsWith('/app/settings')
+  const normalizedSearch = currentSearch.startsWith('?') ? currentSearch.slice(1) : currentSearch
+  if (normalizedSearch === targetQuery) return true
+  // Settings uses in-page tabs; subscription may be active without ?tab= in the URL.
+  return currentPath === '/app/settings' && targetQuery.startsWith('tab=')
+}
+
 export function UpgradeModal() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const { open, type, payload } = useAppSelector((state) => state.monetization)
+  const location = useLocation()
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { open, openRevision, type, payload } = useAppSelector((state) => state.monetization)
   const user = useAppSelector((state) => state.auth.user)
   const canUpgrade = user?.tenantPermissions?.includes('SUBSCRIPTIONS_MANAGE') ?? true
 
@@ -99,12 +118,43 @@ export function UpgradeModal() {
     }
   }, [open, recommendation?.recommendedPlanCode, recordConversionEvent])
 
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
+    }
+  }, [])
+
+  const schedulePayloadReset = () => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
+    resetTimerRef.current = setTimeout(() => {
+      dispatch(resetMonetizationModal())
+      resetTimerRef.current = null
+    }, 300)
+  }
+
   const handleClose = () => {
     recordConversionEvent({ eventType: 'CLOSE_UPGRADE_MODAL' }).catch(() => {})
     dispatch(closeMonetizationModal())
+    schedulePayloadReset()
   }
 
   const handleUpgrade = () => {
+    if (!payload) return
+
+    const upgradePath = normalizeUpgradePath(
+      (payload as { upgradeUrl?: string }).upgradeUrl || '/app/settings?tab=subscription'
+    )
+    const onUpgradePage = isOnUpgradeDestination(
+      location.pathname,
+      location.search,
+      upgradePath
+    )
+    const planLabel =
+      recommendation?.recommendedPlanName ??
+      (recommendedCode ? (PLAN_LABELS[recommendedCode] ?? recommendedCode) : 'a paid plan')
+    const currentPlan =
+      (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
+
     recordConversionEvent({
       eventType: canUpgrade ? 'CLICK_UPGRADE' : 'CLOSE_UPGRADE_MODAL',
       metadata: recommendedCode ? { recommendedPlanCode: recommendedCode, source: 'modal' } : {},
@@ -115,11 +165,21 @@ export function UpgradeModal() {
         metadata: { recommendedPlanCode: recommendation.recommendedPlanCode },
       }).catch(() => {})
     }
-    if (canUpgrade) {
-      dispatch(closeMonetizationModal())
-      const path = (payload as { upgradeUrl?: string })?.upgradeUrl || '/app/settings'
-      navigate(path.startsWith('/') ? path : `/app/${path}`)
+
+    if (!canUpgrade) return
+
+    if (onUpgradePage) {
+      const subject = encodeURIComponent(`Plan upgrade request (${planLabel})`)
+      const body = encodeURIComponent(
+        `Hi Supplify team,\n\nI would like to upgrade my workspace to ${planLabel}.\n\nCurrent plan: ${currentPlan}\n\nThank you.`
+      )
+      window.location.href = `mailto:${UPGRADE_SUPPORT_EMAIL}?subject=${subject}&body=${body}`
+      return
     }
+
+    dispatch(closeMonetizationModal())
+    schedulePayloadReset()
+    navigate(upgradePath)
   }
 
   if (!payload) return null
@@ -129,6 +189,15 @@ export function UpgradeModal() {
     'featureKey' in payload &&
     (payload as { featureKey: string }).featureKey === 'upgrade_prompt'
 
+  const upgradePath = normalizeUpgradePath(
+    (payload as { upgradeUrl?: string }).upgradeUrl || '/app/settings?tab=subscription'
+  )
+  const onUpgradePage = isOnUpgradeDestination(
+    location.pathname,
+    location.search,
+    upgradePath
+  )
+
   const currentPlanName =
     (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
   const recommendedPlans = (payload as { recommendedPlans?: string[] }).recommendedPlans ?? []
@@ -136,8 +205,17 @@ export function UpgradeModal() {
     recommendation?.recommendedPlanName ??
     (recommendedCode ? (PLAN_LABELS[recommendedCode] ?? recommendedCode) : null)
 
+  const topPlanName = topPlan?.name ?? (topCode === 'platinum' ? 'Platinum' : 'Top')
+  const showPlatinumCta =
+    canUpgrade &&
+    topPlan &&
+    recommendedCode &&
+    topCode !== recommendedCode &&
+    topCode !== currentCode
+
   return (
     <Dialog
+      key={openRevision}
       open={open}
       onOpenChange={(v) => {
         if (!v) handleClose()
@@ -292,17 +370,44 @@ export function UpgradeModal() {
             </div>
           )}
 
-          <div className="flex gap-2 pt-2 sticky bottom-0 bg-white border-t pt-4 -mx-6 px-6 -mb-2 pb-2">
-            <Button onClick={handleUpgrade} className="flex-1">
-              {canUpgrade
-                ? recommendedPlanName
-                  ? `Upgrade to ${recommendedPlanName}`
-                  : 'Upgrade'
-                : 'Ask Owner to Upgrade'}
-            </Button>
-            <Button variant="outline" onClick={handleClose}>
-              Dismiss
-            </Button>
+          <p className="text-xs text-gray-500">
+            Plan changes are applied by your workspace administrator. On the subscription page, use
+            the buttons below to request an upgrade by email.
+          </p>
+
+          <div className="flex flex-col gap-2 pt-2 sticky bottom-0 bg-white border-t pt-4 -mx-6 px-6 -mb-2 pb-2">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={handleUpgrade} className="flex-1 min-w-[10rem]">
+                {canUpgrade
+                  ? onUpgradePage
+                    ? recommendedPlanName
+                      ? `Request ${recommendedPlanName} upgrade`
+                      : 'Request plan upgrade'
+                    : recommendedPlanName
+                      ? `Upgrade to ${recommendedPlanName}`
+                      : 'View plans in settings'
+                  : 'Ask Owner to Upgrade'}
+              </Button>
+              {showPlatinumCta && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 min-w-[10rem]"
+                  onClick={() => {
+                    const subject = encodeURIComponent(`Plan upgrade request (${topPlanName})`)
+                    const body = encodeURIComponent(
+                      `Hi Supplify team,\n\nI would like to upgrade my workspace to ${topPlanName}.\n\nCurrent plan: ${currentPlanName}\n\nThank you.`
+                    )
+                    window.location.href = `mailto:${UPGRADE_SUPPORT_EMAIL}?subject=${subject}&body=${body}`
+                  }}
+                >
+                  Request {topPlanName}
+                </Button>
+              )}
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Dismiss
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

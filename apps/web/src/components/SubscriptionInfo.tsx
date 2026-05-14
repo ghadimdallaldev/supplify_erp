@@ -96,6 +96,7 @@ export function SubscriptionInfo() {
             Compare available plans and choose an upgrade when you are ready.
           </p>
           <Button
+            type="button"
             onClick={() => {
               recordConversionEvent({
                 eventType: 'OPEN_UPGRADE',
@@ -199,6 +200,7 @@ export function SubscriptionInfo() {
                           {limit} ({Math.round(pct)}%)
                         </span>
                         <Button
+                          type="button"
                           variant="outline"
                           size="sm"
                           className="shrink-0 text-amber-800 border-amber-300 hover:bg-amber-100"
@@ -271,6 +273,7 @@ export function SubscriptionInfo() {
                       Near limit
                     </div>
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
                       className="text-amber-800 border-amber-300 hover:bg-amber-100"
@@ -346,6 +349,7 @@ export function SubscriptionInfo() {
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm space-y-3">
             <PlanRecommendationCta currentCode={plan.code} />
             <Button
+              type="button"
               className="w-full sm:w-auto"
               onClick={() => {
                 recordConversionEvent({

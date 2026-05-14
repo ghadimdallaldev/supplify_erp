@@ -22,6 +22,8 @@ export type FeatureNotAvailablePayload = {
 
 type MonetizationState = {
   open: boolean
+  /** Bumped on each open so Radix Dialog remounts reliably after close */
+  openRevision: number
   type: MonetizationBlockType
   payload: LimitExceededPayload | FeatureNotAvailablePayload | null
   /** Count of blocks in last 7 days (for proactive nudge) */
@@ -56,6 +58,7 @@ function pushBlockedTimestamp(): number[] {
 
 const initialState: MonetizationState = {
   open: false,
+  openRevision: 0,
   type: null,
   payload: null,
   blockedCountLast7d: 0,
@@ -72,12 +75,16 @@ const slice = createSlice({
       }
     ) {
       state.open = true
+      state.openRevision += 1
       state.type = action.payload.type
       state.payload = action.payload.payload
       const timestamps = pushBlockedTimestamp()
       state.blockedCountLast7d = timestamps.length
     },
     closeMonetizationModal(state) {
+      state.open = false
+    },
+    resetMonetizationModal(state) {
       state.open = false
       state.type = null
       state.payload = null
@@ -90,5 +97,10 @@ const slice = createSlice({
   },
 })
 
-export const { showMonetizationBlock, closeMonetizationModal, refreshBlockedCount } = slice.actions
+export const {
+  showMonetizationBlock,
+  closeMonetizationModal,
+  resetMonetizationModal,
+  refreshBlockedCount,
+} = slice.actions
 export default slice.reducer
