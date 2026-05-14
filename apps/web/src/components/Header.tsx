@@ -7,7 +7,7 @@ import {
   useGetEntitlementsQuery,
   useRecordConversionEventMutation,
 } from '../services/api'
-import { showMonetizationBlock } from '../features/monetization/monetizationSlice'
+import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
 import { LogOut, User, Bell, X, TrendingUp } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -41,37 +41,22 @@ export function Header() {
     })
     .filter(({ pct }) => pct >= 80 && pct < 100)
     .slice(0, 3)
-  const showUpgrade =
-    user?.role !== 'ADMIN' &&
-    user?.role !== 'PENDING' &&
-    (nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1)
+  const showUpgrade = user?.role !== 'ADMIN' && user?.role !== 'PENDING'
   const hasUrgency = nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1
+  const settingsPlanTab =
+    user?.role === 'SUPPLIER' ? '/app/settings?tab=plan' : '/app/settings?tab=subscription'
 
   const handleNavUpgrade = () => {
     const trigger =
-      nearLimitKeys.length > 0 ? 'near_limit' : (blockedCountLast7d ?? 0) >= 1 ? 'blocked' : 'free'
+      nearLimitKeys.length > 0 ? 'near_limit' : (blockedCountLast7d ?? 0) >= 1 ? 'blocked' : 'browse'
     recordConversionEvent({
       eventType: 'OPEN_UPGRADE',
       metadata: { source: 'nav_upgrade_cta', trigger },
     }).catch(() => {})
-    if (nearLimitKeys.length > 0) {
-      const first = nearLimitKeys[0]
-      dispatch(
-        showMonetizationBlock({
-          type: 'limit',
-          payload: {
-            limitKey: first.key,
-            limitValue: first.limit,
-            currentUsage: first.current,
-            currentPlan: e?.plan?.name ?? null,
-            recommendedPlans: [],
-            upgradeUrl: '/app/settings',
-          },
-        })
-      )
-    } else {
-      navigate('/app/settings')
-    }
+    openBrowseUpgrade(dispatch, {
+      currentPlan: e?.plan?.name ?? null,
+      upgradeUrl: settingsPlanTab,
+    })
   }
 
   // Fetch notifications

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -91,6 +92,7 @@ const CATEGORY_FIELDS: PreferenceField[] = [
 
 export function RestaurantOnboardingPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const [searchParams] = useSearchParams()
   const { data: restaurantData, isLoading: isLoadingRestaurant, refetch: refetchRestaurant } = useGetRestaurantMeQuery()
   const [updateRestaurant, { isLoading: isUpdating }] = useUpdateRestaurantMutation()
   const [uploadRestaurantLogo] = useUploadRestaurantLogoMutation()
@@ -101,6 +103,13 @@ export function RestaurantOnboardingPage() {
   const { data: ordersData } = useGetOrdersQuery({ limit: 100 }, { skip: !restaurantData?.restaurant?.id })
   
   const [activeTab, setActiveTab] = useState('profile')
+
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['profile', 'team', 'branches', 'subscription', 'notifications'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
   
   const restaurant = restaurantData?.restaurant
   

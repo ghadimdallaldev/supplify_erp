@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -52,6 +53,8 @@ const SUPPLIER_NOTIFICATION_FIELDS: Array<{ key: keyof typeof SUPPLIER_NOTIFICAT
 
 export function SupplierSettingsPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState('profile')
   const { data: supplierData, isLoading: isLoadingSupplier, refetch: refetchSupplier } = useGetSupplierMeQuery()
   const [updateSupplier, { isLoading: isUpdating }] = useUpdateSupplierMutation()
   const [uploadSupplierLogo] = useUploadSupplierLogoMutation()
@@ -121,6 +124,18 @@ export function SupplierSettingsPage() {
       toast.error(error?.data?.error?.message || 'Failed to save notification preferences')
     }
   }
+
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (
+      tab &&
+      ['profile', 'contacts', 'business', 'warehouses', 'delivery', 'notifications', 'plan'].includes(
+        tab
+      )
+    ) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   // Load supplier data into form
   useEffect(() => {
@@ -404,7 +419,7 @@ export function SupplierSettingsPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>

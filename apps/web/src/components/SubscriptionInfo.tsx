@@ -1,8 +1,10 @@
 import { useAppDispatch } from '../hooks/redux'
 import { showMonetizationBlock } from '../features/monetization/monetizationSlice'
+import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import {
   useGetEntitlementsQuery,
   useGetRecommendationQuery,
+  useGetSubscriptionPlansQuery,
   useRecordConversionEventMutation,
 } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -63,6 +65,7 @@ export function SubscriptionInfo() {
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const { data, isLoading, error } = useGetEntitlementsQuery()
   const { data: recommendation } = useGetRecommendationQuery({})
+  const { data: plansData } = useGetSubscriptionPlansQuery()
 
   if (isLoading) {
     return (
@@ -86,10 +89,23 @@ export function SubscriptionInfo() {
       <Card>
         <CardHeader>
           <CardTitle>Subscription</CardTitle>
-          <CardDescription>No active subscription found</CardDescription>
+          <CardDescription>We could not load your plan details yet.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Badge variant="secondary">None</Badge>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Compare available plans and choose an upgrade when you are ready.
+          </p>
+          <Button
+            onClick={() => {
+              recordConversionEvent({
+                eventType: 'OPEN_UPGRADE',
+                metadata: { source: 'subscription_settings_fallback' },
+              }).catch(() => {})
+              openBrowseUpgrade(dispatch)
+            }}
+          >
+            Compare plans &amp; upgrade
+          </Button>
         </CardContent>
       </Card>
     )
@@ -327,8 +343,41 @@ export function SubscriptionInfo() {
 
         {/* Upgrade CTA + Recommended plan */}
         {(plan.name === 'Free' || plan.code !== 'platinum') && (
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm space-y-3">
             <PlanRecommendationCta currentCode={plan.code} />
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => {
+                recordConversionEvent({
+                  eventType: 'OPEN_UPGRADE',
+                  metadata: { source: 'subscription_settings', currentPlan: plan.code },
+                }).catch(() => {})
+                openBrowseUpgrade(dispatch, {
+                  currentPlan: plan.name ?? null,
+                  upgradeUrl:
+                    e.tenantType === 'SUPPLIER'
+                      ? '/app/settings?tab=plan'
+                      : '/app/settings?tab=subscription',
+                })
+              }}
+            >
+              Compare plans & upgrade
+            </Button>
+            {plansData?.plans && plansData.plans.length > 0 && (
+              <div className="grid gap-2 pt-1 sm:grid-cols-2">
+                {plansData.plans.map((p) => (
+                  <div
+                    key={p.code}
+                    className="rounded-md border border-blue-100 bg-white px-3 py-2"
+                  >
+                    <p className="font-medium text-gray-900">{p.name}</p>
+                    {getPlanSubtitle(p.code) && (
+                      <p className="text-xs text-gray-500">{getPlanSubtitle(p.code)}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
