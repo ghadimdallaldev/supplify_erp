@@ -8,8 +8,9 @@ describe('whatsapp.service', () => {
     expect(result.reason).toBe('NOT_CONFIGURED')
   })
 
-  it('returns sent:false when no phone provided', async () => {
+  it('returns sent:false with reason NO_PHONE when no phone provided', async () => {
     const result = await sendWhatsAppMessage({ to: '', message: 'Hello' })
     expect(result.sent).toBe(false)
+    expect(result.reason).toBe('NO_PHONE')
   })
 })
