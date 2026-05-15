@@ -259,6 +259,7 @@ interface ChairLayerProps {
 
 function ChairLayer({ shape, capacity, widthPx, heightPx, color, isActive }: ChairLayerProps) {
   const count = Math.min(capacity, MAX_VISIBLE_CHAIRS)
+  if (count === 0) return null
   const chairColor = isActive ? color : '#94a3b8'
   const chairOpacity = isActive ? 0.6 : 0.4
 
@@ -353,7 +354,7 @@ function ChairLayer({ shape, capacity, widthPx, heightPx, color, isActive }: Cha
     // square / rectangle: distribute on all 4 sides proportionally
     const perimRatio = widthPx / (widthPx + heightPx)
     const longSideCount = Math.round(count * perimRatio * 0.6)
-    const shortSideCount = Math.round((count - longSideCount * 2) / 2)
+    const shortSideCount = Math.max(0, Math.round((count - longSideCount * 2) / 2))
 
     const topCount = Math.max(0, longSideCount)
     const botCount = Math.max(0, count - topCount - shortSideCount * 2)
@@ -478,6 +479,8 @@ export function ReservationTableBuilder({
   // ── Sync from prop ──────────────────────────────────────────────────────────
   useEffect(() => {
     setEditableTables(hydrateTables(tables))
+    setHistory([])
+    setFuture([])
   }, [tables])
 
   // ── Auto-select first table ─────────────────────────────────────────────────
@@ -500,7 +503,7 @@ export function ReservationTableBuilder({
       if (!entry) return
       setCanvasSize({
         width: entry.contentRect.width || DEFAULT_CANVAS_WIDTH,
-        height: entry.contentRect.height || DEFAULT_CANVAS_HEIGHT,
+        height: DEFAULT_CANVAS_HEIGHT, // always use the logical constant, never the DOM height
       })
     })
     observer.observe(element)
@@ -522,25 +525,23 @@ export function ReservationTableBuilder({
   }, [pushHistory])
 
   const handleUndo = useCallback(() => {
-    setHistory((prev) => {
-      if (!prev.length) return prev
-      const snapshot = prev[prev.length - 1]
-      const next = prev.slice(0, -1)
-      setFuture((f) => [editableTablesRef.current, ...f])
-      setEditableTables(snapshot)
-      return next
-    })
+    const h = historyRef.current
+    const cur = editableTablesRef.current
+    if (!h.length) return
+    const snapshot = h[h.length - 1]
+    setHistory(h.slice(0, -1))
+    setFuture((f) => [cur, ...f.slice(0, MAX_HISTORY - 1)])
+    setEditableTables(snapshot)
   }, [])
 
   const handleRedo = useCallback(() => {
-    setFuture((prev) => {
-      if (!prev.length) return prev
-      const snapshot = prev[0]
-      const next = prev.slice(1)
-      setHistory((h) => [...h, editableTablesRef.current])
-      setEditableTables(snapshot)
-      return next
-    })
+    const f = futureRef.current
+    const cur = editableTablesRef.current
+    if (!f.length) return
+    const snapshot = f[0]
+    setFuture(f.slice(1))
+    setHistory((h) => [...h.slice(-(MAX_HISTORY - 1)), cur])
+    setEditableTables(snapshot)
   }, [])
 
   const handleUndoRef = useRef(handleUndo)
@@ -612,7 +613,7 @@ export function ReservationTableBuilder({
   }, [])
 
   // ── Grid snap helper ────────────────────────────────────────────────────────
-  const snapPx = (px: number) => (gridSnap ? Math.round(px / GRID_PX) * GRID_PX : px)
+  const snapPx = (px: number) => (gridSnapRef.current ? Math.round(px / GRID_PX) * GRID_PX : px)
 
   // ── Zoom helpers ────────────────────────────────────────────────────────────
   const zoomIn = () => setZoom((z) => Math.min(MAX_ZOOM, Math.round((z + ZOOM_STEP) * 100) / 100))
@@ -847,11 +848,13 @@ export function ReservationTableBuilder({
         bounds="parent"
         onDragStart={() => setSelectedTableId(table.localId)}
         onDragStop={(_, data) => {
+          pushHistoryRef.current(editableTablesRef.current)
           const nextX = clamp(snapPx(data.x) / displayW, 0, 1 - table.width)
           const nextY = clamp(snapPx(data.y) / displayH, 0, 1 - table.height)
           updateTable(table.localId, { x: nextX, y: nextY })
         }}
         onResizeStop={(_, __, ref, ___, position) => {
+          pushHistoryRef.current(editableTablesRef.current)
           const nextWidth = clamp(ref.offsetWidth / displayW, MIN_SIZE_RATIO, MAX_SIZE_RATIO)
           const nextHeight = clamp(ref.offsetHeight / displayH, MIN_SIZE_RATIO, MAX_SIZE_RATIO)
           const nextX = clamp(position.x / displayW, 0, 1 - nextWidth)
@@ -930,7 +933,7 @@ export function ReservationTableBuilder({
                 variant="outline"
                 className="border-white/60 bg-white/80 text-[9px] font-medium text-[var(--text-muted)]"
               >
-                {f.replace('_', ' ')}
+                {f.replaceAll('_', ' ')}
               </Badge>
             ))}
           </div>
@@ -1348,7 +1351,6 @@ export function ReservationTableBuilder({
                   width: displayW,
                   height: displayH,
                   minWidth: '100%',
-                  position: 'relative',
                 }}
               >
                 {/* Background grid */}
