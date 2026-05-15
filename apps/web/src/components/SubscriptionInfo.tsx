@@ -5,7 +5,6 @@ import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import {
   useGetEntitlementsQuery,
   useGetRecommendationQuery,
-  useGetSubscriptionPlansQuery,
   useRecordConversionEventMutation,
 } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -33,44 +32,11 @@ const LIMIT_LABELS: Record<string, string> = {
   storage_mb: 'Storage (MB)',
 }
 
-const PLAN_CODE_LABELS: Record<string, string> = {
-  free: 'Free',
-  bronze: 'Bronze',
-  gold: 'Gold',
-  platinum: 'Platinum',
-}
-
-function PlanRecommendationCta({ currentCode }: { currentCode: string }) {
-  const { data } = useGetRecommendationQuery({})
-  const rec = data?.recommendedPlanCode
-  const reason = data?.reason
-  const isRecommended = rec && rec !== currentCode?.toLowerCase()
-  if (!isRecommended) {
-    return (
-      <>
-        <p className="text-[var(--brand-mid)] font-medium mb-2">Upgrade to unlock more features</p>
-        <p className="text-[var(--brand-mid)]">
-          Bronze, Gold, and Platinum plans offer advanced features, higher limits, and more.
-        </p>
-      </>
-    )
-  }
-  return (
-    <>
-      <p className="text-[var(--brand-mid)] font-medium mb-2 flex items-center gap-2">
-        Recommended: <span className="font-semibold">{PLAN_CODE_LABELS[rec] ?? rec}</span>
-      </p>
-      <p className="text-[var(--brand-mid)]">{reason}</p>
-    </>
-  )
-}
-
 export function SubscriptionInfo() {
   const dispatch = useAppDispatch()
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const { data, isLoading, error } = useGetEntitlementsQuery()
   const { data: recommendation } = useGetRecommendationQuery({})
-  const { data: plansData } = useGetSubscriptionPlansQuery()
 
   const e = data?.entitlements ?? null
   const externallyDisabled = useMemo(() => (e ? getExternallyDisabledFeatures(e) : []), [e])
@@ -145,7 +111,7 @@ export function SubscriptionInfo() {
     if (features[featureKey as keyof typeof features]) return null
     const src = featureSources?.[featureKey]
     if (src === 'plan' || src === 'default') {
-      return 'Not included on your current plan tier. Compare plans below to upgrade.'
+      return 'Not included on your current plan tier.'
     }
     return null
   }
@@ -455,47 +421,6 @@ export function SubscriptionInfo() {
             </div>
           </div>
         </div>
-
-        {/* Upgrade CTA + Recommended plan */}
-        {(plan.name === 'Free' || plan.code !== 'platinum') && (
-          <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4 text-sm space-y-3">
-            <PlanRecommendationCta currentCode={plan.code} />
-            <Button
-              type="button"
-              className="w-full sm:w-auto"
-              onClick={() => {
-                recordConversionEvent({
-                  eventType: 'OPEN_UPGRADE',
-                  metadata: { source: 'subscription_settings', currentPlan: plan.code },
-                }).catch(() => {})
-                openBrowseUpgrade(dispatch, {
-                  currentPlan: plan.name ?? null,
-                  upgradeUrl:
-                    e.tenantType === 'SUPPLIER'
-                      ? '/app/settings?tab=plan'
-                      : '/app/settings?tab=subscription',
-                })
-              }}
-            >
-              Compare plans & upgrade
-            </Button>
-            {plansData?.plans && plansData.plans.length > 0 && (
-              <div className="grid gap-2 pt-1 sm:grid-cols-2">
-                {plansData.plans.map((p) => (
-                  <div
-                    key={p.code}
-                    className="rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2"
-                  >
-                    <p className="font-medium text-[var(--text)]">{p.name}</p>
-                    {getPlanSubtitle(p.code) && (
-                      <p className="text-xs text-[var(--text-muted)]">{getPlanSubtitle(p.code)}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </CardContent>
     </Card>
   )
