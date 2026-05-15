@@ -24,6 +24,7 @@ import {
   getPlanTierDisabledFeatures,
   settingsFeaturesTabPath,
 } from '../lib/externallyControlledFeatures'
+import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 
 export function Layout() {
   const location = useLocation()
@@ -208,7 +209,7 @@ export function Layout() {
                   <button
                     type="button"
                     className="shrink-0 self-start font-medium text-slate-900 underline hover:no-underline sm:ml-4"
-                    onClick={() => navigate(settingsFeaturesTabPath(e.tenantType))}
+                    onClick={() => openBrowseUpgrade(dispatch, { currentPlan: e?.plan?.name })}
                   >
                     Compare plans
                   </button>
@@ -270,7 +271,7 @@ export function Layout() {
                   className="font-medium underline hover:no-underline"
                   onClick={() => {
                     recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
-                    navigate('/app/settings')
+                    openBrowseUpgrade(dispatch, { currentPlan: e?.plan?.name })
                   }}
                 >
                   View plans

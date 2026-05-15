@@ -1,8 +1,5 @@
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
-import {
-  closeMonetizationModal,
-  resetMonetizationModal,
-} from '../features/monetization/monetizationSlice'
+import { closeMonetizationModal, resetMonetizationModal } from '../features/monetization/monetizationSlice'
 import {
   useGetRecommendationQuery,
   useGetEntitlementsQuery,
@@ -12,7 +9,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Lock, TrendingUp } from 'lucide-react'
+import { Check, Lock, Minus, TrendingUp } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import {
   getLimitKeys,
@@ -21,7 +18,6 @@ import {
   FEATURE_KEY_LABELS,
   getPlanSubtitle,
 } from '../lib/planComparison'
-import { RecommendedBadge } from './RecommendedBadge'
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
@@ -30,10 +26,24 @@ const PLAN_LABELS: Record<string, string> = {
   platinum: 'Platinum',
 }
 
+const PLAN_PRICE_FALLBACK: Record<string, string> = {
+  free: 'Free',
+  bronze: '$49/mo',
+  gold: '$149/mo',
+  platinum: '$349/mo',
+}
+
+function getPlanPrice(plan: any): string {
+  if (plan.price_monthly != null) {
+    return plan.price_monthly === 0 ? 'Free' : `$${plan.price_monthly}/mo`
+  }
+  return PLAN_PRICE_FALLBACK[(plan.code || '').toLowerCase()] ?? '—'
+}
+
 function formatLimit(val: number | null | undefined): string {
   if (val == null) return '—'
   if (val === -1 || val >= 999999) return 'Unlimited'
-  return String(val)
+  return val.toLocaleString()
 }
 
 function toLimitNum(val: unknown): number | null {
@@ -42,36 +52,35 @@ function toLimitNum(val: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function isBetterLimit(premium: number | null, current: number | null): boolean {
-  if (premium == null) return false
-  if (current == null) return premium > 0 || premium === -1
-  if (premium === -1) return current !== -1
-  if (current === -1) return false
-  return premium > current
+function isBetterLimit(a: number | null, b: number | null): boolean {
+  if (a == null) return false
+  if (b == null) return a > 0 || a === -1
+  if (a === -1) return b !== -1
+  if (b === -1) return false
+  return a > b
 }
 
-function isBetterFeature(premium: boolean, current: boolean): boolean {
-  return premium && !current
+function isWorseThanCurrent(a: number | null, b: number | null): boolean {
+  if (a == null || b == null) return false
+  if (b === -1) return a !== -1 && a >= 0
+  if (a === -1) return false
+  return a < b
 }
 
-const UPGRADE_SUPPORT_EMAIL = import.meta.env.VITE_UPGRADE_SUPPORT_EMAIL || 'admin@supplify.com'
+const UPGRADE_SUPPORT_EMAIL =
+  import.meta.env.VITE_UPGRADE_SUPPORT_EMAIL || 'admin@supplify.com'
 
 function normalizeUpgradePath(url: string): string {
   return url.startsWith('/') ? url : `/app/${url}`
 }
 
-function isOnUpgradeDestination(
-  currentPath: string,
-  currentSearch: string,
-  target: string
-): boolean {
+function isOnUpgradeDestination(path: string, search: string, target: string): boolean {
   const [targetPath, targetQuery] = target.split('?')
-  if (currentPath !== targetPath) return false
-  if (!targetQuery) return currentPath.startsWith('/app/settings')
-  const normalizedSearch = currentSearch.startsWith('?') ? currentSearch.slice(1) : currentSearch
-  if (normalizedSearch === targetQuery) return true
-  // Settings uses in-page tabs; subscription may be active without ?tab= in the URL.
-  return currentPath === '/app/settings' && targetQuery.startsWith('tab=')
+  if (path !== targetPath) return false
+  if (!targetQuery) return path.startsWith('/app/settings')
+  const s = search.startsWith('?') ? search.slice(1) : search
+  if (s === targetQuery) return true
+  return path === '/app/settings' && targetQuery.startsWith('tab=')
 }
 
 export function UpgradeModal() {
@@ -102,18 +111,8 @@ export function UpgradeModal() {
   const featureKeys = getFeatureKeys(tenantType)
   const currentCode = (entitlements?.plan?.code ?? 'free').toLowerCase()
   const recommendedCode = recommendation?.recommendedPlanCode?.toLowerCase() ?? null
-  const topPlan = plans.length > 0 ? plans[plans.length - 1] : null
-  const topCode = topPlan?.code?.toLowerCase() ?? 'platinum'
+  const currentPlanIndex = plans.findIndex((p) => (p.code || '').toLowerCase() === currentCode)
   const currentPlanRow = plans.find((p) => (p.code || '').toLowerCase() === currentCode)
-  const recommendedPlanRow = plans.find((p) => (p.code || '').toLowerCase() === recommendedCode)
-  const mergeUpgradeColumn = Boolean(
-    recommendedPlanRow &&
-      topPlan &&
-      (recommendedPlanRow.code || '').toLowerCase() === (topPlan.code || '').toLowerCase()
-  )
-  const gridCols = mergeUpgradeColumn ? 'grid-cols-3' : 'grid-cols-4'
-  const highlightCell =
-    'bg-[var(--brand-pale)] font-medium text-[var(--brand-mid)] border-l-2 border-l-[var(--brand-mid)]'
 
   useEffect(() => {
     if (open)
@@ -152,38 +151,40 @@ export function UpgradeModal() {
     schedulePayloadReset()
   }
 
-  const handleUpgrade = () => {
+  const handleUpgrade = (targetCode?: string) => {
     if (!payload) return
 
     const upgradePath = normalizeUpgradePath(
       (payload as { upgradeUrl?: string }).upgradeUrl || '/app/settings?tab=subscription'
     )
     const onUpgradePage = isOnUpgradeDestination(location.pathname, location.search, upgradePath)
+    const code = targetCode ?? recommendedCode ?? null
     const planLabel =
-      recommendation?.recommendedPlanName ??
-      (recommendedCode ? (PLAN_LABELS[recommendedCode] ?? recommendedCode) : 'a paid plan')
+      code
+        ? (plans.find((p) => (p.code || '').toLowerCase() === code)?.name ??
+          PLAN_LABELS[code] ??
+          code)
+        : recommendation?.recommendedPlanName ?? 'a paid plan'
     const currentPlan =
-      (payload as { currentPlan?: string }).currentPlan ??
-      entitlements?.plan?.name ??
-      'Current plan'
+      (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
 
     recordConversionEvent({
       eventType: canUpgrade ? 'CLICK_UPGRADE' : 'CLOSE_UPGRADE_MODAL',
-      metadata: recommendedCode ? { recommendedPlanCode: recommendedCode, source: 'modal' } : {},
+      metadata: code ? { recommendedPlanCode: code, source: 'modal' } : {},
     }).catch(() => {})
-    if (recommendation?.recommendedPlanCode) {
+    if (code) {
       recordConversionEvent({
         eventType: 'RECOMMENDATION_CLICKED',
-        metadata: { recommendedPlanCode: recommendation.recommendedPlanCode },
+        metadata: { recommendedPlanCode: code },
       }).catch(() => {})
     }
 
     if (!canUpgrade) return
 
     if (onUpgradePage) {
-      const subject = encodeURIComponent(`Plan upgrade request (${planLabel})`)
+      const subject = encodeURIComponent(`Plan change request (${planLabel})`)
       const body = encodeURIComponent(
-        `Hi Supplify team,\n\nI would like to upgrade my workspace to ${planLabel}.\n\nCurrent plan: ${currentPlan}\n\nThank you.`
+        `Hi Supplify team,\n\nI would like to change my workspace plan to ${planLabel}.\n\nCurrent plan: ${currentPlan}\n\nThank you.`
       )
       window.location.href = `mailto:${UPGRADE_SUPPORT_EMAIL}?subject=${subject}&body=${body}`
       return
@@ -208,18 +209,11 @@ export function UpgradeModal() {
 
   const currentPlanName =
     (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
-  const recommendedPlans = (payload as { recommendedPlans?: string[] }).recommendedPlans ?? []
   const recommendedPlanName =
     recommendation?.recommendedPlanName ??
     (recommendedCode ? (PLAN_LABELS[recommendedCode] ?? recommendedCode) : null)
 
-  const topPlanName = topPlan?.name ?? (topCode === 'platinum' ? 'Platinum' : 'Top')
-  const showPlatinumCta =
-    canUpgrade &&
-    topPlan &&
-    recommendedCode &&
-    topCode !== recommendedCode &&
-    topCode !== currentCode
+  const colCount = Math.max(plans.length, 1)
 
   return (
     <Dialog
@@ -229,235 +223,319 @@ export function UpgradeModal() {
         if (!v) handleClose()
       }}
     >
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {type === 'limit' ? (
+            {type === 'limit' || (!isBrowseUpgrade && type === 'feature') ? (
               <TrendingUp className="h-5 w-5 text-amber-600" />
-            ) : isBrowseUpgrade ? (
-              <TrendingUp className="h-5 w-5 text-[var(--brand-mid)]" />
             ) : (
-              <Lock className="h-5 w-5 text-amber-600" />
+              <TrendingUp className="h-5 w-5 text-[var(--brand-mid)]" />
             )}
             {type === 'limit'
-              ? 'Limit reached'
+              ? 'Upgrade your plan'
               : isBrowseUpgrade
-                ? 'Upgrade your plan'
-                : 'Feature not available'}
+                ? 'Plans & Pricing'
+                : 'Feature not available on your plan'}
           </DialogTitle>
           <DialogDescription>
             {type === 'limit'
-              ? `You've reached your plan limit. Upgrade to get more.`
+              ? `You've reached your ${LIMIT_KEY_LABELS[(payload as any).limitKey] ?? 'plan'} limit. Upgrade to continue.`
               : isBrowseUpgrade
-                ? 'Compare plans and choose what fits your business.'
-                : `This feature isn't included in your current plan.`}
+                ? 'Compare plans and upgrade or downgrade at any time.'
+                : 'This feature requires a higher plan tier.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="rounded-lg border border-[var(--app-border)] bg-[var(--bg)] p-3 text-sm">
-            <p className="font-medium text-[var(--text-mid)]">Current plan: {currentPlanName}</p>
-            {type === 'limit' && 'limitKey' in payload && (
-              <p className="mt-1 text-[var(--text-muted)]">
-                {LIMIT_KEY_LABELS[payload.limitKey] || payload.limitKey}: {payload.currentUsage} /{' '}
-                {payload.limitValue}
-              </p>
-            )}
-            {type === 'feature' && 'featureKey' in payload && !isBrowseUpgrade && (
-              <p className="mt-1 text-[var(--text-muted)]">
-                Feature: {payload.featureKey.replace(/_/g, ' ')}
-              </p>
-            )}
-          </div>
 
-          {(recommendation?.recommendedPlanCode || recommendedPlans.length > 0) && (
-            <div className="rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3">
-              {recommendation?.recommendedPlanCode ? (
-                <p className="text-sm font-medium text-[var(--text-mid)]">
-                  Recommended:{' '}
-                  <span className="font-semibold">
-                    {recommendedPlanName ?? recommendation.recommendedPlanCode}
-                  </span>
-                </p>
-              ) : recommendedPlans.length > 0 ? (
-                <p className="text-sm font-medium text-[var(--text-mid)]">
-                  Upgrade to unlock:{' '}
-                  <span className="font-semibold">{recommendedPlans.join(', ')}</span>
-                </p>
-              ) : null}
-              {(recommendation?.reasonText ?? recommendation?.reason ?? '').trim() ? (
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  {recommendation?.reasonText ?? recommendation?.reason}
-                </p>
-              ) : null}
+        <div className="space-y-4 py-2">
+          {/* Context banner */}
+          {type === 'limit' && 'limitKey' in payload && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+              <p className="font-medium text-amber-900">
+                {LIMIT_KEY_LABELS[(payload as any).limitKey] || (payload as any).limitKey}:{' '}
+                {(payload as any).currentUsage} / {(payload as any).limitValue} used
+              </p>
+              <p className="mt-0.5 text-xs text-amber-800">
+                You're on the <span className="font-semibold">{currentPlanName}</span> plan.
+              </p>
+            </div>
+          )}
+          {type === 'feature' && 'featureKey' in payload && !isBrowseUpgrade && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+              <p className="font-medium text-amber-900">
+                <span className="font-semibold">
+                  {FEATURE_KEY_LABELS[(payload as any).featureKey] ??
+                    (payload as any).featureKey.replace(/_/g, ' ')}
+                </span>{' '}
+                is not included in your{' '}
+                <span className="font-semibold">{currentPlanName}</span> plan.
+              </p>
             </div>
           )}
 
-          {plans.length >= 2 && entitlements && (
-            <div className="overflow-hidden rounded-lg border border-[var(--app-border)]">
-              <div
-                className={`grid ${gridCols} border-b border-[var(--app-border)] bg-[var(--bg)] text-sm`}
-              >
-                <div className="p-2 font-medium text-[var(--text-mid)]">Feature / Limit</div>
-                <div className="p-2">
-                  <div className="font-semibold">{currentPlanRow?.name ?? 'Current'}</div>
-                  {currentPlanRow?.code && getPlanSubtitle(currentPlanRow.code) && (
-                    <div className="text-xs font-normal text-[var(--text-muted)]">
-                      {getPlanSubtitle(currentPlanRow.code)}
-                    </div>
-                  )}
-                </div>
-                {mergeUpgradeColumn ? (
-                  <div className="p-2">
-                    <div className="flex flex-wrap items-center gap-1.5 font-semibold">
-                      {recommendedPlanRow?.name ?? topPlan?.name ?? 'Upgrade'}
-                      <RecommendedBadge
-                        planCode={recommendedPlanRow?.code ?? topPlan?.code ?? ''}
-                        recommendedPlanCode={recommendation?.recommendedPlanCode}
-                        subtle={recommendation?.reasonCode === 'CURRENT_BEST'}
-                      />
-                    </div>
-                    {(() => {
-                      const code = recommendedPlanRow?.code ?? topPlan?.code
-                      const sub = getPlanSubtitle(code)
-                      return sub ? (
-                        <div className="text-xs font-normal text-[var(--text-muted)]">{sub}</div>
-                      ) : null
-                    })()}
-                  </div>
-                ) : (
-                  <>
-                    <div className="p-2">
-                      <div className="flex flex-wrap items-center gap-1.5 font-semibold">
-                        {recommendedPlanRow?.name ?? 'Recommended'}
-                        <RecommendedBadge
-                          planCode={recommendedPlanRow?.code ?? ''}
-                          recommendedPlanCode={recommendation?.recommendedPlanCode}
-                          subtle={recommendation?.reasonCode === 'CURRENT_BEST'}
-                        />
-                      </div>
-                      {recommendedPlanRow?.code && getPlanSubtitle(recommendedPlanRow.code) && (
-                        <div className="text-xs font-normal text-[var(--text-muted)]">
-                          {getPlanSubtitle(recommendedPlanRow.code)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-2">
-                      <div className="font-semibold">{topPlan?.name ?? 'Top'}</div>
-                      {topPlan?.code && getPlanSubtitle(topPlan.code) && (
-                        <div className="text-xs font-normal text-[var(--text-muted)]">
-                          {getPlanSubtitle(topPlan.code)}
-                        </div>
-                      )}
-                    </div>
-                  </>
+          {/* Recommendation banner */}
+          {recommendation?.recommendedPlanCode &&
+            recommendation.reasonCode !== 'CURRENT_BEST' &&
+            recommendedCode !== currentCode && (
+              <div className="rounded-lg border border-[var(--brand-pale)] bg-[var(--brand-ultra)] px-4 py-3 text-sm">
+                <p className="font-medium text-[var(--brand-mid)]">
+                  We recommend:{' '}
+                  <span className="font-semibold">{recommendedPlanName}</span>
+                </p>
+                {((recommendation.reasonText ?? (recommendation as any).reason) ?? '').trim() && (
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                    {recommendation.reasonText ?? (recommendation as any).reason}
+                  </p>
                 )}
               </div>
-              {limitKeys.map((key) => {
-                const cur = currentPlanRow?.limits?.[key] ?? entitlements.limits?.[key]
-                const curNum = toLimitNum(cur)
-                const rec = recommendedPlanRow?.limits?.[key]
-                const recNum = toLimitNum(rec)
-                const top = topPlan?.limits?.[key]
-                const topNum = toLimitNum(top)
-                const recHighlight = isBetterLimit(recNum, curNum)
-                const topHighlight = isBetterLimit(topNum, curNum)
-                const upgradeHighlight = mergeUpgradeColumn
-                  ? recHighlight || topHighlight
-                  : recHighlight
+            )}
+
+          {/* Plan cards */}
+          {plans.length >= 2 && entitlements && (
+            <div
+              className="grid gap-3"
+              style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}
+            >
+              {plans.map((plan, i) => {
+                const code = (plan.code || '').toLowerCase()
+                const isCurrent = code === currentCode
+                const isRecommended = code === recommendedCode && recommendedCode !== currentCode
+                const isAbove = i > currentPlanIndex
+                const isBelow = i < currentPlanIndex && !isCurrent
+
                 return (
-                  <div key={key} className={`grid ${gridCols} border-b text-sm last:border-b-0`}>
-                    <div className="p-2 text-[var(--text-muted)]">
-                      {LIMIT_KEY_LABELS[key] ?? key}
-                    </div>
-                    <div className="p-2">{formatLimit(curNum)}</div>
-                    <div className={`p-2 ${upgradeHighlight ? highlightCell : ''}`}>
-                      {formatLimit(recNum)}
-                    </div>
-                    {!mergeUpgradeColumn && (
-                      <div className={`p-2 ${topHighlight ? highlightCell : ''}`}>
-                        {formatLimit(topNum)}
+                  <div
+                    key={plan.id ?? plan.code}
+                    className={`flex flex-col gap-2 rounded-lg border p-3 ${
+                      isCurrent
+                        ? 'border-[var(--brand-mid)] bg-[var(--brand-ultra)] ring-1 ring-[var(--brand-mid)]'
+                        : isRecommended
+                          ? 'border-[var(--brand)] bg-[var(--surface)]'
+                          : 'border-[var(--app-border)] bg-[var(--surface)]'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center justify-between gap-1">
+                        <span
+                          className={`text-xs font-semibold uppercase tracking-wide ${
+                            isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)]'
+                          }`}
+                        >
+                          {plan.name}
+                        </span>
+                        {isCurrent && (
+                          <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                            Your plan
+                          </span>
+                        )}
+                        {isRecommended && (
+                          <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                            Recommended
+                          </span>
+                        )}
                       </div>
-                    )}
+                      <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                        {getPlanSubtitle(plan.code)}
+                      </p>
+                    </div>
+
+                    <p className="text-lg font-bold text-[var(--text)]">{getPlanPrice(plan)}</p>
+
+                    <div className="flex-1" />
+
+                    {isCurrent ? (
+                      <button
+                        disabled
+                        className="w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-1.5 text-xs text-[var(--text-muted)]"
+                      >
+                        Current plan
+                      </button>
+                    ) : !canUpgrade ? (
+                      <button
+                        disabled
+                        className="w-full cursor-default rounded-md border border-[var(--app-border)] py-1.5 text-xs text-[var(--text-muted)]"
+                      >
+                        Ask owner
+                      </button>
+                    ) : isAbove ? (
+                      <button
+                        className="w-full cursor-pointer rounded-md py-1.5 text-xs font-semibold text-white"
+                        style={{
+                          background: isRecommended ? 'var(--brand)' : 'var(--brand-mid)',
+                        }}
+                        onClick={() => handleUpgrade(code)}
+                      >
+                        Upgrade to {plan.name}
+                      </button>
+                    ) : isBelow ? (
+                      <button
+                        className="w-full cursor-pointer rounded-md border border-[var(--app-border)] py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg)]"
+                        onClick={() => handleUpgrade(code)}
+                      >
+                        Downgrade to {plan.name}
+                      </button>
+                    ) : null}
                   </div>
                 )
               })}
-              {featureKeys.map((key) => {
-                const cur = currentPlanRow?.features?.[key] ?? entitlements.features?.[key]
-                const curVal = typeof cur === 'boolean' ? cur : cur !== 'false' && !!cur
-                const rec = recommendedPlanRow?.features?.[key]
-                const recVal = typeof rec === 'boolean' ? rec : rec !== 'false' && !!rec
-                const top = topPlan?.features?.[key]
-                const topVal = typeof top === 'boolean' ? top : top !== 'false' && !!top
-                const recHighlight = isBetterFeature(recVal, curVal)
-                const topHighlight = isBetterFeature(topVal, curVal)
-                const upgradeHighlight = mergeUpgradeColumn
-                  ? recHighlight || topHighlight
-                  : recHighlight
-                return (
-                  <div key={key} className={`grid ${gridCols} border-b text-sm last:border-b-0`}>
-                    <div className="p-2 text-[var(--text-muted)]">
-                      {FEATURE_KEY_LABELS[key] ?? key}
-                    </div>
-                    <div className="p-2">{curVal ? 'Yes' : 'No'}</div>
-                    <div className={`p-2 ${upgradeHighlight ? highlightCell : ''}`}>
-                      {recVal ? 'Yes' : 'No'}
-                    </div>
-                    {!mergeUpgradeColumn && (
-                      <div className={`p-2 ${topHighlight ? highlightCell : ''}`}>
-                        {topVal ? 'Yes' : 'No'}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              <div
-                className={`grid ${gridCols} border-t border-[var(--app-border)] bg-[var(--bg)] px-2 py-1 text-xs text-[var(--text-muted)]`}
-              >
-                <div className={`p-1 ${mergeUpgradeColumn ? 'col-span-3' : 'col-span-4'}`}>
-                  Highlight = higher limit or unlocked feature vs your current plan
-                </div>
-              </div>
             </div>
           )}
 
-          <p className="text-xs text-[var(--text-muted)]">
-            Plan changes are applied by your workspace administrator. On the subscription page, use
-            the buttons below to request an upgrade by email.
-          </p>
+          {/* Comparison table */}
+          {plans.length >= 2 && entitlements && (
+            <div className="overflow-hidden rounded-lg border border-[var(--app-border)]">
+              {/* Header row */}
+              <div
+                className="grid border-b border-[var(--app-border)] bg-[var(--bg)]"
+                style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
+              >
+                <div className="p-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                  Plan details
+                </div>
+                {plans.map((plan) => {
+                  const code = (plan.code || '').toLowerCase()
+                  const isCurrent = code === currentCode
+                  return (
+                    <div
+                      key={plan.code}
+                      className={`p-2 text-center ${isCurrent ? 'bg-[var(--brand-ultra)]' : ''}`}
+                    >
+                      <div
+                        className={`text-xs font-semibold ${
+                          isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)]'
+                        }`}
+                      >
+                        {plan.name}
+                        {isCurrent && ' ✓'}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
 
-          <div className="flex flex-col gap-2 pt-2 sticky bottom-0 bg-[var(--surface)] border-t border-[var(--app-border)] pt-4 -mx-6 px-6 -mb-2 pb-2">
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={handleUpgrade} className="flex-1 min-w-[10rem]">
-                {canUpgrade
-                  ? onUpgradePage
-                    ? recommendedPlanName
-                      ? `Request ${recommendedPlanName} upgrade`
-                      : 'Request plan upgrade'
-                    : recommendedPlanName
-                      ? `Upgrade to ${recommendedPlanName}`
-                      : 'View plans in settings'
-                  : 'Ask Owner to Upgrade'}
-              </Button>
-              {showPlatinumCta && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 min-w-[10rem]"
-                  onClick={() => {
-                    const subject = encodeURIComponent(`Plan upgrade request (${topPlanName})`)
-                    const body = encodeURIComponent(
-                      `Hi Supplify team,\n\nI would like to upgrade my workspace to ${topPlanName}.\n\nCurrent plan: ${currentPlanName}\n\nThank you.`
-                    )
-                    window.location.href = `mailto:${UPGRADE_SUPPORT_EMAIL}?subject=${subject}&body=${body}`
-                  }}
+              {/* Limit rows */}
+              {limitKeys.map((key) => (
+                <div
+                  key={key}
+                  className="grid border-b border-[var(--app-border)] last:border-b-0"
+                  style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
                 >
-                  Request {topPlanName}
-                </Button>
-              )}
-              <Button type="button" variant="outline" onClick={handleClose}>
-                Dismiss
-              </Button>
+                  <div className="p-2 text-xs text-[var(--text-muted)]">
+                    {LIMIT_KEY_LABELS[key] ?? key}
+                  </div>
+                  {plans.map((plan) => {
+                    const code = (plan.code || '').toLowerCase()
+                    const isCurrent = code === currentCode
+                    const rawVal = isCurrent
+                      ? (currentPlanRow?.limits?.[key] ?? entitlements.limits?.[key])
+                      : plan.limits?.[key]
+                    const val = toLimitNum(rawVal)
+                    const curVal = toLimitNum(
+                      currentPlanRow?.limits?.[key] ?? entitlements.limits?.[key]
+                    )
+                    const better = !isCurrent && isBetterLimit(val, curVal)
+                    const worse = !isCurrent && isWorseThanCurrent(val, curVal)
+                    return (
+                      <div
+                        key={plan.code}
+                        className={`p-2 text-center text-xs ${
+                          isCurrent
+                            ? 'bg-[var(--brand-ultra)] font-semibold text-[var(--brand-mid)]'
+                            : better
+                              ? 'font-medium text-emerald-700'
+                              : worse
+                                ? 'text-[var(--text-muted)]'
+                                : 'text-[var(--text)]'
+                        }`}
+                      >
+                        {formatLimit(val)}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+
+              {/* Feature rows */}
+              {featureKeys.map((key) => (
+                <div
+                  key={key}
+                  className="grid border-b border-[var(--app-border)] last:border-b-0"
+                  style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
+                >
+                  <div className="p-2 text-xs text-[var(--text-muted)]">
+                    {FEATURE_KEY_LABELS[key] ?? key}
+                  </div>
+                  {plans.map((plan) => {
+                    const code = (plan.code || '').toLowerCase()
+                    const isCurrent = code === currentCode
+                    const rawVal = isCurrent
+                      ? (currentPlanRow?.features?.[key] ?? entitlements.features?.[key])
+                      : plan.features?.[key]
+                    const val =
+                      typeof rawVal === 'boolean' ? rawVal : rawVal !== 'false' && !!rawVal
+                    const curRaw =
+                      currentPlanRow?.features?.[key] ?? entitlements.features?.[key]
+                    const curVal =
+                      typeof curRaw === 'boolean' ? curRaw : curRaw !== 'false' && !!curRaw
+                    const better = !isCurrent && val && !curVal
+                    return (
+                      <div
+                        key={plan.code}
+                        className={`flex items-center justify-center p-2 ${
+                          isCurrent ? 'bg-[var(--brand-ultra)]' : ''
+                        }`}
+                      >
+                        {val ? (
+                          <Check
+                            className={`h-3.5 w-3.5 ${
+                              isCurrent
+                                ? 'text-[var(--brand-mid)]'
+                                : better
+                                  ? 'text-emerald-600'
+                                  : 'text-[var(--text-muted)]'
+                            }`}
+                          />
+                        ) : (
+                          <Minus className="h-3.5 w-3.5 text-[var(--app-border-mid)]" />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
+          )}
+
+          {!canUpgrade && (
+            <p className="text-xs text-[var(--text-muted)]">
+              Plan changes require workspace owner permissions. Ask your account owner to upgrade.
+            </p>
+          )}
+
+          {/* Bottom actions */}
+          <div className="-mb-2 -mx-6 flex flex-wrap gap-2 border-t border-[var(--app-border)] bg-[var(--surface)] px-6 pb-2 pt-4 sticky bottom-0">
+            {canUpgrade && recommendedCode && recommendedCode !== currentCode && (
+              <Button
+                type="button"
+                onClick={() => handleUpgrade()}
+                className="min-w-[10rem] flex-1"
+              >
+                {onUpgradePage
+                  ? `Request ${recommendedPlanName ?? 'upgrade'}`
+                  : `Upgrade to ${recommendedPlanName ?? 'recommended plan'}`}
+              </Button>
+            )}
+            {canUpgrade && (!recommendedCode || recommendedCode === currentCode) && !isBrowseUpgrade && (
+              <Button
+                type="button"
+                onClick={() => handleUpgrade()}
+                className="min-w-[10rem] flex-1"
+              >
+                {onUpgradePage ? 'Request plan upgrade' : 'View plans in settings'}
+              </Button>
+            )}
+            <Button type="button" variant="outline" onClick={handleClose}>
+              {isBrowseUpgrade ? 'Close' : 'Dismiss'}
+            </Button>
           </div>
         </div>
       </DialogContent>

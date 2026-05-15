@@ -161,7 +161,7 @@ export function Header() {
             }
           >
             <TrendingUp style={{ width: 14, height: 14, marginRight: 4 }} />
-            Upgrade
+            {hasUrgency ? 'Upgrade' : 'Plans'}
             {hasUrgency && (
               <span
                 style={{
