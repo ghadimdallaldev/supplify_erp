@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useAppDispatch } from '../hooks/redux'
 import { showMonetizationBlock } from '../features/monetization/monetizationSlice'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
@@ -12,9 +13,13 @@ import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
 import { Skeleton } from './ui/skeleton'
-import { AlertCircle, AlertTriangle, Infinity, TrendingUp } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Infinity, Layers, Lock, TrendingUp } from 'lucide-react'
 import { RecommendedBadge } from './RecommendedBadge'
 import { getPlanSubtitle } from '../lib/planComparison'
+import {
+  getExternallyDisabledFeatures,
+  getPlanTierDisabledFeatures,
+} from '../lib/externallyControlledFeatures'
 
 const LIMIT_LABELS: Record<string, string> = {
   branches: 'Branches',
@@ -43,8 +48,8 @@ function PlanRecommendationCta({ currentCode }: { currentCode: string }) {
   if (!isRecommended) {
     return (
       <>
-        <p className="text-blue-800 font-medium mb-2">Upgrade to unlock more features</p>
-        <p className="text-blue-700">
+        <p className="text-[var(--brand-mid)] font-medium mb-2">Upgrade to unlock more features</p>
+        <p className="text-[var(--brand-mid)]">
           Bronze, Gold, and Platinum plans offer advanced features, higher limits, and more.
         </p>
       </>
@@ -52,10 +57,10 @@ function PlanRecommendationCta({ currentCode }: { currentCode: string }) {
   }
   return (
     <>
-      <p className="text-blue-800 font-medium mb-2 flex items-center gap-2">
+      <p className="text-[var(--brand-mid)] font-medium mb-2 flex items-center gap-2">
         Recommended: <span className="font-semibold">{PLAN_CODE_LABELS[rec] ?? rec}</span>
       </p>
-      <p className="text-blue-700">{reason}</p>
+      <p className="text-[var(--brand-mid)]">{reason}</p>
     </>
   )
 }
@@ -66,6 +71,10 @@ export function SubscriptionInfo() {
   const { data, isLoading, error } = useGetEntitlementsQuery()
   const { data: recommendation } = useGetRecommendationQuery({})
   const { data: plansData } = useGetSubscriptionPlansQuery()
+
+  const e = data?.entitlements ?? null
+  const externallyDisabled = useMemo(() => (e ? getExternallyDisabledFeatures(e) : []), [e])
+  const planTierDisabled = useMemo(() => (e ? getPlanTierDisabledFeatures(e) : []), [e])
 
   if (isLoading) {
     return (
@@ -84,7 +93,7 @@ export function SubscriptionInfo() {
     )
   }
 
-  if (error || !data?.entitlements) {
+  if (error || !e) {
     return (
       <Card>
         <CardHeader>
@@ -92,7 +101,7 @@ export function SubscriptionInfo() {
           <CardDescription>We could not load your plan details yet.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-[var(--text-muted)]">
             Compare available plans and choose an upgrade when you are ready.
           </p>
           <Button
@@ -112,13 +121,48 @@ export function SubscriptionInfo() {
     )
   }
 
-  const e = data.entitlements
   const plan = e.plan
   const limits = e.limits
   const usage = e.usage
   const features = e.features
+  const featureSources = e.featureSources
 
   const getFeatureDisplay = (value: boolean) => (value ? 'Enabled' : 'Disabled')
+
+  function featureOffNote(featureKey: string): string | null {
+    if (features[featureKey as keyof typeof features]) return null
+    const src = featureSources?.[featureKey]
+    if (src === 'tenant_override') {
+      return 'Turned off for your account by an administrator.'
+    }
+    if (src === 'global') {
+      return 'Turned off platform-wide by an administrator.'
+    }
+    return null
+  }
+
+  function planTierOffNote(featureKey: string): string | null {
+    if (features[featureKey as keyof typeof features]) return null
+    const src = featureSources?.[featureKey]
+    if (src === 'plan' || src === 'default') {
+      return 'Not included on your current plan tier. Compare plans below to upgrade.'
+    }
+    return null
+  }
+
+  const keyFeatureOffNotes = {
+    chat: featureOffNote('chat'),
+    smart_reorder: featureOffNote('smart_reorder'),
+    reports: featureOffNote('reports'),
+    multi_branch: featureOffNote('multi_branch'),
+  } as const
+
+  const keyFeatureTierNotes = {
+    chat: planTierOffNote('chat'),
+    smart_reorder: planTierOffNote('smart_reorder'),
+    reports: planTierOffNote('reports'),
+    multi_branch: planTierOffNote('multi_branch'),
+  } as const
 
   const limitEntries = Object.entries(limits).filter(
     ([_, limit]) => limit !== null && limit !== undefined
@@ -146,16 +190,16 @@ export function SubscriptionInfo() {
                 />
               </div>
               {getPlanSubtitle(plan.code) && (
-                <p className="text-sm text-gray-500">{getPlanSubtitle(plan.code)}</p>
+                <p className="text-sm text-[var(--text-muted)]">{getPlanSubtitle(plan.code)}</p>
               )}
-              <p className="text-sm text-gray-600">Current Plan</p>
+              <p className="text-sm text-[var(--text-muted)]">Current Plan</p>
             </div>
             <Badge variant="outline">
               {e.tenantType === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
             </Badge>
           </div>
           {plan.price_monthly != null && (
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[var(--text-muted)]">
               ${plan.price_monthly}/mo
               {plan.price_yearly != null && plan.price_yearly > 0 && ` · $${plan.price_yearly}/yr`}
             </p>
@@ -250,7 +294,7 @@ export function SubscriptionInfo() {
                   <span>{label}</span>
                   <span
                     className={
-                      isOver ? 'text-red-600 font-medium' : isWarning ? 'text-amber-600' : ''
+                      isOver ? 'text-[var(--red)] font-medium' : isWarning ? 'text-amber-600' : ''
                     }
                   >
                     {current} / {limitNum}
@@ -261,7 +305,7 @@ export function SubscriptionInfo() {
                   className={isOver ? 'bg-red-200' : isWarning ? 'bg-amber-100' : ''}
                 />
                 {isOver && (
-                  <div className="flex items-center gap-2 text-sm text-red-600">
+                  <div className="flex items-center gap-2 text-sm text-[var(--red)]">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     Limit exceeded
                   </div>
@@ -306,7 +350,7 @@ export function SubscriptionInfo() {
           })}
 
           {limitEntries.length === 0 && (
-            <div className="flex items-center gap-2 text-sm text-green-600">
+            <div className="flex items-center gap-2 text-sm text-[var(--mint)]">
               <Infinity className="w-4 h-4" />
               Unlimited access on this plan
             </div>
@@ -316,37 +360,105 @@ export function SubscriptionInfo() {
         {/* Key Features */}
         <div className="space-y-4">
           <h4 className="font-semibold">Key Features</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          {externallyDisabled.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              <p className="font-medium flex items-center gap-2">
+                <Lock className="h-4 w-4 shrink-0" aria-hidden />
+                Administrator access controls
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-900/95">
+                {externallyDisabled.map(({ key, label, source }) => (
+                  <li key={key}>
+                    <span className="font-medium">{label}</span>
+                    {source === 'tenant_override'
+                      ? ' is disabled specifically for your account by an administrator.'
+                      : ' is disabled platform-wide for all accounts.'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {planTierDisabled.length > 0 && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900">
+              <p className="font-medium flex items-center gap-2">
+                <Layers className="h-4 w-4 shrink-0" aria-hidden />
+                Plan tier
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700">
+                {planTierDisabled.map(({ key, label, source }) => (
+                  <li key={key}>
+                    <span className="font-medium text-slate-900">{label}</span>
+                    {source === 'plan'
+                      ? ' is turned off for your current plan tier (see your plan details above).'
+                      : ' is not included on your current plan tier.'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 sm:gap-2">
             <div>
-              <span className="text-gray-600">Chat:</span>{' '}
-              <Badge variant={features.chat ? 'default' : 'secondary'} className="ml-2">
-                {getFeatureDisplay(features.chat)}
-              </Badge>
+              <div>
+                <span className="text-[var(--text-muted)]">Chat:</span>{' '}
+                <Badge variant={features.chat ? 'default' : 'secondary'} className="ml-2">
+                  {getFeatureDisplay(features.chat)}
+                </Badge>
+              </div>
+              {keyFeatureOffNotes.chat && (
+                <p className="mt-1 text-xs text-amber-900">{keyFeatureOffNotes.chat}</p>
+              )}
+              {!keyFeatureOffNotes.chat && keyFeatureTierNotes.chat && (
+                <p className="mt-1 text-xs text-slate-700">{keyFeatureTierNotes.chat}</p>
+              )}
             </div>
             <div>
-              <span className="text-gray-600">Smart Reorder:</span>{' '}
-              <Badge variant={features.smart_reorder ? 'default' : 'secondary'} className="ml-2">
-                {getFeatureDisplay(features.smart_reorder)}
-              </Badge>
+              <div>
+                <span className="text-[var(--text-muted)]">Smart Reorder:</span>{' '}
+                <Badge variant={features.smart_reorder ? 'default' : 'secondary'} className="ml-2">
+                  {getFeatureDisplay(features.smart_reorder)}
+                </Badge>
+              </div>
+              {keyFeatureOffNotes.smart_reorder && (
+                <p className="mt-1 text-xs text-amber-900">{keyFeatureOffNotes.smart_reorder}</p>
+              )}
+              {!keyFeatureOffNotes.smart_reorder && keyFeatureTierNotes.smart_reorder && (
+                <p className="mt-1 text-xs text-slate-700">{keyFeatureTierNotes.smart_reorder}</p>
+              )}
             </div>
             <div>
-              <span className="text-gray-600">Analytics:</span>{' '}
-              <Badge variant={features.reports ? 'default' : 'secondary'} className="ml-2">
-                {getFeatureDisplay(features.reports)}
-              </Badge>
+              <div>
+                <span className="text-[var(--text-muted)]">Analytics:</span>{' '}
+                <Badge variant={features.reports ? 'default' : 'secondary'} className="ml-2">
+                  {getFeatureDisplay(features.reports)}
+                </Badge>
+              </div>
+              {keyFeatureOffNotes.reports && (
+                <p className="mt-1 text-xs text-amber-900">{keyFeatureOffNotes.reports}</p>
+              )}
+              {!keyFeatureOffNotes.reports && keyFeatureTierNotes.reports && (
+                <p className="mt-1 text-xs text-slate-700">{keyFeatureTierNotes.reports}</p>
+              )}
             </div>
             <div>
-              <span className="text-gray-600">Multi-Branch:</span>{' '}
-              <Badge variant={features.multi_branch ? 'default' : 'secondary'} className="ml-2">
-                {getFeatureDisplay(features.multi_branch)}
-              </Badge>
+              <div>
+                <span className="text-[var(--text-muted)]">Multi-Branch:</span>{' '}
+                <Badge variant={features.multi_branch ? 'default' : 'secondary'} className="ml-2">
+                  {getFeatureDisplay(features.multi_branch)}
+                </Badge>
+              </div>
+              {keyFeatureOffNotes.multi_branch && (
+                <p className="mt-1 text-xs text-amber-900">{keyFeatureOffNotes.multi_branch}</p>
+              )}
+              {!keyFeatureOffNotes.multi_branch && keyFeatureTierNotes.multi_branch && (
+                <p className="mt-1 text-xs text-slate-700">{keyFeatureTierNotes.multi_branch}</p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Upgrade CTA + Recommended plan */}
         {(plan.name === 'Free' || plan.code !== 'platinum') && (
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm space-y-3">
+          <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4 text-sm space-y-3">
             <PlanRecommendationCta currentCode={plan.code} />
             <Button
               type="button"
@@ -372,11 +484,11 @@ export function SubscriptionInfo() {
                 {plansData.plans.map((p) => (
                   <div
                     key={p.code}
-                    className="rounded-md border border-blue-100 bg-white px-3 py-2"
+                    className="rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2"
                   >
-                    <p className="font-medium text-gray-900">{p.name}</p>
+                    <p className="font-medium text-[var(--text)]">{p.name}</p>
                     {getPlanSubtitle(p.code) && (
-                      <p className="text-xs text-gray-500">{getPlanSubtitle(p.code)}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{getPlanSubtitle(p.code)}</p>
                     )}
                   </div>
                 ))}
