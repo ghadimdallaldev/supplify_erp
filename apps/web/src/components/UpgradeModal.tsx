@@ -105,7 +105,12 @@ export function UpgradeModal() {
   const [recordConversionEvent] = useRecordConversionEventMutation()
 
   const entitlements = entitlementsData?.entitlements
-  const plans = plansData?.plans ?? []
+  const TIER_ORDER = ['free', 'bronze', 'gold', 'platinum', 'enterprise']
+  const plans = [...(plansData?.plans ?? [])].sort((a, b) => {
+    const ai = TIER_ORDER.indexOf((a.code || '').toLowerCase())
+    const bi = TIER_ORDER.indexOf((b.code || '').toLowerCase())
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+  })
   const tenantType = entitlements?.tenantType ?? 'RESTAURANT'
   const limitKeys = getLimitKeys(tenantType)
   const featureKeys = getFeatureKeys(tenantType)
