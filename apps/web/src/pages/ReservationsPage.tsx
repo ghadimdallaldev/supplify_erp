@@ -26,10 +26,7 @@ export function ReservationsPage() {
     isLoading: boardLoading,
     refetch,
   } = useGetReservationBoardQuery({ date: selectedDate })
-  const {
-    data: analytics,
-    refetch: refetchAnalytics,
-  } = useGetReservationAnalyticsQuery({ range })
+  const { data: analytics, refetch: refetchAnalytics } = useGetReservationAnalyticsQuery({ range })
   const { data: guestIntel, isLoading: guestIntelLoading } = useGetGuestIntelligenceQuery({})
   const { data: restaurantMe } = useGetRestaurantMeQuery()
 
@@ -283,7 +280,8 @@ export function ReservationsPage() {
 
                 <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-800">
                   Email and WhatsApp confirmations are sent automatically for confirmed seats when
-                  guests provide contact details. Configure your channels in Settings → Notifications.
+                  guests provide contact details. Configure your channels in Settings →
+                  Notifications.
                 </div>
               </>
             )}
