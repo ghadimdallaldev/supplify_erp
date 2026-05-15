@@ -288,8 +288,8 @@ Canonical list of all implemented features. Single source of truth for backend e
 **Flags**
 
 - Recommendation API: always returns a result; reasonCode one of FREE_DEFAULT, NEAR_LIMIT, LIMIT_EXCEEDED, FEATURE_BLOCKED, MULTIPLE_BLOCKS, CURRENT_BEST. Deterministic: lowest plan that resolves; Free with no issue → Gold.
-- Enterprise checklist: docs/sales/enterprise_checklist.md (discovery, sizing, integration, onboarding, contract template, timelines).
-- Launch Polish: docs/LAUNCH_POLISH.md (manual test notes for Recommended badge, nav Upgrade CTA, plan subtitles).
+- Enterprise checklist: [enterprise_checklist.md](../sales/enterprise_checklist.md) (discovery, sizing, integration, onboarding, contract template, timelines).
+- Launch Polish: [LAUNCH_POLISH.md](../operations/LAUNCH_POLISH.md) (manual test notes for Recommended badge, nav Upgrade CTA, plan subtitles).
 
 ---
 
@@ -298,7 +298,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 - **CORS (API):** Multiple dev origins supported via `WEB_ORIGINS` (default dev: localhost 5173–5175); production defaults to single `WEB_ORIGIN`. See apps/api/src/config/env.js, server.js, lib/socket.js.
 - **API exports (web):** Subscription/entitlements and plan-change preview hooks exported from apps/web/src/services/api.ts (useGetEntitlementsQuery, usePreviewSubscriptionPlanChangeMutation).
 - **Sidebar:** usePermissions imported from hooks/usePermissions; admin nav shown for any user with role ADMIN (no ADMIN_ACCESS gate in UI).
-- **Launch Polish (micro):** RecommendedBadge component (planComparison.ts PLAN_SUBTITLES); Header nav Upgrade CTA (visibility from entitlements + blockedCountLast7d); manual checks in docs/LAUNCH_POLISH.md.
+- **Launch Polish (micro):** RecommendedBadge component (planComparison.ts PLAN_SUBTITLES); Header nav Upgrade CTA (visibility from entitlements + blockedCountLast7d); manual checks in [LAUNCH_POLISH.md](../operations/LAUNCH_POLISH.md).
 
 ---
 

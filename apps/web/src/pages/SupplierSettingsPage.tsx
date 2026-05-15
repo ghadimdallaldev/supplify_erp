@@ -23,9 +23,9 @@ import { formatCurrency } from '../utils/format'
 import { canAddWarehouses } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { 
-  useGetSupplierMeQuery, 
-  useUpdateSupplierMutation, 
-  useUploadSupplierLogoMutation, 
+  useGetSupplierMeQuery,
+  useUpdateSupplierMutation,
+  useUploadSupplierLogoMutation,
   useGetPresignedUrlMutation,
   useGetProductsQuery,
   useGetOrdersQuery,
@@ -33,6 +33,8 @@ import {
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
   useGetEntitlementsQuery,
+  useGetWarehousesQuery,
+  useCreateWarehouseMutation,
 } from '../services/api'
 
 const SUPPLIER_NOTIFICATION_DEFAULTS = {
@@ -80,6 +82,8 @@ export function SupplierSettingsPage() {
   const { data: notificationPrefsData, isLoading: isLoadingNotificationPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
   const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
+  const { data: warehousesData, refetch: refetchWarehouses } = useGetWarehousesQuery()
+  const [createWarehouse, { isLoading: isCreatingWarehouse }] = useCreateWarehouseMutation()
   const entitlements = entitlementsData?.entitlements
   // Main warehouse placeholder counts as one location under plan limits.
   const canAddWarehouse = canAddWarehouses(entitlements, 1)
@@ -257,7 +261,7 @@ export function SupplierSettingsPage() {
     isPrimary: false,
   })
 
-  const handleAddWarehouse = () => {
+  const handleAddWarehouse = async () => {
     if (!canAddWarehouse) {
       toast.error('Additional warehouses are not included on your current plan. Upgrade to add more.')
       openBrowseUpgrade(dispatch, {
@@ -266,18 +270,26 @@ export function SupplierSettingsPage() {
       })
       return
     }
-    // TODO: Implement API call to add warehouse
-    console.log('Adding warehouse:', warehouseForm)
-    toast.success('Warehouse added successfully!')
-    setShowAddWarehouse(false)
-    setWarehouseForm({
-      name: '',
-      code: '',
-      address: '',
-      city: '',
-      country: '',
-      isMain: false,
-    })
+    if (!warehouseForm.name.trim()) {
+      toast.error('Warehouse name is required')
+      return
+    }
+    try {
+      const address = [warehouseForm.address, warehouseForm.city, warehouseForm.country]
+        .filter(Boolean)
+        .join(', ')
+      await createWarehouse({
+        name: warehouseForm.name,
+        code: warehouseForm.code || undefined,
+        address: address || undefined,
+      }).unwrap()
+      toast.success('Warehouse added successfully!')
+      await refetchWarehouses()
+      setShowAddWarehouse(false)
+      setWarehouseForm({ name: '', code: '', address: '', city: '', country: '', isMain: false })
+    } catch (err: any) {
+      toast.error(err?.data?.error?.message || 'Failed to add warehouse')
+    }
   }
 
   const handleAddZone = () => {
@@ -367,7 +379,7 @@ export function SupplierSettingsPage() {
   if (isLoadingSupplier) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -375,62 +387,62 @@ export function SupplierSettingsPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Supplier Settings</h1>
-        <p className="text-gray-600 mt-2">Manage your business profile and settings</p>
+        <h1 className="text-[21px] font-black text-[var(--text)]">Supplier Settings</h1>
+        <p className="text-[var(--text-muted)] mt-2">Manage your business profile and settings</p>
       </div>
 
       {/* Statistics Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+        <Card className="bg-gradient-to-br from-[var(--brand-ultra)] to-[var(--brand-pale)] border-[var(--app-border)]">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-700">Total Products</p>
-                <p className="text-2xl font-bold text-blue-900">{statistics.totalProducts}</p>
-                <p className="text-xs text-blue-600 mt-1">{statistics.activeProducts} active</p>
+                <p className="text-sm font-medium text-[var(--brand-mid)]">Total Products</p>
+                <p className="text-2xl font-bold text-[var(--text)]">{statistics.totalProducts}</p>
+                <p className="text-xs text-[var(--brand-mid)] mt-1">{statistics.activeProducts} active</p>
               </div>
-              <Package className="h-10 w-10 text-blue-500" />
+              <Package className="h-10 w-10 text-[var(--brand-mid)]" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+        <Card className="bg-gradient-to-br from-[var(--mint-pale)] to-[var(--mint-pale)] border-[var(--mint)]/35">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-700">Total Orders</p>
-                <p className="text-2xl font-bold text-green-900">{statistics.totalOrders}</p>
-                <p className="text-xs text-green-600 mt-1">{statistics.completedOrders} completed</p>
+                <p className="text-sm font-medium text-[var(--mint)]">Total Orders</p>
+                <p className="text-2xl font-bold text-[var(--mint)]">{statistics.totalOrders}</p>
+                <p className="text-xs text-[var(--mint)] mt-1">{statistics.completedOrders} completed</p>
               </div>
-              <ShoppingCart className="h-10 w-10 text-green-500" />
+              <ShoppingCart className="h-10 w-10 text-[var(--mint)]" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+        <Card className="bg-gradient-to-br from-[var(--amber-pale)] to-[var(--amber-pale)] border-[var(--amber-mid)]/35">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-yellow-700">Pending Orders</p>
-                <p className="text-2xl font-bold text-yellow-900">{statistics.pendingOrders}</p>
-                <p className="text-xs text-yellow-600 mt-1">Awaiting fulfillment</p>
+                <p className="text-sm font-medium text-[var(--amber)]">Pending Orders</p>
+                <p className="text-2xl font-bold text-[var(--amber)]">{statistics.pendingOrders}</p>
+                <p className="text-xs text-[var(--amber)] mt-1">Awaiting fulfillment</p>
               </div>
-              <Clock className="h-10 w-10 text-yellow-500" />
+              <Clock className="h-10 w-10 text-[var(--amber-mid)]" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+        <Card className="bg-gradient-to-br from-[var(--brand-pale)] to-[var(--brand-ultra)] border-[var(--app-border)]">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-700">Total Revenue</p>
-                <p className="text-2xl font-bold text-purple-900">
+                <p className="text-sm font-medium text-[var(--brand-mid)]">Total Revenue</p>
+                <p className="text-2xl font-bold text-[var(--text)]">
                   {formatCurrency(statistics.totalRevenue)}
                 </p>
-                <p className="text-xs text-purple-600 mt-1">All-time</p>
+                <p className="text-xs text-[var(--brand-mid)] mt-1">All-time</p>
               </div>
-              <DollarSign className="h-10 w-10 text-purple-500" />
+              <DollarSign className="h-10 w-10 text-[var(--brand-mid)]" />
             </div>
           </CardContent>
         </Card>
@@ -467,7 +479,7 @@ export function SupplierSettingsPage() {
                   getPresignedUrl={handleGetPresignedUrl}
                 />
               ) : (
-                <p className="text-sm text-gray-500">Loading supplier information...</p>
+                <p className="text-sm text-[var(--text-muted)]">Loading supplier information...</p>
               )}
             </CardContent>
           </Card>
@@ -524,7 +536,7 @@ export function SupplierSettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="contact_email">Contact Email *</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                     <Input 
                       id="contact_email"
                       type="email"
@@ -538,7 +550,7 @@ export function SupplierSettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                     <Input 
                       id="phone"
                       type="tel"
@@ -554,7 +566,7 @@ export function SupplierSettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="website">Website</Label>
                 <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                   <Input 
                     id="website"
                     type="url"
@@ -670,15 +682,15 @@ export function SupplierSettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-semibold">John Doe</h4>
                         <Badge variant="secondary">Sales Manager</Badge>
-                        <Badge className="bg-blue-500 text-white">Primary</Badge>
+                        <Badge className="bg-[var(--brand)] text-white">Primary</Badge>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
                         <span className="flex items-center gap-1">
                           <Mail className="h-3 w-3" />
                           john.doe@freshproduce.com
@@ -691,19 +703,19 @@ export function SupplierSettingsPage() {
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">Remove</Button>
+                      <Button variant="outline" size="sm" className="text-[var(--red)] hover:text-[var(--red)]">Remove</Button>
                     </div>
                   </div>
                 </div>
                 
-                <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-semibold">Jane Smith</h4>
                         <Badge variant="secondary">Operations Lead</Badge>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
                         <span className="flex items-center gap-1">
                           <Mail className="h-3 w-3" />
                           jane.smith@freshproduce.com
@@ -716,15 +728,15 @@ export function SupplierSettingsPage() {
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">Remove</Button>
+                      <Button variant="outline" size="sm" className="text-[var(--red)] hover:text-[var(--red)]">Remove</Button>
                     </div>
                   </div>
                 </div>
                 
-                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                  <UserPlus className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                  <p className="text-gray-600">No additional contacts</p>
-                  <p className="text-sm text-gray-500 mt-1">Add contacts to manage your team</p>
+                <div className="text-center py-8 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                  <UserPlus className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                  <p className="text-[var(--text-muted)]">No additional contacts</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Add contacts to manage your team</p>
                 </div>
               </div>
             </CardContent>
@@ -748,10 +760,10 @@ export function SupplierSettingsPage() {
                 </div>
                 <div className="space-y-3">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                    <div key={day} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-gray-50">
+                    <div key={day} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-[var(--brand-ultra)]">
                       <div className="w-28 font-medium">{day}</div>
                       <Input type="time" className="w-32" placeholder="09:00" />
-                      <span className="text-gray-500">to</span>
+                      <span className="text-[var(--text-muted)]">to</span>
                       <Input type="time" className="w-32" placeholder="17:00" />
                       <Button variant="outline" size="sm" className="ml-auto">Closed</Button>
                     </div>
@@ -768,12 +780,12 @@ export function SupplierSettingsPage() {
                   <div className="space-y-2">
                     <Label>Minimum Order Value ($)</Label>
                     <Input type="number" placeholder="100.00" />
-                    <p className="text-xs text-gray-500">Restaurants must order at least this amount</p>
+                    <p className="text-xs text-[var(--text-muted)]">Restaurants must order at least this amount</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Payment Terms</Label>
                     <Input placeholder="Net 30" />
-                    <p className="text-xs text-gray-500">e.g., Net 30, Cash on Delivery</p>
+                    <p className="text-xs text-[var(--text-muted)]">e.g., Net 30, Cash on Delivery</p>
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label>Return Policy</Label>
@@ -836,29 +848,33 @@ export function SupplierSettingsPage() {
                   higher to add warehouse locations.
                 </div>
               )}
-              <div className="space-y-4">
-                <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold">Main Warehouse</h4>
-                        <Badge className="bg-green-500 text-white">Main</Badge>
-                        <Badge variant="outline">WH-001</Badge>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <MapPin className="h-4 w-4" />
-                        <span>123 Farm Road, Agricultural City, USA</span>
+              <div className="space-y-3">
+                {(warehousesData?.warehouses ?? []).length === 0 ? (
+                  <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                    <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                    <p className="text-[var(--text-muted)]">No warehouses yet</p>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">Add a warehouse to manage multiple locations</p>
+                  </div>
+                ) : (
+                  (warehousesData?.warehouses ?? []).map((wh: any) => (
+                    <div key={wh.id} className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold">{wh.name}</h4>
+                            {wh.code && <Badge variant="outline">{wh.code}</Badge>}
+                          </div>
+                          {wh.address && (
+                            <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                              <MapPin className="h-4 w-4" />
+                              <span>{wh.address}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">Edit</Button>
-                  </div>
-                </div>
-                
-                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-                  <Warehouse className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                  <p className="text-gray-600">No additional warehouses</p>
-                  <p className="text-sm text-gray-500 mt-1">Add warehouses to manage multiple locations</p>
-                </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -882,7 +898,7 @@ export function SupplierSettingsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {isLoadingNotificationPrefs ? (
-                <div className="flex items-center gap-3 text-sm text-gray-500">
+                <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading notification preferences…
                 </div>
@@ -892,13 +908,13 @@ export function SupplierSettingsPage() {
                     {SUPPLIER_NOTIFICATION_FIELDS.map(({ key, label, description }) => (
                       <label
                         key={key}
-                        className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-gray-50 cursor-pointer"
+                        className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-[var(--brand-ultra)] cursor-pointer"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-gray-800">{label}</span>
-                          {notificationPrefs[key] && <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />}
+                          <span className="text-sm font-medium text-[var(--text)]">{label}</span>
+                          {notificationPrefs[key] && <CheckCircle2 className="h-5 w-5 text-[var(--mint)] shrink-0" />}
                         </div>
-                        <p className="text-xs text-gray-500">{description}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{description}</p>
                         <input
                           type="checkbox"
                           className="hidden"
@@ -945,21 +961,21 @@ export function SupplierSettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <h4 className="font-semibold mb-2">Downtown Zone</h4>
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
-                          <span className="text-gray-500">Fee:</span>
+                          <span className="text-[var(--text-muted)]">Fee:</span>
                           <span className="ml-2 font-medium">$10.00</span>
                         </div>
                         <div>
-                          <span className="text-gray-500">Min Order:</span>
+                          <span className="text-[var(--text-muted)]">Min Order:</span>
                           <span className="ml-2 font-medium">$50.00</span>
                         </div>
                         <div>
-                          <span className="text-gray-500">Delivery:</span>
+                          <span className="text-[var(--text-muted)]">Delivery:</span>
                           <span className="ml-2 font-medium">2 days</span>
                         </div>
                       </div>
@@ -968,10 +984,10 @@ export function SupplierSettingsPage() {
                   </div>
                 </div>
                 
-                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-                  <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                  <p className="text-gray-600">No additional delivery zones</p>
-                  <p className="text-sm text-gray-500 mt-1">Add zones to define delivery areas and pricing</p>
+                <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                  <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                  <p className="text-[var(--text-muted)]">No additional delivery zones</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Add zones to define delivery areas and pricing</p>
                 </div>
               </div>
             </CardContent>
@@ -1053,7 +1069,8 @@ export function SupplierSettingsPage() {
             <Button variant="outline" onClick={() => setShowAddWarehouse(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddWarehouse}>
+            <Button onClick={handleAddWarehouse} disabled={isCreatingWarehouse}>
+              {isCreatingWarehouse ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Add Warehouse
             </Button>
           </DialogFooter>
@@ -1113,10 +1130,10 @@ export function SupplierSettingsPage() {
             </div>
             <div className="space-y-2">
               <Label>Coverage Area (Map Integration)</Label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">Map picker will be integrated here</p>
-                <p className="text-xs text-gray-400 mt-1">Draw polygon or select area</p>
+              <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center">
+                <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                <p className="text-sm text-[var(--text-muted)]">Map picker will be integrated here</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Draw polygon or select area</p>
               </div>
             </div>
           </div>
@@ -1215,7 +1232,7 @@ export function SupplierSettingsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer transition-colors">
+            <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center hover:border-[var(--brand-mid)] cursor-pointer transition-colors">
               <input
                 type="file"
                 accept=".csv,.xlsx,.xls"
@@ -1224,12 +1241,12 @@ export function SupplierSettingsPage() {
                 id="csv-upload"
               />
               <label htmlFor="csv-upload" className="cursor-pointer">
-                <Upload className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">Drop your CSV/Excel file here</p>
-                <p className="text-xs text-gray-400 mt-1">or click to browse</p>
+                <Upload className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                <p className="text-sm text-[var(--text-muted)]">Drop your CSV/Excel file here</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">or click to browse</p>
               </label>
             </div>
-            <div className="text-sm text-gray-600 bg-blue-50 p-4 rounded-lg">
+            <div className="text-sm text-[var(--text-muted)] bg-[var(--brand-ultra)] p-4 rounded-lg">
               <p className="font-medium mb-2">Expected columns:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>Name (required)</li>
@@ -1245,7 +1262,7 @@ export function SupplierSettingsPage() {
                 <p className="font-medium text-sm">Preview ({uploadedContacts.length} contacts):</p>
                 <div className="max-h-48 overflow-y-auto border rounded-lg">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-[var(--brand-ultra)]">
                       <tr>
                         <th className="px-3 py-2 text-left">Name</th>
                         <th className="px-3 py-2 text-left">Email</th>
@@ -1263,9 +1280,9 @@ export function SupplierSettingsPage() {
                           <td className="px-3 py-2">{contact.role}</td>
                           <td className="px-3 py-2 text-center">
                             {contact.isPrimary ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
+                              <CheckCircle2 className="h-4 w-4 text-[var(--mint)] mx-auto" />
                             ) : (
-                              <XCircle className="h-4 w-4 text-gray-400 mx-auto" />
+                              <XCircle className="h-4 w-4 text-[var(--text-muted)] mx-auto" />
                             )}
                           </td>
                         </tr>

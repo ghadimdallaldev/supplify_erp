@@ -17,10 +17,10 @@ Full guide: **[docs/README.md](docs/README.md)**
 
 | Topic                 | Doc                                                        |
 | --------------------- | ---------------------------------------------------------- |
-| **Feature catalog**   | [docs/features.md](docs/features.md)                       |
+| **Feature catalog**   | [docs/product/features.md](docs/product/features.md)                       |
 | Local Docker workflow | [docs/README.md](docs/README.md)                           |
-| Database migrations   | [docs/database-migrations.md](docs/database-migrations.md) |
-| Admin feature toggles | [docs/admin-feature-flags.md](docs/admin-feature-flags.md) |
+| Database migrations   | [docs/guides/database-migrations.md](docs/guides/database-migrations.md) |
+| Admin feature toggles | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md) |
 | Production deploy     | [deploy/README.md](deploy/README.md)                       |
 
 ## Scripts

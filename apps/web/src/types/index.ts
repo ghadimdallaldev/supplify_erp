@@ -876,6 +876,8 @@ export interface Entitlements {
     price_yearly: number | null
   }
   features: Record<string, boolean>
+  /** How each feature in `features` was resolved (tenant override → global → plan → default). */
+  featureSources?: Record<string, 'tenant_override' | 'global' | 'plan' | 'default'>
   limits: Record<string, number | null>
   baseLimits: Record<string, number | null>
   overrides: Array<{
@@ -893,7 +895,7 @@ export interface AdminFeatureFlag {
   featureName: string
   description: string | null
   globalOverride: boolean | null
-  updatedAt: string
+  updatedAt: string | null
 }
 
 export interface EffectiveFeature {

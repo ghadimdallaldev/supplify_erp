@@ -126,7 +126,7 @@ async function main() {
     console.log('   • Supplier:   Fresh Foods Co. – supplier@supplify.com')
     console.log('   • Each tenant has an ACTIVE Free subscription.')
     console.log(
-      '\n   Run seed:demo-users so Keycloak has exactly these 3 users, then use docs/MANUAL_TEST_CHECKLIST.md to test.'
+      '\n   Run seed:demo-users so Keycloak has exactly these 3 users, then use docs/guides/manual-testing.md to test.'
     )
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})

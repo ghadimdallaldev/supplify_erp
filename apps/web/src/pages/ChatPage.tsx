@@ -12,7 +12,12 @@ import { Link } from 'react-router-dom'
 import { format, isToday, isYesterday } from 'date-fns'
 import { formatPrice } from '../utils/format'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+/** Same host as API in dev (Vite proxies /api and /socket.io); explicit URL when set. */
+function getChatSocketBaseUrl(): string {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
+  if (typeof window !== 'undefined') return window.location.origin
+  return 'http://localhost:4000'
+}
 
 export function ChatPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -61,34 +66,25 @@ export function ChatPage() {
   // Initialize socket
   useEffect(() => {
     if (!socketRef.current) {
-      socketRef.current = io(API_URL, {
+      socketRef.current = io(getChatSocketBaseUrl(), {
+        path: '/socket.io',
         transports: ['websocket', 'polling'],
         withCredentials: true,
       })
 
-      socketRef.current.on('connect', () => {
-        console.log('Socket connected')
-      })
+      socketRef.current.on('connect', () => {})
 
-      socketRef.current.on('disconnect', () => {
-        console.log('Socket disconnected')
-      })
+      socketRef.current.on('disconnect', () => {})
 
-      socketRef.current.on('new_message', (data: any) => {
-        console.log('New message received:', data)
-        // Refetch messages to show the new message
+      socketRef.current.on('new_message', (_data: any) => {
         refetchMessages()
       })
 
-      socketRef.current.on('message_read_update', (data: any) => {
-        console.log('Message read update received:', data)
-        // Refetch messages to update read status
+      socketRef.current.on('message_read_update', (_data: any) => {
         refetchMessages()
       })
 
-      socketRef.current.on('messages_read_update', (data: any) => {
-        console.log('Messages read update received:', data)
-        // Refetch messages to update read status
+      socketRef.current.on('messages_read_update', (_data: any) => {
         refetchMessages()
       })
 
@@ -111,9 +107,15 @@ export function ChatPage() {
   useEffect(() => {
     const supplierId = searchParams.get('supplier')
     const conversationId = searchParams.get('conversation')
-    
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
     // Only process supplier param if we don't already have a conversation param
     if (supplierId && !conversationId && user?.role === 'RESTAURANT' && !isCreatingConversation) {
+      if (!uuidRe.test(supplierId)) {
+        toast.error('This supplier link is invalid. Open chat from the supplier profile.')
+        navigate('/app/chat', { replace: true })
+        return
+      }
       // Find existing conversation with this supplier
       const existingConv = conversationsData?.conversations?.find((conv: any) => 
         conv.supplier_id === supplierId
@@ -134,8 +136,12 @@ export function ChatPage() {
             navigate(`/app/chat?conversation=${result.conversation.id}`, { replace: true })
           })
           .catch((error: any) => {
-            console.error('Create conversation error:', error)
-            toast.error(error?.data?.error?.message || 'Failed to create conversation')
+            const msg =
+              error?.data?.message ||
+              error?.data?.error?.message ||
+              error?.error ||
+              'Failed to create conversation'
+            toast.error(typeof msg === 'string' ? msg : 'Failed to create conversation')
           })
       }
     }
@@ -467,16 +473,6 @@ export function ChatPage() {
     return groups
   }, [])
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Chat Page Debug:', {
-      conversationsCount: conversations.length,
-      conversations,
-      selectedConversation,
-      messagesCount: messages.length,
-    })
-  }, [conversations, selectedConversation, messages])
-
   if (conversationsLoading || isCreatingConversation) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -503,8 +499,8 @@ export function ChatPage() {
           <CardContent className="p-0 flex-1 flex flex-col min-h-0">
             <div className="divide-y max-h-[calc(100vh-14rem)] overflow-y-auto">
               {conversations.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground space-y-3">
-                  <MessageSquare className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />
+                <div className="p-4 text-center text-sm text-[var(--text-muted)] space-y-3">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-2 text-[var(--text-muted)]/50" />
                   <p className="font-medium">No conversations yet</p>
                   {user?.role === 'RESTAURANT' && (
                     <>
@@ -532,27 +528,27 @@ export function ChatPage() {
                       selectedConversation === conv.id 
                         ? 'bg-accent border-l-primary' 
                         : conv.is_pinned 
-                          ? 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20' 
+                          ? 'border-l-[var(--brand-mid)] bg-[var(--brand-ultra)]/50 dark:bg-[var(--brand)]/20' 
                           : 'border-l-transparent'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2 font-medium">
                         {conv.is_pinned && (
-                          <Pin className="h-3 w-3 text-blue-600 dark:text-blue-400 fill-current" />
+                          <Pin className="h-3 w-3 text-[var(--brand-mid)] dark:text-[var(--brand-light)] fill-current" />
                         )}
                         {conv.participant_name}
                       </div>
                       {conv.unread_count > 0 && (
-                        <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs rounded-full px-2 py-0.5 font-semibold shadow-sm">
+                        <span className="bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] text-white text-xs rounded-full px-2 py-0.5 font-semibold shadow-sm">
                           {conv.unread_count}
                         </span>
                       )}
                     </div>
-                    <div className="text-sm text-muted-foreground truncate">
+                    <div className="text-sm text-[var(--text-muted)] truncate">
                       {conv.last_message_preview || 'No messages yet'}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-[var(--text-muted)] mt-1">
                       {conv.last_message_at ? (
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
@@ -573,19 +569,19 @@ export function ChatPage() {
         <Card className="flex-1 flex flex-col min-h-0">
           {selectedConversation ? (
             <>
-              <CardHeader className="border-b bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/50 dark:to-purple-950/50">
+              <CardHeader className="border-b bg-gradient-to-r from-[var(--brand-ultra)]/50 to-[var(--brand-pale)]/50 dark:from-[var(--brand)]/50 dark:to-[var(--text)]/50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CardTitle className="flex items-center gap-2">
                       {conversations.find((c: any) => c.id === selectedConversation)?.is_pinned && (
-                        <Pin className="h-4 w-4 text-blue-600 dark:text-blue-400 fill-current" />
+                        <Pin className="h-4 w-4 text-[var(--brand-mid)] dark:text-[var(--brand-light)] fill-current" />
                       )}
                       {conversations.find((c: any) => c.id === selectedConversation)?.participant_name || 'Chat'}
                     </CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="relative">
-                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                       <Input
                         placeholder="Search messages..."
                         value={searchQuery}
@@ -597,7 +593,7 @@ export function ChatPage() {
                           onClick={() => setSearchQuery('')}
                           className="absolute right-2 top-1/2 transform -translate-y-1/2"
                         >
-                            <X className="h-4 w-4 text-muted-foreground" />
+                            <X className="h-4 w-4 text-[var(--text-muted)]" />
                           </button>
                       )}
                     </div>
@@ -611,13 +607,13 @@ export function ChatPage() {
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                       {showConversationMenu && (
-                        <div className="absolute right-0 top-10 z-50 w-48 bg-background border rounded-lg shadow-xl p-1 border-gray-200 dark:border-gray-700">
+                        <div className="absolute right-0 top-10 z-50 w-48 bg-background border rounded-lg shadow-xl p-1 border-[var(--app-border)] dark:border-[var(--app-border-mid)]">
                           <button
                             onClick={() => {
                               handlePinConversation()
                               setShowConversationMenu(false)
                             }}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-muted text-sm transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--brand-ultra)] text-sm transition-colors"
                           >
                             {conversations.find((c: any) => c.id === selectedConversation)?.is_pinned ? (
                               <>
@@ -636,7 +632,7 @@ export function ChatPage() {
                               handleArchiveConversation()
                               setShowConversationMenu(false)
                             }}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-muted text-sm transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--brand-ultra)] text-sm transition-colors"
                           >
                             <Archive className="h-4 w-4" />
                             Archive
@@ -665,9 +661,9 @@ export function ChatPage() {
                   className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
                 >
                   {messagesLoading ? (
-                    <div className="text-center text-muted-foreground">Loading messages...</div>
+                    <div className="text-center text-[var(--text-muted)]">Loading messages...</div>
                   ) : filteredMessages.length === 0 ? (
-                    <div className="text-center text-muted-foreground">
+                    <div className="text-center text-[var(--text-muted)]">
                       {searchQuery ? 'No messages found' : 'No messages yet. Start the conversation!'}
                     </div>
                   ) : (
@@ -676,7 +672,7 @@ export function ChatPage() {
                         <div key={group.date}>
                           {/* Date Separator */}
                           <div className="flex items-center justify-center my-6">
-                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 px-4 py-1.5 rounded-full text-xs font-medium text-blue-700 dark:text-blue-300 shadow-sm border border-blue-200 dark:border-blue-800">
+                            <div className="bg-gradient-to-r from-[var(--brand-ultra)] to-[var(--brand-pale)] dark:from-[var(--brand)] dark:to-[var(--text)] px-4 py-1.5 rounded-full text-xs font-medium text-[var(--brand-mid)] dark:text-[var(--brand-light)] shadow-sm border border-[var(--app-border)] dark:border-[var(--brand)]">
                               {isToday(new Date(group.date)) ? '📅 Today' : isYesterday(new Date(group.date)) ? '📅 Yesterday' : `📅 ${format(new Date(group.date), 'MMMM d, yyyy')}`}
                             </div>
                           </div>
@@ -694,19 +690,19 @@ export function ChatPage() {
                               >
                                 <div className={`max-w-[75%] ${isMyMessage ? 'flex flex-col items-end' : 'flex flex-col items-start'}`}>
                                   {replyingTo?.id === msg.id && (
-                                    <div className="text-xs text-muted-foreground mb-1 px-2">
+                                    <div className="text-xs text-[var(--text-muted)] mb-1 px-2">
                                       Replying to: {msg.content.substring(0, 50)}...
                                     </div>
                                   )}
                                   <div
                                     className={`rounded-2xl px-4 py-2.5 shadow-md transition-all hover:shadow-lg backdrop-blur-sm ${
                                       isMyMessage
-                                        ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 text-white border border-blue-400/30 shadow-blue-500/20'
-                                        : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 text-gray-900 dark:from-gray-800 dark:via-gray-850 dark:to-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-gray-500/10'
+                                        ? 'bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] text-white border border-white/20 shadow-md'
+                                        : 'bg-gradient-to-br from-[var(--surface)] via-[var(--brand-ultra)] to-[var(--brand-ultra)] text-[var(--text)] border border-[var(--app-border)] shadow-sm'
                                     }`}
                                   >
                                     {msg.reply_to && msg.reply_to_content && (
-                                      <div className={`text-xs mb-1 pb-1 border-b ${isMyMessage ? 'border-primary-foreground/20' : 'border-border'} opacity-70`}>
+                                      <div className={`text-xs mb-1 pb-1 border-b ${isMyMessage ? 'border-white/20' : 'border-[var(--app-border)]'} opacity-70`}>
                                         <div className="flex items-start gap-1">
                                           <Reply className="h-3 w-3 mt-0.5 flex-shrink-0" />
                                           <div className="flex-1 min-w-0">
@@ -725,15 +721,15 @@ export function ChatPage() {
                                       <div className={`mb-2 p-3 rounded-lg border-2 ${
                                         isMyMessage 
                                           ? 'bg-white/10 border-white/20' 
-                                          : 'bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700'
+                                          : 'bg-[var(--brand-ultra)] dark:bg-[var(--text)] border-[var(--app-border-mid)] dark:border-[var(--app-border-mid)]'
                                       }`}>
                                         <div className="flex items-center gap-2 mb-2">
-                                          <ShoppingCart className={`h-4 w-4 ${isMyMessage ? 'text-white' : 'text-blue-600'}`} />
-                                          <span className={`font-semibold text-sm ${isMyMessage ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>
+                                          <ShoppingCart className={`h-4 w-4 ${isMyMessage ? 'text-white' : 'text-[var(--brand-mid)]'}`} />
+                                          <span className={`font-semibold text-sm ${isMyMessage ? 'text-white' : 'text-[var(--text)]'}`}>
                                             Order Reference
                                           </span>
                                         </div>
-                                        <div className={`text-xs ${isMyMessage ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'}`}>
+                                        <div className={`text-xs ${isMyMessage ? 'text-white/90' : 'text-[var(--text-muted)] dark:text-[var(--text-muted)]'}`}>
                                           Order ID: {msg.order_id.slice(0, 8)}...
                                         </div>
                                         {ordersData?.orders?.find((o: any) => o.id === msg.order_id) && (
@@ -768,7 +764,7 @@ export function ChatPage() {
                                                 className={`flex items-center gap-2 p-2 rounded-lg border ${
                                                   isMyMessage 
                                                     ? 'bg-white/10 border-white/20 text-white hover:bg-white/20' 
-                                                    : 'bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                    : 'bg-[var(--brand-ultra)] border-[var(--app-border-mid)] hover:bg-[var(--brand-pale)]'
                                                 } transition-colors`}
                                               >
                                                 <FileText className="h-4 w-4" />
@@ -784,16 +780,16 @@ export function ChatPage() {
                                     <div className="text-sm break-words whitespace-pre-wrap">{msg.content}</div>
                                     <div
                                       className={`text-xs mt-1 flex items-center gap-1 ${
-                                        isMyMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                                        isMyMessage ? 'text-white/70' : 'text-[var(--text-muted)]'
                                       }`}
                                     >
                                       <span>{formatMessageDate(msg.created_at)}</span>
                                       {isMyMessage && (
                                         <span className="ml-1">
                                           {msg.is_read ? (
-                                            <span className="text-blue-400">✓✓</span>
+                                            <span className="text-[var(--brand-light)]">✓✓</span>
                                           ) : (
-                                            <span className="text-primary-foreground/50">✓</span>
+                                            <span className="text-white/50">✓</span>
                                           )}
                                         </span>
                                       )}
@@ -802,7 +798,7 @@ export function ChatPage() {
                                   {!isMyMessage && (
                                     <button
                                       onClick={() => setReplyingTo(msg)}
-                                      className="text-xs text-muted-foreground mt-1 px-2 hover:text-foreground"
+                                      className="text-xs text-[var(--text-muted)] mt-1 px-2 hover:text-foreground"
                                     >
                                       Reply
                                     </button>
@@ -817,13 +813,13 @@ export function ChatPage() {
                       {/* Typing Indicator - Only show when OTHER party is typing */}
                       {otherPartyTyping && (
                         <div className="flex justify-start mb-2">
-                          <div className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-2xl px-4 py-2.5 shadow-sm border border-gray-200 dark:border-gray-700">
+                          <div className="bg-gradient-to-br from-[var(--brand-ultra)] to-[var(--app-border-mid)] rounded-2xl px-4 py-2.5 shadow-sm border border-[var(--app-border)]">
                             <div className="flex gap-1.5 items-center">
                               <span className="text-base">✍️</span>
-                              <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                              <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                              <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                              <span className="text-xs text-muted-foreground ml-2">typing...</span>
+                              <div className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <div className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <div className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                              <span className="text-xs text-[var(--text-muted)] ml-2">typing...</span>
                             </div>
                           </div>
                         </div>
@@ -847,10 +843,10 @@ export function ChatPage() {
 
                 {/* Reply Preview */}
                 {replyingTo && (
-                  <div className="border-t px-4 py-2 bg-muted/50 flex items-center justify-between">
+                  <div className="border-t px-4 py-2 bg-[var(--brand-ultra)]/50 flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm">
-                      <Reply className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Replying to:</span>
+                      <Reply className="h-4 w-4 text-[var(--text-muted)]" />
+                      <span className="text-[var(--text-muted)]">Replying to:</span>
                       <span className="truncate max-w-xs">{replyingTo.content}</span>
                     </div>
                     <Button
@@ -866,19 +862,19 @@ export function ChatPage() {
 
                 {/* File/Order Previews */}
                 {(selectedFiles.length > 0 || selectedOrder) && (
-                  <div className="border-t px-4 py-3 bg-muted/30 space-y-2">
+                  <div className="border-t px-4 py-3 bg-[var(--brand-ultra)]/30 space-y-2">
                     {selectedFiles.map((file, index) => (
                       <div key={index} className="flex items-center gap-2 p-2 bg-background rounded-lg border">
                         {filePreviews[index] ? (
                           <img src={filePreviews[index]} alt={file.name} className="h-12 w-12 rounded object-cover" />
                         ) : (
-                          <div className="h-12 w-12 rounded bg-muted flex items-center justify-center">
-                            <FileText className="h-6 w-6 text-muted-foreground" />
+                          <div className="h-12 w-12 rounded bg-[var(--brand-ultra)] flex items-center justify-center">
+                            <FileText className="h-6 w-6 text-[var(--text-muted)]" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm truncate">{file.name}</div>
-                          <div className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</div>
+                          <div className="text-xs text-[var(--text-muted)]">{(file.size / 1024).toFixed(1)} KB</div>
                         </div>
                         <Button
                           variant="ghost"
@@ -892,10 +888,10 @@ export function ChatPage() {
                     ))}
                     {selectedOrder && (
                       <div className="flex items-center gap-2 p-2 bg-background rounded-lg border">
-                        <ShoppingCart className="h-5 w-5 text-blue-600" />
+                        <ShoppingCart className="h-5 w-5 text-[var(--brand-mid)]" />
                         <div className="flex-1">
                           <div className="text-sm font-medium">Order #{selectedOrder.id.slice(0, 8)}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-[var(--text-muted)]">
                             {selectedOrder.total_amount ? formatPrice(selectedOrder.total_amount) : 'View details'}
                           </div>
                         </div>
@@ -916,13 +912,13 @@ export function ChatPage() {
                 <div className="border-t p-4 bg-gradient-to-t from-background to-background/95">
                   {/* Emoji Picker */}
                   {showEmojiPicker && (
-                    <div className="emoji-picker-container mb-3 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-gray-200 dark:border-gray-700">
+                    <div className="emoji-picker-container mb-3 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-[var(--app-border)] dark:border-[var(--app-border-mid)]">
                       <div className="grid grid-cols-8 gap-1">
                         {commonEmojis.map((emoji, index) => (
                           <button
                             key={index}
                             onClick={() => insertEmoji(emoji)}
-                            className="text-2xl hover:scale-125 transition-transform p-1 rounded hover:bg-muted"
+                            className="text-2xl hover:scale-125 transition-transform p-1 rounded hover:bg-[var(--brand-ultra)]"
                           >
                             {emoji}
                           </button>
@@ -993,7 +989,7 @@ export function ChatPage() {
                     <Button 
                       onClick={handleSendMessage} 
                       disabled={(!message.trim() && selectedFiles.length === 0 && !selectedOrder) || isSendingMessage || isUploadingFile}
-                      className="h-9 px-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md"
+                      className="h-9 px-4 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] hover:opacity-90 text-white shadow-md"
                     >
                       <Send className="h-4 w-4" />
                     </Button>
@@ -1001,8 +997,8 @@ export function ChatPage() {
                   
                   {/* Order Picker */}
                   {showOrderPicker && ordersData?.orders && (
-                    <div className="order-picker-container mt-2 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-gray-200 dark:border-gray-700">
-                      <div className="text-xs font-medium mb-2 text-muted-foreground">Select an order to share:</div>
+                    <div className="order-picker-container mt-2 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-[var(--app-border)] dark:border-[var(--app-border-mid)]">
+                      <div className="text-xs font-medium mb-2 text-[var(--text-muted)]">Select an order to share:</div>
                       <div className="space-y-1">
                         {ordersData.orders.slice(0, 5).map((order: any) => (
                           <button
@@ -1011,10 +1007,10 @@ export function ChatPage() {
                               setSelectedOrder(order)
                               setShowOrderPicker(false)
                             }}
-                            className="w-full text-left p-2 rounded hover:bg-muted transition-colors text-sm"
+                            className="w-full text-left p-2 rounded hover:bg-[var(--brand-ultra)] transition-colors text-sm"
                           >
                             <div className="font-medium">Order #{order.id.slice(0, 8)}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-[var(--text-muted)]">
                               {order.total_amount ? formatPrice(order.total_amount) : 'No amount'} • {order.status}
                             </div>
                           </button>
@@ -1026,7 +1022,7 @@ export function ChatPage() {
               </CardContent>
             </>
           ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
+            <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
               Select a conversation to start chatting
             </div>
           )}

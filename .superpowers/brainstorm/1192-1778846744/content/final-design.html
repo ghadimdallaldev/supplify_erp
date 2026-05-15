@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supplify ERP — Final Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --brand:       #5b21b6;
+  --brand-mid:   #7c3aed;
+  --brand-light: #a78bfa;
+  --brand-pale:  #ede9fe;
+  --brand-ultra: #f5f0ff;
+  --mint:        #059669;
+  --mint-mid:    #10b981;
+  --mint-light:  #6ee7b7;
+  --mint-pale:   #d1fae5;
+  --amber:       #d97706;
+  --amber-mid:   #f59e0b;
+  --amber-pale:  #fef3c7;
+  --red:         #dc2626;
+  --red-pale:    #fee2e2;
+  --bg:          #f5f0ff;
+  --surface:     #ffffff;
+  --border:      #ede8f5;
+  --border-mid:  #e0d8f0;
+  --text:        #1e0b3a;
+  --text-mid:    #4a3570;
+  --text-muted:  #8b7aaa;
+  --sidebar-bg:  #ffffff;
+}
+
+body {
+  background: #0f0a1a;
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 16px 60px;
+  gap: 20px;
+  color: var(--text);
+}
+
+.pg-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand-light);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.pg-sub {
+  font-size: 12px;
+  color: #4a3570;
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* ── ROLE TABS ── */
+.role-tabs {
+  display: flex;
+  gap: 0;
+  background: #1a0f2e;
+  border: 1px solid #2d1f4a;
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 4px;
+  gap: 4px;
+}
+.role-tab {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b5a8a;
+  padding: 7px 20px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.role-tab.active {
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(91,33,182,.4);
+}
+
+/* ── SHELL ── */
+.shell-wrap {
+  width: 1060px;
+  max-width: 100%;
+}
+.shell {
+  display: flex;
+  height: 640px;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 32px 80px rgba(0,0,0,.5), 0 4px 16px rgba(91,33,182,.15);
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 224px;
+  flex-shrink: 0;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.sb-brand {
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sb-mark {
+  width: 36px; height: 36px;
+  background: linear-gradient(140deg, var(--brand-mid), var(--brand));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px rgba(91,33,182,.35);
+  flex-shrink: 0;
+}
+.sb-mark svg { width: 18px; height: 18px; }
+.sb-brand-text { flex: 1; }
+.sb-name { font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: -.04em; line-height: 1; }
+.sb-tagline { font-size: 10px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
+
+.sb-nav { flex: 1; padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+
+.sb-group { font-size: 9.5px; font-weight: 700; color: #d4c8f0; letter-spacing: .12em; text-transform: uppercase; padding: 10px 8px 5px; }
+
+.sb-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  position: relative;
+  transition: all .12s;
+  user-select: none;
+}
+.sb-item:hover { background: var(--brand-ultra); color: var(--text-mid); }
+.sb-item.active { background: var(--brand-pale); color: var(--brand); font-weight: 600; }
+.sb-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 3px;
+  background: var(--mint-mid);
+  border-radius: 0 3px 3px 0;
+}
+
+.sb-icon {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  background: #f5f0ff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.sb-item.active .sb-icon { background: #ede9fe; }
+.sb-icon svg { width: 14px; height: 14px; color: var(--text-muted); }
+.sb-item.active .sb-icon svg { color: var(--brand); }
+
+.sb-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--amber-pale);
+  color: var(--amber);
+  border-radius: 20px;
+  padding: 2px 7px;
+}
+.sb-badge.new { background: var(--brand-pale); color: var(--brand); font-size: 9px; }
+.sb-badge.alert { background: var(--red-pale); color: var(--red); }
+
+.sb-foot {
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+.sb-user {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.sb-user:hover { background: var(--brand-ultra); }
+.sb-av {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand), var(--mint-mid));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(91,33,182,.3);
+}
+.sb-user-info { flex: 1; min-width: 0; }
+.sb-uname { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-urole { font-size: 10px; color: var(--text-muted); }
+.plan-indicator {
+  display: flex; align-items: center; gap: 3px;
+  background: var(--amber-pale);
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.plan-indicator span { font-size: 9px; font-weight: 700; color: var(--amber); }
+
+/* ── MAIN ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; background: var(--bg); }
+
+/* HEADER */
+.hdr {
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 22px; gap: 10px;
+  flex-shrink: 0;
+}
+.hdr-breadcrumb { flex: 1; display: flex; align-items: center; gap: 7px; }
+.hdr-parent { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.hdr-sep { color: var(--border-mid); font-size: 14px; }
+.hdr-current { font-size: 14px; font-weight: 700; color: var(--text); }
+
+.hdr-search {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--brand-ultra);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 6px 12px;
+  width: 200px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.hdr-search:hover { border-color: var(--brand-light); }
+.hdr-search svg { width: 13px; height: 13px; color: var(--text-muted); flex-shrink: 0; }
+.hdr-search-ph { font-size: 12px; color: var(--text-muted); flex: 1; }
+.hdr-search-kbd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  background: var(--brand-pale);
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.hdr-btn {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  background: var(--brand-ultra);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: background .12s;
+}
+.hdr-btn:hover { background: var(--brand-pale); border-color: var(--brand-light); }
+.hdr-btn svg { width: 15px; height: 15px; color: var(--text-mid); }
+.hdr-notif-dot {
+  position: absolute; top: 5px; right: 5px;
+  width: 8px; height: 8px;
+  background: var(--red);
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+}
+.hdr-av {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand), var(--mint-mid));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border-mid);
+}
+
+/* ── DASHBOARD ── */
+.dash { flex: 1; overflow-y: auto; padding: 20px 22px 28px; display: flex; flex-direction: column; gap: 16px; }
+
+/* Page heading */
+.dash-head { display: flex; align-items: flex-start; justify-content: space-between; }
+.dash-head-left h1 { font-size: 21px; font-weight: 900; color: var(--text); letter-spacing: -.04em; line-height: 1.1; }
+.dash-head-left p { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.period-sel {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+  padding: 3px;
+  gap: 2px;
+}
+.period-opt {
+  font-size: 11px; font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.period-opt.active { background: var(--brand); color: #fff; }
+
+/* KPI CARDS */
+.kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 1px 4px rgba(91,33,182,.05);
+  transition: box-shadow .15s, transform .15s;
+}
+.kpi-card:hover { box-shadow: 0 6px 20px rgba(91,33,182,.1); transform: translateY(-1px); }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; }
+.kpi-ico { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.kpi-ico svg { width: 15px; height: 15px; }
+.kpi-value { font-size: 26px; font-weight: 900; color: var(--text); letter-spacing: -.05em; line-height: 1; }
+.kpi-meta { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+.kpi-up { font-size: 11px; font-weight: 700; color: var(--mint-mid); }
+.kpi-warn { font-size: 11px; font-weight: 700; color: var(--amber); }
+.kpi-ctx { font-size: 11px; color: var(--text-muted); }
+.kpi-spark { margin-top: 10px; height: 26px; display: flex; gap: 3px; align-items: flex-end; }
+.ks { flex: 1; border-radius: 3px 3px 0 0; }
+
+/* CONTENT ROW */
+.content-row { display: grid; grid-template-columns: 5fr 3fr 4fr; gap: 12px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 1px 4px rgba(91,33,182,.05);
+}
+.card-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.card-hd-left { display: flex; align-items: center; gap: 7px; }
+.card-dot { width: 7px; height: 7px; border-radius: 50%; }
+.card-title { font-size: 12px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .07em; }
+.card-link { font-size: 11px; font-weight: 600; color: var(--brand-mid); }
+
+/* mini chart */
+.mini-ch { height: 48px; display: flex; gap: 3px; align-items: flex-end; margin-bottom: 10px; }
+.mbar { flex: 1; border-radius: 3px 3px 0 0; }
+
+/* order list */
+.order-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--brand-ultra);
+  gap: 8px;
+}
+.order-row:last-child { border-bottom: none; padding-bottom: 0; }
+.o-left { min-width: 0; flex: 1; }
+.o-id { font-size: 12px; font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+.o-cust { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.o-right { text-align: right; flex-shrink: 0; }
+.o-amt { font-size: 12px; font-weight: 700; color: var(--text); }
+.o-chip {
+  display: inline-block;
+  font-size: 9px; font-weight: 700;
+  border-radius: 4px; padding: 2px 6px;
+  letter-spacing: .04em; margin-top: 2px;
+}
+.chip-placed { background: var(--brand-pale); color: var(--brand); }
+.chip-shipped { background: var(--mint-pale); color: var(--mint); }
+.chip-processing { background: var(--amber-pale); color: var(--amber); }
+
+/* status bars */
+.stat-list { display: flex; flex-direction: column; gap: 9px; }
+.stat-item { display: flex; flex-direction: column; gap: 4px; }
+.stat-hd { display: flex; align-items: center; justify-content: space-between; }
+.stat-lbl { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-mid); }
+.stat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.stat-val { font-size: 12px; font-weight: 700; color: var(--text); }
+.stat-track { height: 5px; background: var(--brand-ultra); border-radius: 3px; overflow: hidden; }
+.stat-fill { height: 100%; border-radius: 3px; }
+
+/* reorder */
+.reorder-list { display: flex; flex-direction: column; gap: 7px; }
+.reorder-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--brand-ultra);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 10px;
+}
+.reorder-urg { width: 5px; height: 28px; border-radius: 3px; flex-shrink: 0; }
+.reorder-info { flex: 1; min-width: 0; }
+.reorder-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.reorder-meta { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+.reorder-btn {
+  font-size: 10px; font-weight: 700;
+  color: var(--brand);
+  background: var(--brand-pale);
+  border: 1px solid var(--brand-light);
+  border-radius: 7px;
+  padding: 4px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.reorder-btn:hover { background: var(--brand); color: #fff; }
+
+/* CALENDAR */
+.cal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 15px; box-shadow: 0 1px 4px rgba(91,33,182,.05); }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-top: 4px; }
+.cal-day-lbl { font-size: 9px; font-weight: 700; color: #d4c8f0; text-align: center; padding-bottom: 3px; }
+.cal-day {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: var(--brand-ultra);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--text-muted);
+  cursor: pointer;
+  transition: background .1s;
+}
+.cal-day:hover { background: var(--brand-pale); color: var(--brand); }
+.cal-day.has-order { background: var(--brand-pale); color: var(--brand); font-weight: 700; }
+.cal-day.delivery { background: var(--mint-pale); color: var(--mint); font-weight: 700; }
+.cal-day.today { background: var(--brand); color: #fff; font-weight: 800; border-radius: 50%; box-shadow: 0 2px 8px rgba(91,33,182,.4); }
+.cal-legend { display: flex; gap: 14px; margin-top: 10px; }
+.cal-leg-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-muted); }
+.cal-leg-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* RESTAURANT ROLE display */
+.role-view { display: none; }
+.role-view.visible { display: contents; }
+</style>
+</head>
+<body>
+
+<div class="pg-label">Supplify ERP — Deep Violet & Mint · Final Design</div>
+<div class="pg-sub">Click a role tab to switch views. This is what gets built.</div>
+
+<div class="role-tabs">
+  <div class="role-tab active" onclick="switchRole('supplier', this)">Supplier View</div>
+  <div class="role-tab" onclick="switchRole('restaurant', this)">Restaurant View</div>
+</div>
+
+<div class="shell-wrap">
+<div class="shell">
+
+  <!-- ══ SIDEBAR ══ -->
+  <div class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-mark">
+        <svg viewBox="0 0 18 18" fill="none">
+          <path d="M9 1.5L15.5 5.25V12.75L9 16.5L2.5 12.75V5.25L9 1.5Z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M9 1.5V16.5M2.5 5.25L15.5 12.75M15.5 5.25L2.5 12.75" stroke="white" stroke-width="1.1" stroke-opacity=".35"/>
+        </svg>
+      </div>
+      <div class="sb-brand-text">
+        <div class="sb-name">Supplify</div>
+        <div class="sb-tagline">Enterprise ERP</div>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <div class="sb-group">Overview</div>
+      <div class="sb-item active">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+        </div>
+        Dashboard
+      </div>
+
+      <div class="sb-group">Operations</div>
+      <div class="sb-item">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3.5h14M1 7.5h14M1 11.5h10"/></svg>
+        </div>
+        Orders
+        <span class="sb-badge">14</span>
+      </div>
+      <div class="sb-item">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3.5 3.5 0 100 7A3.5 3.5 0 008 1zM3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z"/></svg>
+        </div>
+        Products
+      </div>
+      <div class="sb-item">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 2h15l-1.5 9H1.5L0 2zm5 10a1.5 1.5 0 103 0zm5 0a1.5 1.5 0 103 0z"/></svg>
+        </div>
+        Fulfillment
+      </div>
+      <div class="sb-item">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5.5a.5.5 0 01.5.5V1h8V1a.5.5 0 011 0V1h1a2 2 0 012 2v11a2 2 0 01-2 2H2a2 2 0 01-2-2V3a2 2 0 012-2h1V1a.5.5 0 01.5-.5zm10 4.5H2v9h12V5z"/></svg>
+        </div>
+        Reservations
+      </div>
+
+      <div class="sb-group">Intelligence</div>
+      <div class="sb-item">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 13l3-5 3 3 3-5 4 7H1z"/></svg>
+        </div>
+        Analytics
+        <span class="sb-badge new">New</span>
+      </div>
+      <div class="sb-item">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 002-2H6a2 2 0 002 2zm.995-14.9a1 1 0 10-1.99 0A5 5 0 003 6c0 1.1-.5 6-2 7h14c-1.5-1-2-5.9-2-7a5 5 0 00-4.005-4.9z"/></svg>
+        </div>
+        Notifications
+        <span class="sb-badge alert">3</span>
+      </div>
+
+      <div class="sb-group">Account</div>
+      <div class="sb-item">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M14 1a1 1 0 011 1v8a1 1 0 01-1 1H4.414L2 13.414V2a1 1 0 011-1h11z"/></svg>
+        </div>
+        Branches
+      </div>
+      <div class="sb-item">
+        <div class="sb-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 01-1.255.52l-.292-.16c-1.64-.892-3.434.902-2.54 2.541l.159.292a.873.873 0 01-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 01.52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 011.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 011.255-.52l.292.16c1.64.892 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 01.52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 01-.52-1.255l.16-.292c.892-1.64-.901-3.434-2.541-2.54l-.292.159a.873.873 0 01-1.255-.52l-.094-.319zM8 10a2 2 0 110-4 2 2 0 010 4z"/></svg>
+        </div>
+        Settings
+      </div>
+    </nav>
+
+    <div class="sb-foot">
+      <div class="sb-user">
+        <div class="sb-av">GM</div>
+        <div class="sb-user-info">
+          <div class="sb-uname">Ghadi Mdallal</div>
+          <div class="sb-urole" id="sb-role-label">Supplier</div>
+        </div>
+        <div class="plan-indicator"><span>Gold</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main">
+    <div class="hdr">
+      <div class="hdr-breadcrumb">
+        <span class="hdr-parent">Supplify</span>
+        <span class="hdr-sep">›</span>
+        <span class="hdr-current">Dashboard</span>
+      </div>
+      <div class="hdr-search">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="6.5" r="5"/><path d="M10.5 10.5L14 14"/></svg>
+        <span class="hdr-search-ph">Search anything…</span>
+        <span class="hdr-search-kbd">⌘K</span>
+      </div>
+      <div class="hdr-btn">
+        <div class="hdr-notif-dot"></div>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 015 5v2.5L14.5 11h-13L3 8.5V6a5 5 0 015-5zM6.5 13a1.5 1.5 0 003 0"/></svg>
+      </div>
+      <div class="hdr-btn">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/></svg>
+      </div>
+      <div class="hdr-av">GM</div>
+    </div>
+
+    <div class="dash">
+
+      <!-- ── SUPPLIER VIEW ── -->
+      <div id="supplier-view">
+        <div class="dash-head" style="margin-bottom:16px;">
+          <div class="dash-head-left">
+            <h1>Good morning, Ghadi ☀</h1>
+            <p>Thursday, May 15, 2026 · Supplier Dashboard · Gold Plan</p>
+          </div>
+          <div class="period-sel">
+            <div class="period-opt">7d</div>
+            <div class="period-opt active">30d</div>
+            <div class="period-opt">90d</div>
+          </div>
+        </div>
+
+        <div class="kpi-grid" style="margin-bottom:14px;">
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-label">Revenue</span>
+              <div class="kpi-ico" style="background:#ede9fe;">
+                <svg viewBox="0 0 15 15" fill="#7c3aed"><path d="M7.5 0a7.5 7.5 0 100 15A7.5 7.5 0 007.5 0zm.75 11v.75H6.75V11A2.25 2.25 0 014.5 8.75h1.5a.75.75 0 00.75.75h.5a.75.75 0 000-1.5h-.5A2.25 2.25 0 014.5 5.75v-.5H3.75V3.75H5.25V3h1.5v.75A2.25 2.25 0 018.5 6h-1.5a.75.75 0 00-.75-.75H6a.75.75 0 000 1.5h.5a2.25 2.25 0 012.25 2.25v.5H10.5v1.5H8.25z"/></svg>
+              </div>
+            </div>
+            <div class="kpi-value">$48.2k</div>
+            <div class="kpi-meta"><span class="kpi-up">↑ 12.4%</span><span class="kpi-ctx">vs last month</span></div>
+            <div class="kpi-spark">
+              <div class="ks" style="height:28%;background:#ede9fe;"></div>
+              <div class="ks" style="height:42%;background:#ddd6fe;"></div>
+              <div class="ks" style="height:38%;background:#c4b5fd;"></div>
+              <div class="ks" style="height:60%;background:#a78bfa;"></div>
+              <div class="ks" style="height:55%;background:#8b5cf6;"></div>
+              <div class="ks" style="height:78%;background:#7c3aed;"></div>
+              <div class="ks" style="height:100%;background:#5b21b6;"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-label">Orders</span>
+              <div class="kpi-ico" style="background:#d1fae5;">
+                <svg viewBox="0 0 15 15" fill="#059669"><path d="M0 2h15l-1.5 9H1.5L0 2zm5 10a1.5 1.5 0 103 0zm5 0a1.5 1.5 0 103 0z"/></svg>
+              </div>
+            </div>
+            <div class="kpi-value">127</div>
+            <div class="kpi-meta"><span class="kpi-up">↑ 8.1%</span><span class="kpi-ctx">vs last month</span></div>
+            <div class="kpi-spark">
+              <div class="ks" style="height:35%;background:#d1fae5;"></div>
+              <div class="ks" style="height:50%;background:#a7f3d0;"></div>
+              <div class="ks" style="height:45%;background:#6ee7b7;"></div>
+              <div class="ks" style="height:68%;background:#34d399;"></div>
+              <div class="ks" style="height:60%;background:#10b981;"></div>
+              <div class="ks" style="height:82%;background:#059669;"></div>
+              <div class="ks" style="height:100%;background:#047857;"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-label">Pending</span>
+              <div class="kpi-ico" style="background:#fef3c7;">
+                <svg viewBox="0 0 15 15" fill="#d97706"><path d="M7.5 0a7.5 7.5 0 100 15A7.5 7.5 0 007.5 0zM6.75 3.75h1.5v4.5l3 1.8-.75 1.2-3.75-2.25V3.75z"/></svg>
+              </div>
+            </div>
+            <div class="kpi-value">14</div>
+            <div class="kpi-meta"><span class="kpi-warn">⚠ 3 urgent</span></div>
+            <div class="kpi-spark">
+              <div class="ks" style="height:45%;background:#fef3c7;"></div>
+              <div class="ks" style="height:62%;background:#fde68a;"></div>
+              <div class="ks" style="height:42%;background:#fcd34d;"></div>
+              <div class="ks" style="height:75%;background:#fbbf24;"></div>
+              <div class="ks" style="height:52%;background:#f59e0b;"></div>
+              <div class="ks" style="height:68%;background:#d97706;"></div>
+              <div class="ks" style="height:100%;background:#b45309;"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-label">Restaurants</span>
+              <div class="kpi-ico" style="background:#ede9fe;">
+                <svg viewBox="0 0 15 15" fill="#5b21b6"><path d="M3.5 1a2 2 0 100 4 2 2 0 000-4zm7 0a2 2 0 100 4 2 2 0 000-4zM1 10c0-1.657 1.119-3 2.5-3s2.5 1.343 2.5 3v2H1v-2zm7 0c0-1.657 1.119-3 2.5-3s2.5 1.343 2.5 3v2H8v-2z"/></svg>
+              </div>
+            </div>
+            <div class="kpi-value">38</div>
+            <div class="kpi-meta"><span class="kpi-up">+3 new</span><span class="kpi-ctx">this month</span></div>
+            <div class="kpi-spark">
+              <div class="ks" style="height:30%;background:#ede9fe;"></div>
+              <div class="ks" style="height:46%;background:#ddd6fe;"></div>
+              <div class="ks" style="height:42%;background:#c4b5fd;"></div>
+              <div class="ks" style="height:64%;background:#a78bfa;"></div>
+              <div class="ks" style="height:70%;background:#8b5cf6;"></div>
+              <div class="ks" style="height:86%;background:#7c3aed;"></div>
+              <div class="ks" style="height:100%;background:#5b21b6;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-row" style="margin-bottom:14px;">
+          <div class="card">
+            <div class="card-hd">
+              <div class="card-hd-left"><div class="card-dot" style="background:var(--brand-mid);"></div><span class="card-title">Recent Orders</span></div>
+              <a class="card-link">View all →</a>
+            </div>
+            <div class="mini-ch">
+              <div class="mbar" style="height:32%;background:#ede9fe;"></div>
+              <div class="mbar" style="height:52%;background:#ddd6fe;"></div>
+              <div class="mbar" style="height:44%;background:#c4b5fd;"></div>
+              <div class="mbar" style="height:70%;background:#a78bfa;"></div>
+              <div class="mbar" style="height:58%;background:#8b5cf6;"></div>
+              <div class="mbar" style="height:85%;background:#7c3aed;"></div>
+              <div class="mbar" style="height:100%;background:#5b21b6;"></div>
+            </div>
+            <div class="order-row">
+              <div class="o-left"><div class="o-id">#A4F2</div><div class="o-cust">Al Reem Kitchen</div></div>
+              <div class="o-right"><div class="o-amt">$840</div><span class="o-chip chip-placed">PLACED</span></div>
+            </div>
+            <div class="order-row">
+              <div class="o-left"><div class="o-id">#B7C1</div><div class="o-cust">Spice Route</div></div>
+              <div class="o-right"><div class="o-amt">$1,240</div><span class="o-chip chip-shipped">SHIPPED</span></div>
+            </div>
+            <div class="order-row">
+              <div class="o-left"><div class="o-id">#C3D8</div><div class="o-cust">Café Milano</div></div>
+              <div class="o-right"><div class="o-amt">$590</div><span class="o-chip chip-processing">PROCESSING</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <div class="card-hd-left"><div class="card-dot" style="background:var(--mint-mid);"></div><span class="card-title">Order Status</span></div>
+            </div>
+            <div class="stat-list">
+              <div class="stat-item">
+                <div class="stat-hd"><span class="stat-lbl"><span class="stat-dot" style="background:var(--mint-mid);"></span>Completed</span><span class="stat-val">113</span></div>
+                <div class="stat-track"><div class="stat-fill" style="width:89%;background:var(--mint-mid);"></div></div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-hd"><span class="stat-lbl"><span class="stat-dot" style="background:var(--brand-mid);"></span>Processing</span><span class="stat-val">32</span></div>
+                <div class="stat-track"><div class="stat-fill" style="width:25%;background:var(--brand-mid);"></div></div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-hd"><span class="stat-lbl"><span class="stat-dot" style="background:var(--amber-mid);"></span>Pending</span><span class="stat-val">14</span></div>
+                <div class="stat-track"><div class="stat-fill" style="width:11%;background:var(--amber-mid);"></div></div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-hd"><span class="stat-lbl"><span class="stat-dot" style="background:var(--brand-light);"></span>Shipped</span><span class="stat-val">23</span></div>
+                <div class="stat-track"><div class="stat-fill" style="width:18%;background:var(--brand-light);"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <div class="card-hd-left"><div class="card-dot" style="background:var(--red);"></div><span class="card-title">Reorder Alerts</span></div>
+              <a class="card-link">Add all →</a>
+            </div>
+            <div class="reorder-list">
+              <div class="reorder-row">
+                <div class="reorder-urg" style="background:var(--red);"></div>
+                <div class="reorder-info"><div class="reorder-name">Olive Oil E.V.</div><div class="reorder-meta">2 days left · ×24 suggested</div></div>
+                <div class="reorder-btn">+ Add</div>
+              </div>
+              <div class="reorder-row">
+                <div class="reorder-urg" style="background:var(--amber-mid);"></div>
+                <div class="reorder-info"><div class="reorder-name">All-Purpose Flour</div><div class="reorder-meta">5 days left · ×50 suggested</div></div>
+                <div class="reorder-btn">+ Add</div>
+              </div>
+              <div class="reorder-row">
+                <div class="reorder-urg" style="background:var(--mint-mid);"></div>
+                <div class="reorder-info"><div class="reorder-name">Sea Salt Fine</div><div class="reorder-meta">12 days left · ×10 suggested</div></div>
+                <div class="reorder-btn">+ Add</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cal-card">
+          <div class="card-hd">
+            <div class="card-hd-left"><div class="card-dot" style="background:var(--brand);"></div><span class="card-title">Delivery Calendar — May 2026</span></div>
+            <a class="card-link">Full view →</a>
+          </div>
+          <div class="cal-grid">
+            <div class="cal-day-lbl">Mo</div><div class="cal-day-lbl">Tu</div><div class="cal-day-lbl">We</div><div class="cal-day-lbl">Th</div><div class="cal-day-lbl">Fr</div><div class="cal-day-lbl">Sa</div><div class="cal-day-lbl">Su</div>
+            <div class="cal-day"></div><div class="cal-day"></div><div class="cal-day"></div>
+            <div class="cal-day">1</div><div class="cal-day delivery">2</div><div class="cal-day">3</div><div class="cal-day">4</div>
+            <div class="cal-day">5</div><div class="cal-day has-order">6</div><div class="cal-day">7</div><div class="cal-day">8</div><div class="cal-day delivery">9</div><div class="cal-day">10</div><div class="cal-day">11</div>
+            <div class="cal-day has-order">12</div><div class="cal-day">13</div><div class="cal-day">14</div><div class="cal-day today">15</div><div class="cal-day delivery">16</div><div class="cal-day">17</div><div class="cal-day">18</div>
+            <div class="cal-day">19</div><div class="cal-day has-order">20</div><div class="cal-day delivery">21</div><div class="cal-day">22</div><div class="cal-day">23</div><div class="cal-day">24</div><div class="cal-day">25</div>
+          </div>
+          <div class="cal-legend">
+            <div class="cal-leg-item"><div class="cal-leg-dot" style="background:var(--brand);"></div>Order placed</div>
+            <div class="cal-leg-item"><div class="cal-leg-dot" style="background:var(--mint-mid);"></div>Delivery scheduled</div>
+            <div class="cal-leg-item"><div class="cal-leg-dot" style="background:var(--brand);box-shadow:0 0 0 2px var(--brand-pale);"></div>Today</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RESTAURANT VIEW ── -->
+      <div id="restaurant-view" style="display:none;">
+        <div class="dash-head" style="margin-bottom:16px;">
+          <div class="dash-head-left">
+            <h1>Good morning, Ghadi ☀</h1>
+            <p>Thursday, May 15, 2026 · Restaurant Dashboard · Gold Plan</p>
+          </div>
+          <div class="period-sel">
+            <div class="period-opt">7d</div>
+            <div class="period-opt active">30d</div>
+            <div class="period-opt">90d</div>
+          </div>
+        </div>
+
+        <div class="kpi-grid" style="margin-bottom:14px;">
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-label">Total Spent</span>
+              <div class="kpi-ico" style="background:#ede9fe;">
+                <svg viewBox="0 0 15 15" fill="#7c3aed"><path d="M7.5 0a7.5 7.5 0 100 15A7.5 7.5 0 007.5 0zm.75 11v.75H6.75V11A2.25 2.25 0 014.5 8.75h1.5a.75.75 0 00.75.75h.5a.75.75 0 000-1.5h-.5A2.25 2.25 0 014.5 5.75v-.5H3.75V3.75H5.25V3h1.5v.75A2.25 2.25 0 018.5 6h-1.5a.75.75 0 00-.75-.75H6a.75.75 0 000 1.5h.5a2.25 2.25 0 012.25 2.25v.5H10.5v1.5H8.25z"/></svg>
+              </div>
+            </div>
+            <div class="kpi-value">$12.4k</div>
+            <div class="kpi-meta"><span class="kpi-up">↑ 5.2%</span><span class="kpi-ctx">vs last month</span></div>
+            <div class="kpi-spark">
+              <div class="ks" style="height:28%;background:#ede9fe;"></div>
+              <div class="ks" style="height:42%;background:#ddd6fe;"></div>
+              <div class="ks" style="height:55%;background:#c4b5fd;"></div>
+              <div class="ks" style="height:48%;background:#a78bfa;"></div>
+              <div class="ks" style="height:70%;background:#8b5cf6;"></div>
+              <div class="ks" style="height:78%;background:#7c3aed;"></div>
+              <div class="ks" style="height:100%;background:#5b21b6;"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-label">My Orders</span>
+              <div class="kpi-ico" style="background:#d1fae5;">
+                <svg viewBox="0 0 15 15" fill="#059669"><path d="M0 2h15l-1.5 9H1.5L0 2zm5 10a1.5 1.5 0 103 0zm5 0a1.5 1.5 0 103 0z"/></svg>
+              </div>
+            </div>
+            <div class="kpi-value">34</div>
+            <div class="kpi-meta"><span class="kpi-up">↑ 3</span><span class="kpi-ctx">this month</span></div>
+            <div class="kpi-spark">
+              <div class="ks" style="height:35%;background:#d1fae5;"></div>
+              <div class="ks" style="height:55%;background:#6ee7b7;"></div>
+              <div class="ks" style="height:48%;background:#34d399;"></div>
+              <div class="ks" style="height:72%;background:#10b981;"></div>
+              <div class="ks" style="height:60%;background:#059669;"></div>
+              <div class="ks" style="height:85%;background:#047857;"></div>
+              <div class="ks" style="height:100%;background:#065f46;"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-label">Pending</span>
+              <div class="kpi-ico" style="background:#fef3c7;">
+                <svg viewBox="0 0 15 15" fill="#d97706"><path d="M7.5 0a7.5 7.5 0 100 15A7.5 7.5 0 007.5 0zM6.75 3.75h1.5v4.5l3 1.8-.75 1.2-3.75-2.25V3.75z"/></svg>
+              </div>
+            </div>
+            <div class="kpi-value">4</div>
+            <div class="kpi-meta"><span class="kpi-warn">In progress</span></div>
+            <div class="kpi-spark">
+              <div class="ks" style="height:40%;background:#fef3c7;"></div>
+              <div class="ks" style="height:55%;background:#fde68a;"></div>
+              <div class="ks" style="height:45%;background:#fcd34d;"></div>
+              <div class="ks" style="height:70%;background:#fbbf24;"></div>
+              <div class="ks" style="height:60%;background:#f59e0b;"></div>
+              <div class="ks" style="height:80%;background:#d97706;"></div>
+              <div class="ks" style="height:100%;background:#b45309;"></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-label">Suppliers</span>
+              <div class="kpi-ico" style="background:#ede9fe;">
+                <svg viewBox="0 0 15 15" fill="#5b21b6"><path d="M3.5 1a2 2 0 100 4 2 2 0 000-4zm7 0a2 2 0 100 4 2 2 0 000-4zM1 10c0-1.657 1.119-3 2.5-3s2.5 1.343 2.5 3v2H1v-2zm7 0c0-1.657 1.119-3 2.5-3s2.5 1.343 2.5 3v2H8v-2z"/></svg>
+              </div>
+            </div>
+            <div class="kpi-value">7</div>
+            <div class="kpi-meta"><span class="kpi-up">+1 new</span><span class="kpi-ctx">vendors</span></div>
+            <div class="kpi-spark">
+              <div class="ks" style="height:30%;background:#ede9fe;"></div>
+              <div class="ks" style="height:44%;background:#ddd6fe;"></div>
+              <div class="ks" style="height:58%;background:#c4b5fd;"></div>
+              <div class="ks" style="height:65%;background:#a78bfa;"></div>
+              <div class="ks" style="height:72%;background:#8b5cf6;"></div>
+              <div class="ks" style="height:86%;background:#7c3aed;"></div>
+              <div class="ks" style="height:100%;background:#5b21b6;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-row" style="margin-bottom:14px;">
+          <div class="card">
+            <div class="card-hd">
+              <div class="card-hd-left"><div class="card-dot" style="background:var(--brand-mid);"></div><span class="card-title">My Orders</span></div>
+              <a class="card-link">View all →</a>
+            </div>
+            <div class="mini-ch">
+              <div class="mbar" style="height:32%;background:#ede9fe;"></div>
+              <div class="mbar" style="height:52%;background:#ddd6fe;"></div>
+              <div class="mbar" style="height:44%;background:#c4b5fd;"></div>
+              <div class="mbar" style="height:70%;background:#a78bfa;"></div>
+              <div class="mbar" style="height:58%;background:#8b5cf6;"></div>
+              <div class="mbar" style="height:85%;background:#7c3aed;"></div>
+              <div class="mbar" style="height:100%;background:#5b21b6;"></div>
+            </div>
+            <div class="order-row">
+              <div class="o-left"><div class="o-id">#D9A1</div><div class="o-cust">From: Gulf Provisions Co.</div></div>
+              <div class="o-right"><div class="o-amt">$1,840</div><span class="o-chip chip-shipped">SHIPPED</span></div>
+            </div>
+            <div class="order-row">
+              <div class="o-left"><div class="o-id">#E2B4</div><div class="o-cust">From: Fresh Farms Ltd.</div></div>
+              <div class="o-right"><div class="o-amt">$620</div><span class="o-chip chip-placed">PLACED</span></div>
+            </div>
+            <div class="order-row">
+              <div class="o-left"><div class="o-id">#F5C7</div><div class="o-cust">From: Spice Masters</div></div>
+              <div class="o-right"><div class="o-amt">$340</div><span class="o-chip chip-processing">PROCESSING</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <div class="card-hd-left"><div class="card-dot" style="background:var(--mint-mid);"></div><span class="card-title">Spend Trend</span></div>
+            </div>
+            <div class="stat-list">
+              <div class="stat-item">
+                <div class="stat-hd"><span class="stat-lbl"><span class="stat-dot" style="background:var(--brand-mid);"></span>Gulf Provisions</span><span class="stat-val">$5.2k</span></div>
+                <div class="stat-track"><div class="stat-fill" style="width:72%;background:var(--brand-mid);"></div></div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-hd"><span class="stat-lbl"><span class="stat-dot" style="background:var(--mint-mid);"></span>Fresh Farms</span><span class="stat-val">$3.8k</span></div>
+                <div class="stat-track"><div class="stat-fill" style="width:53%;background:var(--mint-mid);"></div></div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-hd"><span class="stat-lbl"><span class="stat-dot" style="background:var(--brand-light);"></span>Spice Masters</span><span class="stat-val">$2.1k</span></div>
+                <div class="stat-track"><div class="stat-fill" style="width:29%;background:var(--brand-light);"></div></div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-hd"><span class="stat-lbl"><span class="stat-dot" style="background:var(--amber-mid);"></span>Others</span><span class="stat-val">$1.3k</span></div>
+                <div class="stat-track"><div class="stat-fill" style="width:18%;background:var(--amber-mid);"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <div class="card-hd-left"><div class="card-dot" style="background:var(--red);"></div><span class="card-title">Reorder Alerts</span></div>
+              <a class="card-link">Add all →</a>
+            </div>
+            <div class="reorder-list">
+              <div class="reorder-row">
+                <div class="reorder-urg" style="background:var(--red);"></div>
+                <div class="reorder-info"><div class="reorder-name">Olive Oil E.V.</div><div class="reorder-meta">2 days left · ×24 suggested</div></div>
+                <div class="reorder-btn">+ Add</div>
+              </div>
+              <div class="reorder-row">
+                <div class="reorder-urg" style="background:var(--amber-mid);"></div>
+                <div class="reorder-info"><div class="reorder-name">All-Purpose Flour</div><div class="reorder-meta">5 days left · ×50 suggested</div></div>
+                <div class="reorder-btn">+ Add</div>
+              </div>
+              <div class="reorder-row">
+                <div class="reorder-urg" style="background:var(--mint-mid);"></div>
+                <div class="reorder-info"><div class="reorder-name">Sea Salt Fine</div><div class="reorder-meta">12 days left · ×10 suggested</div></div>
+                <div class="reorder-btn">+ Add</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cal-card">
+          <div class="card-hd">
+            <div class="card-hd-left"><div class="card-dot" style="background:var(--brand);"></div><span class="card-title">Delivery Calendar — May 2026</span></div>
+            <a class="card-link">Full view →</a>
+          </div>
+          <div class="cal-grid">
+            <div class="cal-day-lbl">Mo</div><div class="cal-day-lbl">Tu</div><div class="cal-day-lbl">We</div><div class="cal-day-lbl">Th</div><div class="cal-day-lbl">Fr</div><div class="cal-day-lbl">Sa</div><div class="cal-day-lbl">Su</div>
+            <div class="cal-day"></div><div class="cal-day"></div><div class="cal-day"></div>
+            <div class="cal-day">1</div><div class="cal-day delivery">2</div><div class="cal-day">3</div><div class="cal-day">4</div>
+            <div class="cal-day has-order">5</div><div class="cal-day">6</div><div class="cal-day">7</div><div class="cal-day delivery">9</div><div class="cal-day">10</div><div class="cal-day">11</div>
+            <div class="cal-day">12</div><div class="cal-day">13</div><div class="cal-day">14</div><div class="cal-day today">15</div><div class="cal-day delivery">16</div><div class="cal-day">17</div><div class="cal-day">18</div>
+            <div class="cal-day">19</div><div class="cal-day has-order">20</div><div class="cal-day delivery">21</div><div class="cal-day">22</div><div class="cal-day">23</div><div class="cal-day">24</div><div class="cal-day">25</div>
+          </div>
+          <div class="cal-legend">
+            <div class="cal-leg-item"><div class="cal-leg-dot" style="background:var(--brand);"></div>Order placed</div>
+            <div class="cal-leg-item"><div class="cal-leg-dot" style="background:var(--mint-mid);"></div>Delivery scheduled</div>
+            <div class="cal-leg-item"><div class="cal-leg-dot" style="background:var(--brand);box-shadow:0 0 0 2px var(--brand-pale);"></div>Today</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<div style="text-align:center;max-width:720px;">
+  <p style="font-size:12px;color:#6b5a8a;line-height:1.8;">
+    <strong style="color:#a78bfa;">Color system:</strong>
+    Brand violet <span style="background:#5b21b6;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;">#5b21b6</span> ·
+    Mint accent <span style="background:#10b981;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;">#10b981</span> ·
+    Amber alert <span style="background:#f59e0b;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;">#f59e0b</span> ·
+    Background <span style="background:#f5f0ff;color:#5b21b6;padding:1px 6px;border-radius:4px;font-size:10px;border:1px solid #ddd6fe;">#f5f0ff</span><br>
+    Use the role tabs above to switch between Supplier and Restaurant views.
+  </p>
+</div>
+
+<script>
+function switchRole(role, el) {
+  document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('supplier-view').style.display = role === 'supplier' ? 'block' : 'none';
+  document.getElementById('restaurant-view').style.display = role === 'restaurant' ? 'block' : 'none';
+  document.getElementById('sb-role-label').textContent = role === 'supplier' ? 'Supplier' : 'Restaurant';
+}
+</script>
+</body>
+</html>

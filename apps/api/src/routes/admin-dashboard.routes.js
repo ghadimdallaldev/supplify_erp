@@ -14,6 +14,7 @@ import {
 import { getEntitlements, RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } from '../lib/subscription.js'
 import {
   getAllowedFeatureKeys,
+  featureDisplayName,
 } from '../lib/feature-keys.js'
 import {
   listGlobalFeatureFlags,
@@ -1890,6 +1891,18 @@ router.patch('/feature-flags/:featureKey', async (req, res) => {
       flag,
       { mode }
     )
+    try {
+      const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
+      emitEntitlementsRefreshNotice({
+        reason: 'global_feature',
+        featureKey,
+        featureName: featureDisplayName(featureKey),
+        mode: mode === null ? 'inherit' : mode,
+        globalOverride: flag.globalOverride,
+      })
+    } catch (emitErr) {
+      logger.warn('emitEntitlementsRefreshNotice failed', { error: emitErr.message })
+    }
     res.json({ ok: true, data: { flag }, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('Update global feature flag error:', error)
@@ -1974,6 +1987,19 @@ router.put('/tenants/:tenantType/:id/feature-overrides/:featureKey', async (req,
       override,
       { reason }
     )
+    try {
+      const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
+      emitEntitlementsRefreshNotice({
+        reason: 'tenant_feature_override',
+        tenantType,
+        tenantId: id,
+        featureKey,
+        featureName: featureDisplayName(featureKey),
+        enabled,
+      })
+    } catch (emitErr) {
+      logger.warn('emitEntitlementsRefreshNotice failed', { error: emitErr.message })
+    }
     res.json({ ok: true, data: { override }, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('Set tenant feature override error:', error)
@@ -2008,6 +2034,18 @@ router.delete('/tenants/:tenantType/:id/feature-overrides/:featureKey', async (r
       null,
       null
     )
+    try {
+      const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
+      emitEntitlementsRefreshNotice({
+        reason: 'tenant_feature_override_clear',
+        tenantType,
+        tenantId: id,
+        featureKey,
+        featureName: featureDisplayName(featureKey),
+      })
+    } catch (emitErr) {
+      logger.warn('emitEntitlementsRefreshNotice failed', { error: emitErr.message })
+    }
     res.json({ ok: true, data: { cleared: true }, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('Clear tenant feature override error:', error)

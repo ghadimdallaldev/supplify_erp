@@ -89,7 +89,7 @@ export function RestaurantDetailPage() {
   if (!restaurant) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Restaurant not found</p>
+        <p className="text-[var(--text-muted)]">Restaurant not found</p>
         <Button onClick={() => navigate('/app/restaurants')} className="mt-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Restaurants
@@ -112,12 +112,12 @@ export function RestaurantDetailPage() {
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center space-x-2">
+            <h1 className="text-[21px] font-black text-[var(--text)] flex items-center space-x-2">
               <Building2 className="h-8 w-8" />
               <span>{restaurant.name}</span>
-              {isPinned && <Pin className="h-5 w-5 text-yellow-500 fill-yellow-500" />}
+              {isPinned && <Pin className="h-5 w-5 text-[var(--amber-mid)] fill-yellow-500" />}
             </h1>
-            <p className="text-gray-600 mt-1">{restaurant.slug}</p>
+            <p className="text-[var(--text-muted)] mt-1">{restaurant.slug}</p>
           </div>
         </div>
         <Button
@@ -138,18 +138,18 @@ export function RestaurantDetailPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center space-x-2">
-              <Mail className="h-4 w-4 text-gray-400" />
+              <Mail className="h-4 w-4 text-[var(--text-muted)]" />
               <span>{restaurant.contact_email}</span>
             </div>
             {restaurant.phone && (
               <div className="flex items-center space-x-2">
-                <Phone className="h-4 w-4 text-gray-400" />
+                <Phone className="h-4 w-4 text-[var(--text-muted)]" />
                 <span>{restaurant.phone}</span>
               </div>
             )}
             {restaurant.address_json && (
               <div className="flex items-center space-x-2">
-                <MapPin className="h-4 w-4 text-gray-400" />
+                <MapPin className="h-4 w-4 text-[var(--text-muted)]" />
                 <span>
                   {restaurant.address_json.city}, {restaurant.address_json.country}
                 </span>
@@ -157,7 +157,7 @@ export function RestaurantDetailPage() {
             )}
             {restaurant.trade_license_no && (
               <div className="flex items-center space-x-2">
-                <Activity className="h-4 w-4 text-gray-400" />
+                <Activity className="h-4 w-4 text-[var(--text-muted)]" />
                 <span>License: {restaurant.trade_license_no}</span>
               </div>
             )}
@@ -170,11 +170,11 @@ export function RestaurantDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <ShoppingCart className="h-4 w-4 text-[var(--text-muted)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalOrders}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1">
               {stats.recentOrders} in last 6 months
             </p>
           </CardContent>
@@ -183,11 +183,11 @@ export function RestaurantDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-[var(--text-muted)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatPrice(stats.totalSpent)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1">
               Lifetime value
             </p>
           </CardContent>
@@ -196,11 +196,11 @@ export function RestaurantDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Average Order</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-[var(--text-muted)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatPrice(stats.averageOrderValue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1">
               Per order
             </p>
           </CardContent>
@@ -209,13 +209,13 @@ export function RestaurantDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Member Since</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-4 w-4 text-[var(--text-muted)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-base">
               {format(new Date(restaurant.created_at), 'MMM yyyy')}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1">
               Customer since
             </p>
           </CardContent>
@@ -234,22 +234,22 @@ export function RestaurantDetailPage() {
               stats.mostPurchasedProducts.map((product, index) => (
                 <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Package className="h-4 w-4 text-primary" />
+                    <div className="w-8 h-8 rounded-full bg-[var(--brand-pale)] flex items-center justify-center">
+                      <Package className="h-4 w-4 text-[var(--brand-mid)]" />
                     </div>
                     <div>
                       <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-gray-500">SKU: {product.sku}</p>
+                      <p className="text-sm text-[var(--text-muted)]">SKU: {product.sku}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{typeof product.totalQuantity === 'number' ? product.totalQuantity : 0} units</p>
-                    <p className="text-sm text-gray-500">{formatPrice(product.totalRevenue)}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{formatPrice(product.totalRevenue)}</p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 text-center py-4">No products purchased yet</p>
+              <p className="text-[var(--text-muted)] text-center py-4">No products purchased yet</p>
             )}
           </div>
         </CardContent>
@@ -277,7 +277,7 @@ export function RestaurantDetailPage() {
               <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
                   <p className="font-medium">Order #{order.id.substring(0, 8)}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-[var(--text-muted)]">
                     {format(new Date(order.placed_at || order.created_at), 'MMM dd, yyyy')}
                   </p>
                 </div>
@@ -290,7 +290,7 @@ export function RestaurantDetailPage() {
               </div>
             ))}
             {restaurantOrders.length === 0 && (
-              <p className="text-gray-500 text-center py-4">No orders yet</p>
+              <p className="text-[var(--text-muted)] text-center py-4">No orders yet</p>
             )}
           </div>
         </CardContent>

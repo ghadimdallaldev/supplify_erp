@@ -24,7 +24,7 @@ export function RecommendedBadge({ planCode, recommendedPlanCode, subtle }: Reco
       className={
         subtle
           ? 'text-xs font-medium bg-amber-100 text-amber-800 border-amber-200'
-          : 'text-xs font-medium bg-primary text-primary-foreground'
+          : 'text-xs font-medium bg-[var(--brand)] text-white'
       }
     >
       Recommended

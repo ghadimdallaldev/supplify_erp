@@ -47,15 +47,15 @@ export function ReservationAnalyticsPanel({ analytics, onRangeChange, activeRang
             <AreaChart data={analytics.slots}>
               <defs>
                 <linearGradient id="coversGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#ede8f5" />
               <XAxis dataKey="hour_slot" tickFormatter={(value) => new Date(value).toLocaleTimeString([], { hour: '2-digit' })} />
               <YAxis width={40} />
               <Tooltip labelFormatter={(value) => new Date(value).toLocaleString()} />
-              <Area dataKey="total_covers" name="Covers" stroke="#6366f1" fill="url(#coversGradient)" />
+              <Area dataKey="total_covers" name="Covers" stroke="#7c3aed" fill="url(#coversGradient)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -63,7 +63,7 @@ export function ReservationAnalyticsPanel({ analytics, onRangeChange, activeRang
         <div className="h-40">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={analytics.waitlist}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#ede8f5" />
               <XAxis dataKey="status" />
               <YAxis allowDecimals={false} />
               <Tooltip />

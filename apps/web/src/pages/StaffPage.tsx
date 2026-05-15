@@ -363,11 +363,11 @@ export function StaffPage() {
   const renderStaffStatus = (status: StaffMember['status']) => {
     switch (status) {
       case 'ACTIVE':
-        return <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>
+        return <Badge className="bg-[var(--mint-pale)] text-[var(--mint)]">Active</Badge>
       case 'INACTIVE':
         return <Badge className="bg-amber-100 text-amber-700">Inactive</Badge>
       case 'ARCHIVED':
-        return <Badge className="bg-gray-200 text-gray-700">Archived</Badge>
+        return <Badge className="bg-[var(--app-border-mid)] text-[var(--text-mid)]">Archived</Badge>
       default:
         return null
     }
@@ -585,8 +585,8 @@ export function StaffPage() {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Staff operations</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-[21px] font-black text-[var(--text)]">Staff operations</h1>
+          <p className="text-sm text-[var(--text-muted)]">
             Schedule shifts, manage time, and keep your single-location team aligned.
           </p>
         </div>
@@ -626,7 +626,7 @@ export function StaffPage() {
                       id="shiftStaff"
                       value={shiftForm.staffId}
                       onChange={(event) => handleShiftInputChange('staffId', event.target.value)}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                     >
                       <option value="">Unassigned</option>
                       {staffMembers.map((member) => (
@@ -750,7 +750,7 @@ export function StaffPage() {
                       id="wageType"
                       value={staffForm.wageType}
                       onChange={(event) => handleStaffInputChange('wageType', event.target.value)}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                     >
                       {wageTypeOptions.map((option) => (
                         <option key={option} value={option}>
@@ -821,9 +821,9 @@ export function StaffPage() {
               </CardHeader>
               <CardContent>
                 {staffLoading ? (
-                  <p className="text-sm text-gray-500">Loading staff…</p>
+                  <p className="text-sm text-[var(--text-muted)]">Loading staff…</p>
                 ) : staffMembers.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                  <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
                     <p>No staff yet. Add your first teammate to start scheduling and clocking time.</p>
                   </div>
                 ) : (
@@ -834,7 +834,7 @@ export function StaffPage() {
                       return (
                         <div
                           key={member.id}
-                          className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                          className="flex flex-col gap-3 rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
@@ -842,15 +842,15 @@ export function StaffPage() {
                                 className="h-2.5 w-2.5 rounded-full"
                                 style={{ backgroundColor: member.profileColor || '#2563eb' }}
                               />
-                              <p className="text-sm font-semibold text-gray-900">{member.displayName}</p>
+                              <p className="text-sm font-semibold text-[var(--text)]">{member.displayName}</p>
                               {renderStaffStatus(member.status)}
                             </div>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-[var(--text-muted)]">
                               {member.role} · {member.email || 'No email'}
                             </p>
-                            {member.phone ? <p className="text-xs text-gray-400">{member.phone}</p> : null}
+                            {member.phone ? <p className="text-xs text-[var(--text-muted)]">{member.phone}</p> : null}
                           </div>
-                          <div className="flex flex-col items-start gap-2 text-xs text-gray-500 sm:flex-row sm:items-center">
+                          <div className="flex flex-col items-start gap-2 text-xs text-[var(--text-muted)] sm:flex-row sm:items-center">
                             <div className="space-y-1">
                               <p>
                                 Wage: {member.wageType.toLowerCase()}{' '}
@@ -861,7 +861,7 @@ export function StaffPage() {
                               ) : null}
                               <p>
                                 Status:{' '}
-                                <span className="font-medium text-gray-700">
+                                <span className="font-medium text-[var(--text-mid)]">
                                   {isOnShift ? 'On shift' : 'Off shift'}
                                 </span>
                               </p>
@@ -898,31 +898,31 @@ export function StaffPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {timeEntriesLoading ? (
-                  <p className="text-sm text-gray-500">Loading time entries…</p>
+                  <p className="text-sm text-[var(--text-muted)]">Loading time entries…</p>
                 ) : recentEntries.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                  <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
                     <p>No time entries in the last few days.</p>
                   </div>
                 ) : (
                   recentEntries.map((entry) => (
-                    <div key={entry.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div key={entry.id} className="rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{entry.staffName}</p>
-                          <p className="text-xs text-gray-500">{entry.role}</p>
+                          <p className="text-sm font-semibold text-[var(--text)]">{entry.staffName}</p>
+                          <p className="text-xs text-[var(--text-muted)]">{entry.role}</p>
                         </div>
                         <Badge
                           className={
-                            entry.clockOutAt ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            entry.clockOutAt ? 'bg-[var(--mint-pale)] text-[var(--mint)]' : 'bg-[var(--amber-pale)] text-[var(--amber)]'
                           }
                         >
                           {entry.clockOutAt ? 'Closed' : 'Open'}
                         </Badge>
                       </div>
-                      <div className="mt-3 grid gap-2 text-xs text-gray-500">
+                      <div className="mt-3 grid gap-2 text-xs text-[var(--text-muted)]">
                         <p>
                           Clock in:{' '}
-                          <span className="text-gray-700">
+                          <span className="text-[var(--text-mid)]">
                             {format(new Date(entry.clockInAt), 'MMM d, yyyy · p')} (
                             {entry.clockInMethod || 'web'})
                           </span>
@@ -930,7 +930,7 @@ export function StaffPage() {
                         {entry.clockOutAt ? (
                           <p>
                             Clock out:{' '}
-                            <span className="text-gray-700">
+                            <span className="text-[var(--text-mid)]">
                               {format(new Date(entry.clockOutAt), 'MMM d, yyyy · p')} (
                               {entry.clockOutMethod || 'web'})
                             </span>
@@ -938,10 +938,10 @@ export function StaffPage() {
                         ) : null}
                         {entry.breakMinutes ? (
                           <p>
-                            Breaks: <span className="text-gray-700">{entry.breakMinutes} min</span>
+                            Breaks: <span className="text-[var(--text-mid)]">{entry.breakMinutes} min</span>
                           </p>
                         ) : null}
-                        {entry.note ? <p className="text-gray-400">Note: {entry.note}</p> : null}
+                        {entry.note ? <p className="text-[var(--text-muted)]">Note: {entry.note}</p> : null}
                       </div>
                     </div>
                   ))
@@ -959,46 +959,46 @@ export function StaffPage() {
             </CardHeader>
             <CardContent>
               {shiftsLoading ? (
-                <p className="text-sm text-gray-500">Loading schedule…</p>
+                <p className="text-sm text-[var(--text-muted)]">Loading schedule…</p>
               ) : upcomingShifts.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
                   <p>No upcoming shifts scheduled yet.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-[var(--app-border)] text-sm">
+                    <thead className="bg-[var(--brand-ultra)]">
                       <tr>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Date</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Staff</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Role</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Time</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Status</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Notes</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Date</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Staff</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Role</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Time</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Status</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Notes</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-[var(--app-border)]">
                       {upcomingShifts.map((shift) => (
                         <tr key={shift.id}>
-                          <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                          <td className="whitespace-nowrap px-4 py-3 text-[var(--text-mid)]">
                             {format(new Date(shift.shiftDate), 'EEE, MMM d')}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-col">
-                              <span className="font-medium text-gray-800">{shift.staff?.name ?? 'Unassigned'}</span>
+                              <span className="font-medium text-[var(--text)]">{shift.staff?.name ?? 'Unassigned'}</span>
                               {shift.staff?.role ? (
-                                <span className="text-xs text-gray-500">{shift.staff.role}</span>
+                                <span className="text-xs text-[var(--text-muted)]">{shift.staff.role}</span>
                               ) : null}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{shift.role}</td>
-                          <td className="px-4 py-3 text-gray-700">
+                          <td className="px-4 py-3 text-[var(--text-mid)]">{shift.role}</td>
+                          <td className="px-4 py-3 text-[var(--text-mid)]">
                             {format(new Date(shift.startsAt), 'p')} – {format(new Date(shift.endsAt), 'p')}
                           </td>
                           <td className="px-4 py-3">
-                            <Badge className="bg-blue-100 text-blue-700">{shift.status.toLowerCase()}</Badge>
+                            <Badge className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">{shift.status.toLowerCase()}</Badge>
                           </td>
-                          <td className="px-4 py-3 text-gray-500">{shift.notes || '—'}</td>
+                          <td className="px-4 py-3 text-[var(--text-muted)]">{shift.notes || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1015,31 +1015,31 @@ export function StaffPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {swapsLoading ? (
-                <p className="text-sm text-gray-500">Loading swaps…</p>
+                <p className="text-sm text-[var(--text-muted)]">Loading swaps…</p>
               ) : swaps.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
                   <p>No swap requests yet.</p>
                 </div>
               ) : (
                 swaps.map((swap) => (
-                  <div key={swap.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div key={swap.id} className="rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-[var(--text)]">
                           {swap.requester?.name} → {swap.cover?.name || 'Waiting for cover'}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-[var(--text-muted)]">
                           {swap.shift?.role} ·{' '}
                           {swap.shift ? format(new Date(swap.shift.startsAt), 'MMM d, p') : 'TBD'}
                         </p>
                       </div>
-                      <Badge className="bg-indigo-100 text-indigo-700">
+                      <Badge className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
                         {swapStatusLabels[swap.status]}
                       </Badge>
                     </div>
-                    {swap.reason ? <p className="mt-2 text-xs text-gray-500">Reason: {swap.reason}</p> : null}
+                    {swap.reason ? <p className="mt-2 text-xs text-[var(--text-muted)]">Reason: {swap.reason}</p> : null}
                     {swap.managerNote ? (
-                      <p className="mt-1 text-xs text-gray-400">Decision note: {swap.managerNote}</p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">Decision note: {swap.managerNote}</p>
                     ) : null}
                     {swap.status === 'REQUESTED' ? (
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1079,7 +1079,7 @@ export function StaffPage() {
                   id="swapShift"
                   value={swapForm.shiftId}
                   onChange={(event) => setSwapForm((prev) => ({ ...prev, shiftId: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 >
                   <option value="">Select shift</option>
                   {shifts.map((shift) => (
@@ -1095,7 +1095,7 @@ export function StaffPage() {
                   id="swapRequester"
                   value={swapForm.requestedBy}
                   onChange={(event) => setSwapForm((prev) => ({ ...prev, requestedBy: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 >
                   <option value="">Choose staff</option>
                   {staffMembers.map((member) => (
@@ -1111,7 +1111,7 @@ export function StaffPage() {
                   id="swapCover"
                   value={swapForm.proposedCoverId}
                   onChange={(event) => setSwapForm((prev) => ({ ...prev, proposedCoverId: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 >
                   <option value="">Open to team</option>
                   {staffMembers.map((member) => (
@@ -1146,21 +1146,21 @@ export function StaffPage() {
             </CardHeader>
             <CardContent>
               {ptoLoading ? (
-                <p className="text-sm text-gray-500">Loading PTO requests…</p>
+                <p className="text-sm text-[var(--text-muted)]">Loading PTO requests…</p>
               ) : ptoRequests.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
                   <p>No requests yet. Encourage staff to submit time off from the Staff App.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {ptoRequests.map((request) => (
-                    <div key={request.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div key={request.id} className="rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">
+                          <p className="text-sm font-semibold text-[var(--text)]">
                             {request.staff?.name || 'Team member'} · {request.type.toLowerCase()}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-[var(--text-muted)]">
                             {format(new Date(request.startDate), 'MMM d, yyyy')} →{' '}
                             {format(new Date(request.endDate), 'MMM d, yyyy')}
                           </p>
@@ -1168,20 +1168,20 @@ export function StaffPage() {
                         <Badge
                           className={
                             request.status === 'APPROVED'
-                              ? 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-[var(--mint-pale)] text-[var(--mint)]'
                               : request.status === 'PENDING'
                               ? 'bg-amber-100 text-amber-700'
-                              : 'bg-gray-200 text-gray-700'
+                              : 'bg-[var(--app-border-mid)] text-[var(--text-mid)]'
                           }
                         >
                           {ptoStatusLabels[request.status]}
                         </Badge>
                       </div>
                       {request.reason ? (
-                        <p className="mt-2 text-xs text-gray-500">Reason: {request.reason}</p>
+                        <p className="mt-2 text-xs text-[var(--text-muted)]">Reason: {request.reason}</p>
                       ) : null}
                       {request.managerNote ? (
-                        <p className="mt-1 text-xs text-gray-400">Manager note: {request.managerNote}</p>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">Manager note: {request.managerNote}</p>
                       ) : null}
                       {request.status === 'PENDING' ? (
                         <div className="mt-3 flex gap-2">
@@ -1222,7 +1222,7 @@ export function StaffPage() {
                   id="ptoStaff"
                   value={ptoForm.staffId}
                   onChange={(event) => setPtoForm((prev) => ({ ...prev, staffId: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 >
                   <option value="">Select staff</option>
                   {staffMembers.map((member) => (
@@ -1238,7 +1238,7 @@ export function StaffPage() {
                   id="ptoType"
                   value={ptoForm.type}
                   onChange={(event) => setPtoForm((prev) => ({ ...prev, type: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 >
                   <option value="VACATION">Vacation</option>
                   <option value="SICK">Sick</option>
@@ -1305,7 +1305,7 @@ export function StaffPage() {
                     id="availabilityStaff"
                     value={availabilityForm.staffId}
                     onChange={(event) => setAvailabilityForm((prev) => ({ ...prev, staffId: event.target.value }))}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                   >
                     <option value="">Select staff</option>
                     {staffMembers.map((member) => (
@@ -1321,7 +1321,7 @@ export function StaffPage() {
                     id="availabilityDay"
                     value={availabilityForm.weekday}
                     onChange={(event) => setAvailabilityForm((prev) => ({ ...prev, weekday: event.target.value }))}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                   >
                     <option value="0">Sunday</option>
                     <option value="1">Monday</option>
@@ -1365,29 +1365,29 @@ export function StaffPage() {
                 </Button>
               </div>
               {availability.length ? (
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
+                <div className="rounded-xl border border-[var(--app-border)] bg-white shadow-sm">
+                  <table className="min-w-full divide-y divide-[var(--app-border)] text-sm">
+                    <thead className="bg-[var(--brand-ultra)]">
                       <tr>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Staff</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Day</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Window</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Notes</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Staff</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Day</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Window</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Notes</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-[var(--app-border)]">
                       {availability.map((item) => (
                         <tr key={item.id}>
-                          <td className="px-4 py-2 text-gray-700">{item.staffName}</td>
-                          <td className="px-4 py-2 text-gray-700">
+                          <td className="px-4 py-2 text-[var(--text-mid)]">{item.staffName}</td>
+                          <td className="px-4 py-2 text-[var(--text-mid)]">
                             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][item.weekday]}
                           </td>
-                          <td className="px-4 py-2 text-gray-700">
+                          <td className="px-4 py-2 text-[var(--text-mid)]">
                             {(item.availability?.blocks || defaultAvailabilityBlocks.blocks)
                               .map((block) => `${block.start} – ${block.end}`)
                               .join(', ')}
                           </td>
-                          <td className="px-4 py-2 text-gray-500">{item.notes || '—'}</td>
+                          <td className="px-4 py-2 text-[var(--text-muted)]">{item.notes || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1419,7 +1419,7 @@ export function StaffPage() {
                     <input
                       id="announcementAck"
                       type="checkbox"
-                      className="h-4 w-4 cursor-pointer rounded border-gray-300"
+                      className="h-4 w-4 cursor-pointer rounded border-[var(--app-border-mid)]"
                       checked={announcementForm.requireAck}
                       onChange={(event) =>
                         setAnnouncementForm((prev) => ({ ...prev, requireAck: event.target.checked }))
@@ -1455,30 +1455,30 @@ export function StaffPage() {
               </div>
               <div className="space-y-3">
                 {announcementsLoading ? (
-                  <p className="text-sm text-gray-500">Loading announcements…</p>
+                  <p className="text-sm text-[var(--text-muted)]">Loading announcements…</p>
                 ) : announcements.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                  <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
                     <p>No announcements yet.</p>
                   </div>
                 ) : (
                   announcements.map((announcement) => (
-                    <div key={announcement.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div key={announcement.id} className="rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{announcement.title}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-sm font-semibold text-[var(--text)]">{announcement.title}</p>
+                          <p className="text-xs text-[var(--text-muted)]">
                             {format(new Date(announcement.publishedAt), 'MMM d, yyyy · p')}
                           </p>
                         </div>
-                        <Badge className="bg-purple-100 text-purple-700">
+                        <Badge className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
                           {announcement.requireAck
                             ? `${announcement.acknowledgmentCount} acknowledged`
                             : 'Info'}
                         </Badge>
                       </div>
-                      <p className="mt-2 text-sm text-gray-600">{announcement.body}</p>
+                      <p className="mt-2 text-sm text-[var(--text-muted)]">{announcement.body}</p>
                       {announcement.audience?.roles ? (
-                        <p className="mt-2 text-xs text-gray-400">
+                        <p className="mt-2 text-xs text-[var(--text-muted)]">
                           Audience: {(announcement.audience.roles as string[]).join(', ')}
                         </p>
                       ) : null}
@@ -1518,7 +1518,7 @@ export function StaffPage() {
                     id="docStaff"
                     value={documentForm.staffId}
                     onChange={(event) => setDocumentForm((prev) => ({ ...prev, staffId: event.target.value }))}
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                   >
                     <option value="">Select staff</option>
                     {staffMembers.map((member) => (
@@ -1570,21 +1570,21 @@ export function StaffPage() {
                 </Button>
               </div>
               {documentsLoading ? (
-                <p className="text-sm text-gray-500">Loading documents…</p>
+                <p className="text-sm text-[var(--text-muted)]">Loading documents…</p>
               ) : documents.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
                   <p>No documents uploaded yet.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {documents.map((doc) => (
-                    <div key={doc.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div key={doc.id} className="rounded-xl border border-[var(--app-border)] bg-white p-4 shadow-sm">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">
+                          <p className="text-sm font-semibold text-[var(--text)]">
                             {doc.title || doc.docType} · {doc.staff?.name}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-[var(--text-muted)]">
                             {doc.expiresAt ? `Expires ${format(new Date(doc.expiresAt), 'MMM d, yyyy')}` : 'No expiry'}
                           </p>
                         </div>
@@ -1592,7 +1592,7 @@ export function StaffPage() {
                           href={doc.fileUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs font-medium text-primary hover:underline"
+                          className="text-xs font-medium text-[var(--brand-mid)] hover:underline"
                         >
                           View file
                         </a>
@@ -1611,8 +1611,8 @@ export function StaffPage() {
             </CardHeader>
             <CardContent className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-3">
-                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                  <h3 className="text-sm font-semibold text-gray-900">Log incident</h3>
+                <div className="rounded-lg border border-[var(--app-border)] bg-white p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold text-[var(--text)]">Log incident</h3>
                   <div className="mt-3 space-y-2 text-sm">
                     <div>
                       <Label htmlFor="incidentStaff">Staff</Label>
@@ -1622,7 +1622,7 @@ export function StaffPage() {
                         onChange={(event) =>
                           setIncidentForm((prev) => ({ ...prev, staffId: event.target.value }))
                         }
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                       >
                         <option value="">Unassigned</option>
                         {staffMembers.map((member) => (
@@ -1650,7 +1650,7 @@ export function StaffPage() {
                         onChange={(event) =>
                           setIncidentForm((prev) => ({ ...prev, severity: event.target.value }))
                         }
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                       >
                         <option value="LOW">Low</option>
                         <option value="MEDIUM">Medium</option>
@@ -1690,22 +1690,22 @@ export function StaffPage() {
 
                 <div className="space-y-2">
                   {incidentsLoading ? (
-                    <p className="text-sm text-gray-500">Loading incidents…</p>
+                    <p className="text-sm text-[var(--text-muted)]">Loading incidents…</p>
                   ) : incidents.length === 0 ? (
-                    <p className="text-sm text-gray-500">No incidents recorded.</p>
+                    <p className="text-sm text-[var(--text-muted)]">No incidents recorded.</p>
                   ) : (
                     incidents.slice(0, 5).map((incident) => (
-                      <div key={incident.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                      <div key={incident.id} className="rounded-lg border border-[var(--app-border)] bg-white p-3 shadow-sm">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-gray-900">
+                          <p className="text-sm font-semibold text-[var(--text)]">
                             {incident.category} · {incident.staff?.name || 'Unassigned'}
                           </p>
-                          <Badge className="bg-red-100 text-red-700">{incident.severity.toLowerCase()}</Badge>
+                          <Badge className="bg-[var(--red-pale)] text-[var(--red)]">{incident.severity.toLowerCase()}</Badge>
                         </div>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
                           {format(new Date(incident.occurredAt), 'MMM d, yyyy · p')}
                         </p>
-                        {incident.notes ? <p className="mt-1 text-xs text-gray-500">{incident.notes}</p> : null}
+                        {incident.notes ? <p className="mt-1 text-xs text-[var(--text-muted)]">{incident.notes}</p> : null}
                       </div>
                     ))
                   )}
@@ -1713,8 +1713,8 @@ export function StaffPage() {
               </div>
 
               <div className="space-y-3">
-                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                  <h3 className="text-sm font-semibold text-gray-900">Performance notes</h3>
+                <div className="rounded-lg border border-[var(--app-border)] bg-white p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold text-[var(--text)]">Performance notes</h3>
                   <div className="mt-3 space-y-2 text-sm">
                     <div>
                       <Label htmlFor="performanceStaff">Staff</Label>
@@ -1724,7 +1724,7 @@ export function StaffPage() {
                         onChange={(event) =>
                           setPerformanceNoteForm((prev) => ({ ...prev, staffId: event.target.value }))
                         }
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                       >
                         <option value="">Select staff</option>
                         {staffMembers.map((member) => (
@@ -1742,7 +1742,7 @@ export function StaffPage() {
                         onChange={(event) =>
                           setPerformanceNoteForm((prev) => ({ ...prev, noteType: event.target.value }))
                         }
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                       >
                         <option value="KUDOS">Kudos</option>
                         <option value="COACHING">Coaching</option>
@@ -1770,17 +1770,17 @@ export function StaffPage() {
 
                 <div className="space-y-2">
                   {notesLoading ? (
-                    <p className="text-sm text-gray-500">Loading notes…</p>
+                    <p className="text-sm text-[var(--text-muted)]">Loading notes…</p>
                   ) : performanceNotes.length === 0 ? (
-                    <p className="text-sm text-gray-500">No notes recorded.</p>
+                    <p className="text-sm text-[var(--text-muted)]">No notes recorded.</p>
                   ) : (
                     performanceNotes.slice(0, 5).map((note) => (
-                      <div key={note.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-                        <p className="text-sm font-semibold text-gray-900">
+                      <div key={note.id} className="rounded-lg border border-[var(--app-border)] bg-white p-3 shadow-sm">
+                        <p className="text-sm font-semibold text-[var(--text)]">
                           {note.staff?.name} · {note.noteType.toLowerCase()}
                         </p>
-                        <p className="mt-1 text-xs text-gray-500">{note.body}</p>
-                        <p className="mt-1 text-xs text-gray-400">
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">{note.body}</p>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
                           {format(new Date(note.createdAt), 'MMM d, yyyy · p')}
                         </p>
                       </div>
@@ -1858,46 +1858,46 @@ export function StaffPage() {
                 </Button>
               </div>
               {payrollLoading ? (
-                <p className="text-sm text-gray-500">Loading payroll exports…</p>
+                <p className="text-sm text-[var(--text-muted)]">Loading payroll exports…</p>
               ) : payrollExports.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">
                   <p>No payroll exports generated yet.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-[var(--app-border)] text-sm">
+                    <thead className="bg-[var(--brand-ultra)]">
                       <tr>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Period</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Status</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Totals</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-600">Export</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Period</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Status</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Totals</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">Export</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-[var(--app-border)]">
                       {payrollExports.map((exportRow) => (
                         <tr key={exportRow.id}>
-                          <td className="px-4 py-3 text-gray-700">
+                          <td className="px-4 py-3 text-[var(--text-mid)]">
                             {format(new Date(exportRow.periodStart), 'MMM d, yyyy')} –{' '}
                             {format(new Date(exportRow.periodEnd), 'MMM d, yyyy')}
                           </td>
                           <td className="px-4 py-3">
-                            <Badge className="bg-slate-100 text-slate-700">{exportRow.status.toLowerCase()}</Badge>
+                            <Badge className="bg-[var(--brand-ultra)] text-[var(--text-muted)]">{exportRow.status.toLowerCase()}</Badge>
                           </td>
-                          <td className="px-4 py-3 text-gray-700">
+                          <td className="px-4 py-3 text-[var(--text-mid)]">
                             {exportRow.totals
                               ? Object.entries(exportRow.totals)
                                   .map(([key, value]) => `${key}: ${value}`)
                                   .join(' · ')
                               : '—'}
                           </td>
-                          <td className="px-4 py-3 text-gray-700">
+                          <td className="px-4 py-3 text-[var(--text-mid)]">
                             {exportRow.exportUrl ? (
                               <a
                                 href={exportRow.exportUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-xs font-medium text-primary hover:underline"
+                                className="text-xs font-medium text-[var(--brand-mid)] hover:underline"
                               >
                                 Download
                               </a>

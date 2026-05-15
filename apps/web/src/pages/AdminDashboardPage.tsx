@@ -287,8 +287,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   return (
     <div className="p-6" data-testid="admin-dashboard-page">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600 mt-2">Manage subscriptions, plans, and tenant quotas</p>
+        <h1 className="text-[21px] font-black text-[var(--text)]">Admin Dashboard</h1>
+        <p className="text-[var(--text-muted)] mt-2">Manage subscriptions, plans, and tenant quotas</p>
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
@@ -327,23 +327,23 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         <TabsContent value="overview" className="space-y-6">
           {overviewLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Tenants</h3>
-                    <Users className="h-5 w-5 text-blue-600" />
+                    <h3 className="text-lg font-semibold text-[var(--text)]">Tenants</h3>
+                    <Users className="h-5 w-5 text-[var(--brand-mid)]" />
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Suppliers:</span>
+                      <span className="text-[var(--text-muted)]">Suppliers:</span>
                       <span className="font-semibold">{overview?.tenantCounts?.SUPPLIER || 0}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Restaurants:</span>
+                      <span className="text-[var(--text-muted)]">Restaurants:</span>
                       <span className="font-semibold">
                         {overview?.tenantCounts?.RESTAURANT || 0}
                       </span>
@@ -353,18 +353,18 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Revenue</h3>
-                    <DollarSign className="h-5 w-5 text-green-600" />
+                    <h3 className="text-lg font-semibold text-[var(--text)]">Revenue</h3>
+                    <DollarSign className="h-5 w-5 text-[var(--mint)]" />
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">MRR:</span>
+                      <span className="text-[var(--text-muted)]">MRR:</span>
                       <span className="font-semibold">
                         {formatCurrency(overview?.revenue?.mrr)}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">ARR:</span>
+                      <span className="text-[var(--text-muted)]">ARR:</span>
                       <span className="font-semibold">
                         {formatCurrency(overview?.revenue?.arr)}
                       </span>
@@ -374,18 +374,18 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Activity (24h)</h3>
-                    <TrendingUp className="h-5 w-5 text-purple-600" />
+                    <h3 className="text-lg font-semibold text-[var(--text)]">Activity (24h)</h3>
+                    <TrendingUp className="h-5 w-5 text-[var(--brand-mid)]" />
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Orders:</span>
+                      <span className="text-[var(--text-muted)]">Orders:</span>
                       <span className="font-semibold">
                         {overview?.activity?.ordersLast24h || 0}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Chats:</span>
+                      <span className="text-[var(--text-muted)]">Chats:</span>
                       <span className="font-semibold">{overview?.activity?.chatsLast24h || 0}</span>
                     </div>
                   </div>
@@ -394,7 +394,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Subscription Status</h3>
+                  <h3 className="text-lg font-semibold text-[var(--text)] mb-4">Subscription Status</h3>
                   <div className="space-y-3">
                     {Object.entries(overview?.subscriptionStats || {}).map(([status, count]) => (
                       <div key={status} className="flex justify-between items-center">
@@ -408,14 +408,14 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 </Card>
 
                 <Card className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Alerts</h3>
+                  <h3 className="text-lg font-semibold text-[var(--text)] mb-4">Alerts</h3>
                   <div className="space-y-2">
                     {overview?.alerts?.pastDueInvoices ? (
                       <Badge variant="destructive" className="w-full justify-center py-2">
                         {overview.alerts.pastDueInvoices} Past Due Invoices
                       </Badge>
                     ) : (
-                      <p className="text-gray-500 text-sm">No alerts</p>
+                      <p className="text-[var(--text-muted)] text-sm">No alerts</p>
                     )}
                   </div>
                 </Card>
@@ -423,26 +423,26 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 {conversionStats && (
                   <>
                     <Card className="p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      <h3 className="text-lg font-semibold text-[var(--text)] mb-4">
                         Conversion funnel (last {conversionStats.days}d)
                       </h3>
                       <div className="space-y-3 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Blocks (feature/limit)</span>
+                          <span className="text-[var(--text-muted)]">Blocks (feature/limit)</span>
                           <span className="font-semibold">{conversionStats.totalBlocks}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Upgrades</span>
+                          <span className="text-[var(--text-muted)]">Upgrades</span>
                           <span className="font-semibold">{conversionStats.totalUpgrades}</span>
                         </div>
                         <div className="flex justify-between border-t pt-2">
-                          <span className="text-gray-600">Blocks → upgrades %</span>
+                          <span className="text-[var(--text-muted)]">Blocks → upgrades %</span>
                           <span className="font-semibold">
                             {conversionStats.blocksToUpgradesConversionPercent}%
                           </span>
                         </div>
                         {conversionStats.mostBlockedFeature && (
-                          <p className="text-gray-600 pt-1">
+                          <p className="text-[var(--text-muted)] pt-1">
                             Most blocked feature:{' '}
                             <span className="font-medium">
                               {conversionStats.mostBlockedFeature}
@@ -450,7 +450,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           </p>
                         )}
                         {conversionStats.mostBlockedLimit && (
-                          <p className="text-gray-600">
+                          <p className="text-[var(--text-muted)]">
                             Most blocked limit:{' '}
                             <span className="font-medium">{conversionStats.mostBlockedLimit}</span>
                           </p>
@@ -459,13 +459,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     </Card>
                     {conversionStats.funnelDropOff && (
                       <Card className="p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        <h3 className="text-lg font-semibold text-[var(--text)] mb-4">
                           Conversion drop-off
                         </h3>
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="border-b text-left text-gray-600">
+                              <tr className="border-b text-left text-[var(--text-muted)]">
                                 <th className="py-2 pr-4">Step</th>
                                 <th className="py-2 pr-4">7d</th>
                                 <th className="py-2">30d</th>
@@ -513,12 +513,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         </div>
                         {conversionStats.recommendationFunnel && (
                           <div className="mt-4 pt-4 border-t">
-                            <h4 className="font-medium text-gray-900 mb-2">
+                            <h4 className="font-medium text-[var(--text)] mb-2">
                               Recommendation funnel
                             </h4>
                             <table className="w-full text-sm">
                               <thead>
-                                <tr className="border-b text-left text-gray-600">
+                                <tr className="border-b text-left text-[var(--text-muted)]">
                                   <th className="py-1 pr-4">Step</th>
                                   <th className="py-1 pr-4">7d</th>
                                   <th className="py-1">30d</th>
@@ -567,11 +567,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <TabsContent value="plans" className="space-y-6">
           <div className="flex flex-wrap justify-between items-center gap-4">
-            <h2 className="text-2xl font-bold text-gray-900">Subscription Plans</h2>
+            <h2 className="text-2xl font-bold text-[var(--text)]">Subscription Plans</h2>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Filter:</span>
+              <span className="text-sm text-[var(--text-muted)]">Filter:</span>
               <select
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                className="rounded-md border border-[var(--app-border-mid)] px-3 py-1.5 text-sm"
                 value={plansTenantFilter ?? ''}
                 onChange={(e) =>
                   setPlansTenantFilter(
@@ -616,7 +616,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     <div>
                       <Label>Tenant type</Label>
                       <select
-                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                        className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2"
                         value={createPlanForm.tenantType}
                         onChange={(e) =>
                           setCreatePlanForm((s) => ({
@@ -688,7 +688,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
           {plansLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -696,13 +696,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <Card key={plan.id} className="p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+                      <h3 className="text-xl font-bold text-[var(--text)]">{plan.name}</h3>
                       <Badge variant="outline">
                         {plan.tenant_type === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
                       </Badge>
-                      {plan.code && <span className="text-xs text-gray-500">{plan.code}</span>}
+                      {plan.code && <span className="text-xs text-[var(--text-muted)]">{plan.code}</span>}
                       {plan.code && getPlanSubtitle(plan.code) ? (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-[var(--text-muted)]">
                           · {getPlanSubtitle(plan.code)}
                         </span>
                       ) : null}
@@ -712,19 +712,19 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     </Badge>
                   </div>
                   <div className="mb-4">
-                    <p className="text-3xl font-bold text-gray-900">
+                    <p className="text-[21px] font-black text-[var(--text)]">
                       ${plan.price_per_month}
-                      <span className="text-sm text-gray-600 font-normal">/mo</span>
+                      <span className="text-sm text-[var(--text-muted)] font-normal">/mo</span>
                     </p>
                     {plan.price_per_year && (
-                      <p className="text-sm text-gray-600">${plan.price_per_year}/yr</p>
+                      <p className="text-sm text-[var(--text-muted)]">${plan.price_per_year}/yr</p>
                     )}
                   </div>
                   {plan.description && (
-                    <p className="text-sm text-gray-600 mb-4">{plan.description}</p>
+                    <p className="text-sm text-[var(--text-muted)] mb-4">{plan.description}</p>
                   )}
                   <div className="space-y-2 mb-4">
-                    <p className="text-sm font-semibold text-gray-700">Limits (top 6):</p>
+                    <p className="text-sm font-semibold text-[var(--text-mid)]">Limits (top 6):</p>
                     {plan.limits &&
                       (() => {
                         const limitKeys =
@@ -750,7 +750,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           .map((k) => [k, plan.limits[k]] as const)
                         return entries.map(([key, value]) => (
                           <div key={key} className="flex justify-between text-sm">
-                            <span className="text-gray-600">{key.replace(/_/g, ' ')}:</span>
+                            <span className="text-[var(--text-muted)]">{key.replace(/_/g, ' ')}:</span>
                             <span className="font-semibold">
                               {value === -1 ? 'Unlimited' : value}
                             </span>
@@ -759,7 +759,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       })()}
                   </div>
                   <div className="space-y-2 mb-4">
-                    <p className="text-sm font-semibold text-gray-700">Features:</p>
+                    <p className="text-sm font-semibold text-[var(--text-mid)]">Features:</p>
                     <div className="flex flex-wrap gap-1">
                       {plan.features && typeof plan.features === 'object' ? (
                         Object.entries(plan.features)
@@ -774,7 +774,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           })
                           .filter(Boolean)
                       ) : (
-                        <span className="text-sm text-gray-500">No features defined</span>
+                        <span className="text-sm text-[var(--text-muted)]">No features defined</span>
                       )}
                     </div>
                   </div>
@@ -890,7 +890,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       onChange={(e) =>
                         setEditPlanForm((s) => ({ ...s, isActive: e.target.checked }))
                       }
-                      className="rounded border-gray-300"
+                      className="rounded border-[var(--app-border-mid)]"
                     />
                     <Label htmlFor="edit-plan-active">Active</Label>
                   </div>
@@ -910,35 +910,35 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <TabsContent value="subscriptions" className="space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900">Subscriptions</h2>
+            <h2 className="text-2xl font-bold text-[var(--text)]">Subscriptions</h2>
           </div>
 
           {subscriptionsLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Tenant</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Plan</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Type</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Created</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Actions</th>
+                  <tr className="border-b border-[var(--app-border)]">
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Tenant</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Plan</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Type</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Created</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {subscriptions.map((sub) => (
-                    <tr key={sub.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={sub.id} className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]">
                       <td className="py-3 px-4">
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-[var(--text)]">
                             {sub.tenant_name || 'Unknown'}
                           </p>
-                          <p className="text-sm text-gray-500">{sub.tenant_email}</p>
+                          <p className="text-sm text-[var(--text-muted)]">{sub.tenant_email}</p>
                         </div>
                       </td>
                       <td className="py-3 px-4">
@@ -962,7 +962,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       <td className="py-3 px-4">
                         <Badge variant="outline">{sub.tenant_type}</Badge>
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">
+                      <td className="py-3 px-4 text-sm text-[var(--text-muted)]">
                         {new Date(sub.created_at).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4">
@@ -989,10 +989,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         </TabsContent>
 
         <TabsContent value="health" className="space-y-6">
-          <h2 className="text-2xl font-bold text-gray-900">System Health</h2>
+          <h2 className="text-2xl font-bold text-[var(--text)]">System Health</h2>
           {healthLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <div className="grid gap-4">
@@ -1015,14 +1015,14 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 </CardHeader>
                 <CardContent>
                   {!healthData?.recentApiErrors?.length ? (
-                    <p className="text-sm text-gray-500">No recent errors</p>
+                    <p className="text-sm text-[var(--text-muted)]">No recent errors</p>
                   ) : (
                     <ul className="text-sm space-y-1 max-h-64 overflow-auto">
                       {healthData.recentApiErrors.map((e: any, i: number) => (
                         <li key={i} className="flex gap-2">
-                          <span className="text-red-600">{e.type}</span>
+                          <span className="text-[var(--red)]">{e.type}</span>
                           <span>{e.source}</span>
-                          <span className="text-gray-500 truncate">{e.message}</span>
+                          <span className="text-[var(--text-muted)] truncate">{e.message}</span>
                         </li>
                       ))}
                     </ul>
@@ -1034,10 +1034,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         </TabsContent>
 
         <TabsContent value="finance" className="space-y-6">
-          <h2 className="text-2xl font-bold text-gray-900">Financial Overview</h2>
+          <h2 className="text-2xl font-bold text-[var(--text)]">Financial Overview</h2>
           {financeLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
@@ -1056,7 +1056,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   </p>
                   <p className="flex justify-between">
                     <span>Overdue</span>
-                    <span className="font-semibold text-red-600">{formatCurrency(financeData?.overdue)}</span>
+                    <span className="font-semibold text-[var(--red)]">{formatCurrency(financeData?.overdue)}</span>
                   </p>
                   <p className="flex justify-between">
                     <span>MRR</span>
@@ -1074,7 +1074,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 </CardHeader>
                 <CardContent>
                   {!financeData?.revenueByPlan?.length ? (
-                    <p className="text-sm text-gray-500">No data</p>
+                    <p className="text-sm text-[var(--text-muted)]">No data</p>
                   ) : (
                     <ul className="text-sm space-y-1">
                       {financeData.revenueByPlan.map((r: any, i: number) => (
@@ -1097,7 +1097,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <TabsContent value="tenants" className="space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-[var(--text)]">
               {initialTab === 'suppliers'
                 ? 'Supplier Management'
                 : initialTab === 'restaurants'
@@ -1117,15 +1117,15 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 {!showRestaurantsOnly && (
                   <Card>
                     <CardHeader>
-                      <h3 className="text-xl font-bold text-gray-900">Suppliers</h3>
-                      <p className="text-sm text-gray-600">
+                      <h3 className="text-xl font-bold text-[var(--text)]">Suppliers</h3>
+                      <p className="text-sm text-[var(--text-muted)]">
                         Manage supplier tenants and subscriptions
                       </p>
                     </CardHeader>
                     <CardContent>
                       {suppliersError ? (
-                        <div className="p-4 bg-red-50 border border-red-200 rounded">
-                          <p className="text-red-800">
+                        <div className="p-4 bg-[var(--red-pale)] border border-[var(--red)]/30 rounded">
+                          <p className="text-[var(--red)]">
                             Error loading suppliers. Check console for details.
                           </p>
                         </div>
@@ -1134,31 +1134,31 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
                       ) : !suppliersData?.suppliers || suppliersData.suppliers.length === 0 ? (
-                        <p className="text-center py-8 text-gray-500">No suppliers found</p>
+                        <p className="text-center py-8 text-[var(--text-muted)]">No suppliers found</p>
                       ) : (
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                              <tr className="border-b border-[var(--app-border)]">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Supplier
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Plan
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Status
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Products
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Warehouses
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Revenue
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Actions
                                 </th>
                               </tr>
@@ -1167,12 +1167,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                               {suppliersData.suppliers.map((supplier: any) => (
                                 <tr
                                   key={supplier.id}
-                                  className="border-b border-gray-100 hover:bg-gray-50"
+                                  className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
                                 >
                                   <td className="py-3 px-4">
                                     <div>
-                                      <p className="font-medium text-gray-900">{supplier.name}</p>
-                                      <p className="text-sm text-gray-500">
+                                      <p className="font-medium text-[var(--text)]">{supplier.name}</p>
+                                      <p className="text-sm text-[var(--text-muted)]">
                                         {supplier.contact_email}
                                       </p>
                                     </div>
@@ -1191,13 +1191,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                       {supplier.subscription_status || 'NONE'}
                                     </Badge>
                                   </td>
-                                  <td className="py-3 px-4 text-gray-600">
+                                  <td className="py-3 px-4 text-[var(--text-muted)]">
                                     {supplier.product_count || 0}
                                   </td>
-                                  <td className="py-3 px-4 text-gray-600">
+                                  <td className="py-3 px-4 text-[var(--text-muted)]">
                                     {supplier.warehouse_count || 0}
                                   </td>
-                                  <td className="py-3 px-4 text-gray-600">
+                                  <td className="py-3 px-4 text-[var(--text-muted)]">
                                     {formatCurrency(supplier.total_revenue)}
                                   </td>
                                   <td className="py-3 px-4 flex gap-2">
@@ -1282,15 +1282,15 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 {!showSuppliersOnly && (
                   <Card>
                     <CardHeader>
-                      <h3 className="text-xl font-bold text-gray-900">Restaurants</h3>
-                      <p className="text-sm text-gray-600">
+                      <h3 className="text-xl font-bold text-[var(--text)]">Restaurants</h3>
+                      <p className="text-sm text-[var(--text-muted)]">
                         Manage restaurant tenants and subscriptions
                       </p>
                     </CardHeader>
                     <CardContent>
                       {restaurantsError ? (
-                        <div className="p-4 bg-red-50 border border-red-200 rounded">
-                          <p className="text-red-800">
+                        <div className="p-4 bg-[var(--red-pale)] border border-[var(--red)]/30 rounded">
+                          <p className="text-[var(--red)]">
                             Error loading restaurants. Check console for details.
                           </p>
                         </div>
@@ -1300,28 +1300,28 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         </div>
                       ) : !restaurantsData?.restaurants ||
                         restaurantsData.restaurants.length === 0 ? (
-                        <p className="text-center py-8 text-gray-500">No restaurants found</p>
+                        <p className="text-center py-8 text-[var(--text-muted)]">No restaurants found</p>
                       ) : (
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                              <tr className="border-b border-[var(--app-border)]">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Restaurant
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Plan
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Status
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Orders (30d)
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Total Spent
                                 </th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                                <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
                                   Actions
                                 </th>
                               </tr>
@@ -1330,12 +1330,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                               {restaurantsData.restaurants.map((restaurant: any) => (
                                 <tr
                                   key={restaurant.id}
-                                  className="border-b border-gray-100 hover:bg-gray-50"
+                                  className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
                                 >
                                   <td className="py-3 px-4">
                                     <div>
-                                      <p className="font-medium text-gray-900">{restaurant.name}</p>
-                                      <p className="text-sm text-gray-500">
+                                      <p className="font-medium text-[var(--text)]">{restaurant.name}</p>
+                                      <p className="text-sm text-[var(--text-muted)]">
                                         {restaurant.contact_email}
                                       </p>
                                     </div>
@@ -1356,10 +1356,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                       {restaurant.subscription_status || 'NONE'}
                                     </Badge>
                                   </td>
-                                  <td className="py-3 px-4 text-gray-600">
+                                  <td className="py-3 px-4 text-[var(--text-muted)]">
                                     {restaurant.orders_last_30d || 0}
                                   </td>
-                                  <td className="py-3 px-4 text-gray-600">
+                                  <td className="py-3 px-4 text-[var(--text-muted)]">
                                     {formatCurrency(restaurant.total_spent)}
                                   </td>
                                   <td className="py-3 px-4 flex gap-2">
@@ -1446,14 +1446,14 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <TabsContent value="usage" className="space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-[var(--text)]">
               {initialTab === 'suppliers'
                 ? 'Supplier Usage & Quotas'
                 : initialTab === 'restaurants'
                   ? 'Restaurant Usage & Quotas'
                   : 'Usage & Quotas'}
             </h2>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[var(--text-muted)]">
               Monitor tenant resource usage against plan limits
             </p>
           </div>
@@ -1463,8 +1463,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <>
               <Card>
                 <CardHeader>
-                  <h3 className="text-xl font-bold text-gray-900">Supplier Usage Overview</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="text-xl font-bold text-[var(--text)]">Supplier Usage Overview</h3>
+                  <p className="text-sm text-[var(--text-muted)]">
                     Product and warehouse usage across all suppliers
                   </p>
                 </CardHeader>
@@ -1472,42 +1472,42 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Total Products</span>
-                        <Package className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Total Products</span>
+                        <Package className="h-4 w-4 text-[var(--brand-mid)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {suppliersData?.suppliers?.reduce(
                           (sum, s) => sum + parseInt(s.product_count || 0),
                           0
                         ) || 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Across all suppliers</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">Across all suppliers</p>
                     </div>
 
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Active Suppliers</span>
-                        <Building2 className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Active Suppliers</span>
+                        <Building2 className="h-4 w-4 text-[var(--mint)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {suppliersData?.suppliers?.length || 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">With active subscriptions</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">With active subscriptions</p>
                     </div>
 
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Over Limit</span>
-                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Over Limit</span>
+                        <AlertCircle className="h-4 w-4 text-[var(--red)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {suppliersData?.suppliers?.filter((s) => {
                           const limit =
                             s.plan_name === 'Free' ? 50 : s.plan_name === 'Bronze' ? 1000 : 10000
                           return parseInt(s.product_count || 0) > limit
                         }).length || 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Suppliers over product limit</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">Suppliers over product limit</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1515,7 +1515,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
               <Card>
                 <CardHeader>
-                  <h3 className="text-xl font-bold text-gray-900">Products by Supplier</h3>
+                  <h3 className="text-xl font-bold text-[var(--text)]">Products by Supplier</h3>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
@@ -1532,13 +1532,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <div key={supplier.id} className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span className="font-medium">{supplier.name}</span>
-                            <span className={productCount > limit ? 'text-red-600' : ''}>
+                            <span className={productCount > limit ? 'text-[var(--red)]' : ''}>
                               {productCount} / {limit}
                             </span>
                           </div>
-                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-2 bg-[var(--app-border-mid)] rounded-full overflow-hidden">
                             <div
-                              className={`h-full ${productCount > limit ? 'bg-red-500' : 'bg-blue-500'}`}
+                              className={`h-full ${productCount > limit ? 'bg-[var(--red)]' : 'bg-[var(--brand-mid)]'}`}
                               style={{ width: `${Math.min(usage, 100)}%` }}
                             />
                           </div>
@@ -1556,8 +1556,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <>
               <Card>
                 <CardHeader>
-                  <h3 className="text-xl font-bold text-gray-900">Restaurant Usage Overview</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="text-xl font-bold text-[var(--text)]">Restaurant Usage Overview</h3>
+                  <p className="text-sm text-[var(--text-muted)]">
                     Orders and spending across all restaurants
                   </p>
                 </CardHeader>
@@ -1565,35 +1565,35 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">30-Day Orders</span>
-                        <TrendingUp className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm text-[var(--text-muted)]">30-Day Orders</span>
+                        <TrendingUp className="h-4 w-4 text-[var(--brand-mid)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {restaurantsData?.restaurants?.reduce(
                           (sum, r) => sum + parseInt(r.orders_last_30d || 0),
                           0
                         ) || 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Total orders last 30 days</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">Total orders last 30 days</p>
                     </div>
 
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Active Restaurants</span>
-                        <Users className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Active Restaurants</span>
+                        <Users className="h-4 w-4 text-[var(--mint)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {restaurantsData?.restaurants?.length || 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">With active subscriptions</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">With active subscriptions</p>
                     </div>
 
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Total Spent (30d)</span>
-                        <DollarSign className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Total Spent (30d)</span>
+                        <DollarSign className="h-4 w-4 text-[var(--mint)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {formatCurrency(
                           restaurantsData?.restaurants?.reduce(
                             (sum, r) => sum + parseFloat(r.total_spent || 0),
@@ -1601,7 +1601,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           )
                         )}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Across all restaurants</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">Across all restaurants</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1609,7 +1609,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
               <Card>
                 <CardHeader>
-                  <h3 className="text-xl font-bold text-gray-900">Orders by Restaurant</h3>
+                  <h3 className="text-xl font-bold text-[var(--text)]">Orders by Restaurant</h3>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
@@ -1628,7 +1628,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                             <span className="font-medium">{restaurant.name}</span>
                             <span>{restaurant.orders_last_30d || 0} orders</span>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-[var(--text-muted)]">
                             Daily limit: {dailyLimit === -1 ? 'Unlimited' : `${dailyLimit}/day`}
                           </div>
                         </div>
@@ -1645,8 +1645,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <>
               <Card>
                 <CardHeader>
-                  <h3 className="text-xl font-bold text-gray-900">Platform usage overview</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="text-xl font-bold text-[var(--text)]">Platform usage overview</h3>
+                  <p className="text-sm text-[var(--text-muted)]">
                     Aggregated usage across all suppliers and restaurants. Use Supplier Admin or
                     Restaurant Admin for per-tenant detail.
                   </p>
@@ -1655,13 +1655,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Suppliers</span>
-                        <Building2 className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Suppliers</span>
+                        <Building2 className="h-4 w-4 text-[var(--brand-mid)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {suppliersData?.suppliers?.length ?? 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
                         Total products:{' '}
                         {suppliersData?.suppliers?.reduce(
                           (sum, s) => sum + parseInt(s.product_count || 0),
@@ -1671,13 +1671,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     </div>
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Restaurants</span>
-                        <Users className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Restaurants</span>
+                        <Users className="h-4 w-4 text-[var(--mint)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {restaurantsData?.restaurants?.length ?? 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
                         30-day orders:{' '}
                         {restaurantsData?.restaurants?.reduce(
                           (sum, r) => sum + parseInt(r.orders_last_30d || 0),
@@ -1687,24 +1687,24 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     </div>
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Suppliers over limit</span>
-                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Suppliers over limit</span>
+                        <AlertCircle className="h-4 w-4 text-[var(--red)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {suppliersData?.suppliers?.filter((s) => {
                           const limit =
                             s.plan_name === 'Free' ? 50 : s.plan_name === 'Bronze' ? 1000 : 10000
                           return parseInt(s.product_count || 0) > limit
                         }).length ?? 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Product limit exceeded</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">Product limit exceeded</p>
                     </div>
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Restaurant spend (30d)</span>
-                        <DollarSign className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-[var(--text-muted)]">Restaurant spend (30d)</span>
+                        <DollarSign className="h-4 w-4 text-[var(--mint)]" />
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-[var(--text)]">
                         {formatCurrency(
                           restaurantsData?.restaurants?.reduce(
                             (sum, r) => sum + parseFloat(r.total_spent || 0),
@@ -1712,13 +1712,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           )
                         )}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Across all restaurants</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">Across all restaurants</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
               {(suppliersLoading || restaurantsLoading) && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading usage data…
                 </div>
@@ -1742,12 +1742,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <TabsContent value="audit">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Audit Logs</h2>
+            <h2 className="text-2xl font-bold text-[var(--text)]">Audit Logs</h2>
           </div>
 
           {auditLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <div className="space-y-4">
@@ -1756,11 +1756,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-gray-900">{log.action_type}</p>
+                        <p className="font-semibold text-[var(--text)]">{log.action_type}</p>
                         <Badge variant="outline">{log.target_entity_type}</Badge>
                       </div>
-                      <p className="text-sm text-gray-600">{log.action_description}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-sm text-[var(--text-muted)]">{log.action_description}</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
                         By {log.admin_name} at {new Date(log.created_at).toLocaleString()}
                       </p>
                     </div>
@@ -1786,7 +1786,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               <div>
                 <Label>Target plan</Label>
                 <select
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 mt-1"
+                  className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 mt-1"
                   value={changePlanModal.targetPlanId}
                   onChange={(e) =>
                     setChangePlanModal((m) => m && { ...m, targetPlanId: e.target.value })
@@ -1813,7 +1813,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               {changePlanPreview && (
                 <div className="border rounded-lg p-4 space-y-3 text-sm">
                   {!hasPreviewContent(changePlanPreview) && (
-                    <p className="text-gray-600">
+                    <p className="text-[var(--text-muted)]">
                       No impact: usage is within target plan limits; no feature changes.
                     </p>
                   )}
@@ -1832,9 +1832,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   {((changePlanPreview.featureDiff?.enabled?.length ?? 0) > 0 ||
                     (changePlanPreview.featureDiff?.disabled?.length ?? 0) > 0) && (
                     <div>
-                      <p className="font-semibold text-gray-700">Feature changes:</p>
+                      <p className="font-semibold text-[var(--text-mid)]">Feature changes:</p>
                       {(changePlanPreview.featureDiff?.enabled?.length ?? 0) > 0 && (
-                        <p className="text-green-600">
+                        <p className="text-[var(--mint)]">
                           Enabled: {changePlanPreview.featureDiff!.enabled!.join(', ')}
                         </p>
                       )}
@@ -1846,7 +1846,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     </div>
                   )}
                   {(changePlanPreview.recommendedActions?.length ?? 0) > 0 && (
-                    <p className="text-gray-600">
+                    <p className="text-[var(--text-muted)]">
                       {changePlanPreview.recommendedActions!.join(' ')}
                     </p>
                   )}

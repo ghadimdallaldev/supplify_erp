@@ -255,8 +255,8 @@ export function RestaurantInventoryPage() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 text-lg font-semibold mb-2">Failed to load inventory</p>
-        <p className="text-gray-600 text-sm">{error?.message || 'An error occurred'}</p>
+        <p className="text-[var(--red)] text-lg font-semibold mb-2">Failed to load inventory</p>
+        <p className="text-[var(--text-muted)] text-sm">{error?.message || 'An error occurred'}</p>
       </div>
     )
   }
@@ -265,8 +265,8 @@ export function RestaurantInventoryPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-          <p className="text-gray-600 mt-2">Track your stock levels and manage inventory</p>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Inventory</h1>
+          <p className="text-[var(--text-muted)] mt-2">Track your stock levels and manage inventory</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => setShowBulkUploadDialog(true)} variant="outline">
@@ -298,15 +298,15 @@ export function RestaurantInventoryPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <p className="text-sm text-gray-600">Total Movements</p>
+                    <p className="text-sm text-[var(--text-muted)]">Total Movements</p>
                     <p className="text-2xl font-bold">{history.length}</p>
                   </div>
-                  <FileText className="h-8 w-8 text-blue-500" />
+                  <FileText className="h-8 w-8 text-[var(--brand-mid)]" />
                 </div>
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <p className="text-sm text-gray-600">Recent Additions</p>
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-sm text-[var(--text-muted)]">Recent Additions</p>
+                    <p className="text-2xl font-bold text-[var(--mint)]">
                       {
                         history.filter(
                           (h: any) =>
@@ -316,12 +316,12 @@ export function RestaurantInventoryPage() {
                       }
                     </p>
                   </div>
-                  <TrendingUp className="h-8 w-8 text-green-500" />
+                  <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
                 </div>
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <p className="text-sm text-gray-600">Recent Subtractions</p>
-                    <p className="text-2xl font-bold text-red-600">
+                    <p className="text-sm text-[var(--text-muted)]">Recent Subtractions</p>
+                    <p className="text-2xl font-bold text-[var(--red)]">
                       {
                         history.filter(
                           (h: any) =>
@@ -331,7 +331,7 @@ export function RestaurantInventoryPage() {
                       }
                     </p>
                   </div>
-                  <TrendingDown className="h-8 w-8 text-red-500" />
+                  <TrendingDown className="h-8 w-8 text-[var(--red)]" />
                 </div>
               </div>
             </CardContent>
@@ -343,10 +343,10 @@ export function RestaurantInventoryPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total Products</p>
+                    <p className="text-sm text-[var(--text-muted)]">Total Products</p>
                     <p className="text-2xl font-bold">{summary.total}</p>
                   </div>
-                  <Package className="h-8 w-8 text-blue-500" />
+                  <Package className="h-8 w-8 text-[var(--brand-mid)]" />
                 </div>
               </CardContent>
             </Card>
@@ -354,10 +354,10 @@ export function RestaurantInventoryPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">In Stock</p>
+                    <p className="text-sm text-[var(--text-muted)]">In Stock</p>
                     <p className="text-2xl font-bold">{summary.inStock}</p>
                   </div>
-                  <TrendingUp className="h-8 w-8 text-green-500" />
+                  <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
                 </div>
               </CardContent>
             </Card>
@@ -365,10 +365,10 @@ export function RestaurantInventoryPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Low Stock</p>
+                    <p className="text-sm text-[var(--text-muted)]">Low Stock</p>
                     <p className="text-2xl font-bold">{summary.lowStock}</p>
                   </div>
-                  <AlertCircle className="h-8 w-8 text-orange-500" />
+                  <AlertCircle className="h-8 w-8 text-[var(--amber-mid)]" />
                 </div>
               </CardContent>
             </Card>
@@ -376,10 +376,10 @@ export function RestaurantInventoryPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Out of Stock</p>
+                    <p className="text-sm text-[var(--text-muted)]">Out of Stock</p>
                     <p className="text-2xl font-bold">{summary.outOfStock}</p>
                   </div>
-                  <TrendingDown className="h-8 w-8 text-red-500" />
+                  <TrendingDown className="h-8 w-8 text-[var(--red)]" />
                 </div>
               </CardContent>
             </Card>
@@ -399,7 +399,7 @@ export function RestaurantInventoryPage() {
                 <select
                   value={supplierFilter}
                   onChange={(e) => setSupplierFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md"
+                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                 >
                   <option value="ALL">All Suppliers</option>
                   {Array.from(
@@ -417,7 +417,7 @@ export function RestaurantInventoryPage() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md"
+                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                 >
                   <option value="ALL">All Status</option>
                   <option value="IN_STOCK">In Stock</option>
@@ -461,54 +461,54 @@ export function RestaurantInventoryPage() {
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-[var(--brand-ultra)]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Product
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Supplier
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Quantity
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Suggested Reorder
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Status
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Last Updated
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-[var(--app-border)]">
                     {filteredInventory.map((item: any) => {
                       const status = getStockStatus(item.quantity, item.low_stock_threshold)
                       const reorderQty = calculateReorderQuantity(item)
                       return (
-                        <tr key={item.id} className="hover:bg-gray-50">
+                        <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
                           <td className="px-4 py-4">
                             <div>
-                              <p className="font-medium text-gray-900">{item.product_name}</p>
-                              <p className="text-sm text-gray-500">{item.product_sku}</p>
+                              <p className="font-medium text-[var(--text)]">{item.product_name}</p>
+                              <p className="text-sm text-[var(--text-muted)]">{item.product_sku}</p>
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-900">{item.supplier_name}</td>
+                          <td className="px-4 py-4 text-sm text-[var(--text)]">{item.supplier_name}</td>
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold">{item.quantity}</span>
-                              <span className="text-sm text-gray-500">{item.product_unit}</span>
+                              <span className="text-sm text-[var(--text-muted)]">{item.product_unit}</span>
                             </div>
                           </td>
                           <td className="px-4 py-4">
                             {reorderQty > 0 ? (
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold text-orange-600">{reorderQty}</span>
+                                <span className="font-semibold text-[var(--amber)]">{reorderQty}</span>
                                 <Badge variant="outline" className="text-xs">
                                   Suggested
                                 </Badge>
@@ -527,7 +527,7 @@ export function RestaurantInventoryPage() {
                                 </Button>
                               </div>
                             ) : (
-                              <span className="text-gray-400">-</span>
+                              <span className="text-[var(--text-muted)]">-</span>
                             )}
                           </td>
                           <td className="px-4 py-4">
@@ -535,7 +535,7 @@ export function RestaurantInventoryPage() {
                               {status.replace('_', ' ')}
                             </Badge>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-500">
+                          <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
                             {new Date(item.updated_at).toLocaleDateString()}
                           </td>
                           <td className="px-4 py-4">
@@ -578,10 +578,10 @@ export function RestaurantInventoryPage() {
               </div>
 
               {filteredInventory.length === 0 && (
-                <div className="text-center py-12 rounded-lg border border-dashed border-gray-300 bg-gray-50/50">
-                  <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 font-medium">No inventory yet</p>
-                  <p className="text-sm text-gray-500 mt-1">
+                <div className="text-center py-12 rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90">
+                  <Package className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                  <p className="text-[var(--text-muted)] font-medium">No inventory yet</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
                     Place an order and receive goods to see inventory here.
                   </p>
                   <Button asChild className="mt-4">
@@ -621,7 +621,7 @@ export function RestaurantInventoryPage() {
                     value={adjustQuantity}
                     onChange={(e) => setAdjustQuantity(e.target.value)}
                   />
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-[var(--text-muted)]">
                     Current quantity: {adjustingItem?.quantity} {adjustingItem?.product_unit}
                   </p>
                 </div>
@@ -659,7 +659,7 @@ export function RestaurantInventoryPage() {
             <CardContent>
               <div className="flex gap-4 mb-4">
                 <div>
-                  <label className="text-sm text-gray-600 mr-2">Source</label>
+                  <label className="text-sm text-[var(--text-muted)] mr-2">Source</label>
                   <select
                     onChange={(e) => {
                       const val = e.target.value
@@ -675,7 +675,7 @@ export function RestaurantInventoryPage() {
                         row.style.display = val === 'ALL' || src === val ? '' : 'none'
                       })
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-md"
+                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                   >
                     <option value="ALL">All</option>
                     <option value="Order">Order</option>
@@ -687,41 +687,41 @@ export function RestaurantInventoryPage() {
                 <div className="text-center py-12">Loading history...</div>
               ) : history.length === 0 ? (
                 <div className="text-center py-12">
-                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No inventory movements yet</p>
+                  <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                  <p className="text-[var(--text-muted)]">No inventory movements yet</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-[var(--brand-ultra)]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Date
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Product
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Type
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Source
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Quantity
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Balance Before
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Balance After
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                           Reason
                         </th>
                       </tr>
                     </thead>
-                    <tbody id="history-table-body" className="divide-y divide-gray-200">
+                    <tbody id="history-table-body" className="divide-y divide-[var(--app-border)]">
                       {history.map((movement: any) => {
                         const source =
                           movement.reference_type === 'RECEIVING_REPORT'
@@ -740,14 +740,14 @@ export function RestaurantInventoryPage() {
                           return t || '—'
                         })()
                         return (
-                          <tr key={movement.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-4 text-sm text-gray-900">
+                          <tr key={movement.id} className="hover:bg-[var(--brand-ultra)]">
+                            <td className="px-4 py-4 text-sm text-[var(--text)]">
                               {new Date(movement.created_at).toLocaleString()}
                             </td>
                             <td className="px-4 py-4">
                               <div>
-                                <p className="font-medium text-gray-900">{movement.product_name}</p>
-                                <p className="text-sm text-gray-500">{movement.product_sku}</p>
+                                <p className="font-medium text-[var(--text)]">{movement.product_name}</p>
+                                <p className="text-sm text-[var(--text-muted)]">{movement.product_sku}</p>
                               </div>
                             </td>
                             <td className="px-4 py-4">
@@ -764,23 +764,23 @@ export function RestaurantInventoryPage() {
                               </Badge>
                             </td>
                             <td
-                              className="px-4 py-4 text-sm text-gray-900"
+                              className="px-4 py-4 text-sm text-[var(--text)]"
                               data-col="source"
                               data-value={source}
                             >
                               {source}
                             </td>
-                            <td className="px-4 py-4 text-sm text-gray-900">
+                            <td className="px-4 py-4 text-sm text-[var(--text)]">
                               {movement.quantity > 0 ? '+' : ''}
                               {movement.quantity}
                             </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
                               {movement.balance_before}
                             </td>
-                            <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                            <td className="px-4 py-4 text-sm font-medium text-[var(--text)]">
                               {movement.balance_after}
                             </td>
-                            <td className="px-4 py-4 text-sm text-gray-500">
+                            <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
                               {movement.reason || '-'}
                             </td>
                           </tr>
@@ -803,26 +803,26 @@ export function RestaurantInventoryPage() {
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-[var(--brand-ultra)]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Product
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Current Total
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Unit
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Last Source
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">
                         Last Change
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-[var(--app-border)]">
                     {inventory.map((item: any) => {
                       const lastMovement = history.find(
                         (m: any) => m.product_id === item.product_id
@@ -834,17 +834,17 @@ export function RestaurantInventoryPage() {
                             ? 'Manual'
                             : lastMovement?.reference_type || '—'
                       return (
-                        <tr key={item.id} className="hover:bg-gray-50">
+                        <tr key={item.id} className="hover:bg-[var(--brand-ultra)]">
                           <td className="px-4 py-4">
                             <div>
-                              <p className="font-medium text-gray-900">{item.product_name}</p>
-                              <p className="text-sm text-gray-500">{item.product_sku}</p>
+                              <p className="font-medium text-[var(--text)]">{item.product_name}</p>
+                              <p className="text-sm text-[var(--text-muted)]">{item.product_sku}</p>
                             </div>
                           </td>
                           <td className="px-4 py-4 font-semibold">{item.quantity}</td>
-                          <td className="px-4 py-4 text-sm text-gray-500">{item.product_unit}</td>
-                          <td className="px-4 py-4 text-sm text-gray-900">{source}</td>
-                          <td className="px-4 py-4 text-sm text-gray-500">
+                          <td className="px-4 py-4 text-sm text-[var(--text-muted)]">{item.product_unit}</td>
+                          <td className="px-4 py-4 text-sm text-[var(--text)]">{source}</td>
+                          <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
                             {lastMovement
                               ? new Date(lastMovement.created_at).toLocaleString()
                               : '—'}
@@ -871,7 +871,7 @@ export function RestaurantInventoryPage() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="product">Select Product</Label>
-              <p className="text-sm text-gray-500 mb-2">
+              <p className="text-sm text-[var(--text-muted)] mb-2">
                 This feature requires API integration with product search
               </p>
               <Input
@@ -895,8 +895,8 @@ export function RestaurantInventoryPage() {
               />
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
+              <p className="text-sm text-[var(--brand-mid)]">
                 <strong>Tip:</strong> You can also add products by receiving orders or importing
                 from a CSV file.
               </p>
@@ -945,11 +945,11 @@ export function RestaurantInventoryPage() {
                 accept=".csv,.xlsx"
                 onChange={(e) => setBulkUploadFile(e.target.files?.[0] || null)}
               />
-              <p className="text-sm text-gray-500 mt-2">Accepted formats: CSV, Excel (.xlsx)</p>
+              <p className="text-sm text-[var(--text-muted)] mt-2">Accepted formats: CSV, Excel (.xlsx)</p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
+              <p className="text-sm text-[var(--brand-mid)]">
                 <strong>CSV Format Example:</strong>
                 <br />
                 Product SKU,Quantity,Notes
@@ -961,9 +961,9 @@ export function RestaurantInventoryPage() {
             </div>
 
             {bulkUploadFile && (
-              <div className="border rounded-md p-3 bg-gray-50">
-                <p className="text-sm font-medium text-gray-700">Selected: {bulkUploadFile.name}</p>
-                <p className="text-xs text-gray-500">
+              <div className="border rounded-md p-3 bg-[var(--brand-ultra)]">
+                <p className="text-sm font-medium text-[var(--text-mid)]">Selected: {bulkUploadFile.name}</p>
+                <p className="text-xs text-[var(--text-muted)]">
                   Size: {formatNumber(bulkUploadFile.size / 1024, { maximumFractionDigits: 2 })} KB
                 </p>
               </div>

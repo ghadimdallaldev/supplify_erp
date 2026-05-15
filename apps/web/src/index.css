@@ -1,51 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* shadcn / Tailwind — cool neutral shell + violet accents */
+    --background: 210 40% 98%;
+    --foreground: 266 69% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 266 69% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --popover-foreground: 266 69% 14%;
+    --primary: 262 68% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 35% 96%;
+    --secondary-foreground: 266 45% 28%;
+    --muted: 210 30% 96%;
+    --muted-foreground: 258 18% 46%;
+    --accent: 262 55% 97%;
+    --accent-foreground: 266 69% 14%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 258 90% 60%;
+    --radius: 0.75rem;
+
+    /* Supplify brand tokens (hex) */
+    --brand: #5b21b6;
+    --brand-mid: #7c3aed;
+    --brand-light: #a78bfa;
+    --brand-pale: #ede9fe;
+    /* Row hovers / subtle fills — neutral, not lavender */
+    --brand-ultra: #f8fafc;
+    --mint: #059669;
+    --mint-mid: #10b981;
+    --mint-light: #6ee7b7;
+    --mint-pale: #d1fae5;
+    --amber: #d97706;
+    --amber-mid: #f59e0b;
+    --amber-pale: #fef3c7;
+    --red: #dc2626;
+    --red-pale: #fee2e2;
+    --bg: #f1f5f9;
+    --surface: #ffffff;
+    --app-border: #e2e8f0;
+    --app-border-mid: #cbd5e1;
+    --text: #1e0b3a;
+    --text-mid: #4a3570;
+    --text-muted: #8b7aaa;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --background: 266 35% 10%;
+    --foreground: 266 40% 96%;
+    --card: 266 32% 12%;
+    --card-foreground: 266 40% 96%;
+    --popover: 266 32% 12%;
+    --popover-foreground: 266 40% 96%;
+    --primary: 258 90% 66%;
+    --primary-foreground: 266 69% 10%;
+    --secondary: 266 25% 18%;
+    --secondary-foreground: 266 40% 96%;
+    --muted: 266 25% 18%;
+    --muted-foreground: 266 20% 70%;
+    --accent: 266 30% 20%;
+    --accent-foreground: 266 40% 96%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 266 22% 22%;
+    --input: 266 22% 22%;
+    --ring: 258 90% 66%;
   }
 }
 
@@ -55,6 +82,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
   }
 }
 
@@ -99,5 +127,10 @@
 
   .fc .supplify-calendar-event:hover {
     transform: translateY(-2px);
+  }
+
+  .sidebar-nav-item:hover {
+    background: #f1f5f9 !important;
+    color: var(--text-mid) !important;
   }
 }

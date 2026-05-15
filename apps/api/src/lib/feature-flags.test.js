@@ -20,6 +20,30 @@ describe('feature-flags', () => {
     })
   })
 
+  describe('resolveAllFeaturesForTenant', () => {
+    it('merges tenant overrides, global, and plan in one pass', async () => {
+      const { resolveAllFeaturesForTenant } = await import('./feature-flags.js')
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [{ feature_key: 'reports', global_override: false }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ feature_key: 'chat', is_enabled: true }],
+        })
+
+      const { features, featureSources } = await resolveAllFeaturesForTenant(
+        't1',
+        'RESTAURANT',
+        { chat: false, reports: true }
+      )
+
+      expect(features.chat).toBe(true)
+      expect(featureSources.chat).toBe('tenant_override')
+      expect(features.reports).toBe(false)
+      expect(featureSources.reports).toBe('global')
+    })
+  })
+
   describe('resolveFeatureEnabled', () => {
     it('prefers tenant override over global and plan', async () => {
       const { resolveFeatureEnabled } = await import('./feature-flags.js')

@@ -83,6 +83,32 @@ async function getOrCreateConversation(supplierId, restaurantId) {
     )
   } else {
     conversation = conversations[0]
+    // Repair rows created before participants existed or if inserts failed mid-flight
+    const { rows: existingParts } = await query(
+      `SELECT participant_type FROM conversation_participant WHERE conversation_id = $1`,
+      [conversation.id]
+    )
+    const types = new Set(existingParts.map((row) => row.participant_type))
+    if (!types.has('SUPPLIER')) {
+      await query(
+        `
+        INSERT INTO conversation_participant (conversation_id, participant_type, participant_id)
+        VALUES ($1, 'SUPPLIER', $2)
+        ON CONFLICT (conversation_id, participant_type) DO NOTHING
+      `,
+        [conversation.id, supplierId]
+      )
+    }
+    if (!types.has('RESTAURANT')) {
+      await query(
+        `
+        INSERT INTO conversation_participant (conversation_id, participant_type, participant_id)
+        VALUES ($1, 'RESTAURANT', $2)
+        ON CONFLICT (conversation_id, participant_type) DO NOTHING
+      `,
+        [conversation.id, restaurantId]
+      )
+    }
   }
 
   return conversation
@@ -101,42 +127,44 @@ router.get('/conversations', async (req, res) => {
       queryText = `
         SELECT 
           c.*,
-          cp.unread_count,
+          COALESCE(cp.unread_count, 0) AS unread_count,
           cp.last_read_at,
           s.name as supplier_name,
           r.name as restaurant_name,
           r.contact_email as restaurant_email,
-          cp.is_pinned,
-          cp.is_archived,
+          COALESCE(cp.is_pinned, false) AS is_pinned,
+          COALESCE(cp.is_archived, false) AS is_archived,
           COALESCE(r.name, s.name) as participant_name,
           (SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_preview
         FROM conversation c
-        JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
+        LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
         LEFT JOIN supplier s ON s.id = c.supplier_id
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
-        WHERE c.supplier_id = $1 AND cp.is_archived = false
-        ORDER BY cp.is_pinned DESC, c.last_message_at DESC NULLS LAST
+        WHERE c.supplier_id = $1
+          AND (cp.id IS NULL OR cp.is_archived = false)
+        ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST
       `
       queryParams = [tenant.tenantId]
     } else if (tenant?.tenantType === 'RESTAURANT') {
       queryText = `
         SELECT 
           c.*,
-          cp.unread_count,
+          COALESCE(cp.unread_count, 0) AS unread_count,
           cp.last_read_at,
           s.name as supplier_name,
           s.contact_email as supplier_email,
           r.name as restaurant_name,
-          cp.is_pinned,
-          cp.is_archived,
+          COALESCE(cp.is_pinned, false) AS is_pinned,
+          COALESCE(cp.is_archived, false) AS is_archived,
           COALESCE(s.name, r.name) as participant_name,
           (SELECT content FROM message WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_preview
         FROM conversation c
-        JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
+        LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
         LEFT JOIN supplier s ON s.id = c.supplier_id
         LEFT JOIN restaurant r ON r.id = c.restaurant_id
-        WHERE c.restaurant_id = $1 AND cp.is_archived = false
-        ORDER BY cp.is_pinned DESC, c.last_message_at DESC NULLS LAST
+        WHERE c.restaurant_id = $1
+          AND (cp.id IS NULL OR cp.is_archived = false)
+        ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST
       `
       queryParams = [tenant.tenantId]
     } else {

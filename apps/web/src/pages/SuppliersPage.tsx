@@ -111,7 +111,7 @@ export function SuppliersPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -119,7 +119,7 @@ export function SuppliersPage() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Failed to load suppliers</p>
+        <p className="text-[var(--red)]">Failed to load suppliers</p>
       </div>
     )
   }
@@ -128,8 +128,8 @@ export function SuppliersPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Suppliers</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-[21px] font-black text-[var(--text)]">Suppliers</h1>
+          <p className="text-[var(--text-muted)] mt-2">
             {isRestaurant ? 'Discover and connect with trusted suppliers' : 'Manage suppliers in the marketplace'}
           </p>
         </div>
@@ -162,10 +162,10 @@ export function SuppliersPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Suppliers</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Suppliers</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{stats.total}</p>
                 </div>
-                <Building2 className="h-8 w-8 text-blue-500" />
+                <Building2 className="h-8 w-8 text-[var(--brand-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -173,10 +173,10 @@ export function SuppliersPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Following</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.followed}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Following</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{stats.followed}</p>
                 </div>
-                <Heart className="h-8 w-8 text-red-500 fill-current" />
+                <Heart className="h-8 w-8 text-[var(--red)] fill-current" />
               </div>
             </CardContent>
           </Card>
@@ -184,10 +184,10 @@ export function SuppliersPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">With Products</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.withProducts}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">With Products</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{stats.withProducts}</p>
                 </div>
-                <Package className="h-8 w-8 text-green-500" />
+                <Package className="h-8 w-8 text-[var(--mint)]" />
               </div>
             </CardContent>
           </Card>
@@ -195,10 +195,10 @@ export function SuppliersPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Products</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Products</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{stats.totalProducts}</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-orange-500" />
+                <TrendingUp className="h-8 w-8 text-[var(--amber-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -211,7 +211,7 @@ export function SuppliersPage() {
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
                   placeholder="Search suppliers by name, email, or city..."
                   value={search}
@@ -271,9 +271,9 @@ export function SuppliersPage() {
         <Card>
           <CardContent className="pt-12 pb-12">
             <div className="text-center">
-              <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No suppliers found</h3>
-              <p className="text-gray-600 mb-6">
+              <Building2 className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No suppliers found</h3>
+              <p className="text-[var(--text-muted)] mb-6">
                 {search || cityFilter || filterBy !== 'all' 
                   ? 'Try adjusting your search or filter criteria' 
                   : 'No suppliers available in the marketplace'}
@@ -297,7 +297,7 @@ export function SuppliersPage() {
               {/* Follow Badge */}
               {isRestaurant && supplier.is_followed && (
                 <div className="absolute top-4 right-4 z-10">
-                  <Badge className="bg-blue-500 text-white flex items-center gap-1 shadow-md">
+                  <Badge className="bg-[var(--brand)] text-white flex items-center gap-1 shadow-md">
                     <Heart className="h-3 w-3 fill-current" />
                     Following
                   </Badge>
@@ -311,7 +311,7 @@ export function SuppliersPage() {
                 if (daysSince <= 30) {
                   return (
                     <div className="absolute top-4 left-4 z-10">
-                      <Badge className="bg-green-500 text-white flex items-center gap-1 shadow-md">
+                      <Badge className="bg-[var(--mint)] text-white flex items-center gap-1 shadow-md">
                         <Sparkles className="h-3 w-3" />
                         New
                       </Badge>
@@ -327,7 +327,7 @@ export function SuppliersPage() {
                     <img 
                       src={supplier.logo_url} 
                       alt={supplier.name} 
-                      className="h-12 w-12 rounded-lg object-cover border-2 border-gray-200 shadow-md"
+                      className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                       onError={(e) => {
                         // Fallback to gradient if image fails to load
                         const target = e.target as HTMLImageElement
@@ -337,7 +337,7 @@ export function SuppliersPage() {
                       }}
                     />
                   ) : null}
-                  <div className={`h-12 w-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
+                  <div className={`h-12 w-12 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-lg shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
                     {supplier.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -350,20 +350,20 @@ export function SuppliersPage() {
               <CardContent className="space-y-4">
                 {/* Key Stats */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                  <div className="bg-[var(--brand-ultra)] rounded-lg p-3 border border-[var(--app-border)]">
                     <div className="flex items-center gap-2 mb-1">
-                      <Package className="h-4 w-4 text-blue-600" />
-                      <span className="text-xs font-medium text-blue-700">Products</span>
+                      <Package className="h-4 w-4 text-[var(--brand-mid)]" />
+                      <span className="text-xs font-medium text-[var(--brand-mid)]">Products</span>
                     </div>
-                    <p className="text-xl font-bold text-blue-900">{Number(supplier.product_count || 0)}</p>
+                    <p className="text-xl font-bold text-[var(--text)]">{Number(supplier.product_count || 0)}</p>
                   </div>
                   {supplier.avg_price > 0 && (
-                    <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                    <div className="bg-[var(--mint-pale)] rounded-lg p-3 border border-[var(--mint)]/25">
                       <div className="flex items-center gap-2 mb-1">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        <span className="text-xs font-medium text-green-700">Avg Price</span>
+                        <TrendingUp className="h-4 w-4 text-[var(--mint)]" />
+                        <span className="text-xs font-medium text-[var(--mint)]">Avg Price</span>
                       </div>
-                      <p className="text-xl font-bold text-green-900">
+                      <p className="text-xl font-bold text-[var(--mint)]">
                         ${formatPrice(supplier.avg_price)}
                       </p>
                     </div>
@@ -372,8 +372,8 @@ export function SuppliersPage() {
 
                 {/* Location */}
                 {supplier.address_json && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-md p-2">
-                    <MapPin className="h-4 w-4 text-gray-400" />
+                  <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] bg-[var(--brand-ultra)] rounded-md p-2">
+                    <MapPin className="h-4 w-4 text-[var(--text-muted)]" />
                     <span className="truncate">
                       {supplier.address_json.city}, {supplier.address_json.country}
                     </span>
@@ -385,7 +385,7 @@ export function SuppliersPage() {
                   {supplier.contact_email && (
                     <a 
                       href={`mailto:${supplier.contact_email}`}
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
+                      className="flex items-center gap-1 text-[var(--brand-mid)] hover:text-[var(--brand-mid)] hover:underline"
                     >
                       <Mail className="h-3 w-3" />
                       <span className="truncate text-xs">{supplier.contact_email}</span>
@@ -434,7 +434,7 @@ export function SuppliersPage() {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleFollow(supplier.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-[var(--red)] hover:text-[var(--red)] hover:bg-[var(--red-pale)]"
                         >
                           <Heart className="h-4 w-4" />
                         </Button>
@@ -443,7 +443,7 @@ export function SuppliersPage() {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleUnfollow(supplier.id)}
-                          className="text-red-600 bg-red-50 hover:bg-red-100"
+                          className="text-[var(--red)] bg-[var(--red-pale)] hover:bg-[var(--red-pale)]"
                         >
                           <Heart className="h-4 w-4 fill-current" />
                         </Button>
@@ -453,7 +453,7 @@ export function SuppliersPage() {
                 </div>
 
                 {/* Additional Info */}
-                <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t">
+                <div className="flex items-center justify-between text-xs text-[var(--text-muted)] pt-2 border-t">
                   {supplier.vat_no && (
                     <span>VAT: {supplier.vat_no}</span>
                   )}
@@ -477,7 +477,7 @@ export function SuppliersPage() {
                       <img 
                         src={supplier.logo_url} 
                         alt={supplier.name} 
-                        className="h-16 w-16 rounded-lg object-cover border-2 border-gray-200 shadow-md"
+                        className="h-16 w-16 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
                           target.style.display = 'none'
@@ -486,20 +486,20 @@ export function SuppliersPage() {
                         }}
                       />
                     ) : null}
-                    <div className={`h-16 w-16 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
+                    <div className={`h-16 w-16 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
                       {supplier.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-lg font-bold text-gray-900">{supplier.name}</h3>
+                        <h3 className="text-lg font-bold text-[var(--text)]">{supplier.name}</h3>
                         {isRestaurant && supplier.is_followed && (
-                          <Badge className="bg-blue-500 text-white">
+                          <Badge className="bg-[var(--brand)] text-white">
                             <Heart className="h-3 w-3 mr-1 fill-current" />
                             Following
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
                         <span className="flex items-center gap-1">
                           <Package className="h-4 w-4" />
                           {Number(supplier.product_count || 0)} Products
@@ -566,7 +566,7 @@ export function SuppliersPage() {
                             size="sm" 
                             variant="outline"
                             onClick={() => handleUnfollow(supplier.id)}
-                            className="text-red-600"
+                            className="text-[var(--red)]"
                           >
                             <Heart className="h-4 w-4 mr-1 fill-current" />
                             Unfollow

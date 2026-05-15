@@ -221,23 +221,40 @@ Supplify offers tiered subscription plans designed for **restaurants and supplie
 
 ## Feature Matrix
 
-| Feature           | Free         | Bronze           | Gold          | Platinum             |
-| ----------------- | ------------ | ---------------- | ------------- | -------------------- |
-| Quick Lists       | Basic Manual | Automated Weekly | Full Schedule | AI Automation        |
-| Smart Reorder     | ❌           | Limited (7-day)  | Full (90-day) | AI Forecast          |
-| Inventory         | Basic        | Real-Time        | Multi-Branch  | Lot Tracking         |
-| Waste Tracking    | ❌           | Manual           | Analytics     | Cost vs Sales        |
-| Receiving Quality | Manual       | Photos           | Scoring       | Performance Reports  |
-| Finance           | View Only    | Record Payments  | Analytics     | Advanced Dashboard   |
-| Chat              | 1 Supplier   | Multi-Supplier   | Group + Files | Real-Time + Media    |
-| Reports           | ❌           | Basic KPIs       | Usage/Cost    | Custom + Forecasting |
-| Approvals         | ❌           | Single-Level     | Caps          | Multi-Level          |
-| Multi-Branch      | ❌           | ❌               | ✅            | ✅                   |
-| Fulfillment       | Basic Orders | Manual           | Pick/Pack     | Full Suite           |
-| Notifications     | In-App       | + Email          | + SMS         | + Webhooks           |
-| API               | ❌           | Exports Only     | API Keys      | Full + Webhooks      |
-| Support           | Community    | 72h              | 24h Priority  | Dedicated            |
-| Branding          | None         | None             | Logo/Colors   | White-Label          |
+### Limits
+
+| Limit | Free | Bronze | Gold | Platinum |
+|---|---|---|---|---|
+| **Branches** (restaurants) | 0 | 1 | 3 | Unlimited |
+| **Warehouses** (suppliers) | 0 | 1 | 3 | Unlimited |
+| **Users** | 1 | 3 | 10 | Unlimited |
+| **Orders / day** | 5 | 50 | 200 | Unlimited |
+| **Suppliers per restaurant** | 1 | 5 | 20 | Unlimited |
+| **Inventory SKUs** (restaurant) | 50 | 500 | 2,000 | Unlimited |
+| **Products / SKUs** (supplier) | 50 | 500 | 2,000 | Unlimited |
+| **Chats / day** | 5 | 30 | 100 | Unlimited |
+| **Storage** | 100 MB | 1 GB | 5 GB | 50 GB |
+
+### Features
+
+| Feature | Free | Bronze | Gold | Platinum |
+|---|---|---|---|---|
+| **Chat** | Basic (1 supplier) | Multi-supplier | Groups + files | Real-time + media + read receipts |
+| **Reports** | ❌ | Basic KPIs | Usage & cost dashboards | Advanced forecasting + custom reports |
+| **Smart Reorder** | ❌ | ❌ | Full (90-day trends) | AI forecast + seasonality |
+| **Reservations** *(restaurant)* | ❌ | Basic (board + create) | Floor plan builder + analytics | Guest intelligence + VIP tracking |
+| **Multi-Branch** *(restaurant)* | ❌ | ❌ | ✅ | Central purchasing |
+| **Inventory Management** | Basic | Real-time | Multi-branch tracking | Lot + expiry tracking |
+| **Waste Tracking** | ❌ | Manual entry | Analytics dashboard | Cost vs. sales analytics |
+| **Receiving Quality** | Manual only | Photos enabled | Quality scoring | Supplier performance reports |
+| **Finance & Invoices** | View only | Record payments | Expense analytics | Advanced finance dashboard |
+| **Approvals & Budgets** | ❌ | Single-level | Approval + budget caps | Multi-level approvals |
+| **Quick Lists** | Manual only | Automated weekly | Full schedule | AI smart automation |
+| **Fulfillment Tools** *(supplier)* | Basic orders | Manual + invoices | Warehouse pick & pack | Full routing suite |
+| **Notifications** | In-app only | + Email | + SMS | + Webhooks |
+| **API Integrations** | ❌ | ❌ | API key access | Full API + webhooks |
+| **Support SLA** | Community | 72h standard | 24h priority | Same-day dedicated |
+| **Custom Branding** | ❌ | ❌ | Logo + colors | White-label + custom domain |
 
 ---
 
@@ -292,7 +309,7 @@ Admins can:
 - View usage analytics
 - Configure plan features directly in plan JSONB field
 
-See [ADMIN.md](./ADMIN.md) for details.
+See [ADMIN.md](../admin/ADMIN.md) for details.
 
 ---
 

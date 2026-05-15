@@ -1,6 +1,6 @@
 /**
  * Test user credentials (Keycloak demo accounts). Must exist in Keycloak when running E2E with auth.
- * See docs/SETUP.md and seed:demo-users.
+ * See docs/guides/SETUP.md and seed:demo-users.
  */
 /** Align with seed:demo-users and reduce-to-single-tenant: 1 admin, 1 restaurant, 1 supplier. */
 export const TEST_USERS = {

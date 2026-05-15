@@ -33,13 +33,13 @@ export function StaffSelfServiceLogin() {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 lg:flex-row">
         <div className="w-full space-y-4 lg:w-1/2">
           <h1 className="text-3xl font-bold tracking-tight">Supplify Staff Access</h1>
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-[var(--text-muted)]">
             View your schedule, request time off, and stay in sync with your restaurant. Enter your work email to receive a
             magic link. Keep this page open—you&apos;ll be redirected automatically once the link is generated.
           </p>
           <div className="rounded-2xl border border-white/10 bg-slate-800/60 p-5 text-sm">
-            <p className="font-semibold text-slate-100">What you can do</p>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-slate-300">
+            <p className="font-semibold text-[var(--text-muted)]">What you can do</p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-[var(--text-muted)]">
               <li>See upcoming shifts and coverage needs</li>
               <li>Request PTO and log shift swaps</li>
               <li>Clock-in guidance and special announcements</li>
@@ -48,7 +48,7 @@ export function StaffSelfServiceLogin() {
           </div>
         </div>
 
-        <Card className="w-full bg-white/95 text-slate-900 shadow-xl lg:w-1/2">
+        <Card className="w-full bg-white/95 text-[var(--text-muted)] shadow-xl lg:w-1/2">
           <CardHeader>
             <CardTitle>Request secure login link</CardTitle>
             <CardDescription>

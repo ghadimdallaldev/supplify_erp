@@ -129,7 +129,7 @@ export function CartPage() {
                     toast.dismiss(t.id)
                     window.location.href = '/app/settings'
                   }}
-                  className="px-3 py-1 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
+                  className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90"
                 >
                   View Plans
                 </button>
@@ -152,13 +152,13 @@ export function CartPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
-          <p className="text-gray-600 mt-2">Your cart is empty</p>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Shopping Cart</h1>
+          <p className="text-[var(--text-muted)] mt-2">Your cart is empty</p>
         </div>
 
         <div className="text-center py-12">
-          <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">No items in your cart</p>
+          <ShoppingCart className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
+          <p className="text-[var(--text-muted)] mb-4">No items in your cart</p>
           <Button asChild>
             <a href="/app/products">Browse Products</a>
           </Button>
@@ -171,8 +171,8 @@ export function CartPage() {
     <div className="space-y-6" data-testid="cart-page">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
-          <p className="text-gray-600 mt-2">Review your order before placing it</p>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Shopping Cart</h1>
+          <p className="text-[var(--text-muted)] mt-2">Review your order before placing it</p>
         </div>
         <div className="flex space-x-2">
           {drafts.length > 0 && (
@@ -214,7 +214,7 @@ export function CartPage() {
                     className="flex items-center space-x-4 p-4 border rounded-lg"
                     data-testid={`cart-item-row-${item.productId}`}
                   >
-                    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <div className="w-16 h-16 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
                       {item.product.image_url ? (
                         <img
                           src={item.product.image_url}
@@ -222,14 +222,14 @@ export function CartPage() {
                           className="w-full h-full object-cover rounded-lg"
                         />
                       ) : (
-                        <ShoppingCart className="h-6 w-6 text-gray-400" />
+                        <ShoppingCart className="h-6 w-6 text-[var(--text-muted)]" />
                       )}
                     </div>
 
                     <div className="flex-1">
                       <h4 className="font-medium">{item.product.name}</h4>
-                      <p className="text-sm text-gray-600">SKU: {item.product.sku}</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-[var(--text-muted)]">SKU: {item.product.sku}</p>
+                      <p className="text-sm text-[var(--text-muted)]">
                         $
                         {typeof item.product.current_price === 'number'
                           ? formatPrice(item.product.current_price)
@@ -290,11 +290,11 @@ export function CartPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Subtotal</span>
+                <span className="text-[var(--text-muted)]">Subtotal</span>
                 <span>${formatPrice(total)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Tax</span>
+                <span className="text-[var(--text-muted)]">Tax</span>
                 <span>$0.00</span>
               </div>
               <div className="border-t pt-4">
@@ -354,7 +354,7 @@ export function CartPage() {
           </DialogHeader>
           <div className="space-y-4">
             {drafts.length === 0 ? (
-              <p className="text-sm text-gray-600">No saved drafts</p>
+              <p className="text-sm text-[var(--text-muted)]">No saved drafts</p>
             ) : (
               drafts.map((draft) => (
                 <div
@@ -363,7 +363,7 @@ export function CartPage() {
                 >
                   <div>
                     <p className="font-medium">{draft.name}</p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-[var(--text-muted)]">
                       {draft.items.length} items • {new Date(draft.createdAt).toLocaleDateString()}
                     </p>
                   </div>

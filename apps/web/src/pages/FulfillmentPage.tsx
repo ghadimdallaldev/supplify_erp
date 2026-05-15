@@ -237,8 +237,8 @@ export function FulfillmentPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Fulfillment & Logistics</h1>
-        <p className="text-gray-600 mt-2">Wave planning, mobile pick lists, and driver dispatch.</p>
+        <h1 className="text-[21px] font-black text-[var(--text)]">Fulfillment & Logistics</h1>
+        <p className="text-[var(--text-muted)] mt-2">Wave planning, mobile pick lists, and driver dispatch.</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -254,7 +254,7 @@ export function FulfillmentPage() {
         <TabsContent value="dispatch" className="space-y-4">
           {boardLoading || !boardData ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <Loader2 className="h-10 w-10 animate-spin text-[var(--brand-mid)]" />
             </div>
           ) : (
             <DispatchBoardView
@@ -288,7 +288,7 @@ export function FulfillmentPage() {
             <CardContent>
               <div className="space-y-4">
                 {waves.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">No delivery waves scheduled yet.</div>
+                  <div className="text-center py-8 text-[var(--text-muted)]">No delivery waves scheduled yet.</div>
                 ) : waves.map((wave) => (
                   <div key={wave.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between">
@@ -299,7 +299,7 @@ export function FulfillmentPage() {
                             {wave.status}
                           </Badge>
                         </div>
-                        <div className="text-sm text-gray-600 space-y-1">
+                        <div className="text-sm text-[var(--text-muted)] space-y-1">
                           <p>Scheduled: {wave.scheduledDate}</p>
                           <p>Orders: {wave.orderCount}</p>
                         </div>
@@ -336,18 +336,18 @@ export function FulfillmentPage() {
             </CardHeader>
             <CardContent>
               {shippedOrders.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-[var(--text-muted)]">
                   No orders ready for picking. Orders will appear here when they reach SHIPPED status.
                 </div>
               ) : (
                 <div className="space-y-4">
                   {shippedOrders.map((order) => (
-                    <div key={order.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                    <div key={order.id} className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <Link to={`/app/orders/${order.id}`}>
-                              <h4 className="font-semibold hover:text-primary cursor-pointer">
+                              <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer">
                                 #{order.orderNumber}
                               </h4>
                             </Link>
@@ -363,7 +363,7 @@ export function FulfillmentPage() {
                               {order.status}
                             </Badge>
                           </div>
-                          <div className="text-sm text-gray-600 space-y-1">
+                          <div className="text-sm text-[var(--text-muted)] space-y-1">
                             <p>Restaurant: {order.restaurantName}</p>
                             <p>
                               Items: {order.itemCount} | Total: {formatPrice(order.totalAmount)}
@@ -405,7 +405,7 @@ export function FulfillmentPage() {
             <CardContent>
               <div className="space-y-4">
                 {routeSummaries.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">No delivery routes planned yet.</div>
+                  <div className="text-center py-8 text-[var(--text-muted)]">No delivery routes planned yet.</div>
                 ) : routeSummaries.map((route) => (
                   <div key={route.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between">
@@ -416,7 +416,7 @@ export function FulfillmentPage() {
                             {route.status}
                           </Badge>
                         </div>
-                        <div className="text-sm text-gray-600 space-y-1">
+                        <div className="text-sm text-[var(--text-muted)] space-y-1">
                           <p>Driver: {route.driver}</p>
                           <p>
                             Vehicle: {route.vehicle} | Stops: {route.stops}
@@ -450,7 +450,7 @@ export function FulfillmentPage() {
             </CardHeader>
             <CardContent>
               {shippedOrders.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No deliveries currently in transit</div>
+                <div className="text-center py-8 text-[var(--text-muted)]">No deliveries currently in transit</div>
               ) : (
                 <div className="space-y-4">
                   {shippedOrders
@@ -460,11 +460,11 @@ export function FulfillmentPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <Link to={`/app/orders/${order.id}`}>
-                              <h4 className="font-semibold hover:text-primary cursor-pointer">
+                              <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer">
                                 Order #{order.orderNumber}
                               </h4>
                             </Link>
-                            <div className="text-sm text-gray-600 space-y-1 mt-1">
+                            <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
                               <p>Restaurant: {order.restaurantName}</p>
                               <p>
                                 Items: {order.itemCount} | Total: {formatPrice(order.totalAmount)}
@@ -497,7 +497,7 @@ export function FulfillmentPage() {
             <CardContent>
               <div className="space-y-4">
                 {exceptions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">No delivery exceptions recorded.</div>
+                  <div className="text-center py-8 text-[var(--text-muted)]">No delivery exceptions recorded.</div>
                 ) : (
                   exceptions.map((ex) => (
                     <div key={ex.id} className="border rounded-lg p-4">
@@ -506,7 +506,7 @@ export function FulfillmentPage() {
                           <h4 className="font-semibold">
                             {ex.orderLabel} — {ex.exceptionType.replace(/_/g, ' ')}
                           </h4>
-                          <div className="text-sm text-gray-600 space-y-1 mt-1">
+                          <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
                             {ex.productName && <p>Product: {ex.productName}</p>}
                             {(ex.quantityExpected != null || ex.quantityActual != null) && (
                               <p>
@@ -610,7 +610,7 @@ function DispatchBoardView({
             <CardDescription>Not yet assigned to a driver</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold text-gray-900">{board.stats.pending}</p>
+            <p className="text-2xl font-semibold text-[var(--text)]">{board.stats.pending}</p>
           </CardContent>
         </Card>
         <Card>
@@ -619,7 +619,7 @@ function DispatchBoardView({
             <CardDescription>Stops currently en route</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold text-gray-900">{board.stats.outForDelivery}</p>
+            <p className="text-2xl font-semibold text-[var(--text)]">{board.stats.outForDelivery}</p>
           </CardContent>
         </Card>
         <Card>
@@ -628,7 +628,7 @@ function DispatchBoardView({
             <CardDescription>Completed drops with proof</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold text-gray-900">{board.stats.deliveredToday}</p>
+            <p className="text-2xl font-semibold text-[var(--text)]">{board.stats.deliveredToday}</p>
           </CardContent>
         </Card>
       </div>
@@ -741,20 +741,20 @@ function DispatchColumn({
     <div className="space-y-3" data-column={id}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-gray-900">{title}</p>
-          {description && <p className="text-xs text-gray-500">{description}</p>}
+          <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
+          {description && <p className="text-xs text-[var(--text-muted)]">{description}</p>}
         </div>
         <Badge variant="outline">{badgeValue}</Badge>
       </div>
 
       {driver && route && onRouteStatusChange && (
-        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-600">
+        <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-muted)]">
           <div className="flex items-center gap-2">
-            <Navigation className="h-4 w-4 text-primary" />
+            <Navigation className="h-4 w-4 text-[var(--brand-mid)]" />
             <div>
-              <p className="font-medium text-gray-800">{route.route_number}</p>
+              <p className="font-medium text-[var(--text)]">{route.route_number}</p>
               <p>
-                <span className="font-semibold text-gray-900">{route.status}</span> • Scheduled{' '}
+                <span className="font-semibold text-[var(--text)]">{route.status}</span> • Scheduled{' '}
                 {new Date(route.scheduled_date).toLocaleDateString()}
               </p>
             </div>
@@ -774,7 +774,7 @@ function DispatchColumn({
         </div>
       )}
 
-      <div className="min-h-[220px] rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3">
+      <div className="min-h-[220px] rounded-lg border border-dashed border-[var(--app-border)] bg-[var(--brand-ultra)] p-3">
         <SortableContext items={items} strategy={verticalListSortingStrategy}>
           {children}
         </SortableContext>
@@ -785,7 +785,7 @@ function DispatchColumn({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex h-full min-h-[120px] items-center justify-center rounded-lg border border-dashed border-gray-200 bg-white text-sm text-gray-500">
+    <div className="flex h-full min-h-[120px] items-center justify-center rounded-lg border border-dashed border-[var(--app-border)] bg-[var(--surface)] text-sm text-[var(--text-muted)]">
       {message}
     </div>
   )
@@ -793,10 +793,10 @@ function EmptyState({ message }: { message: string }) {
 
 function OrderCard({ order, compact = false }: { order: DispatchOrderSummary; compact?: boolean }) {
   return (
-    <div className={`rounded-lg border border-gray-200 bg-white p-3 shadow-sm ${compact ? 'w-64' : ''}`}>
-      <p className="text-sm font-semibold text-gray-900">{order.restaurant_name}</p>
-      <p className="text-xs text-gray-500 mb-2">Order #{order.id.slice(0, 6).toUpperCase()}</p>
-      <div className="flex items-center justify-between text-xs text-gray-600">
+    <div className={`rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm ${compact ? 'w-64' : ''}`}>
+      <p className="text-sm font-semibold text-[var(--text)]">{order.restaurant_name}</p>
+      <p className="text-xs text-[var(--text-muted)] mb-2">Order #{order.id.slice(0, 6).toUpperCase()}</p>
+      <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
         <span>{formatPrice(order.total_amount)}</span>
         <span>{order.item_count} items</span>
       </div>
@@ -816,26 +816,26 @@ function StopCard({
   onCaptureProof?: (stop: DispatchStop) => void
 }) {
   const statusColors: Record<string, string> = {
-    PLANNED: 'bg-blue-100 text-blue-600',
+    PLANNED: 'bg-[var(--brand-pale)] text-[var(--brand-mid)]',
     OUT_FOR_DELIVERY: 'bg-amber-100 text-amber-600',
-    DELIVERED: 'bg-emerald-100 text-emerald-600',
-    FAILED: 'bg-red-100 text-red-600',
+    DELIVERED: 'bg-[var(--mint-pale)] text-[var(--mint)]',
+    FAILED: 'bg-[var(--red-pale)] text-[var(--red)]',
   }
 
   return (
-    <div className={`rounded-lg border border-gray-200 bg-white p-3 shadow-sm ${compact ? 'w-64' : ''}`}>
+    <div className={`rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm ${compact ? 'w-64' : ''}`}>
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-gray-900">{stop.restaurant_name}</p>
+        <p className="text-sm font-semibold text-[var(--text)]">{stop.restaurant_name}</p>
         <span
           className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${
-            statusColors[stop.status] ?? 'bg-gray-100 text-gray-600'
+            statusColors[stop.status] ?? 'bg-[var(--brand-ultra)] text-[var(--text-muted)]'
           }`}
         >
           {stop.status.replace(/_/g, ' ')}
         </span>
       </div>
-      <p className="text-xs text-gray-500 mb-2">Order #{stop.order_id.slice(0, 6).toUpperCase()}</p>
-      <div className="flex items-center justify-between text-xs text-gray-600">
+      <p className="text-xs text-[var(--text-muted)] mb-2">Order #{stop.order_id.slice(0, 6).toUpperCase()}</p>
+      <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
         <span>{formatPrice(stop.total_amount)}</span>
         {stop.eta_seconds ? <span>{Math.round(stop.eta_seconds / 60)} min eta</span> : null}
       </div>
@@ -867,7 +867,7 @@ function StopCard({
 
 function DragOverlayCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="pointer-events-none rounded-lg border border-primary/40 bg-white/95 p-3 shadow-lg backdrop-blur">
+    <div className="pointer-events-none rounded-lg border border-[var(--brand)]/40 bg-[var(--surface)]/95 p-3 shadow-lg backdrop-blur">
       {children}
     </div>
   )

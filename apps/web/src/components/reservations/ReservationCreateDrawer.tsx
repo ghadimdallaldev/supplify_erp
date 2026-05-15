@@ -65,7 +65,7 @@ export function ReservationCreateDrawer({ tables, branchId, onCreated }: Reserva
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-primary text-white hover:bg-primary/90">+ New reservation</Button>
+        <Button>+ New reservation</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>

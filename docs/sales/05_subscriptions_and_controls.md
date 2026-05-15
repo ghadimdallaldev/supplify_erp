@@ -11,7 +11,7 @@ Every restaurant and supplier has a **subscription** with a **plan** (Free, Bron
 - **Gold** — The default plan for serious daily use. Multi-branch, more orders and products, analytics, and key features.
 - **Platinum** — For scale. Very high or unlimited limits and the full feature set so you don’t think about caps.
 
-Restaurant and supplier plans are aligned (same tier names, different limit sets: branches vs warehouses, etc.). See **docs/SUBSCRIPTIONS.md** and **docs/PLANS.md** for exact matrices.
+Restaurant and supplier plans are aligned (same tier names, different limit sets: branches vs warehouses, etc.). See **docs/monetization/SUBSCRIPTIONS.md** and **docs/monetization/PLANS.md** for exact matrices.
 
 ### How subscription changes work
 

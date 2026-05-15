@@ -73,7 +73,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   if (isLoading || (data?.role !== 'PENDING' && registerStatusLoading && !registerStatus)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]" />
       </div>
     )
   }
@@ -85,7 +85,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   if (needsRegister) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]" />
       </div>
     )
   }

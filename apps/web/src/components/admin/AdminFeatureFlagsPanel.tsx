@@ -107,20 +107,20 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
             <Flag className="h-5 w-5 text-violet-600" />
             Global feature flags
           </CardTitle>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-[var(--text-muted)]">
             Force features on or off for all tenants, or inherit from each subscription plan.
           </p>
         </CardHeader>
         <CardContent>
           {flagsLoading ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left text-gray-600">
+                  <tr className="border-b text-left text-[var(--text-muted)]">
                     <th className="py-2 pr-4 font-medium">Feature</th>
                     <th className="py-2 pr-4 font-medium">Global</th>
                     <th className="py-2 font-medium">Actions</th>
@@ -130,8 +130,8 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
                   {(flagsData?.flags ?? []).map((flag) => (
                     <tr key={flag.featureKey} className="border-b last:border-0">
                       <td className="py-3 pr-4">
-                        <div className="font-medium text-gray-900">{flag.featureName}</div>
-                        <div className="text-xs text-gray-500">{flag.featureKey}</div>
+                        <div className="font-medium text-[var(--text)]">{flag.featureName}</div>
+                        <div className="text-xs text-[var(--text-muted)]">{flag.featureKey}</div>
                       </td>
                       <td className="py-3 pr-4">
                         <Badge variant="outline">{globalModeLabel(flag.globalOverride)}</Badge>
@@ -169,16 +169,16 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
       <Card>
         <CardHeader>
           <CardTitle>Per-tenant overrides</CardTitle>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-[var(--text-muted)]">
             Overrides win over global settings and plan features for a single restaurant or supplier.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Tenant type</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text-mid)]">Tenant type</label>
               <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 value={tenantType}
                 onChange={(e) => {
                   setTenantType(e.target.value as TenantType)
@@ -190,9 +190,9 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
               </select>
             </div>
             <div className="min-w-[220px] flex-1">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Tenant</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text-mid)]">Tenant</label>
               <select
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 value={selectedTenantId}
                 onChange={(e) => setTenantId(e.target.value)}
               >
@@ -210,16 +210,16 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
           </div>
 
           {!selectedTenantId ? (
-            <p className="text-sm text-gray-500">Select a tenant to manage overrides.</p>
+            <p className="text-sm text-[var(--text-muted)]">Select a tenant to manage overrides.</p>
           ) : tenantLoading ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left text-gray-600">
+                  <tr className="border-b text-left text-[var(--text-muted)]">
                     <th className="py-2 pr-4 font-medium">Feature</th>
                     <th className="py-2 pr-4 font-medium">Effective</th>
                     <th className="py-2 pr-4 font-medium">Source</th>
@@ -229,13 +229,13 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
                 <tbody>
                   {effectiveFeatures.map((feature) => (
                     <tr key={feature.featureKey} className="border-b last:border-0">
-                      <td className="py-3 pr-4 font-medium text-gray-900">{feature.featureName}</td>
+                      <td className="py-3 pr-4 font-medium text-[var(--text)]">{feature.featureName}</td>
                       <td className="py-3 pr-4">
                         <Badge variant={feature.enabled ? 'default' : 'secondary'}>
                           {feature.enabled ? 'On' : 'Off'}
                         </Badge>
                       </td>
-                      <td className="py-3 pr-4 text-gray-600">{sourceBadge(feature.source)}</td>
+                      <td className="py-3 pr-4 text-[var(--text-muted)]">{sourceBadge(feature.source)}</td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
                           <Button

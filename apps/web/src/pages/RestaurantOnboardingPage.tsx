@@ -323,7 +323,7 @@ export function RestaurantOnboardingPage() {
   if (isLoadingRestaurant) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -331,62 +331,62 @@ export function RestaurantOnboardingPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Account Setup</h1>
-        <p className="text-gray-600 mt-2">Complete your business profile and preferences</p>
+        <h1 className="text-[21px] font-black text-[var(--text)]">Account Setup</h1>
+        <p className="text-[var(--text-muted)] mt-2">Complete your business profile and preferences</p>
       </div>
 
       {/* Statistics Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+        <Card className="bg-gradient-to-br from-[var(--brand-ultra)] to-[var(--brand-pale)] border-[var(--app-border)]">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-700">Total Orders</p>
-                <p className="text-2xl font-bold text-blue-900">{statistics.totalOrders}</p>
-                <p className="text-xs text-blue-600 mt-1">All orders</p>
+                <p className="text-sm font-medium text-[var(--brand-mid)]">Total Orders</p>
+                <p className="text-2xl font-bold text-[var(--text)]">{statistics.totalOrders}</p>
+                <p className="text-xs text-[var(--brand-mid)] mt-1">All orders</p>
               </div>
-              <ShoppingCart className="h-10 w-10 text-blue-500" />
+              <ShoppingCart className="h-10 w-10 text-[var(--brand-mid)]" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+        <Card className="bg-gradient-to-br from-[var(--mint-pale)] to-[var(--mint-pale)] border-[var(--mint)]/35">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-700">Completed Orders</p>
-                <p className="text-2xl font-bold text-green-900">{statistics.completedOrders}</p>
-                <p className="text-xs text-green-600 mt-1">Received</p>
+                <p className="text-sm font-medium text-[var(--mint)]">Completed Orders</p>
+                <p className="text-2xl font-bold text-[var(--mint)]">{statistics.completedOrders}</p>
+                <p className="text-xs text-[var(--mint)] mt-1">Received</p>
               </div>
-              <Package className="h-10 w-10 text-green-500" />
+              <Package className="h-10 w-10 text-[var(--mint)]" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+        <Card className="bg-gradient-to-br from-[var(--amber-pale)] to-[var(--amber-pale)] border-[var(--amber-mid)]/35">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-yellow-700">Pending Orders</p>
-                <p className="text-2xl font-bold text-yellow-900">{statistics.pendingOrders}</p>
-                <p className="text-xs text-yellow-600 mt-1">In progress</p>
+                <p className="text-sm font-medium text-[var(--amber)]">Pending Orders</p>
+                <p className="text-2xl font-bold text-[var(--amber)]">{statistics.pendingOrders}</p>
+                <p className="text-xs text-[var(--amber)] mt-1">In progress</p>
               </div>
-              <Clock className="h-10 w-10 text-yellow-500" />
+              <Clock className="h-10 w-10 text-[var(--amber-mid)]" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+        <Card className="bg-gradient-to-br from-[var(--brand-pale)] to-[var(--brand-ultra)] border-[var(--app-border)]">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-700">Total Spent</p>
-                <p className="text-2xl font-bold text-purple-900">
+                <p className="text-sm font-medium text-[var(--brand-mid)]">Total Spent</p>
+                <p className="text-2xl font-bold text-[var(--text)]">
                   {formatCurrency(statistics.totalSpent)}
                 </p>
-                <p className="text-xs text-purple-600 mt-1">All-time</p>
+                <p className="text-xs text-[var(--brand-mid)] mt-1">All-time</p>
               </div>
-              <DollarSign className="h-10 w-10 text-purple-500" />
+              <DollarSign className="h-10 w-10 text-[var(--brand-mid)]" />
             </div>
           </CardContent>
         </Card>
@@ -433,7 +433,7 @@ export function RestaurantOnboardingPage() {
                   getPresignedUrl={handleGetPresignedUrl}
                 />
               ) : (
-                <p className="text-sm text-gray-500">Loading restaurant information...</p>
+                <p className="text-sm text-[var(--text-muted)]">Loading restaurant information...</p>
               )}
             </CardContent>
           </Card>
@@ -458,7 +458,7 @@ export function RestaurantOnboardingPage() {
                   <Label htmlFor="businessType">Business Type *</Label>
                   <select 
                     id="businessType" 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                     value={profileForm.business_type}
                     onChange={(e) => setProfileForm({ ...profileForm, business_type: e.target.value })}
                   >
@@ -505,7 +505,7 @@ export function RestaurantOnboardingPage() {
                 <div className="space-y-2">
                   <Label htmlFor="contact-email">Contact Email *</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                     <Input 
                       id="contact-email"
                       type="email"
@@ -519,7 +519,7 @@ export function RestaurantOnboardingPage() {
                 <div className="space-y-2">
                   <Label htmlFor="contact-phone">Phone</Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                     <Input 
                       id="contact-phone"
                       type="tel"
@@ -535,7 +535,7 @@ export function RestaurantOnboardingPage() {
               <div className="space-y-2">
                 <Label htmlFor="website">Website</Label>
                 <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                   <Input 
                     id="website"
                     type="url"
@@ -654,22 +654,22 @@ export function RestaurantOnboardingPage() {
             </CardHeader>
             <CardContent>
               {teamMembers.length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No team members added yet</p>
-                  <p className="text-sm text-gray-500 mt-2">Add contacts for owner, manager, purchasing, finance, and kitchen</p>
+                <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                  <Users className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                  <p className="text-[var(--text-muted)]">No team members added yet</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-2">Add contacts for owner, manager, purchasing, finance, and kitchen</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {teamMembers.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div key={member.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <p className="font-medium">{member.name}</p>
                           {member.isPrimary && <Badge variant="default">Primary</Badge>}
                           <Badge variant="outline" className="capitalize">{member.role}</Badge>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
                           <span className="flex items-center gap-1">
                             <Mail className="h-3 w-3" />
                             {member.email}
@@ -734,20 +734,20 @@ export function RestaurantOnboardingPage() {
                 </div>
               )}
               {branches.length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No branch accounts yet</p>
-                  <p className="text-sm text-gray-500 mt-2">
+                <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                  <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                  <p className="text-[var(--text-muted)]">No branch accounts yet</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-2">
                     Add a new account for each additional location (paid plans only)
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {branches.map((branch: any) => (
-                    <div key={branch.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div key={branch.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
                       <div className="flex-1">
                         <p className="font-medium mb-2">{branch.name}</p>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
                           {branch.contact_phone && (
                             <span className="flex items-center gap-1">
                               <Phone className="h-3 w-3" />
@@ -797,30 +797,30 @@ export function RestaurantOnboardingPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {isLoadingPrefs ? (
-                <div className="flex items-center gap-3 text-sm text-gray-500">
+                <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading notification preferences…
                 </div>
               ) : (
                 <>
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700">Delivery methods</h4>
+                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">Delivery methods</h4>
                     <div className="mt-3 grid gap-3 md:grid-cols-3">
                       {CHANNEL_FIELDS.map(({ key, label, description, icon: Icon }) => {
                         const checked = notificationPrefs[key]
                         return (
                           <label
                             key={key}
-                            className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-gray-50 cursor-pointer"
+                            className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-[var(--brand-ultra)] cursor-pointer"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <Icon className="h-4 w-4 text-gray-500" />
-                                <span className="text-sm font-medium text-gray-800">{label}</span>
+                                <Icon className="h-4 w-4 text-[var(--text-muted)]" />
+                                <span className="text-sm font-medium text-[var(--text)]">{label}</span>
                               </div>
-                              {checked && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
+                              {checked && <CheckCircle2 className="h-5 w-5 text-[var(--mint)]" />}
                             </div>
-                            <p className="text-xs text-gray-500">{description}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{description}</p>
                             <input
                               type="checkbox"
                               className="hidden"
@@ -834,24 +834,24 @@ export function RestaurantOnboardingPage() {
                   </div>
 
                   <div className="border-t pt-6">
-                    <h4 className="text-sm font-semibold text-gray-700">Notification types</h4>
+                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">Notification types</h4>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       {CATEGORY_FIELDS.map(({ key, label, description, icon: Icon }) => {
                         const checked = notificationPrefs[key]
                         return (
                           <label
                             key={key}
-                            className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-gray-50 cursor-pointer"
+                            className="flex flex-col gap-2 rounded-xl border p-4 hover:bg-[var(--brand-ultra)] cursor-pointer"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <Icon className="h-4 w-4 text-gray-500" />
+                                <Icon className="h-4 w-4 text-[var(--text-muted)]" />
                                 <div>
-                                  <span className="text-sm font-medium text-gray-800">{label}</span>
-                                  <p className="text-xs text-gray-500">{description}</p>
+                                  <span className="text-sm font-medium text-[var(--text)]">{label}</span>
+                                  <p className="text-xs text-[var(--text-muted)]">{description}</p>
                                 </div>
                               </div>
-                              {checked && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
+                              {checked && <CheckCircle2 className="h-5 w-5 text-[var(--mint)]" />}
                             </div>
                             <input
                               type="checkbox"
@@ -930,7 +930,7 @@ export function RestaurantOnboardingPage() {
               <Label htmlFor="memberRole">Role</Label>
               <select
                 id="memberRole"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                 value={newMember.role}
                 onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
               >

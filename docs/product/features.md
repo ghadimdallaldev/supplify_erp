@@ -71,7 +71,7 @@ RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) furth
 | Chat UI | `/app/chat` | `/api/chat` | Conversations, messages, attachments |
 | Socket.IO | — | same origin as API | Initialized in `server.js` |
 
-Gated by subscription feature `chat` (see [admin-feature-flags.md](./admin-feature-flags.md)).
+Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admin-feature-flags.md)).
 
 **Verify:** Restaurant opens chat from supplier detail; messages persist after refresh. Tests: `chat.routes.test.js`, web `useSocket.test.ts`.
 
@@ -163,7 +163,7 @@ Tests: `notification.service.test.js`.
 | Impersonation | Banner when active | cookie + middleware | View app as tenant |
 | Legacy admin routes | — | `/api/admin` | Internal maintenance endpoints |
 
-See [admin-feature-flags.md](./admin-feature-flags.md) for toggle API details. Tests: `admin-dashboard.routes.test.js`.
+See [admin-feature-flags.md](../admin/admin-feature-flags.md) for toggle API details. Tests: `admin-dashboard.routes.test.js`.
 
 ## Auth & files
 

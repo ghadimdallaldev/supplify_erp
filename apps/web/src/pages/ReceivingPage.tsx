@@ -100,22 +100,12 @@ export function ReceivingPage() {
         reportFound = reports.some((r: any) => r.order_id === orderId)
         
         if (reportFound) {
-          console.log('✅ Receiving report found in history after', retries + 1, 'retry attempt(s)')
           historyCheckResult = retryResult
           break
         }
         retries++
       }
-      
-      // Debug logs
-      console.log('Receiving history check:', {
-        reportFound,
-        retries,
-        totalReports: reports.length,
-        orderId,
-        reportIds: reports.map((r: any) => r.order_id).slice(0, 5)
-      })
-      
+
       // Order will be automatically removed from pending list by backend filter
       // Keep it in receivingOrderIds if it's still in pending OR if it's not yet in history
       const orderStillPending = refetchPendingResult.data?.orders?.some((o: any) => o.id === orderId)
@@ -127,14 +117,12 @@ export function ReceivingPage() {
           next.delete(orderId)
           return next
         })
-        console.log('✅ Order successfully received and removed from pending')
       } else if (!reportFound) {
         // Report not found in history - something went wrong
-        console.error('⚠️ Receiving report not found in history after', maxRetries, 'retries')
+        console.error('Receiving report not found in history after', maxRetries, 'retries')
         // Keep it in receivingOrderIds to show "Processing..." state
       } else {
         // Order still in pending but we created report - keep showing processing state
-        console.log('Order still in pending list, keeping in receivingOrderIds')
       }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to create receiving report')
@@ -193,14 +181,6 @@ export function ReceivingPage() {
     }
   }, [pendingData?.orders])
 
-  // Debug: Monitor historyData changes
-  useEffect(() => {
-    console.log('historyData changed:', historyData)
-    if (historyData?.reports) {
-      console.log('History reports count:', historyData.reports.length)
-    }
-  }, [historyData])
-
   const pendingOrders = (pendingData?.orders || []).map((order: any) => ({
     ...order,
     // Ensure has_receiving_report is true if order is in receivingOrderIds or if backend says it has a report
@@ -209,16 +189,18 @@ export function ReceivingPage() {
   const historyReports = historyData?.reports || []
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <PackageCheck className="h-8 w-8" />
-          Receiving & Quality Control
-        </h2>
-      </div>
+    <div className="space-y-6">
+      <Card className="shadow-sm">
+        <CardContent className="space-y-4 p-4 md:p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="flex items-center gap-2 text-[21px] font-black text-[var(--text)]">
+              <PackageCheck className="h-7 w-7 shrink-0 text-[var(--brand-mid)]" />
+              Receiving & Quality Control
+            </h1>
+          </div>
 
-      <Tabs defaultValue="pending" className="space-y-4">
-        <TabsList>
+          <Tabs defaultValue="pending" className="space-y-4">
+            <TabsList className="h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
           <TabsTrigger value="pending" className="flex items-center gap-2">
             <PackageCheck className="h-4 w-4" />
             Pending Orders
@@ -234,20 +216,18 @@ export function ReceivingPage() {
 
         <TabsContent value="pending" className="space-y-4">
           {pendingLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
           ) : pendingOrders.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <PackageCheck className="h-16 w-16 text-muted-foreground mb-4" />
+                <PackageCheck className="h-16 w-16 text-[var(--text-muted)] mb-4" />
                 <p className="text-lg font-semibold mb-2">No Pending Orders</p>
-                <p className="text-sm text-muted-foreground">All delivered orders have been received</p>
+                <p className="text-sm text-[var(--text-muted)]">All delivered orders have been received</p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4">
               {pendingOrders.map((order: any) => {
-                // Debug: Log order status to verify it's in the data
-                console.log('Order status debug:', { orderId: order.id, status: order.status, orderKeys: Object.keys(order) })
                 return (
                   <Card key={order.id}>
                   <CardHeader>
@@ -267,7 +247,7 @@ export function ReceivingPage() {
                             {order.status || 'UNKNOWN'}
                           </Badge>
                         </CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-sm text-[var(--text-muted)] mt-1">
                           Placed: {new Date(order.created_at).toLocaleString()}
                         </p>
                         {/* Status message explaining why order can't be received */}
@@ -275,8 +255,7 @@ export function ReceivingPage() {
                           <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
                             {(() => {
                               const status = order.status?.toUpperCase() || order.status
-                              console.log('Rendering status message for:', status, 'order:', order.id)
-                              
+
                               if (status === 'PLACED') {
                                 return (
                                   <>
@@ -361,7 +340,7 @@ export function ReceivingPage() {
                         <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0">
                           <div>
                             <p className="font-medium">{item.product_name}</p>
-                            <p className="text-sm text-muted-foreground">{item.sku} • Qty: {item.ordered_quantity} {item.unit}</p>
+                            <p className="text-sm text-[var(--text-muted)]">{item.sku} • Qty: {item.ordered_quantity} {item.unit}</p>
                           </div>
                           <p className="font-medium">{formatPrice(item.unit_price)}</p>
                         </div>
@@ -377,13 +356,13 @@ export function ReceivingPage() {
 
         <TabsContent value="history" className="space-y-4">
           {historyLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
           ) : historyReports.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <History className="h-16 w-16 text-muted-foreground mb-4" />
+                <History className="h-16 w-16 text-[var(--text-muted)] mb-4" />
                 <p className="text-lg font-semibold mb-2">No Receiving History</p>
-                <p className="text-sm text-muted-foreground">Receiving reports will appear here</p>
+                <p className="text-sm text-[var(--text-muted)]">Receiving reports will appear here</p>
               </CardContent>
             </Card>
           ) : (
@@ -397,7 +376,7 @@ export function ReceivingPage() {
                           {report.order_id?.slice(0, 8) || 'N/A'}
                           <Badge variant="outline">{report.supplier_name}</Badge>
                         </CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-sm text-[var(--text-muted)] mt-1">
                           Received: {new Date(report.received_at).toLocaleString()}
                         </p>
                       </div>
@@ -417,21 +396,21 @@ export function ReceivingPage() {
                   <CardContent>
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
-                        <p className="text-muted-foreground">Items Ordered</p>
+                        <p className="text-[var(--text-muted)]">Items Ordered</p>
                         <p className="font-semibold">{report.total_items_ordered}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Items Received</p>
+                        <p className="text-[var(--text-muted)]">Items Received</p>
                         <p className="font-semibold">{report.total_items_received}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Total Cost</p>
+                        <p className="text-[var(--text-muted)]">Total Cost</p>
                         <p className="font-semibold">{formatPrice(report.total_actual_cost)}</p>
                       </div>
                     </div>
                     {report.delivery_notes && (
                       <div className="mt-4 pt-4 border-t">
-                        <p className="text-sm text-muted-foreground mb-2">Delivery Notes:</p>
+                        <p className="text-sm text-[var(--text-muted)] mb-2">Delivery Notes:</p>
                         <p className="text-sm">{report.delivery_notes}</p>
                       </div>
                     )}
@@ -442,6 +421,8 @@ export function ReceivingPage() {
           )}
         </TabsContent>
       </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Receiving Dialog */}
       {selectedOrder && (
@@ -483,8 +464,8 @@ function ReceivingDialog({ order, open, onOpenChange, onSubmit, isLoading }: any
                   <div className="space-y-3">
                     <div>
                       <p className="font-medium">{item.product_name}</p>
-                      <p className="text-sm text-muted-foreground">SKU: {item.sku}</p>
-                      <p className="text-sm text-muted-foreground">Ordered: {item.ordered_quantity} {item.unit}</p>
+                      <p className="text-sm text-[var(--text-muted)]">SKU: {item.sku}</p>
+                      <p className="text-sm text-[var(--text-muted)]">Ordered: {item.ordered_quantity} {item.unit}</p>
                     </div>
                     <div className="border-t pt-3 mt-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -502,7 +483,7 @@ function ReceivingDialog({ order, open, onOpenChange, onSubmit, isLoading }: any
                         <Label htmlFor={`quality_${item.id}`}>Quality Status</Label>
                         <select
                           id={`quality_${item.id}`}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           defaultValue="ACCEPTED"
                           onChange={(e) => setFormData({ ...formData, [`quality_${item.id}`]: e.target.value })}
                         >

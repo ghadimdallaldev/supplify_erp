@@ -30,7 +30,7 @@ export function ProductDetailPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -38,7 +38,7 @@ export function ProductDetailPage() {
   if (error || !data) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Product not found</p>
+        <p className="text-[var(--red)]">Product not found</p>
       </div>
     )
   }
@@ -58,7 +58,7 @@ export function ProductDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4">
-          <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
+          <div className="aspect-square bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
             {product.image_url ? (
               <img
                 src={product.image_url}
@@ -66,15 +66,15 @@ export function ProductDetailPage() {
                 className="w-full h-full object-cover rounded-lg"
               />
             ) : (
-              <Package className="h-24 w-24 text-gray-400" />
+              <Package className="h-24 w-24 text-[var(--text-muted)]" />
             )}
           </div>
         </div>
 
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
-            <p className="text-gray-600 mt-2">{product.description}</p>
+            <h1 className="text-[21px] font-black text-[var(--text)]">{product.name}</h1>
+            <p className="text-[var(--text-muted)] mt-2">{product.description}</p>
             <div className="flex items-center space-x-2 mt-4">
               <Badge variant="secondary">{product.category}</Badge>
               <Badge variant="outline">{product.brand}</Badge>
@@ -88,19 +88,19 @@ export function ProductDetailPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="font-medium text-gray-600">SKU</p>
+                  <p className="font-medium text-[var(--text-muted)]">SKU</p>
                   <p>{product.sku}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-600">Supplier</p>
+                  <p className="font-medium text-[var(--text-muted)]">Supplier</p>
                   <p>{product.supplier_name}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-600">Unit</p>
+                  <p className="font-medium text-[var(--text-muted)]">Unit</p>
                   <p>{product.unit || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-600">Stock</p>
+                  <p className="font-medium text-[var(--text-muted)]">Stock</p>
                   <p>{product.available_qty || 0} {product.unit || 'units'}</p>
                 </div>
               </div>
@@ -112,10 +112,10 @@ export function ProductDetailPage() {
               <CardTitle>Pricing</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">
+              <div className="text-3xl font-bold text-[var(--brand-mid)]">
                 {formatPrice(product.current_price) || 'N/A'}
               </div>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-[var(--text-muted)] mt-1">
                 {product.currency || 'USD'} per {product.unit || 'unit'}
               </p>
             </CardContent>

@@ -170,7 +170,7 @@ export function StaffSelfServiceDashboard() {
   if (isLoading || !data) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900/90 text-white">
-        <p className="text-sm text-slate-300">Loading your schedule…</p>
+        <p className="text-sm text-[var(--text-muted)]">Loading your schedule…</p>
       </div>
     )
   }
@@ -182,15 +182,15 @@ export function StaffSelfServiceDashboard() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="flex flex-col items-start justify-between gap-3 text-white lg:flex-row lg:items-center">
           <div>
-            <p className="text-sm uppercase tracking-wide text-slate-400">Welcome back</p>
+            <p className="text-sm uppercase tracking-wide text-[var(--text-muted)]">Welcome back</p>
             <h1 className="text-3xl font-bold tracking-tight">{staff.display_name}</h1>
-            <p className="text-sm text-slate-300">Role: {staff.role}</p>
+            <p className="text-sm text-[var(--text-muted)]">Role: {staff.role}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-300">
+            <Badge variant="secondary" className="bg-[var(--mint-pale)]/10 text-[var(--mint)]">
               {upcomingShifts.length} upcoming shifts
             </Badge>
-            <Badge variant="secondary" className="bg-sky-500/10 text-sky-300">
+            <Badge variant="secondary" className="bg-[var(--brand-pale)]/10 text-[var(--brand-mid)]">
               {announcements.length} announcements
             </Badge>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -199,7 +199,7 @@ export function StaffSelfServiceDashboard() {
           </div>
         </header>
 
-        <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/30">
+        <Card className="border-[var(--mint)]/35 bg-[var(--mint-pale)]/50 dark:border-[var(--mint)]/50 dark:bg-[var(--mint)]/15">
           <CardHeader>
             <CardTitle>Time clock</CardTitle>
             <CardDescription>
@@ -211,7 +211,7 @@ export function StaffSelfServiceDashboard() {
             <div className="flex flex-wrap items-center gap-3">
               {openEntry ? (
                 <>
-                  <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                  <p className="text-sm font-medium text-[var(--mint)] dark:text-[var(--mint)]">
                     Clocked in since{' '}
                     {new Date(openEntry.clockInAt).toLocaleString(undefined, {
                       dateStyle: 'medium',
@@ -233,26 +233,26 @@ export function StaffSelfServiceDashboard() {
                   size="sm"
                   onClick={handleClockIn}
                   disabled={checkingIn}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-[var(--mint)] hover:opacity-90"
                 >
                   {checkingIn ? 'Clocking in…' : 'Clock in'}
                 </Button>
               )}
             </div>
             <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                 Recent check-ins & check-outs
               </p>
               {timeEntries.length === 0 ? (
-                <p className="text-sm text-gray-500">No time entries yet. Clock in to start.</p>
+                <p className="text-sm text-[var(--text-muted)]">No time entries yet. Clock in to start.</p>
               ) : (
                 <ul className="space-y-2">
                   {timeEntries.slice(0, 15).map((entry: StaffTimeEntry) => (
                     <li
                       key={entry.id}
-                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                      className="flex items-center justify-between rounded-lg border border-[var(--app-border)] bg-white px-3 py-2 text-sm dark:border-[var(--app-border-mid)] dark:bg-[var(--text)]"
                     >
-                      <span className="text-gray-600 dark:text-gray-400">
+                      <span className="text-[var(--text-muted)] dark:text-[var(--text-muted)]">
                         {new Date(entry.clockInAt).toLocaleDateString()} · In{' '}
                         {new Date(entry.clockInAt).toLocaleTimeString([], {
                           hour: '2-digit',
@@ -286,20 +286,20 @@ export function StaffSelfServiceDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {upcomingShifts.length === 0 ? (
-                <p className="text-sm text-gray-500">No scheduled shifts yet. Check back soon!</p>
+                <p className="text-sm text-[var(--text-muted)]">No scheduled shifts yet. Check back soon!</p>
               ) : (
                 upcomingShifts.map((shift: StaffPortalDashboard['upcomingShifts'][number]) => (
                   <div
                     key={shift.id}
                     className={`flex items-center justify-between rounded-xl border px-4 py-3 text-sm transition ${
                       swapForm.shiftId === shift.id
-                        ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-gray-200'
+                        ? 'border-[var(--brand)] bg-[var(--brand-pale)] text-[var(--brand-mid)]'
+                        : 'border-[var(--app-border)]'
                     }`}
                   >
                     <div>
-                      <p className="font-semibold text-gray-900">{shift.role}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="font-semibold text-[var(--text)]">{shift.role}</p>
+                      <p className="text-xs text-[var(--text-muted)]">
                         {new Date(shift.shift_date).toLocaleDateString()} •{' '}
                         {new Date(shift.starts_at).toLocaleTimeString([], {
                           hour: '2-digit',
@@ -471,18 +471,18 @@ export function StaffSelfServiceDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {announcements.length === 0 ? (
-                <p className="text-sm text-gray-500">No announcements yet. Check again soon.</p>
+                <p className="text-sm text-[var(--text-muted)]">No announcements yet. Check again soon.</p>
               ) : (
                 announcements.map((announcement: StaffPortalDashboard['announcements'][number]) => (
-                  <div key={announcement.id} className="rounded-xl border border-gray-200 p-4">
+                  <div key={announcement.id} className="rounded-xl border border-[var(--app-border)] p-4">
                     <div className="flex items-center justify-between">
-                      <p className="font-semibold text-gray-900">{announcement.title}</p>
+                      <p className="font-semibold text-[var(--text)]">{announcement.title}</p>
                       <Badge variant={announcement.acknowledged ? 'default' : 'outline'}>
                         {announcement.acknowledged ? 'Acknowledged' : 'Unread'}
                       </Badge>
                     </div>
-                    <p className="mt-2 text-sm text-gray-600">{announcement.body}</p>
-                    <p className="mt-3 text-xs text-gray-400">
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">{announcement.body}</p>
+                    <p className="mt-3 text-xs text-[var(--text-muted)]">
                       Posted {new Date(announcement.published_at).toLocaleString()}
                     </p>
                   </div>
@@ -497,20 +497,20 @@ export function StaffSelfServiceDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {documents.length === 0 ? (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[var(--text-muted)]">
                   You’re all caught up! No documents assigned right now.
                 </p>
               ) : (
                 documents.map((document: StaffPortalDashboard['documents'][number]) => (
                   <div
                     key={document.id}
-                    className="flex items-center justify-between rounded-xl border border-gray-200 p-4"
+                    className="flex items-center justify-between rounded-xl border border-[var(--app-border)] p-4"
                   >
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-[var(--text)]">
                         {document.title ?? document.doc_type}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[var(--text-muted)]">
                         Uploaded {new Date(document.uploaded_at).toLocaleDateString()}
                         {document.expires_at
                           ? ` • Expires ${new Date(document.expires_at).toLocaleDateString()}`
@@ -521,7 +521,7 @@ export function StaffSelfServiceDashboard() {
                       href={document.file_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs font-medium text-primary hover:underline"
+                      className="text-xs font-medium text-[var(--brand-mid)] hover:underline"
                     >
                       View
                     </a>
@@ -539,16 +539,16 @@ export function StaffSelfServiceDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {ptoRequests.length === 0 ? (
-                <p className="text-sm text-gray-500">No requests submitted yet.</p>
+                <p className="text-sm text-[var(--text-muted)]">No requests submitted yet.</p>
               ) : (
                 ptoRequests.map((request: StaffPortalDashboard['ptoRequests'][number]) => (
                   <div
                     key={request.id}
-                    className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    className="flex items-center justify-between rounded-xl border border-[var(--app-border)] px-4 py-3 text-sm"
                   >
                     <div>
-                      <p className="font-medium text-gray-900">{request.type}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="font-medium text-[var(--text)]">{request.type}</p>
+                      <p className="text-xs text-[var(--text-muted)]">
                         {new Date(request.start_date).toLocaleDateString()} →{' '}
                         {new Date(request.end_date).toLocaleDateString()}
                       </p>
@@ -568,18 +568,18 @@ export function StaffSelfServiceDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {swapRequests.length === 0 ? (
-                <p className="text-sm text-gray-500">No swap activity yet.</p>
+                <p className="text-sm text-[var(--text-muted)]">No swap activity yet.</p>
               ) : (
                 swapRequests.map((swap: StaffPortalDashboard['swapRequests'][number]) => (
                   <div
                     key={swap.id}
-                    className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    className="flex items-center justify-between rounded-xl border border-[var(--app-border)] px-4 py-3 text-sm"
                   >
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-[var(--text)]">
                         {swap.reason || 'Shift swap request'}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[var(--text-muted)]">
                         {new Date(swap.created_at).toLocaleString()}
                       </p>
                     </div>

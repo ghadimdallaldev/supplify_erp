@@ -65,7 +65,7 @@ export function LimitExceededBanner({
       <Button
         size="sm"
         variant="outline"
-        className="border-amber-300 bg-white hover:bg-amber-100"
+        className="border-amber-300 bg-[var(--surface)] hover:bg-amber-100"
         onClick={() => navigate(upgradeUrl)}
         title={valueProp ?? `Upgrade to ${planToUnlock} for higher ${label} limit`}
       >

@@ -89,12 +89,12 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
             </div>
           )}
           {isLoading ? (
-            <p className="text-sm text-gray-500">Loading branch accounts…</p>
+            <p className="text-sm text-[var(--text-muted)]">Loading branch accounts…</p>
           ) : linked.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-              <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No branch accounts yet</p>
-              <p className="text-sm text-gray-500 mt-2">
+            <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+              <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+              <p className="text-[var(--text-muted)]">No branch accounts yet</p>
+              <p className="text-sm text-[var(--text-muted)] mt-2">
                 Create a separate account for each additional {entityLabel}
               </p>
             </div>
@@ -103,11 +103,11 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
               {linked.map((branch: any) => (
                 <div
                   key={branch.id}
-                  className="flex items-center justify-between border rounded-lg p-4 hover:bg-gray-50"
+                  className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
                 >
                   <div>
                     <p className="font-medium">{branch.name}</p>
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 mt-1">
+                    <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] mt-1">
                       {branch.phone && (
                         <span className="flex items-center gap-1">
                           <Phone className="h-3 w-3" />

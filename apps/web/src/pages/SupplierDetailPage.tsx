@@ -39,7 +39,7 @@ export function SupplierDetailPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -47,7 +47,7 @@ export function SupplierDetailPage() {
   if (error || !data?.supplier) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Failed to load supplier</p>
+        <p className="text-[var(--red)]">Failed to load supplier</p>
       </div>
     )
   }
@@ -103,7 +103,7 @@ export function SupplierDetailPage() {
             <img 
               src={supplier.logo_url} 
               alt={supplier.name} 
-              className="h-20 w-20 rounded-lg object-cover border-2 border-gray-200 shadow-md"
+              className="h-20 w-20 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
               onError={(e) => {
                 const target = e.target as HTMLImageElement
                 target.style.display = 'none'
@@ -112,14 +112,14 @@ export function SupplierDetailPage() {
               }}
             />
           ) : null}
-          <div className={`h-20 w-20 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-3xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
+          <div className={`h-20 w-20 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-3xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
             {supplier.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{supplier.name}</h1>
-            <p className="text-gray-600 mt-1">{supplier.slug}</p>
+            <h1 className="text-[21px] font-black text-[var(--text)]">{supplier.name}</h1>
+            <p className="text-[var(--text-muted)] mt-1">{supplier.slug}</p>
             {supplier.description && (
-              <p className="text-sm text-gray-500 mt-2 max-w-2xl">{supplier.description}</p>
+              <p className="text-sm text-[var(--text-muted)] mt-2 max-w-2xl">{supplier.description}</p>
             )}
           </div>
         </div>
@@ -154,10 +154,10 @@ export function SupplierDetailPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Orders</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{stats.totalOrders}</p>
                 </div>
-                <ShoppingCart className="h-8 w-8 text-blue-500" />
+                <ShoppingCart className="h-8 w-8 text-[var(--brand-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -165,10 +165,10 @@ export function SupplierDetailPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Spent</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalSpent, { maximumFractionDigits: 0 })}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Spent</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{formatCurrency(stats.totalSpent, { maximumFractionDigits: 0 })}</p>
                 </div>
-                <DollarSign className="h-8 w-8 text-green-500" />
+                <DollarSign className="h-8 w-8 text-[var(--mint)]" />
               </div>
             </CardContent>
           </Card>
@@ -176,10 +176,10 @@ export function SupplierDetailPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.averageOrderValue, { maximumFractionDigits: 0 })}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Avg Order Value</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{formatCurrency(stats.averageOrderValue, { maximumFractionDigits: 0 })}</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-purple-500" />
+                <TrendingUp className="h-8 w-8 text-[var(--brand-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -187,10 +187,10 @@ export function SupplierDetailPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Products Available</p>
-                  <p className="text-2xl font-bold text-gray-900">{supplier.product_count || 0}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Products Available</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{supplier.product_count || 0}</p>
                 </div>
-                <Package className="h-8 w-8 text-orange-500" />
+                <Package className="h-8 w-8 text-[var(--amber-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -208,27 +208,27 @@ export function SupplierDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              <a href={`mailto:${supplier.contact_email}`} className="text-blue-600 hover:underline truncate">
+              <Mail className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+              <a href={`mailto:${supplier.contact_email}`} className="text-[var(--brand-mid)] hover:underline truncate">
                 {supplier.contact_email}
               </a>
             </div>
             {supplier.phone && (
               <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <a href={`tel:${supplier.phone}`} className="text-gray-700 hover:text-blue-600">
+                <Phone className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+                <a href={`tel:${supplier.phone}`} className="text-[var(--text-mid)] hover:text-[var(--brand-mid)]">
                   {supplier.phone}
                 </a>
               </div>
             )}
             {supplier.address_json && (
               <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                <MapPin className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0 mt-0.5" />
                 <div>
                   {supplier.address_json.street && (
-                    <p className="text-gray-700">{supplier.address_json.street}</p>
+                    <p className="text-[var(--text-mid)]">{supplier.address_json.street}</p>
                   )}
-                  <p className="text-gray-700">
+                  <p className="text-[var(--text-mid)]">
                     {supplier.address_json.city}, {supplier.address_json.country}
                   </p>
                 </div>
@@ -236,8 +236,8 @@ export function SupplierDetailPage() {
             )}
             {supplier.website && (
               <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <a href={supplier.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">
+                <Globe className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+                <a href={supplier.website} target="_blank" rel="noopener noreferrer" className="text-[var(--brand-mid)] hover:underline truncate">
                   {supplier.website}
                 </a>
               </div>
@@ -256,24 +256,24 @@ export function SupplierDetailPage() {
           <CardContent className="space-y-4">
             {supplier.legal_name && (
               <div>
-                <p className="text-sm text-gray-600">Legal Name</p>
+                <p className="text-sm text-[var(--text-muted)]">Legal Name</p>
                 <p className="font-medium">{supplier.legal_name}</p>
               </div>
             )}
             {supplier.vat_no && (
               <div>
-                <p className="text-sm text-gray-600">VAT Number</p>
+                <p className="text-sm text-[var(--text-muted)]">VAT Number</p>
                 <p className="font-medium">{supplier.vat_no}</p>
               </div>
             )}
             {supplier.trade_license_no && (
               <div>
-                <p className="text-sm text-gray-600">Trade License</p>
+                <p className="text-sm text-[var(--text-muted)]">Trade License</p>
                 <p className="font-medium">{supplier.trade_license_no}</p>
               </div>
             )}
             <div>
-              <p className="text-sm text-gray-600">Member Since</p>
+              <p className="text-sm text-[var(--text-muted)]">Member Since</p>
               <p className="font-medium flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 {new Date(supplier.created_at).toLocaleDateString('en-US', { 
@@ -297,12 +297,12 @@ export function SupplierDetailPage() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-3xl font-bold">{supplier.product_count || 0}</p>
-              <p className="text-sm text-gray-600">Total products available</p>
+              <p className="text-sm text-[var(--text-muted)]">Total products available</p>
             </div>
             {supplier.avg_price > 0 && (
               <div>
-                <p className="text-2xl font-bold text-green-600">{formatPrice(supplier.avg_price)}</p>
-                <p className="text-sm text-gray-600">Average product price</p>
+                <p className="text-2xl font-bold text-[var(--mint)]">{formatPrice(supplier.avg_price)}</p>
+                <p className="text-sm text-[var(--text-muted)]">Average product price</p>
               </div>
             )}
           </CardContent>
@@ -341,12 +341,12 @@ export function SupplierDetailPage() {
         <CardContent>
           {isLoadingProducts ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"></div>
             </div>
           ) : productsData?.products.length === 0 ? (
             <div className="text-center py-12">
-              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No products available from this supplier</p>
+              <Package className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
+              <p className="text-[var(--text-muted)]">No products available from this supplier</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -358,12 +358,12 @@ export function SupplierDetailPage() {
                       <Badge variant="secondary">{product.category}</Badge>
                     )}
                   </div>
-                  <p className="text-sm text-gray-600 mb-2">{product.sku}</p>
+                  <p className="text-sm text-[var(--text-muted)] mb-2">{product.sku}</p>
                   <div className="flex items-center justify-between">
                     <p className="font-semibold">
                       {product.current_price ? formatPrice(product.current_price) : 'N/A'}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-[var(--text-muted)]">
                       Stock: {product.available_qty || 0}
                     </p>
                   </div>

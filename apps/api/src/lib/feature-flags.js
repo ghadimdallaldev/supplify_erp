@@ -70,6 +70,69 @@ export async function resolveFeatureEnabled(tenantId, tenantType, featureKey, pl
   return { enabled: false, source: 'default' }
 }
 
+/**
+ * Resolve all allowed features in two DB round-trips (plan + global + tenant overrides).
+ * @param {string} tenantId
+ * @param {'RESTAURANT'|'SUPPLIER'} tenantType
+ * @param {Record<string, unknown>|null|undefined} planFeatures
+ * @returns {Promise<{ features: Record<string, boolean>, featureSources: Record<string, string> }>}
+ */
+export async function resolveAllFeaturesForTenant(tenantId, tenantType, planFeatures) {
+  const keys = getAllowedFeatureKeys(tenantType)
+  /** @type {Record<string, boolean|null>} */
+  const globalMap = {}
+  /** @type {Record<string, boolean>} */
+  const tenantMap = {}
+
+  try {
+    const { rows } = await query(
+      `SELECT feature_key, global_override FROM feature_flag WHERE feature_key = ANY($1::text[])`,
+      [keys]
+    )
+    for (const row of rows) {
+      globalMap[row.feature_key] = row.global_override
+    }
+  } catch (error) {
+    if (error.code !== '42P01') throw error
+  }
+
+  try {
+    const { rows } = await query(
+      `SELECT feature_key, is_enabled FROM feature_flag_override WHERE tenant_id = $1 AND tenant_type = $2 AND feature_key = ANY($3::text[])`,
+      [tenantId, tenantType, keys]
+    )
+    for (const row of rows) {
+      tenantMap[row.feature_key] = row.is_enabled === true
+    }
+  } catch (error) {
+    if (error.code !== '42P01') throw error
+  }
+
+  const features = {}
+  const featureSources = {}
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(tenantMap, key)) {
+      features[key] = tenantMap[key]
+      featureSources[key] = 'tenant_override'
+      continue
+    }
+    if (Object.prototype.hasOwnProperty.call(globalMap, key) && globalMap[key] !== null) {
+      features[key] = globalMap[key] === true
+      featureSources[key] = 'global'
+      continue
+    }
+    if (planFeatures && typeof planFeatures === 'object' && key in planFeatures) {
+      features[key] = evaluatePlanFeatureValue(planFeatures[key])
+      featureSources[key] = 'plan'
+    } else {
+      features[key] = false
+      featureSources[key] = 'default'
+    }
+  }
+
+  return { features, featureSources }
+}
+
 /** Used by requireFeature middleware (via subscription.js). */
 export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey) {
   try {
@@ -89,24 +152,31 @@ export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey
 }
 
 export async function listGlobalFeatureFlags() {
+  const byKey = new Map()
   try {
     const { rows } = await query(
       `SELECT feature_key, feature_name, description, global_override, updated_at
        FROM feature_flag
        ORDER BY feature_key`
     )
-    return rows.map((r) => ({
-      featureKey: r.feature_key,
-      featureName: r.feature_name,
-      description: r.description,
-      /** null = inherit from each tenant's plan */
-      globalOverride: r.global_override,
-      updatedAt: r.updated_at,
-    }))
+    for (const r of rows) {
+      byKey.set(r.feature_key, r)
+    }
   } catch (error) {
     if (error.code === '42P01') return []
     throw error
   }
+  return [...ALL_FEATURE_KEYS].sort().map((featureKey) => {
+    const r = byKey.get(featureKey)
+    return {
+      featureKey,
+      featureName: r?.feature_name ?? featureDisplayName(featureKey),
+      description: r?.description ?? null,
+      /** null = inherit from each tenant's plan */
+      globalOverride: r ? r.global_override : null,
+      updatedAt: r?.updated_at ? new Date(r.updated_at).toISOString() : null,
+    }
+  })
 }
 
 /**
@@ -171,19 +241,19 @@ export async function getEffectiveFeaturesForTenant(tenantId, tenantType) {
   const overrides = await listTenantFeatureOverrides(tenantId, tenantType)
   const overrideByKey = Object.fromEntries(overrides.map((o) => [o.featureKey, o]))
 
-  const features = []
-  for (const key of allowed) {
-    const resolved = await resolveFeatureEnabled(tenantId, tenantType, key, planFeatures)
-    features.push({
-      featureKey: key,
-      featureName: featureDisplayName(key),
-      enabled: resolved.enabled,
-      source: resolved.source,
-      planValue: planFeatures[key] ?? null,
-      tenantOverride: overrideByKey[key] || null,
-    })
-  }
-  return features
+  const { features, featureSources } = await resolveAllFeaturesForTenant(
+    tenantId,
+    tenantType,
+    planFeatures
+  )
+  return allowed.map((key) => ({
+    featureKey: key,
+    featureName: featureDisplayName(key),
+    enabled: features[key],
+    source: featureSources[key],
+    planValue: planFeatures[key] ?? null,
+    tenantOverride: overrideByKey[key] || null,
+  }))
 }
 
 export async function setTenantFeatureOverride(

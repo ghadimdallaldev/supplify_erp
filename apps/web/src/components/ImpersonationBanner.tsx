@@ -28,7 +28,10 @@ export function ImpersonationBanner() {
   }
 
   return (
-    <div className="bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between gap-4 shadow">
+    <div
+      className="px-4 py-2 flex items-center justify-between gap-4 shadow-md"
+      style={{ background: 'var(--amber-mid)', color: '#000' }}
+    >
       <div className="flex items-center gap-2">
         <UserX className="h-5 w-5 shrink-0" />
         <span className="font-medium">You are impersonating {label}</span>
@@ -39,11 +42,11 @@ export function ImpersonationBanner() {
         )}
       </div>
       <Button
-        variant="secondary"
+        variant="outline"
         size="sm"
         onClick={handleStop}
         disabled={stopping}
-        className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white"
+        className="shrink-0 border-black/25 bg-black/10 text-black hover:bg-black/20"
       >
         {stopping ? 'Stopping…' : 'Stop impersonating'}
       </Button>

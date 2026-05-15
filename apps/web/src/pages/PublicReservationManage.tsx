@@ -45,7 +45,7 @@ export function PublicReservationManage() {
   if (!token) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900/90 text-white">
-        <p className="text-sm text-slate-300">Missing reservation token.</p>
+        <p className="text-sm text-[var(--text-muted)]">Missing reservation token.</p>
       </div>
     )
   }
@@ -53,7 +53,7 @@ export function PublicReservationManage() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900/90 text-white">
-        <p className="text-sm text-slate-300">Loading reservation details…</p>
+        <p className="text-sm text-[var(--text-muted)]">Loading reservation details…</p>
       </div>
     )
   }
@@ -61,7 +61,7 @@ export function PublicReservationManage() {
   if (!reservation) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900/90 text-white">
-        <Card className="w-full max-w-md border-white/10 bg-white/95 text-slate-900 shadow-xl">
+        <Card className="w-full max-w-md border-white/10 bg-white/95 text-[var(--text-muted)] shadow-xl">
           <CardHeader>
             <CardTitle>Reservation not found</CardTitle>
             <CardDescription>The management link may have expired or already been used.</CardDescription>
@@ -107,12 +107,12 @@ export function PublicReservationManage() {
   return (
     <div className="min-h-screen bg-slate-900/90 py-12 px-4 text-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 lg:flex-row">
-        <Card className="w-full bg-white/95 text-slate-900 shadow-xl lg:w-2/5">
+        <Card className="w-full bg-white/95 text-[var(--text-muted)] shadow-xl lg:w-2/5">
           <CardHeader>
             <CardTitle>Reservation details</CardTitle>
             <CardDescription>Your management link is valid for six months.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-gray-600">
+          <CardContent className="space-y-4 text-sm text-[var(--text-muted)]">
             <div>
               <Label>Status</Label>
               <div className="mt-1 flex items-center gap-2">
@@ -123,11 +123,11 @@ export function PublicReservationManage() {
             </div>
             <div>
               <Label>When</Label>
-              <p className="mt-1 font-semibold text-gray-900">{formatDateTime(reservation.scheduled_at)}</p>
+              <p className="mt-1 font-semibold text-[var(--text)]">{formatDateTime(reservation.scheduled_at)}</p>
             </div>
             <div>
               <Label>Guests</Label>
-              <p className="mt-1 font-semibold text-gray-900">{reservation.party_size}</p>
+              <p className="mt-1 font-semibold text-[var(--text)]">{reservation.party_size}</p>
             </div>
             <div>
               <Label>Special notes</Label>
@@ -144,7 +144,7 @@ export function PublicReservationManage() {
           </CardContent>
         </Card>
 
-        <Card className="w-full bg-white/95 text-slate-900 shadow-xl lg:w-3/5">
+        <Card className="w-full bg-white/95 text-[var(--text-muted)] shadow-xl lg:w-3/5">
           <CardHeader>
             <CardTitle>Reschedule reservation</CardTitle>
             <CardDescription>Pick a new date and time. Availability updates in real-time.</CardDescription>
@@ -173,7 +173,7 @@ export function PublicReservationManage() {
               <div className="space-y-2">
                 <Label>Available times</Label>
                 {slots.length === 0 ? (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-[var(--text-muted)]">
                     No availability for the selected date. Try a different day or contact the restaurant.
                   </p>
                 ) : (
@@ -184,17 +184,17 @@ export function PublicReservationManage() {
                         key={slot.startTime}
                         className={`flex flex-col rounded-lg border px-3 py-2 text-left text-xs transition ${
                           rescheduleSlot === slot.startTime
-                            ? 'border-primary bg-primary/10 text-primary'
+                            ? 'border-[var(--brand)] bg-[var(--brand-pale)] text-[var(--brand-mid)]'
                             : slot.isAvailable
-                              ? 'border-gray-200 hover:border-primary/50 hover:text-primary'
-                              : 'border-gray-100 text-gray-400'
+                              ? 'border-[var(--app-border)] hover:border-[var(--brand)]/50 hover:text-[var(--brand-mid)]'
+                              : 'border-[var(--app-border)] text-[var(--text-muted)]'
                         }`}
                         disabled={!slot.isAvailable}
                         onClick={() => setRescheduleSlot(slot.startTime)}
                       >
                         <span className="font-semibold">{new Date(slot.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         <span>Up to {slot.capacityAvailable} seats</span>
-                        {!slot.isAvailable ? <span className="text-[10px] uppercase text-red-500">Unavailable</span> : null}
+                        {!slot.isAvailable ? <span className="text-[10px] uppercase text-[var(--red)]">Unavailable</span> : null}
                       </button>
                     ))}
                   </div>

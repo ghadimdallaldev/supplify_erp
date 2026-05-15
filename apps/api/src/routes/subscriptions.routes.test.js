@@ -262,6 +262,10 @@ describe('Subscriptions Routes', () => {
 
     it('returns synthetic Free entitlements when getEntitlements returns null', async () => {
       mockGetEntitlements.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      const dbModule = await import('../lib/db.js')
+      vi.mocked(dbModule.query)
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
 
       const res = await request(app).get('/api/subscriptions/entitlements').expect(200)
 

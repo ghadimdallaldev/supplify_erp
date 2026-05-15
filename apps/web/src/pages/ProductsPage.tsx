@@ -7,6 +7,7 @@ import {
   useGeneratePresignedUrlMutation,
   useGetWarehousesQuery,
   useGetSuppliersQuery,
+  useCreateInventoryAdjustmentMutation,
 } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -67,6 +68,7 @@ export function ProductsPage() {
   const { user } = useAppSelector((state) => state.auth)
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
+  const [createInventoryAdjustment, { isLoading: isAdjustingInventory }] = useCreateInventoryAdjustmentMutation()
 
   // Check if user is a supplier
   const isSupplier = user?.role === 'SUPPLIER'
@@ -369,7 +371,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -377,7 +379,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Failed to load products</p>
+        <p className="text-[var(--red)]">Failed to load products</p>
       </div>
     )
   }
@@ -386,8 +388,8 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
     <div className="space-y-6" data-testid="products-page">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-[21px] font-black text-[var(--text)]">Products</h1>
+          <p className="text-[var(--text-muted)] mt-2">
             {isSupplier
               ? 'Manage your product catalog'
               : 'Browse and search products from suppliers'}
@@ -413,11 +415,12 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
         </div>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex space-x-4">
+      <Card className="shadow-sm">
+        <CardContent className="space-y-4 p-4 pt-6">
+        <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
               <Input
                 placeholder="Search products..."
                 value={search}
@@ -431,7 +434,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <select
                 value={supplierFilter}
                 onChange={(e) => setSupplierFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
+                className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
               >
                 <option value="">All Suppliers</option>
                 {uniqueSuppliers.map((supplier: any) => (
@@ -448,7 +451,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               setCategoryId(e.target.value)
               setCategory('') // Clear old category when using new one
             }}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            className="rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
           >
             <option value="">All Categories</option>
             {categoriesData?.categories?.map((cat) => (
@@ -468,7 +471,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 <Badge
                   key={tag}
                   variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                  className="cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer hover:bg-[var(--bg)]"
                   onClick={() => {
                     setSelectedTags((prev) =>
                       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
@@ -498,7 +501,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                     step="0.01"
                   />
                 </div>
-                <span className="self-center text-gray-500">-</span>
+                <span className="self-center text-[var(--text-muted)]">-</span>
                 <div className="flex-1">
                   <Input
                     type="number"
@@ -535,11 +538,11 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
           maxPrice) &&
           !isSupplier && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-gray-600">Filtered by:</span>
+              <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
               {supplierFilter && (
                 <Badge
                   variant="secondary"
-                  className="cursor-pointer hover:bg-gray-300"
+                  className="cursor-pointer hover:bg-[var(--app-border-mid)]"
                   onClick={() => setSupplierFilter('')}
                 >
                   Supplier: {supplierFilter} ×
@@ -548,7 +551,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               {(categoryId || category) && (
                 <Badge
                   variant="secondary"
-                  className="cursor-pointer hover:bg-gray-300"
+                  className="cursor-pointer hover:bg-[var(--app-border-mid)]"
                   onClick={() => {
                     setCategoryId('')
                     setCategory('')
@@ -562,7 +565,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 <Badge
                   key={tag}
                   variant="secondary"
-                  className="cursor-pointer hover:bg-gray-300"
+                  className="cursor-pointer hover:bg-[var(--app-border-mid)]"
                   onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
                 >
                   Tag: {tag} ×
@@ -571,7 +574,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               {(minPrice || maxPrice) && (
                 <Badge
                   variant="secondary"
-                  className="cursor-pointer hover:bg-gray-300"
+                  className="cursor-pointer hover:bg-[var(--app-border-mid)]"
                   onClick={() => {
                     setMinPrice('')
                     setMaxPrice('')
@@ -582,30 +585,31 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               )}
             </div>
           )}
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="border rounded-lg overflow-hidden">
+      <Card className="overflow-hidden p-0 shadow-sm">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+          <thead className="border-b border-[var(--app-border)] bg-[var(--bg)]">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Product</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Supplier</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Price</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stock</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Product</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Category</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Supplier</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Price</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Stock</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-[var(--app-border)]">
             {filteredProducts?.map((product) => (
               <tr
                 key={product.id}
-                className="hover:bg-gray-50 transition-colors"
+                className="transition-colors hover:bg-[var(--bg)]"
                 data-testid={`product-row-${product.id}`}
               >
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--app-border)] bg-[var(--bg)]">
                       {product.image_url ? (
                         <img
                           src={product.image_url}
@@ -613,12 +617,12 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <Package className="h-6 w-6 text-gray-400" />
+                        <Package className="h-6 w-6 text-[var(--text-muted)]" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{product.name}</p>
-                      <p className="text-sm text-gray-500 truncate">{product.sku}</p>
+                      <p className="font-medium text-[var(--text)] truncate">{product.name}</p>
+                      <p className="text-sm text-[var(--text-muted)] truncate">{product.sku}</p>
                     </div>
                   </div>
                 </td>
@@ -644,7 +648,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <p className="text-sm text-gray-600">{product.supplier_name || 'N/A'}</p>
+                  <p className="text-sm text-[var(--text-muted)]">{product.supplier_name || 'N/A'}</p>
                 </td>
                 <td className="px-4 py-4">
                   {product.current_price ? (
@@ -652,16 +656,16 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                       <p className="font-semibold">
                         {formatPrice(product.current_price)}
                       </p>
-                      {product.unit && <p className="text-xs text-gray-500">per {product.unit}</p>}
+                      {product.unit && <p className="text-xs text-[var(--text-muted)]">per {product.unit}</p>}
                     </>
                   ) : (
-                    <p className="text-sm text-gray-400">N/A</p>
+                    <p className="text-sm text-[var(--text-muted)]">N/A</p>
                   )}
                 </td>
                 <td className="px-4 py-4">
                   <p
                     className={`text-sm font-medium ${
-                      parseFloat(product.available_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
+                      parseFloat(product.available_qty || 0) > 0 ? 'text-[var(--mint)]' : 'text-[var(--red)]'
                     }`}
                   >
                     {formatNumber(product.available_qty, { maximumFractionDigits: 2 })} {product.unit || 'units'}
@@ -713,12 +717,12 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       {filteredProducts?.length === 0 && (
         <div className="text-center py-12">
-          <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">
+          <Package className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
+          <p className="text-[var(--text-muted)]">
             {isSupplier
               ? 'No products yet. Click "Add Product" to get started!'
               : 'No products found'}
@@ -769,7 +773,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 <Label htmlFor="category_id">Category *</Label>
                 <select
                   id="category_id"
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
+                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
                   value={productForm.category_id}
                   onChange={(e) =>
                     setProductForm({ ...productForm, category_id: e.target.value, category: '' })
@@ -787,7 +791,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 <Label htmlFor="unit">Unit *</Label>
                 <select
                   id="unit"
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
+                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
                   value={productForm.unit}
                   onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
                 >
@@ -836,7 +840,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <Label htmlFor="warehouse">Warehouse (Optional)</Label>
               <select
                 id="warehouse"
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary w-full"
+                className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
                 value={productForm.warehouse_id}
                 onChange={(e) => setProductForm({ ...productForm, warehouse_id: e.target.value })}
               >
@@ -905,7 +909,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               )}
               {tagsData?.tags && tagsData.tags.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-xs text-gray-500 mb-1">Suggested tags:</p>
+                  <p className="text-xs text-[var(--text-muted)] mb-1">Suggested tags:</p>
                   <div className="flex flex-wrap gap-1">
                     {tagsData.tags.slice(0, 10).map((tag) => (
                       <Badge
@@ -942,7 +946,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   </div>
                 )}
               </div>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--text-muted)]">
                 Recommended: Square image, max 5MB. Formats: JPG, PNG, WebP
               </p>
             </div>
@@ -993,13 +997,13 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 onChange={handleFileUpload}
                 className="cursor-pointer"
               />
-              <p className="text-sm text-gray-500">Supported formats: CSV, Excel (.xlsx, .xls)</p>
+              <p className="text-sm text-[var(--text-muted)]">Supported formats: CSV, Excel (.xlsx, .xls)</p>
             </div>
 
             {uploadedFile && (
               <div className="space-y-2">
                 <Label>File: {uploadedFile.name}</Label>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-[var(--text-muted)]">
                   Size: {formatNumber(uploadedFile.size / 1024, { maximumFractionDigits: 2 })} KB
                 </p>
               </div>
@@ -1011,7 +1015,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 <div className="border rounded-md overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 border-b">
+                      <tr className="bg-[var(--brand-ultra)] border-b">
                         {Object.keys(uploadPreview[0] || {}).map((key) => (
                           <th key={key} className="px-3 py-2 text-left font-medium">
                             {key}
@@ -1035,8 +1039,8 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               </div>
             )}
 
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
+              <p className="text-sm text-[var(--brand-mid)]">
                 <strong>CSV Format Example:</strong>
                 <br />
                 Name,SKU,Description,Category,Unit,Price,Stock
@@ -1122,7 +1126,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <Label htmlFor="reason">Reason</Label>
               <select
                 id="reason"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
                 value={adjustmentReason}
                 onChange={(e) => setAdjustmentReason(e.target.value)}
               >
@@ -1139,7 +1143,7 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <Label htmlFor="notes">Notes</Label>
               <textarea
                 id="notes"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
                 rows={3}
                 value={adjustmentNotes}
                 onChange={(e) => setAdjustmentNotes(e.target.value)}
@@ -1148,14 +1152,14 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             </div>
 
             {selectedProductForAdjustment && (
-              <div className="bg-gray-50 p-4 rounded-md">
-                <p className="text-sm font-medium text-gray-700">Current Stock</p>
-                <p className="text-lg font-semibold text-green-600">
+              <div className="bg-[var(--brand-ultra)] p-4 rounded-md">
+                <p className="text-sm font-medium text-[var(--text-mid)]">Current Stock</p>
+                <p className="text-lg font-semibold text-[var(--mint)]">
                   {formatNumber(selectedProductForAdjustment.available_qty, { maximumFractionDigits: 2 })}{' '}
                   {selectedProductForAdjustment.unit || 'units'}
                 </p>
                 {adjustmentQuantity && (
-                  <p className="text-sm text-gray-600 mt-2">
+                  <p className="text-sm text-[var(--text-muted)] mt-2">
                     New Stock:{' '}
                     {formatNumber(
                       parseFloat(String(selectedProductForAdjustment.available_qty || 0)) +
@@ -1183,18 +1187,28 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                toast.success(
-                  `Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`
-                )
-                setShowInventoryAdjustment(false)
-                setSelectedProductForAdjustment(null)
-                setAdjustmentQuantity('')
-                setAdjustmentReason('')
-                setAdjustmentNotes('')
-                // TODO: Implement API call to update inventory
+              onClick={async () => {
+                const qty = parseFloat(adjustmentQuantity)
+                if (!qty || qty <= 0 || !adjustmentReason || !selectedProductForAdjustment?.id) return
+                try {
+                  await createInventoryAdjustment({
+                    productId: selectedProductForAdjustment.id,
+                    adjustmentType: adjustmentType === 'ADD' ? 'IN' : 'OUT',
+                    quantity: qty,
+                    reason: adjustmentReason,
+                    notes: adjustmentNotes || undefined,
+                  }).unwrap()
+                  toast.success(`Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`)
+                  setShowInventoryAdjustment(false)
+                  setSelectedProductForAdjustment(null)
+                  setAdjustmentQuantity('')
+                  setAdjustmentReason('')
+                  setAdjustmentNotes('')
+                } catch (err: any) {
+                  toast.error(err?.data?.error?.message || 'Failed to update inventory')
+                }
               }}
-              disabled={!adjustmentQuantity || !adjustmentReason}
+              disabled={!adjustmentQuantity || !adjustmentReason || isAdjustingInventory}
             >
               {adjustmentType === 'ADD' ? 'Add' : 'Remove'} Stock
             </Button>

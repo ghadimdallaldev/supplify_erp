@@ -162,7 +162,7 @@ export function OrdersPage() {
                     toast.dismiss(t.id)
                     window.location.href = '/app/settings'
                   }}
-                  className="px-3 py-1 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
+                  className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90"
                 >
                   View Plans
                 </button>
@@ -327,8 +327,8 @@ export function OrdersPage() {
     const errorMessage = (error as any)?.data?.error?.message || 'Failed to load orders'
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 text-lg font-semibold mb-2">Failed to load orders</p>
-        <p className="text-gray-600 text-sm">{errorMessage}</p>
+        <p className="text-[var(--red)] text-lg font-semibold mb-2">Failed to load orders</p>
+        <p className="text-[var(--text-muted)] text-sm">{errorMessage}</p>
         <Button onClick={() => refetch()} className="mt-4">
           Try Again
         </Button>
@@ -340,8 +340,8 @@ export function OrdersPage() {
     <div className="space-y-6 p-6" data-testid="orders-page">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Orders Inbox</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-[21px] font-black text-[var(--text)]">Orders Inbox</h1>
+          <p className="text-[var(--text-muted)] mt-2">
             {isSupplier
               ? 'Manage inbound orders from restaurants'
               : 'Track your orders and their status'}
@@ -370,7 +370,7 @@ export function OrdersPage() {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
               <Input
                 placeholder="Search by order ID or restaurant..."
                 value={search}
@@ -382,7 +382,7 @@ export function OrdersPage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
+                className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
               >
                 <option value="">All Statuses</option>
                 <option value="PLACED">Placed</option>
@@ -441,13 +441,13 @@ export function OrdersPage() {
                           <Badge variant="destructive">Action Required</Badge>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600 space-y-1">
+                      <div className="text-sm text-[var(--text-muted)] space-y-1">
                         <div>Restaurant: {order.restaurant_name}</div>
                         <div>
                           Placed: {new Date(order.placed_at || order.created_at).toLocaleString()}
                         </div>
                         {!isSupplier && order.status === 'DELIVERED' && (
-                          <div className="mt-2 p-2 rounded bg-blue-50 text-blue-700 border border-blue-200 text-xs">
+                          <div className="mt-2 p-2 rounded bg-[var(--brand-ultra)] text-[var(--brand-mid)] border border-[var(--app-border)] text-xs">
                             Supplier marked this order as delivered. Please{' '}
                             <Link to={`/app/receiving?order=${order.id}`} className="underline">
                               receive this order
@@ -456,7 +456,7 @@ export function OrdersPage() {
                           </div>
                         )}
                         {isSupplier && order.status === 'DELIVERED' && (
-                          <div className="mt-2 p-2 rounded bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs">
+                          <div className="mt-2 p-2 rounded bg-[var(--amber-pale)] text-[var(--amber)] border border-[var(--amber-mid)]/35 text-xs">
                             Awaiting restaurant receiving. You’ll see the invoice after they
                             receive.
                           </div>
@@ -464,10 +464,10 @@ export function OrdersPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">
+                      <div className="text-2xl font-bold text-[var(--brand-mid)]">
                         {`$${formatPrice(order.total_amount)}`}
                       </div>
-                      <div className="text-sm text-gray-600">{order.items?.length || 0} items</div>
+                      <div className="text-sm text-[var(--text-muted)]">{order.items?.length || 0} items</div>
                     </div>
                   </div>
                 </CardHeader>
@@ -475,7 +475,7 @@ export function OrdersPage() {
                   <div className="flex items-center justify-between">
                     {/* Order Items Preview */}
                     <div className="flex-1">
-                      <div className="text-sm text-gray-600 mb-2">Items:</div>
+                      <div className="text-sm text-[var(--text-muted)] mb-2">Items:</div>
                       <div className="flex flex-wrap gap-2">
                         {order.items?.slice(0, 3).map((item: any, idx: number) => (
                           <Badge key={idx} variant="outline" className="text-xs">
@@ -589,10 +589,10 @@ export function OrdersPage() {
           </div>
 
           {(!filteredOrders || filteredOrders.length === 0) && (
-            <div className="text-center py-12 rounded-lg border border-dashed border-gray-300 bg-gray-50/50">
-              <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 font-medium">No orders yet</p>
-              <p className="text-sm text-gray-500 mt-1">
+            <div className="text-center py-12 rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90">
+              <ShoppingCart className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
+              <p className="text-[var(--text-muted)] font-medium">No orders yet</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">
                 {!isSupplier
                   ? 'Create your first order to get started.'
                   : 'Orders from restaurants will appear here.'}
@@ -627,7 +627,7 @@ export function OrdersPage() {
                 <Label htmlFor="restaurant">Restaurant *</Label>
                 <select
                   id="restaurant"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                   value={selectedRestaurant}
                   onChange={(e) => setSelectedRestaurant(e.target.value)}
                 >
@@ -646,7 +646,7 @@ export function OrdersPage() {
                 <textarea
                   id="orderNotes"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                   placeholder="Additional notes for this order..."
                   value={orderNotes}
                   onChange={(e) => setOrderNotes(e.target.value)}
@@ -662,7 +662,7 @@ export function OrdersPage() {
                       <div key={item.productId} className="flex items-center justify-between p-3">
                         <div className="flex-1">
                           <p className="font-medium">{item.productName}</p>
-                          <p className="text-sm text-gray-600">${formatPrice(item.price)} each</p>
+                          <p className="text-sm text-[var(--text-muted)]">${formatPrice(item.price)} each</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
@@ -735,7 +735,7 @@ export function OrdersPage() {
           <div className="space-y-4">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
               <Input
                 placeholder="Search products..."
                 value={productSearch}
@@ -749,12 +749,12 @@ export function OrdersPage() {
               {filteredProducts?.map((product: any) => (
                 <div
                   key={product.id}
-                  className="flex items-center justify-between p-4 hover:bg-gray-50"
+                  className="flex items-center justify-between p-4 hover:bg-[var(--brand-ultra)]"
                 >
                   <div className="flex-1">
                     <p className="font-medium">{product.name}</p>
-                    <p className="text-sm text-gray-600">{product.sku}</p>
-                    <p className="text-sm font-semibold text-green-600">
+                    <p className="text-sm text-[var(--text-muted)]">{product.sku}</p>
+                    <p className="text-sm font-semibold text-[var(--mint)]">
                       ${formatPrice(product.price)} / {product.unit}
                     </p>
                   </div>
@@ -772,7 +772,7 @@ export function OrdersPage() {
               ))}
 
               {(!filteredProducts || filteredProducts.length === 0) && (
-                <div className="text-center py-8 text-gray-500">No products found</div>
+                <div className="text-center py-8 text-[var(--text-muted)]">No products found</div>
               )}
             </div>
           </div>

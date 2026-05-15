@@ -158,7 +158,7 @@ export function OrderDetailPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -166,7 +166,7 @@ export function OrderDetailPage() {
   if (error || !data) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Order not found</p>
+        <p className="text-[var(--red)]">Order not found</p>
       </div>
     )
   }
@@ -192,7 +192,7 @@ export function OrderDetailPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">Order #{order.id.slice(-8).toUpperCase()}</h1>
-            <p className="text-gray-600">{order.restaurant_name}</p>
+            <p className="text-[var(--text-muted)]">{order.restaurant_name}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -303,24 +303,24 @@ export function OrderDetailPage() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">Order ID</p>
+                      <p className="text-sm text-[var(--text-muted)]">Order ID</p>
                       <p className="font-medium">{order.id}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Status</p>
+                      <p className="text-sm text-[var(--text-muted)]">Status</p>
                       <Badge variant={getStatusColor(order.status)}>
                         {order.status}
                       </Badge>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Created</p>
+                      <p className="text-sm text-[var(--text-muted)]">Created</p>
                       <p className="font-medium">
                         {new Date(order.created_at).toLocaleString()}
                       </p>
                     </div>
                     {order.placed_at && (
                       <div>
-                        <p className="text-sm text-gray-600">Placed</p>
+                        <p className="text-sm text-[var(--text-muted)]">Placed</p>
                         <p className="font-medium">
                           {new Date(order.placed_at).toLocaleString()}
                         </p>
@@ -349,15 +349,15 @@ export function OrderDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Subtotal</span>
+                    <span className="text-[var(--text-muted)]">Subtotal</span>
                     <span>${formatPrice(order.total_amount)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Shipping</span>
+                    <span className="text-[var(--text-muted)]">Shipping</span>
                     <span>$0.00</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Tax</span>
+                    <span className="text-[var(--text-muted)]">Tax</span>
                     <span>$0.00</span>
                   </div>
                   <div className="border-t pt-4">
@@ -412,14 +412,14 @@ export function OrderDetailPage() {
             <CardContent>
               <div className="space-y-4">
                 {order.items?.map((item: any, idx: number) => (
-                  <div key={item.id || idx} className="border rounded-lg p-4 hover:bg-gray-50">
+                  <div key={item.id || idx} className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="font-semibold text-lg">{item.product_name || 'Product'}</h4>
                           <Badge variant="outline">SKU: {item.product_sku || 'N/A'}</Badge>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                        <div className="grid grid-cols-2 gap-4 text-sm text-[var(--text-muted)]">
                           <div>
                             <span className="font-medium">Quantity:</span> {item.quantity}
                           </div>
@@ -439,10 +439,10 @@ export function OrderDetailPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-primary">
+                        <p className="text-2xl font-bold text-[var(--brand-mid)]">
                           ${formatPrice(item.line_total)}
                         </p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-[var(--text-muted)]">
                           {item.quantity} × ${formatPrice(item.unit_price)}
                         </p>
                       </div>
@@ -485,7 +485,7 @@ export function OrderDetailPage() {
               <CardContent>
                 {isLoadingInvoices ? (
                   <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"></div>
                   </div>
                 ) : invoicesData?.invoices && invoicesData.invoices.length > 0 ? (
                   <div className="space-y-4">
@@ -497,7 +497,7 @@ export function OrderDetailPage() {
                         <div
                           key={invoice.id}
                           className={`border rounded-lg p-6 hover:shadow-md transition-shadow ${
-                            isOverdue ? 'border-red-300 bg-red-50' : ''
+                            isOverdue ? 'border-red-300 bg-[var(--red-pale)]' : ''
                           }`}
                         >
                           <div className="flex items-start justify-between mb-4">
@@ -511,19 +511,19 @@ export function OrderDetailPage() {
                                   <Badge variant="destructive">Overdue</Badge>
                                 )}
                               </div>
-                              <p className="text-sm text-gray-600 font-medium">{invoice.supplier_name}</p>
-                              <div className="flex gap-4 text-xs text-gray-500 mt-2">
+                              <p className="text-sm text-[var(--text-muted)] font-medium">{invoice.supplier_name}</p>
+                              <div className="flex gap-4 text-xs text-[var(--text-muted)] mt-2">
                                 <span>Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
                                 <span>Due Date: {new Date(invoice.due_date).toLocaleDateString()}</span>
                               </div>
                             </div>
                             <div className="text-right">
                               <p className="text-2xl font-bold">${formatPrice(invoice.total_amount)}</p>
-                              <p className={`text-sm font-semibold ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              <p className={`text-sm font-semibold ${remaining > 0 ? 'text-[var(--red)]' : 'text-[var(--mint)]'}`}>
                                 Balance: ${formatPrice(remaining)}
                               </p>
                               {parseFloat(String(invoice.total_paid || 0)) > 0 && (
-                                <p className="text-xs text-green-600">
+                                <p className="text-xs text-[var(--mint)]">
                                   Paid: ${formatPrice(invoice.total_paid)}
                                 </p>
                               )}
@@ -551,15 +551,15 @@ export function OrderDetailPage() {
                   </div>
                 ) : order.status === 'COMPLETED' ? (
                   <div className="text-center py-12">
-                    <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-lg font-semibold text-gray-900 mb-2">Invoice Not Yet Generated</p>
-                    <p className="text-gray-600">Invoice will be created automatically. Please check back shortly.</p>
+                    <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                    <p className="text-lg font-semibold text-[var(--text)] mb-2">Invoice Not Yet Generated</p>
+                    <p className="text-[var(--text-muted)]">Invoice will be created automatically. Please check back shortly.</p>
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-lg font-semibold text-gray-900 mb-2">Invoice Not Available</p>
-                    <p className="text-gray-600">Invoice will be generated when the order is completed.</p>
+                    <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                    <p className="text-lg font-semibold text-[var(--text)] mb-2">Invoice Not Available</p>
+                    <p className="text-[var(--text-muted)]">Invoice will be generated when the order is completed.</p>
                   </div>
                 )}
               </CardContent>
@@ -592,26 +592,26 @@ export function OrderDetailPage() {
                     <div key={item.id || idx} className="border rounded-lg p-4">
                       <div className="grid grid-cols-4 gap-4">
                         <div>
-                          <p className="text-sm font-medium text-gray-600">Product</p>
+                          <p className="text-sm font-medium text-[var(--text-muted)]">Product</p>
                           <p className="font-semibold">{item.product_name}</p>
-                          <p className="text-xs text-gray-500 mt-1">SKU: {item.product_sku}</p>
+                          <p className="text-xs text-[var(--text-muted)] mt-1">SKU: {item.product_sku}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-600">Quantity</p>
+                          <p className="text-sm font-medium text-[var(--text-muted)]">Quantity</p>
                           <p className="text-lg font-bold">{item.quantity}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-600">Warehouse Location</p>
+                          <p className="text-sm font-medium text-[var(--text-muted)]">Warehouse Location</p>
                           <p className="font-medium">{item.location_code || 'Not assigned'}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-600">Lot/Expiry</p>
+                          <p className="text-sm font-medium text-[var(--text-muted)]">Lot/Expiry</p>
                           <p className="text-sm">—</p>
                         </div>
                       </div>
                       {item.picking_notes && (
                         <div className="mt-3 pt-3 border-t">
-                          <p className="text-sm font-medium text-gray-600">Picking Notes:</p>
+                          <p className="text-sm font-medium text-[var(--text-muted)]">Picking Notes:</p>
                           <p className="text-sm">{item.picking_notes}</p>
                         </div>
                       )}
@@ -636,16 +636,16 @@ export function OrderDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Delivery Time Window</p>
+                    <p className="text-sm font-medium text-[var(--text-muted)] mb-1">Delivery Time Window</p>
                     <p className="text-sm">{operatingHoursLabel || 'Not specified'}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Access Instructions</p>
+                    <p className="text-sm font-medium text-[var(--text-muted)] mb-1">Access Instructions</p>
                     <p className="text-sm">{deliveryInstructions || 'Not specified'}</p>
                   </div>
                   {deliveryPhone && (
                     <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Contact</p>
+                      <p className="text-sm font-medium text-[var(--text-muted)] mb-1">Contact</p>
                       <p className="text-sm">{deliveryPhone}</p>
                     </div>
                   )}
@@ -663,10 +663,10 @@ export function OrderDetailPage() {
                   <div className="space-y-2">
                     <p className="font-medium">{order.restaurant_name}</p>
                     {(order as any).branch_name && (
-                      <p className="text-sm text-gray-600">Branch: {(order as any).branch_name}</p>
+                      <p className="text-sm text-[var(--text-muted)]">Branch: {(order as any).branch_name}</p>
                     )}
                     {addressLines.length > 0 ? (
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-[var(--text-muted)]">
                         {addressLines.map((line) => (
                           <span key={line} className="block">
                             {line}
@@ -674,7 +674,7 @@ export function OrderDetailPage() {
                         ))}
                       </p>
                     ) : (
-                      <p className="text-sm text-gray-500">No delivery address on file</p>
+                      <p className="text-sm text-[var(--text-muted)]">No delivery address on file</p>
                     )}
                   </div>
                 </CardContent>
@@ -709,17 +709,17 @@ export function OrderDetailPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 space-y-6">
+                <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 space-y-6">
                   {/* Header */}
                   <div className="text-center">
                     <h2 className="text-2xl font-bold">PACKING SLIP</h2>
-                    <p className="text-sm text-gray-600">Order #{order.id.slice(-8).toUpperCase()}</p>
+                    <p className="text-sm text-[var(--text-muted)]">Order #{order.id.slice(-8).toUpperCase()}</p>
                   </div>
 
                   {/* Ship To */}
                   <div className="grid grid-cols-2 gap-8">
                     <div>
-                      <p className="text-sm font-bold text-gray-600 mb-2">SHIP TO:</p>
+                      <p className="text-sm font-bold text-[var(--text-muted)] mb-2">SHIP TO:</p>
                       <p className="font-semibold">{order.restaurant_name}</p>
                       {addressLines.length > 0 ? (
                         addressLines.map((line) => (
@@ -728,11 +728,11 @@ export function OrderDetailPage() {
                           </p>
                         ))
                       ) : (
-                        <p className="text-sm text-gray-500">No delivery address on file</p>
+                        <p className="text-sm text-[var(--text-muted)]">No delivery address on file</p>
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-gray-600 mb-2">ORDER DETAILS:</p>
+                      <p className="text-sm font-bold text-[var(--text-muted)] mb-2">ORDER DETAILS:</p>
                       <p className="text-sm">Order Date: {new Date(order.created_at).toLocaleDateString()}</p>
                       <p className="text-sm">Status: {order.status}</p>
                       <p className="text-sm">Items: {order.items?.length || 0}</p>
@@ -743,7 +743,7 @@ export function OrderDetailPage() {
                   <div>
                     <table className="w-full border-collapse">
                       <thead>
-                        <tr className="border-b-2 border-gray-300">
+                        <tr className="border-b-2 border-[var(--app-border-mid)]">
                           <th className="text-left py-2 px-3 text-sm font-bold">Item</th>
                           <th className="text-left py-2 px-3 text-sm font-bold">SKU</th>
                           <th className="text-right py-2 px-3 text-sm font-bold">Qty</th>
@@ -755,7 +755,7 @@ export function OrderDetailPage() {
                         {order.items?.map((item: any, idx: number) => (
                           <tr key={item.id || idx} className="border-b">
                             <td className="py-3 px-3 text-sm">{item.product_name}</td>
-                            <td className="py-3 px-3 text-sm text-gray-600">{item.product_sku}</td>
+                            <td className="py-3 px-3 text-sm text-[var(--text-muted)]">{item.product_sku}</td>
                             <td className="py-3 px-3 text-sm text-right">{item.quantity}</td>
                             <td className="py-3 px-3 text-sm text-right">${formatPrice(item.unit_price)}</td>
                             <td className="py-3 px-3 text-sm text-right font-medium">${formatPrice(item.line_total)}</td>
@@ -768,7 +768,7 @@ export function OrderDetailPage() {
                   {/* Footer */}
                   <div className="border-t-2 pt-4 flex justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Thank you for your business!</p>
+                      <p className="text-sm text-[var(--text-muted)]">Thank you for your business!</p>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-lg">Total: ${formatPrice(order.total_amount)}</p>

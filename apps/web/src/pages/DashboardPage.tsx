@@ -4,13 +4,11 @@ import {
   useGetOrdersQuery,
   useGetReorderSuggestionsQuery,
   useGetInvoiceAnalyticsQuery,
-  useGetProductCategoriesQuery,
   useGetQuickListsQuery,
   useAddItemToQuickListMutation,
   useGetImpersonationStatusQuery,
+  useGetEntitlementsQuery,
 } from '../services/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
 import {
@@ -19,269 +17,357 @@ import {
   Users,
   Building2,
   DollarSign,
-  TrendingUp,
-  ClipboardCheck,
   Loader2,
   Shield,
+  AlertTriangle,
+  TrendingUp,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  XAxis,
-  YAxis,
   Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  CartesianGrid,
-  AreaChart,
-  Area,
 } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { CalendarView } from '../components/CalendarView'
 import { formatCurrency } from '../utils/format'
 
+// ─── Tiny helpers ────────────────────────────────────────────────────────────
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  const max = Math.max(...data, 1)
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 26, marginTop: 8 }}>
+      {data.map((v, i) => (
+        <div
+          key={i}
+          style={{
+            flex: 1,
+            height: `${Math.max(12, Math.round((v / max) * 100))}%`,
+            borderRadius: '2px 2px 0 0',
+            background: color,
+            opacity: 0.25 + (i / data.length) * 0.75,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function StatusChip({ status }: { status: string }) {
+  const s = (status || '').toUpperCase()
+  const map: Record<string, [string, string]> = {
+    PLACED: ['var(--brand-pale)', 'var(--brand-mid)'],
+    PENDING: ['var(--amber-pale)', 'var(--amber)'],
+    PROCESSING: ['var(--amber-pale)', 'var(--amber)'],
+    SHIPPED: ['var(--mint-pale)', 'var(--mint)'],
+    COMPLETED: ['var(--mint-pale)', 'var(--mint)'],
+    CANCELLED: ['var(--red-pale)', 'var(--red)'],
+  }
+  const [bg, color] = map[s] || ['var(--brand-pale)', 'var(--brand-mid)']
+  return (
+    <span
+      style={{
+        background: bg,
+        color,
+        fontSize: 10,
+        fontWeight: 700,
+        borderRadius: 6,
+        padding: '2px 7px',
+        letterSpacing: '0.02em',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {s}
+    </span>
+  )
+}
+
+interface KpiCardProps {
+  label: string
+  value: string | number
+  iconBg: string
+  iconColor: string
+  Icon: any
+  meta?: string
+  sparkData: number[]
+  sparkColor: string
+}
+
+function KpiCard({ label, value, iconBg, iconColor, Icon, meta, sparkData, sparkColor }: KpiCardProps) {
+  return (
+    <div
+      className="kpi-card"
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--app-border)',
+        borderRadius: 12,
+        padding: 15,
+        transition: 'transform 0.15s, box-shadow 0.15s',
+      }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLElement
+        el.style.transform = 'translateY(-1px)'
+        el.style.boxShadow = '0 6px 20px rgba(91,33,182,0.12)'
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLElement
+        el.style.transform = ''
+        el.style.boxShadow = ''
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.07em',
+          }}
+        >
+          {label}
+        </span>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: iconBg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon size={15} style={{ color: iconColor }} />
+        </div>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', lineHeight: 1.1 }}>
+        {value === 0 || value === '0' || value === '$0.00' || value === formatCurrency(0) ? (
+          <span>{value}</span>
+        ) : (
+          value
+        )}
+      </div>
+      {meta && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{meta}</div>
+      )}
+      <Sparkline data={sparkData} color={sparkColor} />
+    </div>
+  )
+}
+
+function SectionCard({
+  title,
+  children,
+  action,
+}: {
+  title: string
+  children: React.ReactNode
+  action?: React.ReactNode
+}) {
+  return (
+    <div
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--app-border)',
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          padding: '12px 15px 10px',
+          borderBottom: '1px solid var(--app-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: 'var(--text-mid)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.07em',
+          }}
+        >
+          {title}
+        </span>
+        {action}
+      </div>
+      <div style={{ padding: '12px 15px' }}>{children}</div>
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth)
   const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
     skip: user?.role !== 'ADMIN',
   })
-  // When admin is not impersonating, show admin CTA only (no tenant calendar/orders)
   const isAdminNotImpersonating = user?.role === 'ADMIN' && !impersonation?.active
-  const {
-    data: stats,
-    isLoading,
-    error,
-  } = useGetDashboardStatsQuery(undefined, {
+  const { data: stats, isLoading, error } = useGetDashboardStatsQuery(undefined, {
     skip: isAdminNotImpersonating,
   })
 
-  // Effective role: when impersonating, show that tenant's dashboard
   const effectiveRole =
     user?.role === 'ADMIN' && impersonation?.active ? impersonation.tenantType : user?.role
-  const effectiveIsRestaurant = effectiveRole === 'RESTAURANT'
-  const effectiveIsSupplier = effectiveRole === 'SUPPLIER'
+  const isRestaurant = effectiveRole === 'RESTAURANT'
+  const isSupplier = effectiveRole === 'SUPPLIER'
 
-  // Recent orders preview (shared) — skip when admin not impersonating
   const { data: recentOrders } = useGetOrdersQuery(
-    { limit: 5, offset: 0 },
+    { limit: 7, offset: 0 },
     { skip: isAdminNotImpersonating }
   )
-  // Orders dataset for charts
-  const { data: chartOrders } = useGetOrdersQuery(
-    { limit: 50, offset: 0 },
-    { skip: isAdminNotImpersonating }
-  )
-
-  // Reorder suggestions for restaurants
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
-    skip: !effectiveIsRestaurant,
+    skip: !isRestaurant,
   })
   const { data: quickListsData } = useGetQuickListsQuery(undefined, {
-    skip: !effectiveIsRestaurant,
+    skip: !isRestaurant,
   })
-  const [addItemToQuickList, { isLoading: isAddingToQuickList }] = useAddItemToQuickListMutation()
+  const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null)
-
-  // Restaurant spend analytics (30 days)
   const { data: invoiceAnalytics } = useGetInvoiceAnalyticsQuery(
     { period: 30 },
-    { skip: !effectiveIsRestaurant }
+    { skip: !isRestaurant }
   )
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !user || user.role === 'ADMIN',
+  })
+  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
-  // Supplier product categories for distribution
-  const { data: productCategories } = useGetProductCategoriesQuery(undefined, {
-    skip: !effectiveIsSupplier,
+  const planName = entitlementsData?.entitlements?.plan?.name ?? 'Free'
+  const firstName =
+    (user?.displayName || user?.email || '').split(/[\s@]/)[0] || 'there'
+
+  const now = new Date()
+  const hour = now.getHours()
+  const greeting =
+    hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const formattedDate = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
   })
 
-  // Admin not impersonating: show simple landing, no tenant dashboard
+  // ── Admin not impersonating ──────────────────────────────────────────────
   if (isAdminNotImpersonating) {
     return (
-      <div className="space-y-6">
-        <div className="rounded-2xl p-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-sm">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="mt-2 opacity-90">Platform management and tenant overview</p>
+      <div className="space-y-6" data-testid="dashboard-page">
+        <div
+          style={{
+            borderRadius: 16,
+            padding: '20px 24px',
+            background: 'linear-gradient(135deg, var(--brand), var(--brand-mid))',
+            color: '#fff',
+          }}
+        >
+          <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Admin Dashboard</h1>
+          <p style={{ marginTop: 4, opacity: 0.85, fontSize: 14 }}>
+            Platform management and tenant overview
+          </p>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
+        <div
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--app-border)',
+            borderRadius: 12,
+            padding: 20,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <Shield size={18} style={{ color: 'var(--brand)' }} />
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
               You are viewing as platform admin
-            </CardTitle>
-            <CardDescription>
-              Use the Admin Dashboard to manage tenants, plans, and support. To see a restaurant or
-              supplier view, use &quot;Impersonate&quot; from the Admin Dashboard.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link to="/app/admin">Open Admin Dashboard</Link>
-            </Button>
-          </CardContent>
-        </Card>
+            </span>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+            Use the Admin Dashboard to manage tenants, plans, and support. To see a restaurant or
+            supplier view, use &quot;Impersonate&quot; from the Admin Dashboard.
+          </p>
+          <Button asChild style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}>
+            <Link to="/app/admin">Open Admin Dashboard</Link>
+          </Button>
+        </div>
       </div>
     )
   }
 
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-32 w-full rounded-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} data-testid="dashboard-page">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Skeleton className="h-7 w-48" style={{ background: 'var(--brand-ultra)' }} />
+            <Skeleton className="h-4 w-64" style={{ background: 'var(--brand-ultra)' }} />
+          </div>
+          <Skeleton className="h-8 w-36" style={{ background: 'var(--brand-ultra)' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16 mb-2" />
-                <Skeleton className="h-3 w-20" />
-              </CardContent>
-            </Card>
+            <div
+              key={i}
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--app-border)',
+                borderRadius: 12,
+                padding: 15,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <Skeleton className="h-3 w-20" style={{ background: 'var(--brand-ultra)' }} />
+              <Skeleton className="h-8 w-16" style={{ background: 'var(--brand-ultra)' }} />
+              <Skeleton className="h-6 w-full" style={{ background: 'var(--brand-ultra)' }} />
+            </div>
           ))}
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Skeleton className="h-64 w-full rounded-lg" />
-          <Skeleton className="h-64 w-full rounded-lg" />
+        <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: 12 }}>
+          <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
+          <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
+          <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
         </div>
+        <Skeleton className="h-48 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
       </div>
     )
   }
 
+  // ── Error ────────────────────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-600 text-lg font-semibold mb-2">Failed to load dashboard</p>
-        <p className="text-gray-600 text-sm">Please try refreshing the page</p>
+      <div style={{ textAlign: 'center', paddingTop: 64 }} data-testid="dashboard-page">
+        <AlertTriangle size={32} style={{ color: 'var(--brand)', margin: '0 auto 12px' }} />
+        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+          Failed to load dashboard
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Please try refreshing the page</p>
       </div>
     )
   }
 
-  const isSupplier = effectiveIsSupplier
-  const isRestaurant = effectiveIsRestaurant
+  // ── Derived data ─────────────────────────────────────────────────────────
+  const orders = recentOrders?.orders || []
+  const orderAmounts = orders.map((o: any) => Number(o.total_amount) || 0)
+  const syntheticRamp = (n: number, peak: number) =>
+    Array.from({ length: 7 }, (_, i) => Math.round((peak || 100) * (0.3 + (i / 6) * 0.7) * (0.7 + Math.random() * 0.3)))
+      .slice(0, n)
+  const revenueSparkData =
+    orderAmounts.length >= 4
+      ? [...orderAmounts.slice(-7).reverse()]
+      : syntheticRamp(7, (stats?.totalRevenue as number) || 500)
+  const ordersSparkData = syntheticRamp(7, (stats?.totalOrders as number) || 10)
+  const pendingSparkData = syntheticRamp(7, (stats?.pendingOrders as number) || 5)
+  const counterpartSparkData = syntheticRamp(7, (isSupplier ? stats?.totalRestaurants : stats?.totalSuppliers) as number || 5)
 
-  // Build KPI cards based on role
-  const kpis: Array<{ title: string; value: string | number; icon: any; description: string }> = []
-
-  if (isSupplier) {
-    kpis.push(
-      {
-        title: 'Products',
-        value: stats?.totalProducts ?? 0,
-        icon: Package,
-        description: 'Active SKUs',
-      },
-      {
-        title: 'Pending Orders',
-        value: stats?.pendingOrders ?? 0,
-        icon: TrendingUp,
-        description: 'Awaiting fulfillment',
-      },
-      {
-        title: 'Completed Orders',
-        value: stats?.completedOrders ?? 0,
-        icon: ClipboardCheck,
-        description: 'Shipped & delivered',
-      }
-    )
-    if (typeof stats?.totalRevenue === 'number') {
-      kpis.push({
-        title: 'Revenue',
-        value: formatCurrency(stats.totalRevenue),
-        icon: DollarSign,
-        description: 'All-time',
-      })
-    }
-    if (typeof stats?.totalRestaurants === 'number') {
-      kpis.push({
-        title: 'Restaurants',
-        value: stats.totalRestaurants,
-        icon: Users,
-        description: 'Customers',
-      })
-    }
-  }
-
-  if (isRestaurant) {
-    kpis.push(
-      {
-        title: 'Orders',
-        value: stats?.totalOrders ?? 0,
-        icon: ShoppingCart,
-        description: 'All orders',
-      },
-      {
-        title: 'Pending Orders',
-        value: stats?.pendingOrders ?? 0,
-        icon: TrendingUp,
-        description: 'In progress',
-      },
-      {
-        title: 'Completed Orders',
-        value: stats?.completedOrders ?? 0,
-        icon: Package,
-        description: 'Received',
-      }
-    )
-    if (typeof stats?.totalSpent === 'number') {
-      kpis.push({
-        title: 'Total Spent',
-        value: formatCurrency(stats.totalSpent),
-        icon: DollarSign,
-        description: 'All-time',
-      })
-    }
-    if (typeof stats?.totalSuppliers === 'number') {
-      kpis.push({
-        title: 'Suppliers',
-        value: stats.totalSuppliers,
-        icon: Building2,
-        description: 'Active vendors',
-      })
-    }
-  }
-
-  // Default KPIs if role unknown
-  if (!kpis.length) {
-    kpis.push(
-      {
-        title: 'Products',
-        value: stats?.totalProducts ?? 0,
-        icon: Package,
-        description: 'Available',
-      },
-      { title: 'Orders', value: stats?.totalOrders ?? 0, icon: ShoppingCart, description: 'Placed' }
-    )
-  }
-
-  // Prepare simple viz data
-  const recentOrderData = (recentOrders?.orders || []).map((o: any, idx: number) => ({
-    name: `#${String(o.id).slice(0, 4)}`,
-    amount: Number(o.total_amount) || 0,
-    idx,
-  }))
-
-  const statusPieData = [
-    { name: 'Pending', value: Number(stats?.pendingOrders) || 0, color: '#f59e0b' },
-    { name: 'Completed', value: Number(stats?.completedOrders) || 0, color: '#10b981' },
-  ]
-
-  const hasSpend = typeof stats?.totalSpent === 'number'
-  const hasRevenue = typeof stats?.totalRevenue === 'number'
-
-  // Build orders trend (by placement order, synthetic day index)
-  const ordersTrendData = (chartOrders?.orders || [])
-    .slice()
-    .reverse()
-    .map((o: any, i: number) => ({
-      name: `#${i + 1}`,
-      amount: Number(o.total_amount) || 0,
-    }))
-
-  // Restaurant spend trend (from analytics API if available)
   const spendTrend = Array.isArray(invoiceAnalytics?.points)
     ? invoiceAnalytics.points.map((p: any) => ({
         name: p.date?.slice(5) || '',
@@ -289,364 +375,556 @@ export function DashboardPage() {
       }))
     : []
 
-  // Supplier product category distribution
-  const categoryDist = Array.isArray(productCategories?.categories)
-    ? productCategories.categories
-        .slice(0, 8)
-        .map((c: any) => ({ name: c.name, value: c.product_count ?? 0 }))
-    : []
+  // ── KPI definitions ──────────────────────────────────────────────────────
+  const supplierKpis: KpiCardProps[] = [
+    {
+      label: 'Revenue',
+      value: typeof stats?.totalRevenue === 'number' ? formatCurrency(stats.totalRevenue) : '$0',
+      iconBg: 'var(--brand-pale)',
+      iconColor: 'var(--brand)',
+      Icon: DollarSign,
+      meta: 'All-time',
+      sparkData: revenueSparkData,
+      sparkColor: 'var(--brand)',
+    },
+    {
+      label: 'Orders',
+      value: stats?.totalOrders ?? 0,
+      iconBg: 'var(--mint-pale)',
+      iconColor: 'var(--mint)',
+      Icon: ShoppingCart,
+      meta: 'All orders',
+      sparkData: ordersSparkData,
+      sparkColor: 'var(--mint-mid)',
+    },
+    {
+      label: 'Pending',
+      value: stats?.pendingOrders ?? 0,
+      iconBg: 'var(--amber-pale)',
+      iconColor: 'var(--amber)',
+      Icon: TrendingUp,
+      meta: 'Awaiting fulfillment',
+      sparkData: pendingSparkData,
+      sparkColor: 'var(--amber-mid)',
+    },
+    {
+      label: 'Restaurants',
+      value: stats?.totalRestaurants ?? 0,
+      iconBg: 'var(--brand-pale)',
+      iconColor: 'var(--brand)',
+      Icon: Users,
+      meta: 'Active customers',
+      sparkData: counterpartSparkData,
+      sparkColor: 'var(--brand-light)',
+    },
+  ]
 
+  const restaurantKpis: KpiCardProps[] = [
+    {
+      label: 'Total Spent',
+      value: typeof stats?.totalSpent === 'number' ? formatCurrency(stats.totalSpent) : '$0',
+      iconBg: 'var(--brand-pale)',
+      iconColor: 'var(--brand)',
+      Icon: DollarSign,
+      meta: 'All-time',
+      sparkData: revenueSparkData,
+      sparkColor: 'var(--brand)',
+    },
+    {
+      label: 'My Orders',
+      value: stats?.totalOrders ?? 0,
+      iconBg: 'var(--mint-pale)',
+      iconColor: 'var(--mint)',
+      Icon: ShoppingCart,
+      meta: 'All orders',
+      sparkData: ordersSparkData,
+      sparkColor: 'var(--mint-mid)',
+    },
+    {
+      label: 'Pending',
+      value: stats?.pendingOrders ?? 0,
+      iconBg: 'var(--amber-pale)',
+      iconColor: 'var(--amber)',
+      Icon: TrendingUp,
+      meta: 'In progress',
+      sparkData: pendingSparkData,
+      sparkColor: 'var(--amber-mid)',
+    },
+    {
+      label: 'Suppliers',
+      value: stats?.totalSuppliers ?? 0,
+      iconBg: 'var(--brand-pale)',
+      iconColor: 'var(--brand)',
+      Icon: Building2,
+      meta: 'Active vendors',
+      sparkData: counterpartSparkData,
+      sparkColor: 'var(--brand-light)',
+    },
+  ]
+
+  const kpis = isSupplier ? supplierKpis : restaurantKpis
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6" data-testid="dashboard-page">
-      <div className="rounded-2xl p-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-sm">
-        <h1 className="text-3xl font-bold">
-          {isSupplier ? 'Supplier Dashboard' : isRestaurant ? 'Restaurant Dashboard' : 'Dashboard'}
-        </h1>
-        <p className="mt-2 opacity-90">Clear, visual insights tailored to your role</p>
-        {(hasRevenue || hasSpend) && (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {hasRevenue && (
-              <div className="rounded-xl bg-white/10 p-4">
-                <p className="text-xs uppercase tracking-wide opacity-80">Revenue</p>
-                <p className="text-lg font-semibold">
-                  {formatCurrency(stats.totalRevenue)}
-                </p>
-              </div>
-            )}
-            {hasSpend && (
-              <div className="rounded-xl bg-white/10 p-4">
-                <p className="text-xs uppercase tracking-wide opacity-80">Total Spent</p>
-                <p className="text-lg font-semibold">{formatCurrency(stats.totalSpent)}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Post-onboarding: direct to first order or first product */}
+    <div
+      data-testid="dashboard-page"
+      style={{ display: 'flex', flexDirection: 'column', gap: 16, fontFamily: "'Inter', system-ui, sans-serif" }}
+    >
+      {/* Post-onboarding CTAs */}
       {isRestaurant && (stats?.totalOrders ?? 0) === 0 && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="font-semibold text-gray-900">You&apos;re all set</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Create your first order to start receiving from suppliers.
-              </p>
+        <div
+          style={{
+            background: 'var(--brand-pale)',
+            border: '1px solid var(--brand-light)',
+            borderRadius: 12,
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>You&apos;re all set</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              Create your first order to start receiving from suppliers.
             </div>
-            <Button asChild>
-              <Link to="/app/cart">
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Create first order
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <Button asChild style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff', flexShrink: 0 }}>
+            <Link to="/app/cart">
+              <ShoppingCart style={{ width: 14, height: 14, marginRight: 6 }} />
+              Create first order
+            </Link>
+          </Button>
+        </div>
       )}
       {isSupplier && (stats?.totalProducts ?? 0) === 0 && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="font-semibold text-gray-900">You&apos;re all set</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Add your first product so restaurants can order from you.
-              </p>
+        <div
+          style={{
+            background: 'var(--brand-pale)',
+            border: '1px solid var(--brand-light)',
+            borderRadius: 12,
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>You&apos;re all set</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              Add your first product so restaurants can order from you.
             </div>
-            <Button asChild>
-              <Link to="/app/products">
-                <Package className="h-4 w-4 mr-2" />
-                Create first product
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <Button asChild style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff', flexShrink: 0 }}>
+            <Link to="/app/products">
+              <Package style={{ width: 14, height: 14, marginRight: 6 }} />
+              Add first product
+            </Link>
+          </Button>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {/* Page heading */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: 21, fontWeight: 900, color: 'var(--text)', margin: 0 }}>
+            {greeting}, {firstName} ☀️
+          </h1>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+            {formattedDate} &nbsp;·&nbsp; {effectiveRole?.toLowerCase() ?? 'user'} &nbsp;·&nbsp; {planName}
+          </p>
+        </div>
+        {/* Period selector — UI only */}
+        <div
+          style={{
+            display: 'flex',
+            background: 'var(--surface)',
+            border: '1px solid var(--app-border)',
+            borderRadius: 8,
+            overflow: 'hidden',
+            flexShrink: 0,
+          }}
+        >
+          {(['7d', '30d', '90d'] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              style={{
+                padding: '5px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                border: 'none',
+                cursor: 'pointer',
+                background: period === p ? 'var(--brand)' : 'transparent',
+                color: period === p ? '#fff' : 'var(--text-muted)',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI grid — 4 columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {kpis.map((kpi) => (
-          <Card
-            key={kpi.title}
-            className="transition-transform hover:shadow-md hover:-translate-y-0.5"
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
-              <kpi.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpi.value}</div>
-              <p className="text-xs text-muted-foreground">{kpi.description}</p>
-            </CardContent>
-          </Card>
+          <KpiCard key={kpi.label} {...kpi} />
         ))}
       </div>
 
-      <CalendarView role={effectiveRole ?? null} isAdmin={user?.role === 'ADMIN'} />
+      {/* 3-col content row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: 12 }}>
 
-      <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
-              <CardDescription>
-                Last 5 orders {isSupplier ? 'from your customers' : 'you placed'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={recentOrderData}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="amountGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
-                    <Tooltip cursor={{ stroke: '#6366f1', strokeWidth: 1 }} />
-                    <Area
-                      type="monotone"
-                      dataKey="amount"
-                      stroke="#6366f1"
-                      fillOpacity={1}
-                      fill="url(#amountGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="divide-y">
-                {recentOrders?.orders?.length ? (
-                  recentOrders.orders.map((o: any) => (
-                    <a
-                      key={o.id}
-                      href={`/app/orders/${o.id}`}
-                      className="flex items-center justify-between py-3 hover:bg-gray-50 rounded-md px-2 transition-colors"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">Order #{o.id.slice(0, 8)}</p>
-                        <p className="text-xs text-gray-500">{o.status}</p>
-                      </div>
-                      <div className="text-sm font-semibold">
-                        {formatCurrency(o.total_amount)}
-                      </div>
-                    </a>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground py-2">No recent orders</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* Col 1 — Recent Orders */}
+        <SectionCard
+          title="Recent Orders"
+          action={
+            <Link
+              to="/app/orders"
+              style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}
+            >
+              View all →
+            </Link>
+          }
+        >
+          {/* Mini bar chart */}
+          {orders.length > 0 && (
+            <div style={{ height: 48, marginBottom: 10 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={orders.slice(0, 7).map((o: any, i: number) => ({
+                    name: `#${i + 1}`,
+                    v: Number(o.total_amount) || 0,
+                  }))}
+                  margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+                  barSize={16}
+                >
+                  <Bar dataKey="v" fill="var(--brand-mid)" radius={[3, 3, 0, 0]} opacity={0.7} />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--surface)',
+                      border: '1px solid var(--app-border)',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      color: 'var(--text)',
+                    }}
+                    formatter={(v: any) => [formatCurrency(v), 'Amount']}
+                    labelFormatter={() => ''}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Status</CardTitle>
-              <CardDescription>Pending vs Completed</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={statusPieData}
-                      dataKey="value"
-                      nameKey="name"
-                      outerRadius={80}
-                      innerRadius={48}
-                      paddingAngle={2}
+          {/* Order list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {orders.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+                No recent orders
+              </p>
+            ) : (
+              orders.slice(0, 3).map((o: any) => (
+                <Link
+                  key={o.id}
+                  to={`/app/orders/${o.id}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 4px',
+                    borderBottom: '1px solid var(--app-border)',
+                    textDecoration: 'none',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: 'var(--text)',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        whiteSpace: 'nowrap',
+                      }}
                     >
-                      {statusPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                {statusPieData.map((s) => (
-                  <div key={s.name} className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: s.color }}
-                    ></span>
-                    <span className="text-gray-600">{s.name}</span>
-                    <span className="ml-auto font-medium">{s.value}</span>
+                      #{o.id.slice(0, 8).toUpperCase()}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--text-muted)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        marginTop: 1,
+                      }}
+                    >
+                      {isSupplier
+                        ? o.restaurant_name || o.restaurantName || 'Customer'
+                        : `From: ${o.supplier_name || o.supplierName || 'Supplier'}`}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                      {formatCurrency(o.total_amount)}
+                    </span>
+                    <StatusChip status={o.status} />
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </SectionCard>
 
-          {isRestaurant && spendTrend.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Spend Trend</CardTitle>
-                <CardDescription>Last 30 days</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={spendTrend}
-                      margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+        {/* Col 2 — Supplier: order status bars | Restaurant: spend trend */}
+        {isSupplier ? (
+          <SectionCard title="Order Status">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
+              {[
+                { label: 'Completed', value: stats?.completedOrders ?? 0, color: 'var(--mint-mid)' },
+                { label: 'Pending', value: stats?.pendingOrders ?? 0, color: 'var(--amber-mid)' },
+                { label: 'Processing', value: Math.max(0, (stats?.totalOrders ?? 0) - (stats?.completedOrders ?? 0) - (stats?.pendingOrders ?? 0)), color: 'var(--brand-mid)' },
+              ].map(({ label, value, color }) => {
+                const total = stats?.totalOrders || 1
+                const pct = Math.round((value / total) * 100)
+                return (
+                  <div key={label}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+                        <span style={{ fontSize: 12, color: 'var(--text-mid)', fontWeight: 500 }}>
+                          {label}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                        {value}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 5,
+                        background: 'var(--brand-ultra)',
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                      }}
                     >
-                      <defs>
-                        <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                      <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                      <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
-                      <Tooltip />
-                      <Area
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#8b5cf6"
-                        fillOpacity={1}
-                        fill="url(#spendGradient)"
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${pct}%`,
+                          background: color,
+                          borderRadius: 4,
+                          transition: 'width 0.4s ease',
+                        }}
                       />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    </div>
+                  </div>
+                )
+              })}
 
-          {isSupplier && categoryDist.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Categories</CardTitle>
-                <CardDescription>Top distribution</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={categoryDist}
-                      layout="vertical"
-                      margin={{ top: 10, right: 10, left: 20, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                      <XAxis type="number" hide />
-                      <YAxis type="category" dataKey="name" width={120} />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#06b6d4" radius={[0, 6, 6, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Orders Trend</CardTitle>
-              <CardDescription>Amounts over recent orders</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48">
+              <div
+                style={{
+                  marginTop: 8,
+                  paddingTop: 10,
+                  borderTop: '1px solid var(--app-border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total orders</span>
+                <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>
+                  {stats?.totalOrders ?? 0}
+                </span>
+              </div>
+            </div>
+          </SectionCard>
+        ) : (
+          <SectionCard title="Spend Trend" action={
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>30 days</span>
+          }>
+            {spendTrend.length > 0 ? (
+              <div style={{ height: 120 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={ordersTrendData}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  <BarChart
+                    data={spendTrend}
+                    margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+                    barSize={4}
                   >
-                    <defs>
-                      <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={48} />
-                    <Tooltip />
-                    <Area
-                      type="monotone"
-                      dataKey="amount"
-                      stroke="#22c55e"
-                      fillOpacity={1}
-                      fill="url(#ordersGradient)"
+                    <Bar dataKey="value" fill="var(--brand-mid)" radius={[2, 2, 0, 0]} opacity={0.75} />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'var(--surface)',
+                        border: '1px solid var(--app-border)',
+                        borderRadius: 6,
+                        fontSize: 11,
+                        color: 'var(--text)',
+                      }}
+                      formatter={(v: any) => [formatCurrency(v), 'Spend']}
                     />
-                  </AreaChart>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
+            ) : (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '32px 0' }}>
+                No spend data yet
+              </p>
+            )}
+            <div
+              style={{
+                marginTop: 8,
+                paddingTop: 10,
+                borderTop: '1px solid var(--app-border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total spent</span>
+              <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>
+                {typeof stats?.totalSpent === 'number' ? formatCurrency(stats.totalSpent) : '$0'}
+              </span>
+            </div>
+          </SectionCard>
+        )}
 
-          {isRestaurant && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Reorder Suggestions</CardTitle>
-                <CardDescription>Top items predicted to run low</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y">
-                  {reorderSuggestions?.suggestions?.length ? (
-                    reorderSuggestions.suggestions.slice(0, 5).map((s: any) => {
-                      const qty =
-                        s.suggested_reorder_qty ??
-                        Math.max(1, Math.ceil(s.avg_daily_usage_30day * 3))
-                      const isAdding = addingSuggestionId === s.id
-                      const handleAddToQuickList = async () => {
-                        const lists = quickListsData?.quickLists || []
-                        if (lists.length === 0) {
-                          toast.error('Create a quick list first')
-                          return
-                        }
-                        setAddingSuggestionId(s.id)
-                        try {
-                          await addItemToQuickList({
-                            quickListId: lists[0].id,
-                            body: {
-                              productId: s.product_id,
-                              supplierId: s.supplier_id,
-                              quantity: qty,
-                            },
-                          }).unwrap()
-                          toast.success(`Added ${s.product_name} (${qty}) to ${lists[0].name}`)
-                        } catch (e: any) {
-                          toast.error(e?.data?.error?.message || 'Failed to add to quick list')
-                        } finally {
-                          setAddingSuggestionId(null)
-                        }
-                      }
-                      return (
-                        <div key={s.id} className="flex items-center justify-between py-3">
-                          <div>
-                            <p className="text-sm font-medium">{s.product_name}</p>
-                            <p className="text-xs text-gray-500">
-                              Current: {s.current_qty} • Suggested: {qty}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-primary hover:underline"
-                            disabled={isAdding}
-                            onClick={handleAddToQuickList}
-                          >
-                            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                            Add to Quick List
-                          </Button>
+        {/* Col 3 — Reorder Alerts */}
+        <SectionCard
+          title="Reorder Alerts"
+          action={
+            isRestaurant && (reorderSuggestions?.suggestions?.length ?? 0) > 0 ? (
+              <Link
+                to="/app/quick-lists"
+                style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}
+              >
+                Add all →
+              </Link>
+            ) : undefined
+          }
+        >
+          {isRestaurant ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {(reorderSuggestions?.suggestions?.length ?? 0) === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+                  No reorder suggestions
+                </p>
+              ) : (
+                reorderSuggestions!.suggestions.slice(0, 3).map((s: any, idx: number) => {
+                  const qty =
+                    s.suggested_reorder_qty ??
+                    Math.max(1, Math.ceil(s.avg_daily_usage_30day * 3))
+                  const urgencyColor =
+                    idx === 0 ? 'var(--red)' : idx === 1 ? 'var(--amber)' : 'var(--mint-mid)'
+                  const isAdding = addingSuggestionId === s.id
+
+                  const handleAdd = async () => {
+                    const lists = quickListsData?.quickLists || []
+                    if (lists.length === 0) {
+                      toast.error('Create a quick list first')
+                      return
+                    }
+                    setAddingSuggestionId(s.id)
+                    try {
+                      await addItemToQuickList({
+                        quickListId: lists[0].id,
+                        body: { productId: s.product_id, supplierId: s.supplier_id, quantity: qty },
+                      }).unwrap()
+                      toast.success(`Added ${s.product_name} (${qty}) to ${lists[0].name}`)
+                    } catch (e: any) {
+                      toast.error(e?.data?.error?.message || 'Failed to add to quick list')
+                    } finally {
+                      setAddingSuggestionId(null)
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '8px 0',
+                        borderBottom: '1px solid var(--app-border)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 4,
+                          height: 36,
+                          borderRadius: '0 2px 2px 0',
+                          background: urgencyColor,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: 'var(--text)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {s.product_name}
                         </div>
-                      )
-                    })
-                  ) : (
-                    <p className="text-sm text-muted-foreground py-2">No suggestions available</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                          Current: {s.current_qty} · Suggest: {qty}
+                        </div>
+                      </div>
+                      <button
+                        disabled={isAdding}
+                        onClick={handleAdd}
+                        style={{
+                          background: 'var(--brand-pale)',
+                          color: 'var(--brand)',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '4px 8px',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: isAdding ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {isAdding ? <Loader2 size={11} className="animate-spin" /> : '+ Add'}
+                      </button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <Package size={24} style={{ color: 'var(--brand-light)', margin: '0 auto 8px' }} />
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                Reorder alerts available for restaurants
+              </p>
+            </div>
           )}
-        </div>
+        </SectionCard>
+      </div>
+
+      {/* Calendar row */}
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--app-border)',
+          borderRadius: 12,
+          overflow: 'hidden',
+        }}
+      >
+        <CalendarView role={effectiveRole ?? null} isAdmin={user?.role === 'ADMIN'} />
       </div>
     </div>
   )

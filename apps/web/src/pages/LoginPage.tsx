@@ -6,7 +6,6 @@ import { Badge } from '../components/ui/badge'
 import {
   Loader2,
   LogIn,
-  Store,
   ShoppingCart,
   Truck,
   Shield,
@@ -15,6 +14,7 @@ import {
   BarChart3,
   CheckCircle2,
 } from 'lucide-react'
+import { SupplifyLogo } from '../components/SupplifyLogo'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -52,89 +52,92 @@ export function LoginPage() {
       role: 'Admin',
       email: 'admin@supplify.com',
       password: 'SupplifyAdmin1!',
-      color: 'bg-purple-100 text-purple-800',
+      bg: 'var(--brand-pale)',
+      color: 'var(--brand-mid)',
     },
     {
       role: 'Supplier',
       email: 'supplier@supplify.com',
       password: 'SupplifySupplier1!',
-      color: 'bg-blue-100 text-blue-800',
+      bg: 'var(--brand-pale)',
+      color: 'var(--brand-mid)',
     },
     {
       role: 'Restaurant',
       email: 'restaurant@supplify.com',
       password: 'SupplifyRestaurant1!',
-      color: 'bg-green-100 text-green-800',
+      bg: 'var(--mint-pale)',
+      color: 'var(--mint)',
     },
   ]
 
   return (
     <div className="min-h-screen flex">
       {/* Left side - Branding and Features */}
-      <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-white p-12 flex-col justify-between">
+      <div
+        className="hidden lg:flex lg:flex-1 text-white p-12 flex-col justify-between"
+        style={{ background: 'linear-gradient(145deg, #5b21b6 0%, #4c1d95 50%, #1e0b3a 100%)' }}
+      >
         <div>
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-              <Store className="w-7 h-7" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold">Supplify</h1>
-              <p className="text-primary-foreground/80 text-sm">Food & Beverage Marketplace</p>
-            </div>
+          <div className="mb-10">
+            <SupplifyLogo size={48} variant="lockup" theme="dark" tagline={true} />
           </div>
 
-          <h2 className="text-4xl font-bold mb-4">Connect. Order. Grow.</h2>
-          <p className="text-xl text-primary-foreground/90 mb-12 max-w-md">
-            The premier platform connecting restaurants with trusted F&B suppliers. Streamline your
-            operations, reduce costs, and scale your business.
+          <h2 style={{ fontSize: 40, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 16, lineHeight: 1.1 }}>
+            Connect.<br />Order.<br />Grow.
+          </h2>
+          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.75)', maxWidth: 360, lineHeight: 1.6 }}>
+            The platform connecting restaurants with trusted F&amp;B suppliers. Streamline operations,
+            reduce costs, scale your business.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 max-w-lg">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, maxWidth: 420 }}>
           {features.map((feature, idx) => (
             <div
               key={idx}
-              className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20"
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                backdropFilter: 'blur(8px)',
+                borderRadius: 12,
+                padding: '14px 16px',
+                border: '1px solid rgba(255,255,255,0.12)',
+              }}
             >
-              <feature.icon className="w-6 h-6 mb-2" />
-              <h3 className="font-semibold mb-1">{feature.title}</h3>
-              <p className="text-sm text-primary-foreground/80">{feature.desc}</p>
+              <feature.icon style={{ width: 20, height: 20, marginBottom: 8, color: '#a78bfa' }} />
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>{feature.title}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{feature.desc}</div>
             </div>
           ))}
         </div>
 
-        <div className="flex items-center space-x-2 text-primary-foreground/80 text-sm mt-8">
-          <CheckCircle2 className="w-4 h-4" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 24 }}>
+          <CheckCircle2 style={{ width: 14, height: 14, color: '#10b981' }} />
           <span>Trusted by 100+ restaurants and suppliers</span>
         </div>
       </div>
 
       {/* Right side - Login Form */}
       <div
-        className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-gray-50 via-white to-gray-50"
+        className="flex-1 flex items-center justify-center p-8"
+        style={{ background: 'var(--bg)' }}
         data-testid="login-page"
       >
         <div className="w-full max-w-md space-y-8">
           {/* Mobile Logo */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="flex items-center justify-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                <Store className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Supplify</h1>
-                <p className="text-sm text-gray-600">F&B Marketplace</p>
-              </div>
-            </div>
+          <div className="lg:hidden flex justify-center mb-8">
+            <SupplifyLogo size={44} variant="lockup" theme="light" tagline={true} />
           </div>
 
-          <Card className="border-2 shadow-xl">
+          <Card style={{ border: '1px solid var(--app-border)', boxShadow: '0 8px 32px rgba(91,33,182,0.10)' }}>
             <CardHeader className="space-y-1 pb-4">
-              <div className="flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mx-auto mb-4">
-                <LogIn className="w-8 h-8 text-primary" />
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                <SupplifyLogo size={56} variant="mark" />
               </div>
-              <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
-              <CardDescription className="text-center">
+              <CardTitle className="text-2xl text-center" style={{ color: 'var(--text)', fontWeight: 900, letterSpacing: '-0.02em' }}>
+                Welcome back
+              </CardTitle>
+              <CardDescription className="text-center" style={{ color: 'var(--text-muted)' }}>
                 Sign in to access your account and start managing your orders
               </CardDescription>
             </CardHeader>
@@ -149,8 +152,9 @@ export function LoginPage() {
                 data-testid="login-button"
                 onClick={handleLogin}
                 disabled={isLoading}
-                className="w-full h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all"
+                className="w-full h-12 text-base font-semibold transition-all"
                 size="lg"
+                style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}
               >
                 {isLoading ? (
                   <>
@@ -165,13 +169,13 @@ export function LoginPage() {
                 )}
               </Button>
 
-              <p className="text-center text-sm text-muted-foreground">
+              <p className="text-center text-sm text-[var(--text-muted)]">
                 Don&apos;t have an account?{' '}
                 <button
                   type="button"
                   onClick={handleSignup}
                   disabled={isLoading}
-                  className="font-medium text-primary hover:underline"
+                  className="font-medium text-[var(--brand-mid)] hover:underline"
                 >
                   Create account
                 </button>
@@ -182,36 +186,59 @@ export function LoginPage() {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">Demo Accounts</span>
+                  <span className="bg-card px-2 text-[var(--text-muted)]">Demo Accounts</span>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <p className="text-xs text-center text-muted-foreground mb-4">
+                <p className="text-xs text-center text-[var(--text-muted)] mb-4">
                   Try these demo accounts to explore different roles
                 </p>
                 {demoAccounts.map((account, idx) => (
                   <div
                     key={idx}
-                    className={`p-3 rounded-lg border ${account.color} border-current/20`}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      background: account.bg,
+                      border: `1px solid ${account.color}33`,
+                    }}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <Badge variant="outline" className="text-xs font-semibold">
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: account.color,
+                          background: 'white',
+                          borderRadius: 4,
+                          padding: '2px 7px',
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
                         {account.role}
-                      </Badge>
+                      </span>
                     </div>
-                    <div className="text-xs space-y-1 mt-2">
-                      <p className="font-mono">{account.email}</p>
-                      <p className="opacity-75">
-                        Password: <span className="font-mono">{account.password}</span>
-                      </p>
+                    <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span
+                        style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}
+                      >
+                        {account.email}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Password:{' '}
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                          {account.password}
+                        </span>
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
 
               <div className="pt-4 border-t">
-                <div className="flex items-center justify-center space-x-6 text-xs text-muted-foreground">
+                <div className="flex items-center justify-center space-x-6 text-xs text-[var(--text-muted)]">
                   <div className="flex items-center space-x-1">
                     <Shield className="w-3 h-3" />
                     <span>Secure</span>
@@ -229,7 +256,7 @@ export function LoginPage() {
             </CardContent>
           </Card>
 
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-[var(--text-muted)]">
             By signing in, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>

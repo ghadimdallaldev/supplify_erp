@@ -208,7 +208,7 @@ export function InvoicesPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--brand-mid)]" />
       </div>
     )
   }
@@ -217,8 +217,8 @@ export function InvoicesPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Invoice Dashboard</h1>
-          <p className="text-gray-600 mt-2">Manage billing, payments, and financial analytics</p>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Invoice Dashboard</h1>
+          <p className="text-[var(--text-muted)] mt-2">Manage billing, payments, and financial analytics</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => refetch()}>
@@ -234,13 +234,13 @@ export function InvoicesPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Invoices</p>
+                <p className="text-sm text-[var(--text-muted)]">Total Invoices</p>
                 <p className="text-2xl font-bold">{stats.total}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[var(--text-muted)] mt-1">
                   {analytics.issued_count || 0} issued • {analytics.partial_count || 0} partial
                 </p>
               </div>
-              <FileText className="h-10 w-10 text-blue-500" />
+              <FileText className="h-10 w-10 text-[var(--brand-mid)]" />
             </div>
           </CardContent>
         </Card>
@@ -249,35 +249,35 @@ export function InvoicesPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Outstanding</p>
-                <p className="text-2xl font-bold text-orange-600">
+                <p className="text-sm text-[var(--text-muted)]">Outstanding</p>
+                <p className="text-2xl font-bold text-[var(--amber)]">
                   {formatPrice(stats.totalOutstanding)}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[var(--text-muted)] mt-1">
                   {stats.unpaid} unpaid invoices
                 </p>
               </div>
-              <Clock className="h-10 w-10 text-orange-500" />
+              <Clock className="h-10 w-10 text-[var(--amber-mid)]" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className={stats.overdue > 0 ? 'border-red-300' : ''}>
+        <Card className={stats.overdue > 0 ? 'border-[var(--red)]/40' : ''}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">
+                <p className="text-sm text-[var(--text-muted)]">Overdue</p>
+                <p className="text-2xl font-bold text-[var(--red)]">
                   {stats.overdue}
                 </p>
-                <p className="text-xs text-red-600 mt-1">
+                <p className="text-xs text-[var(--red)] mt-1">
                   {overdueData?.summary?.totalOverdue 
                     ? formatPrice(overdueData.summary.totalOverdue)
                     : 'All current'
                   }
                 </p>
               </div>
-              <AlertTriangle className="h-10 w-10 text-red-500" />
+              <AlertTriangle className="h-10 w-10 text-[var(--red)]" />
             </div>
           </CardContent>
         </Card>
@@ -286,15 +286,15 @@ export function InvoicesPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Paid</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-sm text-[var(--text-muted)]">Total Paid</p>
+                <p className="text-2xl font-bold text-[var(--mint)]">
                   {formatPrice(stats.totalPaid)}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[var(--text-muted)] mt-1">
                   {analytics.paid_count || 0} paid invoices
                 </p>
               </div>
-              <CheckCircle className="h-10 w-10 text-green-500" />
+              <CheckCircle className="h-10 w-10 text-[var(--mint)]" />
             </div>
           </CardContent>
         </Card>
@@ -307,7 +307,7 @@ export function InvoicesPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Avg Days to Pay</p>
+                  <p className="text-sm text-[var(--text-muted)]">Avg Days to Pay</p>
                   <p className="text-xl font-semibold">
                     {analytics.avg_days_to_pay 
                       ? `${parseInt(analytics.avg_days_to_pay)} days`
@@ -315,7 +315,7 @@ export function InvoicesPage() {
                     }
                   </p>
                 </div>
-                <Calendar className="h-8 w-8 text-gray-400" />
+                <Calendar className="h-8 w-8 text-[var(--text-muted)]" />
               </div>
             </CardContent>
           </Card>
@@ -324,12 +324,12 @@ export function InvoicesPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Paid (30d)</p>
-                  <p className="text-xl font-semibold text-green-600">
+                  <p className="text-sm text-[var(--text-muted)]">Total Paid (30d)</p>
+                  <p className="text-xl font-semibold text-[var(--mint)]">
                     {formatPrice(analytics.total_paid_amount)}
                   </p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-green-400" />
+                <TrendingUp className="h-8 w-8 text-[var(--mint)]" />
               </div>
             </CardContent>
           </Card>
@@ -338,12 +338,12 @@ export function InvoicesPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Outstanding (30d)</p>
-                  <p className="text-xl font-semibold text-orange-600">
+                  <p className="text-sm text-[var(--text-muted)]">Outstanding (30d)</p>
+                  <p className="text-xl font-semibold text-[var(--amber)]">
                     {formatPrice(analytics.total_outstanding)}
                   </p>
                 </div>
-                <TrendingDown className="h-8 w-8 text-orange-400" />
+                <TrendingDown className="h-8 w-8 text-[var(--amber-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -357,7 +357,7 @@ export function InvoicesPage() {
             <CardTitle>Invoice List</CardTitle>
             <div className="flex gap-2">
               <div className="flex items-center gap-2 border rounded-md px-3 py-1">
-                <Search className="h-4 w-4 text-gray-400" />
+                <Search className="h-4 w-4 text-[var(--text-muted)]" />
                 <input
                   type="text"
                   placeholder="Search invoices..."
@@ -399,7 +399,7 @@ export function InvoicesPage() {
                 <div
                   key={invoice.id}
                   className={`border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
-                    isOverdue ? 'border-red-200 bg-red-50' : ''
+                    isOverdue ? 'border-[var(--red)]/30 bg-[var(--red-pale)]' : ''
                   }`}
                   onClick={() => {
                     setSelectedInvoice(invoice)
@@ -421,15 +421,15 @@ export function InvoicesPage() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600 font-medium">{invoice.supplier_name}</p>
-                      <div className="flex gap-4 text-xs text-gray-500 mt-2">
+                      <p className="text-sm text-[var(--text-muted)] font-medium">{invoice.supplier_name}</p>
+                      <div className="flex gap-4 text-xs text-[var(--text-muted)] mt-2">
                         <span>Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
                         <span>Due Date: {new Date(invoice.due_date).toLocaleDateString()}</span>
                         {invoice.order_id && (
                           <Link 
                             to={`/app/orders/${invoice.order_id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="text-blue-600 hover:underline flex items-center gap-1"
+                            className="text-[var(--brand-mid)] hover:underline flex items-center gap-1"
                           >
                             <Receipt className="h-3 w-3" />
                             Order #{invoice.order_id.slice(0, 8)}
@@ -439,11 +439,11 @@ export function InvoicesPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-semibold">{formatPrice(invoice.total_amount)}</p>
-                      <p className={`text-sm ${remaining > 0 ? 'text-red-600 font-semibold' : 'text-green-600'}`}>
+                      <p className={`text-sm ${remaining > 0 ? 'text-[var(--red)] font-semibold' : 'text-[var(--mint)]'}`}>
                         Balance: {formatPrice(remaining)}
                       </p>
                       {parseFloat(invoice.total_paid || 0) > 0 && (
-                        <p className="text-xs text-green-600">
+                        <p className="text-xs text-[var(--mint)]">
                           Paid: {formatPrice(invoice.total_paid)}
                         </p>
                       )}
@@ -469,9 +469,9 @@ export function InvoicesPage() {
 
             {filteredInvoices.length === 0 && (
               <div className="text-center py-12">
-                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg font-semibold text-gray-900 mb-2">No invoices found</p>
-                <p className="text-gray-600">Try adjusting your filters</p>
+                <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+                <p className="text-lg font-semibold text-[var(--text)] mb-2">No invoices found</p>
+                <p className="text-[var(--text-muted)]">Try adjusting your filters</p>
               </div>
             )}
           </div>
@@ -549,7 +549,7 @@ export function InvoicesPage() {
               <TabsContent value="details" className="space-y-6">
                 {isLoadingDetail ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <Loader2 className="h-8 w-8 animate-spin text-[var(--brand-mid)]" />
                   </div>
                 ) : invoiceDetail?.invoice ? (
                   <>
@@ -559,26 +559,26 @@ export function InvoicesPage() {
                         <h3 className="font-semibold mb-2">Bill From:</h3>
                         <p className="font-medium">{invoiceDetail.invoice.supplier_name}</p>
                         {invoiceDetail.invoice.supplier_address && (
-                          <p className="text-sm text-gray-600 mt-1">{invoiceDetail.invoice.supplier_address}</p>
+                          <p className="text-sm text-[var(--text-muted)] mt-1">{invoiceDetail.invoice.supplier_address}</p>
                         )}
                         {invoiceDetail.invoice.supplier_phone && (
-                          <p className="text-sm text-gray-600">{invoiceDetail.invoice.supplier_phone}</p>
+                          <p className="text-sm text-[var(--text-muted)]">{invoiceDetail.invoice.supplier_phone}</p>
                         )}
                         {invoiceDetail.invoice.supplier_email && (
-                          <p className="text-sm text-gray-600">{invoiceDetail.invoice.supplier_email}</p>
+                          <p className="text-sm text-[var(--text-muted)]">{invoiceDetail.invoice.supplier_email}</p>
                         )}
                       </div>
                       <div className="text-right">
                         <div className="space-y-3">
                           <div>
-                            <p className="text-sm text-gray-600">Invoice Date</p>
+                            <p className="text-sm text-[var(--text-muted)]">Invoice Date</p>
                             <p className="font-semibold">{new Date(invoiceDetail.invoice.invoice_date).toLocaleDateString()}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600">Due Date</p>
+                            <p className="text-sm text-[var(--text-muted)]">Due Date</p>
                             <p className={`font-semibold ${
                               new Date(invoiceDetail.invoice.due_date) < new Date() && remainingBalance > 0
-                                ? 'text-red-600'
+                                ? 'text-[var(--red)]'
                                 : ''
                             }`}>
                               {new Date(invoiceDetail.invoice.due_date).toLocaleDateString()}
@@ -586,10 +586,10 @@ export function InvoicesPage() {
                           </div>
                           {invoiceDetail.invoice.order_id && (
                             <div>
-                              <p className="text-sm text-gray-600">Order</p>
+                              <p className="text-sm text-[var(--text-muted)]">Order</p>
                               <Link 
                                 to={`/app/orders/${invoiceDetail.invoice.order_id}`}
-                                className="font-semibold text-blue-600 hover:underline"
+                                className="font-semibold text-[var(--brand-mid)] hover:underline"
                               >
                                 #{invoiceDetail.invoice.order_id.slice(0, 8)}
                               </Link>
@@ -604,7 +604,7 @@ export function InvoicesPage() {
                       <h3 className="font-semibold mb-4">Line Items</h3>
                       <div className="border rounded-lg overflow-hidden">
                         <table className="w-full">
-                          <thead className="bg-gray-50">
+                          <thead className="bg-[var(--brand-ultra)]">
                             <tr>
                               <th className="text-left py-3 px-4 text-sm font-medium">Product</th>
                               <th className="text-left py-3 px-4 text-sm font-medium">SKU</th>
@@ -616,14 +616,14 @@ export function InvoicesPage() {
                           </thead>
                           <tbody>
                             {invoiceDetail.lineItems?.map((item: any) => (
-                              <tr key={item.id} className="border-b hover:bg-gray-50">
+                              <tr key={item.id} className="border-b hover:bg-[var(--brand-ultra)]">
                                 <td className="py-3 px-4">{item.description}</td>
-                                <td className="py-3 px-4 text-sm text-gray-600">{item.sku || 'N/A'}</td>
+                                <td className="py-3 px-4 text-sm text-[var(--text-muted)]">{item.sku || 'N/A'}</td>
                                 <td className="py-3 px-4 text-right">{item.quantity}</td>
                                 <td className="py-3 px-4 text-right">{formatPrice(item.unit_price)}</td>
                                 <td className="py-3 px-4 text-right">
                                   {parseFloat(item.tax_amount || 0) > 0 && (
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-[var(--text-muted)]">
                                       {formatPrice(item.tax_amount)}
                                       {item.tax_rate && ` (${item.tax_rate}%)`}
                                     </span>
@@ -641,14 +641,14 @@ export function InvoicesPage() {
 
                     {/* Totals */}
                     <div className="ml-auto w-80">
-                      <div className="space-y-2 border rounded-lg p-4 bg-gray-50">
+                      <div className="space-y-2 border rounded-lg p-4 bg-[var(--brand-ultra)]">
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Subtotal</span>
+                          <span className="text-[var(--text-muted)]">Subtotal</span>
                           <span>{formatPrice(invoiceDetail.invoice.subtotal)}</span>
                         </div>
                         {parseFloat(invoiceDetail.invoice.tax_amount || 0) > 0 && (
                           <div className="flex justify-between">
-                            <span className="text-gray-600">
+                            <span className="text-[var(--text-muted)]">
                               Tax {invoiceDetail.invoice.tax_rate ? `(${invoiceDetail.invoice.tax_rate}%)` : ''}
                             </span>
                             <span>{formatPrice(invoiceDetail.invoice.tax_amount)}</span>
@@ -659,19 +659,19 @@ export function InvoicesPage() {
                           <span>{formatPrice(invoiceDetail.invoice.total_amount)}</span>
                         </div>
                         {parseFloat(invoiceDetail.invoice.total_paid || 0) > 0 && (
-                          <div className="flex justify-between text-green-600 border-t pt-2 mt-2">
+                          <div className="flex justify-between text-[var(--mint)] border-t pt-2 mt-2">
                             <span>Paid</span>
                             <span>-{formatPrice(invoiceDetail.invoice.total_paid)}</span>
                           </div>
                         )}
                         {remainingBalance > 0 && (
-                          <div className="flex justify-between font-semibold text-lg text-red-600 border-t pt-2 mt-2">
+                          <div className="flex justify-between font-semibold text-lg text-[var(--red)] border-t pt-2 mt-2">
                             <span>Balance Due</span>
                             <span>{formatPrice(remainingBalance)}</span>
                           </div>
                         )}
                         {remainingBalance === 0 && (
-                          <div className="flex justify-between font-semibold text-lg text-green-600 border-t pt-2 mt-2">
+                          <div className="flex justify-between font-semibold text-lg text-[var(--mint)] border-t pt-2 mt-2">
                             <span>Status</span>
                             <span>Fully Paid</span>
                           </div>
@@ -680,9 +680,9 @@ export function InvoicesPage() {
                     </div>
 
                     {invoiceDetail.invoice.notes && (
-                      <div className="border rounded-lg p-4 bg-blue-50">
-                        <p className="text-sm font-medium text-blue-900 mb-1">Notes</p>
-                        <p className="text-sm text-blue-800">{invoiceDetail.invoice.notes}</p>
+                      <div className="border rounded-lg p-4 bg-[var(--brand-ultra)]">
+                        <p className="text-sm font-medium text-[var(--text-mid)] mb-1">Notes</p>
+                        <p className="text-sm text-[var(--text-muted)]">{invoiceDetail.invoice.notes}</p>
                       </div>
                     )}
                   </>
@@ -699,24 +699,24 @@ export function InvoicesPage() {
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="font-medium">{payment.payment_method}</p>
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-[var(--text-muted)]">
                                 {new Date(payment.payment_date).toLocaleDateString()} • 
                                 {payment.payment_number && ` ${payment.payment_number}`}
                               </p>
                               {payment.payment_reference && (
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-[var(--text-muted)] mt-1">
                                   Reference: {payment.payment_reference}
                                 </p>
                               )}
                               {payment.notes && (
-                                <p className="text-xs text-gray-500 mt-1">{payment.notes}</p>
+                                <p className="text-xs text-[var(--text-muted)] mt-1">{payment.notes}</p>
                               )}
                               {payment.bank_name && (
-                                <p className="text-xs text-gray-500">Bank: {payment.bank_name}</p>
+                                <p className="text-xs text-[var(--text-muted)]">Bank: {payment.bank_name}</p>
                               )}
                             </div>
                             <div className="text-right">
-                              <p className="text-lg font-semibold text-green-600">
+                              <p className="text-lg font-semibold text-[var(--mint)]">
                                 {formatPrice(payment.payment_amount)}
                               </p>
                               <Badge variant="outline" className="mt-1">
@@ -728,16 +728,16 @@ export function InvoicesPage() {
                       </Card>
                     ))}
                     {isRestaurant && remainingBalance > 0 && (
-                      <div className="border-2 border-orange-300 rounded-lg p-4 bg-orange-50">
+                      <div className="border-2 border-[var(--amber-mid)]/40 rounded-lg p-4 bg-[var(--amber-pale)]">
                         <div className="flex justify-between items-center">
                           <div>
-                            <p className="font-medium text-orange-900">Outstanding Balance</p>
-                            <p className="text-sm text-orange-700">
+                            <p className="font-medium text-[var(--amber)]">Outstanding Balance</p>
+                            <p className="text-sm text-[var(--amber)]">
                               Due {new Date(selectedInvoice.due_date).toLocaleDateString()}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-bold text-red-600">
+                            <p className="text-2xl font-bold text-[var(--red)]">
                               {formatPrice(remainingBalance)}
                             </p>
                           </div>
@@ -746,9 +746,9 @@ export function InvoicesPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="border rounded-lg p-8 text-center bg-gray-50">
-                    <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-600">No payments recorded yet</p>
+                  <div className="border rounded-lg p-8 text-center bg-[var(--brand-ultra)]">
+                    <CreditCard className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
+                    <p className="text-[var(--text-muted)]">No payments recorded yet</p>
                     {isRestaurant && remainingBalance > 0 && (
                       <Button 
                         className="mt-4"
@@ -780,16 +780,16 @@ export function InvoicesPage() {
                       <CardContent className="pt-4">
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Order ID</span>
+                            <span className="text-[var(--text-muted)]">Order ID</span>
                             <span className="font-medium">{invoiceDetail.invoice.order_id}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Order Status</span>
+                            <span className="text-[var(--text-muted)]">Order Status</span>
                             <Badge variant="outline">{invoiceDetail.invoice.order_status || 'N/A'}</Badge>
                           </div>
                           {invoiceDetail.invoice.order_placed_at && (
                             <div className="flex justify-between">
-                              <span className="text-gray-600">Placed</span>
+                              <span className="text-[var(--text-muted)]">Placed</span>
                               <span>{new Date(invoiceDetail.invoice.order_placed_at).toLocaleDateString()}</span>
                             </div>
                           )}
@@ -798,7 +798,7 @@ export function InvoicesPage() {
                     </Card>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-[var(--text-muted)]">
                     <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
                     <p>No related order</p>
                   </div>
@@ -828,16 +828,16 @@ export function InvoicesPage() {
           {selectedInvoice && (
             <div className="space-y-6">
               {/* Payment Summary */}
-              <Card className="bg-blue-50 border-blue-200">
+              <Card className="bg-[var(--brand-ultra)] border-[var(--app-border)]">
                 <CardContent className="pt-4">
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="text-sm text-blue-900">Invoice {selectedInvoice.invoice_number}</p>
-                      <p className="text-sm text-blue-700">Due {new Date(selectedInvoice.due_date).toLocaleDateString()}</p>
+                      <p className="text-sm text-[var(--text)]">Invoice {selectedInvoice.invoice_number}</p>
+                      <p className="text-sm text-[var(--brand-mid)]">Due {new Date(selectedInvoice.due_date).toLocaleDateString()}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-blue-600">Remaining Balance</p>
-                      <p className="text-2xl font-bold text-blue-900">{formatPrice(remainingBalance)}</p>
+                      <p className="text-sm text-[var(--brand-mid)]">Remaining Balance</p>
+                      <p className="text-2xl font-bold text-[var(--text)]">{formatPrice(remainingBalance)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -858,8 +858,8 @@ export function InvoicesPage() {
               {/* Full Payment Mode */}
               {paymentMode === 'full' && (
                 <div className="space-y-4">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-sm text-green-800">
+                  <div className="bg-[var(--mint-pale)] border border-[var(--mint)]/35 rounded-lg p-4">
+                    <p className="text-sm text-[var(--mint)]">
                       <CheckCircle className="h-4 w-4 inline mr-2" />
                       Paying full remaining balance: <strong>{formatPrice(remainingBalance)}</strong>
                     </p>
@@ -943,7 +943,7 @@ export function InvoicesPage() {
                         }
                       }}
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-[var(--text-muted)] mt-1">
                       Remaining after payment: {formatPrice(remainingBalance - paymentAmount)}
                     </p>
                   </div>
@@ -1005,7 +1005,7 @@ export function InvoicesPage() {
 
                   {/* Credit Option in Partial Payment */}
                   {creditsData && creditNotes.length > 0 && (
-                    <div className="border rounded-lg p-4 bg-gray-50">
+                    <div className="border rounded-lg p-4 bg-[var(--brand-ultra)]">
                       <Label className="mb-2 block">Apply Credit Note (Optional)</Label>
                       <Select value={selectedCreditNoteId} onValueChange={setSelectedCreditNoteId}>
                         <SelectTrigger placeholder="Select credit note...">
@@ -1088,7 +1088,7 @@ export function InvoicesPage() {
                               }
                             }}
                           />
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-[var(--text-muted)] mt-1">
                             Available: {formatPrice(creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount)}
                           </p>
                         </div>
@@ -1113,10 +1113,10 @@ export function InvoicesPage() {
                       </div>
                     </>
                   ) : (
-                    <div className="border rounded-lg p-8 text-center bg-gray-50">
-                      <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600 mb-2">No available credit notes</p>
-                      <p className="text-xs text-gray-500">You can switch to full or partial payment instead</p>
+                    <div className="border rounded-lg p-8 text-center bg-[var(--brand-ultra)]">
+                      <CreditCard className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
+                      <p className="text-[var(--text-muted)] mb-2">No available credit notes</p>
+                      <p className="text-xs text-[var(--text-muted)]">You can switch to full or partial payment instead</p>
                     </div>
                   )}
                 </div>
@@ -1150,28 +1150,28 @@ export function InvoicesPage() {
 
               {/* Payment Summary */}
               {(paymentAmount > 0 || creditAmount > 0) && (
-                <Card className="bg-green-50 border-green-200">
+                <Card className="bg-[var(--mint-pale)] border-[var(--mint)]/35">
                   <CardContent className="pt-4">
                     <div className="space-y-2">
                       {paymentAmount > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Cash Payment</span>
+                          <span className="text-[var(--text-muted)]">Cash Payment</span>
                           <span className="font-medium">{formatPrice(paymentAmount)}</span>
                         </div>
                       )}
                       {creditAmount > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Credit Applied</span>
-                          <span className="font-medium text-green-700">{formatPrice(creditAmount)}</span>
+                          <span className="text-[var(--text-muted)]">Credit Applied</span>
+                          <span className="font-medium text-[var(--mint)]">{formatPrice(creditAmount)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-semibold text-lg border-t pt-2">
                         <span>Total Payment</span>
-                        <span className="text-green-700">{formatPrice(paymentAmount + creditAmount)}</span>
+                        <span className="text-[var(--mint)]">{formatPrice(paymentAmount + creditAmount)}</span>
                       </div>
                       <div className="flex justify-between text-sm border-t pt-2">
                         <span>New Balance</span>
-                        <span className={remainingBalance - paymentAmount - creditAmount > 0 ? 'text-orange-600' : 'text-green-600'}>
+                        <span className={remainingBalance - paymentAmount - creditAmount > 0 ? 'text-[var(--amber)]' : 'text-[var(--mint)]'}>
                           {formatPrice(remainingBalance - paymentAmount - creditAmount)}
                         </span>
                       </div>

@@ -549,11 +549,30 @@ export const api = createApi({
       }),
       invalidatesTags: ['Inventory'],
     }),
+    createInventoryAdjustment: builder.mutation<
+      any,
+      { productId: string; adjustmentType: 'IN' | 'OUT'; quantity: number; reason: string; notes?: string }
+    >({
+      query: ({ productId, ...body }) => ({
+        url: `/api/inventory/product/${productId}/adjustment`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Inventory'],
+    }),
 
     // Warehouse endpoints
     getWarehouses: builder.query<{ warehouses: any[] }, void>({
       query: () => '/api/warehouses',
       providesTags: ['Inventory'],
+    }),
+    createWarehouse: builder.mutation<{ warehouse: any }, { name: string; code?: string; address?: string; city?: string; country?: string; capacity?: number; contact_name?: string; contact_email?: string; contact_phone?: string }>({
+      query: (body) => ({
+        url: '/api/warehouses',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Inventory'],
     }),
 
     // Admin endpoints
@@ -1439,7 +1458,7 @@ export const api = createApi({
         method: 'PATCH',
         body: { mode },
       }),
-      invalidatesTags: ['AdminFeatureFlags', 'AdminTenantFeatures'],
+      invalidatesTags: ['AdminFeatureFlags', 'AdminTenantFeatures', 'Subscription'],
     }),
     getTenantFeatureOverrides: builder.query<
       { overrides: unknown[]; effectiveFeatures: EffectiveFeature[] },
@@ -1468,6 +1487,7 @@ export const api = createApi({
       }),
       invalidatesTags: (_r, _e, arg) => [
         { type: 'AdminTenantFeatures', id: `${arg.tenantType}:${arg.tenantId}` },
+        'Subscription',
       ],
     }),
     clearTenantFeatureOverride: builder.mutation<
@@ -1480,6 +1500,7 @@ export const api = createApi({
       }),
       invalidatesTags: (_r, _e, arg) => [
         { type: 'AdminTenantFeatures', id: `${arg.tenantType}:${arg.tenantId}` },
+        'Subscription',
       ],
     }),
   }),
@@ -1525,7 +1546,9 @@ export const {
   useGetInventoryListQuery,
   useGetInventoryQuery,
   useUpdateInventoryMutation,
+  useCreateInventoryAdjustmentMutation,
   useGetWarehousesQuery,
+  useCreateWarehouseMutation,
   useGetDashboardStatsQuery,
   useGetAuditLogsQuery,
   useGeneratePresignedUrlMutation,

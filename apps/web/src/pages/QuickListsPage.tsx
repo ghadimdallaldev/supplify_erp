@@ -394,7 +394,7 @@ export function QuickListsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -405,8 +405,8 @@ export function QuickListsPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Quick Lists</h1>
-          <p className="text-gray-600 mt-2">Create lists for recurring orders and save time</p>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Quick Lists</h1>
+          <p className="text-[var(--text-muted)] mt-2">Create lists for recurring orders and save time</p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
@@ -420,10 +420,10 @@ export function QuickListsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Lists</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-sm font-medium text-[var(--text-muted)]">Total Lists</p>
+                <p className="text-2xl font-bold text-[var(--text)]">{stats.total}</p>
               </div>
-              <Package className="h-8 w-8 text-blue-500" />
+              <Package className="h-8 w-8 text-[var(--brand-mid)]" />
             </div>
           </CardContent>
         </Card>
@@ -431,10 +431,10 @@ export function QuickListsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Scheduled</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.scheduled}</p>
+                <p className="text-sm font-medium text-[var(--text-muted)]">Scheduled</p>
+                <p className="text-2xl font-bold text-[var(--text)]">{stats.scheduled}</p>
               </div>
-              <Clock className="h-8 w-8 text-green-500" />
+              <Clock className="h-8 w-8 text-[var(--mint)]" />
             </div>
           </CardContent>
         </Card>
@@ -442,10 +442,10 @@ export function QuickListsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
+                <p className="text-sm font-medium text-[var(--text-muted)]">Active</p>
+                <p className="text-2xl font-bold text-[var(--text)]">{stats.active}</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-purple-500" />
+              <CheckCircle className="h-8 w-8 text-[var(--brand-mid)]" />
             </div>
           </CardContent>
         </Card>
@@ -453,10 +453,10 @@ export function QuickListsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Items</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalItems}</p>
+                <p className="text-sm font-medium text-[var(--text-muted)]">Total Items</p>
+                <p className="text-2xl font-bold text-[var(--text)]">{stats.totalItems}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-orange-500" />
+              <TrendingUp className="h-8 w-8 text-[var(--amber-mid)]" />
             </div>
           </CardContent>
         </Card>
@@ -468,7 +468,7 @@ export function QuickListsPage() {
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
                   placeholder="Search quick lists..."
                   value={listSearch}
@@ -512,9 +512,9 @@ export function QuickListsPage() {
         <Card>
           <CardContent className="pt-12 pb-12">
             <div className="text-center">
-              <List className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No quick lists yet</h3>
-              <p className="text-gray-600 mb-6">Create your first quick list to save products for recurring orders</p>
+              <List className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No quick lists yet</h3>
+              <p className="text-[var(--text-muted)] mb-6">Create your first quick list to save products for recurring orders</p>
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Quick List
@@ -526,9 +526,9 @@ export function QuickListsPage() {
         <Card>
           <CardContent className="pt-12 pb-12">
             <div className="text-center">
-              <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No lists found</h3>
-              <p className="text-gray-600 mb-6">Try adjusting your search or filter criteria</p>
+              <Search className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No lists found</h3>
+              <p className="text-[var(--text-muted)] mb-6">Try adjusting your search or filter criteria</p>
               <Button variant="outline" onClick={() => { setListSearch(''); setFilterStatus('all'); }}>
                 <X className="h-4 w-4 mr-2" />
                 Clear Filters
@@ -543,7 +543,7 @@ export function QuickListsPage() {
               {/* Scheduled Badge */}
               {list.is_scheduled && list.status === 'ACTIVE' && (
                 <div className="absolute top-4 right-4">
-                  <Badge className="bg-green-500 text-white flex items-center gap-1">
+                  <Badge className="bg-[var(--mint)] text-white flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     Scheduled
                   </Badge>
@@ -562,7 +562,7 @@ export function QuickListsPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1 pr-8">
                     <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5 text-primary" />
+                      <Package className="h-5 w-5 text-[var(--brand-mid)]" />
                       {list.name}
                     </CardTitle>
                     <CardDescription className="mt-2">
@@ -575,7 +575,7 @@ export function QuickListsPage() {
                 <div className="space-y-4">
                   {/* Items Count */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Items</span>
+                    <span className="text-sm text-[var(--text-muted)]">Items</span>
                     <Badge variant="secondary" className="text-sm font-semibold">
                       {list.item_count || 0}
                     </Badge>
@@ -584,13 +584,13 @@ export function QuickListsPage() {
                   {/* Products List */}
                   {list.items && list.items.length > 0 ? (
                     <div className="border-t pt-3 space-y-2">
-                      <p className="text-xs font-medium text-gray-600 mb-2">Products:</p>
+                      <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Products:</p>
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {list.items.slice(0, 5).map((item: any) => {
                           const product = productsData?.products?.find((p: any) => p.id === item.product_id)
                           return (
-                            <div key={item.id} className="flex items-center justify-between text-xs p-1.5 bg-gray-50 rounded">
-                              <span className="font-medium text-gray-700 flex-1 truncate">
+                            <div key={item.id} className="flex items-center justify-between text-xs p-1.5 bg-[var(--brand-ultra)] rounded">
+                              <span className="font-medium text-[var(--text-mid)] flex-1 truncate">
                                 {product?.name || item.product_name || 'Unknown Product'}
                               </span>
                               <Badge variant="outline" className="ml-2 text-xs">
@@ -600,7 +600,7 @@ export function QuickListsPage() {
                           )
                         })}
                         {list.items.length > 5 && (
-                          <p className="text-xs text-gray-500 text-center pt-1">
+                          <p className="text-xs text-[var(--text-muted)] text-center pt-1">
                             +{list.items.length - 5} more
                           </p>
                         )}
@@ -608,23 +608,23 @@ export function QuickListsPage() {
                     </div>
                   ) : (
                     <div className="border-t pt-3">
-                      <p className="text-xs text-gray-400 text-center">No products added</p>
+                      <p className="text-xs text-[var(--text-muted)] text-center">No products added</p>
                     </div>
                   )}
 
                   {/* Scheduled Info */}
                   {list.is_scheduled && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
+                    <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-3 space-y-2">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-blue-700 font-medium">Frequency:</span>
-                        <span className="text-blue-900 font-semibold">
+                        <span className="text-[var(--brand-mid)] font-medium">Frequency:</span>
+                        <span className="text-[var(--text)] font-semibold">
                           {formatFrequency(list.frequency, list.days_of_week)}
                         </span>
                       </div>
                       {list.next_execution_date && formatNextExecution(list) && (
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-blue-700 font-medium">Next:</span>
-                          <span className="text-blue-900 font-semibold flex items-center gap-1">
+                          <span className="text-[var(--brand-mid)] font-medium">Next:</span>
+                          <span className="text-[var(--text)] font-semibold flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             {formatNextExecution(list)}
                           </span>
@@ -632,8 +632,8 @@ export function QuickListsPage() {
                       )}
                       {list.last_execution_date && (
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-blue-700 font-medium">Last:</span>
-                          <span className="text-blue-900">
+                          <span className="text-[var(--brand-mid)] font-medium">Last:</span>
+                          <span className="text-[var(--text)]">
                             {new Date(list.last_execution_date).toLocaleDateString()}
                           </span>
                         </div>
@@ -687,7 +687,7 @@ export function QuickListsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleUnschedule(list.id, list.name)}
-                          className="text-orange-600 hover:text-orange-700"
+                          className="text-[var(--amber)] hover:text-[var(--amber-mid)]"
                         >
                           <Pause className="h-4 w-4" />
                         </Button>
@@ -707,14 +707,14 @@ export function QuickListsPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteList(list.id, list.name)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-[var(--red)] hover:text-[var(--red)]"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
 
                   {list.created_at && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-[var(--text-muted)]">
                       Created {new Date(list.created_at).toLocaleDateString()}
                     </p>
                   )}
@@ -757,8 +757,8 @@ export function QuickListsPage() {
               />
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
+              <p className="text-sm text-[var(--brand-mid)]">
                 💡 <strong>Tip:</strong> After creating the list, you can add products and then quickly reorder them anytime!
               </p>
             </div>
@@ -788,7 +788,7 @@ export function QuickListsPage() {
           <div className="space-y-4">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
               <Input
                 placeholder="Search products..."
                 value={productSearch}
@@ -802,12 +802,12 @@ export function QuickListsPage() {
               {filteredProducts?.map((product: any) => (
                 <div
                   key={product.id}
-                  className="flex items-center justify-between p-4 hover:bg-gray-50"
+                  className="flex items-center justify-between p-4 hover:bg-[var(--brand-ultra)]"
                 >
                   <div className="flex-1">
                     <p className="font-medium">{product.name}</p>
-                    <p className="text-sm text-gray-600">{product.sku}</p>
-                    <p className="text-sm font-semibold text-green-600">
+                    <p className="text-sm text-[var(--text-muted)]">{product.sku}</p>
+                    <p className="text-sm font-semibold text-[var(--mint)]">
                       {formatPrice(product.price)} / {product.unit}
                     </p>
                   </div>
@@ -822,7 +822,7 @@ export function QuickListsPage() {
               ))}
 
               {(!filteredProducts || filteredProducts.length === 0) && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-[var(--text-muted)]">
                   No products found
                 </div>
               )}
@@ -851,7 +851,7 @@ export function QuickListsPage() {
             <div>
               <Label>Frequency</Label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary mt-2"
+                className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] mt-2"
                 value={scheduleFrequency}
                 onChange={(e) => {
                   const newFrequency = e.target.value as any
@@ -900,10 +900,10 @@ export function QuickListsPage() {
                         key={day}
                         className={`flex items-center p-2 border rounded-md transition-colors ${
                           isSelected
-                            ? 'bg-primary text-white border-primary cursor-pointer'
+                            ? 'bg-[var(--brand)] text-white border-[var(--brand)] cursor-pointer'
                             : isDisabled
-                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                            : 'bg-white border-gray-300 hover:bg-gray-50 cursor-pointer'
+                            ? 'bg-[var(--brand-ultra)] text-[var(--text-muted)] border-[var(--app-border)] cursor-not-allowed'
+                            : 'bg-white border-[var(--app-border-mid)] hover:bg-[var(--brand-ultra)] cursor-pointer'
                         }`}
                       >
                         <input
@@ -922,13 +922,13 @@ export function QuickListsPage() {
                   })}
                 </div>
                 {scheduleDays.length === 0 && (
-                  <p className="text-sm text-red-600 mt-1">Please select at least one day</p>
+                  <p className="text-sm text-[var(--red)] mt-1">Please select at least one day</p>
                 )}
                 {scheduleFrequency === 'WEEKLY' && scheduleDays.length > 0 && (
-                  <p className="text-sm text-gray-500 mt-1">Selecting a different day will replace the current selection</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Selecting a different day will replace the current selection</p>
                 )}
                 {scheduleFrequency === 'WEEKLY_3X' && scheduleDays.length >= 3 && (
-                  <p className="text-sm text-gray-500 mt-1">Maximum of 3 days selected. Deselect a day to select a different one.</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Maximum of 3 days selected. Deselect a day to select a different one.</p>
                 )}
               </div>
             )}
@@ -956,8 +956,8 @@ export function QuickListsPage() {
               </Label>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
+              <p className="text-sm text-[var(--brand-mid)]">
                 <strong>Note:</strong> Orders will be {autoCreateOrder ? 'automatically created' : 'reminders sent'} for "{selectedListForSchedule?.name}"
                 {scheduleFrequency === 'DAILY' && ' every day'}
                 {scheduleFrequency === 'WEEKLY' && ` every week on ${scheduleDays.join(', ')}`}
@@ -1010,20 +1010,20 @@ export function QuickListsPage() {
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Status:</span>
+                      <span className="text-sm text-[var(--text-muted)]">Status:</span>
                       <Badge variant={selectedListDetails.status === 'ACTIVE' ? 'default' : 'secondary'}>
                         {selectedListDetails.status}
                       </Badge>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Frequency:</span>
+                      <span className="text-sm text-[var(--text-muted)]">Frequency:</span>
                       <span className="text-sm font-medium">
                         {formatFrequency(selectedListDetails.frequency, selectedListDetails.days_of_week)}
                       </span>
                     </div>
                     {selectedListDetails.days_of_week && selectedListDetails.days_of_week.length > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Days:</span>
+                        <span className="text-sm text-[var(--text-muted)]">Days:</span>
                         <span className="text-sm font-medium">
                           {JSON.parse(selectedListDetails.days_of_week).map((d: string) => 
                             d.charAt(0) + d.slice(1).toLowerCase()
@@ -1033,7 +1033,7 @@ export function QuickListsPage() {
                     )}
                     {selectedListDetails.preferred_time && (
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Preferred Time:</span>
+                        <span className="text-sm text-[var(--text-muted)]">Preferred Time:</span>
                         <span className="text-sm font-medium">
                           {selectedListDetails.preferred_time.slice(0, 5)}
                         </span>
@@ -1041,7 +1041,7 @@ export function QuickListsPage() {
                     )}
                     {selectedListDetails.next_execution_date && formatNextExecution(selectedListDetails) && (
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Next Execution:</span>
+                        <span className="text-sm text-[var(--text-muted)]">Next Execution:</span>
                         <span className="text-sm font-medium">
                           {formatNextExecution(selectedListDetails)}
                         </span>
@@ -1049,14 +1049,14 @@ export function QuickListsPage() {
                     )}
                     {selectedListDetails.last_execution_date && (
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Last Execution:</span>
+                        <span className="text-sm text-[var(--text-muted)]">Last Execution:</span>
                         <span className="text-sm font-medium">
                           {new Date(selectedListDetails.last_execution_date).toLocaleDateString()}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Auto Create Order:</span>
+                      <span className="text-sm text-[var(--text-muted)]">Auto Create Order:</span>
                       <Badge variant={selectedListDetails.auto_create_order ? 'default' : 'secondary'}>
                         {selectedListDetails.auto_create_order ? 'Yes' : 'No'}
                       </Badge>
@@ -1083,13 +1083,13 @@ export function QuickListsPage() {
                             <div className="flex-1">
                               <p className="font-medium">{product?.name || 'Product not found'}</p>
                               {product?.sku && (
-                                <p className="text-sm text-gray-600">SKU: {product.sku}</p>
+                                <p className="text-sm text-[var(--text-muted)]">SKU: {product.sku}</p>
                               )}
                             </div>
                             <div className="text-right">
                               <p className="font-semibold">Qty: {item.quantity}</p>
                               {product?.price && (
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-[var(--text-muted)]">
                                   {formatPrice(Number(product.price) * item.quantity)}
                                 </p>
                               )}
@@ -1099,8 +1099,8 @@ export function QuickListsPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <Package className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                    <div className="text-center py-8 text-[var(--text-muted)]">
+                      <Package className="h-12 w-12 mx-auto mb-2 text-[var(--text-muted)]" />
                       <p>No items in this list</p>
                       <Button
                         variant="outline"

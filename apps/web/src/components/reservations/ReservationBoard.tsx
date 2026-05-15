@@ -9,9 +9,9 @@ import { Badge } from '../ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 
 const STATUS_COLUMNS: Array<{ id: ReservationStatus; title: string; tone: string }> = [
-  { id: 'PENDING', title: 'Pending', tone: 'border-yellow-200 bg-yellow-50' },
-  { id: 'CONFIRMED', title: 'Confirmed', tone: 'border-emerald-200 bg-emerald-50' },
-  { id: 'SEATED', title: 'Seated', tone: 'border-sky-200 bg-sky-50' },
+  { id: 'PENDING', title: 'Pending', tone: 'border-[var(--amber-mid)]/35 bg-[var(--amber-pale)]' },
+  { id: 'CONFIRMED', title: 'Confirmed', tone: 'border-[var(--mint)]/35 bg-[var(--mint-pale)]' },
+  { id: 'SEATED', title: 'Seated', tone: 'border-[var(--app-border)] bg-[var(--brand-ultra)]' },
   { id: 'WAITLIST', title: 'Waitlist', tone: 'border-amber-200 bg-amber-50' },
 ]
 
@@ -51,21 +51,21 @@ function SortableReservationCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="group rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition hover:shadow-md"
+      className="group rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm transition hover:shadow-md"
       onClick={() => onOpen?.(reservation)}
       {...attributes}
       {...listeners}
     >
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-gray-900">{reservation.customer_name}</p>
-          <p className="text-xs text-gray-500">{new Date(reservation.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+          <p className="text-sm font-semibold text-[var(--text)]">{reservation.customer_name}</p>
+          <p className="text-xs text-[var(--text-muted)]">{new Date(reservation.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
         </div>
         <Badge className="text-xs font-normal">{reservation.party_size} guests</Badge>
       </div>
-      <div className="mt-2 space-y-1 text-xs text-gray-500">
+      <div className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">
         <p>{assignedTables || 'Unassigned tables'}</p>
-        {reservation.notes ? <p className="line-clamp-2 italic text-gray-400">{reservation.notes}</p> : null}
+        {reservation.notes ? <p className="line-clamp-2 italic text-[var(--text-muted)]">{reservation.notes}</p> : null}
       </div>
     </div>
   )
@@ -125,7 +125,7 @@ export function ReservationBoard({ reservations, tables, waitlist, onOpenReserva
     return (
       <div
         ref={setNodeRef}
-        className={`flex-1 space-y-3 rounded-xl border border-dashed border-gray-200 bg-white/40 p-3 transition ${isOver ? 'border-primary bg-primary/5' : ''}`}
+        className={`flex-1 space-y-3 rounded-xl border border-dashed border-[var(--app-border)] bg-white/40 p-3 transition ${isOver ? 'border-[var(--brand)] bg-[var(--brand-pale)]' : ''}`}
       >
         {children}
       </div>
@@ -140,15 +140,15 @@ export function ReservationBoard({ reservations, tables, waitlist, onOpenReserva
             <CardTitle className="text-xl">Reservations Board</CardTitle>
             <CardDescription>Drag reservations across stages to keep the front-of-house perfectly aligned.</CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-            <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-muted)]">
+            <Badge variant="secondary" className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
               Total seats: {totalCapacity}
             </Badge>
-            <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+            <Badge variant="secondary" className="bg-[var(--mint-pale)] text-[var(--mint)]">
               Covers booked: {coversBooked}
             </Badge>
             {totalCapacity ? (
-              <Badge variant="secondary" className="bg-indigo-100 text-indigo-700">
+              <Badge variant="secondary" className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">
                 Utilisation: {Math.round((coversBooked / totalCapacity) * 100)}%
               </Badge>
             ) : null}
@@ -159,10 +159,10 @@ export function ReservationBoard({ reservations, tables, waitlist, onOpenReserva
         <DndContext onDragEnd={handleDragEnd}>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {columns.map((column) => (
-              <div key={column.id} className="flex flex-col rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
+              <div key={column.id} className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)]/70 p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">{column.title}</h3>
-                  <Badge variant="secondary" className="bg-white text-gray-600 shadow">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">{column.title}</h3>
+                  <Badge variant="secondary" className="bg-[var(--surface)] text-[var(--text-muted)] shadow">
                     {column.reservations.length}
                   </Badge>
                 </div>
@@ -173,7 +173,7 @@ export function ReservationBoard({ reservations, tables, waitlist, onOpenReserva
                         <SortableReservationCard key={reservation.id} reservation={reservation} tables={tables} onOpen={onOpenReservation} />
                       ))
                     ) : (
-                      <p className="text-xs italic text-gray-400">Drop reservations here</p>
+                      <p className="text-xs italic text-[var(--text-muted)]">Drop reservations here</p>
                     )}
                   </SortableContext>
                 </ColumnContainer>
@@ -197,8 +197,8 @@ export function ReservationBoard({ reservations, tables, waitlist, onOpenReserva
           </div>
         </DndContext>
         {updating && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-primary"></span>
+          <div className="mt-4 flex items-center gap-2 text-sm text-[var(--text-muted)]">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand)]"></span>
             Syncing reservation changes…
           </div>
         )}

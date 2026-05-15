@@ -100,7 +100,7 @@ export function LogoUpload({ currentLogo, onUpload, entityId: _entityId, entityN
     <div className="space-y-4">
       <div className="flex items-center gap-4">
         <div className="relative">
-          <div className="w-32 h-32 rounded-lg border-2 border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden">
+          <div className="w-32 h-32 rounded-lg border-2 border-[var(--app-border-mid)] flex items-center justify-center bg-[var(--brand-ultra)] overflow-hidden">
             {preview ? (
               <img
                 src={preview}
@@ -108,7 +108,7 @@ export function LogoUpload({ currentLogo, onUpload, entityId: _entityId, entityN
                 className="w-full h-full object-cover"
               />
             ) : (
-              <ImageIcon className="w-12 h-12 text-gray-400" />
+              <ImageIcon className="w-12 h-12 text-[var(--text-muted)]" />
             )}
           </div>
           {isUploading && (
@@ -142,7 +142,7 @@ export function LogoUpload({ currentLogo, onUpload, entityId: _entityId, entityN
               </Button>
             )}
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--text-muted)]">
             Recommended: Square image, at least 200x200px. Max size: 5MB
           </p>
         </div>

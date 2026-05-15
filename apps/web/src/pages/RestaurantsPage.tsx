@@ -192,7 +192,7 @@ export function RestaurantsPage() {
     if (isLoading) {
       return (
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
         </div>
       )
     }
@@ -200,7 +200,7 @@ export function RestaurantsPage() {
     if (error) {
       return (
         <div className="text-center py-12">
-          <p className="text-red-600">Failed to load restaurants</p>
+          <p className="text-[var(--red)]">Failed to load restaurants</p>
         </div>
       )
     }
@@ -208,8 +208,8 @@ export function RestaurantsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Restaurants</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-[21px] font-black text-[var(--text)]">Restaurants</h1>
+          <p className="text-[var(--text-muted)] mt-2">
             Manage restaurants in the marketplace
           </p>
         </div>
@@ -229,18 +229,18 @@ export function RestaurantsPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2">
-                    <Mail className="h-4 w-4 text-gray-400" />
+                    <Mail className="h-4 w-4 text-[var(--text-muted)]" />
                     <span>{restaurant.contact_email}</span>
                   </div>
                   {restaurant.phone && (
                     <div className="flex items-center space-x-2">
-                      <Phone className="h-4 w-4 text-gray-400" />
+                      <Phone className="h-4 w-4 text-[var(--text-muted)]" />
                       <span>{restaurant.phone}</span>
                     </div>
                   )}
                   {restaurant.address_json && (
                     <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
+                      <MapPin className="h-4 w-4 text-[var(--text-muted)]" />
                       <span>
                         {restaurant.address_json.city}, {restaurant.address_json.country}
                       </span>
@@ -252,7 +252,7 @@ export function RestaurantsPage() {
                   <Badge variant="outline">
                     {restaurant.trade_license_no ? `License: ${restaurant.trade_license_no}` : 'No License'}
                   </Badge>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-[var(--text-muted)]">
                     Joined {new Date(restaurant.created_at).toLocaleDateString()}
                   </span>
                 </div>
@@ -263,8 +263,8 @@ export function RestaurantsPage() {
 
         {restaurantsData?.restaurants.length === 0 && (
           <div className="text-center py-12">
-            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No restaurants found</p>
+            <Building2 className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
+            <p className="text-[var(--text-muted)]">No restaurants found</p>
           </div>
         )}
       </div>
@@ -274,7 +274,7 @@ export function RestaurantsPage() {
   if (isLoading || (isSupplier && !supplierId)) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--brand)]"></div>
       </div>
     )
   }
@@ -282,7 +282,7 @@ export function RestaurantsPage() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Failed to load restaurants</p>
+        <p className="text-[var(--red)]">Failed to load restaurants</p>
       </div>
     )
   }
@@ -292,8 +292,8 @@ export function RestaurantsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Restaurants</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-[21px] font-black text-[var(--text)]">My Restaurants</h1>
+          <p className="text-[var(--text-muted)] mt-2">
             Restaurants that purchase from you
           </p>
         </div>
@@ -326,10 +326,10 @@ export function RestaurantsPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Restaurants</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Restaurants</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{stats.total}</p>
                 </div>
-                <Building2 className="h-8 w-8 text-blue-500" />
+                <Building2 className="h-8 w-8 text-[var(--brand-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -337,10 +337,10 @@ export function RestaurantsPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Orders</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{stats.totalOrders}</p>
                 </div>
-                <ShoppingCart className="h-8 w-8 text-green-500" />
+                <ShoppingCart className="h-8 w-8 text-[var(--mint)]" />
               </div>
             </CardContent>
           </Card>
@@ -348,10 +348,10 @@ export function RestaurantsPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue, { maximumFractionDigits: 0 })}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Revenue</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{formatCurrency(stats.totalRevenue, { maximumFractionDigits: 0 })}</p>
                 </div>
-                <DollarSign className="h-8 w-8 text-purple-500" />
+                <DollarSign className="h-8 w-8 text-[var(--brand-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -359,10 +359,10 @@ export function RestaurantsPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.avgOrderValue, { maximumFractionDigits: 0 })}</p>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">Avg Order Value</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">{formatCurrency(stats.avgOrderValue, { maximumFractionDigits: 0 })}</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-orange-500" />
+                <TrendingUp className="h-8 w-8 text-[var(--amber-mid)]" />
               </div>
             </CardContent>
           </Card>
@@ -373,7 +373,7 @@ export function RestaurantsPage() {
       <div className="space-y-4">
         <div className="flex items-center gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
             <Input
               placeholder="Search restaurants by name, email, or city..."
               value={search}
@@ -416,11 +416,11 @@ export function RestaurantsPage() {
           </Button>
           <div className="flex-1" />
           <div className="flex items-center gap-2">
-            <ArrowUpDown className="h-4 w-4 text-gray-400" />
+            <ArrowUpDown className="h-4 w-4 text-[var(--text-muted)]" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-1 text-sm border border-gray-300 rounded-md bg-white"
+              className="px-3 py-1 text-sm border border-[var(--app-border-mid)] rounded-md bg-white"
             >
               <option value="name">Sort by Name</option>
               <option value="orders">Sort by Orders</option>
@@ -436,9 +436,9 @@ export function RestaurantsPage() {
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
-              <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No restaurants found</h3>
-              <p className="text-gray-600 mb-4">
+              <Building2 className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No restaurants found</h3>
+              <p className="text-[var(--text-muted)] mb-4">
                 {search || cityFilter || filterBy !== 'all'
                   ? 'Try adjusting your search or filters'
                   : 'No restaurants have purchased from you yet'}
@@ -474,13 +474,13 @@ export function RestaurantsPage() {
                   return (
                     <div className="absolute top-3 right-3 z-10">
                       {isActive && (
-                        <Badge className="bg-green-500 text-white">
+                        <Badge className="bg-[var(--mint)] text-white">
                           <Clock className="h-3 w-3 mr-1" />
                           Active
                         </Badge>
                       )}
                       {isNew && (
-                        <Badge className="bg-blue-500 text-white ml-1">
+                        <Badge className="bg-[var(--brand)] text-white ml-1">
                           <Sparkles className="h-3 w-3 mr-1" />
                           New
                         </Badge>
@@ -497,7 +497,7 @@ export function RestaurantsPage() {
                     <img 
                       src={restaurant.logo_url} 
                       alt={restaurant.name} 
-                      className="h-12 w-12 rounded-lg object-cover border-2 border-gray-200 shadow-md"
+                      className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
                         target.style.display = 'none'
@@ -506,7 +506,7 @@ export function RestaurantsPage() {
                       }}
                     />
                   ) : null}
-                  <div className={`h-12 w-12 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-white font-bold text-lg shadow-md ${restaurant.logo_url ? 'hidden' : ''}`}>
+                  <div className={`h-12 w-12 rounded-lg bg-gradient-to-br from-[var(--amber-mid)] to-[var(--red)] flex items-center justify-center text-white font-bold text-lg shadow-md ${restaurant.logo_url ? 'hidden' : ''}`}>
                     {restaurant.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -520,24 +520,24 @@ export function RestaurantsPage() {
                 <div className="space-y-2 text-sm">
                   {restaurant.contact_email && (
                     <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <a href={`mailto:${restaurant.contact_email}`} className="text-blue-600 hover:underline truncate">
+                      <Mail className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+                      <a href={`mailto:${restaurant.contact_email}`} className="text-[var(--brand-mid)] hover:underline truncate">
                         {restaurant.contact_email}
                       </a>
                     </div>
                   )}
                   {restaurant.phone && (
                     <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <a href={`tel:${restaurant.phone}`} className="text-gray-700 hover:text-blue-600">
+                      <Phone className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+                      <a href={`tel:${restaurant.phone}`} className="text-[var(--text-mid)] hover:text-[var(--brand-mid)]">
                         {restaurant.phone}
                       </a>
                     </div>
                   )}
                   {restaurant.address_json && (
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <span className="text-gray-700">
+                      <MapPin className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+                      <span className="text-[var(--text-mid)]">
                         {restaurant.address_json.city}, {restaurant.address_json.country}
                       </span>
                     </div>
@@ -547,21 +547,21 @@ export function RestaurantsPage() {
                 {/* Statistics */}
                 <div className="grid grid-cols-3 gap-3 pt-3 border-t">
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-gray-600">
+                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
                       <ShoppingCart className="h-4 w-4" />
                       <p className="text-xl font-bold">{restaurant.totalOrders || 0}</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Orders</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">Orders</p>
                   </div>
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-gray-600">
+                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
                       <DollarSign className="h-4 w-4" />
                       <p className="text-xl font-bold">{formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Revenue</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">Revenue</p>
                   </div>
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-gray-600">
+                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
                       <TrendingUp className="h-4 w-4" />
                       <p className="text-lg font-semibold">
                         {restaurant.latestOrder 
@@ -569,7 +569,7 @@ export function RestaurantsPage() {
                           : 'N/A'}
                       </p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Last Order</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">Last Order</p>
                   </div>
                 </div>
 
@@ -577,14 +577,14 @@ export function RestaurantsPage() {
                 {restaurant.latestOrder && (
                   <div className="pt-3 border-t">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-gray-600">Latest Order</span>
+                      <span className="text-xs font-medium text-[var(--text-muted)]">Latest Order</span>
                       <Badge variant={restaurant.latestOrder.status === 'COMPLETED' ? 'default' : 'secondary'} className="text-xs">
                         {restaurant.latestOrder.status}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">Order #{restaurant.latestOrder.id.substring(0, 8)}</span>
-                      <span className="font-semibold text-gray-900">
+                      <span className="text-[var(--text-muted)]">Order #{restaurant.latestOrder.id.substring(0, 8)}</span>
+                      <span className="font-semibold text-[var(--text)]">
                         {formatPrice(restaurant.latestOrder.total_amount)}
                       </span>
                     </div>
@@ -625,7 +625,7 @@ export function RestaurantsPage() {
                     <img 
                       src={restaurant.logo_url} 
                       alt={restaurant.name} 
-                      className="h-16 w-16 rounded-lg object-cover border-2 border-gray-200 shadow-md"
+                      className="h-16 w-16 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
                         target.style.display = 'none'
@@ -634,12 +634,12 @@ export function RestaurantsPage() {
                       }}
                     />
                   ) : null}
-                  <div className={`h-16 w-16 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-white font-bold text-xl shadow-md ${restaurant.logo_url ? 'hidden' : ''}`}>
+                  <div className={`h-16 w-16 rounded-lg bg-gradient-to-br from-[var(--amber-mid)] to-[var(--red)] flex items-center justify-center text-white font-bold text-xl shadow-md ${restaurant.logo_url ? 'hidden' : ''}`}>
                     {restaurant.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-bold text-gray-900">{restaurant.name}</h3>
+                      <h3 className="text-lg font-bold text-[var(--text)]">{restaurant.name}</h3>
                       {(() => {
                         const thirtyDaysAgo = new Date()
                         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
@@ -649,13 +649,13 @@ export function RestaurantsPage() {
                         return (
                           <>
                             {isActive && (
-                              <Badge className="bg-green-500 text-white">
+                              <Badge className="bg-[var(--mint)] text-white">
                                 <Clock className="h-3 w-3 mr-1" />
                                 Active
                               </Badge>
                             )}
                             {isNew && (
-                              <Badge className="bg-blue-500 text-white">
+                              <Badge className="bg-[var(--brand)] text-white">
                                 <Sparkles className="h-3 w-3 mr-1" />
                                 New
                               </Badge>
@@ -664,24 +664,24 @@ export function RestaurantsPage() {
                         )
                       })()}
                     </div>
-                    <p className="text-sm text-gray-600">{restaurant.slug}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{restaurant.slug}</p>
                   </div>
                   <div className="flex items-center gap-6">
                     <div className="text-center">
-                      <p className="text-xl font-bold text-gray-900">{restaurant.totalOrders || 0}</p>
-                      <p className="text-xs text-gray-500">Orders</p>
+                      <p className="text-xl font-bold text-[var(--text)]">{restaurant.totalOrders || 0}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Orders</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl font-bold text-gray-900">{formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}</p>
-                      <p className="text-xs text-gray-500">Revenue</p>
+                      <p className="text-xl font-bold text-[var(--text)]">{formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Revenue</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-[var(--text)]">
                         {restaurant.latestOrder 
                           ? new Date(restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                           : 'N/A'}
                       </p>
-                      <p className="text-xs text-gray-500">Last Order</p>
+                      <p className="text-xs text-[var(--text-muted)]">Last Order</p>
                     </div>
                   </div>
                   <div className="flex gap-2">

@@ -16,9 +16,9 @@ export function BranchSwitcher() {
   }
 
   return (
-    <div className="hidden md:flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm">
-      <Building2 className="h-4 w-4 text-gray-500 shrink-0" />
-      {(isLoading || isSwitching) && <Loader2 className="h-3 w-3 animate-spin text-gray-400" />}
+    <div className="hidden md:flex items-center gap-2 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 py-1 text-sm">
+      <Building2 className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+      {(isLoading || isSwitching) && <Loader2 className="h-3 w-3 animate-spin text-[var(--text-muted)]" />}
       <select
         className="bg-transparent border-none outline-none text-sm max-w-[180px] truncate cursor-pointer"
         value={activeAccountId ?? accounts[0]?.id ?? ''}

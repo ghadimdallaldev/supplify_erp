@@ -1,5 +1,6 @@
 import { query, withTransaction } from './db.js'
 import { logger } from './logger.js'
+import { resolveAllFeaturesForTenant } from './feature-flags.js'
 
 /**
  * Ensure tenant has an active subscription; if none, create one with the free plan.
@@ -124,8 +125,7 @@ export async function getTenantSubscription(tenantId, tenantType) {
 }
 
 /**
- * Check if feature is enabled for tenant based on subscription plan
- * Features are determined solely by the subscription plan's features JSONB field
+ * Check if feature is enabled for tenant (tenant override → global override → plan).
  * @param {string} tenantId - Tenant ID
  * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
  * @param {string} featureKey - Feature key to check
@@ -432,7 +432,7 @@ export async function incrementUsage(tenantId, tenantType, meterType, increment 
 /** Fixed date for cumulative meters (e.g. storage_mb) - one row per tenant */
 const CUMULATIVE_PERIOD_DATE = '2000-01-01'
 
-/** Canonical limit keys per tenant type (from docs/SUBSCRIPTIONS.md) */
+/** Canonical limit keys per tenant type (from docs/monetization/SUBSCRIPTIONS.md) */
 export const RESTAURANT_LIMIT_KEYS = [
   'branches',
   'users',
@@ -559,14 +559,11 @@ export async function getEntitlements(tenantId, tenantType) {
     limits[o.limitKey] = o.value
   })
 
-  const features = {}
-  if (subscription.features && typeof subscription.features === 'object') {
-    for (const [k, v] of Object.entries(subscription.features)) {
-      if (typeof v === 'boolean') features[k] = v
-      else if (typeof v === 'string') features[k] = v !== 'false' && v !== 'disabled' && v !== ''
-      else features[k] = !!v
-    }
-  }
+  const { features, featureSources } = await resolveAllFeaturesForTenant(
+    tenantId,
+    tenantType,
+    subscription.features
+  )
 
   const usage = await getUsageSnapshot(tenantId, tenantType)
   const usageWindowMeta = {}
@@ -591,6 +588,7 @@ export async function getEntitlements(tenantId, tenantType) {
         subscription.plan_price_per_year != null ? Number(subscription.plan_price_per_year) : null,
     },
     features,
+    featureSources,
     limits,
     baseLimits,
     overrides: overrides.map((o) => ({

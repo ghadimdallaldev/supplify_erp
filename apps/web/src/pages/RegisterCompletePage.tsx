@@ -95,13 +95,13 @@ export function RegisterCompletePage() {
   if (showSpinner) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <Loader2 className="h-10 w-10 animate-spin text-[var(--brand-mid)]" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-50 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-ultra)] via-[var(--surface)] to-[var(--brand-ultra)] p-6">
       <Card className="w-full max-w-lg border-2 shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Set up your organization</CardTitle>
@@ -125,8 +125,8 @@ export function RegisterCompletePage() {
                   onClick={() => setAccountType('RESTAURANT')}
                   className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-colors ${
                     accountType === 'RESTAURANT'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-muted hover:border-primary/40'
+                      ? 'border-[var(--brand)] bg-[var(--brand-pale)]'
+                      : 'border-[var(--app-border)] hover:border-[var(--brand)]/40'
                   }`}
                 >
                   <Store className="h-6 w-6" />
@@ -137,8 +137,8 @@ export function RegisterCompletePage() {
                   onClick={() => setAccountType('SUPPLIER')}
                   className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-colors ${
                     accountType === 'SUPPLIER'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-muted hover:border-primary/40'
+                      ? 'border-[var(--brand)] bg-[var(--brand-pale)]'
+                      : 'border-[var(--app-border)] hover:border-[var(--brand)]/40'
                   }`}
                 >
                   <Truck className="h-6 w-6" />
@@ -150,7 +150,7 @@ export function RegisterCompletePage() {
             <div className="space-y-2">
               <Label htmlFor="businessName">Business name</Label>
               <div className="relative">
-                <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Building2 className="absolute left-3 top-3 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
                   id="businessName"
                   className="pl-9"

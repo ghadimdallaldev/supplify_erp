@@ -22,17 +22,17 @@ interface CalendarViewProps {
 }
 
 const statusThemeMap: Record<string, string> = {
-  completed: 'border-emerald-500/60 bg-emerald-50 text-emerald-700',
-  pending: 'border-amber-500/60 bg-amber-50 text-amber-700',
-  in_transit: 'border-sky-500/60 bg-sky-50 text-sky-700',
-  cancelled: 'border-rose-500/60 bg-rose-50 text-rose-700',
+  completed: 'border-[var(--mint)]/60 bg-[var(--mint-pale)] text-[var(--mint)]',
+  pending: 'border-[var(--amber-mid)]/60 bg-[var(--amber-pale)] text-[var(--amber)]',
+  in_transit: 'border-[var(--brand-mid)]/60 bg-[var(--brand-ultra)] text-[var(--brand-mid)]',
+  cancelled: 'border-[var(--red)]/60 bg-[var(--red-pale)] text-[var(--red)]',
 }
 
 const statusDotMap: Record<string, string> = {
-  completed: 'bg-emerald-500 shadow-emerald-500/40',
-  pending: 'bg-amber-500 shadow-amber-500/40',
-  in_transit: 'bg-sky-500 shadow-sky-500/40',
-  cancelled: 'bg-rose-500 shadow-rose-500/40',
+  completed: 'bg-[var(--mint)] shadow-[var(--mint)]/40',
+  pending: 'bg-[var(--amber-mid)] shadow-[var(--amber-mid)]/40',
+  in_transit: 'bg-[var(--brand-mid)] shadow-[var(--brand-mid)]/40',
+  cancelled: 'bg-[var(--red)] shadow-[var(--red)]/40',
 }
 
 const viewOptions: Array<{ label: string; value: CalendarViewType }> = [
@@ -148,14 +148,14 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       return (
         <div className="group relative flex h-full items-center justify-center">
           <div className={`h-3.5 w-3.5 rounded-full shadow-sm transition-transform duration-150 group-hover:scale-150 ${dotTheme}`} />
-          <div className="pointer-events-none absolute left-1/2 top-full z-30 hidden w-60 -translate-x-1/2 translate-y-2 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-700 shadow-xl group-hover:block">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{event.type?.replace(/_/g, ' ') || 'Order'}</p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">{`#${event.orderId?.slice(0, 8) ?? content.event.id}`}</p>
-            {event.status && <p className="mt-1 capitalize text-gray-500">Status: {event.status.replace(/_/g, ' ').toLowerCase()}</p>}
-            <p className="mt-1 text-gray-500">Counterpart: {event.counterpartName}</p>
-            <p className="mt-1 font-semibold text-gray-900">{formattedAmount}</p>
-            {event.branchName && <p className="mt-1 text-gray-500">Branch: {event.branchName}</p>}
-            {event.categories?.length ? <p className="mt-1 text-gray-500">Categories: {event.categories.join(', ')}</p> : null}
+          <div className="pointer-events-none absolute left-1/2 top-full z-30 hidden w-60 -translate-x-1/2 translate-y-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] shadow-xl group-hover:block">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{event.type?.replace(/_/g, ' ') || 'Order'}</p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text)]">{`#${event.orderId?.slice(0, 8) ?? content.event.id}`}</p>
+            {event.status && <p className="mt-1 capitalize text-[var(--text-muted)]">Status: {event.status.replace(/_/g, ' ').toLowerCase()}</p>}
+            <p className="mt-1 text-[var(--text-muted)]">Counterpart: {event.counterpartName}</p>
+            <p className="mt-1 font-semibold text-[var(--text)]">{formattedAmount}</p>
+            {event.branchName && <p className="mt-1 text-[var(--text-muted)]">Branch: {event.branchName}</p>}
+            {event.categories?.length ? <p className="mt-1 text-[var(--text-muted)]">Categories: {event.categories.join(', ')}</p> : null}
           </div>
         </div>
       )
@@ -168,18 +168,18 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide">{event.type?.replace(/_/g, ' ') || 'Order'}</span>
           {event.status && (
-            <span className="text-[10px] rounded-full bg-white/70 px-2 py-0.5 font-medium text-gray-700 shadow-sm">
+            <span className="text-[10px] rounded-full bg-white/70 px-2 py-0.5 font-medium text-[var(--text-mid)] shadow-sm">
               {event.status.replace(/_/g, ' ')}
             </span>
           )}
         </div>
-        <div className="mt-1 text-sm font-semibold leading-tight text-gray-900 truncate">
+        <div className="mt-1 text-sm font-semibold leading-tight text-[var(--text)] truncate">
           {`#${event.orderId?.slice(0, 8) ?? content.event.id}`}
         </div>
-        <div className="text-xs text-gray-700 truncate">{event.counterpartName}</div>
-        <div className="mt-2 text-xs font-semibold text-gray-900">{formattedAmount}</div>
-        <div className="pointer-events-none absolute -left-2 top-full z-10 w-48 origin-top-left rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 opacity-0 shadow-lg transition-all duration-150 group-hover:translate-y-1 group-hover:opacity-100">
-          <p className="font-semibold text-gray-900">{event.type?.replace(/_/g, ' ')}</p>
+        <div className="text-xs text-[var(--text-mid)] truncate">{event.counterpartName}</div>
+        <div className="mt-2 text-xs font-semibold text-[var(--text)]">{formattedAmount}</div>
+        <div className="pointer-events-none absolute -left-2 top-full z-10 w-48 origin-top-left rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] opacity-0 shadow-lg transition-all duration-150 group-hover:translate-y-1 group-hover:opacity-100">
+          <p className="font-semibold text-[var(--text)]">{event.type?.replace(/_/g, ' ')}</p>
           <p className="mt-1">Status: {event.status}</p>
           {event.branchName && <p>Branch: {event.branchName}</p>}
           {event.categories?.length ? <p>Categories: {event.categories.join(', ')}</p> : null}
@@ -208,14 +208,14 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
   )
 
   return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="flex items-center gap-3 text-gray-900">
+          <div className="flex items-center gap-3 text-[var(--text)]">
             <span className="text-3xl leading-none">📅</span>
             <div>
               <h2 className="text-xl font-semibold">Order Calendar</h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--text-muted)]">
                 Visualize orders, deliveries, and payments {activeRole === 'RESTAURANT' ? 'for your branches' : 'across your restaurant partners'}
               </p>
             </div>
@@ -245,7 +245,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
           {isAdmin && (
             <Button
               onClick={() => toast('Event creation is coming soon!')}
-              className="bg-primary text-white hover:bg-primary/90"
+              className="bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90"
               size="sm"
             >
               + Add Event
@@ -324,33 +324,33 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         </Select>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-        <Badge variant="outline" className="flex items-center gap-1 border-dashed border-primary text-primary">
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-[var(--text-muted)]">
+        <Badge variant="outline" className="flex items-center gap-1 border-dashed border-[var(--brand)] text-[var(--brand-mid)]">
           <Filter className="h-3.5 w-3.5" />
           Filters update in real time
         </Badge>
-        <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900" onClick={clearFilters} disabled={filtersDisabled}>
+        <Button variant="ghost" size="sm" className="text-[var(--text-muted)] hover:text-[var(--text)]" onClick={clearFilters} disabled={filtersDisabled}>
           <RefreshCcw className="mr-1 h-3.5 w-3.5" />
           Reset
         </Button>
         {isFetching && (
-          <span className="flex items-center gap-1 text-xs text-gray-400">
+          <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Updating…
           </span>
         )}
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--app-border)]">
         {isLoading && (
-          <div className="flex h-64 items-center justify-center text-gray-500">
+          <div className="flex h-64 items-center justify-center text-[var(--text-muted)]">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             Loading calendar…
           </div>
         )}
 
         {!isLoading && error && (
-          <div className="flex h-64 flex-col items-center justify-center gap-4 text-center text-gray-500">
+          <div className="flex h-64 flex-col items-center justify-center gap-4 text-center text-[var(--text-muted)]">
             <p>Unable to load the order calendar right now.</p>
             <Button onClick={() => refetch()} size="sm">
               Try again
@@ -397,7 +397,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       </div>
 
       <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <CalendarDays className="h-4 w-4" />
           <span>
             Showing {data?.events?.length ? data.events.length : 0} of{' '}
@@ -414,7 +414,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             <ArrowLeft className="mr-1 h-4 w-4" />
             Prev
           </Button>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[var(--text-muted)]">
             Page {page} of {totalPages}
           </span>
           <Button
@@ -440,7 +440,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
               onClick={() => setSelectedEvent(null)}
             />
             <motion.aside
-              className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-gray-200 bg-white p-6 shadow-xl"
+              className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-[var(--app-border)] bg-[var(--surface)] p-6 shadow-xl"
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
@@ -448,8 +448,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-400">{selectedEvent.type?.replace(/_/g, ' ')}</p>
-                  <h3 className="text-xl font-semibold text-gray-900">
+                  <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">{selectedEvent.type?.replace(/_/g, ' ')}</p>
+                  <h3 className="text-xl font-semibold text-[var(--text)]">
                     Order #{selectedEvent.orderId?.slice(0, 8) ?? selectedEvent.id}
                   </h3>
                   {selectedEvent.status && (
@@ -463,8 +463,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                 </Button>
               </div>
 
-              <div className="mt-6 space-y-4 text-sm text-gray-600">
-                <div className="flex items-center justify-between text-base font-semibold text-gray-900">
+              <div className="mt-6 space-y-4 text-sm text-[var(--text-muted)]">
+                <div className="flex items-center justify-between text-base font-semibold text-[var(--text)]">
                   <span>Total</span>
                   <span>
                     {new Intl.NumberFormat('en-US', {
@@ -476,32 +476,32 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                 </div>
                 <div className="grid gap-2">
                   <div className="flex justify-between">
-                    <span className="font-medium text-gray-500">Counterpart</span>
-                    <span className="text-gray-900">{selectedEvent.counterpartName}</span>
+                    <span className="font-medium text-[var(--text-muted)]">Counterpart</span>
+                    <span className="text-[var(--text)]">{selectedEvent.counterpartName}</span>
                   </div>
                   {selectedEvent.branchName && (
                     <div className="flex justify-between">
-                      <span className="font-medium text-gray-500">Branch</span>
-                      <span className="text-gray-900">{selectedEvent.branchName}</span>
+                      <span className="font-medium text-[var(--text-muted)]">Branch</span>
+                      <span className="text-[var(--text)]">{selectedEvent.branchName}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="font-medium text-gray-500">Scheduled</span>
-                    <span className="text-gray-900">
+                    <span className="font-medium text-[var(--text-muted)]">Scheduled</span>
+                    <span className="text-[var(--text)]">
                       {selectedEvent.start ? format(new Date(selectedEvent.start), 'PPp') : '—'}
                     </span>
                   </div>
                   {selectedEvent.end && (
                     <div className="flex justify-between">
-                      <span className="font-medium text-gray-500">Ends</span>
-                      <span className="text-gray-900">{format(new Date(selectedEvent.end), 'PPp')}</span>
+                      <span className="font-medium text-[var(--text-muted)]">Ends</span>
+                      <span className="text-[var(--text)]">{format(new Date(selectedEvent.end), 'PPp')}</span>
                     </div>
                   )}
                 </div>
 
                 {selectedEvent.categories?.length ? (
                   <div>
-                    <p className="font-medium text-gray-500">Categories</p>
+                    <p className="font-medium text-[var(--text-muted)]">Categories</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {selectedEvent.categories.map((category) => (
                         <Badge key={category} variant="outline">
@@ -514,10 +514,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
                 {selectedEvent.supplierList?.length ? (
                   <div>
-                    <p className="font-medium text-gray-500">
+                    <p className="font-medium text-[var(--text-muted)]">
                       {activeRole === 'SUPPLIER' ? 'Restaurant contacts' : 'Suppliers on this order'}
                     </p>
-                    <ul className="mt-2 space-y-1 text-gray-900">
+                    <ul className="mt-2 space-y-1 text-[var(--text)]">
                       {selectedEvent.supplierList.map((supplier) => (
                         <li key={supplier.id} className="flex items-center justify-between">
                           <span>{supplier.name}</span>
@@ -527,8 +527,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                   </div>
                 ) : null}
 
-                <div className="rounded-xl bg-gray-50 p-4 text-xs text-gray-500">
-                  <p className="font-semibold text-gray-600">Tip</p>
+                <div className="rounded-xl bg-[var(--brand-ultra)] p-4 text-xs text-[var(--text-muted)]">
+                  <p className="font-semibold text-[var(--text-muted)]">Tip</p>
                   <p>
                     Track delivery progress and payment deadlines in one place. Filters stay in sync across all views for
                     faster follow-ups.

@@ -84,14 +84,14 @@ export function ReservationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reservations cockpit</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-[21px] font-black text-[var(--text)]">Reservations cockpit</h1>
+          <p className="text-sm text-[var(--text-muted)]">
             Track bookings, optimise capacity, and wow every guest from one unified view.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
-            <CalendarDays className="mr-2 h-4 w-4 text-primary" />
+          <div className="flex items-center rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm">
+            <CalendarDays className="mr-2 h-4 w-4 text-[var(--brand-mid)]" />
             <Input
               type="date"
               value={selectedDate}
@@ -110,10 +110,10 @@ export function ReservationsPage() {
       </div>
 
       {bookingLink ? (
-        <Card className="border border-gray-200 bg-white">
+        <Card className="border border-[var(--app-border)] bg-[var(--surface)]">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Link2 className="h-4 w-4 text-primary" />
+              <Link2 className="h-4 w-4 text-[var(--brand-mid)]" />
               Booking link for guests
             </CardTitle>
             <CardDescription>
@@ -123,7 +123,7 @@ export function ReservationsPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div
-              className="min-w-0 flex-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-700 truncate"
+              className="min-w-0 flex-1 rounded-md border border-[var(--app-border)] bg-[var(--bg)] px-3 py-2 font-mono text-sm text-[var(--text-mid)] truncate"
               title={bookingLink}
             >
               {bookingLink}
@@ -142,42 +142,42 @@ export function ReservationsPage() {
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-none bg-blue-50 text-blue-700 shadow-none">
+        <Card className="border-l-4 border-l-[var(--brand-mid)] shadow-sm">
           <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wide text-blue-800">
+            <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
               Covers today
             </CardTitle>
-            <CardDescription className="text-2xl font-semibold text-blue-900">
+            <CardDescription className="text-2xl font-semibold text-[var(--text)]">
               {summary.coversToday}
             </CardDescription>
           </CardHeader>
         </Card>
-        <Card className="border-none bg-emerald-50 text-emerald-700 shadow-none">
+        <Card className="border-l-4 border-l-[var(--mint)] shadow-sm">
           <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wide text-emerald-800">
+            <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
               Confirmed
             </CardTitle>
-            <CardDescription className="text-2xl font-semibold text-emerald-900">
+            <CardDescription className="text-2xl font-semibold text-[var(--text)]">
               {summary.confirmed}
             </CardDescription>
           </CardHeader>
         </Card>
-        <Card className="border-none bg-amber-50 text-amber-700 shadow-none">
+        <Card className="border-l-4 border-l-[var(--amber)] shadow-sm">
           <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wide text-amber-800">
+            <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
               Waitlist
             </CardTitle>
-            <CardDescription className="text-2xl font-semibold text-amber-900">
+            <CardDescription className="text-2xl font-semibold text-[var(--text)]">
               {summary.waitlisted}
             </CardDescription>
           </CardHeader>
         </Card>
-        <Card className="border-none bg-sky-50 text-sky-700 shadow-none">
+        <Card className="border-l-4 border-l-[var(--brand)] shadow-sm">
           <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wide text-sky-800">
+            <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
               Currently seated
             </CardTitle>
-            <CardDescription className="text-2xl font-semibold text-sky-900">
+            <CardDescription className="text-2xl font-semibold text-[var(--text)]">
               {summary.seated}
             </CardDescription>
           </CardHeader>
@@ -185,9 +185,9 @@ export function ReservationsPage() {
       </div>
 
       {boardLoading ? (
-        <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-gray-200">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
-          <p className="text-sm text-gray-500">Loading reservations…</p>
+        <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-[var(--app-border)]">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin text-[var(--brand-mid)]" />
+          <p className="text-sm text-[var(--text-muted)]">Loading reservations…</p>
         </div>
       ) : (
         <ReservationBoard reservations={reservations} tables={tables} waitlist={waitlist} />
@@ -211,39 +211,39 @@ export function ReservationsPage() {
               Repeat guests, loyalty moments, and smart follow-ups for your location.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-gray-600">
+          <CardContent className="space-y-4 text-sm text-[var(--text-muted)]">
             {guestIntelLoading ? (
-              <div className="flex items-center gap-2 text-gray-500">
+              <div className="flex items-center gap-2 text-[var(--text-muted)]">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading guest insights…
               </div>
             ) : (
               <>
                 <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <Users className="h-4 w-4" />
                       Recent guests
                     </p>
-                    <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
                       {guestIntel?.recentGuests?.length ?? 0}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <Sparkles className="h-4 w-4" />
                       Repeat guests
                     </p>
-                    <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
                       {guestIntel?.repeatGuests?.length ?? 0}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  <div className="rounded-2xl border border-[var(--amber-mid)]/35 bg-[var(--amber-pale)] p-4">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--amber)]">
                       <Star className="h-4 w-4" />
                       VIP guests
                     </p>
-                    <p className="mt-2 text-2xl font-semibold text-amber-900">
+                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
                       {guestIntel?.vipGuests?.length ?? 0}
                     </p>
                   </div>
@@ -251,15 +251,15 @@ export function ReservationsPage() {
 
                 {(guestIntel?.followUps?.length ?? 0) > 0 ? (
                   <div className="space-y-2">
-                    <p className="font-medium text-gray-900">Suggested follow-ups</p>
+                    <p className="font-medium text-[var(--text)]">Suggested follow-ups</p>
                     {guestIntel?.followUps?.map((guest, index) => (
                       <div
                         key={`${guest.customer_name}-${index}`}
-                        className="flex flex-col gap-1 rounded-xl border border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-1 rounded-xl border border-[var(--app-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div>
-                          <p className="font-medium text-gray-900">{String(guest.customer_name)}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="font-medium text-[var(--text)]">{String(guest.customer_name)}</p>
+                          <p className="text-xs text-[var(--text-muted)]">
                             {Number(guest.visit_count)} visits · last{' '}
                             {guest.last_visit
                               ? new Date(String(guest.last_visit)).toLocaleDateString()
@@ -273,12 +273,12 @@ export function ReservationsPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500">
+                  <p className="text-[var(--text-muted)]">
                     Book more reservations to unlock repeat-guest and VIP insights.
                   </p>
                 )}
 
-                <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-800">
+                <div className="rounded-2xl border border-dashed border-[var(--mint)]/35 bg-[var(--mint-pale)] p-4 text-xs text-[var(--mint)]">
                   Email and WhatsApp confirmations are sent automatically for confirmed seats when
                   guests provide contact details. Configure your channels in Settings →
                   Notifications.

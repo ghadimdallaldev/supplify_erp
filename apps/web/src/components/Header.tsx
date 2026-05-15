@@ -9,15 +9,38 @@ import {
 } from '../services/api'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
-import { LogOut, User, Bell, X, TrendingUp } from 'lucide-react'
+import { Bell, X, TrendingUp, Settings, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { BranchSwitcher } from './BranchSwitcher'
-import { Badge } from './ui/badge'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+
+const PAGE_NAMES: Record<string, string> = {
+  '/app/dashboard': 'Dashboard',
+  '/app/orders': 'Orders',
+  '/app/products': 'Products',
+  '/app/fulfillment': 'Fulfillment',
+  '/app/restaurants': 'Restaurants',
+  '/app/suppliers': 'Suppliers',
+  '/app/cart': 'Cart',
+  '/app/quick-lists': 'Quick Lists',
+  '/app/reservations': 'Reservations',
+  '/app/receiving': 'Receiving',
+  '/app/staff': 'Staff',
+  '/app/restaurant-inventory': 'Inventory',
+  '/app/invoices': 'Invoices',
+  '/app/chat': 'Chat',
+  '/app/notifications': 'Notifications',
+  '/app/settings': 'Settings',
+  '/app/branches': 'Branches',
+  '/app/admin': 'Admin Dashboard',
+  '/app/admin/suppliers': 'Supplier Admin',
+  '/app/admin/restaurants': 'Restaurant Admin',
+}
 
 export function Header() {
   const { user } = useAppSelector((state) => state.auth)
   const dispatch = useAppDispatch()
+  const location = useLocation()
   const [logout] = useLogoutMutation()
   const [showNotifications, setShowNotifications] = useState(false)
   const navigate = useNavigate()
@@ -31,7 +54,6 @@ export function Header() {
   const e = entitlementsData?.entitlements
   const limits = e?.limits ?? {}
   const usage = e?.usage ?? {}
-  const planCode = (e?.plan?.code ?? 'free').toLowerCase()
   const nearLimitKeys = Object.entries(limits)
     .filter(([_, limit]) => limit != null && limit !== -1)
     .map(([key]) => {
@@ -60,13 +82,9 @@ export function Header() {
     })
   }
 
-  // Fetch notifications
   const { data: notificationsData } = useGetNotificationsQuery(
     { limit: 10, offset: 0 },
-    {
-      pollingInterval: 60000, // Poll every 60 seconds (reduced from 30)
-      skip: !user, // Skip if not logged in
-    }
+    { pollingInterval: 60000, skip: !user }
   )
 
   const notifications = notificationsData?.notifications || []
@@ -76,7 +94,6 @@ export function Header() {
     try {
       const data = await logout().unwrap()
       toast.success('Logged out successfully')
-      // Redirect to Keycloak logout so SSO session is cleared; then Keycloak redirects back to /login
       if (data?.keycloakLogoutUrl) {
         window.location.href = data.keycloakLogoutUrl
       } else {
@@ -87,151 +104,347 @@ export function Header() {
     }
   }
 
+  const pageName =
+    PAGE_NAMES[location.pathname] ??
+    Object.entries(PAGE_NAMES).find(([key]) => location.pathname.startsWith(key + '/'))?.[1] ??
+    'Dashboard'
+
+  const initials = (user?.displayName || user?.email || 'U')
+    .split(/[\s@]/)
+    .filter(Boolean)
+    .map((w: string) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
   return (
-    <header className="bg-white shadow-sm border-b" data-testid="header">
-      <div className="px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Welcome back, {user?.displayName}
-            </h2>
-            <p className="text-sm text-gray-600 capitalize">{user?.role?.toLowerCase()} Account</p>
-          </div>
+    <header
+      data-testid="header"
+      style={{
+        height: 56,
+        minHeight: 56,
+        background: 'var(--surface)',
+        borderBottom: '1px solid var(--app-border)',
+        padding: '0 22px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        fontFamily: "'Inter', system-ui, sans-serif",
+        flexShrink: 0,
+      }}
+    >
+      {/* Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+        <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400 }}>Supplify</span>
+        <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
+        <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{pageName}</span>
+      </div>
 
-          <div className="flex items-center space-x-4">
-            <BranchSwitcher />
-            {showUpgrade && (
-              <Button
-                variant={hasUrgency ? 'default' : 'outline'}
-                size="sm"
-                onClick={handleNavUpgrade}
-                className="relative"
-              >
-                <TrendingUp className="h-4 w-4 mr-1" />
-                Upgrade
-                {hasUrgency && (
-                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-amber-400 rounded-full" />
-                )}
-              </Button>
+      {/* Right side controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <BranchSwitcher />
+
+        {showUpgrade && (
+          <Button
+            variant={hasUrgency ? 'default' : 'outline'}
+            size="sm"
+            onClick={handleNavUpgrade}
+            className="relative"
+            style={
+              hasUrgency
+                ? { background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }
+                : { borderColor: 'var(--app-border-mid)', color: 'var(--text-mid)' }
+            }
+          >
+            <TrendingUp style={{ width: 14, height: 14, marginRight: 4 }} />
+            Upgrade
+            {hasUrgency && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: 'var(--amber-mid)',
+                  border: '2px solid var(--surface)',
+                }}
+              />
             )}
-            {/* Notifications */}
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative"
-              >
-                <Bell className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </Badge>
-                )}
-              </Button>
+          </Button>
+        )}
 
-              {/* Notifications Dropdown */}
-              {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
-                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold">Notifications</h3>
-                    <div className="flex gap-2">
-                      {unreadCount > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              await markAllAsRead().unwrap()
-                            } catch (error) {
-                              console.error('Failed to mark all as read:', error)
-                            }
-                          }}
-                        >
-                          Mark all as read
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" onClick={() => setShowNotifications(false)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="divide-y">
-                    {notifications.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">No notifications</div>
-                    ) : (
-                      notifications.map((notification: any) => (
-                        <div
-                          key={notification.id}
-                          className={`p-4 hover:bg-gray-50 cursor-pointer ${!notification.is_read ? 'bg-blue-50' : ''}`}
-                          onClick={() => {
-                            if (
-                              notification.reference_type === 'ORDER' &&
-                              notification.reference_id
-                            ) {
-                              navigate(`/app/orders/${notification.reference_id}`)
-                              setShowNotifications(false)
-                            }
-                          }}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="text-sm font-medium text-gray-900">
-                                {notification.title}
-                              </h4>
-                              <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                {new Date(notification.created_at).toLocaleString()}
-                              </p>
-                              {(() => {
-                                const meta =
-                                  typeof notification.metadata === 'string'
-                                    ? JSON.parse(notification.metadata || '{}')
-                                    : notification.metadata || {}
-                                const whatsappUrl = meta?.whatsappUrl
-                                return whatsappUrl ? (
-                                  <a
-                                    href={whatsappUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="mt-2 inline-flex text-xs font-medium text-emerald-700 hover:underline"
-                                    onClick={(event) => event.stopPropagation()}
-                                  >
-                                    Open in WhatsApp
-                                  </a>
-                                ) : null
-                              })()}
-                            </div>
-                            {!notification.is_read && (
-                              <div className="ml-2 h-2 w-2 bg-blue-500 rounded-full"></div>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <User className="h-4 w-4" />
-              <span>{user?.email}</span>
-            </div>
-
-            <Button
-              data-testid="logout-button"
-              variant="outline"
-              size="sm"
-              onClick={handleLogout}
-              className="flex items-center space-x-2"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
-            </Button>
-          </div>
+        {/* Search bar */}
+        <div
+          style={{
+            width: 200,
+            height: 34,
+            borderRadius: 8,
+            background: 'var(--brand-ultra)',
+            border: '1px solid var(--app-border)',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 10px',
+            gap: 6,
+            cursor: 'text',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <circle cx="5.5" cy="5.5" r="4" stroke="var(--text-muted)" strokeWidth="1.3" />
+            <path d="M9 9l2.5 2.5" stroke="var(--text-muted)" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>Search…</span>
+          <kbd
+            style={{
+              fontSize: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              color: 'var(--text-muted)',
+              background: 'var(--surface)',
+              border: '1px solid var(--app-border)',
+              borderRadius: 4,
+              padding: '1px 4px',
+            }}
+          >
+            ⌘K
+          </kbd>
         </div>
+
+        {/* Notification bell */}
+        <div style={{ position: 'relative' }}>
+          <button
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 9,
+              background: 'transparent',
+              border: '1px solid var(--app-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              position: 'relative',
+            }}
+            onClick={() => setShowNotifications(!showNotifications)}
+          >
+            <Bell size={16} style={{ color: 'var(--text-muted)' }} />
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 6,
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: 'var(--red)',
+                  border: '1.5px solid var(--surface)',
+                }}
+              />
+            )}
+          </button>
+
+          {showNotifications && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 44,
+                width: 320,
+                background: 'var(--surface)',
+                borderRadius: 12,
+                border: '1px solid var(--app-border)',
+                boxShadow: '0 8px 32px rgba(91,33,182,0.12)',
+                zIndex: 50,
+                maxHeight: 400,
+                overflowY: 'auto',
+              }}
+            >
+              <div
+                style={{
+                  padding: '12px 16px',
+                  borderBottom: '1px solid var(--app-border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                  Notifications
+                </span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {unreadCount > 0 && (
+                    <button
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--brand)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                      onClick={async () => {
+                        try {
+                          await markAllAsRead().unwrap()
+                        } catch (error) {
+                          console.error('Failed to mark all as read:', error)
+                        }
+                      }}
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                  <button
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--text-muted)',
+                    }}
+                    onClick={() => setShowNotifications(false)}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                {notifications.length === 0 ? (
+                  <div
+                    style={{
+                      padding: 20,
+                      textAlign: 'center',
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    No notifications
+                  </div>
+                ) : (
+                  notifications.map((notification: any) => (
+                    <div
+                      key={notification.id}
+                      style={{
+                        padding: '12px 16px',
+                        borderBottom: '1px solid var(--app-border)',
+                        cursor: 'pointer',
+                        background: !notification.is_read ? 'var(--brand-ultra)' : 'transparent',
+                      }}
+                      onClick={() => {
+                        if (
+                          notification.reference_type === 'ORDER' &&
+                          notification.reference_id
+                        ) {
+                          navigate(`/app/orders/${notification.reference_id}`)
+                          setShowNotifications(false)
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                            {notification.title}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {notification.message}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
+                            {new Date(notification.created_at).toLocaleString()}
+                          </div>
+                          {(() => {
+                            const meta =
+                              typeof notification.metadata === 'string'
+                                ? JSON.parse(notification.metadata || '{}')
+                                : notification.metadata || {}
+                            const whatsappUrl = meta?.whatsappUrl
+                            return whatsappUrl ? (
+                              <a
+                                href={whatsappUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: 'inline-flex',
+                                  marginTop: 4,
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  color: 'var(--mint)',
+                                  textDecoration: 'none',
+                                }}
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                Open in WhatsApp
+                              </a>
+                            ) : null
+                          })()}
+                        </div>
+                        {!notification.is_read && (
+                          <div
+                            style={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: '50%',
+                              background: 'var(--brand)',
+                              marginLeft: 8,
+                              marginTop: 3,
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Settings icon button */}
+        <button
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 9,
+            background: 'transparent',
+            border: '1px solid var(--app-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          onClick={() => navigate('/app/settings')}
+          title="Settings"
+        >
+          <Settings size={15} style={{ color: 'var(--text-muted)' }} />
+        </button>
+
+        {/* User avatar */}
+        <button
+          data-testid="logout-button"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--brand), var(--mint-mid))',
+            border: '2px solid var(--surface)',
+            outline: '1px solid var(--app-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#fff',
+            cursor: 'pointer',
+            flexShrink: 0,
+            fontFamily: 'inherit',
+          }}
+          title={`${user?.displayName || user?.email} — click to logout`}
+          onClick={handleLogout}
+        >
+          {initials}
+        </button>
       </div>
     </header>
   )

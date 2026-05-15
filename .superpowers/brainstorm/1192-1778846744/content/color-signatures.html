@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signature Color Palettes</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #111;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  padding: 36px 24px 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+h2 { font-size: 15px; font-weight: 700; color: #e2e8f0; text-align: center; }
+.sub { font-size: 12px; color: #475569; text-align: center; }
+
+/* ── THEME BLOCKS ── */
+.themes { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 1080px; }
+
+.theme-block {
+  flex: 1;
+  min-width: 300px;
+  max-width: 340px;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  border: 2px solid transparent;
+  position: relative;
+}
+.theme-block:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+.theme-block.selected { border-color: #fff; }
+
+.theme-label {
+  position: absolute;
+  top: 10px; right: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  border-radius: 6px;
+  padding: 3px 8px;
+  z-index: 10;
+}
+
+/* App shell within each theme */
+.mini-shell {
+  display: flex;
+  height: 420px;
+  font-size: 10px;
+}
+
+/* ──────────────────────────────
+   THEME A: Saffron & Forest
+   Brand: deep forest green
+   Accent: saffron/amber
+   BG: warm ivory
+────────────────────────────── */
+.a-sidebar {
+  width: 110px;
+  background: #fff;
+  border-right: 1px solid #e8e6e0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 8px;
+  gap: 3px;
+}
+.a-brand {
+  display: flex; align-items: center; gap: 6px;
+  padding-bottom: 12px; border-bottom: 1px solid #f0ede6; margin-bottom: 6px;
+}
+.a-brand-mark {
+  width: 26px; height: 26px;
+  background: linear-gradient(135deg, #064e3b, #065f46);
+  border-radius: 7px;
+  box-shadow: 0 2px 8px rgba(6,78,59,.3);
+  flex-shrink: 0;
+}
+.a-brand-name { font-size: 11px; font-weight: 800; color: #064e3b; letter-spacing: -.03em; }
+.a-nav-lbl { font-size: 8px; color: #c8b89a; letter-spacing: .1em; text-transform: uppercase; padding: 6px 6px 2px; font-weight: 700; }
+.a-nav-item {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 6px; border-radius: 6px; color: #7a6e60; cursor: pointer;
+}
+.a-nav-item.active {
+  background: #f0fdf4; color: #064e3b; font-weight: 700;
+  position: relative;
+}
+.a-nav-item.active::before {
+  content:''; position: absolute; left: 0; top: 5px; bottom: 5px;
+  width: 3px; background: #f59e0b; border-radius: 0 3px 3px 0;
+}
+.a-nav-icon { width: 18px; height: 18px; border-radius: 5px; background: #f5f0e8; flex-shrink: 0; }
+.a-nav-item.active .a-nav-icon { background: #d1fae5; }
+.a-badge { margin-left: auto; background: #fef3c7; color: #b45309; font-size: 8px; font-weight: 700; border-radius: 8px; padding: 1px 5px; }
+.a-user { margin-top: auto; display: flex; align-items: center; gap: 5px; padding: 6px; border-top: 1px solid #f0ede6; }
+.a-av { width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(135deg, #064e3b, #f59e0b); font-size: 8px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.a-uname { font-size: 9px; font-weight: 600; color: #3d3428; }
+.a-urole { font-size: 8px; color: #a89880; }
+.a-dot { width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; margin-left: auto; flex-shrink: 0; }
+
+.a-main { flex: 1; background: #faf8f3; display: flex; flex-direction: column; overflow: hidden; }
+.a-header {
+  height: 42px; background: #fff; border-bottom: 1px solid #e8e6e0;
+  display: flex; align-items: center; padding: 0 14px; gap: 8px;
+}
+.a-bread { font-size: 11px; font-weight: 700; color: #064e3b; }
+.a-search {
+  margin-left: auto; display: flex; align-items: center; gap: 5px;
+  background: #f5f0e8; border: 1px solid #e8e0d0; border-radius: 6px; padding: 4px 8px; width: 110px;
+}
+.a-search-text { font-size: 9px; color: #a89880; flex: 1; }
+.a-search-kbd { font-size: 8px; background: #ece4d6; border-radius: 3px; padding: 1px 3px; color: #a89880; font-family: monospace; }
+.a-hbtn { width: 26px; height: 26px; border-radius: 6px; background: #f5f0e8; border: 1px solid #e8e0d0; display: flex; align-items: center; justify-content: center; }
+.a-hav { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #064e3b, #f59e0b); font-size: 8px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+.a-dash { flex: 1; padding: 12px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.a-greeting h3 { font-size: 12px; font-weight: 800; color: #1a1207; letter-spacing: -.02em; }
+.a-greeting p { font-size: 8px; color: #a89880; margin-top: 1px; }
+
+.a-kpi-row { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; }
+.a-kpi {
+  background: #fff; border: 1px solid #e8e0d0; border-radius: 8px; padding: 8px;
+  border-top: 2px solid;
+}
+.a-kpi-lbl { font-size: 8px; color: #a89880; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3px; }
+.a-kpi-val { font-size: 15px; font-weight: 800; color: #1a1207; letter-spacing: -.03em; }
+.a-kpi-delta { font-size: 8px; font-weight: 600; }
+.a-spark { margin-top: 5px; height: 14px; display: flex; gap: 2px; align-items: flex-end; }
+.a-sb { flex: 1; border-radius: 1px 1px 0 0; }
+
+.a-lower { display: grid; grid-template-columns: 3fr 2fr; gap: 6px; flex: 1; }
+.a-card { background: #fff; border: 1px solid #e8e0d0; border-radius: 8px; padding: 8px; overflow: hidden; }
+.a-card-ttl { font-size: 8px; font-weight: 700; color: #7a6e60; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+.a-order-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f5f0e8; }
+.a-order-row:last-child { border-bottom: none; }
+.a-oid { font-size: 9px; font-weight: 700; color: #1a1207; font-family: monospace; }
+.a-ocust { font-size: 8px; color: #a89880; }
+.a-oamt { font-size: 9px; font-weight: 700; color: #064e3b; }
+.a-ostatus { font-size: 7px; font-weight: 700; border-radius: 3px; padding: 1px 4px; }
+.a-stat-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 5px; }
+.a-stat-head { display: flex; justify-content: space-between; }
+.a-stat-lbl { font-size: 8px; color: #7a6e60; }
+.a-stat-val { font-size: 9px; font-weight: 700; color: #1a1207; }
+.a-stat-track { height: 4px; background: #f5f0e8; border-radius: 2px; overflow: hidden; }
+.a-stat-fill { height: 100%; border-radius: 2px; }
+
+
+/* ──────────────────────────────
+   THEME B: Terracotta & Cream
+   Brand: terracotta/rust
+   Accent: deep terracotta
+   BG: warm cream
+────────────────────────────── */
+.b-sidebar {
+  width: 110px;
+  background: #fff;
+  border-right: 1px solid #ede8e3;
+  display: flex; flex-direction: column; padding: 14px 8px; gap: 3px;
+}
+.b-brand { display: flex; align-items: center; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid #f2ede8; margin-bottom: 6px; }
+.b-brand-mark { width: 26px; height: 26px; background: linear-gradient(135deg, #c2410c, #9a3412); border-radius: 7px; box-shadow: 0 2px 8px rgba(194,65,12,.3); flex-shrink: 0; }
+.b-brand-name { font-size: 11px; font-weight: 800; color: #1c0a03; letter-spacing: -.03em; }
+.b-nav-lbl { font-size: 8px; color: #d4b4a0; letter-spacing: .1em; text-transform: uppercase; padding: 6px 6px 2px; font-weight: 700; }
+.b-nav-item { display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-radius: 6px; color: #8a6a58; cursor: pointer; }
+.b-nav-item.active { background: #fff7f5; color: #9a3412; font-weight: 700; position: relative; }
+.b-nav-item.active::before { content:''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 3px; background: #ea580c; border-radius: 0 3px 3px 0; }
+.b-nav-icon { width: 18px; height: 18px; border-radius: 5px; background: #f7f0eb; flex-shrink: 0; }
+.b-nav-item.active .b-nav-icon { background: #fee2d5; }
+.b-badge { margin-left: auto; background: #fee2d5; color: #9a3412; font-size: 8px; font-weight: 700; border-radius: 8px; padding: 1px 5px; }
+.b-user { margin-top: auto; display: flex; align-items: center; gap: 5px; padding: 6px; border-top: 1px solid #f2ede8; }
+.b-av { width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(135deg, #9a3412, #ea580c); font-size: 8px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.b-uname { font-size: 9px; font-weight: 600; color: #1c0a03; }
+.b-urole { font-size: 8px; color: #b4947e; }
+.b-dot { width: 5px; height: 5px; border-radius: 50%; background: #ea580c; margin-left: auto; flex-shrink: 0; }
+
+.b-main { flex: 1; background: #faf7f4; display: flex; flex-direction: column; overflow: hidden; }
+.b-header { height: 42px; background: #fff; border-bottom: 1px solid #ede8e3; display: flex; align-items: center; padding: 0 14px; gap: 8px; }
+.b-bread { font-size: 11px; font-weight: 700; color: #9a3412; }
+.b-search { margin-left: auto; display: flex; align-items: center; gap: 5px; background: #f7f0eb; border: 1px solid #ede0d6; border-radius: 6px; padding: 4px 8px; width: 110px; }
+.b-search-text { font-size: 9px; color: #b4947e; flex: 1; }
+.b-search-kbd { font-size: 8px; background: #f0e4da; border-radius: 3px; padding: 1px 3px; color: #b4947e; font-family: monospace; }
+.b-hbtn { width: 26px; height: 26px; border-radius: 6px; background: #f7f0eb; border: 1px solid #ede0d6; display: flex; align-items: center; justify-content: center; }
+.b-hav { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #9a3412, #ea580c); font-size: 8px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+.b-dash { flex: 1; padding: 12px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.b-greeting h3 { font-size: 12px; font-weight: 800; color: #1c0a03; letter-spacing: -.02em; }
+.b-greeting p { font-size: 8px; color: #b4947e; margin-top: 1px; }
+.b-kpi-row { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; }
+.b-kpi { background: #fff; border: 1px solid #ede0d6; border-radius: 8px; padding: 8px; border-top: 2px solid; }
+.b-kpi-lbl { font-size: 8px; color: #b4947e; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3px; }
+.b-kpi-val { font-size: 15px; font-weight: 800; color: #1c0a03; letter-spacing: -.03em; }
+.b-kpi-delta { font-size: 8px; font-weight: 600; }
+.b-spark { margin-top: 5px; height: 14px; display: flex; gap: 2px; align-items: flex-end; }
+.b-sb { flex: 1; border-radius: 1px 1px 0 0; }
+.b-lower { display: grid; grid-template-columns: 3fr 2fr; gap: 6px; flex: 1; }
+.b-card { background: #fff; border: 1px solid #ede0d6; border-radius: 8px; padding: 8px; overflow: hidden; }
+.b-card-ttl { font-size: 8px; font-weight: 700; color: #8a6a58; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+.b-order-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #faf7f4; }
+.b-order-row:last-child { border-bottom: none; }
+.b-oid { font-size: 9px; font-weight: 700; color: #1c0a03; font-family: monospace; }
+.b-ocust { font-size: 8px; color: #b4947e; }
+.b-oamt { font-size: 9px; font-weight: 700; color: #9a3412; }
+.b-ostatus { font-size: 7px; font-weight: 700; border-radius: 3px; padding: 1px 4px; }
+.b-stat-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 5px; }
+.b-stat-head { display: flex; justify-content: space-between; }
+.b-stat-lbl { font-size: 8px; color: #8a6a58; }
+.b-stat-val { font-size: 9px; font-weight: 700; color: #1c0a03; }
+.b-stat-track { height: 4px; background: #f7f0eb; border-radius: 2px; overflow: hidden; }
+.b-stat-fill { height: 100%; border-radius: 2px; }
+
+
+/* ──────────────────────────────
+   THEME C: Deep Violet & Mint
+   Brand: deep violet/plum
+   Accent: electric violet
+   BG: soft lavender-white
+────────────────────────────── */
+.c-sidebar {
+  width: 110px;
+  background: #fff;
+  border-right: 1px solid #ede8f5;
+  display: flex; flex-direction: column; padding: 14px 8px; gap: 3px;
+}
+.c-brand { display: flex; align-items: center; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid #f0eaf8; margin-bottom: 6px; }
+.c-brand-mark { width: 26px; height: 26px; background: linear-gradient(135deg, #5b21b6, #4c1d95); border-radius: 7px; box-shadow: 0 2px 8px rgba(91,33,182,.35); flex-shrink: 0; }
+.c-brand-name { font-size: 11px; font-weight: 800; color: #1e0b3a; letter-spacing: -.03em; }
+.c-nav-lbl { font-size: 8px; color: #c4aee0; letter-spacing: .1em; text-transform: uppercase; padding: 6px 6px 2px; font-weight: 700; }
+.c-nav-item { display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-radius: 6px; color: #7e6a9e; cursor: pointer; }
+.c-nav-item.active { background: #f5f0ff; color: #5b21b6; font-weight: 700; position: relative; }
+.c-nav-item.active::before { content:''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 3px; background: #10b981; border-radius: 0 3px 3px 0; }
+.c-nav-icon { width: 18px; height: 18px; border-radius: 5px; background: #f5f0ff; flex-shrink: 0; }
+.c-nav-item.active .c-nav-icon { background: #ede9fe; }
+.c-badge { margin-left: auto; background: #fef9c3; color: #7c6200; font-size: 8px; font-weight: 700; border-radius: 8px; padding: 1px 5px; }
+.c-user { margin-top: auto; display: flex; align-items: center; gap: 5px; padding: 6px; border-top: 1px solid #f0eaf8; }
+.c-av { width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(135deg, #5b21b6, #10b981); font-size: 8px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.c-uname { font-size: 9px; font-weight: 600; color: #1e0b3a; }
+.c-urole { font-size: 8px; color: #9b86be; }
+.c-dot { width: 5px; height: 5px; border-radius: 50%; background: #10b981; margin-left: auto; flex-shrink: 0; }
+
+.c-main { flex: 1; background: #f9f6ff; display: flex; flex-direction: column; overflow: hidden; }
+.c-header { height: 42px; background: #fff; border-bottom: 1px solid #ede8f5; display: flex; align-items: center; padding: 0 14px; gap: 8px; }
+.c-bread { font-size: 11px; font-weight: 700; color: #5b21b6; }
+.c-search { margin-left: auto; display: flex; align-items: center; gap: 5px; background: #f5f0ff; border: 1px solid #ede0f8; border-radius: 6px; padding: 4px 8px; width: 110px; }
+.c-search-text { font-size: 9px; color: #9b86be; flex: 1; }
+.c-search-kbd { font-size: 8px; background: #ede9fe; border-radius: 3px; padding: 1px 3px; color: #9b86be; font-family: monospace; }
+.c-hbtn { width: 26px; height: 26px; border-radius: 6px; background: #f5f0ff; border: 1px solid #ede0f8; display: flex; align-items: center; justify-content: center; }
+.c-hav { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #5b21b6, #10b981); font-size: 8px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+.c-dash { flex: 1; padding: 12px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.c-greeting h3 { font-size: 12px; font-weight: 800; color: #1e0b3a; letter-spacing: -.02em; }
+.c-greeting p { font-size: 8px; color: #9b86be; margin-top: 1px; }
+.c-kpi-row { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; }
+.c-kpi { background: #fff; border: 1px solid #ede8f5; border-radius: 8px; padding: 8px; border-top: 2px solid; }
+.c-kpi-lbl { font-size: 8px; color: #9b86be; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3px; }
+.c-kpi-val { font-size: 15px; font-weight: 800; color: #1e0b3a; letter-spacing: -.03em; }
+.c-kpi-delta { font-size: 8px; font-weight: 600; }
+.c-spark { margin-top: 5px; height: 14px; display: flex; gap: 2px; align-items: flex-end; }
+.c-sb { flex: 1; border-radius: 1px 1px 0 0; }
+.c-lower { display: grid; grid-template-columns: 3fr 2fr; gap: 6px; flex: 1; }
+.c-card { background: #fff; border: 1px solid #ede8f5; border-radius: 8px; padding: 8px; overflow: hidden; }
+.c-card-ttl { font-size: 8px; font-weight: 700; color: #7e6a9e; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+.c-order-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f9f6ff; }
+.c-order-row:last-child { border-bottom: none; }
+.c-oid { font-size: 9px; font-weight: 700; color: #1e0b3a; font-family: monospace; }
+.c-ocust { font-size: 8px; color: #9b86be; }
+.c-oamt { font-size: 9px; font-weight: 700; color: #5b21b6; }
+.c-ostatus { font-size: 7px; font-weight: 700; border-radius: 3px; padding: 1px 4px; }
+.c-stat-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 5px; }
+.c-stat-head { display: flex; justify-content: space-between; }
+.c-stat-lbl { font-size: 8px; color: #7e6a9e; }
+.c-stat-val { font-size: 9px; font-weight: 700; color: #1e0b3a; }
+.c-stat-track { height: 4px; background: #f5f0ff; border-radius: 2px; overflow: hidden; }
+.c-stat-fill { height: 100%; border-radius: 2px; }
+
+/* SELECTION */
+.theme-block { user-select: none; }
+.theme-block.selected .mini-shell { outline: 3px solid #fff; outline-offset: -3px; }
+
+/* PALETTE STRIP */
+.palette-strip { display: flex; gap: 4px; padding: 8px 10px; }
+.ps { height: 6px; flex: 1; border-radius: 3px; }
+
+.theme-name-bar {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.theme-name { font-size: 13px; font-weight: 700; }
+.theme-desc { font-size: 11px; opacity: .7; margin-top: 2px; }
+</style>
+<script>
+function pick(id) {
+  document.querySelectorAll('.theme-block').forEach(el => el.classList.remove('selected'));
+  document.getElementById(id).classList.add('selected');
+  if (window.recordChoice) recordChoice(id, document.querySelector('#'+id+' .theme-name').textContent);
+}
+</script>
+</head>
+<body>
+
+<h2>Pick your signature color identity</h2>
+<div class="sub">Three completely original palettes — no standard enterprise blue anywhere.</div>
+
+<div class="themes">
+
+  <!-- ═══ THEME A: FOREST & SAFFRON ═══ -->
+  <div class="theme-block" id="a" onclick="pick('a')">
+    <div class="mini-shell">
+      <div class="a-sidebar">
+        <div class="a-brand">
+          <div class="a-brand-mark"></div>
+          <span class="a-brand-name">Supplify</span>
+        </div>
+        <div class="a-nav-lbl">Overview</div>
+        <div class="a-nav-item active">
+          <div class="a-nav-icon"></div>Dashboard
+        </div>
+        <div class="a-nav-lbl">Ops</div>
+        <div class="a-nav-item">
+          <div class="a-nav-icon"></div>Orders
+          <span class="a-badge">14</span>
+        </div>
+        <div class="a-nav-item">
+          <div class="a-nav-icon"></div>Products
+        </div>
+        <div class="a-nav-item">
+          <div class="a-nav-icon"></div>Fulfillment
+        </div>
+        <div class="a-user">
+          <div class="a-av">GM</div>
+          <div><div class="a-uname">Ghadi M.</div><div class="a-urole">Gold Plan</div></div>
+          <div class="a-dot"></div>
+        </div>
+      </div>
+      <div class="a-main">
+        <div class="a-header">
+          <span class="a-bread">Dashboard</span>
+          <div class="a-search"><span class="a-search-text">Search…</span><span class="a-search-kbd">⌘K</span></div>
+          <div class="a-hbtn"></div>
+          <div class="a-hav">GM</div>
+        </div>
+        <div class="a-dash">
+          <div class="a-greeting"><h3>Good morning, Ghadi ☀</h3><p>May 15 · Supplier · Gold Plan</p></div>
+          <div class="a-kpi-row">
+            <div class="a-kpi" style="border-top-color:#f59e0b;">
+              <div class="a-kpi-lbl">Revenue</div>
+              <div class="a-kpi-val">$48.2k</div>
+              <div class="a-kpi-delta" style="color:#064e3b;">↑ 12.4%</div>
+              <div class="a-spark">
+                <div class="a-sb" style="height:30%;background:#fde68a;"></div>
+                <div class="a-sb" style="height:50%;background:#fcd34d;"></div>
+                <div class="a-sb" style="height:45%;background:#fbbf24;"></div>
+                <div class="a-sb" style="height:70%;background:#f59e0b;"></div>
+                <div class="a-sb" style="height:100%;background:#d97706;"></div>
+              </div>
+            </div>
+            <div class="a-kpi" style="border-top-color:#064e3b;">
+              <div class="a-kpi-lbl">Orders</div>
+              <div class="a-kpi-val">127</div>
+              <div class="a-kpi-delta" style="color:#064e3b;">↑ 8.1%</div>
+              <div class="a-spark">
+                <div class="a-sb" style="height:35%;background:#a7f3d0;"></div>
+                <div class="a-sb" style="height:55%;background:#6ee7b7;"></div>
+                <div class="a-sb" style="height:48%;background:#34d399;"></div>
+                <div class="a-sb" style="height:72%;background:#10b981;"></div>
+                <div class="a-sb" style="height:100%;background:#064e3b;"></div>
+              </div>
+            </div>
+            <div class="a-kpi" style="border-top-color:#ef4444;">
+              <div class="a-kpi-lbl">Pending</div>
+              <div class="a-kpi-val">14</div>
+              <div class="a-kpi-delta" style="color:#ef4444;">⚠ 3 urgent</div>
+              <div class="a-spark">
+                <div class="a-sb" style="height:50%;background:#fecaca;"></div>
+                <div class="a-sb" style="height:65%;background:#fca5a5;"></div>
+                <div class="a-sb" style="height:55%;background:#f87171;"></div>
+                <div class="a-sb" style="height:80%;background:#ef4444;"></div>
+                <div class="a-sb" style="height:100%;background:#dc2626;"></div>
+              </div>
+            </div>
+            <div class="a-kpi" style="border-top-color:#f59e0b;">
+              <div class="a-kpi-lbl">Customers</div>
+              <div class="a-kpi-val">38</div>
+              <div class="a-kpi-delta" style="color:#064e3b;">+3 new</div>
+              <div class="a-spark">
+                <div class="a-sb" style="height:35%;background:#fef3c7;"></div>
+                <div class="a-sb" style="height:50%;background:#fde68a;"></div>
+                <div class="a-sb" style="height:60%;background:#fcd34d;"></div>
+                <div class="a-sb" style="height:80%;background:#f59e0b;"></div>
+                <div class="a-sb" style="height:100%;background:#d97706;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="a-lower">
+            <div class="a-card">
+              <div class="a-card-ttl">Recent Orders</div>
+              <div class="a-order-row">
+                <div><div class="a-oid">#A4F2</div><div class="a-ocust">Al Reem Kitchen</div></div>
+                <div style="text-align:right;"><div class="a-oamt">$840</div><span class="a-ostatus" style="background:#d1fae5;color:#064e3b;">PLACED</span></div>
+              </div>
+              <div class="a-order-row">
+                <div><div class="a-oid">#B7C1</div><div class="a-ocust">Spice Route</div></div>
+                <div style="text-align:right;"><div class="a-oamt">$1,240</div><span class="a-ostatus" style="background:#fef3c7;color:#b45309;">PROCESS</span></div>
+              </div>
+              <div class="a-order-row">
+                <div><div class="a-oid">#C3D8</div><div class="a-ocust">Café Milano</div></div>
+                <div style="text-align:right;"><div class="a-oamt">$590</div><span class="a-ostatus" style="background:#dcfce7;color:#15803d;">SHIPPED</span></div>
+              </div>
+            </div>
+            <div class="a-card">
+              <div class="a-card-ttl">Status</div>
+              <div class="a-stat-row"><div class="a-stat-head"><span class="a-stat-lbl">Completed</span><span class="a-stat-val">113</span></div><div class="a-stat-track"><div class="a-stat-fill" style="width:89%;background:#064e3b;"></div></div></div>
+              <div class="a-stat-row"><div class="a-stat-head"><span class="a-stat-lbl">Pending</span><span class="a-stat-val">14</span></div><div class="a-stat-track"><div class="a-stat-fill" style="width:11%;background:#f59e0b;"></div></div></div>
+              <div class="a-stat-row"><div class="a-stat-head"><span class="a-stat-lbl">Shipped</span><span class="a-stat-val">23</span></div><div class="a-stat-track"><div class="a-stat-fill" style="width:18%;background:#10b981;"></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="palette-strip" style="background:#fff8ed;">
+      <div class="ps" style="background:#064e3b;"></div>
+      <div class="ps" style="background:#065f46;"></div>
+      <div class="ps" style="background:#f59e0b;"></div>
+      <div class="ps" style="background:#d97706;"></div>
+      <div class="ps" style="background:#faf8f3;"></div>
+      <div class="ps" style="background:#ef4444;"></div>
+    </div>
+    <div class="theme-name-bar" style="background:#fff8ed;">
+      <div>
+        <div class="theme-name" style="color:#064e3b;">Forest & Saffron</div>
+        <div class="theme-desc" style="color:#a89880;">Deep green brand · amber accent · warm ivory bg</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ THEME B: TERRACOTTA & CREAM ═══ -->
+  <div class="theme-block" id="b" onclick="pick('b')">
+    <div class="mini-shell">
+      <div class="b-sidebar">
+        <div class="b-brand">
+          <div class="b-brand-mark"></div>
+          <span class="b-brand-name">Supplify</span>
+        </div>
+        <div class="b-nav-lbl">Overview</div>
+        <div class="b-nav-item active">
+          <div class="b-nav-icon"></div>Dashboard
+        </div>
+        <div class="b-nav-lbl">Ops</div>
+        <div class="b-nav-item">
+          <div class="b-nav-icon"></div>Orders
+          <span class="b-badge">14</span>
+        </div>
+        <div class="b-nav-item">
+          <div class="b-nav-icon"></div>Products
+        </div>
+        <div class="b-nav-item">
+          <div class="b-nav-icon"></div>Fulfillment
+        </div>
+        <div class="b-user">
+          <div class="b-av">GM</div>
+          <div><div class="b-uname">Ghadi M.</div><div class="b-urole">Gold Plan</div></div>
+          <div class="b-dot"></div>
+        </div>
+      </div>
+      <div class="b-main">
+        <div class="b-header">
+          <span class="b-bread">Dashboard</span>
+          <div class="b-search"><span class="b-search-text">Search…</span><span class="b-search-kbd">⌘K</span></div>
+          <div class="b-hbtn"></div>
+          <div class="b-hav">GM</div>
+        </div>
+        <div class="b-dash">
+          <div class="b-greeting"><h3>Good morning, Ghadi ☀</h3><p>May 15 · Supplier · Gold Plan</p></div>
+          <div class="b-kpi-row">
+            <div class="b-kpi" style="border-top-color:#ea580c;">
+              <div class="b-kpi-lbl">Revenue</div>
+              <div class="b-kpi-val">$48.2k</div>
+              <div class="b-kpi-delta" style="color:#9a3412;">↑ 12.4%</div>
+              <div class="b-spark">
+                <div class="b-sb" style="height:30%;background:#fed7aa;"></div>
+                <div class="b-sb" style="height:50%;background:#fdba74;"></div>
+                <div class="b-sb" style="height:45%;background:#fb923c;"></div>
+                <div class="b-sb" style="height:70%;background:#ea580c;"></div>
+                <div class="b-sb" style="height:100%;background:#9a3412;"></div>
+              </div>
+            </div>
+            <div class="b-kpi" style="border-top-color:#854d0e;">
+              <div class="b-kpi-lbl">Orders</div>
+              <div class="b-kpi-val">127</div>
+              <div class="b-kpi-delta" style="color:#9a3412;">↑ 8.1%</div>
+              <div class="b-spark">
+                <div class="b-sb" style="height:35%;background:#fef3c7;"></div>
+                <div class="b-sb" style="height:55%;background:#fde68a;"></div>
+                <div class="b-sb" style="height:48%;background:#fcd34d;"></div>
+                <div class="b-sb" style="height:72%;background:#ca8a04;"></div>
+                <div class="b-sb" style="height:100%;background:#854d0e;"></div>
+              </div>
+            </div>
+            <div class="b-kpi" style="border-top-color:#dc2626;">
+              <div class="b-kpi-lbl">Pending</div>
+              <div class="b-kpi-val">14</div>
+              <div class="b-kpi-delta" style="color:#dc2626;">⚠ 3 urgent</div>
+              <div class="b-spark">
+                <div class="b-sb" style="height:50%;background:#fecaca;"></div>
+                <div class="b-sb" style="height:65%;background:#fca5a5;"></div>
+                <div class="b-sb" style="height:55%;background:#f87171;"></div>
+                <div class="b-sb" style="height:80%;background:#ef4444;"></div>
+                <div class="b-sb" style="height:100%;background:#dc2626;"></div>
+              </div>
+            </div>
+            <div class="b-kpi" style="border-top-color:#c2410c;">
+              <div class="b-kpi-lbl">Customers</div>
+              <div class="b-kpi-val">38</div>
+              <div class="b-kpi-delta" style="color:#9a3412;">+3 new</div>
+              <div class="b-spark">
+                <div class="b-sb" style="height:35%;background:#ffedd5;"></div>
+                <div class="b-sb" style="height:50%;background:#fed7aa;"></div>
+                <div class="b-sb" style="height:60%;background:#fb923c;"></div>
+                <div class="b-sb" style="height:80%;background:#ea580c;"></div>
+                <div class="b-sb" style="height:100%;background:#c2410c;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="b-lower">
+            <div class="b-card">
+              <div class="b-card-ttl">Recent Orders</div>
+              <div class="b-order-row">
+                <div><div class="b-oid">#A4F2</div><div class="b-ocust">Al Reem Kitchen</div></div>
+                <div style="text-align:right;"><div class="b-oamt">$840</div><span class="b-ostatus" style="background:#ffedd5;color:#9a3412;">PLACED</span></div>
+              </div>
+              <div class="b-order-row">
+                <div><div class="b-oid">#B7C1</div><div class="b-ocust">Spice Route</div></div>
+                <div style="text-align:right;"><div class="b-oamt">$1,240</div><span class="b-ostatus" style="background:#fef9c3;color:#854d0e;">PROCESS</span></div>
+              </div>
+              <div class="b-order-row">
+                <div><div class="b-oid">#C3D8</div><div class="b-ocust">Café Milano</div></div>
+                <div style="text-align:right;"><div class="b-oamt">$590</div><span class="b-ostatus" style="background:#fee2d5;color:#c2410c;">SHIPPED</span></div>
+              </div>
+            </div>
+            <div class="b-card">
+              <div class="b-card-ttl">Status</div>
+              <div class="b-stat-row"><div class="b-stat-head"><span class="b-stat-lbl">Completed</span><span class="b-stat-val">113</span></div><div class="b-stat-track"><div class="b-stat-fill" style="width:89%;background:#ea580c;"></div></div></div>
+              <div class="b-stat-row"><div class="b-stat-head"><span class="b-stat-lbl">Pending</span><span class="b-stat-val">14</span></div><div class="b-stat-track"><div class="b-stat-fill" style="width:11%;background:#ca8a04;"></div></div></div>
+              <div class="b-stat-row"><div class="b-stat-head"><span class="b-stat-lbl">Shipped</span><span class="b-stat-val">23</span></div><div class="b-stat-track"><div class="b-stat-fill" style="width:18%;background:#c2410c;"></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="palette-strip" style="background:#fff7f5;">
+      <div class="ps" style="background:#9a3412;"></div>
+      <div class="ps" style="background:#ea580c;"></div>
+      <div class="ps" style="background:#fb923c;"></div>
+      <div class="ps" style="background:#ca8a04;"></div>
+      <div class="ps" style="background:#faf7f4;"></div>
+      <div class="ps" style="background:#dc2626;"></div>
+    </div>
+    <div class="theme-name-bar" style="background:#fff7f5;">
+      <div>
+        <div class="theme-name" style="color:#9a3412;">Terracotta & Spice</div>
+        <div class="theme-desc" style="color:#b4947e;">Rust/terracotta brand · amber secondary · cream bg</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ THEME C: DEEP VIOLET & MINT ═══ -->
+  <div class="theme-block" id="c" onclick="pick('c')">
+    <div class="mini-shell">
+      <div class="c-sidebar">
+        <div class="c-brand">
+          <div class="c-brand-mark"></div>
+          <span class="c-brand-name">Supplify</span>
+        </div>
+        <div class="c-nav-lbl">Overview</div>
+        <div class="c-nav-item active">
+          <div class="c-nav-icon"></div>Dashboard
+        </div>
+        <div class="c-nav-lbl">Ops</div>
+        <div class="c-nav-item">
+          <div class="c-nav-icon"></div>Orders
+          <span class="c-badge">14</span>
+        </div>
+        <div class="c-nav-item">
+          <div class="c-nav-icon"></div>Products
+        </div>
+        <div class="c-nav-item">
+          <div class="c-nav-icon"></div>Fulfillment
+        </div>
+        <div class="c-user">
+          <div class="c-av">GM</div>
+          <div><div class="c-uname">Ghadi M.</div><div class="c-urole">Gold Plan</div></div>
+          <div class="c-dot"></div>
+        </div>
+      </div>
+      <div class="c-main">
+        <div class="c-header">
+          <span class="c-bread">Dashboard</span>
+          <div class="c-search"><span class="c-search-text">Search…</span><span class="c-search-kbd">⌘K</span></div>
+          <div class="c-hbtn"></div>
+          <div class="c-hav">GM</div>
+        </div>
+        <div class="c-dash">
+          <div class="c-greeting"><h3>Good morning, Ghadi ☀</h3><p>May 15 · Supplier · Gold Plan</p></div>
+          <div class="c-kpi-row">
+            <div class="c-kpi" style="border-top-color:#7c3aed;">
+              <div class="c-kpi-lbl">Revenue</div>
+              <div class="c-kpi-val">$48.2k</div>
+              <div class="c-kpi-delta" style="color:#10b981;">↑ 12.4%</div>
+              <div class="c-spark">
+                <div class="c-sb" style="height:30%;background:#ede9fe;"></div>
+                <div class="c-sb" style="height:50%;background:#ddd6fe;"></div>
+                <div class="c-sb" style="height:45%;background:#a78bfa;"></div>
+                <div class="c-sb" style="height:70%;background:#7c3aed;"></div>
+                <div class="c-sb" style="height:100%;background:#5b21b6;"></div>
+              </div>
+            </div>
+            <div class="c-kpi" style="border-top-color:#10b981;">
+              <div class="c-kpi-lbl">Orders</div>
+              <div class="c-kpi-val">127</div>
+              <div class="c-kpi-delta" style="color:#10b981;">↑ 8.1%</div>
+              <div class="c-spark">
+                <div class="c-sb" style="height:35%;background:#d1fae5;"></div>
+                <div class="c-sb" style="height:55%;background:#6ee7b7;"></div>
+                <div class="c-sb" style="height:48%;background:#34d399;"></div>
+                <div class="c-sb" style="height:72%;background:#10b981;"></div>
+                <div class="c-sb" style="height:100%;background:#059669;"></div>
+              </div>
+            </div>
+            <div class="c-kpi" style="border-top-color:#f59e0b;">
+              <div class="c-kpi-lbl">Pending</div>
+              <div class="c-kpi-val">14</div>
+              <div class="c-kpi-delta" style="color:#f59e0b;">⚠ 3 urgent</div>
+              <div class="c-spark">
+                <div class="c-sb" style="height:50%;background:#fef3c7;"></div>
+                <div class="c-sb" style="height:65%;background:#fde68a;"></div>
+                <div class="c-sb" style="height:55%;background:#fbbf24;"></div>
+                <div class="c-sb" style="height:80%;background:#f59e0b;"></div>
+                <div class="c-sb" style="height:100%;background:#d97706;"></div>
+              </div>
+            </div>
+            <div class="c-kpi" style="border-top-color:#5b21b6;">
+              <div class="c-kpi-lbl">Customers</div>
+              <div class="c-kpi-val">38</div>
+              <div class="c-kpi-delta" style="color:#10b981;">+3 new</div>
+              <div class="c-spark">
+                <div class="c-sb" style="height:35%;background:#f5f3ff;"></div>
+                <div class="c-sb" style="height:50%;background:#ddd6fe;"></div>
+                <div class="c-sb" style="height:60%;background:#a78bfa;"></div>
+                <div class="c-sb" style="height:80%;background:#7c3aed;"></div>
+                <div class="c-sb" style="height:100%;background:#5b21b6;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="c-lower">
+            <div class="c-card">
+              <div class="c-card-ttl">Recent Orders</div>
+              <div class="c-order-row">
+                <div><div class="c-oid">#A4F2</div><div class="c-ocust">Al Reem Kitchen</div></div>
+                <div style="text-align:right;"><div class="c-oamt">$840</div><span class="c-ostatus" style="background:#ede9fe;color:#5b21b6;">PLACED</span></div>
+              </div>
+              <div class="c-order-row">
+                <div><div class="c-oid">#B7C1</div><div class="c-ocust">Spice Route</div></div>
+                <div style="text-align:right;"><div class="c-oamt">$1,240</div><span class="c-ostatus" style="background:#d1fae5;color:#065f46;">SHIPPED</span></div>
+              </div>
+              <div class="c-order-row">
+                <div><div class="c-oid">#C3D8</div><div class="c-ocust">Café Milano</div></div>
+                <div style="text-align:right;"><div class="c-oamt">$590</div><span class="c-ostatus" style="background:#fef3c7;color:#92400e;">PROCESS</span></div>
+              </div>
+            </div>
+            <div class="c-card">
+              <div class="c-card-ttl">Status</div>
+              <div class="c-stat-row"><div class="c-stat-head"><span class="c-stat-lbl">Completed</span><span class="c-stat-val">113</span></div><div class="c-stat-track"><div class="c-stat-fill" style="width:89%;background:#10b981;"></div></div></div>
+              <div class="c-stat-row"><div class="c-stat-head"><span class="c-stat-lbl">Pending</span><span class="c-stat-val">14</span></div><div class="c-stat-track"><div class="c-stat-fill" style="width:11%;background:#f59e0b;"></div></div></div>
+              <div class="c-stat-row"><div class="c-stat-head"><span class="c-stat-lbl">Shipped</span><span class="c-stat-val">23</span></div><div class="c-stat-track"><div class="c-stat-fill" style="width:18%;background:#7c3aed;"></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="palette-strip" style="background:#f9f5ff;">
+      <div class="ps" style="background:#4c1d95;"></div>
+      <div class="ps" style="background:#7c3aed;"></div>
+      <div class="ps" style="background:#a78bfa;"></div>
+      <div class="ps" style="background:#10b981;"></div>
+      <div class="ps" style="background:#f9f6ff;"></div>
+      <div class="ps" style="background:#f59e0b;"></div>
+    </div>
+    <div class="theme-name-bar" style="background:#f9f5ff;">
+      <div>
+        <div class="theme-name" style="color:#5b21b6;">Deep Violet & Mint</div>
+        <div class="theme-desc" style="color:#9b86be;">Plum/violet brand · emerald green accent · lavender bg</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="font-size:11px;color:#475569;text-align:center;max-width:600px;">
+  Click a theme to select it. You can also mix — e.g. Forest & Saffron brand mark with Terracotta action colors.
+</div>
+
+</body>
+</html>

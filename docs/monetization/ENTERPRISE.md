@@ -38,4 +38,4 @@ These are not stored in the product; they are reflected in your contracts and op
 
 - Plan `code` is `enterprise`; `tenant_type` is `RESTAURANT` or `SUPPLIER` (separate rows).
 - The plan row has `requires_admin_assignment = true` so it is excluded from any self-serve plan picker. Only admin-initiated plan changes can set a tenant to Enterprise.
-- See **docs/SUBSCRIPTIONS.md** for enforcement (limits, features) and **docs/ADMIN.md** for admin subscription management.
+- See **[SUBSCRIPTIONS.md](./SUBSCRIPTIONS.md)** for enforcement (limits, features) and **[ADMIN.md](../admin/ADMIN.md)** for admin subscription management.

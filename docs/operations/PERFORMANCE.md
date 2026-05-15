@@ -31,4 +31,4 @@ Indexes and query patterns for admin dashboards and usage/subscription flows.
 
 ## Atomic usage
 
-Daily meters (orders_per_day, chats_per_day) use `checkAndIncrementUsage` with a transaction and `SELECT ... FOR UPDATE` on the usage_meter row so concurrent requests do not double-count. See docs/HARDENING.md.
+Daily meters (orders_per_day, chats_per_day) use `checkAndIncrementUsage` with a transaction and `SELECT ... FOR UPDATE` on the usage_meter row so concurrent requests do not double-count. See [HARDENING.md](../architecture/HARDENING.md).

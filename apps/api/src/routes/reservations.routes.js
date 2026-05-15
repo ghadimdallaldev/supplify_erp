@@ -122,7 +122,7 @@ async function fetchReservations(restaurantId, branchId, dayStart) {
         ${branchFilter}
       ORDER BY r.scheduled_at
     `,
-    branchId ? [...params, branchId] : params
+    params
   )
 
   return rows

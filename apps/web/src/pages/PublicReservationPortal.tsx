@@ -118,7 +118,7 @@ export function PublicReservationPortal() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
         <Card className="max-w-md">
-          <CardContent className="py-8 text-center text-muted-foreground">Loading…</CardContent>
+          <CardContent className="py-8 text-center text-[var(--text-muted)]">Loading…</CardContent>
         </Card>
       </div>
     )
@@ -190,7 +190,7 @@ export function PublicReservationPortal() {
             <div className="space-y-2">
               <Label>Available times</Label>
               {slots.length === 0 ? (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[var(--text-muted)]">
                   Choose a date, then click “Check availability” to view open time slots.
                 </p>
               ) : (
@@ -200,10 +200,10 @@ export function PublicReservationPortal() {
                       type="button"
                       className={`flex flex-col rounded-lg border px-3 py-2 text-left text-xs transition ${
                         slot.startTime === form.selectedSlot
-                          ? 'border-primary bg-primary/10 text-primary'
+                          ? 'border-[var(--brand)] bg-[var(--brand-pale)] text-[var(--brand-mid)]'
                           : slot.isAvailable
-                            ? 'border-gray-200 hover:border-primary/50 hover:text-primary'
-                            : 'border-gray-100 text-gray-400'
+                            ? 'border-[var(--app-border)] hover:border-[var(--brand)]/50 hover:text-[var(--brand-mid)]'
+                            : 'border-[var(--app-border)] text-[var(--text-muted)]'
                       }`}
                       key={slot.startTime}
                       disabled={!slot.isAvailable}
@@ -212,7 +212,7 @@ export function PublicReservationPortal() {
                       <span className="font-medium">{formatTime(slot.startTime)}</span>
                       <span>Up to {slot.capacityAvailable} seats</span>
                       {!slot.isAvailable ? (
-                        <span className="text-[10px] uppercase text-red-500">Waitlist</span>
+                        <span className="text-[10px] uppercase text-[var(--red)]">Waitlist</span>
                       ) : null}
                     </button>
                   ))}
@@ -265,14 +265,14 @@ export function PublicReservationPortal() {
                 </div>
                 <div>
                   <Label>Selected time</Label>
-                  <div className="flex h-10 items-center rounded-md border border-gray-200 px-3 text-sm">
+                  <div className="flex h-10 items-center rounded-md border border-[var(--app-border)] px-3 text-sm">
                     {selectedSlotDetails ? (
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{formatTime(selectedSlotDetails.startTime)}</Badge>
                         <span>{new Date(form.date).toLocaleDateString()}</span>
                       </div>
                     ) : (
-                      <span className="text-gray-400">Pick a time slot to continue</span>
+                      <span className="text-[var(--text-muted)]">Pick a time slot to continue</span>
                     )}
                   </div>
                 </div>
@@ -296,7 +296,7 @@ export function PublicReservationPortal() {
                 {creatingReservation ? 'Reserving…' : 'Confirm reservation'}
               </Button>
 
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[var(--text-muted)]">
                 By completing this booking you agree to receive reservation updates for this visit.
                 To modify or cancel, use the confirmation link sent after booking.
               </p>

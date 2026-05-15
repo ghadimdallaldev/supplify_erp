@@ -45,7 +45,7 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 
 ## Enterprise plan
 
-- **Enterprise** is a separate plan (`code = 'enterprise'`) for both RESTAURANT and SUPPLIER with unlimited or very high limits and full features. It has `requires_admin_assignment = true`: only an admin can assign it (no self-serve). See **docs/ENTERPRISE.md** for what enterprise gets, SLA options, custom contracts, and manual onboarding.
+- **Enterprise** is a separate plan (`code = 'enterprise'`) for both RESTAURANT and SUPPLIER with unlimited or very high limits and full features. It has `requires_admin_assignment = true`: only an admin can assign it (no self-serve). See **[ENTERPRISE.md](./ENTERPRISE.md)** for what enterprise gets, SLA options, custom contracts, and manual onboarding.
 
 ## Admin
 

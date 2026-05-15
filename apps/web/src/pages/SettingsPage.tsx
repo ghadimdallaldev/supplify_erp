@@ -118,8 +118,8 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="text-[21px] font-black tracking-tight text-[var(--text)]">Settings</h1>
+        <p className="text-xs text-[var(--text-muted)] mt-1">
           Manage your account and preferences
         </p>
       </div>
@@ -137,19 +137,19 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-600">Display Name</label>
+              <label className="text-sm font-medium text-[var(--text-mid)]">Display Name</label>
               <p className="text-sm">{user?.displayName}</p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-600">Email</label>
+              <label className="text-sm font-medium text-[var(--text-mid)]">Email</label>
               <p className="text-sm">{user?.email}</p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-600">Role</label>
+              <label className="text-sm font-medium text-[var(--text-mid)]">Role</label>
               <p className="text-sm capitalize">{user?.role?.toLowerCase()}</p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-600">Member Since</label>
+              <label className="text-sm font-medium text-[var(--text-mid)]">Member Since</label>
               <p className="text-sm">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</p>
             </div>
           </CardContent>
@@ -167,7 +167,7 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-[var(--text-muted)]">
                 Your account is secured through Keycloak authentication.
               </p>
               <Button 
@@ -197,7 +197,7 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {isLoadingNotificationPrefs ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading notification preferences…
               </div>
@@ -205,10 +205,10 @@ export function SettingsPage() {
               <>
                 <div className="space-y-4">
                   {NOTIFICATION_FIELDS.map(({ key, label, description }) => (
-                    <div key={key} className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                    <div key={key} className="flex items-start justify-between gap-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
                       <div>
-                        <p className="text-sm font-medium text-foreground">{label}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+                        <p className="text-sm font-medium text-[var(--text)]">{label}</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">{description}</p>
                       </div>
                       <Switch
                         checked={notificationPrefs[key]}
@@ -252,7 +252,7 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-[var(--text-muted)]">
                 Need help? Contact our support team.
               </p>
               <Button variant="outline" size="sm">

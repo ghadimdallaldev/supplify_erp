@@ -55,6 +55,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
     if (!entitlements) {
       // Last resort: return synthetic Free so UI always shows something; backend will still enforce limits
       const { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } = await import('../lib/subscription.js')
+      const { resolveAllFeaturesForTenant } = await import('../lib/feature-flags.js')
       const limitKeys =
         tenant.tenantType === 'RESTAURANT' ? RESTAURANT_LIMIT_KEYS : SUPPLIER_LIMIT_KEYS
       const freeDefaults =
@@ -76,6 +77,17 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
               storage_mb: 50,
             }
       const defaultLimits = Object.fromEntries(limitKeys.map((k) => [k, freeDefaults[k] ?? 0]))
+      const planFeat = {
+        chat: true,
+        smart_reorder: false,
+        reports: false,
+        multi_branch: false,
+      }
+      const { features, featureSources } = await resolveAllFeaturesForTenant(
+        tenant.tenantId,
+        tenant.tenantType,
+        planFeat
+      )
       entitlements = {
         tenantId: tenant.tenantId,
         tenantType: tenant.tenantType,
@@ -87,7 +99,8 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
           price_monthly: 0,
           price_yearly: 0,
         },
-        features: { chat: true, smart_reorder: false, reports: false, multi_branch: false },
+        features,
+        featureSources,
         limits: defaultLimits,
         baseLimits: defaultLimits,
         overrides: [],

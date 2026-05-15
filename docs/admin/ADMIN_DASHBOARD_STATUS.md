@@ -5,7 +5,7 @@
 Supplify’s admin area is a subscription-based operator console for managing tenants, plans, subscriptions, usage, and support (including chat and impersonation). Access is limited to users with the **ADMIN** role.
 
 **Full guide:** [ADMIN.md](./ADMIN.md)  
-**Audit & roadmap:** [ADMIN_AUDIT.md](./ADMIN_AUDIT.md)
+**Audit & roadmap:** [ADMIN_AUDIT.md](../architecture/ADMIN_AUDIT.md)
 
 ---
 

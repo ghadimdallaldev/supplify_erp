@@ -1,6 +1,7 @@
 import express from 'express'
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ALL_FEATURE_KEYS } from '../lib/feature-keys.js'
 
 vi.mock('../lib/db.js', () => ({ query: vi.fn() }))
 vi.mock('../lib/logger.js', () => ({
@@ -461,8 +462,10 @@ describe('Admin Dashboard Routes', () => {
       const res = await request(app).get('/api/admin-dashboard/feature-flags').expect(200)
 
       expect(res.body.ok).toBe(true)
-      expect(res.body.data.flags).toHaveLength(1)
-      expect(res.body.data.flags[0].featureKey).toBe('reports')
+      expect(res.body.data.flags).toHaveLength(ALL_FEATURE_KEYS.length)
+      const reports = res.body.data.flags.find((f) => f.featureKey === 'reports')
+      expect(reports.featureName).toBe('Reports')
+      expect(reports.globalOverride).toBe(null)
     })
   })
 

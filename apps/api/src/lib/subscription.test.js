@@ -277,6 +277,8 @@ describe('Subscription lib', () => {
             },
           ],
         })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ c: 0 }] })
         .mockResolvedValueOnce({ rows: [{ c: 0 }] })
         .mockResolvedValueOnce({ rows: [] })

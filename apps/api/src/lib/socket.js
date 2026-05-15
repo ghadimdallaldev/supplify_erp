@@ -1,6 +1,8 @@
 import { Server } from 'socket.io'
 import { logger } from './logger.js'
 import { config } from '../config/env.js'
+import { verifyToken } from './auth.js'
+import { query } from './db.js'
 import { persistMessageFromSocket } from '../services/chatSocket.service.js'
 
 let io = null
@@ -14,8 +16,31 @@ export function initializeSocket(server) {
     },
   })
 
+  io.use(async (socket, next) => {
+    try {
+      const cookieHeader = socket.handshake.headers.cookie || ''
+      const accessToken = cookieHeader
+        .split(';')
+        .map((c) => { const i = c.indexOf('='); return [c.slice(0, i).trim(), c.slice(i + 1).trim()] })
+        .find(([k]) => k === 'access_token')?.[1]
+      if (!accessToken) {
+        return next(new Error('Unauthorized: no access token'))
+      }
+      const payload = await verifyToken(accessToken)
+      const { rows } = await query('SELECT id, role FROM app_user WHERE keycloak_sub = $1', [payload.sub])
+      if (rows.length === 0) {
+        return next(new Error('Unauthorized: user not found'))
+      }
+      socket.data.userId = rows[0].id
+      socket.data.role = rows[0].role
+      next()
+    } catch {
+      next(new Error('Unauthorized: invalid token'))
+    }
+  })
+
   io.on('connection', (socket) => {
-    logger.info('Client connected', { socketId: socket.id })
+    logger.info('Client connected', { socketId: socket.id, userId: socket.data.userId })
 
     // Handle joining a conversation
     socket.on('join_conversation', async (conversationId) => {
@@ -31,7 +56,8 @@ export function initializeSocket(server) {
 
     // Handle sending a message (fallback for clients that only emit socket; persist so message is not lost)
     socket.on('send_message', async (data) => {
-      const { conversationId, content, senderId } = data
+      const { conversationId, content } = data
+      const senderId = socket.data.userId
 
       logger.info('New message received via socket', {
         socketId: socket.id,
@@ -111,4 +137,20 @@ export function getIO() {
     throw new Error('Socket.IO not initialized. Call initializeSocket() first.')
   }
   return io
+}
+
+/**
+ * Notify all connected clients to refetch entitlements (global or tenant feature flag change).
+ * Safe to call before Socket.IO is initialized (no-op).
+ * @param {Record<string, unknown>} payload
+ */
+export function emitEntitlementsRefreshNotice(payload) {
+  if (!io) {
+    logger.debug('emitEntitlementsRefreshNotice skipped: socket not initialized', payload)
+    return
+  }
+  io.emit('entitlements_refresh', {
+    ...payload,
+    at: new Date().toISOString(),
+  })
 }
