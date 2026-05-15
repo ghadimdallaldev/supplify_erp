@@ -4,7 +4,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
-import { notifySupplierLowStock } from '../services/notification.service.js'
+import { notifySupplierLowStock, notifyOutOfStock } from '../services/notification.service.js'
 
 const router = express.Router()
 
@@ -373,6 +373,15 @@ router.post(
             threshold,
             currentValue: newQty,
           }).catch((err) => logger.warn('Low-stock notification failed', { err: err.message }))
+        }
+
+        if (newQty <= 0 && currentQty > 0) {
+          const { rows: pRow } = await query('SELECT name FROM product WHERE id = $1', [productId])
+          notifyOutOfStock({
+            productId,
+            warehouseId: adjustmentData.warehouseId || null,
+            productName: pRow[0]?.name || null,
+          }).catch((err) => logger.warn('Out-of-stock notification failed', { err: err.message }))
         }
 
         await query('COMMIT')

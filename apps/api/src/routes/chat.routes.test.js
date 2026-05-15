@@ -60,6 +60,14 @@ vi.mock('../lib/subscription.js', () => ({
   incrementUsage: vi.fn().mockResolvedValue(true),
 }))
 
+vi.mock('../services/notification.service.js', async (importOriginal) => {
+  const mod = await importOriginal()
+  return {
+    ...mod,
+    notifyMessageReceived: vi.fn().mockResolvedValue(null),
+  }
+})
+
 // Import routes after mocks
 import { chatRoutes } from './chat.routes.js'
 

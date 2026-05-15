@@ -346,7 +346,9 @@ router.post('/logout', requireAuth, async (req, res) => {
     let keycloakLogoutUrl = null
     try {
       keycloakLogoutUrl = await getKeycloakLogoutUrl(postLogoutRedirectUri)
-    } catch (_) {}
+    } catch {
+      /* optional: logout URL not required for success response */
+    }
 
     res.json({
       ok: true,

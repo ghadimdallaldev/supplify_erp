@@ -42,6 +42,7 @@ import adminDashboardRoutes from './routes/admin-dashboard.routes.js'
 import branchesRoutes from './routes/branches.routes.js'
 import warehousesRoutes from './routes/warehouses.routes.js'
 import { executeScheduledOrders } from './services/scheduled-orders.service.js'
+import { checkOverdueInvoices } from './jobs/invoice-overdue.job.js'
 import { ensureReservationsSchema, ensureStaffAppSchema } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
@@ -264,6 +265,15 @@ server.listen(PORT, () => {
   }, CRON_INTERVAL)
 
   logger.info('Scheduled orders cron job started (runs every 5 minutes for testing)')
+
+  checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed on startup:', err))
+  setInterval(
+    () => {
+      checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed:', err))
+    },
+    24 * 60 * 60 * 1000
+  )
+  logger.info('Invoice overdue job started (runs every 24h)')
 })
 
 export default app

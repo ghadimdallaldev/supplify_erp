@@ -17,6 +17,7 @@ import {
   buildLimitExceededPayload,
 } from '../lib/subscription.js'
 import { z } from 'zod'
+import { notifyMessageReceived } from '../services/notification.service.js'
 
 const router = express.Router()
 
@@ -778,6 +779,12 @@ router.post(
         }
 
         await query('COMMIT')
+
+        notifyMessageReceived({
+          conversationId,
+          senderType: req.userData.role,
+          messagePreview: messageData.content?.slice(0, 100) || '',
+        }).catch((err) => logger.warn('Message received notification failed', { err: err.message }))
 
         // Fetch message with attachments
         const { rows: fullMessages } = await query(

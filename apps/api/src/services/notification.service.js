@@ -1,7 +1,9 @@
-import { query } from '../lib/db.js';
-import { logger } from '../lib/logger.js';
-import { sendMail } from './mailer.service.js';
-import { buildWhatsAppUrl } from '../lib/whatsapp.js';
+import { query } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
+import { sendMail } from './mailer.service.js'
+import { buildWhatsAppUrl } from '../lib/whatsapp.js'
+import { getEntitlements } from '../lib/subscription.js'
+import { sendWhatsAppMessage as sendWhatsAppMessageService } from './whatsapp.service.js'
 
 /**
  * Notification Service — email via nodemailer (SMTP), WhatsApp via wa.me deep links.
@@ -9,25 +11,16 @@ import { buildWhatsAppUrl } from '../lib/whatsapp.js';
 
 const emailService = {
   async send(email, subject, html, text) {
-    if (!email) return false;
+    if (!email) return false
     try {
-      await sendMail({ to: email, subject, text, html });
-      return true;
+      await sendMail({ to: email, subject, text, html })
+      return true
     } catch (error) {
-      logger.error('Email send failed', { error: error.message });
-      return false;
+      logger.error('Email send failed', { error: error.message })
+      return false
     }
   },
-};
-
-const whatsappService = {
-  /**
-   * Returns a wa.me URL (does not send server-side). Caller stores link in metadata / in-app UI.
-   */
-  buildLink(phone, message) {
-    return buildWhatsAppUrl(phone, message);
-  },
-};
+}
 
 // Push notifications disabled for now
 // const pushService = { ... }
@@ -60,7 +53,7 @@ const DEFAULT_NOTIFICATION_PREFS = {
   notify_staff_announcement: true,
   notify_staff_document: true,
   notify_scheduled_order: true,
-};
+}
 
 const CATEGORY_PREF_MAP = {
   placed: 'notify_order_new',
@@ -90,34 +83,34 @@ const CATEGORY_PREF_MAP = {
   staff_document: 'notify_staff_document',
   scheduled_order: 'notify_scheduled_order',
   test: 'notify_system_updates',
-};
+}
 
 function readPref(prefs, snakeKey) {
-  if (!prefs || !snakeKey) return undefined;
-  const camelKey = snakeKey.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-  if (prefs[camelKey] !== undefined) return prefs[camelKey];
-  return prefs[snakeKey];
+  if (!prefs || !snakeKey) return undefined
+  const camelKey = snakeKey.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+  if (prefs[camelKey] !== undefined) return prefs[camelKey]
+  return prefs[snakeKey]
 }
 
 function isPrefEnabled(prefs, snakeKey, defaultValue = true) {
-  const value = readPref(prefs, snakeKey);
-  if (value === undefined) return defaultValue;
-  return value !== false;
+  const value = readPref(prefs, snakeKey)
+  if (value === undefined) return defaultValue
+  return value !== false
 }
 
 function resolvePreferenceKey(notificationCategory) {
   const normalized = String(notificationCategory || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_|_$/g, '');
+    .replace(/^_|_$/g, '')
   if (CATEGORY_PREF_MAP[normalized]) {
-    return CATEGORY_PREF_MAP[normalized];
+    return CATEGORY_PREF_MAP[normalized]
   }
-  const directKey = `notify_${normalized}`;
+  const directKey = `notify_${normalized}`
   if (DEFAULT_NOTIFICATION_PREFS[directKey] !== undefined) {
-    return directKey;
+    return directKey
   }
-  return null;
+  return null
 }
 
 async function getRestaurantUserContext(restaurantId) {
@@ -128,9 +121,9 @@ async function getRestaurantUserContext(restaurantId) {
       JOIN app_user u ON u.email = r.contact_email
       WHERE r.id = $1
     `,
-    [restaurantId],
-  );
-  return rows[0] || null;
+    [restaurantId]
+  )
+  return rows[0] || null
 }
 
 async function getStaffMemberContext(staffId) {
@@ -140,18 +133,18 @@ async function getStaffMemberContext(staffId) {
       FROM staff_member m
       WHERE m.id = $1
     `,
-    [staffId],
-  );
-  return rows[0] || null;
+    [staffId]
+  )
+  return rows[0] || null
 }
 
 function mapPreferencesRow(row) {
-  if (!row) return null;
+  if (!row) return null
   const entries = Object.entries(row).map(([key, value]) => {
-    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-    return [camelKey, value];
-  });
-  return Object.fromEntries(entries);
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+    return [camelKey, value]
+  })
+  return Object.fromEntries(entries)
 }
 
 /**
@@ -164,11 +157,11 @@ export async function ensureNotificationPreferences(userId, userType) {
       FROM notification_preferences
       WHERE user_id = $1 AND user_type = $2
     `,
-    [userId, userType],
-  );
+    [userId, userType]
+  )
 
   if (rows.length) {
-    return rows[0];
+    return rows[0]
   }
 
   const { rows: inserted } = await query(
@@ -179,27 +172,27 @@ export async function ensureNotificationPreferences(userId, userType) {
       DO UPDATE SET updated_at = now()
       RETURNING *
     `,
-    [userId, userType],
-  );
+    [userId, userType]
+  )
 
-  return inserted[0];
+  return inserted[0]
 }
 
 /**
  * Get or create notification preferences for a user
  */
 export async function getUserPreferences(userId, userType) {
-  const row = await ensureNotificationPreferences(userId, userType);
-  return mapPreferencesRow({ ...DEFAULT_NOTIFICATION_PREFS, ...row });
+  const row = await ensureNotificationPreferences(userId, userType)
+  return mapPreferencesRow({ ...DEFAULT_NOTIFICATION_PREFS, ...row })
 }
 
 /**
  * Get user contact information (syncs from tenant profile when missing)
  */
 export async function getUserContactInfo(userId, userType) {
-  const idTable = userType === 'SUPPLIER' ? 'supplier' : 'restaurant';
-  const idColumn = userType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id';
-  const contactTable = userType === 'SUPPLIER' ? 'supplier_contact_info' : 'restaurant_contact_info';
+  const idTable = userType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+  const idColumn = userType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id'
+  const contactTable = userType === 'SUPPLIER' ? 'supplier_contact_info' : 'restaurant_contact_info'
 
   const { rows: tenantRows } = await query(
     `
@@ -208,8 +201,8 @@ export async function getUserContactInfo(userId, userType) {
       JOIN app_user u ON u.email = s.contact_email
       WHERE u.id = $1
     `,
-    [userId],
-  );
+    [userId]
+  )
 
   if (!tenantRows.length) {
     return {
@@ -217,14 +210,13 @@ export async function getUserContactInfo(userId, userType) {
       phone: null,
       email_verified: false,
       phone_verified: false,
-    };
+    }
   }
 
-  const tenant = tenantRows[0];
-  const { rows } = await query(
-    `SELECT * FROM ${contactTable} WHERE ${idColumn} = $1`,
-    [tenant.tenant_id],
-  );
+  const tenant = tenantRows[0]
+  const { rows } = await query(`SELECT * FROM ${contactTable} WHERE ${idColumn} = $1`, [
+    tenant.tenant_id,
+  ])
 
   if (rows.length) {
     return {
@@ -232,7 +224,7 @@ export async function getUserContactInfo(userId, userType) {
       phone: rows[0].phone || tenant.phone,
       email_verified: rows[0].email_verified ?? false,
       phone_verified: rows[0].phone_verified ?? false,
-    };
+    }
   }
 
   if (tenant.email || tenant.phone) {
@@ -245,8 +237,8 @@ export async function getUserContactInfo(userId, userType) {
             phone = COALESCE(EXCLUDED.phone, ${contactTable}.phone),
             updated_at = now()
       `,
-      [tenant.tenant_id, tenant.email, tenant.phone, !!tenant.email, !!tenant.phone],
-    );
+      [tenant.tenant_id, tenant.email, tenant.phone, !!tenant.email, !!tenant.phone]
+    )
   }
 
   return {
@@ -254,7 +246,38 @@ export async function getUserContactInfo(userId, userType) {
     phone: tenant.phone || null,
     email_verified: !!tenant.email,
     phone_verified: !!tenant.phone,
-  };
+  }
+}
+
+/**
+ * Resolve which notification channels are allowed for a given plan feature value.
+ */
+export function resolveAllowedChannels(notificationsFeatureValue) {
+  switch (notificationsFeatureValue) {
+    case 'in_app_and_email':
+      return new Set(['in_app', 'email'])
+    case 'email_and_whatsapp':
+    case 'email_whatsapp_webhook':
+      return new Set(['in_app', 'email', 'whatsapp'])
+    case 'in_app_only':
+    default:
+      return new Set(['in_app'])
+  }
+}
+
+/**
+ * Look up the tenant (restaurant/supplier) ID for a given app_user ID.
+ */
+async function getTenantIdForUser(userId, userType) {
+  const table = userType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+  const { rows } = await query(
+    `SELECT s.id AS tenant_id
+     FROM ${table} s
+     JOIN app_user u ON u.email = s.contact_email
+     WHERE u.id = $1`,
+    [userId]
+  )
+  return rows[0]?.tenant_id || null
 }
 
 /**
@@ -273,79 +296,99 @@ export async function sendNotification({
 }) {
   try {
     // Get user preferences
-    const prefs = await getUserPreferences(userId, userType);
-    const contact = await getUserContactInfo(userId, userType);
+    const prefs = await getUserPreferences(userId, userType)
+    const contact = await getUserContactInfo(userId, userType)
 
-    // Determine which channels to send to (push/SMS disabled; WhatsApp preferred for phone)
+    // Tier enforcement: derive allowed channels from subscription plan
+    let allowedChannels = new Set(['in_app']) // safe default
+    try {
+      const tenantId = await getTenantIdForUser(userId, userType)
+      if (tenantId) {
+        const entitlements = await getEntitlements(tenantId, userType)
+        allowedChannels = resolveAllowedChannels(entitlements?.features?.notifications)
+      }
+    } catch (err) {
+      logger.warn('Failed to resolve notification tier, defaulting to in_app', { err: err.message })
+    }
+
     const channels = {
-      email: isPrefEnabled(prefs, 'email_enabled') && contact?.email,
-      whatsapp: isPrefEnabled(prefs, 'whatsapp_enabled') && contact?.phone,
+      email:
+        allowedChannels.has('email') && isPrefEnabled(prefs, 'email_enabled') && !!contact?.email,
+      whatsapp:
+        allowedChannels.has('whatsapp') &&
+        isPrefEnabled(prefs, 'whatsapp_enabled') &&
+        !!contact?.phone,
       sms: false,
       push: false,
       inApp: isPrefEnabled(prefs, 'in_app_enabled'),
-    };
+    }
 
-    const preferenceKey = resolvePreferenceKey(notificationCategory);
-    const shouldSend = preferenceKey ? isPrefEnabled(prefs, preferenceKey) : true;
+    const preferenceKey = resolvePreferenceKey(notificationCategory)
+    const shouldSend = preferenceKey ? isPrefEnabled(prefs, preferenceKey) : true
     if (!shouldSend) {
-      logger.info('Notification skipped due to user preference', { userId, notificationCategory });
-      return null;
+      logger.info('Notification skipped due to user preference', { userId, notificationCategory })
+      return null
     }
 
     // Log notification
-    const { rows: [notification] } = await query(`
+    const {
+      rows: [notification],
+    } = await query(
+      `
       INSERT INTO notification_log (
         user_id, user_type, notification_type, notification_category,
         title, message, reference_id, reference_type, metadata,
         email_sent, sms_sent, push_sent, in_app_sent
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
-    `, [
-      userId,
-      userType,
-      notificationType,
-      notificationCategory,
-      title,
-      message,
-      referenceId || null,
-      referenceType || null,
-      metadata ? JSON.stringify(metadata) : null,
-      !!channels.email, // Convert to boolean
-      !!channels.sms,   // Convert to boolean
-      !!channels.push,  // Convert to boolean
-      !!channels.inApp, // Convert to boolean
-    ]);
+    `,
+      [
+        userId,
+        userType,
+        notificationType,
+        notificationCategory,
+        title,
+        message,
+        referenceId || null,
+        referenceType || null,
+        metadata ? JSON.stringify(metadata) : null,
+        !!channels.email, // Convert to boolean
+        !!channels.sms, // Convert to boolean
+        !!channels.push, // Convert to boolean
+        !!channels.inApp, // Convert to boolean
+      ]
+    )
 
     const results = {
       email: false,
       sms: false,
       push: false,
       inApp: true,
-    };
+    }
 
-    const metadataPayload = metadata && typeof metadata === 'object' ? { ...metadata } : {};
+    const metadataPayload = metadata && typeof metadata === 'object' ? { ...metadata } : {}
 
     if (channels.email && contact?.email) {
       try {
-        results.email = await emailService.send(contact.email, title, null, message);
+        results.email = await emailService.send(contact.email, title, null, message)
       } catch (error) {
-        logger.error('Email send failed', { error: error.message });
+        logger.error('Email send failed', { error: error.message })
       }
     }
 
     if (channels.whatsapp && contact?.phone) {
-      const whatsappUrl = whatsappService.buildLink(contact.phone, message);
-      if (whatsappUrl) {
-        metadataPayload.whatsappUrl = whatsappUrl;
-        results.sms = true;
-      }
+      const waResult = await sendWhatsAppMessageService({ to: contact.phone, message })
+      results.sms = waResult.sent
+      // Store deep link in metadata for in-app display
+      const whatsappUrl = buildWhatsAppUrl(contact.phone, message)
+      if (whatsappUrl) metadataPayload.whatsappUrl = whatsappUrl
     }
 
     if (Object.keys(metadataPayload).length) {
       await query(`UPDATE notification_log SET metadata = $1 WHERE id = $2`, [
         JSON.stringify(metadataPayload),
         notification.id,
-      ]);
+      ])
     }
 
     // Push notifications disabled for now
@@ -359,27 +402,30 @@ export async function sendNotification({
     // }
 
     // Update notification log with actual send results
-    await query(`
+    await query(
+      `
       UPDATE notification_log
       SET email_sent = $1, sms_sent = $2, push_sent = $3
       WHERE id = $4
-    `, [results.email, results.sms, results.push, notification.id]);
+    `,
+      [results.email, results.sms, results.push, notification.id]
+    )
 
     logger.info('Notification sent', {
       userId,
       notificationType,
       notificationCategory,
       channels: results,
-    });
+    })
 
-    return notification;
+    return notification
   } catch (error) {
     logger.error('Failed to send notification', {
       error: error.message,
       userId,
       notificationCategory,
-    });
-    throw error;
+    })
+    throw error
   }
 }
 
@@ -387,130 +433,147 @@ export async function sendNotification({
  * Mark notification as read
  */
 export async function markNotificationAsRead(notificationId) {
-  await query(`
+  await query(
+    `
     UPDATE notification_log
     SET is_read = true, read_at = now()
     WHERE id = $1
-  `, [notificationId]);
+  `,
+    [notificationId]
+  )
 }
 
 /**
  * Get user's notifications
  */
-export async function getUserNotifications(userId, userType, { limit = 50, offset = 0, unreadOnly = false }) {
-  let whereClause = 'user_id = $1 AND user_type = $2';
-  const params = [userId, userType];
-  let paramIndex = 3;
+export async function getUserNotifications(
+  userId,
+  userType,
+  { limit = 50, offset = 0, unreadOnly = false }
+) {
+  let whereClause = 'user_id = $1 AND user_type = $2'
+  const params = [userId, userType]
+  let paramIndex = 3
 
   if (unreadOnly) {
-    whereClause += ` AND is_read = false`;
+    whereClause += ` AND is_read = false`
   }
 
-  const { rows } = await query(`
+  const { rows } = await query(
+    `
     SELECT *
     FROM notification_log
     WHERE ${whereClause}
     ORDER BY created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-  `, [...params, limit, offset]);
+  `,
+    [...params, limit, offset]
+  )
 
   // Get unread count
-  const { rows: countRows } = await query(`
+  const { rows: countRows } = await query(
+    `
     SELECT COUNT(*) as count
     FROM notification_log
     WHERE user_id = $1 AND user_type = $2 AND is_read = false
-  `, [userId, userType]);
+  `,
+    [userId, userType]
+  )
 
   return {
     notifications: rows,
     unreadCount: parseInt(countRows[0].count, 10),
-  };
+  }
 }
 
 export async function sendWhatsAppMessage(phone, message) {
   if (!phone) {
-    throw new Error('WhatsApp phone is required');
+    throw new Error('WhatsApp phone is required')
   }
-  return whatsappService.buildLink(phone, message);
+  return buildWhatsAppUrl(phone, message)
 }
 
 function formatReservationTime(scheduledAt) {
-  if (!scheduledAt) return 'your scheduled time';
-  return new Date(scheduledAt).toLocaleString();
+  if (!scheduledAt) return 'your scheduled time'
+  return new Date(scheduledAt).toLocaleString()
 }
 
 /**
  * Notify a guest about their reservation (email and/or WhatsApp based on contact provided).
  */
 export async function notifyGuestReservationConfirmation(reservation, restaurantName) {
-  const customerName = reservation.customer_name || reservation.customerName || 'Guest';
-  const customerPhone = reservation.customer_phone || reservation.customerPhone || null;
-  const customerEmail = reservation.customer_email || reservation.customerEmail || null;
-  const partySize = reservation.party_size || reservation.partySize || 0;
-  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt;
-  const status = reservation.status || 'CONFIRMED';
-  const venue = restaurantName || 'the restaurant';
+  const customerName = reservation.customer_name || reservation.customerName || 'Guest'
+  const customerPhone = reservation.customer_phone || reservation.customerPhone || null
+  const customerEmail = reservation.customer_email || reservation.customerEmail || null
+  const partySize = reservation.party_size || reservation.partySize || 0
+  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
+  const status = reservation.status || 'CONFIRMED'
+  const venue = restaurantName || 'the restaurant'
 
   if (!customerPhone && !customerEmail) {
-    return { email: false, whatsapp: false };
+    return { email: false, whatsapp: false }
   }
 
-  const timeLabel = formatReservationTime(scheduledAt);
+  const timeLabel = formatReservationTime(scheduledAt)
   const title =
-    status === 'WAITLIST'
-      ? `Waitlist update at ${venue}`
-      : `Reservation confirmed at ${venue}`;
+    status === 'WAITLIST' ? `Waitlist update at ${venue}` : `Reservation confirmed at ${venue}`
   const message =
     status === 'WAITLIST'
       ? `Hi ${customerName}, you're on the waitlist at ${venue} for ${partySize} guests around ${timeLabel}. We'll message you when a table opens.`
-      : `Hi ${customerName}, your table for ${partySize} at ${venue} is confirmed for ${timeLabel}. See you soon!`;
+      : `Hi ${customerName}, your table for ${partySize} at ${venue} is confirmed for ${timeLabel}. See you soon!`
 
-  const results = { email: false, whatsapp: false };
+  const results = { email: false, whatsapp: false }
 
   if (customerEmail) {
     try {
-      await emailService.send(customerEmail, title, null, message);
-      results.email = true;
+      await emailService.send(customerEmail, title, null, message)
+      results.email = true
     } catch (error) {
-      logger.error('Guest reservation email failed', { error: error.message });
+      logger.error('Guest reservation email failed', { error: error.message })
     }
   }
 
   if (customerPhone) {
-    const guestWhatsAppUrl = whatsappService.buildLink(customerPhone, message);
+    const guestWhatsAppUrl = buildWhatsAppUrl(customerPhone, message)
     if (guestWhatsAppUrl) {
-      results.whatsapp = true;
-      results.whatsappUrl = guestWhatsAppUrl;
+      results.whatsapp = true
+      results.whatsappUrl = guestWhatsAppUrl
     }
   }
 
-  return results;
+  return results
 }
 
 /**
  * Notify supplier when their warehouse/product stock is low.
  * Call after creating an inventory_alert (e.g. from inventory adjustment).
  */
-export async function notifySupplierLowStock({ productId, warehouseId, productName, threshold, currentValue }) {
+export async function notifySupplierLowStock({
+  productId,
+  warehouseId,
+  productName,
+  threshold,
+  currentValue,
+}) {
   const { rows: productRows } = await query(
     `SELECT p.name, p.supplier_id FROM product p WHERE p.id = $1`,
     [productId]
-  );
-  if (productRows.length === 0) return null;
-  const supplierId = productRows[0].supplier_id;
-  const name = productName || productRows[0].name;
+  )
+  if (productRows.length === 0) return null
+  const supplierId = productRows[0].supplier_id
+  const name = productName || productRows[0].name
 
   const { rows: userRows } = await query(
     `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
     [supplierId]
-  );
+  )
   if (userRows.length === 0) {
-    logger.warn('No app_user found for supplier', { supplierId });
-    return null;
+    logger.warn('No app_user found for supplier', { supplierId })
+    return null
   }
-  const userId = userRows[0].id;
+  const userId = userRows[0].id
 
-  const message = `Low stock: ${name}. Current: ${currentValue}, threshold: ${threshold}. Restock soon.`;
+  const message = `Low stock: ${name}. Current: ${currentValue}, threshold: ${threshold}. Restock soon.`
   try {
     return await sendNotification({
       userId,
@@ -522,10 +585,10 @@ export async function notifySupplierLowStock({ productId, warehouseId, productNa
       referenceId: productId,
       referenceType: 'PRODUCT',
       metadata: { productId, warehouseId, threshold, currentValue },
-    });
+    })
   } catch (err) {
-    logger.error('notifySupplierLowStock failed', { error: err.message, productId });
-    return null;
+    logger.error('notifySupplierLowStock failed', { error: err.message, productId })
+    return null
   }
 }
 
@@ -535,48 +598,54 @@ export async function notifySupplierLowStock({ productId, warehouseId, productNa
 
 export async function notifyOrderStatusChange(order, status) {
   // Determine who to notify
-  let userId, userType;
-  
+  let userId, userType
+
   if (status === 'PLACED' || status === 'CANCELLED') {
     // Notify supplier for new orders and cancellations
     // Get supplier's Keycloak user ID from contact_email
-    const { rows: suppliers } = await query(`
+    const { rows: suppliers } = await query(
+      `
       SELECT s.id as supplier_id, u.id as user_id 
       FROM supplier s
       JOIN app_user u ON u.email = s.contact_email
       WHERE s.id = $1
-    `, [order.supplier_id]);
-    
+    `,
+      [order.supplier_id]
+    )
+
     if (suppliers.length > 0 && suppliers[0].user_id) {
-      userId = suppliers[0].user_id;
-      userType = 'SUPPLIER';
+      userId = suppliers[0].user_id
+      userType = 'SUPPLIER'
     } else {
-      logger.warn('No user_id found for supplier', { supplier_id: order.supplier_id });
-      return null;
+      logger.warn('No user_id found for supplier', { supplier_id: order.supplier_id })
+      return null
     }
   } else {
     // All other statuses (ACKNOWLEDGED, PROCESSING, SHIPPED, DELIVERED) notify restaurant
     // Get restaurant's Keycloak user ID from contact_email
-    const { rows: restaurants } = await query(`
+    const { rows: restaurants } = await query(
+      `
       SELECT r.id as restaurant_id, u.id as user_id 
       FROM restaurant r
       JOIN app_user u ON u.email = r.contact_email
       WHERE r.id = $1
-    `, [order.restaurant_id]);
-    
+    `,
+      [order.restaurant_id]
+    )
+
     if (restaurants.length > 0 && restaurants[0].user_id) {
-      userId = restaurants[0].user_id;
-      userType = 'RESTAURANT';
+      userId = restaurants[0].user_id
+      userType = 'RESTAURANT'
     } else {
-      logger.warn('No user_id found for restaurant', { restaurant_id: order.restaurant_id });
-      return null;
+      logger.warn('No user_id found for restaurant', { restaurant_id: order.restaurant_id })
+      return null
     }
   }
 
   const messages = {
     PLACED: {
       title: 'New Order Received',
-      message: order.restaurant_name 
+      message: order.restaurant_name
         ? `New order from ${order.restaurant_name} - Order #${order.id.slice(0, 8)} for $${order.total_amount}`
         : `New order #${order.id.slice(0, 8)} for $${order.total_amount}`,
     },
@@ -606,10 +675,10 @@ export async function notifyOrderStatusChange(order, status) {
         ? `Order #${order.id.slice(0, 8)} from ${order.restaurant_name} has been cancelled`
         : `Order #${order.id.slice(0, 8)} has been cancelled`,
     },
-  };
+  }
 
-  const msg = messages[status];
-  if (!msg) return;
+  const msg = messages[status]
+  if (!msg) return
 
   return sendNotification({
     userId,
@@ -621,21 +690,21 @@ export async function notifyOrderStatusChange(order, status) {
     referenceId: order.id,
     referenceType: 'ORDER',
     metadata: { order_id: order.id, status },
-  });
+  })
 }
 
 export async function notifyReservationCreated(reservation) {
-  const restaurantId = reservation.restaurant_id || reservation.restaurantId;
-  const branchId = reservation.branch_id || reservation.branchId || null;
-  const customerName = reservation.customer_name || reservation.customerName || 'Guest';
-  const partySize = reservation.party_size || reservation.partySize || 0;
-  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt;
-  const status = reservation.status || reservation.reservationStatus;
+  const restaurantId = reservation.restaurant_id || reservation.restaurantId
+  const branchId = reservation.branch_id || reservation.branchId || null
+  const customerName = reservation.customer_name || reservation.customerName || 'Guest'
+  const partySize = reservation.party_size || reservation.partySize || 0
+  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
+  const status = reservation.status || reservation.reservationStatus
 
-  const context = await getRestaurantUserContext(restaurantId);
-  if (!context?.user_id) return null;
+  const context = await getRestaurantUserContext(restaurantId)
+  if (!context?.user_id) return null
 
-  const timeslot = scheduledAt ? new Date(scheduledAt).toLocaleString() : 'unscheduled time';
+  const timeslot = scheduledAt ? new Date(scheduledAt).toLocaleString() : 'unscheduled time'
   return sendNotification({
     userId: context.user_id,
     userType: 'RESTAURANT',
@@ -652,19 +721,19 @@ export async function notifyReservationCreated(reservation) {
       scheduledAt,
       status,
     },
-  });
+  })
 }
 
 export async function notifyReservationWaitlist(reservation) {
-  const restaurantId = reservation.restaurant_id || reservation.restaurantId;
-  const branchId = reservation.branch_id || reservation.branchId || null;
-  const customerName = reservation.customer_name || reservation.customerName || 'Guest';
-  const partySize = reservation.party_size || reservation.partySize || 0;
-  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt;
-  const status = reservation.status || reservation.reservationStatus;
+  const restaurantId = reservation.restaurant_id || reservation.restaurantId
+  const branchId = reservation.branch_id || reservation.branchId || null
+  const customerName = reservation.customer_name || reservation.customerName || 'Guest'
+  const partySize = reservation.party_size || reservation.partySize || 0
+  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
+  const status = reservation.status || reservation.reservationStatus
 
-  const context = await getRestaurantUserContext(restaurantId);
-  if (!context?.user_id) return null;
+  const context = await getRestaurantUserContext(restaurantId)
+  if (!context?.user_id) return null
 
   return sendNotification({
     userId: context.user_id,
@@ -682,21 +751,21 @@ export async function notifyReservationWaitlist(reservation) {
       scheduledAt,
       status,
     },
-  });
+  })
 }
 
 export async function notifyStaffPtoRequest(ptoRequest) {
-  const staffId = ptoRequest.staff_id || ptoRequest.staffId;
-  const staffContext = await getStaffMemberContext(staffId);
-  if (!staffContext) return null;
-  const restaurantContext = await getRestaurantUserContext(staffContext.restaurant_id);
-  if (!restaurantContext?.user_id) return null;
+  const staffId = ptoRequest.staff_id || ptoRequest.staffId
+  const staffContext = await getStaffMemberContext(staffId)
+  if (!staffContext) return null
+  const restaurantContext = await getRestaurantUserContext(staffContext.restaurant_id)
+  if (!restaurantContext?.user_id) return null
 
-  const startDate = ptoRequest.start_date || ptoRequest.startDate;
-  const endDate = ptoRequest.end_date || ptoRequest.endDate;
-  const type = ptoRequest.type || ptoRequest.requestType || 'PTO';
-  const status = ptoRequest.status || ptoRequest.requestStatus;
-  const dateRange = `${startDate} → ${endDate}`;
+  const startDate = ptoRequest.start_date || ptoRequest.startDate
+  const endDate = ptoRequest.end_date || ptoRequest.endDate
+  const type = ptoRequest.type || ptoRequest.requestType || 'PTO'
+  const status = ptoRequest.status || ptoRequest.requestStatus
+  const dateRange = `${startDate} → ${endDate}`
   return sendNotification({
     userId: restaurantContext.user_id,
     userType: 'RESTAURANT',
@@ -713,22 +782,24 @@ export async function notifyStaffPtoRequest(ptoRequest) {
       startDate,
       endDate,
     },
-  });
+  })
 }
 
 export async function notifyStaffSwapRequest(swap) {
-  const requestedBy = swap.requested_by || swap.requestedBy;
-  const restaurantId = swap.restaurant_id || swap.restaurantId;
-  const shift = swap.shift || {};
+  const requestedBy = swap.requested_by || swap.requestedBy
+  const restaurantId = swap.restaurant_id || swap.restaurantId
+  const shift = swap.shift || {}
 
-  const staffContext = await getStaffMemberContext(requestedBy);
-  if (!staffContext) return null;
+  const staffContext = await getStaffMemberContext(requestedBy)
+  if (!staffContext) return null
 
-  const restaurantContext = await getRestaurantUserContext(restaurantId || staffContext.restaurant_id);
-  if (!staffContext) return null;
-  if (!restaurantContext?.user_id) return null;
+  const restaurantContext = await getRestaurantUserContext(
+    restaurantId || staffContext.restaurant_id
+  )
+  if (!staffContext) return null
+  if (!restaurantContext?.user_id) return null
 
-  const shiftDate = shift.date || swap.shift_date || 'upcoming shift';
+  const shiftDate = shift.date || swap.shift_date || 'upcoming shift'
 
   return sendNotification({
     userId: restaurantContext.user_id,
@@ -745,18 +816,18 @@ export async function notifyStaffSwapRequest(swap) {
       shiftId: swap.shift_id || shift.id,
       status: swap.status,
     },
-  });
+  })
 }
 
 export async function notifyScheduledOrderEvent(quickList, action) {
-  const restaurantId = quickList.restaurant_id || quickList.restaurantId;
-  const context = await getRestaurantUserContext(restaurantId);
-  if (!context?.user_id) return null;
+  const restaurantId = quickList.restaurant_id || quickList.restaurantId
+  const context = await getRestaurantUserContext(restaurantId)
+  if (!context?.user_id) return null
 
   const autoMessage =
     action === 'EXECUTED'
       ? `Scheduled order "${quickList.name}" has been created automatically.`
-      : `Scheduled order "${quickList.name}" will run soon. Review inventory if you need to pause it.`;
+      : `Scheduled order "${quickList.name}" will run soon. Review inventory if you need to pause it.`
 
   return sendNotification({
     userId: context.user_id,
@@ -772,7 +843,7 @@ export async function notifyScheduledOrderEvent(quickList, action) {
       autoCreate: quickList.auto_create_order,
       nextExecutionDate: quickList.next_execution_date,
     },
-  });
+  })
 }
 
 export async function notifyInvoiceIssued(invoice) {
@@ -787,7 +858,7 @@ export async function notifyInvoiceIssued(invoice) {
     referenceId: invoice.id,
     referenceType: 'INVOICE',
     metadata: { invoice_number: invoice.invoice_number, total_amount: invoice.total_amount },
-  });
+  })
 }
 
 export async function notifyPaymentReceived(payment) {
@@ -804,7 +875,7 @@ export async function notifyPaymentReceived(payment) {
       referenceId: payment.invoice_id,
       referenceType: 'INVOICE',
       metadata: { payment_id: payment.id, amount: payment.payment_amount },
-    });
+    })
   }
 }
 
@@ -819,6 +890,123 @@ export async function notifyLowStock(product, currentStock, threshold) {
     referenceId: product.product_id,
     referenceType: 'PRODUCT',
     metadata: { product_name: product.name, current_stock: currentStock, threshold },
-  });
+  })
 }
 
+export async function notifyInvoiceOverdue(invoice) {
+  const promises = []
+  const { rows: rRows } = await query(
+    `SELECT u.id FROM app_user u JOIN restaurant r ON r.contact_email = u.email WHERE r.id = $1`,
+    [invoice.restaurant_id]
+  )
+  if (rRows.length > 0) {
+    promises.push(
+      sendNotification({
+        userId: rRows[0].id,
+        userType: 'RESTAURANT',
+        notificationType: 'INVOICE',
+        notificationCategory: 'invoice_overdue',
+        title: 'Invoice Overdue',
+        message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} was due on ${invoice.due_date} and is now overdue.`,
+        referenceId: invoice.id,
+        referenceType: 'INVOICE',
+        metadata: { invoice_number: invoice.invoice_number, due_date: invoice.due_date },
+      }).catch((err) =>
+        logger.error('notifyInvoiceOverdue restaurant failed', { err: err.message })
+      )
+    )
+  }
+  const { rows: sRows } = await query(
+    `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
+    [invoice.supplier_id]
+  )
+  if (sRows.length > 0) {
+    promises.push(
+      sendNotification({
+        userId: sRows[0].id,
+        userType: 'SUPPLIER',
+        notificationType: 'INVOICE',
+        notificationCategory: 'invoice_overdue',
+        title: 'Payment Overdue',
+        message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} is overdue since ${invoice.due_date}.`,
+        referenceId: invoice.id,
+        referenceType: 'INVOICE',
+        metadata: { invoice_number: invoice.invoice_number, due_date: invoice.due_date },
+      }).catch((err) => logger.error('notifyInvoiceOverdue supplier failed', { err: err.message }))
+    )
+  }
+  return Promise.allSettled(promises)
+}
+
+export async function notifyOutOfStock({ productId, warehouseId, productName }) {
+  const { rows: pRows } = await query(
+    `SELECT p.name, p.supplier_id FROM product p WHERE p.id = $1`,
+    [productId]
+  )
+  if (!pRows.length) return null
+  const { rows: uRows } = await query(
+    `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
+    [pRows[0].supplier_id]
+  )
+  if (!uRows.length) return null
+  return sendNotification({
+    userId: uRows[0].id,
+    userType: 'SUPPLIER',
+    notificationType: 'OUT_OF_STOCK',
+    notificationCategory: 'out_of_stock',
+    title: 'Out of Stock',
+    message: `${productName || pRows[0].name} is now out of stock.`,
+    referenceId: productId,
+    referenceType: 'PRODUCT',
+    metadata: { productId, warehouseId },
+  }).catch((err) => {
+    logger.error('notifyOutOfStock failed', { err: err.message })
+    return null
+  })
+}
+
+export async function notifyMessageReceived({ conversationId, senderType, messagePreview }) {
+  const { rows: cRows } = await query(
+    `SELECT supplier_id, restaurant_id FROM conversation WHERE id = $1`,
+    [conversationId]
+  )
+  if (!cRows.length) return null
+  const conv = cRows[0]
+  let recipientUserId
+  let recipientType
+  let senderLabel
+  if (senderType === 'RESTAURANT') {
+    const { rows } = await query(
+      `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
+      [conv.supplier_id]
+    )
+    if (!rows.length) return null
+    recipientUserId = rows[0].id
+    recipientType = 'SUPPLIER'
+    senderLabel = 'A restaurant'
+  } else {
+    const { rows } = await query(
+      `SELECT u.id FROM app_user u JOIN restaurant r ON r.contact_email = u.email WHERE r.id = $1`,
+      [conv.restaurant_id]
+    )
+    if (!rows.length) return null
+    recipientUserId = rows[0].id
+    recipientType = 'RESTAURANT'
+    senderLabel = 'A supplier'
+  }
+  const preview = messagePreview ? `: "${messagePreview.slice(0, 80)}"` : ''
+  return sendNotification({
+    userId: recipientUserId,
+    userType: recipientType,
+    notificationType: 'MESSAGE',
+    notificationCategory: 'message_received',
+    title: 'New message',
+    message: `${senderLabel} sent you a message${preview}`,
+    referenceId: conversationId,
+    referenceType: 'CONVERSATION',
+    metadata: { conversationId },
+  }).catch((err) => {
+    logger.error('notifyMessageReceived failed', { err: err.message })
+    return null
+  })
+}

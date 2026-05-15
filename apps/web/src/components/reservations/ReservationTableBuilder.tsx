@@ -173,12 +173,14 @@ const SERVICE_STATUS_STYLES: Record<string, { bg: string; border: string; label:
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
-const shapeDefaults = SHAPE_PRESETS.reduce<Record<TableShape, (typeof SHAPE_PRESETS)[number]>>(
+type ShapePresetRow = (typeof SHAPE_PRESETS)[number]
+
+const shapeDefaults = SHAPE_PRESETS.reduce(
   (acc, p) => {
     acc[p.value] = p
     return acc
   },
-  {} as Record<TableShape, (typeof SHAPE_PRESETS)[number]>
+  {} as Record<TableShape, ShapePresetRow>
 )
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
@@ -621,7 +623,7 @@ export function ReservationTableBuilder({
   const zoomReset = () => setZoom(1.0)
 
   // ── Service mode map ────────────────────────────────────────────────────────
-  const tableServiceMap = useMemo<Map<string, ServiceInfo>>(() => {
+  const tableServiceMap = useMemo((): Map<string, ServiceInfo> => {
     if (!serviceMode) return new Map()
     const map = new Map<string, ServiceInfo>()
     for (const res of reservations) {

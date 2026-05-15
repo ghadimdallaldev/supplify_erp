@@ -15,6 +15,14 @@ vi.mock('./mailer.service.js', () => ({
   sendMail: vi.fn().mockResolvedValue({ messageId: 'test-message-id' }),
 }))
 
+vi.mock('../lib/subscription.js', () => ({
+  getEntitlements: vi.fn(),
+}))
+
+vi.mock('./whatsapp.service.js', () => ({
+  sendWhatsAppMessage: vi.fn().mockResolvedValue({ sent: false, reason: 'NOT_CONFIGURED' }),
+}))
+
 describe('Notification Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -31,11 +39,16 @@ describe('Notification Service', () => {
   describe('sendNotification', () => {
     it('creates a notification and sends email when enabled', async () => {
       const { sendMail } = await import('./mailer.service.js')
+      const { getEntitlements } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_and_email' } })
 
       queryMock
         .mockResolvedValueOnce({ rows: [{ ...basePrefs }] })
-        .mockResolvedValueOnce({ rows: [{ id: 'tenant-1', email: 'owner@test.com', phone: '+96170000000' }] })
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: '+96170000000' }],
+        })
         .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com', phone: '+96170000000' }] })
+        .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] })
         .mockResolvedValueOnce({
           rows: [{ id: 'notif-1', title: 'New Order Received', message: 'Order placed' }],
         })
@@ -55,15 +68,18 @@ describe('Notification Service', () => {
         expect.objectContaining({
           to: 'owner@test.com',
           subject: 'New Order Received',
-        }),
+        })
       )
     })
 
     it('skips notification when preference is disabled', async () => {
       queryMock
         .mockResolvedValueOnce({ rows: [{ ...basePrefs, notify_order_new: false }] })
-        .mockResolvedValueOnce({ rows: [{ id: 'tenant-1', email: 'owner@test.com', phone: null }] })
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }],
+        })
         .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com', phone: null }] })
+        .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] })
 
       const result = await sendNotification({
         userId: 'user-1',
@@ -78,10 +94,16 @@ describe('Notification Service', () => {
     })
 
     it('stores WhatsApp deep link in metadata when whatsapp is enabled', async () => {
+      const { getEntitlements } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'email_and_whatsapp' } })
+
       queryMock
         .mockResolvedValueOnce({ rows: [{ ...basePrefs }] })
-        .mockResolvedValueOnce({ rows: [{ id: 'tenant-1', email: 'owner@test.com', phone: '+96176911906' }] })
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: '+96176911906' }],
+        })
         .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com', phone: '+96176911906' }] })
+        .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] })
         .mockResolvedValueOnce({
           rows: [{ id: 'notif-1', title: 'Low stock', message: 'Restock soon' }],
         })
@@ -98,11 +120,104 @@ describe('Notification Service', () => {
       })
 
       const metadataUpdate = queryMock.mock.calls.find((call) =>
-        String(call[0]).includes('UPDATE notification_log SET metadata'),
+        String(call[0]).includes('UPDATE notification_log SET metadata')
       )
       expect(metadataUpdate).toBeTruthy()
       const payload = JSON.parse(metadataUpdate[1][0])
       expect(payload.whatsappUrl).toContain('https://wa.me/96176911906')
+    })
+
+    it('does NOT send email when tenant is on Free plan', async () => {
+      const { sendMail } = await import('./mailer.service.js')
+      const { getEntitlements } = await import('../lib/subscription.js')
+
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
+
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }],
+        }) // prefs
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }],
+        }) // getUserContactInfo tenant
+        .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com' }] }) // contact_info table
+        .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] }) // getTenantIdForUser
+        .mockResolvedValueOnce({
+          rows: [{ id: 'notif-1', title: 'New Order Received', message: 'Order placed' }],
+        }) // INSERT notification_log
+        .mockResolvedValueOnce({ rowCount: 1 }) // UPDATE notification_log
+
+      await sendNotification({
+        userId: 'user-1',
+        userType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'PLACED',
+        title: 'New Order',
+        message: 'Order placed',
+      })
+
+      expect(sendMail).not.toHaveBeenCalled()
+    })
+
+    it('sends email when tenant is on Bronze plan', async () => {
+      const { sendMail } = await import('./mailer.service.js')
+      const { getEntitlements } = await import('../lib/subscription.js')
+
+      sendMail.mockResolvedValue({ messageId: 'msg-1' })
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_and_email' } })
+
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }],
+        })
+        .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com' }] })
+        .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'notif-1', title: 'New Order' }] })
+        .mockResolvedValueOnce({ rowCount: 1 })
+
+      await sendNotification({
+        userId: 'user-1',
+        userType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'PLACED',
+        title: 'New Order',
+        message: 'Order placed',
+      })
+
+      expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: 'owner@test.com' }))
+    })
+
+    it('defaults to in_app_only when entitlements fetch fails', async () => {
+      const { sendMail } = await import('./mailer.service.js')
+      const { getEntitlements } = await import('../lib/subscription.js')
+
+      getEntitlements.mockRejectedValue(new Error('DB error'))
+
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }],
+        })
+        .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com' }] })
+        .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'notif-1', title: 'New Order' }] })
+        .mockResolvedValueOnce({ rowCount: 1 })
+
+      await sendNotification({
+        userId: 'user-1',
+        userType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'PLACED',
+        title: 'New Order',
+        message: 'Order placed',
+      })
+
+      expect(sendMail).not.toHaveBeenCalled()
     })
   })
 
@@ -118,7 +233,7 @@ describe('Notification Service', () => {
           scheduled_at: '2026-05-20T18:00:00.000Z',
           status: 'CONFIRMED',
         },
-        'Golden Fork',
+        'Golden Fork'
       )
 
       expect(sendMail).toHaveBeenCalled()
@@ -134,7 +249,7 @@ describe('Notification Service', () => {
           scheduled_at: '2026-05-20T18:00:00.000Z',
           status: 'CONFIRMED',
         },
-        'Golden Fork',
+        'Golden Fork'
       )
 
       expect(result.whatsapp).toBe(true)
