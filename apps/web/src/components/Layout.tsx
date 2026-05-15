@@ -151,136 +151,140 @@ export function Layout() {
 
   return (
     <BranchProvider>
-    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
-      <ImpersonationBanner />
-      <UpgradeModal />
-      <div className="flex">
-        <Sidebar />
-        <div className="flex-1 flex flex-col">
-          <Header />
-          {user?.role !== 'ADMIN' && externallyDisabledFeatures.length > 0 && e && (
-            <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex gap-2">
-                  <Lock className="h-4 w-4 shrink-0 text-amber-800 mt-0.5" aria-hidden />
-                  <div>
-                    <p className="font-medium text-amber-950">Some features are not available on your account</p>
-                    <p className="mt-1 text-amber-900/90">
-                      This is set by your organization or platform administrators, not by your subscription plan
-                      alone. Restricted capabilities include:{' '}
-                      <span className="font-medium">
-                        {externallyDisabledFeatures.map((x) => x.label).join(', ')}
-                      </span>
-                      .
-                    </p>
+      <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+        <ImpersonationBanner />
+        <UpgradeModal />
+        <div className="flex">
+          <Sidebar />
+          <div className="flex-1 flex flex-col">
+            <Header />
+            {user?.role !== 'ADMIN' && externallyDisabledFeatures.length > 0 && e && (
+              <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex gap-2">
+                    <Lock className="h-4 w-4 shrink-0 text-amber-800 mt-0.5" aria-hidden />
+                    <div>
+                      <p className="font-medium text-amber-950">
+                        Some features are not available on your account
+                      </p>
+                      <p className="mt-1 text-amber-900/90">
+                        This is set by your organization or platform administrators, not by your
+                        subscription plan alone. Restricted capabilities include:{' '}
+                        <span className="font-medium">
+                          {externallyDisabledFeatures.map((x) => x.label).join(', ')}
+                        </span>
+                        .
+                      </p>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    className="shrink-0 self-start font-medium text-amber-950 underline hover:no-underline sm:ml-4"
+                    onClick={() => navigate(settingsFeaturesTabPath(e.tenantType))}
+                  >
+                    View in Settings
+                  </button>
                 </div>
+              </div>
+            )}
+            {user?.role !== 'ADMIN' && planTierDisabledFeatures.length > 0 && e && (
+              <div className="mx-6 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex gap-2">
+                    <Layers className="h-4 w-4 shrink-0 text-slate-600 mt-0.5" aria-hidden />
+                    <div>
+                      <p className="font-medium text-slate-900">
+                        Some features are limited by your plan tier
+                      </p>
+                      <p className="mt-1 text-slate-700">
+                        Your current subscription does not include:{' '}
+                        <span className="font-medium text-slate-900">
+                          {planTierDisabledFeatures.map((x) => x.label).join(', ')}
+                        </span>
+                        . Upgrade to a higher tier to unlock them.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 self-start font-medium text-slate-900 underline hover:no-underline sm:ml-4"
+                    onClick={() => navigate(settingsFeaturesTabPath(e.tenantType))}
+                  >
+                    Compare plans
+                  </button>
+                </div>
+              </div>
+            )}
+            {user?.role !== 'ADMIN' && nearLimitKeys.length > 0 && (
+              <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                <span className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Usage near limit:{' '}
+                  {nearLimitKeys.map(({ key }) => key.replace(/_/g, ' ')).join(', ')}.{' '}
+                  <button
+                    type="button"
+                    className="font-medium underline hover:no-underline"
+                    onClick={() => navigate('/app/settings')}
+                  >
+                    View usage
+                  </button>
+                </span>
                 <button
                   type="button"
-                  className="shrink-0 self-start font-medium text-amber-950 underline hover:no-underline sm:ml-4"
-                  onClick={() => navigate(settingsFeaturesTabPath(e.tenantType))}
+                  className="font-medium underline hover:no-underline shrink-0"
+                  onClick={() => {
+                    const first = nearLimitKeys[0]
+                    if (first) {
+                      recordConversionEvent({
+                        eventType: 'OPEN_UPGRADE',
+                        metadata: { source: 'near_limit', limitKey: first.key },
+                      }).catch(() => {})
+                      dispatch(
+                        showMonetizationBlock({
+                          type: 'limit',
+                          payload: {
+                            limitKey: first.key,
+                            limitValue: first.limit,
+                            currentUsage: first.current,
+                            currentPlan: e?.plan?.name ?? null,
+                            recommendedPlans: [],
+                            upgradeUrl: '/app/settings',
+                          },
+                        })
+                      )
+                    }
+                  }}
                 >
-                  View in Settings
+                  Upgrade
                 </button>
               </div>
-            </div>
-          )}
-          {user?.role !== 'ADMIN' && planTierDisabledFeatures.length > 0 && e && (
-            <div className="mx-6 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex gap-2">
-                  <Layers className="h-4 w-4 shrink-0 text-slate-600 mt-0.5" aria-hidden />
-                  <div>
-                    <p className="font-medium text-slate-900">Some features are limited by your plan tier</p>
-                    <p className="mt-1 text-slate-700">
-                      Your current subscription does not include:{' '}
-                      <span className="font-medium text-slate-900">
-                        {planTierDisabledFeatures.map((x) => x.label).join(', ')}
-                      </span>
-                      . Upgrade to a higher tier to unlock them.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="shrink-0 self-start font-medium text-slate-900 underline hover:no-underline sm:ml-4"
-                  onClick={() => navigate(settingsFeaturesTabPath(e.tenantType))}
-                >
-                  Compare plans
-                </button>
-              </div>
-            </div>
-          )}
-          {user?.role !== 'ADMIN' && nearLimitKeys.length > 0 && (
-            <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-              <span className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                Usage near limit:{' '}
-                {nearLimitKeys.map(({ key }) => key.replace(/_/g, ' ')).join(', ')}.{' '}
+            )}
+            {user?.role !== 'ADMIN' && blockedCountLast7d >= 3 && (
+              <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)]">
+                <span>
+                  You&apos;ve hit plan limits several times recently. Upgrade for higher limits and
+                  more features.
+                </span>
                 <button
                   type="button"
                   className="font-medium underline hover:no-underline"
-                  onClick={() => navigate('/app/settings')}
+                  onClick={() => {
+                    recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
+                    navigate('/app/settings')
+                  }}
                 >
-                  View usage
+                  View plans
                 </button>
-              </span>
-              <button
-                type="button"
-                className="font-medium underline hover:no-underline shrink-0"
-                onClick={() => {
-                  const first = nearLimitKeys[0]
-                  if (first) {
-                    recordConversionEvent({
-                      eventType: 'OPEN_UPGRADE',
-                      metadata: { source: 'near_limit', limitKey: first.key },
-                    }).catch(() => {})
-                    dispatch(
-                      showMonetizationBlock({
-                        type: 'limit',
-                        payload: {
-                          limitKey: first.key,
-                          limitValue: first.limit,
-                          currentUsage: first.current,
-                          currentPlan: e?.plan?.name ?? null,
-                          recommendedPlans: [],
-                          upgradeUrl: '/app/settings',
-                        },
-                      })
-                    )
-                  }
-                }}
-              >
-                Upgrade
-              </button>
-            </div>
-          )}
-          {user?.role !== 'ADMIN' && blockedCountLast7d >= 3 && (
-            <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)]">
-              <span>
-                You&apos;ve hit plan limits several times recently. Upgrade for higher limits and
-                more features.
-              </span>
-              <button
-                type="button"
-                className="font-medium underline hover:no-underline"
-                onClick={() => {
-                  recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
-                  navigate('/app/settings')
-                }}
-              >
-                View plans
-              </button>
-            </div>
-          )}
-          <main className="flex-1 p-4 md:p-6">
-            <div className="min-h-[calc(100vh-5rem)] rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-4 shadow-sm md:p-6">
-              <Outlet />
-            </div>
-          </main>
+              </div>
+            )}
+            <main className="flex-1 p-4 md:p-6">
+              <div className="min-h-[calc(100vh-5rem)] rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-4 shadow-sm md:p-6">
+                <Outlet />
+              </div>
+            </main>
+          </div>
         </div>
       </div>
-    </div>
     </BranchProvider>
   )
 }

@@ -71,7 +71,11 @@ export function Header() {
 
   const handleNavUpgrade = () => {
     const trigger =
-      nearLimitKeys.length > 0 ? 'near_limit' : (blockedCountLast7d ?? 0) >= 1 ? 'blocked' : 'browse'
+      nearLimitKeys.length > 0
+        ? 'near_limit'
+        : (blockedCountLast7d ?? 0) >= 1
+          ? 'blocked'
+          : 'browse'
     recordConversionEvent({
       eventType: 'OPEN_UPGRADE',
       metadata: { source: 'nav_upgrade_cta', trigger },
@@ -192,7 +196,12 @@ export function Header() {
         >
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <circle cx="5.5" cy="5.5" r="4" stroke="var(--text-muted)" strokeWidth="1.3" />
-            <path d="M9 9l2.5 2.5" stroke="var(--text-muted)" strokeWidth="1.3" strokeLinecap="round" />
+            <path
+              d="M9 9l2.5 2.5"
+              stroke="var(--text-muted)"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
           </svg>
           <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>Search…</span>
           <kbd
@@ -333,16 +342,19 @@ export function Header() {
                         background: !notification.is_read ? 'var(--brand-ultra)' : 'transparent',
                       }}
                       onClick={() => {
-                        if (
-                          notification.reference_type === 'ORDER' &&
-                          notification.reference_id
-                        ) {
+                        if (notification.reference_type === 'ORDER' && notification.reference_id) {
                           navigate(`/app/orders/${notification.reference_id}`)
                           setShowNotifications(false)
                         }
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                        }}
+                      >
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
                             {notification.title}

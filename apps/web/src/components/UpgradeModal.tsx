@@ -1,5 +1,8 @@
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
-import { closeMonetizationModal, resetMonetizationModal } from '../features/monetization/monetizationSlice'
+import {
+  closeMonetizationModal,
+  resetMonetizationModal,
+} from '../features/monetization/monetizationSlice'
 import {
   useGetRecommendationQuery,
   useGetEntitlementsQuery,
@@ -51,14 +54,17 @@ function isBetterFeature(premium: boolean, current: boolean): boolean {
   return premium && !current
 }
 
-const UPGRADE_SUPPORT_EMAIL =
-  import.meta.env.VITE_UPGRADE_SUPPORT_EMAIL || 'admin@supplify.com'
+const UPGRADE_SUPPORT_EMAIL = import.meta.env.VITE_UPGRADE_SUPPORT_EMAIL || 'admin@supplify.com'
 
 function normalizeUpgradePath(url: string): string {
   return url.startsWith('/') ? url : `/app/${url}`
 }
 
-function isOnUpgradeDestination(currentPath: string, currentSearch: string, target: string): boolean {
+function isOnUpgradeDestination(
+  currentPath: string,
+  currentSearch: string,
+  target: string
+): boolean {
   const [targetPath, targetQuery] = target.split('?')
   if (currentPath !== targetPath) return false
   if (!targetQuery) return currentPath.startsWith('/app/settings')
@@ -152,16 +158,14 @@ export function UpgradeModal() {
     const upgradePath = normalizeUpgradePath(
       (payload as { upgradeUrl?: string }).upgradeUrl || '/app/settings?tab=subscription'
     )
-    const onUpgradePage = isOnUpgradeDestination(
-      location.pathname,
-      location.search,
-      upgradePath
-    )
+    const onUpgradePage = isOnUpgradeDestination(location.pathname, location.search, upgradePath)
     const planLabel =
       recommendation?.recommendedPlanName ??
       (recommendedCode ? (PLAN_LABELS[recommendedCode] ?? recommendedCode) : 'a paid plan')
     const currentPlan =
-      (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
+      (payload as { currentPlan?: string }).currentPlan ??
+      entitlements?.plan?.name ??
+      'Current plan'
 
     recordConversionEvent({
       eventType: canUpgrade ? 'CLICK_UPGRADE' : 'CLOSE_UPGRADE_MODAL',
@@ -200,11 +204,7 @@ export function UpgradeModal() {
   const upgradePath = normalizeUpgradePath(
     (payload as { upgradeUrl?: string }).upgradeUrl || '/app/settings?tab=subscription'
   )
-  const onUpgradePage = isOnUpgradeDestination(
-    location.pathname,
-    location.search,
-    upgradePath
-  )
+  const onUpgradePage = isOnUpgradeDestination(location.pathname, location.search, upgradePath)
 
   const currentPlanName =
     (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
@@ -263,7 +263,9 @@ export function UpgradeModal() {
               </p>
             )}
             {type === 'feature' && 'featureKey' in payload && !isBrowseUpgrade && (
-              <p className="mt-1 text-[var(--text-muted)]">Feature: {payload.featureKey.replace(/_/g, ' ')}</p>
+              <p className="mt-1 text-[var(--text-muted)]">
+                Feature: {payload.featureKey.replace(/_/g, ' ')}
+              </p>
             )}
           </div>
 
@@ -282,7 +284,7 @@ export function UpgradeModal() {
                   <span className="font-semibold">{recommendedPlans.join(', ')}</span>
                 </p>
               ) : null}
-              {((recommendation?.reasonText ?? recommendation?.reason) ?? '').trim() ? (
+              {(recommendation?.reasonText ?? recommendation?.reason ?? '').trim() ? (
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
                   {recommendation?.reasonText ?? recommendation?.reason}
                 </p>
@@ -364,11 +366,11 @@ export function UpgradeModal() {
                   : recHighlight
                 return (
                   <div key={key} className={`grid ${gridCols} border-b text-sm last:border-b-0`}>
-                    <div className="p-2 text-[var(--text-muted)]">{LIMIT_KEY_LABELS[key] ?? key}</div>
+                    <div className="p-2 text-[var(--text-muted)]">
+                      {LIMIT_KEY_LABELS[key] ?? key}
+                    </div>
                     <div className="p-2">{formatLimit(curNum)}</div>
-                    <div
-                      className={`p-2 ${upgradeHighlight ? highlightCell : ''}`}
-                    >
+                    <div className={`p-2 ${upgradeHighlight ? highlightCell : ''}`}>
                       {formatLimit(recNum)}
                     </div>
                     {!mergeUpgradeColumn && (
@@ -393,7 +395,9 @@ export function UpgradeModal() {
                   : recHighlight
                 return (
                   <div key={key} className={`grid ${gridCols} border-b text-sm last:border-b-0`}>
-                    <div className="p-2 text-[var(--text-muted)]">{FEATURE_KEY_LABELS[key] ?? key}</div>
+                    <div className="p-2 text-[var(--text-muted)]">
+                      {FEATURE_KEY_LABELS[key] ?? key}
+                    </div>
                     <div className="p-2">{curVal ? 'Yes' : 'No'}</div>
                     <div className={`p-2 ${upgradeHighlight ? highlightCell : ''}`}>
                       {recVal ? 'Yes' : 'No'}

@@ -19,7 +19,9 @@ export interface ExternallyDisabledFeature {
  * Features that are off because of an admin tenant override or a global platform flag,
  * not only because the subscription plan omitted them.
  */
-export function getExternallyDisabledFeatures(entitlements: Entitlements): ExternallyDisabledFeature[] {
+export function getExternallyDisabledFeatures(
+  entitlements: Entitlements
+): ExternallyDisabledFeature[] {
   const sources = entitlements.featureSources
   if (!sources || typeof sources !== 'object') return []
 
