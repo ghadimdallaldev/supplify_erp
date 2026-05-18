@@ -35,6 +35,8 @@ import type {
   AdminFeatureFlag,
   EffectiveFeature,
   SubscriptionPlanChangePreview,
+  BillingStatus,
+  BillingPaymentMethod,
   UsageMeter,
   PublicRestaurant,
   PublicAvailabilityResponse,
@@ -97,6 +99,26 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
       }
       // Dispatch monetization soft-wall when blocked by plan/limit (Phase B)
       const respErr = data.error
+      if (respErr?.name === 'ACCOUNT_LOCKED') {
+        try {
+          const details = (respErr as { details?: { pendingActivation?: boolean } }).details
+          if (details?.pendingActivation) {
+            if (
+              typeof window !== 'undefined' &&
+              !window.location.pathname.startsWith('/app/activate')
+            ) {
+              window.location.href = '/app/activate'
+            }
+          } else {
+            const { openPayOverdueModal } = await import(
+              /* @vite-ignore */ '../features/billing/billingSlice'
+            )
+            api.dispatch(openPayOverdueModal())
+          }
+        } catch {
+          void 0
+        }
+      }
       if (
         respErr?.name === 'LIMIT_EXCEEDED' ||
         respErr?.name === 'FEATURE_NOT_AVAILABLE' ||
@@ -158,6 +180,7 @@ export const api = createApi({
     'Branch',
     'RestaurantTeam',
     'Subscription',
+    'Billing',
     'Admin',
     'AdminFeatureFlags',
     'AdminTenantFeatures',
@@ -1329,6 +1352,90 @@ export const api = createApi({
       }),
     }),
 
+    getBillingStatus: builder.query<BillingStatus, void>({
+      query: () => '/api/billing/status',
+      providesTags: ['Billing', 'Subscription'],
+    }),
+    getBillingPaymentMethods: builder.query<{ paymentMethods: BillingPaymentMethod[] }, void>({
+      query: () => '/api/billing/payment-methods',
+      providesTags: ['Billing'],
+    }),
+    addBillingPaymentMethod: builder.mutation<
+      { paymentMethod: BillingPaymentMethod },
+      {
+        type: 'CARD' | 'BANK_ACCOUNT'
+        setAsDefault?: boolean
+        provider?: string
+        card?: {
+          number?: string
+          expMonth?: string | number
+          expYear?: string | number
+          accountLast4?: string
+          bankName?: string
+        }
+      }
+    >({
+      query: (body) => ({
+        url: '/api/billing/payment-methods',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Billing'],
+    }),
+    removeBillingPaymentMethod: builder.mutation<{ removed: boolean }, string>({
+      query: (id) => ({
+        url: `/api/billing/payment-methods/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Billing'],
+    }),
+    billingCheckout: builder.mutation<
+      { success: boolean },
+      {
+        planId: string
+        billingCycle: 'MONTHLY' | 'YEARLY'
+        paymentMethodId?: string
+        idempotencyKey?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/billing/checkout',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Billing', 'Subscription'],
+    }),
+    billingPayNow: builder.mutation<
+      { allPaid: boolean },
+      { paymentMethodId?: string; idempotencyKey?: string }
+    >({
+      query: (body) => ({
+        url: '/api/billing/pay-now',
+        method: 'POST',
+        body: body ?? {},
+      }),
+      invalidatesTags: ['Billing', 'Subscription'],
+    }),
+    setBillingAutoRenew: builder.mutation<{ autoRenew: boolean }, { autoRenew: boolean }>({
+      query: (body) => ({
+        url: '/api/billing/auto-renew',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Billing', 'Subscription'],
+    }),
+    unlockAdminSubscription: builder.mutation<
+      { subscription: Subscription },
+      { id: string; reason?: string }
+    >({
+      query: ({ id, reason }) => ({
+        url: `/api/admin-dashboard/subscriptions/${id}/unlock`,
+        method: 'POST',
+        body: { reason },
+      }),
+      invalidatesTags: ['Admin', 'Billing', 'Subscription'],
+    }),
+
     // Admin Dashboard endpoints
     getAdminOverview: builder.query<any, void>({
       query: () => '/api/admin-dashboard/overview',
@@ -1434,11 +1541,30 @@ export const api = createApi({
       }),
       providesTags: ['Admin'],
     }),
-    getAdminAuditLogs: builder.query<{ logs: any[]; limit: number; offset: number }, any>({
+    getAdminAuditLogs: builder.query<
+      { logs: any[]; total: number; limit: number; offset: number; actionTypes: string[] },
+      {
+        limit?: number
+        offset?: number
+        tenantId?: string
+        actionType?: string
+        adminId?: string
+        dateFrom?: string
+        dateTo?: string
+        search?: string
+      }
+    >({
       query: (params) => ({
         url: '/api/admin-dashboard/audit-logs',
         params,
       }),
+      providesTags: ['Admin'],
+    }),
+    getAdminActivity: builder.query<
+      { events: any[]; total: number; limit: number; offset: number },
+      { limit?: number; offset?: number; type?: string }
+    >({
+      query: (params) => ({ url: '/api/admin-dashboard/activity', params }),
       providesTags: ['Admin'],
     }),
     getAdminHealth: builder.query<
@@ -1700,6 +1826,14 @@ export const {
   useGetRecommendationQuery,
   useGetSubscriptionPlansQuery,
   useRecordConversionEventMutation,
+  useGetBillingStatusQuery,
+  useGetBillingPaymentMethodsQuery,
+  useAddBillingPaymentMethodMutation,
+  useRemoveBillingPaymentMethodMutation,
+  useBillingCheckoutMutation,
+  useBillingPayNowMutation,
+  useSetBillingAutoRenewMutation,
+  useUnlockAdminSubscriptionMutation,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,
   useGetAdminOverviewQuery,
@@ -1712,6 +1846,7 @@ export const {
   usePreviewSubscriptionPlanChangeMutation,
   useGetTenantUsageQuery,
   useGetAdminAuditLogsQuery,
+  useGetAdminActivityQuery,
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
   useGetSupplierUsageQuery,

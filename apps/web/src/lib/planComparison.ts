@@ -22,13 +22,19 @@ export const SUPPLIER_LIMIT_KEYS = [
 ] as const
 
 export const RESTAURANT_FEATURE_KEYS = [
+  'order_calendar',
   'reports',
   'smart_reorder',
   'multi_branch',
   'custom_branding',
 ] as const
 
-export const SUPPLIER_FEATURE_KEYS = ['reports', 'smart_reorder', 'custom_branding'] as const
+export const SUPPLIER_FEATURE_KEYS = [
+  'order_calendar',
+  'reports',
+  'smart_reorder',
+  'custom_branding',
+] as const
 
 export const LIMIT_KEY_LABELS: Record<string, string> = {
   orders_per_day: 'Daily orders',
@@ -43,6 +49,7 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
 }
 
 export const FEATURE_KEY_LABELS: Record<string, string> = {
+  order_calendar: 'Order calendar',
   reports: 'Reports',
   smart_reorder: 'Smart reorder',
   multi_branch: 'Multi-branch',
@@ -78,7 +85,6 @@ export const PLAN_SUBTITLES: Record<string, string> = {
   bronze: 'Starter',
   gold: 'Most Popular',
   platinum: 'Unlimited Ops',
-  enterprise: 'Custom Contract',
 }
 
 export function getPlanSubtitle(planCode: string | null | undefined): string {

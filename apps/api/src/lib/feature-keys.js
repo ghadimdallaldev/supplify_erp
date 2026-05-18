@@ -1,6 +1,7 @@
 /** Canonical feature keys used in subscription plans and admin toggles. */
 export const RESTAURANT_FEATURE_KEYS = [
   'chat',
+  'order_calendar',
   'reports',
   'smart_reorder',
   'multi_branch',
@@ -19,6 +20,7 @@ export const RESTAURANT_FEATURE_KEYS = [
 
 export const SUPPLIER_FEATURE_KEYS = [
   'chat',
+  'order_calendar',
   'reports',
   'fulfillment_tools',
   'quick_lists',
@@ -30,9 +32,7 @@ export const SUPPLIER_FEATURE_KEYS = [
   'feature_flags_access',
 ]
 
-export const ALL_FEATURE_KEYS = [
-  ...new Set([...RESTAURANT_FEATURE_KEYS, ...SUPPLIER_FEATURE_KEYS]),
-]
+export const ALL_FEATURE_KEYS = [...new Set([...RESTAURANT_FEATURE_KEYS, ...SUPPLIER_FEATURE_KEYS])]
 
 export function getAllowedFeatureKeys(tenantType) {
   return tenantType === 'RESTAURANT' ? RESTAURANT_FEATURE_KEYS : SUPPLIER_FEATURE_KEYS
@@ -44,6 +44,7 @@ export function isFeatureKeyAllowed(featureKey, tenantType) {
 
 const DISPLAY_NAMES = {
   chat: 'Chat',
+  order_calendar: 'Order calendar',
   reports: 'Reports & analytics',
   smart_reorder: 'Smart reorder',
   multi_branch: 'Multi-branch',

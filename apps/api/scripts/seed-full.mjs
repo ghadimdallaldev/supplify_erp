@@ -64,6 +64,8 @@ runStep('Demo tenants (restaurant@supplify.com / supplier@supplify.com)', 'seed-
 
 runStep('Plan-tier demos (Free / Silver·Bronze / Gold restaurants & suppliers)', 'seed-plan-tier-demos.js')
 
+runStep('Subscription billing (payment methods, grace & lock demos)', 'seed-billing.js')
+
 runStep('Quick lists (per restaurant)', 'seed-quick-lists.js')
 
 runStep('Chats (restaurant ↔ supplier with orders)', 'seed-chats.js')

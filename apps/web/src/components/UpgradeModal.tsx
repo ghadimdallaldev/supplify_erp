@@ -12,6 +12,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { openCheckoutPayment } from '../lib/openPaymentModal'
 import { Check, Lock, Minus, TrendingUp } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import {
@@ -108,12 +109,14 @@ export function UpgradeModal() {
   const [recordConversionEvent] = useRecordConversionEventMutation()
 
   const entitlements = entitlementsData?.entitlements
-  const TIER_ORDER = ['free', 'bronze', 'gold', 'platinum', 'enterprise']
-  const plans = [...(plansData?.plans ?? [])].sort((a, b) => {
-    const ai = TIER_ORDER.indexOf((a.code || '').toLowerCase())
-    const bi = TIER_ORDER.indexOf((b.code || '').toLowerCase())
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
-  })
+  const TIER_ORDER = ['free', 'bronze', 'gold', 'platinum']
+  const plans = [...(plansData?.plans ?? [])]
+    .filter((p) => (p.code || '').toLowerCase() !== 'enterprise')
+    .sort((a, b) => {
+      const ai = TIER_ORDER.indexOf((a.code || '').toLowerCase())
+      const bi = TIER_ORDER.indexOf((b.code || '').toLowerCase())
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+    })
   const tenantType = entitlements?.tenantType ?? 'RESTAURANT'
   const limitKeys = getLimitKeys(tenantType)
   const featureKeys = getFeatureKeys(tenantType)
@@ -189,6 +192,26 @@ export function UpgradeModal() {
     }
 
     if (!canUpgrade) return
+
+    const targetPlan = code
+      ? plans.find((p) => (p.code || '').toLowerCase() === code)
+      : plans.find((p) => (p.code || '').toLowerCase() === (recommendedCode ?? ''))
+
+    if (targetPlan && (targetPlan.code || '').toLowerCase() !== 'free' && targetPlan.id) {
+      const monthly = Number(targetPlan.price_per_month ?? 0)
+      const yearly =
+        targetPlan.price_per_year != null ? Number(targetPlan.price_per_year) : monthly * 12
+      dispatch(closeMonetizationModal())
+      schedulePayloadReset()
+      openCheckoutPayment(dispatch, {
+        planId: targetPlan.id,
+        planCode: (targetPlan.code || '').toLowerCase(),
+        planName: targetPlan.name || planLabel,
+        priceMonthly: monthly,
+        priceYearly: yearly,
+      })
+      return
+    }
 
     if (onUpgradePage) {
       const subject = encodeURIComponent(`Plan change request (${planLabel})`)

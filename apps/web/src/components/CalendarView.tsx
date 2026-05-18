@@ -6,12 +6,27 @@ import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import { AnimatePresence, motion } from 'framer-motion'
 import { format } from 'date-fns'
-import { CalendarDays, Filter, RefreshCcw, X, Loader2, ArrowLeft, ArrowRight } from 'lucide-react'
+import {
+  CalendarDays,
+  Filter,
+  RefreshCcw,
+  X,
+  Loader2,
+  ArrowLeft,
+  ArrowRight,
+  Lock,
+  TrendingUp,
+} from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Select, SelectTrigger, SelectItem } from './ui/select'
-import { useOrdersCalendar } from '../hooks/useOrdersCalendar'
+import { useOrdersCalendar, OrdersCalendarFetchError } from '../hooks/useOrdersCalendar'
+import { useGetEntitlementsQuery } from '../services/api'
+import { useAppDispatch } from '../hooks/redux'
+import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
+import { openPayOverdueModal } from '../features/billing/billingSlice'
+import { FEATURE_KEY_LABELS } from '../lib/planComparison'
 import type { OrdersCalendarEvent } from '../types'
 
 type CalendarViewType = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek'
@@ -45,6 +60,12 @@ const viewOptions: Array<{ label: string; value: CalendarViewType }> = [
 const DEFAULT_PAGE_SIZE = 60
 
 export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarViewProps) {
+  const dispatch = useAppDispatch()
+  const { data: entitlementsData, isLoading: entitlementsLoading } = useGetEntitlementsQuery()
+  const entitlements = entitlementsData?.entitlements
+  const hasOrderCalendar = entitlements?.features?.order_calendar === true
+  const planName = entitlements?.plan?.name ?? 'your plan'
+
   const initialRole: 'RESTAURANT' | 'SUPPLIER' = role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
   const [activeRole, setActiveRole] = useState<'RESTAURANT' | 'SUPPLIER'>(initialRole)
   const [currentView, setCurrentView] = useState<CalendarViewType>('dayGridMonth')
@@ -67,18 +88,51 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     setSelectedEvent(null)
   }, [activeRole])
 
-  const { data, isLoading, isFetching, error, refetch } = useOrdersCalendar({
-    start: dateRange?.start,
-    end: dateRange?.end,
-    status: statusFilter || undefined,
-    supplier: supplierFilter || undefined,
-    branch: branchFilter || undefined,
-    category: categoryFilter || undefined,
-    page,
-    pageSize: DEFAULT_PAGE_SIZE,
-    role: activeRole,
-    view: currentView,
-  })
+  const { data, isLoading, isFetching, error, refetch } = useOrdersCalendar(
+    {
+      start: dateRange?.start,
+      end: dateRange?.end,
+      status: statusFilter || undefined,
+      supplier: supplierFilter || undefined,
+      branch: branchFilter || undefined,
+      category: categoryFilter || undefined,
+      page,
+      pageSize: DEFAULT_PAGE_SIZE,
+      role: activeRole,
+      view: currentView,
+    },
+    { enabled: !entitlementsLoading && hasOrderCalendar }
+  )
+
+  const calendarBlocked = useMemo(() => {
+    if (entitlementsLoading) return null
+    if (!hasOrderCalendar) {
+      return { kind: 'plan' as const }
+    }
+    if (!error) return null
+    const errName =
+      error instanceof OrdersCalendarFetchError ? error.name : (error as { name?: string }).name
+    if (errName === 'FEATURE_NOT_AVAILABLE') {
+      return { kind: 'plan' as const }
+    }
+    if (errName === 'ACCOUNT_LOCKED') {
+      return {
+        kind: 'billing' as const,
+        message: error.message,
+      }
+    }
+    if (errName === 'SUBSCRIPTION_SUSPENDED') {
+      return {
+        kind: 'suspended' as const,
+        message: error.message,
+      }
+    }
+    const message =
+      error.message?.includes('Invalid base URL') || error.message?.includes('Failed to construct')
+        ? 'Unable to load the order calendar right now.'
+        : error.message
+    return { kind: 'error' as const, message }
+  }, [entitlementsLoading, hasOrderCalendar, error])
 
   const calendarEvents = useMemo(() => {
     if (!data?.events) return []
@@ -109,7 +163,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         api.changeView(nextView)
       }
     },
-    [setCurrentView],
+    [setCurrentView]
   )
 
   const handleDatesSet = useCallback((arg: { start: Date; end: Date }) => {
@@ -119,74 +173,101 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     })
   }, [])
 
-  const handleEventClick = useCallback((info: { event: { startStr?: string; endStr?: string; extendedProps: unknown }; jsEvent?: { preventDefault: () => void } }) => {
-    info.jsEvent?.preventDefault()
-    const eventProps = info.event.extendedProps as OrdersCalendarEvent
-    setSelectedEvent({
-      ...eventProps,
-      start: info.event.startStr || eventProps.start,
-      end: info.event.endStr || eventProps.end,
-    })
-  }, [])
+  const handleEventClick = useCallback(
+    (info: {
+      event: { startStr?: string; endStr?: string; extendedProps: unknown }
+      jsEvent?: { preventDefault: () => void }
+    }) => {
+      info.jsEvent?.preventDefault()
+      const eventProps = info.event.extendedProps as OrdersCalendarEvent
+      setSelectedEvent({
+        ...eventProps,
+        start: info.event.startStr || eventProps.start,
+        end: info.event.endStr || eventProps.end,
+      })
+    },
+    []
+  )
 
-  const renderEventContent = useCallback((content: { event: { id?: string; extendedProps: unknown }; view: { type: string } }) => {
-    const event = content.event.extendedProps as OrdersCalendarEvent
-    const statusKey = event.statusCategory || 'pending'
-    const isTimeGridView = content.view.type.includes('timeGrid')
-    const amount = event.totalAmount
-    const formattedAmount =
-      typeof amount === 'number'
-        ? new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: event.currency || 'USD',
-            maximumFractionDigits: 2,
-          }).format(amount)
-        : '—'
+  const renderEventContent = useCallback(
+    (content: { event: { id?: string; extendedProps: unknown }; view: { type: string } }) => {
+      const event = content.event.extendedProps as OrdersCalendarEvent
+      const statusKey = event.statusCategory || 'pending'
+      const isTimeGridView = content.view.type.includes('timeGrid')
+      const amount = event.totalAmount
+      const formattedAmount =
+        typeof amount === 'number'
+          ? new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: event.currency || 'USD',
+              maximumFractionDigits: 2,
+            }).format(amount)
+          : '—'
 
-    if (isTimeGridView) {
-      const dotTheme = statusDotMap[statusKey] || statusDotMap.pending
+      if (isTimeGridView) {
+        const dotTheme = statusDotMap[statusKey] || statusDotMap.pending
+        return (
+          <div className="group relative flex h-full items-center justify-center">
+            <div
+              className={`h-3.5 w-3.5 rounded-full shadow-sm transition-transform duration-150 group-hover:scale-150 ${dotTheme}`}
+            />
+            <div className="pointer-events-none absolute left-1/2 top-full z-30 hidden w-60 -translate-x-1/2 translate-y-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] shadow-xl group-hover:block">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                {event.type?.replace(/_/g, ' ') || 'Order'}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[var(--text)]">{`#${event.orderId?.slice(0, 8) ?? content.event.id}`}</p>
+              {event.status && (
+                <p className="mt-1 capitalize text-[var(--text-muted)]">
+                  Status: {event.status.replace(/_/g, ' ').toLowerCase()}
+                </p>
+              )}
+              <p className="mt-1 text-[var(--text-muted)]">Counterpart: {event.counterpartName}</p>
+              <p className="mt-1 font-semibold text-[var(--text)]">{formattedAmount}</p>
+              {event.branchName && (
+                <p className="mt-1 text-[var(--text-muted)]">Branch: {event.branchName}</p>
+              )}
+              {event.categories?.length ? (
+                <p className="mt-1 text-[var(--text-muted)]">
+                  Categories: {event.categories.join(', ')}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        )
+      }
+
+      const statusTheme = statusThemeMap[statusKey] || statusThemeMap.pending
+
       return (
-        <div className="group relative flex h-full items-center justify-center">
-          <div className={`h-3.5 w-3.5 rounded-full shadow-sm transition-transform duration-150 group-hover:scale-150 ${dotTheme}`} />
-          <div className="pointer-events-none absolute left-1/2 top-full z-30 hidden w-60 -translate-x-1/2 translate-y-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] shadow-xl group-hover:block">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{event.type?.replace(/_/g, ' ') || 'Order'}</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--text)]">{`#${event.orderId?.slice(0, 8) ?? content.event.id}`}</p>
-            {event.status && <p className="mt-1 capitalize text-[var(--text-muted)]">Status: {event.status.replace(/_/g, ' ').toLowerCase()}</p>}
-            <p className="mt-1 text-[var(--text-muted)]">Counterpart: {event.counterpartName}</p>
-            <p className="mt-1 font-semibold text-[var(--text)]">{formattedAmount}</p>
-            {event.branchName && <p className="mt-1 text-[var(--text-muted)]">Branch: {event.branchName}</p>}
-            {event.categories?.length ? <p className="mt-1 text-[var(--text-muted)]">Categories: {event.categories.join(', ')}</p> : null}
+        <div
+          className={`supplify-calendar-event group relative border-l-4 p-2 rounded-lg shadow-sm transition-all hover:shadow-md ${statusTheme}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide">
+              {event.type?.replace(/_/g, ' ') || 'Order'}
+            </span>
+            {event.status && (
+              <span className="text-[10px] rounded-full bg-white/70 px-2 py-0.5 font-medium text-[var(--text-mid)] shadow-sm">
+                {event.status.replace(/_/g, ' ')}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 text-sm font-semibold leading-tight text-[var(--text)] truncate">
+            {`#${event.orderId?.slice(0, 8) ?? content.event.id}`}
+          </div>
+          <div className="text-xs text-[var(--text-mid)] truncate">{event.counterpartName}</div>
+          <div className="mt-2 text-xs font-semibold text-[var(--text)]">{formattedAmount}</div>
+          <div className="pointer-events-none absolute -left-2 top-full z-10 w-48 origin-top-left rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] opacity-0 shadow-lg transition-all duration-150 group-hover:translate-y-1 group-hover:opacity-100">
+            <p className="font-semibold text-[var(--text)]">{event.type?.replace(/_/g, ' ')}</p>
+            <p className="mt-1">Status: {event.status}</p>
+            {event.branchName && <p>Branch: {event.branchName}</p>}
+            {event.categories?.length ? <p>Categories: {event.categories.join(', ')}</p> : null}
           </div>
         </div>
       )
-    }
-
-    const statusTheme = statusThemeMap[statusKey] || statusThemeMap.pending
-
-    return (
-      <div className={`supplify-calendar-event group relative border-l-4 p-2 rounded-lg shadow-sm transition-all hover:shadow-md ${statusTheme}`}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide">{event.type?.replace(/_/g, ' ') || 'Order'}</span>
-          {event.status && (
-            <span className="text-[10px] rounded-full bg-white/70 px-2 py-0.5 font-medium text-[var(--text-mid)] shadow-sm">
-              {event.status.replace(/_/g, ' ')}
-            </span>
-          )}
-        </div>
-        <div className="mt-1 text-sm font-semibold leading-tight text-[var(--text)] truncate">
-          {`#${event.orderId?.slice(0, 8) ?? content.event.id}`}
-        </div>
-        <div className="text-xs text-[var(--text-mid)] truncate">{event.counterpartName}</div>
-        <div className="mt-2 text-xs font-semibold text-[var(--text)]">{formattedAmount}</div>
-        <div className="pointer-events-none absolute -left-2 top-full z-10 w-48 origin-top-left rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] opacity-0 shadow-lg transition-all duration-150 group-hover:translate-y-1 group-hover:opacity-100">
-          <p className="font-semibold text-[var(--text)]">{event.type?.replace(/_/g, ' ')}</p>
-          <p className="mt-1">Status: {event.status}</p>
-          {event.branchName && <p>Branch: {event.branchName}</p>}
-          {event.categories?.length ? <p>Categories: {event.categories.join(', ')}</p> : null}
-        </div>
-      </div>
-    )
-  }, [])
+    },
+    []
+  )
 
   const clearFilters = useCallback(() => {
     setStatusFilter('')
@@ -204,7 +285,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
         api.today()
       }
     },
-    [setActiveRole],
+    [setActiveRole]
   )
 
   return (
@@ -216,14 +297,20 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             <div>
               <h2 className="text-xl font-semibold">Order Calendar</h2>
               <p className="text-sm text-[var(--text-muted)]">
-                Visualize orders, deliveries, and payments {activeRole === 'RESTAURANT' ? 'for your branches' : 'across your restaurant partners'}
+                Visualize orders, deliveries, and payments{' '}
+                {activeRole === 'RESTAURANT'
+                  ? 'for your branches'
+                  : 'across your restaurant partners'}
               </p>
             </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {isAdmin && (
-            <Select value={activeRole} onValueChange={(val) => handleRoleSwitch(val as 'RESTAURANT' | 'SUPPLIER')}>
+            <Select
+              value={activeRole}
+              onValueChange={(val) => handleRoleSwitch(val as 'RESTAURANT' | 'SUPPLIER')}
+            >
               <SelectTrigger className="w-40">
                 <option value="RESTAURANT">Restaurant view</option>
                 <option value="SUPPLIER">Supplier view</option>
@@ -325,11 +412,20 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-[var(--text-muted)]">
-        <Badge variant="outline" className="flex items-center gap-1 border-dashed border-[var(--brand)] text-[var(--brand-mid)]">
+        <Badge
+          variant="outline"
+          className="flex items-center gap-1 border-dashed border-[var(--brand)] text-[var(--brand-mid)]"
+        >
           <Filter className="h-3.5 w-3.5" />
           Filters update in real time
         </Badge>
-        <Button variant="ghost" size="sm" className="text-[var(--text-muted)] hover:text-[var(--text)]" onClick={clearFilters} disabled={filtersDisabled}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-[var(--text-muted)] hover:text-[var(--text)]"
+          onClick={clearFilters}
+          disabled={filtersDisabled}
+        >
           <RefreshCcw className="mr-1 h-3.5 w-3.5" />
           Reset
         </Button>
@@ -342,23 +438,51 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       </div>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--app-border)]">
-        {isLoading && (
+        {(entitlementsLoading || (isLoading && !calendarBlocked)) && (
           <div className="flex h-64 items-center justify-center text-[var(--text-muted)]">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             Loading calendar…
           </div>
         )}
 
-        {!isLoading && error && (
-          <div className="flex h-64 flex-col items-center justify-center gap-4 text-center text-[var(--text-muted)]">
-            <p>Unable to load the order calendar right now.</p>
-            <Button onClick={() => refetch()} size="sm">
-              Try again
+        {!entitlementsLoading && calendarBlocked?.kind === 'plan' && (
+          <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-ultra)] text-[var(--brand-mid)]">
+              <Lock className="h-7 w-7" aria-hidden />
+            </div>
+            <div className="max-w-md space-y-2">
+              <p className="text-lg font-semibold text-[var(--text)]">
+                {FEATURE_KEY_LABELS.order_calendar} is not on {planName}
+              </p>
+              <p className="text-sm text-[var(--text-muted)]">
+                Visualize orders, deliveries, and payment due dates in one place. Upgrade to Bronze
+                or Gold to unlock the calendar — Free is for setup and light testing only.
+              </p>
+            </div>
+            <Button
+              type="button"
+              className="gap-2"
+              onClick={() => openBrowseUpgrade(dispatch, { currentPlan: planName })}
+            >
+              <TrendingUp className="h-4 w-4" />
+              Compare plans & upgrade
             </Button>
           </div>
         )}
 
-        {!isLoading && !error && (
+        {hasOrderCalendar &&
+          !isLoading &&
+          !entitlementsLoading &&
+          calendarBlocked?.kind === 'error' && (
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 px-6 py-10 text-center text-[var(--text-muted)]">
+              <p>{calendarBlocked.message || 'Unable to load the order calendar right now.'}</p>
+              <Button onClick={() => refetch()} size="sm">
+                Try again
+              </Button>
+            </div>
+          )}
+
+        {!calendarBlocked && !isLoading && !entitlementsLoading && (
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
@@ -378,9 +502,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             expandRows
             slotDuration="02:00:00"
             slotLabelInterval="02:00:00"
-            slotLabelFormat={[
-              { hour: 'numeric', minute: '2-digit', hour12: true },
-            ]}
+            slotLabelFormat={[{ hour: 'numeric', minute: '2-digit', hour12: true }]}
             scrollTime="07:00:00"
             views={{
               timeGridWeek: {
@@ -448,7 +570,9 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">{selectedEvent.type?.replace(/_/g, ' ')}</p>
+                  <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                    {selectedEvent.type?.replace(/_/g, ' ')}
+                  </p>
                   <h3 className="text-xl font-semibold text-[var(--text)]">
                     Order #{selectedEvent.orderId?.slice(0, 8) ?? selectedEvent.id}
                   </h3>
@@ -494,7 +618,9 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                   {selectedEvent.end && (
                     <div className="flex justify-between">
                       <span className="font-medium text-[var(--text-muted)]">Ends</span>
-                      <span className="text-[var(--text)]">{format(new Date(selectedEvent.end), 'PPp')}</span>
+                      <span className="text-[var(--text)]">
+                        {format(new Date(selectedEvent.end), 'PPp')}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -515,7 +641,9 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                 {selectedEvent.supplierList?.length ? (
                   <div>
                     <p className="font-medium text-[var(--text-muted)]">
-                      {activeRole === 'SUPPLIER' ? 'Restaurant contacts' : 'Suppliers on this order'}
+                      {activeRole === 'SUPPLIER'
+                        ? 'Restaurant contacts'
+                        : 'Suppliers on this order'}
                     </p>
                     <ul className="mt-2 space-y-1 text-[var(--text)]">
                       {selectedEvent.supplierList.map((supplier) => (
@@ -530,8 +658,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                 <div className="rounded-xl bg-[var(--brand-ultra)] p-4 text-xs text-[var(--text-muted)]">
                   <p className="font-semibold text-[var(--text-muted)]">Tip</p>
                   <p>
-                    Track delivery progress and payment deadlines in one place. Filters stay in sync across all views for
-                    faster follow-ups.
+                    Track delivery progress and payment deadlines in one place. Filters stay in sync
+                    across all views for faster follow-ups.
                   </p>
                 </div>
               </div>
@@ -542,4 +670,3 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     </div>
   )
 }
-

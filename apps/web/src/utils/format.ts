@@ -6,18 +6,41 @@
 const defaultLocale = undefined // use user's locale
 const defaultCurrency = 'USD'
 
+/** Intl requires 0 <= minimumFractionDigits <= maximumFractionDigits <= 20 */
+function normalizeFractionDigits(
+  minimumFractionDigits: number,
+  maximumFractionDigits: number
+): { minimumFractionDigits: number; maximumFractionDigits: number } {
+  const max = Math.min(Math.max(0, maximumFractionDigits), 20)
+  const min = Math.min(Math.max(0, minimumFractionDigits), max)
+  return { minimumFractionDigits: min, maximumFractionDigits: max }
+}
+
 /** Format a numeric value (currency). Handles number, string, null, undefined; always returns a string. */
 export function formatCurrency(
   value: number | string | null | undefined,
-  options: { currency?: string; minimumFractionDigits?: number; maximumFractionDigits?: number } = {}
+  options: {
+    currency?: string
+    minimumFractionDigits?: number
+    maximumFractionDigits?: number
+  } = {}
 ): string {
   const num = toNumber(value)
-  const { currency = defaultCurrency, minimumFractionDigits = 2, maximumFractionDigits = 2 } = options
+  const { currency = defaultCurrency } = options
+  let minimumFractionDigits = options.minimumFractionDigits ?? 2
+  const maximumFractionDigits = options.maximumFractionDigits ?? 2
+  if (
+    options.maximumFractionDigits !== undefined &&
+    options.minimumFractionDigits === undefined &&
+    maximumFractionDigits < minimumFractionDigits
+  ) {
+    minimumFractionDigits = maximumFractionDigits
+  }
+  const digits = normalizeFractionDigits(minimumFractionDigits, maximumFractionDigits)
   return new Intl.NumberFormat(defaultLocale, {
     style: 'currency',
     currency,
-    minimumFractionDigits,
-    maximumFractionDigits,
+    ...digits,
   }).format(num)
 }
 
@@ -27,11 +50,11 @@ export function formatNumber(
   options: { minimumFractionDigits?: number; maximumFractionDigits?: number } = {}
 ): string {
   const num = toNumber(value)
-  const { minimumFractionDigits = 0, maximumFractionDigits = 2 } = options
-  return new Intl.NumberFormat(defaultLocale, {
-    minimumFractionDigits,
-    maximumFractionDigits,
-  }).format(num)
+  const digits = normalizeFractionDigits(
+    options.minimumFractionDigits ?? 0,
+    options.maximumFractionDigits ?? 2
+  )
+  return new Intl.NumberFormat(defaultLocale, digits).format(num)
 }
 
 /** Format with exactly 2 decimal places (e.g. for prices in tables). */

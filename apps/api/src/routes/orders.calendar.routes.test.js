@@ -14,11 +14,25 @@ vi.mock('../lib/rbac.js', () => ({
     req.userData = { ...mockUser }
     next()
   },
+  resolveTenantContext: (req, res, next) => {
+    req.tenantContext = {
+      tenantId: 'restaurant-1',
+      tenantType: 'RESTAURANT',
+      tenantName: 'Golden Fork Restaurant',
+      roles: [],
+      permissions: [],
+    }
+    next()
+  },
   getRequestTenant: vi.fn().mockResolvedValue({
     tenantId: 'restaurant-1',
     tenantType: 'RESTAURANT',
     tenantName: 'Golden Fork Restaurant',
   }),
+}))
+
+vi.mock('../lib/subscription.js', () => ({
+  requireFeature: () => (req, res, next) => next(),
 }))
 
 const queryMock = vi.fn()

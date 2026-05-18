@@ -27,6 +27,7 @@
     "seed:demo-users": "pnpm --filter @supplify/api seed:demo-users",
     "seed:demo-tenants": "node scripts/pnpm-run.mjs --filter @supplify/api seed:demo-tenants",
     "seed:plan-tiers": "node scripts/pnpm-run.mjs --filter @supplify/api seed:plan-tiers",
+    "seed:billing": "node scripts/pnpm-run.mjs --filter @supplify/api seed:billing",
     "seed:prodlike-team": "node scripts/pnpm-run.mjs --filter @supplify/api seed:prodlike-team",
     "seed:full": "node scripts/pnpm-run.mjs --filter @supplify/api seed:full",
     "db:reset": "pnpm --filter @supplify/api db:reset",

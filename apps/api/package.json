@@ -26,6 +26,7 @@
     "seed:demo-users": "node scripts/seed-demo-users.js",
     "seed:demo-tenants": "node scripts/seed-demo-tenants.js",
     "seed:plan-tiers": "node scripts/seed-plan-tier-demos.js",
+    "seed:billing": "node scripts/seed-billing.js",
     "seed:prodlike-team": "node scripts/seed-prodlike-team-backfill.js",
     "seed:full": "node scripts/seed-full.mjs",
     "reduce-to-single-tenant": "node scripts/reduce-to-single-tenant.js",

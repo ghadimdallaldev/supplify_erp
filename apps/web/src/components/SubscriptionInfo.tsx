@@ -12,9 +12,19 @@ import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
 import { Skeleton } from './ui/skeleton'
-import { AlertCircle, AlertTriangle, Infinity, Layers, Lock, TrendingUp } from 'lucide-react'
+import {
+  AlertCircle,
+  AlertTriangle,
+  CreditCard,
+  Infinity,
+  Layers,
+  Lock,
+  TrendingUp,
+} from 'lucide-react'
 import { RecommendedBadge } from './RecommendedBadge'
 import { getPlanSubtitle } from '../lib/planComparison'
+import { useGetBillingStatusQuery } from '../services/api'
+import { openCheckoutPayment, openOverduePayment } from '../lib/openPaymentModal'
 import { getUsageMeterDisplay } from '../lib/usageDisplay'
 import {
   getExternallyDisabledFeatures,
@@ -37,6 +47,7 @@ export function SubscriptionInfo() {
   const dispatch = useAppDispatch()
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const { data, isLoading, error } = useGetEntitlementsQuery()
+  const { data: billing } = useGetBillingStatusQuery()
   const { data: recommendation } = useGetRecommendationQuery({})
 
   const e = data?.entitlements ?? null
@@ -172,6 +183,67 @@ export function SubscriptionInfo() {
               ${plan.price_monthly}/mo
               {plan.price_yearly != null && plan.price_yearly > 0 && ` · $${plan.price_yearly}/yr`}
             </p>
+          )}
+          {billing?.access?.isPastDue && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-medium">
+                {billing.access.isLocked
+                  ? 'Account locked — payment required'
+                  : `Payment overdue — ${billing.access.daysUntilLock ?? 0} day(s) until lock`}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                className="mt-2"
+                onClick={() => openOverduePayment(dispatch)}
+              >
+                <CreditCard className="h-4 w-4 mr-1" />
+                Pay now
+              </Button>
+            </div>
+          )}
+          {(plan.code || '').toLowerCase() === 'free' ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm text-[var(--text-muted)]">
+                Upgrade to a paid plan, then pay securely from this page (card or saved method via
+                our payment gateway).
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  recordConversionEvent({
+                    eventType: 'OPEN_UPGRADE',
+                    metadata: { source: 'subscription_billing_free' },
+                  }).catch(() => {})
+                  openBrowseUpgrade(dispatch)
+                }}
+              >
+                <CreditCard className="h-4 w-4 mr-1" />
+                Choose plan & pay
+              </Button>
+            </div>
+          ) : (
+            plan.id && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() =>
+                  openCheckoutPayment(dispatch, {
+                    planId: plan.id,
+                    planCode: plan.code ?? 'gold',
+                    planName: plan.name || 'Plan',
+                    priceMonthly: plan.price_monthly ?? 0,
+                    priceYearly: plan.price_yearly ?? null,
+                  })
+                }
+              >
+                <CreditCard className="h-4 w-4 mr-1" />
+                Manage billing & payment
+              </Button>
+            )
           )}
           {e.overrides.length > 0 && (
             <p className="text-xs text-amber-600 mt-2">

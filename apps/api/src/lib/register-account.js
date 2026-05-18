@@ -2,6 +2,7 @@ import { query, withTransaction } from './db.js'
 import { assignDefaultRoleForTenant } from './rbac.js'
 import { ensureKeycloakRealmRole } from './keycloak-admin.js'
 import { ConflictError, ValidationError } from '../middlewares/errorHandler.js'
+import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 
 const KC_ROLE = { RESTAURANT: 'restaurant', SUPPLIER: 'supplier', ADMIN: 'admin' }
 
@@ -24,19 +25,6 @@ async function uniqueSlug(client, table, baseSlug) {
     n += 1
   }
   throw new ValidationError('Could not generate a unique organization URL slug')
-}
-
-async function assignFreeSubscription(client, tenantId, tenantType) {
-  await client.query(
-    `
-    INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
-    SELECT $1, $2, sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + INTERVAL '1 month'
-    FROM subscription_plan sp
-    WHERE sp.code = 'free' AND sp.tenant_type = $2 AND sp.is_active = true
-    LIMIT 1
-    `,
-    [tenantId, tenantType]
-  )
 }
 
 export async function userNeedsTenantSetup(user) {
@@ -121,7 +109,7 @@ export async function completeTenantRegistration({
       [type, keycloakSub, userId]
     )
 
-    await assignFreeSubscription(client, tenant.id, type)
+    await createPendingActivationSubscription(client, tenant.id, type, 'free')
 
     return { tenant, tenantType: type }
   })

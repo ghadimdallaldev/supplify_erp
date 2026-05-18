@@ -43,6 +43,9 @@ import branchesRoutes from './routes/branches.routes.js'
 import warehousesRoutes from './routes/warehouses.routes.js'
 import { executeScheduledOrders } from './services/scheduled-orders.service.js'
 import { checkOverdueInvoices } from './jobs/invoice-overdue.job.js'
+import { runSubscriptionBillingJob } from './jobs/subscription-billing.job.js'
+import { billingAccessMiddleware } from './middlewares/billingAccess.js'
+import { billingRoutes } from './routes/billing.routes.js'
 import { ensureReservationsSchema, ensureStaffAppSchema } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
@@ -164,6 +167,9 @@ app.use(requestContext)
 app.use(impersonationContext)
 app.use(activeTenantContext)
 
+// Block locked tenants except billing/subscription read endpoints
+app.use(billingAccessMiddleware)
+
 // CSRF protection for state-changing operations (skip for public APIs)
 const csrfBypassPrefixes = ['/api/public']
 app.use((req, res, next) => {
@@ -211,6 +217,7 @@ app.use('/api/staff', staffRoutes)
 app.use('/api/restaurant-pricing', restaurantPricingRoutes)
 app.use('/api/notifications', notificationsRoutes)
 app.use('/api/subscriptions', subscriptionsRoutes)
+app.use('/api/billing', billingRoutes)
 app.use('/api/public', publicRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
 if (config.E2E_SECRET) {
@@ -274,6 +281,19 @@ server.listen(PORT, () => {
     24 * 60 * 60 * 1000
   )
   logger.info('Invoice overdue job started (runs every 24h)')
+
+  runSubscriptionBillingJob().catch((err) =>
+    logger.error('Subscription billing job failed on startup:', err)
+  )
+  setInterval(
+    () => {
+      runSubscriptionBillingJob().catch((err) =>
+        logger.error('Subscription billing job failed:', err)
+      )
+    },
+    60 * 60 * 1000
+  )
+  logger.info('Subscription billing job started (runs every 1h)')
 })
 
 export default app

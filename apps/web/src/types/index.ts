@@ -907,6 +907,66 @@ export interface EffectiveFeature {
   tenantOverride: { enabled: boolean; reason: string | null } | null
 }
 
+export interface BillingPaymentMethod {
+  id: string
+  provider: string
+  type: 'CARD' | 'BANK_ACCOUNT' | 'WALLET' | 'MANUAL'
+  brand?: string | null
+  last4?: string | null
+  exp_month?: number | null
+  exp_year?: number | null
+  bank_name?: string | null
+  is_default: boolean
+  status: string
+  created_at: string
+}
+
+export interface BillingInvoice {
+  id: string
+  invoice_number: string
+  amount: number
+  currency: string
+  status: string
+  due_date: string
+  billing_cycle?: string
+  plan_name?: string
+}
+
+export interface BillingAccessState {
+  requiresPayment: boolean
+  isPastDue: boolean
+  inGracePeriod: boolean
+  isLocked: boolean
+  pendingActivation?: boolean
+  daysUntilLock: number | null
+  gracePeriodEndsAt: string | null
+  pastDueSince: string | null
+  lockReason: string | null
+  autoRenew: boolean
+}
+
+export interface BillingStatus {
+  subscription: {
+    id: string
+    status: string
+    planId: string
+    planName: string
+    planCode: string
+    billingCycle?: string
+    nextBillingDate?: string
+    currentPeriodEnd?: string
+    autoRenew: boolean
+  } | null
+  access: BillingAccessState
+  paymentMethods: BillingPaymentMethod[]
+  defaultPaymentMethod: BillingPaymentMethod | null
+  openInvoices: BillingInvoice[]
+  amountDue: number
+  gracePeriodDays: number
+  availableGateways?: string[]
+  gateways?: string[]
+}
+
 /** Plan recommendation from GET /api/subscriptions/recommendation */
 export interface PlanRecommendation {
   recommendedPlanCode: string

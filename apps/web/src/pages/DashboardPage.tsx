@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import {
   useGetDashboardStatsQuery,
   useGetOrdersQuery,
@@ -8,6 +9,7 @@ import {
   useAddItemToQuickListMutation,
   useGetImpersonationStatusQuery,
   useGetEntitlementsQuery,
+  useGetInventoryListQuery,
 } from '../services/api'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
@@ -18,9 +20,9 @@ import {
   Building2,
   DollarSign,
   Loader2,
-  Shield,
   AlertTriangle,
   TrendingUp,
+  Warehouse,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
@@ -30,6 +32,26 @@ import { CalendarView } from '../components/CalendarView'
 import { formatCurrency } from '../utils/format'
 
 // ─── Tiny helpers ────────────────────────────────────────────────────────────
+
+const SPEND_TREND_DAYS = 30
+
+function buildOrderSpendTrend(orders: any[], days = SPEND_TREND_DAYS) {
+  const cutoff = new Date()
+  cutoff.setHours(0, 0, 0, 0)
+  cutoff.setDate(cutoff.getDate() - days)
+  const buckets = new Map<string, number>()
+  for (const o of orders) {
+    const raw = o.created_at || o.createdAt
+    if (!raw) continue
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime()) || d < cutoff) continue
+    const key = raw.slice(5, 10)
+    buckets.set(key, (buckets.get(key) || 0) + (Number(o.total_amount) || 0))
+  }
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, value]) => ({ name, value }))
+}
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const max = Math.max(...data, 1)
@@ -216,11 +238,18 @@ function SectionCard({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function DashboardPage() {
+  const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
     skip: user?.role !== 'ADMIN',
   })
   const isAdminNotImpersonating = user?.role === 'ADMIN' && !impersonation?.active
+
+  useEffect(() => {
+    if (isAdminNotImpersonating) {
+      navigate('/app/admin', { replace: true })
+    }
+  }, [isAdminNotImpersonating, navigate])
   const {
     data: stats,
     isLoading,
@@ -238,6 +267,13 @@ export function DashboardPage() {
     { limit: 7, offset: 0 },
     { skip: isAdminNotImpersonating }
   )
+  const { data: spendOrdersData } = useGetOrdersQuery(
+    { limit: 200, offset: 0 },
+    { skip: isAdminNotImpersonating || !isRestaurant }
+  )
+  const { data: inventoryData } = useGetInventoryListQuery(undefined, {
+    skip: isAdminNotImpersonating || !isSupplier,
+  })
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
     skip: !isRestaurant,
   })
@@ -267,52 +303,6 @@ export function DashboardPage() {
     day: 'numeric',
     year: 'numeric',
   })
-
-  // ── Admin not impersonating ──────────────────────────────────────────────
-  if (isAdminNotImpersonating) {
-    return (
-      <div className="space-y-6" data-testid="dashboard-page">
-        <div
-          style={{
-            borderRadius: 16,
-            padding: '20px 24px',
-            background: 'linear-gradient(135deg, var(--brand), var(--brand-mid))',
-            color: '#fff',
-          }}
-        >
-          <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Admin Dashboard</h1>
-          <p style={{ marginTop: 4, opacity: 0.85, fontSize: 14 }}>
-            Platform management and tenant overview
-          </p>
-        </div>
-        <div
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--app-border)',
-            borderRadius: 12,
-            padding: 20,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <Shield size={18} style={{ color: 'var(--brand)' }} />
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-              You are viewing as platform admin
-            </span>
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
-            Use the Admin Dashboard to manage tenants, plans, and support. To see a restaurant or
-            supplier view, use &quot;Impersonate&quot; from the Admin Dashboard.
-          </p>
-          <Button
-            asChild
-            style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}
-          >
-            <Link to="/app/admin">Open Admin Dashboard</Link>
-          </Button>
-        </div>
-      </div>
-    )
-  }
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -389,12 +379,20 @@ export function DashboardPage() {
     ((isSupplier ? stats?.totalRestaurants : stats?.totalSuppliers) as number) || 5
   )
 
-  const spendTrend = Array.isArray(invoiceAnalytics?.points)
+  const invoiceSpendTrend = Array.isArray(invoiceAnalytics?.points)
     ? invoiceAnalytics.points.map((p: any) => ({
         name: p.date?.slice(5) || '',
         value: Number(p.total) || 0,
       }))
     : []
+  const orderSpendTrend = buildOrderSpendTrend(spendOrdersData?.orders || [])
+  const spendTrendSource: 'invoices' | 'orders' | null =
+    invoiceSpendTrend.length > 0 ? 'invoices' : orderSpendTrend.length > 0 ? 'orders' : null
+  const spendTrend = spendTrendSource === 'invoices' ? invoiceSpendTrend : orderSpendTrend
+  const spendTrendPeriodTotal = spendTrend.reduce((sum, p) => sum + p.value, 0)
+  const lowStockItems = (inventoryData?.inventory || [])
+    .filter((item: any) => item.isLowStock)
+    .slice(0, 3)
 
   // ── KPI definitions ──────────────────────────────────────────────────────
   const supplierKpis: KpiCardProps[] = [
@@ -838,7 +836,9 @@ export function DashboardPage() {
                   padding: '32px 0',
                 }}
               >
-                No spend data yet
+                {typeof stats?.totalSpent === 'number' && stats.totalSpent > 0
+                  ? `No spend in the last ${SPEND_TREND_DAYS} days. Your all-time order total is in the KPI above.`
+                  : 'No spend data yet'}
               </p>
             )}
             <div
@@ -849,21 +849,44 @@ export function DashboardPage() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                gap: 8,
               }}
             >
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total spent</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {spendTrend.length > 0
+                  ? `Last ${SPEND_TREND_DAYS} days${spendTrendSource === 'orders' ? ' (orders)' : ''}`
+                  : 'All-time (orders)'}
+              </span>
               <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>
-                {typeof stats?.totalSpent === 'number' ? formatCurrency(stats.totalSpent) : '$0'}
+                {formatCurrency(
+                  spendTrend.length > 0
+                    ? spendTrendPeriodTotal
+                    : typeof stats?.totalSpent === 'number'
+                      ? stats.totalSpent
+                      : 0
+                )}
               </span>
             </div>
           </SectionCard>
         )}
 
-        {/* Col 3 — Reorder Alerts */}
+        {/* Col 3 — Restaurant: reorder | Supplier: low stock */}
         <SectionCard
-          title="Reorder Alerts"
+          title={isSupplier ? 'Low Stock' : 'Reorder Alerts'}
           action={
-            isRestaurant && (reorderSuggestions?.suggestions?.length ?? 0) > 0 ? (
+            isSupplier && lowStockItems.length > 0 ? (
+              <Link
+                to="/app/inventory"
+                style={{
+                  fontSize: 11,
+                  color: 'var(--brand)',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                View all →
+              </Link>
+            ) : isRestaurant && (reorderSuggestions?.suggestions?.length ?? 0) > 0 ? (
               <Link
                 to="/app/quick-lists"
                 style={{
@@ -878,7 +901,60 @@ export function DashboardPage() {
             ) : undefined
           }
         >
-          {isRestaurant ? (
+          {isSupplier ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {lowStockItems.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    textAlign: 'center',
+                    padding: '16px 0',
+                  }}
+                >
+                  All products are above their stock thresholds
+                </p>
+              ) : (
+                lowStockItems.map((item: any) => (
+                  <Link
+                    key={item.product_id}
+                    to="/app/inventory"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '8px 0',
+                      borderBottom: '1px solid var(--app-border)',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                    }}
+                  >
+                    <Warehouse size={16} style={{ color: 'var(--amber)', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: 'var(--text)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {item.product_name || item.name || 'Product'}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                        Available: {item.available_qty ?? 0}
+                        {item.low_stock_threshold != null
+                          ? ` · Threshold: ${item.low_stock_threshold}`
+                          : ''}
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+          ) : isRestaurant ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {(reorderSuggestions?.suggestions?.length ?? 0) === 0 ? (
                 <p
@@ -982,14 +1058,7 @@ export function DashboardPage() {
                 })
               )}
             </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <Package size={24} style={{ color: 'var(--brand-light)', margin: '0 auto 8px' }} />
-              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                Reorder alerts available for restaurants
-              </p>
-            </div>
-          )}
+          ) : null}
         </SectionCard>
       </div>
 

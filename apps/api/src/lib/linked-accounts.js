@@ -1,5 +1,6 @@
 import { query, withTransaction } from './db.js'
 import { slugifyName } from './register-account.js'
+import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { assignDefaultRoleForTenant } from './rbac.js'
 
 async function uniqueSlug(client, table, baseSlug) {
@@ -12,19 +13,6 @@ async function uniqueSlug(client, table, baseSlug) {
     n += 1
   }
   throw new Error('Could not generate a unique organization URL slug')
-}
-
-async function assignFreeSubscription(client, tenantId, tenantType) {
-  await client.query(
-    `
-      INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
-      SELECT $1, $2, sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + INTERVAL '1 month'
-      FROM subscription_plan sp
-      WHERE sp.code = 'free' AND sp.tenant_type = $2 AND sp.is_active = true
-      LIMIT 1
-    `,
-    [tenantId, tenantType],
-  )
 }
 
 export async function listLinkedAccounts(parentTenantId, parentTenantType) {
@@ -43,7 +31,7 @@ export async function listLinkedAccounts(parentTenantId, parentTenantType) {
       WHERE l.parent_tenant_id = $1 AND l.parent_tenant_type = $2
       ORDER BY l.created_at DESC
     `,
-    [parentTenantId, parentTenantType],
+    [parentTenantId, parentTenantType]
   )
 
   return {
@@ -85,19 +73,19 @@ export async function createLinkedBranchAccount({
         `INSERT INTO supplier (name, slug, contact_email, phone, address_json)
          VALUES ($1, $2, $3, $4, $5::jsonb)
          RETURNING *`,
-        [name, slug, normalizedEmail, phone || null, addressJson],
+        [name, slug, normalizedEmail, phone || null, addressJson]
       )
       tenant = rows[0]
       await client.query(
         `INSERT INTO catalog (supplier_id, name, is_active) VALUES ($1, $2, true)`,
-        [tenant.id, `${name} Catalog`],
+        [tenant.id, `${name} Catalog`]
       )
     } else {
       const { rows } = await client.query(
         `INSERT INTO restaurant (name, slug, contact_email, phone, address_json)
          VALUES ($1, $2, $3, $4, $5::jsonb)
          RETURNING *`,
-        [name, slug, normalizedEmail, phone || null, addressJson],
+        [name, slug, normalizedEmail, phone || null, addressJson]
       )
       tenant = rows[0]
     }
@@ -108,10 +96,10 @@ export async function createLinkedBranchAccount({
           parent_tenant_id, parent_tenant_type, child_tenant_id, child_tenant_type, branch_name
         ) VALUES ($1, $2, $3, $4, $5)
       `,
-      [parentTenantId, parentTenantType, tenant.id, tenantType, name],
+      [parentTenantId, parentTenantType, tenant.id, tenantType, name]
     )
 
-    await assignFreeSubscription(client, tenant.id, tenantType)
+    await createPendingActivationSubscription(client, tenant.id, tenantType, 'free')
     return tenant
   }).then(async (tenant) => {
     await assignDefaultRoleForTenant(userId, tenant.id, tenantType)
@@ -132,7 +120,7 @@ export async function removeLinkedBranchAccount({
         AND child_tenant_id = $3
         AND child_tenant_type = $2
     `,
-    [parentTenantId, parentTenantType, childTenantId],
+    [parentTenantId, parentTenantType, childTenantId]
   )
   return rowCount > 0
 }

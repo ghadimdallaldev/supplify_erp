@@ -4,6 +4,7 @@ import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
 import { z } from 'zod'
 
 const router = express.Router()
@@ -316,6 +317,8 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
         restaurantData.address ? JSON.stringify(restaurantData.address) : null,
       ]
     )
+
+    await createPendingActivationSubscription(query, rows[0].id, 'RESTAURANT', 'free')
 
     logger.info('Restaurant created', {
       restaurantId: rows[0].id,

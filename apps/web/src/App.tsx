@@ -31,6 +31,7 @@ import { PublicReservationManage } from './pages/PublicReservationManage'
 import { StaffSelfServiceLogin } from './pages/StaffSelfServiceLogin'
 import { StaffSelfServiceDashboard } from './pages/StaffSelfServiceDashboard'
 import { RegisterCompletePage } from './pages/RegisterCompletePage'
+import { AccountActivationPage } from './pages/AccountActivationPage'
 
 const router = createBrowserRouter(
   [
@@ -85,6 +86,10 @@ const router = createBrowserRouter(
         {
           path: 'app/dashboard',
           element: <DashboardPage />,
+        },
+        {
+          path: 'app/activate',
+          element: <AccountActivationPage />,
         },
         {
           path: 'app/products',

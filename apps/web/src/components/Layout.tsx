@@ -6,6 +6,8 @@ import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { ImpersonationBanner } from './ImpersonationBanner'
 import { UpgradeModal } from './UpgradeModal'
+import { PaymentModal } from './billing/PaymentModal'
+import { BillingOverdueBanner } from './billing/BillingOverdueBanner'
 import { BranchProvider } from '../contexts/BranchContext'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import {
@@ -16,6 +18,7 @@ import {
   api,
   useGetImpersonationStatusQuery,
   useGetEntitlementsQuery,
+  useGetBillingStatusQuery,
   useRecordConversionEventMutation,
 } from '../services/api'
 import { AlertTriangle, Layers, Lock } from 'lucide-react'
@@ -54,7 +57,19 @@ export function Layout() {
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: user?.role === 'ADMIN' || !user,
   })
+  const { data: billingStatus } = useGetBillingStatusQuery(undefined, {
+    skip: user?.role === 'ADMIN' || !user,
+  })
   const [recordConversionEvent] = useRecordConversionEventMutation()
+
+  useEffect(() => {
+    if (user?.role === 'ADMIN' || !billingStatus?.access) return
+    const pending = billingStatus.access.pendingActivation && billingStatus.access.isLocked
+    if (!pending) return
+    if (!location.pathname.startsWith('/app/activate')) {
+      navigate('/app/activate', { replace: true })
+    }
+  }, [user?.role, billingStatus, location.pathname, navigate])
   const blockedCountLast7d = useAppSelector((state) => state.monetization.blockedCountLast7d)
   const recentBlockedSummary = useAppSelector((state) => state.monetization.recentBlockedSummary)
 
@@ -184,10 +199,12 @@ export function Layout() {
       <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
         <ImpersonationBanner />
         <UpgradeModal />
+        <PaymentModal />
         <div className="flex">
           <Sidebar />
           <div className="flex-1 flex flex-col">
             <Header />
+            {user?.role !== 'ADMIN' && <BillingOverdueBanner />}
             {user?.role !== 'ADMIN' && externallyDisabledFeatures.length > 0 && e && (
               <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

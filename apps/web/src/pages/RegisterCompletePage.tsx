@@ -26,7 +26,11 @@ function isUnauthorized(error: unknown): boolean {
 
 export function RegisterCompletePage() {
   const navigate = useNavigate()
-  const { data: user, isLoading: userLoading, error: userError } = useGetMeQuery(undefined, {
+  const {
+    data: user,
+    isLoading: userLoading,
+    error: userError,
+  } = useGetMeQuery(undefined, {
     refetchOnMountOrArgChange: false,
     refetchOnFocus: false,
   })
@@ -76,7 +80,7 @@ export function RegisterCompletePage() {
         businessName: businessName.trim(),
         phone: phone.trim() || undefined,
       }).unwrap()
-      navigate('/app', { replace: true })
+      navigate('/app/activate', { replace: true })
     } catch (err: unknown) {
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||

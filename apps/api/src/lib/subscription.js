@@ -1,6 +1,7 @@
 import { query, withTransaction } from './db.js'
 import { logger } from './logger.js'
 import { resolveAllFeaturesForTenant } from './feature-flags.js'
+import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 
 /**
  * Ensure tenant has an active subscription; if none, create one with the free plan.
@@ -22,23 +23,20 @@ async function ensureTenantSubscription(tenantId, tenantType) {
     )
     return
   }
-  const plan = plans[0]
-  const { rowCount } = await query(
-    `INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
-     SELECT $1, $2, $3, $4, 'ACTIVE', 'MONTHLY', now(), now() + INTERVAL '1 month'
-     WHERE NOT EXISTS (
-       SELECT 1 FROM subscription
-       WHERE tenant_id = $1 AND tenant_type = $2 AND status IN ('TRIALING', 'ACTIVE')
-     )`,
-    [tenantId, tenantType, plan.id, plan.name]
+  const { rows: existing } = await query(
+    `SELECT 1 FROM subscription
+     WHERE tenant_id = $1 AND tenant_type = $2 AND status IN ('TRIALING', 'ACTIVE')
+     LIMIT 1`,
+    [tenantId, tenantType]
   )
-  if (rowCount > 0) {
-    logger.info('Created default Free subscription for tenant', {
-      tenantId,
-      tenantType,
-      plan: plan.code,
-    })
-  }
+  if (existing.length > 0) return
+
+  await createPendingActivationSubscription(query, tenantId, tenantType, 'free')
+  logger.info('Created pending-activation Free subscription for tenant', {
+    tenantId,
+    tenantType,
+    plan: 'free',
+  })
 }
 
 /**

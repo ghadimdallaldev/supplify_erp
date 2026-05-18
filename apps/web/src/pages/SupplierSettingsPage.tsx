@@ -548,15 +548,31 @@ export function SupplierSettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="contacts">Contacts</TabsTrigger>
-          <TabsTrigger value="business">Business</TabsTrigger>
-          <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
-          <TabsTrigger value="delivery">Delivery Zones</TabsTrigger>
-          <TabsTrigger value="branches">Branches</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="plan">Plan & usage</TabsTrigger>
+        <TabsList className="flex h-auto w-full flex-wrap gap-1 p-1">
+          <TabsTrigger value="profile" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="contacts" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Contacts
+          </TabsTrigger>
+          <TabsTrigger value="business" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Business
+          </TabsTrigger>
+          <TabsTrigger value="warehouses" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Warehouses
+          </TabsTrigger>
+          <TabsTrigger value="delivery" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Delivery Zones
+          </TabsTrigger>
+          <TabsTrigger value="branches" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Branches
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="plan" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Plan & usage
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">

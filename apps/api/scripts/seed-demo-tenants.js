@@ -57,6 +57,25 @@ export async function clearDemoTenants(client) {
   await run('DELETE FROM restaurant_team WHERE restaurant_id = $1', [DEMO_RESTAURANT_ID])
   await run('DELETE FROM branch WHERE restaurant_id = $1 OR tenant_id = $1', [DEMO_RESTAURANT_ID])
   await run('DELETE FROM restaurant_inventory WHERE restaurant_id = $1', [DEMO_RESTAURANT_ID])
+
+  for (const [tid, ttype] of [
+    [DEMO_RESTAURANT_ID, 'RESTAURANT'],
+    [DEMO_SUPPLIER_ID, 'SUPPLIER'],
+  ]) {
+    for (const table of [
+      'billing_payment',
+      'billing_invoice',
+      'billing_event',
+      'billing_payment_method',
+    ]) {
+      try {
+        await run(`DELETE FROM ${table} WHERE tenant_id = $1 AND tenant_type = $2`, [tid, ttype])
+      } catch (e) {
+        if (e.code !== '42P01') throw e
+      }
+    }
+  }
+
   await run('DELETE FROM subscription WHERE tenant_id = $1 AND tenant_type = $2', [
     DEMO_RESTAURANT_ID,
     'RESTAURANT',
@@ -102,6 +121,17 @@ export async function seedDemoTenants() {
   } finally {
     client.release()
   }
+
+  try {
+    const { seedBilling } = await import('./seed-billing.js')
+    await seedBilling()
+  } catch (e) {
+    if (e.message?.includes('billing_payment_method missing')) {
+      console.warn('⚠  Skipping billing seed — run db:migrate then pnpm run seed:billing')
+    } else {
+      throw e
+    }
+  }
 }
 
 async function main() {
@@ -121,6 +151,7 @@ async function main() {
   console.log(`✅ Demo restaurant: ${r.restaurant_email} (slug: ${DEMO_RESTAURANT_SLUG})`)
   console.log(`✅ Demo supplier:   ${r.supplier_email} (slug: ${DEMO_SUPPLIER_SLUG})`)
   console.log('   Log in with Keycloak: restaurant@supplify.com / SupplifyRestaurant1!')
+  console.log('   Then run: pnpm run seed:billing (after migration 0067)')
 }
 
 if (isMainModule(import.meta.url)) {

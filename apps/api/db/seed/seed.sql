@@ -474,16 +474,28 @@ UPDATE supplier SET contact_email = 'supplier@supplify.com' WHERE slug = 'fresh-
 UPDATE restaurant SET contact_email = 'restaurant@supplify.com' WHERE slug = 'golden-fork-restaurant';
 
 -- Assign Gold subscription to demo tenants (local dev: unlocks smart_reorder, reports, etc.)
-INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
-SELECT r.id, 'RESTAURANT', sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + interval '1 month'
+INSERT INTO subscription (
+  tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle,
+  current_period_start, current_period_end, next_billing_date, auto_renew, billing_email
+)
+SELECT
+  r.id, 'RESTAURANT', sp.id, sp.name, 'ACTIVE', 'MONTHLY',
+  now(), now() + interval '1 month', now() + interval '1 month', true, r.contact_email
 FROM restaurant r
 JOIN (SELECT id, name FROM subscription_plan WHERE code = 'gold' AND tenant_type = 'RESTAURANT' AND is_active = true LIMIT 1) sp ON true
 WHERE r.slug = 'golden-fork-restaurant'
 AND NOT EXISTS (SELECT 1 FROM subscription s WHERE s.tenant_id = r.id AND s.tenant_type = 'RESTAURANT');
 
-INSERT INTO subscription (tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle, current_period_start, current_period_end)
-SELECT s.id, 'SUPPLIER', sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + interval '1 month'
+INSERT INTO subscription (
+  tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle,
+  current_period_start, current_period_end, next_billing_date, auto_renew, billing_email
+)
+SELECT
+  s.id, 'SUPPLIER', sp.id, sp.name, 'ACTIVE', 'MONTHLY',
+  now(), now() + interval '1 month', now() + interval '1 month', true, s.contact_email
 FROM supplier s
 JOIN (SELECT id, name FROM subscription_plan WHERE code = 'gold' AND tenant_type = 'SUPPLIER' AND is_active = true LIMIT 1) sp ON true
 WHERE s.slug = 'fresh-foods-co'
 AND NOT EXISTS (SELECT 1 FROM subscription sub WHERE sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER');
+
+-- Billing seed (payment methods, paid history) runs via: pnpm run seed:billing

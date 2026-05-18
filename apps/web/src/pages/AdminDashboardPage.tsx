@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,7 @@ import {
   useGetAdminPlansQuery,
   useGetAdminSubscriptionsQuery,
   useGetAdminAuditLogsQuery,
+  useGetAdminActivityQuery,
   useUpdateAdminPlanMutation,
   useUpdateAdminSubscriptionMutation,
   useCreateAdminPlanMutation,
@@ -26,6 +27,7 @@ import {
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
   useStartImpersonationMutation,
+  useUnlockAdminSubscriptionMutation,
 } from '@/services/api'
 import {
   Loader2,
@@ -39,10 +41,28 @@ import {
   AlertCircle,
   Package,
   UserCog,
+  Search,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Shield,
+  Activity,
+  CreditCard,
+  ArrowUpRight,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  PauseCircle,
+  Filter,
+  ShoppingCart,
+  MessageSquare,
+  Calendar,
+  Store,
+  ListOrdered,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { SubscriptionPlan } from '@/types'
-import { getPlanSubtitle } from '../lib/planComparison'
+import { getPlanSubtitle, getFeatureLabel, formatPlanFeatureCell } from '../lib/planComparison'
 import { formatCurrency } from '@/utils/format'
 import { AdminFeatureFlagsPanel } from '@/components/admin/AdminFeatureFlagsPanel'
 
@@ -73,10 +93,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const { data: subscriptionsData, isLoading: subscriptionsLoading } =
     useGetAdminSubscriptionsQuery({})
 
-  // Deduplicate plans by (code, tenant_type) and subscriptions by (tenant_id, tenant_type) for display
+  // Deduplicate plans by (code, tenant_type), exclude enterprise
   const plans =
     plansData?.plans?.filter(
       (p, i, arr) =>
+        (p.code || '').toLowerCase() !== 'enterprise' &&
         arr.findIndex(
           (x) =>
             x.code === p.code && (x.tenant_type || 'RESTAURANT') === (p.tenant_type || 'RESTAURANT')
@@ -87,7 +108,39 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
       (s, i, arr) =>
         arr.findIndex((x) => x.tenant_id === s.tenant_id && x.tenant_type === s.tenant_type) === i
     ) ?? []
-  const { data: auditLogsData, isLoading: auditLoading } = useGetAdminAuditLogsQuery({})
+  const [auditActionType, setAuditActionType] = useState('all')
+  const [auditDateFrom, setAuditDateFrom] = useState('')
+  const [auditDateTo, setAuditDateTo] = useState('')
+  const [auditSearch, setAuditSearch] = useState('')
+  const [auditOffset, setAuditOffset] = useState(0)
+  const [auditExpandedId, setAuditExpandedId] = useState<string | null>(null)
+  const auditPageSize = 20
+
+  const {
+    data: auditLogsData,
+    isLoading: auditLoading,
+    refetch: refetchAudit,
+  } = useGetAdminAuditLogsQuery({
+    limit: auditPageSize,
+    offset: auditOffset,
+    ...(auditActionType !== 'all' && { actionType: auditActionType }),
+    ...(auditDateFrom && { dateFrom: auditDateFrom }),
+    ...(auditDateTo && { dateTo: auditDateTo }),
+    ...(auditSearch && { search: auditSearch }),
+  })
+  const [activityType, setActivityType] = useState('all')
+  const [activityOffset, setActivityOffset] = useState(0)
+  const activityPageSize = 30
+  const {
+    data: activityData,
+    isLoading: activityLoading,
+    refetch: refetchActivity,
+  } = useGetAdminActivityQuery({
+    limit: activityPageSize,
+    offset: activityOffset,
+    ...(activityType !== 'all' && { type: activityType }),
+  })
+
   const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery()
   const { data: financeData, isLoading: financeLoading } = (
     api as any
@@ -110,6 +163,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [updateSubscription] = useUpdateAdminSubscriptionMutation()
   const [previewPlanChange] = usePreviewSubscriptionPlanChangeMutation()
   const [startImpersonation] = useStartImpersonationMutation()
+  const [unlockSubscription, { isLoading: isUnlocking }] = useUnlockAdminSubscriptionMutation()
 
   const [changePlanModal, setChangePlanModal] = useState<{
     open: boolean
@@ -289,285 +343,493 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
   return (
     <div className="p-6" data-testid="admin-dashboard-page">
-      <div className="mb-6">
-        <h1 className="text-[21px] font-black text-[var(--text)]">Admin Dashboard</h1>
-        <p className="text-[var(--text-muted)] mt-2">
-          Manage subscriptions, plans, and tenant quotas
-        </p>
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Admin Panel</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+            Platform management · subscriptions · tenants · billing
+          </p>
+        </div>
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-        <TabsList
-          className={
-            initialTab === 'suppliers' || initialTab === 'restaurants'
-              ? 'grid w-full grid-cols-3'
-              : 'grid w-full grid-cols-9'
-          }
-        >
-          {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
-            <>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="plans">Plans</TabsTrigger>
-              <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-              <TabsTrigger value="tenants">Tenants</TabsTrigger>
-              <TabsTrigger value="health">Health</TabsTrigger>
-              <TabsTrigger value="finance">Finance</TabsTrigger>
-              <TabsTrigger value="usage">Usage</TabsTrigger>
-              <TabsTrigger value="features">Features</TabsTrigger>
-              <TabsTrigger value="audit">Audit</TabsTrigger>
-            </>
-          )}
+        <div className="overflow-x-auto mb-1">
+          <TabsList
+            className={
+              initialTab === 'suppliers' || initialTab === 'restaurants'
+                ? 'grid grid-cols-3 min-w-max'
+                : 'flex w-max gap-0'
+            }
+          >
+            {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
+              <>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+                <TabsTrigger value="tenants">Tenants</TabsTrigger>
+                <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+                <TabsTrigger value="plans">Plans</TabsTrigger>
+                <TabsTrigger value="finance">Finance</TabsTrigger>
+                <TabsTrigger value="usage">Usage</TabsTrigger>
+                <TabsTrigger value="features">Features</TabsTrigger>
+                <TabsTrigger value="health">Health</TabsTrigger>
+                <TabsTrigger value="audit">Audit</TabsTrigger>
+              </>
+            )}
 
-          {(initialTab === 'suppliers' || initialTab === 'restaurants') && (
-            <>
-              <TabsTrigger value={initialTab === 'suppliers' ? 'tenants' : 'tenants'}>
-                Directory
-              </TabsTrigger>
-              <TabsTrigger value="usage">Usage & Quotas</TabsTrigger>
-              <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-            </>
-          )}
-        </TabsList>
+            {(initialTab === 'suppliers' || initialTab === 'restaurants') && (
+              <>
+                <TabsTrigger value={initialTab === 'suppliers' ? 'tenants' : 'tenants'}>
+                  Directory
+                </TabsTrigger>
+                <TabsTrigger value="usage">Usage & Quotas</TabsTrigger>
+                <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+              </>
+            )}
+          </TabsList>
+        </div>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-5">
           {overviewLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-[var(--text)]">Tenants</h3>
-                    <Users className="h-5 w-5 text-[var(--brand-mid)]" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">Suppliers:</span>
-                      <span className="font-semibold">{overview?.tenantCounts?.SUPPLIER || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">Restaurants:</span>
-                      <span className="font-semibold">
-                        {overview?.tenantCounts?.RESTAURANT || 0}
+              {/* Alerts banner — only visible if there are issues */}
+              {((overview?.alerts?.pastDueSubscriptions || 0) > 0 ||
+                (overview?.alerts?.trialsExpiringSoon || 0) > 0) && (
+                <div className="flex flex-wrap gap-3">
+                  {(overview?.alerts?.pastDueSubscriptions || 0) > 0 && (
+                    <div
+                      className="flex items-center gap-2 rounded-lg px-4 py-2.5"
+                      style={{ background: '#fef2f2', border: '1px solid #fecaca' }}
+                    >
+                      <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-red-700">
+                        {overview.alerts.pastDueSubscriptions} past-due subscription
+                        {overview.alerts.pastDueSubscriptions > 1 ? 's' : ''}
                       </span>
                     </div>
-                  </div>
-                </Card>
+                  )}
+                  {(overview?.alerts?.trialsExpiringSoon || 0) > 0 && (
+                    <div
+                      className="flex items-center gap-2 rounded-lg px-4 py-2.5"
+                      style={{ background: '#fffbeb', border: '1px solid #fde68a' }}
+                    >
+                      <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-amber-700">
+                        {overview.alerts.trialsExpiringSoon} trial
+                        {overview.alerts.trialsExpiringSoon > 1 ? 's' : ''} expiring in 7 days
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
-                <Card className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-[var(--text)]">Revenue</h3>
-                    <DollarSign className="h-5 w-5 text-[var(--mint)]" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">MRR:</span>
-                      <span className="font-semibold">
-                        {formatCurrency(overview?.revenue?.mrr)}
+              {/* Row 1 — Orders & Activity */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">
+                  Orders & Activity
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--brand-ultra)' }}>
+                        <ListOrdered className="h-4 w-4" style={{ color: 'var(--brand)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Orders Today
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">ARR:</span>
-                      <span className="font-semibold">
-                        {formatCurrency(overview?.revenue?.arr)}
-                      </span>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.orders?.today ?? 0}
+                    </p>
+                    <div className="flex gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                      <span>{overview?.orders?.week ?? 0} this week</span>
+                      <span>·</span>
+                      <span>{overview?.orders?.month ?? 0} this month</span>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
 
-                <Card className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-[var(--text)]">Activity (24h)</h3>
-                    <TrendingUp className="h-5 w-5 text-[var(--brand-mid)]" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">Orders:</span>
-                      <span className="font-semibold">
-                        {overview?.activity?.ordersLast24h || 0}
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--brand-ultra)' }}>
+                        <ShoppingCart className="h-4 w-4" style={{ color: 'var(--brand)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Active Carts
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">Chats:</span>
-                      <span className="font-semibold">{overview?.activity?.chatsLast24h || 0}</span>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.activeCarts ?? 0}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">Draft orders with items</p>
+                  </Card>
+
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--mint-pale)' }}>
+                        <MessageSquare className="h-4 w-4" style={{ color: 'var(--mint)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Chats (24h)
+                      </span>
                     </div>
-                  </div>
-                </Card>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.chatsLast24h ?? 0}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">Messages sent</p>
+                  </Card>
+
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--brand-ultra)' }}>
+                        <Users className="h-4 w-4" style={{ color: 'var(--brand)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Active Staff
+                      </span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.totalActiveStaff ?? 0}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">Across all tenants</p>
+                  </Card>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold text-[var(--text)] mb-4">
-                    Subscription Status
-                  </h3>
-                  <div className="space-y-3">
-                    {Object.entries(overview?.subscriptionStats || {}).map(([status, count]) => (
-                      <div key={status} className="flex justify-between items-center">
-                        <Badge variant={status === 'ACTIVE' ? 'default' : 'secondary'}>
-                          {status}
-                        </Badge>
-                        <span className="font-semibold">{String(count)}</span>
+              {/* Row 2 — Reservations & Catalog */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">
+                  Reservations & Catalog
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--mint-pale)' }}>
+                        <Calendar className="h-4 w-4" style={{ color: 'var(--mint)' }} />
                       </div>
-                    ))}
-                  </div>
-                </Card>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Reservations Today
+                      </span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.reservations?.today ?? 0}
+                    </p>
+                    <div className="flex gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                      <span>{overview?.reservations?.week ?? 0} this week</span>
+                      <span>·</span>
+                      <span>{overview?.reservations?.confirmed ?? 0} confirmed</span>
+                    </div>
+                  </Card>
 
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold text-[var(--text)] mb-4">Alerts</h3>
-                  <div className="space-y-2">
-                    {overview?.alerts?.pastDueInvoices ? (
-                      <Badge variant="destructive" className="w-full justify-center py-2">
-                        {overview.alerts.pastDueInvoices} Past Due Invoices
-                      </Badge>
-                    ) : (
-                      <p className="text-[var(--text-muted)] text-sm">No alerts</p>
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--brand-ultra)' }}>
+                        <Package className="h-4 w-4" style={{ color: 'var(--brand)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Active Products
+                      </span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.totalActiveProducts ?? 0}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">Across all suppliers</p>
+                  </Card>
+
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--brand-ultra)' }}>
+                        <ListOrdered className="h-4 w-4" style={{ color: 'var(--brand)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Quick Lists
+                      </span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.totalQuickLists ?? 0}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">Saved ordering lists</p>
+                  </Card>
+
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--brand-ultra)' }}>
+                        <Activity className="h-4 w-4" style={{ color: 'var(--brand)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Orders Total
+                      </span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.orders?.total ?? 0}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">All time (non-draft)</p>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Row 3 — Tenants & Revenue */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">
+                  Tenants & Revenue
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--brand-ultra)' }}>
+                        <Building2 className="h-4 w-4" style={{ color: 'var(--brand)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Suppliers
+                      </span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.tenants?.totalSuppliers ?? 0}
+                    </p>
+                    {(overview?.tenants?.newSuppliers7d || 0) > 0 && (
+                      <div className="flex items-center gap-1 mt-2">
+                        <ArrowUpRight className="h-3 w-3" style={{ color: 'var(--mint)' }} />
+                        <span className="text-xs font-semibold" style={{ color: 'var(--mint)' }}>
+                          +{overview.tenants.newSuppliers7d} this week
+                        </span>
+                      </div>
                     )}
-                  </div>
-                </Card>
+                    {!overview?.tenants?.newSuppliers7d && (
+                      <p className="text-xs text-[var(--text-muted)] mt-2">No new this week</p>
+                    )}
+                  </Card>
 
-                {conversionStats && (
-                  <>
-                    <Card className="p-6">
-                      <h3 className="text-lg font-semibold text-[var(--text)] mb-4">
-                        Conversion funnel (last {conversionStats.days}d)
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--mint-pale)' }}>
+                        <Store className="h-4 w-4" style={{ color: 'var(--mint)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Restaurants
+                      </span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {overview?.tenants?.totalRestaurants ?? 0}
+                    </p>
+                    {(overview?.tenants?.newRestaurants7d || 0) > 0 && (
+                      <div className="flex items-center gap-1 mt-2">
+                        <ArrowUpRight className="h-3 w-3" style={{ color: 'var(--mint)' }} />
+                        <span className="text-xs font-semibold" style={{ color: 'var(--mint)' }}>
+                          +{overview.tenants.newRestaurants7d} this week
+                        </span>
+                      </div>
+                    )}
+                    {!overview?.tenants?.newRestaurants7d && (
+                      <p className="text-xs text-[var(--text-muted)] mt-2">No new this week</p>
+                    )}
+                  </Card>
+
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--mint-pale)' }}>
+                        <DollarSign className="h-4 w-4" style={{ color: 'var(--mint)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">MRR</span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {formatCurrency(overview?.revenue?.mrr)}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">
+                      ARR: {formatCurrency(overview?.revenue?.arr)}
+                    </p>
+                  </Card>
+
+                  <Card className="p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg p-2" style={{ background: 'var(--brand-ultra)' }}>
+                        <CreditCard className="h-4 w-4" style={{ color: 'var(--brand)' }} />
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] font-medium">
+                        Active Subs
+                      </span>
+                    </div>
+                    <p className="text-3xl font-black text-[var(--text)]">
+                      {(overview?.subscriptionStats as any)?.ACTIVE || 0}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">
+                      {(overview?.subscriptionStats as any)?.TRIALING || 0} trialing
+                      {((overview?.subscriptionStats as any)?.PAST_DUE || 0) > 0 && (
+                        <span className="text-red-500 ml-2">
+                          · {(overview?.subscriptionStats as any)?.PAST_DUE} past due
+                        </span>
+                      )}
+                    </p>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Subscription breakdown */}
+              <Card className="p-5">
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-4">
+                  Subscription Status Breakdown
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {[
+                    {
+                      status: 'ACTIVE',
+                      icon: CheckCircle2,
+                      color: 'var(--mint)',
+                      bg: 'var(--mint-pale)',
+                    },
+                    {
+                      status: 'TRIALING',
+                      icon: Clock,
+                      color: 'var(--brand)',
+                      bg: 'var(--brand-ultra)',
+                    },
+                    { status: 'PAST_DUE', icon: AlertCircle, color: '#ef4444', bg: '#fef2f2' },
+                    { status: 'SUSPENDED', icon: PauseCircle, color: '#f59e0b', bg: '#fffbeb' },
+                    {
+                      status: 'CANCELLED',
+                      icon: XCircle,
+                      color: 'var(--text-muted)',
+                      bg: 'var(--surface-mid)',
+                    },
+                  ].map(({ status, icon: Icon, color, bg }) => (
+                    <div
+                      key={status}
+                      className="flex items-center gap-2 rounded-lg p-3"
+                      style={{ background: bg }}
+                    >
+                      <Icon className="h-4 w-4 flex-shrink-0" style={{ color }} />
+                      <div>
+                        <p className="text-xs font-semibold" style={{ color }}>
+                          {status}
+                        </p>
+                        <p className="text-xl font-black text-[var(--text)]">
+                          {String((overview?.subscriptionStats as any)?.[status] || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Conversion funnel */}
+              {conversionStats && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card className="p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-semibold text-[var(--text)]">
+                        Conversion Funnel (30d)
                       </h3>
-                      <div className="space-y-3 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-[var(--text-muted)]">Blocks (feature/limit)</span>
-                          <span className="font-semibold">{conversionStats.totalBlocks}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {conversionStats.blocksToUpgradesConversionPercent}% rate
+                      </Badge>
+                    </div>
+                    {(() => {
+                      const s30 = conversionStats.funnelDropOff?.['30d']
+                      const funnelSteps = [
+                        {
+                          label: 'Feature / limit blocks',
+                          value: Number(conversionStats.totalBlocks),
+                        },
+                        { label: 'Upgrade modal opens', value: Number(s30?.openUpgrade ?? 0) },
+                        { label: 'Upgrade clicked', value: Number(s30?.clickUpgrade ?? 0) },
+                        {
+                          label: 'Upgrades completed',
+                          value: Number(conversionStats.totalUpgrades),
+                        },
+                      ]
+                      const topValue = Math.max(...funnelSteps.map((s) => s.value), 1)
+                      return (
+                        <div className="space-y-3">
+                          {funnelSteps.map(({ label, value }) => (
+                            <div key={label}>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="text-[var(--text-muted)]">{label}</span>
+                                <span className="font-semibold text-[var(--text)]">{value}</span>
+                              </div>
+                              <div
+                                className="h-1.5 rounded-full overflow-hidden"
+                                style={{ background: 'var(--app-border)' }}
+                              >
+                                <div
+                                  className="h-1.5 rounded-full"
+                                  style={{
+                                    width: `${Math.min(100, Math.round((value / topValue) * 100))}%`,
+                                    background: 'var(--brand)',
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-[var(--text-muted)]">Upgrades</span>
-                          <span className="font-semibold">{conversionStats.totalUpgrades}</span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2">
-                          <span className="text-[var(--text-muted)]">Blocks → upgrades %</span>
-                          <span className="font-semibold">
-                            {conversionStats.blocksToUpgradesConversionPercent}%
-                          </span>
-                        </div>
+                      )
+                    })()}
+                    {(conversionStats.mostBlockedFeature || conversionStats.mostBlockedLimit) && (
+                      <div className="mt-4 pt-3 border-t space-y-1">
                         {conversionStats.mostBlockedFeature && (
-                          <p className="text-[var(--text-muted)] pt-1">
-                            Most blocked feature:{' '}
-                            <span className="font-medium">
+                          <p className="text-xs text-[var(--text-muted)]">
+                            Top blocked feature:{' '}
+                            <span className="font-medium text-[var(--text)]">
                               {conversionStats.mostBlockedFeature}
                             </span>
                           </p>
                         )}
                         {conversionStats.mostBlockedLimit && (
-                          <p className="text-[var(--text-muted)]">
-                            Most blocked limit:{' '}
-                            <span className="font-medium">{conversionStats.mostBlockedLimit}</span>
+                          <p className="text-xs text-[var(--text-muted)]">
+                            Top blocked limit:{' '}
+                            <span className="font-medium text-[var(--text)]">
+                              {conversionStats.mostBlockedLimit}
+                            </span>
                           </p>
                         )}
                       </div>
-                    </Card>
-                    {conversionStats.funnelDropOff && (
-                      <Card className="p-6">
-                        <h3 className="text-lg font-semibold text-[var(--text)] mb-4">
-                          Conversion drop-off
-                        </h3>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b text-left text-[var(--text-muted)]">
-                                <th className="py-2 pr-4">Step</th>
-                                <th className="py-2 pr-4">7d</th>
-                                <th className="py-2">30d</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr className="border-b">
-                                <td className="py-2 pr-4">Blocked (feature/limit)</td>
-                                <td className="py-2 pr-4">
-                                  {conversionStats.funnelDropOff['7d'].blocked}
-                                </td>
-                                <td className="py-2">
-                                  {conversionStats.funnelDropOff['30d'].blocked}
-                                </td>
-                              </tr>
-                              <tr className="border-b">
-                                <td className="py-2 pr-4">Open upgrade</td>
-                                <td className="py-2 pr-4">
-                                  {conversionStats.funnelDropOff['7d'].openUpgrade}
-                                </td>
-                                <td className="py-2">
-                                  {conversionStats.funnelDropOff['30d'].openUpgrade}
-                                </td>
-                              </tr>
-                              <tr className="border-b">
-                                <td className="py-2 pr-4">Click upgrade</td>
-                                <td className="py-2 pr-4">
-                                  {conversionStats.funnelDropOff['7d'].clickUpgrade}
-                                </td>
-                                <td className="py-2">
-                                  {conversionStats.funnelDropOff['30d'].clickUpgrade}
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="py-2 pr-4">Upgrade success</td>
-                                <td className="py-2 pr-4">
-                                  {conversionStats.funnelDropOff['7d'].upgradeSuccess}
-                                </td>
-                                <td className="py-2">
-                                  {conversionStats.funnelDropOff['30d'].upgradeSuccess}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                        {conversionStats.recommendationFunnel && (
-                          <div className="mt-4 pt-4 border-t">
-                            <h4 className="font-medium text-[var(--text)] mb-2">
-                              Recommendation funnel
-                            </h4>
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="border-b text-left text-[var(--text-muted)]">
-                                  <th className="py-1 pr-4">Step</th>
-                                  <th className="py-1 pr-4">7d</th>
-                                  <th className="py-1">30d</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr className="border-b">
-                                  <td className="py-1 pr-4">Recommendation shown</td>
-                                  <td className="py-1 pr-4">
-                                    {conversionStats.recommendationFunnel['7d'].shown}
-                                  </td>
-                                  <td className="py-1">
-                                    {conversionStats.recommendationFunnel['30d'].shown}
-                                  </td>
-                                </tr>
-                                <tr className="border-b">
-                                  <td className="py-1 pr-4">Recommendation clicked</td>
-                                  <td className="py-1 pr-4">
-                                    {conversionStats.recommendationFunnel['7d'].clicked}
-                                  </td>
-                                  <td className="py-1">
-                                    {conversionStats.recommendationFunnel['30d'].clicked}
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="py-1 pr-4">Upgrade success</td>
-                                  <td className="py-1 pr-4">
-                                    {conversionStats.recommendationFunnel['7d'].upgradeSuccess}
-                                  </td>
-                                  <td className="py-1">
-                                    {conversionStats.recommendationFunnel['30d'].upgradeSuccess}
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </Card>
                     )}
-                  </>
-                )}
-              </div>
+                  </Card>
+
+                  {conversionStats.funnelDropOff && (
+                    <Card className="p-5">
+                      <h3 className="text-sm font-semibold text-[var(--text)] mb-4">
+                        7-day vs 30-day Comparison
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2 text-[var(--text-muted)] font-medium">
+                                Step
+                              </th>
+                              <th className="text-right py-2 text-[var(--text-muted)] font-medium">
+                                7d
+                              </th>
+                              <th className="text-right py-2 text-[var(--text-muted)] font-medium">
+                                30d
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--app-border)]">
+                            {[
+                              { label: 'Blocked', key: 'blocked' },
+                              { label: 'Open upgrade', key: 'openUpgrade' },
+                              { label: 'Click upgrade', key: 'clickUpgrade' },
+                              { label: 'Upgrade success', key: 'upgradeSuccess' },
+                            ].map(({ label, key }) => (
+                              <tr key={key}>
+                                <td className="py-2 text-[var(--text)]">{label}</td>
+                                <td className="py-2 text-right font-semibold text-[var(--text)]">
+                                  {(conversionStats.funnelDropOff!['7d'] as any)[key] ?? 0}
+                                </td>
+                                <td className="py-2 text-right font-semibold text-[var(--text)]">
+                                  {(conversionStats.funnelDropOff!['30d'] as any)[key] ?? 0}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              )}
             </>
           )}
         </TabsContent>
@@ -732,65 +994,58 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   {plan.description && (
                     <p className="text-sm text-[var(--text-muted)] mb-4">{plan.description}</p>
                   )}
-                  <div className="space-y-2 mb-4">
-                    <p className="text-sm font-semibold text-[var(--text-mid)]">Limits (top 6):</p>
-                    {plan.limits &&
-                      (() => {
-                        const limitKeys =
-                          plan.tenant_type === 'RESTAURANT'
-                            ? [
-                                'branches',
-                                'users',
-                                'orders_per_day',
-                                'suppliers_per_restaurant',
-                                'restaurant_inventory_skus',
-                                'chats_per_day',
-                              ]
-                            : [
-                                'warehouses',
-                                'users',
-                                'supplier_products_skus',
-                                'chats_per_day',
-                                'storage_mb',
-                              ]
-                        const entries = limitKeys
-                          .filter((k) => plan.limits[k] !== undefined)
-                          .slice(0, 6)
-                          .map((k) => [k, plan.limits[k]] as const)
-                        return entries.map(([key, value]) => (
-                          <div key={key} className="flex justify-between text-sm">
-                            <span className="text-[var(--text-muted)]">
-                              {key.replace(/_/g, ' ')}:
-                            </span>
-                            <span className="font-semibold">
-                              {value === -1 ? 'Unlimited' : value}
-                            </span>
+                  <div className="space-y-1.5 mb-4">
+                    <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
+                      Limits
+                    </p>
+                    {plan.limits && Object.keys(plan.limits).length > 0 ? (
+                      Object.entries(plan.limits).map(([key, value]) => (
+                        <div key={key} className="flex justify-between text-xs">
+                          <span className="text-[var(--text-muted)]">{key.replace(/_/g, ' ')}</span>
+                          <span
+                            className={`font-semibold ${value === -1 ? 'text-[var(--mint)]' : 'text-[var(--text)]'}`}
+                          >
+                            {value === -1 ? '∞ unlimited' : String(value)}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-[var(--text-muted)]">No limits defined</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 mb-4">
+                    <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
+                      Features
+                    </p>
+                    {plan.features &&
+                    typeof plan.features === 'object' &&
+                    Object.keys(plan.features).length > 0 ? (
+                      Object.entries(plan.features).map(([key, value]) => {
+                        const cell = formatPlanFeatureCell(key, value)
+                        return (
+                          <div key={key} className="flex justify-between items-center text-xs">
+                            <span className="text-[var(--text-muted)]">{getFeatureLabel(key)}</span>
+                            {!cell.enabled ? (
+                              <span className="text-[var(--text-muted)]">—</span>
+                            ) : cell.caption ? (
+                              <span className="font-medium text-[var(--brand)] text-right max-w-[120px] truncate">
+                                {cell.caption}
+                              </span>
+                            ) : (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-[var(--mint)]" />
+                            )}
                           </div>
-                        ))
-                      })()}
+                        )
+                      })
+                    ) : (
+                      <p className="text-xs text-[var(--text-muted)]">No features defined</p>
+                    )}
                   </div>
-                  <div className="space-y-2 mb-4">
-                    <p className="text-sm font-semibold text-[var(--text-mid)]">Features:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {plan.features && typeof plan.features === 'object' ? (
-                        Object.entries(plan.features)
-                          .map(([key, value]) => {
-                            // Skip if value is false or empty
-                            if (!value || value === false) return null
-                            return (
-                              <Badge key={key} variant={value ? 'default' : 'secondary'}>
-                                {key.replace(/_/g, ' ')}
-                              </Badge>
-                            )
-                          })
-                          .filter(Boolean)
-                      ) : (
-                        <span className="text-sm text-[var(--text-muted)]">
-                          No features defined
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  {plan.updated_at && (
+                    <p className="text-xs text-[var(--text-muted)] mb-3">
+                      Updated {new Date(plan.updated_at).toLocaleDateString()}
+                    </p>
+                  )}
                   <div className="flex gap-2 mt-4">
                     <Button
                       size="sm"
@@ -986,19 +1241,40 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         {new Date(sub.created_at).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            openChangePlanModal({
-                              id: sub.id,
-                              tenant_type: sub.tenant_type,
-                              tenant_name: sub.tenant_name,
-                            })
-                          }
-                        >
-                          Change plan
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                          {(sub.account_locked_at || sub.lock_reason === 'pending_activation') && (
+                            <Button
+                              size="sm"
+                              disabled={isUnlocking}
+                              onClick={async () => {
+                                try {
+                                  await unlockSubscription({
+                                    id: sub.id,
+                                    reason: 'admin_activation',
+                                  }).unwrap()
+                                  toast.success('Account activated')
+                                } catch {
+                                  toast.error('Failed to activate account')
+                                }
+                              }}
+                            >
+                              Activate
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              openChangePlanModal({
+                                id: sub.id,
+                                tenant_type: sub.tenant_type,
+                                tenant_name: sub.tenant_name,
+                              })
+                            }
+                          >
+                            Change plan
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1008,114 +1284,371 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           )}
         </TabsContent>
 
-        <TabsContent value="health" className="space-y-6">
-          <h2 className="text-2xl font-bold text-[var(--text)]">System Health</h2>
-          {healthLoading ? (
+        <TabsContent value="health" className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-[var(--text)]">System Health</h2>
+              <p className="text-sm text-[var(--text-muted)]">
+                Platform status, subscription health, upcoming expirations
+              </p>
+            </div>
+          </div>
+          {healthLoading || overviewLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
-            <div className="grid gap-4">
-              {healthData?.dbPool && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>DB Pool</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm">
-                      Total: {healthData.dbPool.total} · Idle: {healthData.dbPool.idle} · Waiting:{' '}
-                      {healthData.dbPool.waiting}
+            <>
+              {/* Subscription health */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  {
+                    label: 'Active',
+                    value: (overview?.subscriptionStats as any)?.ACTIVE ?? 0,
+                    color: 'var(--mint)',
+                    bg: 'var(--mint-pale)',
+                  },
+                  {
+                    label: 'Trialing',
+                    value: (overview?.subscriptionStats as any)?.TRIALING ?? 0,
+                    color: 'var(--brand)',
+                    bg: 'var(--brand-ultra)',
+                  },
+                  {
+                    label: 'Past Due',
+                    value:
+                      (overview?.alerts as any)?.pastDueSubscriptions ??
+                      (overview?.subscriptionStats as any)?.PAST_DUE ??
+                      0,
+                    color: '#ef4444',
+                    bg: '#fef2f2',
+                  },
+                  {
+                    label: 'Trials expiring (7d)',
+                    value: (overview?.alerts as any)?.trialsExpiringSoon ?? 0,
+                    color: '#f59e0b',
+                    bg: '#fffbeb',
+                  },
+                ].map(({ label, value, color, bg }) => (
+                  <Card key={label} className="p-4">
+                    <p className="text-xs font-medium text-[var(--text-muted)] mb-1">{label}</p>
+                    <p className="text-2xl font-black" style={{ color }}>
+                      {value}
                     </p>
-                  </CardContent>
+                    <div className="mt-2 h-1 rounded-full" style={{ background: bg }}>
+                      <div
+                        className="h-1 rounded-full"
+                        style={{ width: '100%', background: color + '40' }}
+                      />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* DB Pool */}
+              {healthData?.dbPool && (
+                <Card className="p-5">
+                  <p className="text-sm font-semibold text-[var(--text)] mb-3">Database Pool</p>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    {[
+                      { label: 'Total', value: healthData.dbPool.total },
+                      { label: 'Idle', value: healthData.dbPool.idle, note: 'available' },
+                      {
+                        label: 'Waiting',
+                        value: healthData.dbPool.waiting,
+                        alert: healthData.dbPool.waiting > 0,
+                      },
+                    ].map(({ label, value, note, alert }) => (
+                      <div
+                        key={label}
+                        className="rounded-lg p-3"
+                        style={{ background: alert ? '#fef2f2' : 'var(--surface-mid)' }}
+                      >
+                        <p
+                          className="text-xl font-black"
+                          style={{ color: alert ? '#ef4444' : 'var(--text)' }}
+                        >
+                          {value}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                          {label}
+                          {note ? ` (${note})` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
+                      <span>Pool utilization</span>
+                      <span>
+                        {healthData.dbPool.total > 0
+                          ? Math.round(
+                              ((healthData.dbPool.total - healthData.dbPool.idle) /
+                                healthData.dbPool.total) *
+                                100
+                            )
+                          : 0}
+                        %
+                      </span>
+                    </div>
+                    <div
+                      className="h-2 rounded-full overflow-hidden"
+                      style={{ background: 'var(--app-border)' }}
+                    >
+                      <div
+                        className="h-2 rounded-full"
+                        style={{
+                          width:
+                            healthData.dbPool.total > 0
+                              ? `${Math.min(100, Math.round(((healthData.dbPool.total - healthData.dbPool.idle) / healthData.dbPool.total) * 100))}%`
+                              : '0%',
+                          background: 'var(--brand)',
+                        }}
+                      />
+                    </div>
+                  </div>
                 </Card>
               )}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent API Errors</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {!healthData?.recentApiErrors?.length ? (
-                    <p className="text-sm text-[var(--text-muted)]">No recent errors</p>
-                  ) : (
-                    <ul className="text-sm space-y-1 max-h-64 overflow-auto">
-                      {healthData.recentApiErrors.map((e: any, i: number) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="text-[var(--red)]">{e.type}</span>
-                          <span>{e.source}</span>
-                          <span className="text-[var(--text-muted)] truncate">{e.message}</span>
-                        </li>
-                      ))}
-                    </ul>
+
+              {/* Recent API errors */}
+              <Card className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-[var(--text)]">Recent API Errors</p>
+                  {!healthData?.recentApiErrors?.length && (
+                    <span
+                      className="flex items-center gap-1 text-xs font-medium"
+                      style={{ color: 'var(--mint)' }}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> All clear
+                    </span>
                   )}
-                </CardContent>
+                </div>
+                {!healthData?.recentApiErrors?.length ? (
+                  <p className="text-sm text-[var(--text-muted)]">No errors logged recently</p>
+                ) : (
+                  <div className="rounded-lg overflow-hidden border border-[var(--app-border)]">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr style={{ background: 'var(--surface-mid)' }}>
+                          <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
+                            Type
+                          </th>
+                          <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
+                            Source
+                          </th>
+                          <th className="text-left px-3 py-2 font-medium text-[var(--text-muted)]">
+                            Message
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--app-border)]">
+                        {healthData.recentApiErrors.map((e: any, i: number) => (
+                          <tr key={i}>
+                            <td className="px-3 py-2 text-red-500 font-medium">{e.type}</td>
+                            <td className="px-3 py-2 text-[var(--text-muted)]">{e.source}</td>
+                            <td className="px-3 py-2 text-[var(--text)] max-w-[300px] truncate">
+                              {e.message}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </Card>
-            </div>
+            </>
           )}
         </TabsContent>
 
-        <TabsContent value="finance" className="space-y-6">
-          <h2 className="text-2xl font-bold text-[var(--text)]">Financial Overview</h2>
+        <TabsContent value="finance" className="space-y-5">
+          <div>
+            <h2 className="text-lg font-bold text-[var(--text)]">Finance Dashboard</h2>
+            <p className="text-sm text-[var(--text-muted)]">
+              GMV, recurring revenue, invoices, and top tenants
+            </p>
+          </div>
           {financeLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>GMV & Revenue</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <p className="flex justify-between">
-                    <span>GMV</span>
-                    <span className="font-semibold">{formatCurrency(financeData?.gmv)}</span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span>Outstanding</span>
-                    <span className="font-semibold">
-                      {formatCurrency(financeData?.outstanding)}
-                    </span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span>Overdue</span>
-                    <span className="font-semibold text-[var(--red)]">
-                      {formatCurrency(financeData?.overdue)}
-                    </span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span>MRR</span>
-                    <span className="font-semibold">{formatCurrency(financeData?.mrr)}</span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span>ARR</span>
-                    <span className="font-semibold">{formatCurrency(financeData?.arr)}</span>
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Revenue by Plan</CardTitle>
-                </CardHeader>
-                <CardContent>
+            <>
+              {/* Top KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  {
+                    label: 'GMV (all time)',
+                    value: financeData?.gmv ?? 0,
+                    color: 'var(--brand)',
+                    bg: 'var(--brand-ultra)',
+                    note: 'Total invoice value',
+                  },
+                  {
+                    label: 'MRR',
+                    value: financeData?.mrr ?? 0,
+                    color: 'var(--mint)',
+                    bg: 'var(--mint-pale)',
+                    note: `ARR: ${formatCurrency(financeData?.arr ?? 0)}`,
+                  },
+                  {
+                    label: 'Outstanding',
+                    value: financeData?.outstanding ?? 0,
+                    color: '#f59e0b',
+                    bg: '#fffbeb',
+                    note: 'Awaiting payment',
+                  },
+                  {
+                    label: 'Overdue',
+                    value: financeData?.overdue ?? 0,
+                    color: '#ef4444',
+                    bg: '#fef2f2',
+                    note: 'Past due date',
+                  },
+                ].map(({ label, value, color, bg, note }) => (
+                  <Card key={label} className="p-5">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center mb-3"
+                      style={{ background: bg }}
+                    >
+                      <DollarSign className="h-4 w-4" style={{ color }} />
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] font-medium mb-1">{label}</p>
+                    <p className="text-2xl font-black" style={{ color }}>
+                      {formatCurrency(value)}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">{note}</p>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-5">
+                {/* Revenue by plan */}
+                <Card className="p-5">
+                  <p className="text-sm font-semibold text-[var(--text)] mb-4">Revenue by Plan</p>
                   {!financeData?.revenueByPlan?.length ? (
                     <p className="text-sm text-[var(--text-muted)]">No data</p>
                   ) : (
-                    <ul className="text-sm space-y-1">
-                      {financeData.revenueByPlan.map((r: any, i: number) => (
-                        <li key={i} className="flex justify-between">
-                          <span>
-                            {r.planName} ({r.tenantType})
-                          </span>
-                          <span>
-                            {formatCurrency(r.mrr)} · {r.subscriptionCount} subs
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="space-y-3">
+                      {(() => {
+                        const maxMrr = Math.max(
+                          ...financeData.revenueByPlan.map((r: any) => Number(r.mrr) || 0),
+                          1
+                        )
+                        return financeData.revenueByPlan.map((r: any, i: number) => (
+                          <div key={i}>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-[var(--text)]">{r.planName}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {r.tenantType}
+                                </Badge>
+                                <span className="text-[var(--text-muted)]">
+                                  {r.subscriptionCount} subs
+                                </span>
+                              </div>
+                              <span className="font-semibold text-[var(--text)]">
+                                {formatCurrency(r.mrr)}
+                                <span className="text-[var(--text-muted)] font-normal">/mo</span>
+                              </span>
+                            </div>
+                            <div
+                              className="h-1.5 rounded-full overflow-hidden"
+                              style={{ background: 'var(--app-border)' }}
+                            >
+                              <div
+                                className="h-1.5 rounded-full"
+                                style={{
+                                  width: `${Math.min(100, Math.round((Number(r.mrr) / maxMrr) * 100))}%`,
+                                  background: 'var(--brand)',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))
+                      })()}
+                    </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
+                </Card>
+
+                {/* Top tenants by revenue */}
+                <Card className="p-5">
+                  <p className="text-sm font-semibold text-[var(--text)] mb-4">
+                    Top Tenants by Revenue
+                  </p>
+                  {!financeData?.topTenantsByRevenue?.length ? (
+                    <p className="text-sm text-[var(--text-muted)]">No data</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {financeData.topTenantsByRevenue.slice(0, 8).map((t: any, i: number) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between text-sm py-1.5 border-b border-[var(--app-border)] last:border-0"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-[var(--text-muted)] w-5">
+                              #{i + 1}
+                            </span>
+                            <span className="text-[var(--text)] truncate max-w-[160px]">
+                              {t.tenant_id?.slice(0, 8) ?? '?'}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {t.tenant_type}
+                            </Badge>
+                          </div>
+                          <span className="font-semibold" style={{ color: 'var(--mint)' }}>
+                            {formatCurrency(t.revenue)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+              {/* Overdue tenants */}
+              {financeData?.topTenantsByOverdue?.length > 0 && (
+                <Card className="p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <p className="text-sm font-semibold text-red-700">Overdue Balances</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ background: '#fef2f2' }}>
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-red-700">
+                            Tenant
+                          </th>
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-red-700">
+                            Type
+                          </th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-red-700">
+                            Overdue Amount
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-red-100">
+                        {financeData.topTenantsByOverdue.map((t: any, i: number) => (
+                          <tr key={i}>
+                            <td className="px-3 py-2 font-mono text-xs text-[var(--text)]">
+                              {t.tenant_id?.slice(0, 8) ?? '?'}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Badge variant="outline" className="text-xs">
+                                {t.tenant_type}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold text-red-600">
+                              {formatCurrency(t.overdue_amount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
+            </>
           )}
         </TabsContent>
 
@@ -1808,34 +2341,511 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           />
         </TabsContent>
 
-        <TabsContent value="audit">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-[var(--text)]">Audit Logs</h2>
+        {/* ─── ACTIVITY FEED ──────────────────────────────────────────── */}
+        <TabsContent value="activity">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div>
+              <h2 className="text-lg font-bold text-[var(--text)]">Platform Activity</h2>
+              <p className="text-sm text-[var(--text-muted)]">
+                Real-time stream of orders, registrations, plan changes and more
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                className="rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                value={activityType}
+                onChange={(e) => {
+                  setActivityType(e.target.value)
+                  setActivityOffset(0)
+                }}
+              >
+                <option value="all">All events</option>
+                <option value="order_placed">Order placed</option>
+                <option value="order_confirmed">Order confirmed</option>
+                <option value="cart_updated">Cart updated</option>
+                <option value="new_tenant">New registration</option>
+                <option value="plan_changed">Plan changed</option>
+                <option value="subscription_status">Subscription status</option>
+                <option value="staff_added">Staff added</option>
+                <option value="reservation">Reservation</option>
+                <option value="invoice_issued">Invoice issued</option>
+                <option value="payment_received">Payment received</option>
+                <option value="quick_list">Quick list</option>
+                <option value="receiving">Receiving</option>
+                <option value="chat_started">Chat started</option>
+              </select>
+              <Button variant="outline" size="sm" onClick={() => refetchActivity()}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
+
+          {activityLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
+            </div>
+          ) : !activityData?.events?.length ? (
+            <div className="text-center py-16 text-[var(--text-muted)]">
+              <Activity className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-medium">No activity yet</p>
+              <p className="text-xs mt-1">
+                Events will appear as orders are placed, tenants register, and plans change
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Count */}
+              <p className="text-xs text-[var(--text-muted)] mb-4">
+                {activityData.total ?? activityData.events.length} total events
+              </p>
+
+              <div className="relative">
+                {/* Timeline line */}
+                <div
+                  className="absolute left-5 top-0 bottom-0 w-px"
+                  style={{ background: 'var(--app-border)' }}
+                />
+
+                <div className="space-y-0">
+                  {activityData.events.map((event: any, idx: number) => {
+                    const eventConfig: Record<
+                      string,
+                      { icon: any; color: string; bg: string; label: string }
+                    > = {
+                      order_placed: {
+                        icon: Package,
+                        color: 'var(--brand)',
+                        bg: 'var(--brand-ultra)',
+                        label: 'Order',
+                      },
+                      new_tenant: {
+                        icon: Users,
+                        color: 'var(--mint)',
+                        bg: 'var(--mint-pale)',
+                        label: 'New Tenant',
+                      },
+                      plan_changed: {
+                        icon: CreditCard,
+                        color: '#8b5cf6',
+                        bg: '#ede9fe',
+                        label: 'Plan Change',
+                      },
+                      subscription_status: {
+                        icon: Shield,
+                        color: '#f59e0b',
+                        bg: '#fffbeb',
+                        label: 'Subscription',
+                      },
+                    }
+                    const cfg = eventConfig[event.event_type] ?? {
+                      icon: Activity,
+                      color: 'var(--text-muted)',
+                      bg: 'var(--surface-mid)',
+                      label: event.event_type,
+                    }
+                    const Icon = cfg.icon
+                    const timeStr = new Date(event.occurred_at).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                    const prevEvent = idx > 0 ? activityData.events[idx - 1] : null
+                    const showDateDivider =
+                      !prevEvent ||
+                      new Date(prevEvent.occurred_at).toDateString() !==
+                        new Date(event.occurred_at).toDateString()
+
+                    return (
+                      <React.Fragment key={`${event.event_type}-${event.id}-${idx}`}>
+                        {showDateDivider && (
+                          <div className="flex items-center gap-3 py-3 ml-10">
+                            <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+                              {new Date(event.occurred_at).toLocaleDateString('en-GB', {
+                                weekday: 'short',
+                                day: 'numeric',
+                                month: 'long',
+                              })}
+                            </span>
+                            <div
+                              className="flex-1 h-px"
+                              style={{ background: 'var(--app-border)' }}
+                            />
+                          </div>
+                        )}
+                        <div className="flex items-start gap-4 py-2.5 group">
+                          {/* Icon on timeline */}
+                          <div
+                            className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center z-10 border-2"
+                            style={{ background: cfg.bg, borderColor: cfg.color + '40' }}
+                          >
+                            <Icon className="h-4 w-4" style={{ color: cfg.color }} />
+                          </div>
+
+                          {/* Content */}
+                          <div
+                            className="flex-1 min-w-0 pb-2.5"
+                            style={{ borderBottom: '1px solid var(--app-border)' }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span
+                                    className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                                    style={{ background: cfg.bg, color: cfg.color }}
+                                  >
+                                    {cfg.label}
+                                  </span>
+                                  <span className="text-sm font-semibold text-[var(--text)] truncate">
+                                    {event.title}
+                                  </span>
+                                </div>
+                                {event.subtitle && (
+                                  <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">
+                                    {event.subtitle}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                {event.amount != null && event.amount > 0 && (
+                                  <span
+                                    className="text-sm font-semibold"
+                                    style={{ color: 'var(--mint)' }}
+                                  >
+                                    {formatCurrency(event.amount)}
+                                  </span>
+                                )}
+                                <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
+                                  {timeStr}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Pagination */}
+              {(activityData.total ?? 0) > activityPageSize && (
+                <div className="flex items-center justify-between mt-6">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={activityOffset === 0}
+                    onClick={() =>
+                      setActivityOffset(Math.max(0, activityOffset - activityPageSize))
+                    }
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-[var(--text-muted)]">
+                    Page {Math.floor(activityOffset / activityPageSize) + 1} of{' '}
+                    {Math.ceil((activityData.total ?? 0) / activityPageSize)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={activityOffset + activityPageSize >= (activityData.total ?? 0)}
+                    onClick={() => setActivityOffset(activityOffset + activityPageSize)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        {/* ─── AUDIT LOGS ─────────────────────────────────────────────── */}
+        <TabsContent value="audit">
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 mb-5">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+              <Input
+                className="pl-9"
+                placeholder="Search action, admin, description…"
+                value={auditSearch}
+                onChange={(e) => {
+                  setAuditSearch(e.target.value)
+                  setAuditOffset(0)
+                }}
+              />
+            </div>
+            <select
+              className="rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm min-w-[160px]"
+              value={auditActionType}
+              onChange={(e) => {
+                setAuditActionType(e.target.value)
+                setAuditOffset(0)
+              }}
+            >
+              <option value="all">All action types</option>
+              {auditLogsData?.actionTypes?.map((t: string) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                className="w-36 text-sm"
+                value={auditDateFrom}
+                onChange={(e) => {
+                  setAuditDateFrom(e.target.value)
+                  setAuditOffset(0)
+                }}
+              />
+              <span className="text-[var(--text-muted)] text-sm">to</span>
+              <Input
+                type="date"
+                className="w-36 text-sm"
+                value={auditDateTo}
+                onChange={(e) => {
+                  setAuditDateTo(e.target.value)
+                  setAuditOffset(0)
+                }}
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetchAudit()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Results count */}
+          {!auditLoading && auditLogsData && (
+            <p className="text-sm text-[var(--text-muted)] mb-3">
+              {auditLogsData.total ?? auditLogsData.logs?.length ?? 0} total entries
+              {auditOffset > 0 &&
+                ` · showing ${auditOffset + 1}–${Math.min(auditOffset + auditPageSize, auditLogsData.total ?? 0)}`}
+            </p>
+          )}
 
           {auditLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
-          ) : (
-            <div className="space-y-4">
-              {auditLogsData?.logs?.map((log) => (
-                <Card key={log.id} className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-[var(--text)]">{log.action_type}</p>
-                        <Badge variant="outline">{log.target_entity_type}</Badge>
-                      </div>
-                      <p className="text-sm text-[var(--text-muted)]">{log.action_description}</p>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">
-                        By {log.admin_name} at {new Date(log.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+          ) : !auditLogsData?.logs?.length ? (
+            <div className="text-center py-12 text-[var(--text-muted)]">
+              <Shield className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No audit logs match your filters</p>
             </div>
+          ) : (
+            <>
+              <div className="rounded-lg border border-[var(--app-border)] overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ background: 'var(--surface-mid)' }}>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+                        Action
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide hidden md:table-cell">
+                        Target
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide hidden lg:table-cell">
+                        Description
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+                        Admin
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+                        Time
+                      </th>
+                      <th className="px-4 py-3 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--app-border)]">
+                    {auditLogsData.logs.map((log: any) => {
+                      const isExpanded = auditExpandedId === log.id
+                      const actionCategory = log.action_type?.split('.')[0] ?? ''
+                      const categoryColor: Record<string, string> = {
+                        subscription: 'var(--brand)',
+                        plan: 'var(--mint)',
+                        impersonation: '#8b5cf6',
+                        override: '#f59e0b',
+                        feature_flag: '#06b6d4',
+                        IMPERSONATION_START: '#8b5cf6',
+                        IMPERSONATION_END: '#8b5cf6',
+                        REMOVE_OVERRIDE: '#f59e0b',
+                      }
+                      const color =
+                        categoryColor[actionCategory] ||
+                        categoryColor[log.action_type] ||
+                        'var(--text-muted)'
+                      return (
+                        <React.Fragment key={log.id}>
+                          <tr
+                            className="hover:bg-[var(--surface-mid)] cursor-pointer transition-colors"
+                            onClick={() => setAuditExpandedId(isExpanded ? null : log.id)}
+                          >
+                            <td className="px-4 py-3">
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                                style={{ background: color + '18', color }}
+                              >
+                                {log.action_type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell">
+                              {log.target_entity_type && (
+                                <Badge variant="outline" className="text-xs">
+                                  {log.target_entity_type}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-[var(--text-muted)] hidden lg:table-cell max-w-[260px]">
+                              <span className="truncate block">{log.action_description}</span>
+                            </td>
+                            <td className="px-4 py-3 text-[var(--text)]">
+                              {log.admin_name || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-[var(--text-muted)] whitespace-nowrap">
+                              {new Date(log.created_at).toLocaleDateString()}{' '}
+                              <span className="text-xs">
+                                {new Date(log.created_at).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 text-[var(--text-muted)]" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
+                              )}
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr
+                              key={`${log.id}-detail`}
+                              style={{ background: 'var(--surface-mid)' }}
+                            >
+                              <td colSpan={6} className="px-4 py-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                  {log.action_description && (
+                                    <div>
+                                      <p className="font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                                        Description
+                                      </p>
+                                      <p className="text-[var(--text)]">{log.action_description}</p>
+                                    </div>
+                                  )}
+                                  {log.target_tenant_id && (
+                                    <div>
+                                      <p className="font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                                        Tenant
+                                      </p>
+                                      <p className="text-[var(--text)] font-mono">
+                                        {log.target_tenant_type} · {log.target_tenant_id}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {log.ip_address && (
+                                    <div>
+                                      <p className="font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                                        IP Address
+                                      </p>
+                                      <p className="text-[var(--text)] font-mono">
+                                        {log.ip_address}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {(log.old_value || log.new_value) && (
+                                    <div className="md:col-span-2">
+                                      <p className="font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
+                                        Change
+                                      </p>
+                                      <div className="grid grid-cols-2 gap-3">
+                                        {log.old_value && (
+                                          <div
+                                            className="rounded-md p-2"
+                                            style={{
+                                              background: '#fef2f2',
+                                              border: '1px solid #fecaca',
+                                            }}
+                                          >
+                                            <p className="text-red-600 font-semibold mb-1">
+                                              Before
+                                            </p>
+                                            <pre className="whitespace-pre-wrap text-[var(--text)] overflow-auto max-h-32">
+                                              {JSON.stringify(log.old_value, null, 2)}
+                                            </pre>
+                                          </div>
+                                        )}
+                                        {log.new_value && (
+                                          <div
+                                            className="rounded-md p-2"
+                                            style={{
+                                              background: 'var(--mint-pale)',
+                                              border: '1px solid var(--mint)',
+                                            }}
+                                          >
+                                            <p
+                                              className="font-semibold mb-1"
+                                              style={{ color: 'var(--mint)' }}
+                                            >
+                                              After
+                                            </p>
+                                            <pre className="whitespace-pre-wrap text-[var(--text)] overflow-auto max-h-32">
+                                              {JSON.stringify(log.new_value, null, 2)}
+                                            </pre>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {log.metadata && Object.keys(log.metadata).length > 0 && (
+                                    <div className="md:col-span-2">
+                                      <p className="font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                                        Metadata
+                                      </p>
+                                      <pre className="whitespace-pre-wrap text-[var(--text)] text-xs overflow-auto max-h-24">
+                                        {JSON.stringify(log.metadata, null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {(auditLogsData.total ?? 0) > auditPageSize && (
+                <div className="flex items-center justify-between mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={auditOffset === 0}
+                    onClick={() => setAuditOffset(Math.max(0, auditOffset - auditPageSize))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-[var(--text-muted)]">
+                    Page {Math.floor(auditOffset / auditPageSize) + 1} of{' '}
+                    {Math.ceil((auditLogsData.total ?? 0) / auditPageSize)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={auditOffset + auditPageSize >= (auditLogsData.total ?? 0)}
+                    onClick={() => setAuditOffset(auditOffset + auditPageSize)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
       </Tabs>

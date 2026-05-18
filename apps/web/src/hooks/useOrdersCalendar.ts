@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { OrdersCalendarResponse } from '../types'
+import { apiUrl } from '../lib/apiBase'
 
 export interface OrdersCalendarQuery {
   start?: string | null
@@ -15,45 +16,50 @@ export interface OrdersCalendarQuery {
   view?: string
 }
 
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
+export class OrdersCalendarFetchError extends Error {
+  name: string
+  details?: Record<string, unknown>
+
+  constructor(name: string, message: string, details?: Record<string, unknown>) {
+    super(message)
+    this.name = name
+    this.details = details
+  }
+}
 
 async function fetchCalendar(params: OrdersCalendarQuery): Promise<OrdersCalendarResponse> {
-  const url = new URL('/api/orders/calendar', API_URL)
-
   const searchParams = new URLSearchParams()
 
   if (params.start) searchParams.set('start', params.start)
   if (params.end) searchParams.set('end', params.end)
   if (params.status) searchParams.set('status', params.status)
   if (params.supplier) searchParams.set('supplier', params.supplier)
-  if (params.branch) searchParams.set('branch', params.branch)
   if (params.category) searchParams.set('category', params.category)
+  if (params.branch) searchParams.set('branch', params.branch)
   if (params.page) searchParams.set('page', String(params.page))
   if (params.pageSize) searchParams.set('pageSize', String(params.pageSize))
   if (params.role) searchParams.set('role', params.role)
 
-  const queryString = searchParams.toString()
-  if (queryString) {
-    url.search = queryString
-  }
-
-  const response = await fetch(url.toString(), {
+  const response = await fetch(apiUrl('/api/orders/calendar', searchParams), {
     credentials: 'include',
   })
 
   const payload = await response.json()
 
   if (!response.ok || !payload?.ok) {
-    const errorMessage = payload?.error?.message || 'Failed to load order calendar'
-    throw new Error(errorMessage)
+    const err = payload?.error
+    const name = err?.name || 'CALENDAR_ERROR'
+    const message = err?.message || 'Failed to load order calendar'
+    throw new OrdersCalendarFetchError(name, message, err?.details)
   }
 
   return payload.data as OrdersCalendarResponse
 }
 
 export function useOrdersCalendar(
-  params: OrdersCalendarQuery
-): UseQueryResult<OrdersCalendarResponse> {
+  params: OrdersCalendarQuery,
+  options?: { enabled?: boolean }
+): UseQueryResult<OrdersCalendarResponse, OrdersCalendarFetchError> {
   const queryKey = useMemo(
     () => [
       'orders-calendar',
@@ -84,14 +90,25 @@ export function useOrdersCalendar(
     ]
   )
 
-  const enabled = Boolean(params.start && params.end)
+  const enabled = options?.enabled !== false && Boolean(params.start && params.end)
 
   return useQuery({
     queryKey,
     queryFn: () => fetchCalendar(params),
     enabled,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
-    retry: 1,
+    retry: (failureCount, error) => {
+      if (error instanceof OrdersCalendarFetchError) {
+        if (
+          error.name === 'FEATURE_NOT_AVAILABLE' ||
+          error.name === 'ACCOUNT_LOCKED' ||
+          error.name === 'SUBSCRIPTION_SUSPENDED'
+        ) {
+          return false
+        }
+      }
+      return failureCount < 1
+    },
   })
 }
