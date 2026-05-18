@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockQuery = vi.fn()
+const mockCreatePendingActivation = vi.fn().mockResolvedValue(undefined)
 vi.mock('./db.js', () => ({ query: (...args) => mockQuery(...args) }))
-vi.mock('./logger.js', () => ({ logger: { error: vi.fn(), debug: vi.fn() } }))
+vi.mock('./logger.js', () => ({
+  logger: { error: vi.fn(), debug: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}))
+vi.mock('./billing/subscription-activation.js', () => ({
+  createPendingActivationSubscription: (...args) => mockCreatePendingActivation(...args),
+}))
 
 describe('Subscription lib', () => {
   beforeEach(() => {
     mockQuery.mockReset()
+    mockCreatePendingActivation.mockClear()
   })
 
   describe('getTenantSubscription', () => {
@@ -67,9 +74,11 @@ describe('Subscription lib', () => {
 
       expect(result).not.toBeNull()
       expect(result.plan_name).toBe('Free')
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO subscription'),
-        expect.any(Array)
+      expect(mockCreatePendingActivation).toHaveBeenCalledWith(
+        expect.any(Function),
+        'supp-1',
+        'SUPPLIER',
+        'free'
       )
     })
   })

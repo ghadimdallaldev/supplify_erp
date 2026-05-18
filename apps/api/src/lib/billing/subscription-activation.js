@@ -10,7 +10,7 @@ export async function createPendingActivationSubscription(
   tenantType,
   planCode = 'free'
 ) {
-  const run = executor.query ? executor.query.bind(executor) : query
+  const run = executor?.query ? executor.query.bind(executor) : query
   await run(
     `
     INSERT INTO subscription (

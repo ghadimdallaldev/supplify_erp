@@ -4,46 +4,54 @@ import { AuthGuard } from './AuthGuard'
 import { renderWithProviders } from '../test/utils'
 
 const mockUseGetMeQuery = vi.fn()
+const mockUseGetRegisterStatusQuery = vi.fn()
+
 vi.mock('../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api')>()
   return {
     ...actual,
     useGetMeQuery: (...args: unknown[]) => mockUseGetMeQuery(...args),
+    useGetRegisterStatusQuery: (...args: unknown[]) => mockUseGetRegisterStatusQuery(...args),
   }
 })
+
+const authenticatedMe = {
+  data: {
+    id: 'user-1',
+    email: 'test@example.com',
+    role: 'RESTAURANT',
+    displayName: 'Test',
+    createdAt: new Date().toISOString(),
+  },
+  error: undefined,
+  isLoading: false,
+  isSuccess: true,
+  isError: false,
+  isFetching: false,
+  refetch: vi.fn(),
+  status: 'fulfilled',
+  isUninitialized: false,
+  currentData: undefined,
+  dataUpdatedAt: 0,
+  errorUpdatedAt: 0,
+  isStale: false,
+  isLoadingError: false,
+  isRefetchError: false,
+  failureCount: 0,
+  failureReason: null,
+} as const
 
 describe('AuthGuard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseGetMeQuery.mockReturnValue(authenticatedMe)
+    mockUseGetRegisterStatusQuery.mockReturnValue({
+      data: { needsSetup: false },
+      isLoading: false,
+    })
   })
 
   it('should render children when authenticated', async () => {
-    mockUseGetMeQuery.mockReturnValueOnce({
-      data: {
-        id: 'user-1',
-        email: 'test@example.com',
-        role: 'RESTAURANT',
-        displayName: 'Test',
-        createdAt: new Date().toISOString(),
-      },
-      error: undefined,
-      isLoading: false,
-      isSuccess: true,
-      isError: false,
-      isFetching: false,
-      refetch: vi.fn(),
-      status: 'fulfilled',
-      isUninitialized: false,
-      currentData: undefined,
-      dataUpdatedAt: 0,
-      errorUpdatedAt: 0,
-      isStale: false,
-      isLoadingError: false,
-      isRefetchError: false,
-      failureCount: 0,
-      failureReason: null,
-    } as any)
-
     renderWithProviders(
       <AuthGuard>
         <div>Protected Content</div>
@@ -56,7 +64,7 @@ describe('AuthGuard', () => {
   })
 
   it('should not throw when loading', () => {
-    mockUseGetMeQuery.mockReturnValueOnce({
+    mockUseGetMeQuery.mockReturnValue({
       data: undefined,
       error: undefined,
       isLoading: true,

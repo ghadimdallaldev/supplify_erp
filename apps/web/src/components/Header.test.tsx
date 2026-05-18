@@ -3,6 +3,10 @@ import { screen } from '@testing-library/react'
 import { Header } from './Header'
 import { renderWithProviders } from '../test/utils'
 
+vi.mock('./BranchSwitcher', () => ({
+  BranchSwitcher: () => null,
+}))
+
 vi.mock('../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api')>()
   return {
@@ -30,6 +34,7 @@ describe('Header', () => {
 
   it('should render header with content', () => {
     renderWithProviders(<Header />)
-    expect(screen.getByText(/Logout/i)).toBeInTheDocument()
+    expect(screen.getByTestId('header')).toBeInTheDocument()
+    expect(screen.getByTestId('logout-button')).toBeInTheDocument()
   })
 })

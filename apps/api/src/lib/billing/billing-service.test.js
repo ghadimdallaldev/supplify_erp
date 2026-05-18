@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeBillingAccessState } from './billing-service.js'
+import { buildAccountLockedError, computeBillingAccessState } from './billing-service.js'
 
 describe('computeBillingAccessState', () => {
   it('free plan does not require payment', () => {
@@ -47,5 +47,35 @@ describe('computeBillingAccessState', () => {
     expect(state.isLocked).toBe(true)
     expect(state.isPastDue).toBe(false)
     expect(state.inGracePeriod).toBe(false)
+  })
+})
+
+describe('buildAccountLockedError', () => {
+  it('returns pending activation message and upgrade path', () => {
+    const err = buildAccountLockedError({
+      amountDue: 0,
+      access: {
+        pendingActivation: true,
+        lockReason: 'pending_activation',
+        gracePeriodEndsAt: null,
+      },
+    })
+    expect(err.name).toBe('ACCOUNT_LOCKED')
+    expect(err.message).toMatch(/not activated/i)
+    expect(err.details.pendingActivation).toBe(true)
+    expect(err.details.upgradeUrl).toBe('/app/activate')
+  })
+
+  it('returns overdue message when not pending activation', () => {
+    const err = buildAccountLockedError({
+      amountDue: 50,
+      access: {
+        pendingActivation: false,
+        lockReason: 'payment_overdue',
+        gracePeriodEndsAt: null,
+      },
+    })
+    expect(err.message).toMatch(/overdue/i)
+    expect(err.details.amountDue).toBe(50)
   })
 })
