@@ -7,4 +7,4 @@ if (!args) {
   process.exit(1)
 }
 
-console.log('pnpm is available via:', args[0] === 'pnpm' ? 'pnpm' : 'npx pnpm@8.15.0')
+console.log('pnpm is available via:', args[0] === 'pnpm' ? 'pnpm' : 'npx pnpm@8.15.9')

@@ -277,9 +277,9 @@ elseif ($cmd -eq "seed") {
     } else {
         Write-Host "API container not running — seeding via host Node/pnpm..."
         node (Join-Path $RepoRoot "scripts\dev-infra.mjs")
-        npx --yes pnpm@8.15.0 db:migrate
-        npx --yes pnpm@8.15.0 db:seed
-        npx --yes pnpm@8.15.0 seed:demo-users
+        npx --yes pnpm@8.15.9 db:migrate
+        npx --yes pnpm@8.15.9 db:seed
+        npx --yes pnpm@8.15.9 seed:demo-users
     }
     Write-Host "Bootstrap finished. Log in as restaurant@supplify.com / SupplifyRestaurant1!"
 }
