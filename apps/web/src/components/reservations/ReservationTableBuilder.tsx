@@ -200,8 +200,68 @@ const normalizeDimension = (value: unknown, fallback: number, base: number) => {
   return clamp(value / base, MIN_SIZE_RATIO, MAX_SIZE_RATIO)
 }
 
-const hydrateTables = (tables: ReservationTable[]): EditableTable[] =>
-  tables.map((table) => {
+type TableRect = { x: number; y: number; width: number; height: number }
+
+const POSITION_PAD = 0.02
+
+/** True when the table has been placed on the canvas (not API/DB default origin). */
+const hasStoredPosition = (position?: { x?: number; y?: number } | null) => {
+  if (!position) return false
+  const { x, y } = position
+  if (typeof x !== 'number' || typeof y !== 'number' || Number.isNaN(x) || Number.isNaN(y)) {
+    return false
+  }
+  return !(x === 0 && y === 0)
+}
+
+const rectsOverlap = (a: TableRect, b: TableRect) =>
+  !(
+    a.x + a.width + POSITION_PAD <= b.x ||
+    b.x + b.width + POSITION_PAD <= a.x ||
+    a.y + a.height + POSITION_PAD <= b.y ||
+    b.y + b.height + POSITION_PAD <= a.y
+  )
+
+/** Next open slot on a simple grid so new tables never stack on (0, 0). */
+const findNextTablePosition = (
+  existing: TableRect[],
+  width: number,
+  height: number
+): { x: number; y: number } => {
+  const COLS = 4
+  const padX = 0.04
+  const padY = 0.04
+  const startX = 0.06
+  const startY = 0.06
+  const cellW = Math.max(width + padX, 0.12)
+  const cellH = Math.max(height + padY, 0.12)
+
+  for (let i = 0; i < 80; i++) {
+    const col = i % COLS
+    const row = Math.floor(i / COLS)
+    const x = startX + col * cellW
+    const y = startY + row * cellH
+    if (x + width > 0.97 || y + height > 0.97) continue
+
+    const candidate: TableRect = { x, y, width, height }
+    if (!existing.some((t) => rectsOverlap(candidate, t))) {
+      return { x: clamp(x, 0, 1 - width), y: clamp(y, 0, 1 - height) }
+    }
+  }
+
+  const n = existing.length
+  const col = n % COLS
+  const row = Math.floor(n / COLS)
+  return {
+    x: clamp(startX + col * cellW, 0, 1 - width),
+    y: clamp(startY + row * cellH, 0, 1 - height),
+  }
+}
+
+const hydrateTables = (tables: ReservationTable[]): EditableTable[] => {
+  const placed: EditableTable[] = []
+
+  for (const table of tables) {
     const layout = table.layout ?? {}
     const shape = (layout.shape as TableShape) || 'round'
     const defaults = shapeDefaults[shape] ?? shapeDefaults.round
@@ -218,8 +278,17 @@ const hydrateTables = (tables: ReservationTable[]): EditableTable[] =>
     )
 
     const position = (table.position || {}) as { x?: number; y?: number }
-    const xRatio = normalizeCoordinate(position.x, Math.random() * 0.6 + 0.2, DEFAULT_CANVAS_WIDTH)
-    const yRatio = normalizeCoordinate(position.y, Math.random() * 0.4 + 0.2, DEFAULT_CANVAS_HEIGHT)
+    let xRatio: number
+    let yRatio: number
+
+    if (hasStoredPosition(position)) {
+      xRatio = normalizeCoordinate(position.x, 0.2, DEFAULT_CANVAS_WIDTH)
+      yRatio = normalizeCoordinate(position.y, 0.2, DEFAULT_CANVAS_HEIGHT)
+    } else {
+      const slot = findNextTablePosition(placed, widthRatio, heightRatio)
+      xRatio = slot.x
+      yRatio = slot.y
+    }
 
     const color = typeof layout.color === 'string' ? layout.color : COLOR_PRESETS[0].value
     const zone = (layout.zone as TableZone) || 'main'
@@ -228,14 +297,14 @@ const hydrateTables = (tables: ReservationTable[]): EditableTable[] =>
       : []
     const rotation = typeof layout.rotation === 'number' ? layout.rotation : 0
 
-    return {
+    placed.push({
       localId: createLocalId(table.id),
       id: table.id,
       name: table.name,
       capacity: table.capacity,
       branchId: table.branch_id || null,
-      x: clamp(xRatio, 0, 1 - MIN_SIZE_RATIO),
-      y: clamp(yRatio, 0, 1 - MIN_SIZE_RATIO),
+      x: clamp(xRatio, 0, 1 - widthRatio),
+      y: clamp(yRatio, 0, 1 - heightRatio),
       width: clamp(widthRatio, MIN_SIZE_RATIO, MAX_SIZE_RATIO),
       height: clamp(heightRatio, MIN_SIZE_RATIO, MAX_SIZE_RATIO),
       rotation,
@@ -245,8 +314,11 @@ const hydrateTables = (tables: ReservationTable[]): EditableTable[] =>
       notes: typeof layout.notes === 'string' ? layout.notes : undefined,
       features,
       isActive: table.is_active !== false,
-    }
-  })
+    })
+  }
+
+  return placed
+}
 
 // ─── ChairLayer Component ─────────────────────────────────────────────────────
 
@@ -695,14 +767,16 @@ export function ReservationTableBuilder({
         name = `${base} ${suffix}`
       }
 
+      const { x, y } = findNextTablePosition(prev, widthRatio, heightRatio)
+
       const newTable: EditableTable = {
         localId,
         name,
         capacity:
           shape === 'chef_table' ? 8 : shape === 'rectangle' ? 6 : shape === 'booth' ? 4 : 2,
         branchId: null,
-        x: clamp(Math.random() * (1 - widthRatio), 0.05, 0.95),
-        y: clamp(Math.random() * (1 - heightRatio), 0.05, 0.95),
+        x,
+        y,
         width: widthRatio,
         height: heightRatio,
         rotation: 0,

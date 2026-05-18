@@ -1,5 +1,8 @@
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
-import { closeMonetizationModal, resetMonetizationModal } from '../features/monetization/monetizationSlice'
+import {
+  closeMonetizationModal,
+  resetMonetizationModal,
+} from '../features/monetization/monetizationSlice'
 import {
   useGetRecommendationQuery,
   useGetEntitlementsQuery,
@@ -16,6 +19,7 @@ import {
   getFeatureKeys,
   LIMIT_KEY_LABELS,
   FEATURE_KEY_LABELS,
+  formatPlanFeatureCell,
   getPlanSubtitle,
 } from '../lib/planComparison'
 
@@ -67,8 +71,7 @@ function isWorseThanCurrent(a: number | null, b: number | null): boolean {
   return a < b
 }
 
-const UPGRADE_SUPPORT_EMAIL =
-  import.meta.env.VITE_UPGRADE_SUPPORT_EMAIL || 'admin@supplify.com'
+const UPGRADE_SUPPORT_EMAIL = import.meta.env.VITE_UPGRADE_SUPPORT_EMAIL || 'admin@supplify.com'
 
 function normalizeUpgradePath(url: string): string {
   return url.startsWith('/') ? url : `/app/${url}`
@@ -164,14 +167,15 @@ export function UpgradeModal() {
     )
     const onUpgradePage = isOnUpgradeDestination(location.pathname, location.search, upgradePath)
     const code = targetCode ?? recommendedCode ?? null
-    const planLabel =
-      code
-        ? (plans.find((p) => (p.code || '').toLowerCase() === code)?.name ??
-          PLAN_LABELS[code] ??
-          code)
-        : recommendation?.recommendedPlanName ?? 'a paid plan'
+    const planLabel = code
+      ? (plans.find((p) => (p.code || '').toLowerCase() === code)?.name ??
+        PLAN_LABELS[code] ??
+        code)
+      : (recommendation?.recommendedPlanName ?? 'a paid plan')
     const currentPlan =
-      (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
+      (payload as { currentPlan?: string }).currentPlan ??
+      entitlements?.plan?.name ??
+      'Current plan'
 
     recordConversionEvent({
       eventType: canUpgrade ? 'CLICK_UPGRADE' : 'CLOSE_UPGRADE_MODAL',
@@ -271,8 +275,8 @@ export function UpgradeModal() {
                   {FEATURE_KEY_LABELS[(payload as any).featureKey] ??
                     (payload as any).featureKey.replace(/_/g, ' ')}
                 </span>{' '}
-                is not included in your{' '}
-                <span className="font-semibold">{currentPlanName}</span> plan.
+                is not included in your <span className="font-semibold">{currentPlanName}</span>{' '}
+                plan.
               </p>
             </div>
           )}
@@ -283,10 +287,9 @@ export function UpgradeModal() {
             recommendedCode !== currentCode && (
               <div className="rounded-lg border border-[var(--brand-pale)] bg-[var(--brand-ultra)] px-4 py-3 text-sm">
                 <p className="font-medium text-[var(--brand-mid)]">
-                  We recommend:{' '}
-                  <span className="font-semibold">{recommendedPlanName}</span>
+                  We recommend: <span className="font-semibold">{recommendedPlanName}</span>
                 </p>
-                {((recommendation.reasonText ?? (recommendation as any).reason) ?? '').trim() && (
+                {(recommendation.reasonText ?? (recommendation as any).reason ?? '').trim() && (
                   <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                     {recommendation.reasonText ?? (recommendation as any).reason}
                   </p>
@@ -475,30 +478,34 @@ export function UpgradeModal() {
                     const rawVal = isCurrent
                       ? (currentPlanRow?.features?.[key] ?? entitlements.features?.[key])
                       : plan.features?.[key]
-                    const val =
-                      typeof rawVal === 'boolean' ? rawVal : rawVal !== 'false' && !!rawVal
-                    const curRaw =
-                      currentPlanRow?.features?.[key] ?? entitlements.features?.[key]
-                    const curVal =
-                      typeof curRaw === 'boolean' ? curRaw : curRaw !== 'false' && !!curRaw
-                    const better = !isCurrent && val && !curVal
+                    const cell = formatPlanFeatureCell(key, rawVal)
+                    const curRaw = currentPlanRow?.features?.[key] ?? entitlements.features?.[key]
+                    const curCell = formatPlanFeatureCell(key, curRaw)
+                    const better = !isCurrent && cell.enabled && !curCell.enabled
                     return (
                       <div
                         key={plan.code}
-                        className={`flex items-center justify-center p-2 ${
+                        className={`flex flex-col items-center justify-center gap-0.5 p-2 ${
                           isCurrent ? 'bg-[var(--brand-ultra)]' : ''
                         }`}
                       >
-                        {val ? (
-                          <Check
-                            className={`h-3.5 w-3.5 ${
-                              isCurrent
-                                ? 'text-[var(--brand-mid)]'
-                                : better
-                                  ? 'text-emerald-600'
-                                  : 'text-[var(--text-muted)]'
-                            }`}
-                          />
+                        {cell.enabled ? (
+                          <>
+                            <Check
+                              className={`h-3.5 w-3.5 ${
+                                isCurrent
+                                  ? 'text-[var(--brand-mid)]'
+                                  : better
+                                    ? 'text-emerald-600'
+                                    : 'text-[var(--text-muted)]'
+                              }`}
+                            />
+                            {cell.caption && (
+                              <span className="text-[9px] leading-tight text-[var(--text-muted)] text-center">
+                                {cell.caption}
+                              </span>
+                            )}
+                          </>
                         ) : (
                           <Minus className="h-3.5 w-3.5 text-[var(--app-border-mid)]" />
                         )}
@@ -529,15 +536,17 @@ export function UpgradeModal() {
                   : `Upgrade to ${recommendedPlanName ?? 'recommended plan'}`}
               </Button>
             )}
-            {canUpgrade && (!recommendedCode || recommendedCode === currentCode) && !isBrowseUpgrade && (
-              <Button
-                type="button"
-                onClick={() => handleUpgrade()}
-                className="min-w-[10rem] flex-1"
-              >
-                {onUpgradePage ? 'Request plan upgrade' : 'View plans in settings'}
-              </Button>
-            )}
+            {canUpgrade &&
+              (!recommendedCode || recommendedCode === currentCode) &&
+              !isBrowseUpgrade && (
+                <Button
+                  type="button"
+                  onClick={() => handleUpgrade()}
+                  className="min-w-[10rem] flex-1"
+                >
+                  {onUpgradePage ? 'Request plan upgrade' : 'View plans in settings'}
+                </Button>
+              )}
             <Button type="button" variant="outline" onClick={handleClose}>
               {isBrowseUpgrade ? 'Close' : 'Dismiss'}
             </Button>

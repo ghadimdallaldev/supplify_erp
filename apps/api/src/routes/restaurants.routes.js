@@ -1,5 +1,6 @@
 import express from 'express'
 import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -355,90 +356,100 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   }
 })
 
-// Upload restaurant logo
-router.post('/:id/logo', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params
-    const { logoUrl } = req.body
+// Upload restaurant logo (Gold+ custom branding)
+router.post(
+  '/:id/logo',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'custom_branding',
+    (req) => req.params.id,
+    () => 'RESTAURANT'
+  ),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const { logoUrl } = req.body
 
-    if (!logoUrl) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'logoUrl is required',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (!logoUrl) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'logoUrl is required',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    // Check permissions
-    const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [id])
+      // Check permissions
+      const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [id])
 
-    if (restaurants.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Restaurant not found',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (restaurants.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Restaurant not found',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const restaurant = restaurants[0]
+      const restaurant = restaurants[0]
 
-    // Restaurants can only update their own logo
-    if (req.userData.role === 'RESTAURANT' && restaurant.contact_email !== req.userData.email) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Access denied. You can only update your own logo',
-        },
-        requestId: req.requestId,
-      })
-    }
+      // Restaurants can only update their own logo
+      if (req.userData.role === 'RESTAURANT' && restaurant.contact_email !== req.userData.email) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied. You can only update your own logo',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    // Update logo URL
-    const { rows } = await query(
-      `
+      // Update logo URL
+      const { rows } = await query(
+        `
       UPDATE restaurant 
       SET logo_url = $1, updated_at = now()
       WHERE id = $2
       RETURNING *
     `,
-      [logoUrl, id]
-    )
+        [logoUrl, id]
+      )
 
-    logger.info('Restaurant logo updated', {
-      restaurantId: id,
-      logoUrl,
-      actor: req.userData.id,
-    })
+      logger.info('Restaurant logo updated', {
+        restaurantId: id,
+        logoUrl,
+        actor: req.userData.id,
+      })
 
-    res.json({
-      ok: true,
-      data: { restaurant: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Update restaurant logo error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to update restaurant logo',
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: { restaurant: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Update restaurant logo error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to update restaurant logo',
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Update restaurant
 router.patch('/:id', requireAuth, async (req, res) => {

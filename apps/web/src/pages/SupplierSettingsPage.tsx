@@ -7,11 +7,38 @@ import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
-import { 
-  Building2, Warehouse, MapPin, FileText, Clock, AlertCircle, UserPlus, Upload, 
-  Package, ShoppingCart, TrendingUp, Mail, Phone, Globe, Save, Loader2,
-  Activity, Users, DollarSign, Calendar, CheckCircle2, XCircle, Bell
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
+import {
+  Building2,
+  Warehouse,
+  MapPin,
+  FileText,
+  Clock,
+  AlertCircle,
+  UserPlus,
+  Upload,
+  Package,
+  ShoppingCart,
+  TrendingUp,
+  Mail,
+  Phone,
+  Globe,
+  Save,
+  Loader2,
+  Activity,
+  Users,
+  DollarSign,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  Bell,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
@@ -20,9 +47,13 @@ import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
-import { canAddWarehouses } from '../lib/planLimits'
+import {
+  canAddWarehouses,
+  canUseCustomBranding,
+  customBrandingUpgradeMessage,
+} from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
-import { 
+import {
   useGetSupplierMeQuery,
   useUpdateSupplierMutation,
   useUploadSupplierLogoMutation,
@@ -47,12 +78,36 @@ const SUPPLIER_NOTIFICATION_DEFAULTS = {
   notifyLowStock: true,
 } as const
 
-const SUPPLIER_NOTIFICATION_FIELDS: Array<{ key: keyof typeof SUPPLIER_NOTIFICATION_DEFAULTS; label: string; description: string }> = [
-  { key: 'emailEnabled', label: 'Email notifications', description: 'Receive important updates via email.' },
-  { key: 'whatsappEnabled', label: 'WhatsApp notifications', description: 'Get alerts on WhatsApp when your phone is on file.' },
-  { key: 'inAppEnabled', label: 'In-app notifications', description: 'Show alerts inside Supplify.' },
-  { key: 'notifyOrderNew', label: 'New orders', description: 'Be notified when restaurants place orders.' },
-  { key: 'notifyMessageReceived', label: 'Chat messages', description: 'Receive pings for new chat messages.' },
+const SUPPLIER_NOTIFICATION_FIELDS: Array<{
+  key: keyof typeof SUPPLIER_NOTIFICATION_DEFAULTS
+  label: string
+  description: string
+}> = [
+  {
+    key: 'emailEnabled',
+    label: 'Email notifications',
+    description: 'Receive important updates via email.',
+  },
+  {
+    key: 'whatsappEnabled',
+    label: 'WhatsApp notifications',
+    description: 'Get alerts on WhatsApp when your phone is on file.',
+  },
+  {
+    key: 'inAppEnabled',
+    label: 'In-app notifications',
+    description: 'Show alerts inside Supplify.',
+  },
+  {
+    key: 'notifyOrderNew',
+    label: 'New orders',
+    description: 'Be notified when restaurants place orders.',
+  },
+  {
+    key: 'notifyMessageReceived',
+    label: 'Chat messages',
+    description: 'Receive pings for new chat messages.',
+  },
   { key: 'notifyInvoiceIssued', label: 'Invoices', description: 'Invoice and payment reminders.' },
   { key: 'notifyLowStock', label: 'Low stock', description: 'Warehouse low stock warnings.' },
 ]
@@ -62,16 +117,26 @@ export function SupplierSettingsPage() {
   const { user } = useAppSelector((state) => state.auth)
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('profile')
-  const { data: supplierData, isLoading: isLoadingSupplier, refetch: refetchSupplier } = useGetSupplierMeQuery()
+  const {
+    data: supplierData,
+    isLoading: isLoadingSupplier,
+    refetch: refetchSupplier,
+  } = useGetSupplierMeQuery()
   const [updateSupplier, { isLoading: isUpdating }] = useUpdateSupplierMutation()
   const [uploadSupplierLogo] = useUploadSupplierLogoMutation()
   const [getPresignedUrl] = useGetPresignedUrlMutation()
-  
+
   // Get statistics for dashboard
   const { data: stats } = useGetDashboardStatsQuery()
-  const { data: productsData } = useGetProductsQuery({ limit: 1000 }, { skip: !supplierData?.supplier?.id })
-  const { data: ordersData } = useGetOrdersQuery({ limit: 100 }, { skip: !supplierData?.supplier?.id })
-  
+  const { data: productsData } = useGetProductsQuery(
+    { limit: 1000 },
+    { skip: !supplierData?.supplier?.id }
+  )
+  const { data: ordersData } = useGetOrdersQuery(
+    { limit: 100 },
+    { skip: !supplierData?.supplier?.id }
+  )
+
   const [showAddWarehouse, setShowAddWarehouse] = useState(false)
   const [showAddZone, setShowAddZone] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
@@ -79,17 +144,23 @@ export function SupplierSettingsPage() {
   const [uploadedContacts, setUploadedContacts] = useState<any[]>([])
 
   const [notificationPrefs, setNotificationPrefs] = useState(SUPPLIER_NOTIFICATION_DEFAULTS)
-  const { data: notificationPrefsData, isLoading: isLoadingNotificationPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
-  const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
+  const {
+    data: notificationPrefsData,
+    isLoading: isLoadingNotificationPrefs,
+    refetch: refetchNotificationPrefs,
+  } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
+  const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] =
+    useUpdateNotificationPreferencesMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const { data: warehousesData, refetch: refetchWarehouses } = useGetWarehousesQuery()
   const [createWarehouse, { isLoading: isCreatingWarehouse }] = useCreateWarehouseMutation()
   const entitlements = entitlementsData?.entitlements
   // Main warehouse placeholder counts as one location under plan limits.
   const canAddWarehouse = canAddWarehouses(entitlements, 1)
-  
+  const brandingAllowed = canUseCustomBranding(entitlements)
+
   const supplier = supplierData?.supplier
-  
+
   // Profile form state
   const [profileForm, setProfileForm] = useState({
     name: '',
@@ -107,7 +178,7 @@ export function SupplierSettingsPage() {
     description: '',
     website: '',
   })
-  
+
   useEffect(() => {
     const prefs = notificationPrefsData?.preferences
     if (prefs) {
@@ -142,9 +213,15 @@ export function SupplierSettingsPage() {
     const tab = searchParams.get('tab')
     if (
       tab &&
-      ['profile', 'contacts', 'business', 'warehouses', 'delivery', 'notifications', 'plan'].includes(
-        tab
-      )
+      [
+        'profile',
+        'contacts',
+        'business',
+        'warehouses',
+        'delivery',
+        'notifications',
+        'plan',
+      ].includes(tab)
     ) {
       setActiveTab(tab)
     }
@@ -171,7 +248,7 @@ export function SupplierSettingsPage() {
       })
     }
   }, [supplier])
-  
+
   const handleLogoUpload = async (logoUrl: string) => {
     if (!supplier?.id) {
       toast.error('Supplier information not loaded')
@@ -184,18 +261,22 @@ export function SupplierSettingsPage() {
       toast.error(error?.data?.error?.message || 'Failed to upload logo')
     }
   }
-  
-  const handleGetPresignedUrl = async (params: { fileName: string; fileType: string; fileSize?: number }) => {
+
+  const handleGetPresignedUrl = async (params: {
+    fileName: string
+    fileType: string
+    fileSize?: number
+  }) => {
     const result = await getPresignedUrl(params).unwrap()
     return result
   }
-  
+
   const handleSaveProfile = async () => {
     if (!supplier?.id) {
       toast.error('Supplier information not loaded')
       return
     }
-    
+
     try {
       await updateSupplier({
         id: supplier.id,
@@ -205,9 +286,9 @@ export function SupplierSettingsPage() {
           phone: profileForm.phone,
           contactEmail: profileForm.contact_email,
           address: profileForm.address,
-        }
+        },
       }).unwrap()
-      
+
       // Also update fields that might not be in the standard schema
       // These would need to be added to the API schema if needed
       toast.success('Profile updated successfully!')
@@ -216,24 +297,30 @@ export function SupplierSettingsPage() {
       toast.error(error?.data?.error?.message || 'Failed to update profile')
     }
   }
-  
+
   // Calculate statistics
   const statistics = useMemo(() => {
     const products = productsData?.products || []
     const orders = ordersData?.orders || []
-    
+
     return {
       totalProducts: products.length,
       activeProducts: products.filter((p: any) => p.status === 'ACTIVE').length,
       totalOrders: stats?.totalOrders || orders.length,
-      pendingOrders: stats?.pendingOrders || orders.filter((o: any) => o.status === 'PENDING' || o.status === 'PLACED').length,
-      completedOrders: stats?.completedOrders || orders.filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED').length,
-      totalRevenue: stats?.totalRevenue || orders
-        .filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED')
-        .reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0),
+      pendingOrders:
+        stats?.pendingOrders ||
+        orders.filter((o: any) => o.status === 'PENDING' || o.status === 'PLACED').length,
+      completedOrders:
+        stats?.completedOrders ||
+        orders.filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED').length,
+      totalRevenue:
+        stats?.totalRevenue ||
+        orders
+          .filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED')
+          .reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0),
     }
   }, [productsData, ordersData, stats])
-  
+
   // Warehouse form state
   const [warehouseForm, setWarehouseForm] = useState({
     name: '',
@@ -243,7 +330,7 @@ export function SupplierSettingsPage() {
     country: '',
     isMain: false,
   })
-  
+
   // Delivery zone form state
   const [zoneForm, setZoneForm] = useState({
     name: '',
@@ -263,7 +350,9 @@ export function SupplierSettingsPage() {
 
   const handleAddWarehouse = async () => {
     if (!canAddWarehouse) {
-      toast.error('Additional warehouses are not included on your current plan. Upgrade to add more.')
+      toast.error(
+        'Additional warehouses are not included on your current plan. Upgrade to add more.'
+      )
       openBrowseUpgrade(dispatch, {
         currentPlan: entitlements?.plan?.name ?? null,
         upgradeUrl: '/app/settings?tab=plan',
@@ -324,7 +413,11 @@ export function SupplierSettingsPage() {
     if (!file) return
 
     // Validate file type
-    const validTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    const validTypes = [
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ]
     if (!validTypes.includes(file.type)) {
       toast.error('Please upload a CSV or Excel file')
       return
@@ -335,14 +428,16 @@ export function SupplierSettingsPage() {
       skipEmptyLines: true,
       complete: (results) => {
         try {
-          const contacts = results.data.map((row: any, index) => ({
-            id: index + 1,
-            name: row.Name || row.name || '',
-            email: row.Email || row.email || '',
-            phone: row.Phone || row.phone || '',
-            role: row.Role || row.role || row.Title || row.title || '',
-            isPrimary: row['Is Primary'] === 'true' || row['is_primary'] === 'true' || false,
-          })).filter(contact => contact.name && contact.email)
+          const contacts = results.data
+            .map((row: any, index) => ({
+              id: index + 1,
+              name: row.Name || row.name || '',
+              email: row.Email || row.email || '',
+              phone: row.Phone || row.phone || '',
+              role: row.Role || row.role || row.Title || row.title || '',
+              isPrimary: row['Is Primary'] === 'true' || row['is_primary'] === 'true' || false,
+            }))
+            .filter((contact) => contact.name && contact.email)
 
           if (contacts.length === 0) {
             toast.error('No valid contacts found in the file')
@@ -359,7 +454,7 @@ export function SupplierSettingsPage() {
       error: (error) => {
         toast.error('Error reading file')
         console.error(error)
-      }
+      },
     })
   }
 
@@ -399,26 +494,30 @@ export function SupplierSettingsPage() {
               <div>
                 <p className="text-sm font-medium text-[var(--brand-mid)]">Total Products</p>
                 <p className="text-2xl font-bold text-[var(--text)]">{statistics.totalProducts}</p>
-                <p className="text-xs text-[var(--brand-mid)] mt-1">{statistics.activeProducts} active</p>
+                <p className="text-xs text-[var(--brand-mid)] mt-1">
+                  {statistics.activeProducts} active
+                </p>
               </div>
               <Package className="h-10 w-10 text-[var(--brand-mid)]" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-gradient-to-br from-[var(--mint-pale)] to-[var(--mint-pale)] border-[var(--mint)]/35">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-[var(--mint)]">Total Orders</p>
                 <p className="text-2xl font-bold text-[var(--mint)]">{statistics.totalOrders}</p>
-                <p className="text-xs text-[var(--mint)] mt-1">{statistics.completedOrders} completed</p>
+                <p className="text-xs text-[var(--mint)] mt-1">
+                  {statistics.completedOrders} completed
+                </p>
               </div>
               <ShoppingCart className="h-10 w-10 text-[var(--mint)]" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-gradient-to-br from-[var(--amber-pale)] to-[var(--amber-pale)] border-[var(--amber-mid)]/35">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -431,7 +530,7 @@ export function SupplierSettingsPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-gradient-to-br from-[var(--brand-pale)] to-[var(--brand-ultra)] border-[var(--app-border)]">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -467,23 +566,55 @@ export function SupplierSettingsPage() {
                 <FileText className="h-5 w-5" />
                 Company Logo
               </CardTitle>
-              <CardDescription>Upload your company logo. This will be displayed in your profile and to restaurants.</CardDescription>
+              <CardDescription>
+                Upload your company logo. This will be displayed in your profile and to restaurants.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!brandingAllowed && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span>{customBrandingUpgradeMessage(entitlements?.plan?.name)}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      openBrowseUpgrade(dispatch, {
+                        currentPlan: entitlements?.plan?.name ?? null,
+                        upgradeUrl: '/app/settings?tab=plan',
+                      })
+                    }
+                  >
+                    Compare plans
+                  </Button>
+                </div>
+              )}
               {supplier ? (
-                <LogoUpload
-                  currentLogo={supplier.logo_url}
-                  onUpload={handleLogoUpload}
-                  entityId={supplier.id}
-                  entityName={supplier.name || 'Supplier'}
-                  getPresignedUrl={handleGetPresignedUrl}
-                />
+                brandingAllowed ? (
+                  <LogoUpload
+                    currentLogo={supplier.logo_url}
+                    onUpload={handleLogoUpload}
+                    entityId={supplier.id}
+                    entityName={supplier.name || 'Supplier'}
+                    getPresignedUrl={handleGetPresignedUrl}
+                  />
+                ) : supplier.logo_url ? (
+                  <img
+                    src={supplier.logo_url}
+                    alt={`${supplier.name || 'Supplier'} logo`}
+                    className="h-24 w-24 rounded-lg border object-contain bg-white"
+                  />
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Upgrade to Gold or Platinum to upload your logo.
+                  </p>
+                )
               ) : (
                 <p className="text-sm text-[var(--text-muted)]">Loading supplier information...</p>
               )}
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -496,7 +627,7 @@ export function SupplierSettingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Company Name *</Label>
-                  <Input 
+                  <Input
                     id="name"
                     value={profileForm.name}
                     onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
@@ -505,7 +636,7 @@ export function SupplierSettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="legal_name">Legal Name</Label>
-                  <Input 
+                  <Input
                     id="legal_name"
                     value={profileForm.legal_name}
                     onChange={(e) => setProfileForm({ ...profileForm, legal_name: e.target.value })}
@@ -514,7 +645,7 @@ export function SupplierSettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="vat_no">VAT Number</Label>
-                  <Input 
+                  <Input
                     id="vat_no"
                     value={profileForm.vat_no}
                     onChange={(e) => setProfileForm({ ...profileForm, vat_no: e.target.value })}
@@ -523,25 +654,29 @@ export function SupplierSettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="trade_license_no">Trade License</Label>
-                  <Input 
+                  <Input
                     id="trade_license_no"
                     value={profileForm.trade_license_no}
-                    onChange={(e) => setProfileForm({ ...profileForm, trade_license_no: e.target.value })}
+                    onChange={(e) =>
+                      setProfileForm({ ...profileForm, trade_license_no: e.target.value })
+                    }
                     placeholder="TL-456789"
                   />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="contact_email">Contact Email *</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                    <Input 
+                    <Input
                       id="contact_email"
                       type="email"
                       value={profileForm.contact_email}
-                      onChange={(e) => setProfileForm({ ...profileForm, contact_email: e.target.value })}
+                      onChange={(e) =>
+                        setProfileForm({ ...profileForm, contact_email: e.target.value })
+                      }
                       placeholder="contact@example.com"
                       className="pl-10"
                     />
@@ -551,7 +686,7 @@ export function SupplierSettingsPage() {
                   <Label htmlFor="phone">Phone</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                    <Input 
+                    <Input
                       id="phone"
                       type="tel"
                       value={profileForm.phone}
@@ -562,12 +697,12 @@ export function SupplierSettingsPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="website">Website</Label>
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                  <Input 
+                  <Input
                     id="website"
                     type="url"
                     value={profileForm.website}
@@ -577,10 +712,10 @@ export function SupplierSettingsPage() {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="description">Company Description</Label>
-                <Textarea 
+                <Textarea
                   id="description"
                   value={profileForm.description}
                   onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
@@ -588,58 +723,66 @@ export function SupplierSettingsPage() {
                   rows={4}
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="street">Street Address</Label>
-                  <Input 
+                  <Input
                     id="street"
                     value={profileForm.address.street}
-                    onChange={(e) => setProfileForm({ 
-                      ...profileForm, 
-                      address: { ...profileForm.address, street: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        address: { ...profileForm.address, street: e.target.value },
+                      })
+                    }
                     placeholder="123 Main Street"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="city">City</Label>
-                  <Input 
+                  <Input
                     id="city"
                     value={profileForm.address.city}
-                    onChange={(e) => setProfileForm({ 
-                      ...profileForm, 
-                      address: { ...profileForm.address, city: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        address: { ...profileForm.address, city: e.target.value },
+                      })
+                    }
                     placeholder="City Name"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="region">Region/State</Label>
-                  <Input 
+                  <Input
                     id="region"
                     value={profileForm.address.region}
-                    onChange={(e) => setProfileForm({ 
-                      ...profileForm, 
-                      address: { ...profileForm.address, region: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        address: { ...profileForm.address, region: e.target.value },
+                      })
+                    }
                     placeholder="State or Region"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
-                  <Input 
+                  <Input
                     id="country"
                     value={profileForm.address.country}
-                    onChange={(e) => setProfileForm({ 
-                      ...profileForm, 
-                      address: { ...profileForm.address, country: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        address: { ...profileForm.address, country: e.target.value },
+                      })
+                    }
                     placeholder="Country"
                   />
                 </div>
               </div>
-              
+
               <Button onClick={handleSaveProfile} disabled={isUpdating}>
                 {isUpdating ? (
                   <>
@@ -702,12 +845,20 @@ export function SupplierSettingsPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="outline" size="sm" className="text-[var(--red)] hover:text-[var(--red)]">Remove</Button>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-[var(--red)] hover:text-[var(--red)]"
+                      >
+                        Remove
+                      </Button>
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -727,16 +878,26 @@ export function SupplierSettingsPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="outline" size="sm" className="text-[var(--red)] hover:text-[var(--red)]">Remove</Button>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-[var(--red)] hover:text-[var(--red)]"
+                      >
+                        Remove
+                      </Button>
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="text-center py-8 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
                   <UserPlus className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
                   <p className="text-[var(--text-muted)]">No additional contacts</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">Add contacts to manage your team</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    Add contacts to manage your team
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -759,18 +920,31 @@ export function SupplierSettingsPage() {
                   <Badge variant="outline">Configure your weekly schedule</Badge>
                 </div>
                 <div className="space-y-3">
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                    <div key={day} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-[var(--brand-ultra)]">
+                  {[
+                    'Monday',
+                    'Tuesday',
+                    'Wednesday',
+                    'Thursday',
+                    'Friday',
+                    'Saturday',
+                    'Sunday',
+                  ].map((day) => (
+                    <div
+                      key={day}
+                      className="flex items-center gap-4 p-3 border rounded-lg hover:bg-[var(--brand-ultra)]"
+                    >
                       <div className="w-28 font-medium">{day}</div>
                       <Input type="time" className="w-32" placeholder="09:00" />
                       <span className="text-[var(--text-muted)]">to</span>
                       <Input type="time" className="w-32" placeholder="17:00" />
-                      <Button variant="outline" size="sm" className="ml-auto">Closed</Button>
+                      <Button variant="outline" size="sm" className="ml-auto">
+                        Closed
+                      </Button>
                     </div>
                   ))}
                 </div>
               </div>
-              
+
               <div className="border-t pt-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-lg">Business Policies</h3>
@@ -780,30 +954,28 @@ export function SupplierSettingsPage() {
                   <div className="space-y-2">
                     <Label>Minimum Order Value ($)</Label>
                     <Input type="number" placeholder="100.00" />
-                    <p className="text-xs text-[var(--text-muted)]">Restaurants must order at least this amount</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Restaurants must order at least this amount
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>Payment Terms</Label>
                     <Input placeholder="Net 30" />
-                    <p className="text-xs text-[var(--text-muted)]">e.g., Net 30, Cash on Delivery</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      e.g., Net 30, Cash on Delivery
+                    </p>
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label>Return Policy</Label>
-                    <Textarea 
-                      placeholder="7 days return window for damaged goods..."
-                      rows={3}
-                    />
+                    <Textarea placeholder="7 days return window for damaged goods..." rows={3} />
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label>Terms & Conditions</Label>
-                    <Textarea 
-                      placeholder="Your terms and conditions for orders..."
-                      rows={4}
-                    />
+                    <Textarea placeholder="Your terms and conditions for orders..." rows={4} />
                   </div>
                 </div>
               </div>
-              
+
               <Button>
                 <Save className="h-4 w-4 mr-2" />
                 Save Business Settings
@@ -853,11 +1025,16 @@ export function SupplierSettingsPage() {
                   <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
                     <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
                     <p className="text-[var(--text-muted)]">No warehouses yet</p>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">Add a warehouse to manage multiple locations</p>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      Add a warehouse to manage multiple locations
+                    </p>
                   </div>
                 ) : (
                   (warehousesData?.warehouses ?? []).map((wh: any) => (
-                    <div key={wh.id} className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
+                    <div
+                      key={wh.id}
+                      className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
@@ -912,7 +1089,9 @@ export function SupplierSettingsPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium text-[var(--text)]">{label}</span>
-                          {notificationPrefs[key] && <CheckCircle2 className="h-5 w-5 text-[var(--mint)] shrink-0" />}
+                          {notificationPrefs[key] && (
+                            <CheckCircle2 className="h-5 w-5 text-[var(--mint)] shrink-0" />
+                          )}
                         </div>
                         <p className="text-xs text-[var(--text-muted)]">{description}</p>
                         <input
@@ -980,14 +1159,18 @@ export function SupplierSettingsPage() {
                         </div>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">Edit</Button>
+                    <Button variant="outline" size="sm">
+                      Edit
+                    </Button>
                   </div>
                 </div>
-                
+
                 <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
                   <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
                   <p className="text-[var(--text-muted)]">No additional delivery zones</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">Add zones to define delivery areas and pricing</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    Add zones to define delivery areas and pricing
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -1000,9 +1183,7 @@ export function SupplierSettingsPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add New Warehouse</DialogTitle>
-            <DialogDescription>
-              Create a new warehouse location for your business
-            </DialogDescription>
+            <DialogDescription>Create a new warehouse location for your business</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -1082,9 +1263,7 @@ export function SupplierSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Delivery Zone</DialogTitle>
-            <DialogDescription>
-              Create a new delivery coverage zone
-            </DialogDescription>
+            <DialogDescription>Create a new delivery coverage zone</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1132,7 +1311,9 @@ export function SupplierSettingsPage() {
               <Label>Coverage Area (Map Integration)</Label>
               <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center">
                 <MapPin className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                <p className="text-sm text-[var(--text-muted)]">Map picker will be integrated here</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  Map picker will be integrated here
+                </p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">Draw polygon or select area</p>
               </div>
             </div>
@@ -1141,9 +1322,7 @@ export function SupplierSettingsPage() {
             <Button variant="outline" onClick={() => setShowAddZone(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddZone}>
-              Add Zone
-            </Button>
+            <Button onClick={handleAddZone}>Add Zone</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1153,9 +1332,7 @@ export function SupplierSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Contact</DialogTitle>
-            <DialogDescription>
-              Add a business contact person
-            </DialogDescription>
+            <DialogDescription>Add a business contact person</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1215,9 +1392,7 @@ export function SupplierSettingsPage() {
             <Button variant="outline" onClick={() => setShowAddContact(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddContact}>
-              Add Contact
-            </Button>
+            <Button onClick={handleAddContact}>Add Contact</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1227,9 +1402,7 @@ export function SupplierSettingsPage() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Upload Contacts from CSV/Excel</DialogTitle>
-            <DialogDescription>
-              Upload a spreadsheet file to bulk add contacts
-            </DialogDescription>
+            <DialogDescription>Upload a spreadsheet file to bulk add contacts</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="border-2 border-dashed border-[var(--app-border-mid)] rounded-lg p-8 text-center hover:border-[var(--brand-mid)] cursor-pointer transition-colors">
@@ -1294,10 +1467,13 @@ export function SupplierSettingsPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowBulkUpload(false)
-              setUploadedContacts([])
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBulkUpload(false)
+                setUploadedContacts([])
+              }}
+            >
               Cancel
             </Button>
             <Button onClick={handleSaveBulkContacts} disabled={uploadedContacts.length === 0}>

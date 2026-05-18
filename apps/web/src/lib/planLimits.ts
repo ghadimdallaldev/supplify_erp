@@ -122,3 +122,13 @@ export function canAddWarehouses(
   if (limit == null || limit === -1) return true
   return currentCount < limit
 }
+
+/** Logo upload and brand theming (Gold: logo + colors; Platinum: white-label). */
+export function canUseCustomBranding(entitlements: Entitlements | null | undefined): boolean {
+  return featureEnabled(entitlements?.features?.custom_branding)
+}
+
+export function customBrandingUpgradeMessage(planName?: string | null): string {
+  const plan = planName ?? 'your current plan'
+  return `Custom branding isn't included on ${plan}. Upgrade to Gold for logo and colors, or Platinum for white-label.`
+}

@@ -21,9 +21,14 @@ export const SUPPLIER_LIMIT_KEYS = [
   'storage_mb',
 ] as const
 
-export const RESTAURANT_FEATURE_KEYS = ['reports', 'smart_reorder', 'multi_branch'] as const
+export const RESTAURANT_FEATURE_KEYS = [
+  'reports',
+  'smart_reorder',
+  'multi_branch',
+  'custom_branding',
+] as const
 
-export const SUPPLIER_FEATURE_KEYS = ['reports', 'smart_reorder'] as const
+export const SUPPLIER_FEATURE_KEYS = ['reports', 'smart_reorder', 'custom_branding'] as const
 
 export const LIMIT_KEY_LABELS: Record<string, string> = {
   orders_per_day: 'Daily orders',
@@ -41,6 +46,30 @@ export const FEATURE_KEY_LABELS: Record<string, string> = {
   reports: 'Reports',
   smart_reorder: 'Smart reorder',
   multi_branch: 'Multi-branch',
+  custom_branding: 'Custom branding',
+}
+
+/** Short label for plan comparison cells (tier-specific branding levels). */
+export function formatPlanFeatureCell(
+  featureKey: string,
+  rawVal: unknown
+): { enabled: boolean; caption?: string } {
+  if (featureKey === 'custom_branding') {
+    if (rawVal === false || rawVal == null || rawVal === '') {
+      return { enabled: false }
+    }
+    if (rawVal === 'logo_colors') {
+      return { enabled: true, caption: 'Logo + colors' }
+    }
+    if (rawVal === 'white_label_domain' || rawVal === true) {
+      return { enabled: true, caption: 'White-label' }
+    }
+    return { enabled: true, caption: 'Included' }
+  }
+
+  const enabled =
+    typeof rawVal === 'boolean' ? rawVal : rawVal !== 'false' && rawVal != null && rawVal !== ''
+  return { enabled }
 }
 
 /** Plan value subtitles (pricing psychology). Do not change plan names/codes. */

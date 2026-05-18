@@ -65,7 +65,12 @@ import {
   useDeleteRestaurantTeamMemberMutation,
 } from '../services/api'
 import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
-import { formatBranchGateMessage, getBranchAddGate } from '../lib/planLimits'
+import {
+  canUseCustomBranding,
+  customBrandingUpgradeMessage,
+  formatBranchGateMessage,
+  getBranchAddGate,
+} from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch } from '../hooks/redux'
 
@@ -342,6 +347,7 @@ export function RestaurantOnboardingPage() {
   const [deleteBranch] = useDeleteBranchMutation()
   const branches = branchesData?.branches ?? []
   const branchGate = getBranchAddGate(entitlements, branches.length + 1)
+  const brandingAllowed = canUseCustomBranding(entitlements)
   const canAddBranch = branchGate.canAdd
 
   // Notification preferences
@@ -563,14 +569,44 @@ export function RestaurantOnboardingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!brandingAllowed && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span>{customBrandingUpgradeMessage(entitlements?.plan?.name)}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      openBrowseUpgrade(dispatch, {
+                        currentPlan: entitlements?.plan?.name ?? null,
+                        upgradeUrl: '/app/settings?tab=subscription',
+                      })
+                    }
+                  >
+                    Compare plans
+                  </Button>
+                </div>
+              )}
               {restaurant ? (
-                <LogoUpload
-                  currentLogo={restaurant.logo_url}
-                  onUpload={handleLogoUpload}
-                  entityId={restaurant.id}
-                  entityName={restaurant.name || 'Restaurant'}
-                  getPresignedUrl={handleGetPresignedUrl}
-                />
+                brandingAllowed ? (
+                  <LogoUpload
+                    currentLogo={restaurant.logo_url}
+                    onUpload={handleLogoUpload}
+                    entityId={restaurant.id}
+                    entityName={restaurant.name || 'Restaurant'}
+                    getPresignedUrl={handleGetPresignedUrl}
+                  />
+                ) : restaurant.logo_url ? (
+                  <img
+                    src={restaurant.logo_url}
+                    alt={`${restaurant.name || 'Restaurant'} logo`}
+                    className="h-24 w-24 rounded-lg border object-contain bg-white"
+                  />
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Upgrade to Gold or Platinum to upload your logo.
+                  </p>
+                )
               ) : (
                 <p className="text-sm text-[var(--text-muted)]">
                   Loading restaurant information...

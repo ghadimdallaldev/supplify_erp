@@ -122,6 +122,7 @@ export function SubscriptionInfo() {
     smart_reorder: featureOffNote('smart_reorder'),
     reports: featureOffNote('reports'),
     multi_branch: featureOffNote('multi_branch'),
+    custom_branding: featureOffNote('custom_branding'),
   } as const
 
   const keyFeatureTierNotes = {
@@ -129,6 +130,7 @@ export function SubscriptionInfo() {
     smart_reorder: planTierOffNote('smart_reorder'),
     reports: planTierOffNote('reports'),
     multi_branch: planTierOffNote('multi_branch'),
+    custom_branding: planTierOffNote('custom_branding'),
   } as const
 
   const limitEntries = Object.entries(limits).filter(
@@ -426,6 +428,25 @@ export function SubscriptionInfo() {
               )}
               {!keyFeatureOffNotes.multi_branch && keyFeatureTierNotes.multi_branch && (
                 <p className="mt-1 text-xs text-slate-700">{keyFeatureTierNotes.multi_branch}</p>
+              )}
+            </div>
+            <div>
+              <div>
+                <span className="text-[var(--text-muted)]">Custom branding:</span>{' '}
+                <Badge
+                  variant={features.custom_branding ? 'default' : 'secondary'}
+                  className="ml-2"
+                >
+                  {getFeatureDisplay(features.custom_branding)}
+                </Badge>
+              </div>
+              {keyFeatureOffNotes.custom_branding && (
+                <p className="mt-1 text-xs text-amber-900">{keyFeatureOffNotes.custom_branding}</p>
+              )}
+              {!keyFeatureOffNotes.custom_branding && keyFeatureTierNotes.custom_branding && (
+                <p className="mt-1 text-xs text-slate-700">
+                  {keyFeatureTierNotes.custom_branding} Available on Gold and Platinum.
+                </p>
               )}
             </div>
           </div>

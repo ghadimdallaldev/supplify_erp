@@ -1,5 +1,6 @@
 import express from 'express'
 import { requireAuth, requireRole, optionalAuth } from '../lib/rbac.js'
+import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -497,90 +498,100 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   }
 })
 
-// Upload supplier logo
-router.post('/:id/logo', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params
-    const { logoUrl } = req.body
+// Upload supplier logo (Gold+ custom branding)
+router.post(
+  '/:id/logo',
+  requireAuth,
+  requireRole(['SUPPLIER', 'ADMIN']),
+  requireFeature(
+    'custom_branding',
+    (req) => req.params.id,
+    () => 'SUPPLIER'
+  ),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const { logoUrl } = req.body
 
-    if (!logoUrl) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'logoUrl is required',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (!logoUrl) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'logoUrl is required',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    // Check permissions
-    const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [id])
+      // Check permissions
+      const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [id])
 
-    if (suppliers.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Supplier not found',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (suppliers.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Supplier not found',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const supplier = suppliers[0]
+      const supplier = suppliers[0]
 
-    // Suppliers can only update their own logo
-    if (req.userData.role === 'SUPPLIER' && supplier.contact_email !== req.userData.email) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Access denied. You can only update your own logo',
-        },
-        requestId: req.requestId,
-      })
-    }
+      // Suppliers can only update their own logo
+      if (req.userData.role === 'SUPPLIER' && supplier.contact_email !== req.userData.email) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied. You can only update your own logo',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    // Update logo URL
-    const { rows } = await query(
-      `
+      // Update logo URL
+      const { rows } = await query(
+        `
       UPDATE supplier 
       SET logo_url = $1, updated_at = now()
       WHERE id = $2
       RETURNING *
     `,
-      [logoUrl, id]
-    )
+        [logoUrl, id]
+      )
 
-    logger.info('Supplier logo updated', {
-      supplierId: id,
-      logoUrl,
-      actor: req.userData.id,
-    })
+      logger.info('Supplier logo updated', {
+        supplierId: id,
+        logoUrl,
+        actor: req.userData.id,
+      })
 
-    res.json({
-      ok: true,
-      data: { supplier: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Update supplier logo error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to update supplier logo',
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: { supplier: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Update supplier logo error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to update supplier logo',
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Update supplier
 router.patch('/:id', requireAuth, async (req, res) => {
