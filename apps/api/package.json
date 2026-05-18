@@ -5,34 +5,9 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "node --watch src/server.js",
     "build": "echo 'Build not needed for JS'",
     "start": "node src/server.js",
-    "typecheck": "echo 'Typecheck not needed for JS'",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "test:run": "vitest run",
-    "test:coverage": "vitest --coverage",
-    "test:e2e": "vitest run --config ../../tests/e2e/vitest.config.js",
-    "lint": "eslint src/**/*.js",
-    "lint:fix": "eslint src/**/*.js --fix",
-    "format": "prettier --write \"src/**/*.{js,json}\"",
-    "db:migrate": "node scripts/migrate.js",
-    "db:seed": "node scripts/seed.js",
-    "seed:prodlike": "node scripts/prodlike.seed.js",
-    "seed:accounts": "node scripts/seed-accounts-for-prodlike.js",
-    "seed:quick-lists": "node scripts/seed-quick-lists.js",
-    "seed:chats": "node scripts/seed-chats.js",
-    "seed:demo-users": "node scripts/seed-demo-users.js",
-    "seed:demo-tenants": "node scripts/seed-demo-tenants.js",
-    "seed:plan-tiers": "node scripts/seed-plan-tier-demos.js",
-    "seed:billing": "node scripts/seed-billing.js",
-    "seed:prodlike-team": "node scripts/seed-prodlike-team-backfill.js",
-    "seed:full": "node scripts/seed-full.mjs",
-    "reduce-to-single-tenant": "node scripts/reduce-to-single-tenant.js",
-    "db:reset": "node scripts/reset.js",
-    "db:init-subs": "node scripts/initialize-subscriptions.js",
-    "openapi:gen": "node scripts/generate-openapi.js"
+    "db:migrate": "node scripts/migrate.js"
   },
   "dependencies": {
     "ajv": "^8.12.0",
@@ -60,13 +35,5 @@
     "socket.io": "^4.8.1",
     "uuid": "^9.0.1",
     "zod": "^3.22.4"
-  },
-  "devDependencies": {
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "prettier": "^3.1.0",
-    "supertest": "^6.3.3",
-    "vitest": "^1.1.0",
-    "@vitest/coverage-v8": "^1.1.0"
   }
 }
