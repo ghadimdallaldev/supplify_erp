@@ -11,14 +11,18 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 
 ## Restaurant plan matrix
 
-| Plan     | branches  | users     | orders_per_day | suppliers_per_restaurant | restaurant_inventory_skus | reservations | receiving | finance   |
-| -------- | --------- | --------- | -------------- | ------------------------ | ------------------------- | ------------ | --------- | --------- |
-| Free     | 0         | 1         | 3              | 1                        | 15                        | basic        | manual    | view      |
-| Bronze   | 1         | 3         | 100            | 10                       | 1,000                     | ✓            | photos    | record    |
-| Gold     | 3         | 10        | 500            | unlimited                | 10,000                    | ✓            | quality   | analytics |
-| Platinum | unlimited | unlimited | unlimited      | unlimited                | unlimited                 | ✓            | full      | advanced  |
+| Plan     | branches  | users     | orders_per_day | suppliers_per_restaurant | restaurant_inventory_skus | chats_per_day | reservations | receiving | finance   |
+| -------- | --------- | --------- | -------------- | ------------------------ | ------------------------- | ------------- | ------------ | --------- | --------- |
+| Free     | 1         | 1         | 3              | 1                        | 15                        | 3             | basic        | manual    | view      |
+| Bronze   | 2         | 3         | 20             | 10                       | 1,000                     | 50            | ✓            | photos    | record    |
+| Gold     | 3         | 10        | 50             | unlimited                | 1,000                     | 200           | ✓            | quality   | analytics |
+| Platinum | unlimited | unlimited | unlimited      | unlimited                | unlimited                 | unlimited     | ✓            | full      | advanced  |
 
-**Free plan:** Setup and testing only. Intentionally low limits (3 orders/day, 3 chats/day, 15 SKUs, 1 supplier) to demonstrate value and encourage upgrade. Gold is the default plan for serious usage.
+**Branches** counts total location accounts: your **primary restaurant + linked branch accounts** (not legacy `branch` rows).
+
+**chats_per_day** counts **chat messages sent** per day (enforced on `POST .../messages` via `usage_meter`).
+
+**Free plan:** Setup and testing only. Intentionally low limits (3 orders/day, 3 chats/day, 15 SKUs, 1 supplier, 1 location account) to demonstrate value and encourage upgrade. Gold is the default plan for serious usage.
 
 - **reservations:** Plan feature / reservation capabilities (from plan `features`).
 - **receiving:** Plan feature (e.g. `receiving_quality`: manual_only, photos_enabled, quality_scoring).
@@ -30,7 +34,7 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 | -------- | ---------- | --------- | ---------------------- | ------------- | ---------- | ----------- |
 | Free     | 0          | 1         | 15                     | 3             | 50         | basic       |
 | Bronze   | 1          | 3         | 1,000                  | 50            | 1,000      | manual      |
-| Gold     | 3          | 10        | 10,000                 | 200           | 5,000      | warehouse   |
+| Gold     | 3          | 10        | 1,000                  | 200           | 5,000      | warehouse   |
 | Platinum | unlimited  | unlimited | unlimited              | unlimited     | 20,000     | full        |
 
 **Free plan:** Setup and testing only. Low limits (15 products, 3 chats/day, 50 MB storage, 0 warehouses) to encourage upgrade to Gold for real usage.
@@ -63,5 +67,7 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 ## Migration notes
 
 - Migration **0044** adds `subscription_plan.tenant_type`, normalizes limit keys, duplicates plans into RESTAURANT and SUPPLIER catalogs, and points existing subscriptions to the correct plan by tenant type.
+- Migration **0063** rebalances restaurant Free/Bronze/Gold limits (branches include primary account; Bronze 20 orders/day; Gold 50 orders/day).
+- Migration **0064** sets full Bronze/Gold limit objects (inventory SKUs 1,000 on Gold, not 10,000).
 - **usage_meter:** Rows with `meter_type = 'products'` and `tenant_type = 'SUPPLIER'` were updated to `meter_type = 'supplier_products_skus'`.
 - **tenant_limit_override:** `limit_type = 'products'` was updated to `supplier_products_skus` or `restaurant_inventory_skus` by tenant type.

@@ -19,7 +19,7 @@ import {
   useDeleteBranchMutation,
   useGetEntitlementsQuery,
 } from '../services/api'
-import { canAddBranches } from '../lib/planLimits'
+import { formatBranchGateMessage, getBranchAddGate } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch } from '../hooks/redux'
 
@@ -34,7 +34,9 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
 
   const entitlements = entitlementsData?.entitlements
   const linked = (data?.accounts ?? []).filter((account: any) => !account.isPrimary)
-  const canAdd = canAddBranches(entitlements, linked.length)
+  const totalBranchAccounts = linked.length + 1
+  const branchGate = getBranchAddGate(entitlements, totalBranchAccounts)
+  const canAdd = branchGate.canAdd
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
@@ -84,8 +86,7 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
         <CardContent>
           {!canAdd && (
             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Branch accounts require a paid plan (Gold or higher). Free tier includes one account
-              only.
+              {formatBranchGateMessage(branchGate)}
             </div>
           )}
           {isLoading ? (
@@ -133,7 +134,9 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
                         refetch()
                         toast.success('Branch account unlinked')
                       } catch (error: any) {
-                        toast.error(error?.data?.error?.message || 'Failed to remove branch account')
+                        toast.error(
+                          error?.data?.error?.message || 'Failed to remove branch account'
+                        )
                       }
                     }}
                   >

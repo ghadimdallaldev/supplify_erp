@@ -1,12 +1,11 @@
 import express from 'express'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { requireAuth, requireRole, getRequestTenant } from '../lib/rbac.js'
+import { requireAuth, requireRole } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
-import { checkLimit } from '../lib/subscription.js'
-import { incrementStorageUsage } from '../lib/subscription.js'
+import { meterStorageFromRequest } from '../lib/storage-upload.js'
 
 const router = express.Router()
 
@@ -68,31 +67,15 @@ router.post(
         })
       }
 
-      // Enforce plan storage_mb limit (require fileSize for limit check)
       const sizeBytes = fileSize ? Number(fileSize) : 0
-      if (sizeBytes > 0 && req.userData.role !== 'ADMIN') {
-        const tenant = await getRequestTenant(req)
-        if (tenant) {
-          const storageCheck = await checkLimit(tenant.tenantId, tenant.tenantType, 'storage_mb')
-          const sizeMb = Math.ceil(sizeBytes / (1024 * 1024))
-          if (
-            !storageCheck.isUnlimited &&
-            storageCheck.limit != null &&
-            storageCheck.current + sizeMb > storageCheck.limit
-          ) {
-            return res.status(403).json({
-              ok: false,
-              data: null,
-              error: {
-                name: 'STORAGE_LIMIT_REACHED',
-                message: `Upload would exceed your storage limit (${storageCheck.current}/${storageCheck.limit} MB used). Upgrade your plan for more storage.`,
-                limit: storageCheck.limit,
-                current: storageCheck.current,
-              },
-              requestId: req.requestId,
-            })
-          }
-        }
+      const storageMeter = await meterStorageFromRequest(req, sizeBytes)
+      if (!storageMeter.ok) {
+        return res.status(storageMeter.status).json({
+          ok: false,
+          data: null,
+          error: storageMeter.error,
+          requestId: req.requestId,
+        })
       }
 
       // Generate unique file key
@@ -115,9 +98,11 @@ router.post(
         ok: true,
         data: {
           presignedUrl,
+          url: presignedUrl,
           fileKey,
           fileName,
           fileType,
+          storageMetered: sizeBytes > 0,
         },
         error: null,
         requestId: req.requestId,
@@ -216,8 +201,22 @@ router.post(
         ]
       )
 
-      if (supplierId && sizeBytes > 0) {
-        await incrementStorageUsage(supplierId, 'SUPPLIER', sizeBytes)
+      // Storage is metered at presign when clients upload via /files/presign first.
+      // Direct attach without presign still records usage here.
+      if (supplierId && sizeBytes > 0 && !req.body.storageMeteredAtPresign) {
+        const { ensureStorageForUpload } = await import('../lib/subscription.js')
+        const metered = await ensureStorageForUpload(supplierId, 'SUPPLIER', sizeBytes)
+        if (!metered.allowed) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'LIMIT_EXCEEDED',
+              message: `Storage limit reached (${metered.current}/${metered.limit} MB).`,
+            },
+            requestId: req.requestId,
+          })
+        }
       }
 
       // Update product image URL if it's an image

@@ -16,6 +16,7 @@ import {
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
+  ensureStorageForUpload,
 } from '../lib/subscription.js'
 import { z } from 'zod'
 
@@ -563,6 +564,32 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
         },
         requestId: req.requestId,
       })
+    }
+
+    const imageSizeBytes =
+      req.body.image_size_bytes != null ? Math.max(0, Number(req.body.image_size_bytes) || 0) : 0
+    if (
+      imageSizeBytes > 0 &&
+      (updateData.image_url || req.body.image_url) &&
+      req.userData.role !== 'ADMIN'
+    ) {
+      const metered = await ensureStorageForUpload(product.supplier_id, 'SUPPLIER', imageSizeBytes)
+      if (!metered.allowed) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'LIMIT_EXCEEDED',
+            message: `Storage limit reached (${metered.current}/${metered.limit} MB).`,
+            details: {
+              limitKey: 'storage_mb',
+              limitValue: metered.limit ?? 0,
+              currentUsage: metered.current ?? 0,
+            },
+          },
+          requestId: req.requestId,
+        })
+      }
     }
 
     // Build dynamic update query

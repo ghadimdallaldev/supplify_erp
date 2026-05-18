@@ -10,25 +10,25 @@ Supplify tracks resource usage in real-time to enforce plan limits, provide anal
 
 ### Restaurant Usage
 
-| Metric | Description | Enforcement |
-|--------|-------------|-------------|
-| **Branches** | Number of active branches/locations | Hard cap |
-| **Orders Per Day** | Orders placed today (resets daily) | Hard cap |
-| **Products Tracked** | Products in restaurant inventory | Hard cap |
-| **Chats Per Day** | Messages sent today (resets daily) | Hard cap |
-| **Storage Used** | Product images, documents, chat media | Soft cap (80% warning) |
-| **Exports Per Day** | CSV/API exports today | Hard cap (Gold+) |
-| **Webhooks** | Active webhook subscriptions | Hard cap (Platinum) |
+| Metric               | Description                                                                                      | Enforcement                 |
+| -------------------- | ------------------------------------------------------------------------------------------------ | --------------------------- |
+| **Branches**         | Number of active branches/locations                                                              | Hard cap                    |
+| **Orders Per Day**   | Orders placed today (resets daily)                                                               | Hard cap                    |
+| **Products Tracked** | Products in restaurant inventory                                                                 | Hard cap                    |
+| **Chats Per Day**    | Messages sent today (resets daily)                                                               | Hard cap                    |
+| **Storage Used**     | Files uploaded via presign (logos, product images, chat attachments) + staff documents with size | Hard cap at plan limit (MB) |
+| **Exports Per Day**  | CSV/API exports today                                                                            | Hard cap (Gold+)            |
+| **Webhooks**         | Active webhook subscriptions                                                                     | Hard cap (Platinum)         |
 
 ### Supplier Usage
 
-| Metric | Description | Enforcement |
-|--------|-------------|-------------|
-| **Warehouses** | Number of active warehouses | Hard cap |
-| **Products** | Products in catalog | Hard cap |
-| **Orders Today** | Orders received today | Hard cap |
-| **Picklists Per Day** | Fulfillment picklists generated | Hard cap (Gold+) |
-| **Storage Used** | Product images, warehouse capacity | Soft cap (80% warning) |
+| Metric                | Description                                                          | Enforcement                 |
+| --------------------- | -------------------------------------------------------------------- | --------------------------- |
+| **Warehouses**        | Number of active warehouses                                          | Hard cap                    |
+| **Products**          | Products in catalog                                                  | Hard cap                    |
+| **Orders Today**      | Orders received today                                                | Hard cap                    |
+| **Picklists Per Day** | Fulfillment picklists generated                                      | Hard cap (Gold+)            |
+| **Storage Used**      | Files uploaded via presign (logos, product images, chat attachments) | Hard cap at plan limit (MB) |
 
 ---
 
@@ -37,10 +37,11 @@ Supplify tracks resource usage in real-time to enforce plan limits, provide anal
 ### Automatic Updates
 
 Usage counters update automatically when:
+
 - Creating a branch or warehouse
 - Placing or receiving an order
 - Sending a chat message
-- Uploading a file
+- Uploading a file (via `POST /api/files/presign` — bytes counted in MB, rounded up)
 - Creating a product
 - Exporting data
 - Setting up a webhook
@@ -54,6 +55,7 @@ Usage counters update automatically when:
 ### Manual Adjustments
 
 Admins can manually adjust usage:
+
 1. Navigate to tenant
 2. Click "Usage & Quotas"
 3. Edit any counter (e.g., grant bonus branches)
@@ -66,12 +68,14 @@ Admins can manually adjust usage:
 ### 🟡 80% Warning (Soft Cap)
 
 When usage reaches **80% of limit**:
+
 - Dashboard shows **yellow warning badge**
 - In-app notification: "You're approaching your limit"
 - **No functionality is blocked**
 - Clear upgrade CTA shown
 
 **Example:** Restaurant on Bronze plan (100 orders/day limit)
+
 - 80+ orders today → Warning badge appears
 - Orders still work normally
 - Upgrade to Gold ($149/mo) for 500/day shown
@@ -79,6 +83,7 @@ When usage reaches **80% of limit**:
 ### 🔴 100% Block (Hard Cap)
 
 When usage reaches **100% of limit**:
+
 - Dashboard shows **red error state**
 - Specific feature is **disabled** (not whole app)
 - Clear error message: "You've reached your limit"
@@ -86,6 +91,7 @@ When usage reaches **100% of limit**:
 - Existing data untouched (never deleted)
 
 **Example:** Same restaurant at 100 orders today
+
 - Attempt to place 101st order → **Blocked**
 - Error: "Daily order limit reached (100/100). Upgrade to Gold for 500 orders/day."
 - Can still view past orders, products, chat, etc.
@@ -96,11 +102,13 @@ When usage reaches **100% of limit**:
 ## Unlimited Values (-1)
 
 Some plans have unlimited resources:
+
 - Branch limit = **-1** → Unlimited branches
 - Product limit = **-1** → Unlimited products
 - Orders = **-1** → No daily cap
 
 **UI Behavior:**
+
 - Shows "Unlimited" badge
 - No progress bar
 - No warnings
@@ -113,6 +121,7 @@ Some plans have unlimited resources:
 ### Tenant View (Restaurant/Supplier Settings)
 
 Shows:
+
 - Current usage vs limits
 - Progress bars for each resource
 - Upgrade prompts for near-limit items
@@ -124,6 +133,7 @@ Shows:
 ### Admin View (Admin Dashboard → Usage)
 
 Shows:
+
 - **Platform-wide totals**
 - **Top users by usage**
 - **Over-limit tenants** (red list)
@@ -176,6 +186,7 @@ When a tenant is downgraded:
 ### Step 1: Impact Preview
 
 Before confirming downgrade, admin sees:
+
 - How many branches exceed new limit
 - How many products exceed new limit
 - Which features will be disabled
@@ -184,6 +195,7 @@ Before confirming downgrade, admin sees:
 ### Step 2: Lock Creation (Never Delete)
 
 After downgrade:
+
 - Excess resources **locked** (read-only)
 - Cannot create new items exceeding limit
 - Existing items remain accessible
@@ -195,6 +207,7 @@ After downgrade:
 **After:** Downgrade to Bronze (allows 1 branch)
 
 **Result:**
+
 - All 3 branches still visible
 - Branch 1 active (within limit)
 - Branches 2-3 **locked** (exceed limit)
@@ -208,6 +221,7 @@ After downgrade:
 ### Daily Reconcile Job
 
 Runs nightly to:
+
 - Verify counters match actual counts
 - Fix any drift (audit log entry)
 - Generate usage reports
@@ -216,6 +230,7 @@ Runs nightly to:
 ### Manual Correction
 
 If counters get out of sync:
+
 1. Admin can trigger manual reconciliation
 2. System recounts and updates
 3. Audit log records the correction
@@ -227,6 +242,7 @@ If counters get out of sync:
 ### Analytics Usage
 
 Usage data powers:
+
 - **Tier recommendations:** "You'd save money on Gold"
 - **Capacity planning:** "Most restaurants use 50% of limits"
 - **Churn prediction:** "Usage trending down for this tenant"
@@ -235,6 +251,7 @@ Usage data powers:
 ### Billing Integration (Future)
 
 Usage may affect billing:
+
 - **Overage fees** for exceeding limits
 - **Tiered pricing** based on actual usage
 - **Usage-based plans** (pay for what you use)
@@ -280,18 +297,20 @@ Response:
 ## Troubleshooting
 
 **Issue:** Counter says 0 but I know I have items
+
 - **Check:** Deletion may not have decremented counter
 - **Fix:** Run reconciliation or contact admin
 
 **Issue:** Can't create item but under limit
+
 - **Check:** May be at 100% of another limit
 - **Fix:** Check all limits, not just one
 
 **Issue:** Downgrade didn't lock items
+
 - **Check:** Sync delay (usually instant)
 - **Fix:** Refresh page or wait 60 seconds
 
 ---
 
 Last Updated: [Current Date]
-

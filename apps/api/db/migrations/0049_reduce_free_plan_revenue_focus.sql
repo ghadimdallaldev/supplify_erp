@@ -8,7 +8,7 @@
 UPDATE subscription_plan
 SET
   limits = '{
-    "branches": 0,
+    "branches": 1,
     "users": 1,
     "orders_per_day": 3,
     "suppliers_per_restaurant": 1,

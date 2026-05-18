@@ -54,7 +54,7 @@ export function Header() {
   const e = entitlementsData?.entitlements
   const limits = e?.limits ?? {}
   const usage = e?.usage ?? {}
-  const nearLimitKeys = Object.entries(limits)
+  const usagePressure = Object.entries(limits)
     .filter(([_, limit]) => limit != null && limit !== -1)
     .map(([key]) => {
       const current = usage[key] ?? 0
@@ -62,16 +62,16 @@ export function Header() {
       const pct = limit > 0 ? (current / limit) * 100 : 0
       return { key, pct, current, limit }
     })
-    .filter(({ pct }) => pct >= 80 && pct < 100)
+    .filter(({ pct }) => pct >= 80)
     .slice(0, 3)
   const showUpgrade = user?.role !== 'ADMIN' && user?.role !== 'PENDING'
-  const hasUrgency = nearLimitKeys.length > 0 || (blockedCountLast7d ?? 0) >= 1
+  const hasUrgency = usagePressure.length > 0 || (blockedCountLast7d ?? 0) >= 1
   const settingsPlanTab =
     user?.role === 'SUPPLIER' ? '/app/settings?tab=plan' : '/app/settings?tab=subscription'
 
   const handleNavUpgrade = () => {
     const trigger =
-      nearLimitKeys.length > 0
+      usagePressure.length > 0
         ? 'near_limit'
         : (blockedCountLast7d ?? 0) >= 1
           ? 'blocked'

@@ -410,10 +410,9 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
         await notifyReservationWaitlist(reservation)
       }
       if (reservation.status === 'CONFIRMED' || reservation.status === 'WAITLIST') {
-        const { rows: restaurantRows } = await query(
-          'SELECT name FROM restaurant WHERE id = $1',
-          [restaurantId]
-        )
+        const { rows: restaurantRows } = await query('SELECT name FROM restaurant WHERE id = $1', [
+          restaurantId,
+        ])
         await notifyGuestReservationConfirmation(reservation, restaurantRows[0]?.name)
       }
     } catch (notifyError) {
@@ -472,10 +471,9 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
 
     if (payload.status === 'CONFIRMED' || payload.status === 'WAITLIST') {
       try {
-        const { rows: restaurantRows } = await query(
-          'SELECT name FROM restaurant WHERE id = $1',
-          [restaurantId]
-        )
+        const { rows: restaurantRows } = await query('SELECT name FROM restaurant WHERE id = $1', [
+          restaurantId,
+        ])
         await notifyGuestReservationConfirmation(reservation, restaurantRows[0]?.name)
       } catch (notifyError) {
         logger.warn('Guest reservation notification failed', {
@@ -599,12 +597,17 @@ router.get(
       const daysBack = rangeMultiplier[params.range] || 7
       const start = new Date()
       start.setHours(0, 0, 0, 0)
-      start.setDate(start.getDate() - daysBack)
+      start.setDate(start.getDate() - (params.range === 'day' ? 0 : daysBack))
+
+      const bucketExpr =
+        params.range === 'day'
+          ? "date_trunc('hour', scheduled_at)"
+          : "date_trunc('day', scheduled_at)"
 
       const { rows } = await query(
         `
           SELECT
-            date_trunc('hour', scheduled_at) AS hour_slot,
+            ${bucketExpr} AS hour_slot,
             COUNT(*) FILTER (WHERE status = 'CONFIRMED') AS confirmed,
             COUNT(*) FILTER (WHERE status = 'CANCELLED') AS cancelled,
             COUNT(*) FILTER (WHERE waitlist) AS waitlisted,

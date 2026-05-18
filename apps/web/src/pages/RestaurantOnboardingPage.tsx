@@ -7,8 +7,15 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
-import { 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
+import {
   Building2,
   Users,
   CreditCard,
@@ -40,10 +47,10 @@ import { useAppSelector } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { LogoUpload } from '../components/LogoUpload'
-import { 
-  useGetRestaurantMeQuery, 
-  useUpdateRestaurantMutation, 
-  useUploadRestaurantLogoMutation, 
+import {
+  useGetRestaurantMeQuery,
+  useUpdateRestaurantMutation,
+  useUploadRestaurantLogoMutation,
   useGetPresignedUrlMutation,
   useGetOrdersQuery,
   useGetDashboardStatsQuery,
@@ -53,9 +60,12 @@ import {
   useGetBranchesQuery,
   useCreateBranchMutation,
   useDeleteBranchMutation,
+  useGetRestaurantTeamQuery,
+  useAddRestaurantTeamMemberMutation,
+  useDeleteRestaurantTeamMemberMutation,
 } from '../services/api'
 import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
-import { canAddBranches } from '../lib/planLimits'
+import { formatBranchGateMessage, getBranchAddGate } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch } from '../hooks/redux'
 
@@ -82,36 +92,98 @@ interface PreferenceField {
 }
 
 const CHANNEL_FIELDS: PreferenceField[] = [
-  { key: 'emailEnabled', label: 'Email', description: 'Receive important alerts via email', icon: Mail },
-  { key: 'whatsappEnabled', label: 'WhatsApp', description: 'Receive alerts on WhatsApp (phone required in profile)', icon: MessageCircle },
+  {
+    key: 'emailEnabled',
+    label: 'Email',
+    description: 'Receive important alerts via email',
+    icon: Mail,
+  },
+  {
+    key: 'whatsappEnabled',
+    label: 'WhatsApp',
+    description: 'Receive alerts on WhatsApp (phone required in profile)',
+    icon: MessageCircle,
+  },
   { key: 'inAppEnabled', label: 'In-app', description: 'Show alerts inside Supplify', icon: Bell },
 ]
 
 const CATEGORY_FIELDS: PreferenceField[] = [
-  { key: 'notifyOrderNew', label: 'Order updates', description: 'New orders and status changes', icon: ShoppingCart },
-  { key: 'notifyMessageReceived', label: 'Supplier messages', description: 'Chat and inbox notifications', icon: Mail },
-  { key: 'notifyInvoiceIssued', label: 'Invoice reminders', description: 'Issued and overdue invoices', icon: FileText },
-  { key: 'notifyLowStock', label: 'Low stock alerts', description: 'Inventory thresholds reached', icon: AlertCircle },
-  { key: 'notifyReservationCreated', label: 'New reservations', description: 'Reservations booked by guests or staff', icon: Calendar },
-  { key: 'notifyReservationWaitlist', label: 'Waitlist changes', description: 'Guests added or moved on waitlist', icon: Clock },
-  { key: 'notifyStaffPto', label: 'PTO requests', description: 'Team time-off submissions awaiting review', icon: Users },
-  { key: 'notifyStaffSwap', label: 'Shift swap requests', description: 'Coverage and swap approvals', icon: Users },
-  { key: 'notifyScheduledOrder', label: 'Scheduled orders', description: 'Recurring orders executing automatically', icon: Package },
+  {
+    key: 'notifyOrderNew',
+    label: 'Order updates',
+    description: 'New orders and status changes',
+    icon: ShoppingCart,
+  },
+  {
+    key: 'notifyMessageReceived',
+    label: 'Supplier messages',
+    description: 'Chat and inbox notifications',
+    icon: Mail,
+  },
+  {
+    key: 'notifyInvoiceIssued',
+    label: 'Invoice reminders',
+    description: 'Issued and overdue invoices',
+    icon: FileText,
+  },
+  {
+    key: 'notifyLowStock',
+    label: 'Low stock alerts',
+    description: 'Inventory thresholds reached',
+    icon: AlertCircle,
+  },
+  {
+    key: 'notifyReservationCreated',
+    label: 'New reservations',
+    description: 'Reservations booked by guests or staff',
+    icon: Calendar,
+  },
+  {
+    key: 'notifyReservationWaitlist',
+    label: 'Waitlist changes',
+    description: 'Guests added or moved on waitlist',
+    icon: Clock,
+  },
+  {
+    key: 'notifyStaffPto',
+    label: 'PTO requests',
+    description: 'Team time-off submissions awaiting review',
+    icon: Users,
+  },
+  {
+    key: 'notifyStaffSwap',
+    label: 'Shift swap requests',
+    description: 'Coverage and swap approvals',
+    icon: Users,
+  },
+  {
+    key: 'notifyScheduledOrder',
+    label: 'Scheduled orders',
+    description: 'Recurring orders executing automatically',
+    icon: Package,
+  },
 ]
 
 export function RestaurantOnboardingPage() {
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const [searchParams] = useSearchParams()
-  const { data: restaurantData, isLoading: isLoadingRestaurant, refetch: refetchRestaurant } = useGetRestaurantMeQuery()
+  const {
+    data: restaurantData,
+    isLoading: isLoadingRestaurant,
+    refetch: refetchRestaurant,
+  } = useGetRestaurantMeQuery()
   const [updateRestaurant, { isLoading: isUpdating }] = useUpdateRestaurantMutation()
   const [uploadRestaurantLogo] = useUploadRestaurantLogoMutation()
   const [getPresignedUrl] = useGetPresignedUrlMutation()
-  
+
   // Get statistics for dashboard
   const { data: stats } = useGetDashboardStatsQuery()
-  const { data: ordersData } = useGetOrdersQuery({ limit: 100 }, { skip: !restaurantData?.restaurant?.id })
-  
+  const { data: ordersData } = useGetOrdersQuery(
+    { limit: 100 },
+    { skip: !restaurantData?.restaurant?.id }
+  )
+
   const [activeTab, setActiveTab] = useState('profile')
 
   useEffect(() => {
@@ -120,9 +192,9 @@ export function RestaurantOnboardingPage() {
       setActiveTab(tab)
     }
   }, [searchParams])
-  
+
   const restaurant = restaurantData?.restaurant
-  
+
   // Profile form state
   const [profileForm, setProfileForm] = useState({
     name: '',
@@ -142,7 +214,7 @@ export function RestaurantOnboardingPage() {
     description: '',
     website: '',
   })
-  
+
   // Load restaurant data into form
   useEffect(() => {
     if (restaurant) {
@@ -166,7 +238,7 @@ export function RestaurantOnboardingPage() {
       })
     }
   }, [restaurant])
-  
+
   const handleLogoUpload = async (logoUrl: string) => {
     if (!restaurant?.id) {
       toast.error('Restaurant information not loaded')
@@ -179,18 +251,22 @@ export function RestaurantOnboardingPage() {
       toast.error(error?.data?.error?.message || 'Failed to upload logo')
     }
   }
-  
-  const handleGetPresignedUrl = async (params: { fileName: string; fileType: string; fileSize?: number }) => {
+
+  const handleGetPresignedUrl = async (params: {
+    fileName: string
+    fileType: string
+    fileSize?: number
+  }) => {
     const result = await getPresignedUrl(params).unwrap()
     return result
   }
-  
+
   const handleSaveProfile = async () => {
     if (!restaurant?.id) {
       toast.error('Restaurant information not loaded')
       return
     }
-    
+
     try {
       await updateRestaurant({
         id: restaurant.id,
@@ -200,49 +276,83 @@ export function RestaurantOnboardingPage() {
           phone: profileForm.phone,
           contactEmail: profileForm.contact_email,
           address: profileForm.address,
-        }
+        },
       }).unwrap()
-      
+
       toast.success('Profile updated successfully!')
       refetchRestaurant()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to update profile')
     }
   }
-  
+
   // Calculate statistics
   const statistics = useMemo(() => {
     const orders = ordersData?.orders || []
-    
+
     return {
       totalOrders: stats?.totalOrders || orders.length,
-      pendingOrders: stats?.pendingOrders || orders.filter((o: any) => o.status === 'PENDING' || o.status === 'PLACED').length,
-      completedOrders: stats?.completedOrders || orders.filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED').length,
-      totalSpent: stats?.totalSpent || orders
-        .filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED')
-        .reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0),
+      pendingOrders:
+        stats?.pendingOrders ||
+        orders.filter((o: any) => o.status === 'PENDING' || o.status === 'PLACED').length,
+      completedOrders:
+        stats?.completedOrders ||
+        orders.filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED').length,
+      totalSpent:
+        stats?.totalSpent ||
+        orders
+          .filter((o: any) => o.status === 'COMPLETED' || o.status === 'DELIVERED')
+          .reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0),
     }
   }, [ordersData, stats])
-  
+
   // Team state
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false)
   const [showAddBranchDialog, setShowAddBranchDialog] = useState(false)
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
-  const [newMember, setNewMember] = useState({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
-  const [newBranch, setNewBranch] = useState({ name: '', phone: '', address: '', deliveryInstructions: '' })
+  const [newMember, setNewMember] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'manager',
+    isPrimary: false,
+  })
+  const {
+    data: teamData,
+    isLoading: isLoadingTeam,
+    refetch: refetchTeam,
+  } = useGetRestaurantTeamQuery(undefined, {
+    skip: !user?.id,
+  })
+  const [addTeamMember, { isLoading: isAddingTeamMember }] = useAddRestaurantTeamMemberMutation()
+  const [deleteTeamMember] = useDeleteRestaurantTeamMemberMutation()
+  const teamMembers = teamData?.team ?? []
+  const [newBranch, setNewBranch] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    deliveryInstructions: '',
+  })
 
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
-  const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(undefined, { skip: !user?.id })
+  const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(undefined, {
+    skip: !user?.id,
+  })
   const [createBranch, { isLoading: isCreatingBranch }] = useCreateBranchMutation()
   const [deleteBranch] = useDeleteBranchMutation()
   const branches = branchesData?.branches ?? []
-  const canAddBranch = canAddBranches(entitlements, branches.length)
-  
+  const branchGate = getBranchAddGate(entitlements, branches.length + 1)
+  const canAddBranch = branchGate.canAdd
+
   // Notification preferences
   const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
-  const { data: notificationPrefsData, isLoading: isLoadingPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
-  const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
+  const {
+    data: notificationPrefsData,
+    isLoading: isLoadingPrefs,
+    refetch: refetchNotificationPrefs,
+  } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
+  const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] =
+    useUpdateNotificationPreferencesMutation()
 
   useEffect(() => {
     const prefs = notificationPrefsData?.preferences
@@ -256,8 +366,10 @@ export function RestaurantOnboardingPage() {
         notifyMessageReceived: prefs.notifyMessageReceived ?? previous.notifyMessageReceived,
         notifyInvoiceIssued: prefs.notifyInvoiceIssued ?? previous.notifyInvoiceIssued,
         notifyLowStock: prefs.notifyLowStock ?? previous.notifyLowStock,
-        notifyReservationCreated: prefs.notifyReservationCreated ?? previous.notifyReservationCreated,
-        notifyReservationWaitlist: prefs.notifyReservationWaitlist ?? previous.notifyReservationWaitlist,
+        notifyReservationCreated:
+          prefs.notifyReservationCreated ?? previous.notifyReservationCreated,
+        notifyReservationWaitlist:
+          prefs.notifyReservationWaitlist ?? previous.notifyReservationWaitlist,
         notifyStaffPto: prefs.notifyStaffPto ?? previous.notifyStaffPto,
         notifyStaffSwap: prefs.notifyStaffSwap ?? previous.notifyStaffSwap,
         notifyScheduledOrder: prefs.notifyScheduledOrder ?? previous.notifyScheduledOrder,
@@ -265,21 +377,42 @@ export function RestaurantOnboardingPage() {
     }
   }, [notificationPrefsData])
 
-  const handleAddMember = () => {
+  const handleAddMember = async () => {
     if (!newMember.name || !newMember.email) {
       toast.error('Please fill in name and email')
       return
     }
-    
-    setTeamMembers([...teamMembers, { ...newMember, id: Date.now() }])
-    setNewMember({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
-    setShowAddMemberDialog(false)
-    toast.success('Team member added!')
+
+    try {
+      await addTeamMember({
+        name: newMember.name,
+        email: newMember.email,
+        phone: newMember.phone || undefined,
+        role: newMember.role,
+        isPrimary: newMember.isPrimary,
+      }).unwrap()
+      setNewMember({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
+      setShowAddMemberDialog(false)
+      refetchTeam()
+      toast.success('Team member added!')
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to add team member')
+    }
+  }
+
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      await deleteTeamMember(memberId).unwrap()
+      refetchTeam()
+      toast.success('Member removed')
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to remove member')
+    }
   }
 
   const handleAddBranch = async () => {
     if (!canAddBranch) {
-      toast.error('Branches are not included on your current plan. Upgrade to add locations.')
+      toast.error(formatBranchGateMessage(branchGate))
       openBrowseUpgrade(dispatch, {
         currentPlan: entitlements?.plan?.name ?? null,
         upgradeUrl: '/app/settings?tab=subscription',
@@ -332,7 +465,9 @@ export function RestaurantOnboardingPage() {
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-[21px] font-black text-[var(--text)]">Account Setup</h1>
-        <p className="text-[var(--text-muted)] mt-2">Complete your business profile and preferences</p>
+        <p className="text-[var(--text-muted)] mt-2">
+          Complete your business profile and preferences
+        </p>
       </div>
 
       {/* Statistics Dashboard */}
@@ -349,20 +484,22 @@ export function RestaurantOnboardingPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-gradient-to-br from-[var(--mint-pale)] to-[var(--mint-pale)] border-[var(--mint)]/35">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-[var(--mint)]">Completed Orders</p>
-                <p className="text-2xl font-bold text-[var(--mint)]">{statistics.completedOrders}</p>
+                <p className="text-2xl font-bold text-[var(--mint)]">
+                  {statistics.completedOrders}
+                </p>
                 <p className="text-xs text-[var(--mint)] mt-1">Received</p>
               </div>
               <Package className="h-10 w-10 text-[var(--mint)]" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-gradient-to-br from-[var(--amber-pale)] to-[var(--amber-pale)] border-[var(--amber-mid)]/35">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -375,7 +512,7 @@ export function RestaurantOnboardingPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-gradient-to-br from-[var(--brand-pale)] to-[var(--brand-ultra)] border-[var(--app-border)]">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -421,7 +558,9 @@ export function RestaurantOnboardingPage() {
           <Card>
             <CardHeader>
               <CardTitle>Business Logo</CardTitle>
-              <CardDescription>Upload your business logo. This will be displayed in your profile and to suppliers.</CardDescription>
+              <CardDescription>
+                Upload your business logo. This will be displayed in your profile and to suppliers.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {restaurant ? (
@@ -433,22 +572,26 @@ export function RestaurantOnboardingPage() {
                   getPresignedUrl={handleGetPresignedUrl}
                 />
               ) : (
-                <p className="text-sm text-[var(--text-muted)]">Loading restaurant information...</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  Loading restaurant information...
+                </p>
               )}
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Business Profile</CardTitle>
-              <CardDescription>Update your business information and contact details</CardDescription>
+              <CardDescription>
+                Update your business information and contact details
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="businessName">Business Name *</Label>
-                  <Input 
-                    id="businessName" 
+                  <Input
+                    id="businessName"
                     placeholder="Enter business name"
                     value={profileForm.name}
                     onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
@@ -456,11 +599,13 @@ export function RestaurantOnboardingPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="businessType">Business Type *</Label>
-                  <select 
-                    id="businessType" 
+                  <select
+                    id="businessType"
                     className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
                     value={profileForm.business_type}
-                    onChange={(e) => setProfileForm({ ...profileForm, business_type: e.target.value })}
+                    onChange={(e) =>
+                      setProfileForm({ ...profileForm, business_type: e.target.value })
+                    }
                   >
                     <option value="restaurant">Restaurant</option>
                     <option value="cafe">Café</option>
@@ -473,17 +618,19 @@ export function RestaurantOnboardingPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="registrationNumber">Registration Number</Label>
-                  <Input 
-                    id="registrationNumber" 
+                  <Input
+                    id="registrationNumber"
                     placeholder="Enter registration number"
                     value={profileForm.trade_license_no}
-                    onChange={(e) => setProfileForm({ ...profileForm, trade_license_no: e.target.value })}
+                    onChange={(e) =>
+                      setProfileForm({ ...profileForm, trade_license_no: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="taxId">Tax ID</Label>
-                  <Input 
-                    id="taxId" 
+                  <Input
+                    id="taxId"
                     placeholder="Enter tax ID"
                     value={profileForm.tax_id}
                     onChange={(e) => setProfileForm({ ...profileForm, tax_id: e.target.value })}
@@ -493,25 +640,27 @@ export function RestaurantOnboardingPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="vatNumber">VAT Number</Label>
-                <Input 
-                  id="vatNumber" 
+                <Input
+                  id="vatNumber"
                   placeholder="Enter VAT number"
                   value={profileForm.vat_number}
                   onChange={(e) => setProfileForm({ ...profileForm, vat_number: e.target.value })}
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="contact-email">Contact Email *</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                    <Input 
+                    <Input
                       id="contact-email"
                       type="email"
                       placeholder="contact@restaurant.com"
                       value={profileForm.contact_email}
-                      onChange={(e) => setProfileForm({ ...profileForm, contact_email: e.target.value })}
+                      onChange={(e) =>
+                        setProfileForm({ ...profileForm, contact_email: e.target.value })
+                      }
                       className="pl-10"
                     />
                   </div>
@@ -520,7 +669,7 @@ export function RestaurantOnboardingPage() {
                   <Label htmlFor="contact-phone">Phone</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                    <Input 
+                    <Input
                       id="contact-phone"
                       type="tel"
                       placeholder="+1 (555) 123-4567"
@@ -531,12 +680,12 @@ export function RestaurantOnboardingPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="website">Website</Label>
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                  <Input 
+                  <Input
                     id="website"
                     type="url"
                     placeholder="https://www.restaurant.com"
@@ -549,7 +698,7 @@ export function RestaurantOnboardingPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="description">Business Description</Label>
-                <Textarea 
+                <Textarea
                   id="description"
                   placeholder="Tell suppliers about your restaurant..."
                   rows={4}
@@ -557,66 +706,76 @@ export function RestaurantOnboardingPage() {
                   onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="street">Street Address</Label>
-                  <Input 
+                  <Input
                     id="street"
                     placeholder="123 Main Street"
                     value={profileForm.address.street}
-                    onChange={(e) => setProfileForm({ 
-                      ...profileForm, 
-                      address: { ...profileForm.address, street: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        address: { ...profileForm.address, street: e.target.value },
+                      })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="city">City</Label>
-                  <Input 
+                  <Input
                     id="city"
                     placeholder="City Name"
                     value={profileForm.address.city}
-                    onChange={(e) => setProfileForm({ 
-                      ...profileForm, 
-                      address: { ...profileForm.address, city: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        address: { ...profileForm.address, city: e.target.value },
+                      })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="region">Region/State</Label>
-                  <Input 
+                  <Input
                     id="region"
                     placeholder="State or Region"
                     value={profileForm.address.region}
-                    onChange={(e) => setProfileForm({ 
-                      ...profileForm, 
-                      address: { ...profileForm.address, region: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        address: { ...profileForm.address, region: e.target.value },
+                      })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
-                  <Input 
+                  <Input
                     id="country"
                     placeholder="Country"
                     value={profileForm.address.country}
-                    onChange={(e) => setProfileForm({ 
-                      ...profileForm, 
-                      address: { ...profileForm.address, country: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        address: { ...profileForm.address, country: e.target.value },
+                      })
+                    }
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="deliveryInstructions">Delivery Instructions</Label>
-                <Textarea 
+                <Textarea
                   id="deliveryInstructions"
                   placeholder="e.g., Gate A, Floor 2, Landmark: next to gas station"
                   rows={3}
                   value={profileForm.delivery_instructions}
-                  onChange={(e) => setProfileForm({ ...profileForm, delivery_instructions: e.target.value })}
+                  onChange={(e) =>
+                    setProfileForm({ ...profileForm, delivery_instructions: e.target.value })
+                  }
                 />
               </div>
 
@@ -653,21 +812,36 @@ export function RestaurantOnboardingPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {teamMembers.length === 0 ? (
+              {isLoadingTeam ? (
+                <div className="flex items-center justify-center py-12 text-[var(--text-muted)]">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  Loading team…
+                </div>
+              ) : teamMembers.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
                   <Users className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
                   <p className="text-[var(--text-muted)]">No team members added yet</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-2">Add contacts for owner, manager, purchasing, finance, and kitchen</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-2">
+                    Seeded staff appear under Staff; team contacts (owner, manager, etc.) show here.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {teamMembers.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
+                    >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <p className="font-medium">{member.name}</p>
-                          {member.isPrimary && <Badge variant="default">Primary</Badge>}
-                          <Badge variant="outline" className="capitalize">{member.role}</Badge>
+                          {member.is_primary && <Badge variant="default">Primary</Badge>}
+                          <Badge variant="outline" className="capitalize">
+                            {member.role}
+                          </Badge>
+                          {member.branch_name && (
+                            <Badge variant="secondary">{member.branch_name}</Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
                           <span className="flex items-center gap-1">
@@ -682,10 +856,11 @@ export function RestaurantOnboardingPage() {
                           )}
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => {
-                        setTeamMembers(teamMembers.filter(m => m.id !== member.id))
-                        toast.success('Member removed')
-                      }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveMember(member.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -729,8 +904,7 @@ export function RestaurantOnboardingPage() {
             <CardContent>
               {!canAddBranch && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  Multi-branch accounts are not available on the Free plan. Upgrade to Gold or higher to
-                  add separate location accounts.
+                  {formatBranchGateMessage(branchGate)}
                 </div>
               )}
               {branches.length === 0 ? (
@@ -744,7 +918,10 @@ export function RestaurantOnboardingPage() {
               ) : (
                 <div className="space-y-3">
                   {branches.map((branch: any) => (
-                    <div key={branch.id} className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors">
+                    <div
+                      key={branch.id}
+                      className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
+                    >
                       <div className="flex-1">
                         <p className="font-medium mb-2">{branch.name}</p>
                         <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
@@ -764,15 +941,19 @@ export function RestaurantOnboardingPage() {
                           )}
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={async () => {
-                        try {
-                          await deleteBranch(branch.id).unwrap()
-                          refetchBranches()
-                          toast.success('Branch removed')
-                        } catch (error: any) {
-                          toast.error(error?.data?.error?.message || 'Failed to remove branch')
-                        }
-                      }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await deleteBranch(branch.id).unwrap()
+                            refetchBranches()
+                            toast.success('Branch removed')
+                          } catch (error: any) {
+                            toast.error(error?.data?.error?.message || 'Failed to remove branch')
+                          }
+                        }}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -804,7 +985,9 @@ export function RestaurantOnboardingPage() {
               ) : (
                 <>
                   <div>
-                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">Delivery methods</h4>
+                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">
+                      Delivery methods
+                    </h4>
                     <div className="mt-3 grid gap-3 md:grid-cols-3">
                       {CHANNEL_FIELDS.map(({ key, label, description, icon: Icon }) => {
                         const checked = notificationPrefs[key]
@@ -816,7 +999,9 @@ export function RestaurantOnboardingPage() {
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
                                 <Icon className="h-4 w-4 text-[var(--text-muted)]" />
-                                <span className="text-sm font-medium text-[var(--text)]">{label}</span>
+                                <span className="text-sm font-medium text-[var(--text)]">
+                                  {label}
+                                </span>
                               </div>
                               {checked && <CheckCircle2 className="h-5 w-5 text-[var(--mint)]" />}
                             </div>
@@ -834,7 +1019,9 @@ export function RestaurantOnboardingPage() {
                   </div>
 
                   <div className="border-t pt-6">
-                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">Notification types</h4>
+                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">
+                      Notification types
+                    </h4>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       {CATEGORY_FIELDS.map(({ key, label, description, icon: Icon }) => {
                         const checked = notificationPrefs[key]
@@ -847,7 +1034,9 @@ export function RestaurantOnboardingPage() {
                               <div className="flex items-center gap-2">
                                 <Icon className="h-4 w-4 text-[var(--text-muted)]" />
                                 <div>
-                                  <span className="text-sm font-medium text-[var(--text)]">{label}</span>
+                                  <span className="text-sm font-medium text-[var(--text)]">
+                                    {label}
+                                  </span>
                                   <p className="text-xs text-[var(--text-muted)]">{description}</p>
                                 </div>
                               </div>
@@ -889,9 +1078,7 @@ export function RestaurantOnboardingPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Team Member</DialogTitle>
-            <DialogDescription>
-              Add a contact to your restaurant team
-            </DialogDescription>
+            <DialogDescription>Add a contact to your restaurant team</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -957,8 +1144,15 @@ export function RestaurantOnboardingPage() {
             <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddMember}>
-              Add Member
+            <Button onClick={handleAddMember} disabled={isAddingTeamMember}>
+              {isAddingTeamMember ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding…
+                </>
+              ) : (
+                'Add Member'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -969,9 +1163,7 @@ export function RestaurantOnboardingPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Branch</DialogTitle>
-            <DialogDescription>
-              Add a new branch location
-            </DialogDescription>
+            <DialogDescription>Add a new branch location</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -1012,7 +1204,9 @@ export function RestaurantOnboardingPage() {
                 placeholder="Special instructions for deliveries..."
                 rows={3}
                 value={newBranch.deliveryInstructions}
-                onChange={(e) => setNewBranch({ ...newBranch, deliveryInstructions: e.target.value })}
+                onChange={(e) =>
+                  setNewBranch({ ...newBranch, deliveryInstructions: e.target.value })
+                }
               />
             </div>
           </div>
@@ -1021,9 +1215,7 @@ export function RestaurantOnboardingPage() {
             <Button variant="outline" onClick={() => setShowAddBranchDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddBranch}>
-              Add Branch
-            </Button>
+            <Button onClick={handleAddBranch}>Add Branch</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

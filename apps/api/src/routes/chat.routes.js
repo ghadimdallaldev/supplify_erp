@@ -628,7 +628,7 @@ router.post(
             recommendedPlans
           )
           err.name = 'CHAT_LIMIT_EXCEEDED'
-          err.message = `Daily chat limit reached (${usageResult.current}/${usageResult.limit}). Upgrade your plan to send more messages.`
+          err.message = `Daily chat limit reached (${usageResult.current}/${usageResult.limit}). Upgrade your plan to send more chats.`
           return res.status(403).json({
             ok: false,
             data: null,

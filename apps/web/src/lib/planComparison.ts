@@ -27,7 +27,7 @@ export const SUPPLIER_FEATURE_KEYS = ['reports', 'smart_reorder'] as const
 
 export const LIMIT_KEY_LABELS: Record<string, string> = {
   orders_per_day: 'Daily orders',
-  chats_per_day: 'Daily messages',
+  chats_per_day: 'Daily chats',
   supplier_products_skus: 'Products',
   restaurant_inventory_skus: 'Inventory SKUs',
   branches: 'Branches',
@@ -64,4 +64,52 @@ export function getLimitKeys(tenantType: 'RESTAURANT' | 'SUPPLIER'): readonly st
 
 export function getFeatureKeys(tenantType: 'RESTAURANT' | 'SUPPLIER'): readonly string[] {
   return tenantType === 'RESTAURANT' ? RESTAURANT_FEATURE_KEYS : SUPPLIER_FEATURE_KEYS
+}
+
+export function getLimitLabel(limitKey: string): string {
+  return LIMIT_KEY_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')
+}
+
+export function getFeatureLabel(featureKey: string): string {
+  return FEATURE_KEY_LABELS[featureKey] ?? featureKey.replace(/_/g, ' ')
+}
+
+/** Human-readable nudge when the user has been blocked repeatedly (Layout banner). */
+const IGNORED_BLOCK_KEYS = new Set(['upgrade_prompt'])
+
+export function formatPlanBlockNudgeMessage(
+  limitKeys: string[],
+  featureKeys: string[] = []
+): string | null {
+  const labels = [
+    ...limitKeys.filter((k) => !IGNORED_BLOCK_KEYS.has(k)).map(getLimitLabel),
+    ...featureKeys.filter((k) => !IGNORED_BLOCK_KEYS.has(k)).map(getFeatureLabel),
+  ].filter(Boolean)
+  const unique = [...new Set(labels)]
+  if (unique.length === 0) return null
+
+  if (unique.length === 1) {
+    return `You've reached your ${unique[0]} limit several times this week. Upgrade for more room.`
+  }
+  if (unique.length === 2) {
+    return `You've hit your ${unique[0]} and ${unique[1]} limits several times this week. Upgrade for higher limits.`
+  }
+  const last = unique[unique.length - 1]
+  const rest = unique.slice(0, -1).join(', ')
+  return `You've hit limits on ${rest}, and ${last} several times this week. Upgrade to keep going.`
+}
+
+/** When usage is already at the plan cap (entitlements), not repeat blocks. */
+export function formatAtPlanLimitMessage(limitKeys: string[]): string | null {
+  const unique = [...new Set(limitKeys.map(getLimitLabel))].filter(Boolean)
+  if (unique.length === 0) return null
+  if (unique.length === 1) {
+    return `You're at your ${unique[0]} limit on your current plan. Upgrade for more room.`
+  }
+  if (unique.length === 2) {
+    return `You're at your ${unique[0]} and ${unique[1]} limits. Upgrade for higher limits.`
+  }
+  const last = unique[unique.length - 1]
+  const rest = unique.slice(0, -1).join(', ')
+  return `You're at your plan limits for ${rest}, and ${last}. Upgrade to continue.`
 }

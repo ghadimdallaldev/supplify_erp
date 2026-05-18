@@ -284,7 +284,7 @@ INSERT INTO subscription_plan (id, code, name, description, price_per_month, pri
      "suppliers_per_restaurant": 2,
      "products": 50,
      "warehouses": 0,
-     "branches": 0,
+     "branches": 1,
      "users": 1,
      "storage_mb": 100,
      "orders_per_day": 10,
@@ -315,10 +315,10 @@ INSERT INTO subscription_plan (id, code, name, description, price_per_month, pri
      "suppliers_per_restaurant": 10,
      "products": 1000,
      "warehouses": 1,
-     "branches": 1,
+     "branches": 2,
      "users": 3,
      "storage_mb": 1000,
-     "orders_per_day": 100,
+     "orders_per_day": 20,
      "chats_per_day": 50
    }',
    '{
@@ -344,12 +344,12 @@ INSERT INTO subscription_plan (id, code, name, description, price_per_month, pri
    '{
      "restaurants": 10,
      "suppliers_per_restaurant": -1,
-     "products": 10000,
+     "products": 1000,
      "warehouses": 3,
      "branches": 3,
      "users": 10,
      "storage_mb": 5000,
-     "orders_per_day": 500,
+     "orders_per_day": 50,
      "chats_per_day": 200
    }',
    '{

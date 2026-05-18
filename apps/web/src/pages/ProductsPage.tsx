@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
-import { addItem } from '../features/cart/cartSlice'
+import { useCartActions } from '../hooks/useCartActions'
 import toast from 'react-hot-toast'
 import {
   Dialog,
@@ -65,10 +65,12 @@ export function ProductsPage() {
   })
   const [newTag, setNewTag] = useState('')
   const dispatch = useAppDispatch()
+  const { addItem } = useCartActions()
   const { user } = useAppSelector((state) => state.auth)
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
-  const [createInventoryAdjustment, { isLoading: isAdjustingInventory }] = useCreateInventoryAdjustmentMutation()
+  const [createInventoryAdjustment, { isLoading: isAdjustingInventory }] =
+    useCreateInventoryAdjustmentMutation()
 
   // Check if user is a supplier
   const isSupplier = user?.role === 'SUPPLIER'
@@ -125,13 +127,11 @@ export function ProductsPage() {
   }
 
   const handleAddToCart = (product: any) => {
-    dispatch(
-      addItem({
-        productId: product.id,
-        product,
-        quantity: 1,
-      })
-    )
+    addItem({
+      productId: product.id,
+      product,
+      quantity: 1,
+    })
     toast.success('Added to cart')
   }
 
@@ -175,10 +175,17 @@ export function ProductsPage() {
           const presignedResponse = await generatePresignedUrl({
             fileType: productImage.type,
             fileName,
+            fileSize: productImage.size,
           }).unwrap()
 
           // Upload to S3/MinIO
-          const uploadResponse = await fetch(presignedResponse.url, {
+          const uploadUrl =
+            presignedResponse.presignedUrl || (presignedResponse as { url?: string }).url
+          if (!uploadUrl) {
+            throw new Error('Missing upload URL from server')
+          }
+
+          const uploadResponse = await fetch(uploadUrl, {
             method: 'PUT',
             body: productImage,
             headers: {
@@ -190,8 +197,7 @@ export function ProductsPage() {
             throw new Error('Failed to upload image')
           }
 
-          // Get the public URL
-          imageUrl = presignedResponse.url.split('?')[0]
+          imageUrl = uploadUrl.split('?')[0]
         } catch (error: any) {
           toast.error(error?.data?.error?.message || 'Failed to upload image')
           return
@@ -417,174 +423,175 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
 
       <Card className="shadow-sm">
         <CardContent className="space-y-4 p-4 pt-6">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-              <Input
-                placeholder="Search products..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                <Input
+                  placeholder="Search products..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
+            {!isSupplier && (
+              <div className="w-56">
+                <select
+                  value={supplierFilter}
+                  onChange={(e) => setSupplierFilter(e.target.value)}
+                  className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
+                >
+                  <option value="">All Suppliers</option>
+                  {uniqueSuppliers.map((supplier: any) => (
+                    <option key={supplier.email} value={supplier.name}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <select
+              value={categoryId}
+              onChange={(e) => {
+                setCategoryId(e.target.value)
+                setCategory('') // Clear old category when using new one
+              }}
+              className="rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
+            >
+              <option value="">All Categories</option>
+              {categoriesData?.categories?.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
           </div>
-          {!isSupplier && (
-            <div className="w-56">
-              <select
-                value={supplierFilter}
-                onChange={(e) => setSupplierFilter(e.target.value)}
-                className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
-              >
-                <option value="">All Suppliers</option>
-                {uniqueSuppliers.map((supplier: any) => (
-                  <option key={supplier.email} value={supplier.name}>
-                    {supplier.name}
-                  </option>
+
+          {/* Tags Filter */}
+          {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-medium">Filter by Tags:</Label>
+              <div className="flex flex-wrap gap-2">
+                {tagsData.tags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant={selectedTags.includes(tag) ? 'default' : 'outline'}
+                    className="cursor-pointer hover:bg-[var(--bg)]"
+                    onClick={() => {
+                      setSelectedTags((prev) =>
+                        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                      )
+                    }}
+                  >
+                    {tag}
+                  </Badge>
                 ))}
-              </select>
+              </div>
             </div>
           )}
-          <select
-            value={categoryId}
-            onChange={(e) => {
-              setCategoryId(e.target.value)
-              setCategory('') // Clear old category when using new one
-            }}
-            className="rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
-          >
-            <option value="">All Categories</option>
-            {categoriesData?.categories?.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-        </div>
 
-        {/* Tags Filter */}
-        {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <Label className="text-sm font-medium">Filter by Tags:</Label>
-            <div className="flex flex-wrap gap-2">
-              {tagsData.tags.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                  className="cursor-pointer hover:bg-[var(--bg)]"
-                  onClick={() => {
-                    setSelectedTags((prev) =>
-                      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-                    )
-                  }}
-                >
-                  {tag}
-                </Badge>
-              ))}
+          {/* Price Range Filter */}
+          {!isSupplier && (
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <Label className="text-sm font-medium mb-2 block">Price Range:</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      type="number"
+                      placeholder="Min Price"
+                      value={minPrice}
+                      onChange={(e) => setMinPrice(e.target.value)}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <span className="self-center text-[var(--text-muted)]">-</span>
+                  <div className="flex-1">
+                    <Input
+                      type="number"
+                      placeholder="Max Price"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  {(minPrice || maxPrice) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setMinPrice('')
+                        setMaxPrice('')
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Price Range Filter */}
-        {!isSupplier && (
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <Label className="text-sm font-medium mb-2 block">Price Range:</Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="number"
-                    placeholder="Min Price"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <span className="self-center text-[var(--text-muted)]">-</span>
-                <div className="flex-1">
-                  <Input
-                    type="number"
-                    placeholder="Max Price"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
+          {/* Filter Summary */}
+          {(supplierFilter ||
+            categoryId ||
+            category ||
+            selectedTags.length > 0 ||
+            minPrice ||
+            maxPrice) &&
+            !isSupplier && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
+                {supplierFilter && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => setSupplierFilter('')}
+                  >
+                    Supplier: {supplierFilter} ×
+                  </Badge>
+                )}
+                {(categoryId || category) && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => {
+                      setCategoryId('')
+                      setCategory('')
+                    }}
+                  >
+                    Category:{' '}
+                    {categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category}{' '}
+                    ×
+                  </Badge>
+                )}
+                {selectedTags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                    onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                  >
+                    Tag: {tag} ×
+                  </Badge>
+                ))}
                 {(minPrice || maxPrice) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
                     onClick={() => {
                       setMinPrice('')
                       setMaxPrice('')
                     }}
                   >
-                    Clear
-                  </Button>
+                    Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
+                  </Badge>
                 )}
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Filter Summary */}
-        {(supplierFilter ||
-          categoryId ||
-          category ||
-          selectedTags.length > 0 ||
-          minPrice ||
-          maxPrice) &&
-          !isSupplier && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
-              {supplierFilter && (
-                <Badge
-                  variant="secondary"
-                  className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                  onClick={() => setSupplierFilter('')}
-                >
-                  Supplier: {supplierFilter} ×
-                </Badge>
-              )}
-              {(categoryId || category) && (
-                <Badge
-                  variant="secondary"
-                  className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                  onClick={() => {
-                    setCategoryId('')
-                    setCategory('')
-                  }}
-                >
-                  Category:{' '}
-                  {categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category} ×
-                </Badge>
-              )}
-              {selectedTags.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="secondary"
-                  className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                  onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
-                >
-                  Tag: {tag} ×
-                </Badge>
-              ))}
-              {(minPrice || maxPrice) && (
-                <Badge
-                  variant="secondary"
-                  className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                  onClick={() => {
-                    setMinPrice('')
-                    setMaxPrice('')
-                  }}
-                >
-                  Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
-                </Badge>
-              )}
-            </div>
-          )}
+            )}
         </CardContent>
       </Card>
 
@@ -592,12 +599,24 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
         <table className="w-full">
           <thead className="border-b border-[var(--app-border)] bg-[var(--bg)]">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Product</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Category</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Supplier</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Price</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Stock</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">Actions</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                Product
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                Category
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                Supplier
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                Price
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                Stock
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--app-border)]">
@@ -648,15 +667,17 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <p className="text-sm text-[var(--text-muted)]">{product.supplier_name || 'N/A'}</p>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {product.supplier_name || 'N/A'}
+                  </p>
                 </td>
                 <td className="px-4 py-4">
                   {product.current_price ? (
                     <>
-                      <p className="font-semibold">
-                        {formatPrice(product.current_price)}
-                      </p>
-                      {product.unit && <p className="text-xs text-[var(--text-muted)]">per {product.unit}</p>}
+                      <p className="font-semibold">{formatPrice(product.current_price)}</p>
+                      {product.unit && (
+                        <p className="text-xs text-[var(--text-muted)]">per {product.unit}</p>
+                      )}
                     </>
                   ) : (
                     <p className="text-sm text-[var(--text-muted)]">N/A</p>
@@ -665,10 +686,13 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 <td className="px-4 py-4">
                   <p
                     className={`text-sm font-medium ${
-                      parseFloat(product.available_qty || 0) > 0 ? 'text-[var(--mint)]' : 'text-[var(--red)]'
+                      parseFloat(product.available_qty || 0) > 0
+                        ? 'text-[var(--mint)]'
+                        : 'text-[var(--red)]'
                     }`}
                   >
-                    {formatNumber(product.available_qty, { maximumFractionDigits: 2 })} {product.unit || 'units'}
+                    {formatNumber(product.available_qty, { maximumFractionDigits: 2 })}{' '}
+                    {product.unit || 'units'}
                   </p>
                 </td>
                 <td className="px-4 py-4">
@@ -997,7 +1021,9 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                 onChange={handleFileUpload}
                 className="cursor-pointer"
               />
-              <p className="text-sm text-[var(--text-muted)]">Supported formats: CSV, Excel (.xlsx, .xls)</p>
+              <p className="text-sm text-[var(--text-muted)]">
+                Supported formats: CSV, Excel (.xlsx, .xls)
+              </p>
             </div>
 
             {uploadedFile && (
@@ -1155,7 +1181,9 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               <div className="bg-[var(--brand-ultra)] p-4 rounded-md">
                 <p className="text-sm font-medium text-[var(--text-mid)]">Current Stock</p>
                 <p className="text-lg font-semibold text-[var(--mint)]">
-                  {formatNumber(selectedProductForAdjustment.available_qty, { maximumFractionDigits: 2 })}{' '}
+                  {formatNumber(selectedProductForAdjustment.available_qty, {
+                    maximumFractionDigits: 2,
+                  })}{' '}
                   {selectedProductForAdjustment.unit || 'units'}
                 </p>
                 {adjustmentQuantity && (
@@ -1189,7 +1217,8 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
             <Button
               onClick={async () => {
                 const qty = parseFloat(adjustmentQuantity)
-                if (!qty || qty <= 0 || !adjustmentReason || !selectedProductForAdjustment?.id) return
+                if (!qty || qty <= 0 || !adjustmentReason || !selectedProductForAdjustment?.id)
+                  return
                 try {
                   await createInventoryAdjustment({
                     productId: selectedProductForAdjustment.id,
@@ -1198,7 +1227,9 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                     reason: adjustmentReason,
                     notes: adjustmentNotes || undefined,
                   }).unwrap()
-                  toast.success(`Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`)
+                  toast.success(
+                    `Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`
+                  )
                   setShowInventoryAdjustment(false)
                   setSelectedProductForAdjustment(null)
                   setAdjustmentQuantity('')

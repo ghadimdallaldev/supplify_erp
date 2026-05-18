@@ -7,9 +7,9 @@ SET
   limits = '{
     "branches": 3,
     "users": 10,
-    "orders_per_day": 500,
+    "orders_per_day": 50,
     "suppliers_per_restaurant": -1,
-    "restaurant_inventory_skus": 10000,
+    "restaurant_inventory_skus": 1000,
     "chats_per_day": 200,
     "storage_mb": 5000
   }'::jsonb,
@@ -21,7 +21,7 @@ SET
   limits = '{
     "warehouses": 3,
     "users": 10,
-    "supplier_products_skus": 10000,
+    "supplier_products_skus": 1000,
     "chats_per_day": 200,
     "storage_mb": 5000
   }'::jsonb,

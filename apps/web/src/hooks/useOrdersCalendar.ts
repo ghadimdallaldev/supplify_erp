@@ -15,7 +15,7 @@ export interface OrdersCalendarQuery {
   view?: string
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
 
 async function fetchCalendar(params: OrdersCalendarQuery): Promise<OrdersCalendarResponse> {
   const url = new URL('/api/orders/calendar', API_URL)
@@ -51,7 +51,9 @@ async function fetchCalendar(params: OrdersCalendarQuery): Promise<OrdersCalenda
   return payload.data as OrdersCalendarResponse
 }
 
-export function useOrdersCalendar(params: OrdersCalendarQuery): UseQueryResult<OrdersCalendarResponse> {
+export function useOrdersCalendar(
+  params: OrdersCalendarQuery
+): UseQueryResult<OrdersCalendarResponse> {
   const queryKey = useMemo(
     () => [
       'orders-calendar',
@@ -79,7 +81,7 @@ export function useOrdersCalendar(params: OrdersCalendarQuery): UseQueryResult<O
       params.pageSize,
       params.role,
       params.view,
-    ],
+    ]
   )
 
   const enabled = Boolean(params.start && params.end)
@@ -93,4 +95,3 @@ export function useOrdersCalendar(params: OrdersCalendarQuery): UseQueryResult<O
     retry: 1,
   })
 }
-

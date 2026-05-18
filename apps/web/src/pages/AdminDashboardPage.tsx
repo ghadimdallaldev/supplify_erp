@@ -53,7 +53,9 @@ interface AdminDashboardPageProps {
 export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPageProps) {
   // Default to 'tenants' tab for supplier/restaurant admin views, otherwise use initialTab
   const defaultTab =
-    initialTab === 'suppliers' || initialTab === 'restaurants' ? 'tenants' : (initialTab || 'overview')
+    initialTab === 'suppliers' || initialTab === 'restaurants'
+      ? 'tenants'
+      : initialTab || 'overview'
   const [selectedTab, setSelectedTab] = useState(defaultTab)
 
   // Sync selected tab when route changes (e.g. sidebar: Admin Dashboard → Supplier Admin)
@@ -76,7 +78,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     plansData?.plans?.filter(
       (p, i, arr) =>
         arr.findIndex(
-          (x) => x.code === p.code && (x.tenant_type || 'RESTAURANT') === (p.tenant_type || 'RESTAURANT')
+          (x) =>
+            x.code === p.code && (x.tenant_type || 'RESTAURANT') === (p.tenant_type || 'RESTAURANT')
         ) === i
     ) ?? []
   const subscriptions =
@@ -288,7 +291,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     <div className="p-6" data-testid="admin-dashboard-page">
       <div className="mb-6">
         <h1 className="text-[21px] font-black text-[var(--text)]">Admin Dashboard</h1>
-        <p className="text-[var(--text-muted)] mt-2">Manage subscriptions, plans, and tenant quotas</p>
+        <p className="text-[var(--text-muted)] mt-2">
+          Manage subscriptions, plans, and tenant quotas
+        </p>
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
@@ -394,7 +399,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="p-6">
-                  <h3 className="text-lg font-semibold text-[var(--text)] mb-4">Subscription Status</h3>
+                  <h3 className="text-lg font-semibold text-[var(--text)] mb-4">
+                    Subscription Status
+                  </h3>
                   <div className="space-y-3">
                     {Object.entries(overview?.subscriptionStats || {}).map(([status, count]) => (
                       <div key={status} className="flex justify-between items-center">
@@ -700,7 +707,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       <Badge variant="outline">
                         {plan.tenant_type === 'RESTAURANT' ? 'Restaurant' : 'Supplier'}
                       </Badge>
-                      {plan.code && <span className="text-xs text-[var(--text-muted)]">{plan.code}</span>}
+                      {plan.code && (
+                        <span className="text-xs text-[var(--text-muted)]">{plan.code}</span>
+                      )}
                       {plan.code && getPlanSubtitle(plan.code) ? (
                         <span className="text-xs text-[var(--text-muted)]">
                           · {getPlanSubtitle(plan.code)}
@@ -750,7 +759,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           .map((k) => [k, plan.limits[k]] as const)
                         return entries.map(([key, value]) => (
                           <div key={key} className="flex justify-between text-sm">
-                            <span className="text-[var(--text-muted)]">{key.replace(/_/g, ' ')}:</span>
+                            <span className="text-[var(--text-muted)]">
+                              {key.replace(/_/g, ' ')}:
+                            </span>
                             <span className="font-semibold">
                               {value === -1 ? 'Unlimited' : value}
                             </span>
@@ -774,7 +785,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           })
                           .filter(Boolean)
                       ) : (
-                        <span className="text-sm text-[var(--text-muted)]">No features defined</span>
+                        <span className="text-sm text-[var(--text-muted)]">
+                          No features defined
+                        </span>
                       )}
                     </div>
                   </div>
@@ -926,13 +939,20 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Plan</th>
                     <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Status</th>
                     <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Type</th>
-                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Created</th>
-                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">Actions</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
+                      Created
+                    </th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--text)]">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {subscriptions.map((sub) => (
-                    <tr key={sub.id} className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]">
+                    <tr
+                      key={sub.id}
+                      className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
+                    >
                       <td className="py-3 px-4">
                         <div>
                           <p className="font-medium text-[var(--text)]">
@@ -1052,11 +1072,15 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   </p>
                   <p className="flex justify-between">
                     <span>Outstanding</span>
-                    <span className="font-semibold">{formatCurrency(financeData?.outstanding)}</span>
+                    <span className="font-semibold">
+                      {formatCurrency(financeData?.outstanding)}
+                    </span>
                   </p>
                   <p className="flex justify-between">
                     <span>Overdue</span>
-                    <span className="font-semibold text-[var(--red)]">{formatCurrency(financeData?.overdue)}</span>
+                    <span className="font-semibold text-[var(--red)]">
+                      {formatCurrency(financeData?.overdue)}
+                    </span>
                   </p>
                   <p className="flex justify-between">
                     <span>MRR</span>
@@ -1134,7 +1158,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
                       ) : !suppliersData?.suppliers || suppliersData.suppliers.length === 0 ? (
-                        <p className="text-center py-8 text-[var(--text-muted)]">No suppliers found</p>
+                        <p className="text-center py-8 text-[var(--text-muted)]">
+                          No suppliers found
+                        </p>
                       ) : (
                         <div className="overflow-x-auto">
                           <table className="w-full">
@@ -1171,7 +1197,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                 >
                                   <td className="py-3 px-4">
                                     <div>
-                                      <p className="font-medium text-[var(--text)]">{supplier.name}</p>
+                                      <p className="font-medium text-[var(--text)]">
+                                        {supplier.name}
+                                      </p>
                                       <p className="text-sm text-[var(--text-muted)]">
                                         {supplier.contact_email}
                                       </p>
@@ -1300,7 +1328,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         </div>
                       ) : !restaurantsData?.restaurants ||
                         restaurantsData.restaurants.length === 0 ? (
-                        <p className="text-center py-8 text-[var(--text-muted)]">No restaurants found</p>
+                        <p className="text-center py-8 text-[var(--text-muted)]">
+                          No restaurants found
+                        </p>
                       ) : (
                         <div className="overflow-x-auto">
                           <table className="w-full">
@@ -1334,7 +1364,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                 >
                                   <td className="py-3 px-4">
                                     <div>
-                                      <p className="font-medium text-[var(--text)]">{restaurant.name}</p>
+                                      <p className="font-medium text-[var(--text)]">
+                                        {restaurant.name}
+                                      </p>
                                       <p className="text-sm text-[var(--text-muted)]">
                                         {restaurant.contact_email}
                                       </p>
@@ -1492,7 +1524,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       <p className="text-2xl font-bold text-[var(--text)]">
                         {suppliersData?.suppliers?.length || 0}
                       </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">With active subscriptions</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        With active subscriptions
+                      </p>
                     </div>
 
                     <div className="p-4 border rounded-lg">
@@ -1503,11 +1537,19 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       <p className="text-2xl font-bold text-[var(--text)]">
                         {suppliersData?.suppliers?.filter((s) => {
                           const limit =
-                            s.plan_name === 'Free' ? 50 : s.plan_name === 'Bronze' ? 1000 : 10000
+                            s.plan_name === 'Free'
+                              ? 50
+                              : s.plan_name === 'Bronze'
+                                ? 1000
+                                : s.plan_name === 'Platinum'
+                                  ? 999999
+                                  : 1000
                           return parseInt(s.product_count || 0) > limit
                         }).length || 0}
                       </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">Suppliers over product limit</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        Suppliers over product limit
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -1525,7 +1567,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           ? 50
                           : supplier.plan_name === 'Bronze'
                             ? 1000
-                            : 10000
+                            : supplier.plan_name === 'Platinum'
+                              ? 999999
+                              : 1000
                       const productCount = parseInt(supplier.product_count || 0)
                       const usage = (productCount / limit) * 100
                       return (
@@ -1556,7 +1600,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <>
               <Card>
                 <CardHeader>
-                  <h3 className="text-xl font-bold text-[var(--text)]">Restaurant Usage Overview</h3>
+                  <h3 className="text-xl font-bold text-[var(--text)]">
+                    Restaurant Usage Overview
+                  </h3>
                   <p className="text-sm text-[var(--text-muted)]">
                     Orders and spending across all restaurants
                   </p>
@@ -1574,7 +1620,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           0
                         ) || 0}
                       </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">Total orders last 30 days</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        Total orders last 30 days
+                      </p>
                     </div>
 
                     <div className="p-4 border rounded-lg">
@@ -1585,7 +1633,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       <p className="text-2xl font-bold text-[var(--text)]">
                         {restaurantsData?.restaurants?.length || 0}
                       </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">With active subscriptions</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        With active subscriptions
+                      </p>
                     </div>
 
                     <div className="p-4 border rounded-lg">
@@ -1601,7 +1651,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           )
                         )}
                       </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">Across all restaurants</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        Across all restaurants
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -1687,21 +1739,33 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     </div>
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-[var(--text-muted)]">Suppliers over limit</span>
+                        <span className="text-sm text-[var(--text-muted)]">
+                          Suppliers over limit
+                        </span>
                         <AlertCircle className="h-4 w-4 text-[var(--red)]" />
                       </div>
                       <p className="text-2xl font-bold text-[var(--text)]">
                         {suppliersData?.suppliers?.filter((s) => {
                           const limit =
-                            s.plan_name === 'Free' ? 50 : s.plan_name === 'Bronze' ? 1000 : 10000
+                            s.plan_name === 'Free'
+                              ? 50
+                              : s.plan_name === 'Bronze'
+                                ? 1000
+                                : s.plan_name === 'Platinum'
+                                  ? 999999
+                                  : 1000
                           return parseInt(s.product_count || 0) > limit
                         }).length ?? 0}
                       </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">Product limit exceeded</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        Product limit exceeded
+                      </p>
                     </div>
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-[var(--text-muted)]">Restaurant spend (30d)</span>
+                        <span className="text-sm text-[var(--text-muted)]">
+                          Restaurant spend (30d)
+                        </span>
                         <DollarSign className="h-4 w-4 text-[var(--mint)]" />
                       </div>
                       <p className="text-2xl font-bold text-[var(--text)]">
@@ -1712,7 +1776,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           )
                         )}
                       </p>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">Across all restaurants</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        Across all restaurants
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -1729,10 +1795,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <TabsContent value="features">
           <AdminFeatureFlagsPanel
-            restaurants={(restaurantsData?.restaurants ?? []).map((r: { id: string; name: string }) => ({
-              id: r.id,
-              name: r.name,
-            }))}
+            restaurants={(restaurantsData?.restaurants ?? []).map(
+              (r: { id: string; name: string }) => ({
+                id: r.id,
+                name: r.name,
+              })
+            )}
             suppliers={(suppliersData?.suppliers ?? []).map((s: { id: string; name: string }) => ({
               id: s.id,
               name: s.name,

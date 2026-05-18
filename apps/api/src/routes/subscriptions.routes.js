@@ -61,7 +61,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
       const freeDefaults =
         tenant.tenantType === 'RESTAURANT'
           ? {
-              branches: 0,
+              branches: 1,
               users: 1,
               orders_per_day: 3,
               suppliers_per_restaurant: 1,

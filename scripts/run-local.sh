@@ -229,14 +229,10 @@ cmd_seed() {
     echo "API container is not running. Start the stack first: ./scripts/run-local.sh up"
     exit 1
   fi
-  echo "Running SQL migrations..."
-  docker exec supplify-api node apps/api/scripts/run-migration.js
-  echo "Running database seed (restaurant, supplier, products)..."
-  docker exec supplify-api node apps/api/scripts/seed.js
-  echo "Syncing Keycloak demo users..."
-  docker exec -e KEYCLOAK_BASE_URL=http://keycloak:8080 -e KEYCLOAK_ADMIN_PASSWORD=admin \
-    supplify-api node apps/api/scripts/seed-demo-users.js
-  echo "Bootstrap finished."
+  echo "Running full feature seed (migrations + prod-like data + chats + Keycloak)..."
+  docker exec -e ALLOW_PRODLIKE_SEED=true -e KEYCLOAK_BASE_URL=http://keycloak:8080 -e KEYCLOAK_ADMIN_PASSWORD=admin \
+    supplify-api node apps/api/scripts/seed-full.mjs
+  echo "Bootstrap finished. See seed-full.mjs output for login emails."
 }
 
 main() {

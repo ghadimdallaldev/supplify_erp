@@ -47,9 +47,7 @@ import type {
   PublicReservationDetails,
 } from '../types'
 
-const API_URL =
-  import.meta.env.VITE_API_URL ??
-  (import.meta.env.DEV ? '' : 'http://localhost:4000')
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
 
 // Custom baseQuery to unwrap API response envelope
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,15 +97,31 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
       }
       // Dispatch monetization soft-wall when blocked by plan/limit (Phase B)
       const respErr = data.error
-      if (respErr?.name === 'LIMIT_EXCEEDED' || respErr?.name === 'FEATURE_NOT_AVAILABLE') {
+      if (
+        respErr?.name === 'LIMIT_EXCEEDED' ||
+        respErr?.name === 'FEATURE_NOT_AVAILABLE' ||
+        respErr?.name === 'BRANCH_LIMIT_REACHED'
+      ) {
         try {
           const { showMonetizationBlock } = await import(
             /* @vite-ignore */ '../features/monetization/monetizationSlice'
           )
+          const details = (respErr as { details?: Record<string, unknown> }).details || {}
+          const isLimit =
+            respErr.name === 'LIMIT_EXCEEDED' || respErr.name === 'BRANCH_LIMIT_REACHED'
           api.dispatch(
             showMonetizationBlock({
-              type: respErr.name === 'LIMIT_EXCEEDED' ? 'limit' : 'feature',
-              payload: ((respErr as { details?: unknown }).details || {}) as
+              type: isLimit ? 'limit' : 'feature',
+              payload: (isLimit
+                ? {
+                    limitKey: (details.limitKey as string) || 'branches',
+                    limitValue: Number(details.limitValue ?? details.limit ?? 0),
+                    currentUsage: Number(details.currentUsage ?? details.current ?? 0),
+                    currentPlan: (details.currentPlan as string) ?? null,
+                    recommendedPlans: (details.recommendedPlans as string[]) ?? ['Gold'],
+                    upgradeUrl: (details.upgradeUrl as string) ?? '/app/settings?tab=subscription',
+                  }
+                : details) as
                 | import('../features/monetization/monetizationSlice').LimitExceededPayload
                 | import('../features/monetization/monetizationSlice').FeatureNotAvailablePayload,
             })
@@ -142,6 +156,7 @@ export const api = createApi({
     'RestaurantFinance',
     'Notification',
     'Branch',
+    'RestaurantTeam',
     'Subscription',
     'Admin',
     'AdminFeatureFlags',
@@ -170,10 +185,7 @@ export const api = createApi({
       // Cache for 5 minutes to reduce requests
       keepUnusedDataFor: 300,
     }),
-    logout: builder.mutation<
-      { message?: string; keycloakLogoutUrl?: string },
-      void
-    >({
+    logout: builder.mutation<{ message?: string; keycloakLogoutUrl?: string }, void>({
       query: () => ({
         url: '/auth/logout',
         method: 'POST',
@@ -551,7 +563,13 @@ export const api = createApi({
     }),
     createInventoryAdjustment: builder.mutation<
       any,
-      { productId: string; adjustmentType: 'IN' | 'OUT'; quantity: number; reason: string; notes?: string }
+      {
+        productId: string
+        adjustmentType: 'IN' | 'OUT'
+        quantity: number
+        reason: string
+        notes?: string
+      }
     >({
       query: ({ productId, ...body }) => ({
         url: `/api/inventory/product/${productId}/adjustment`,
@@ -566,7 +584,20 @@ export const api = createApi({
       query: () => '/api/warehouses',
       providesTags: ['Inventory'],
     }),
-    createWarehouse: builder.mutation<{ warehouse: any }, { name: string; code?: string; address?: string; city?: string; country?: string; capacity?: number; contact_name?: string; contact_email?: string; contact_phone?: string }>({
+    createWarehouse: builder.mutation<
+      { warehouse: any },
+      {
+        name: string
+        code?: string
+        address?: string
+        city?: string
+        country?: string
+        capacity?: number
+        contact_name?: string
+        contact_email?: string
+        contact_phone?: string
+      }
+    >({
       query: (body) => ({
         url: '/api/warehouses',
         method: 'POST',
@@ -946,6 +977,48 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Branch', 'Restaurant', 'Supplier', 'Order', 'Reservation', 'Notification'],
+    }),
+
+    getRestaurantTeam: builder.query<
+      {
+        team: Array<{
+          id: string
+          name: string
+          email: string
+          phone?: string | null
+          role: string
+          is_primary: boolean
+          branch_name?: string | null
+        }>
+      },
+      void
+    >({
+      query: () => '/api/restaurant-onboarding/team',
+      providesTags: ['RestaurantTeam'],
+    }),
+    addRestaurantTeamMember: builder.mutation<
+      { member: Record<string, unknown> },
+      { name: string; email: string; phone?: string; role: string; isPrimary?: boolean }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-onboarding/team',
+        method: 'POST',
+        body: {
+          name: body.name,
+          email: body.email,
+          phone: body.phone,
+          role: body.role,
+          isPrimary: body.isPrimary,
+        },
+      }),
+      invalidatesTags: ['RestaurantTeam'],
+    }),
+    deleteRestaurantTeamMember: builder.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({
+        url: `/api/restaurant-onboarding/team/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['RestaurantTeam'],
     }),
 
     // Notification endpoints
@@ -1597,6 +1670,9 @@ export const {
   useUpdateBranchMutation,
   useDeleteBranchMutation,
   useSwitchBranchAccountMutation,
+  useGetRestaurantTeamQuery,
+  useAddRestaurantTeamMemberMutation,
+  useDeleteRestaurantTeamMemberMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
   useGetPublicRestaurantsQuery,

@@ -1,5 +1,10 @@
 import express from 'express'
-import { requireAuth, requireRole, getRequestTenant } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getRequestTenant,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -158,16 +163,10 @@ router.patch('/profile', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asyn
 // Get team members
 router.get('/team', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
       throw new NotFoundError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
 
     const { rows } = await query(
       `
@@ -286,6 +285,53 @@ router.post('/team', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
       error: {
         name: 'INTERNAL_ERROR',
         message: 'Failed to add team member',
+        details: error.message,
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// Remove team member
+router.delete('/team/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      throw new NotFoundError('Restaurant not found')
+    }
+
+    const { rowCount } = await query(
+      `DELETE FROM restaurant_team WHERE id = $1 AND restaurant_id = $2`,
+      [req.params.id, restaurantId]
+    )
+
+    if (rowCount === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Team member not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    res.json({
+      ok: true,
+      data: { deleted: true },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error({
+      message: 'Delete team member error',
+      error: error.message,
+      stack: error.stack,
+    })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'INTERNAL_ERROR',
+        message: 'Failed to delete team member',
         details: error.message,
       },
       requestId: req.requestId,

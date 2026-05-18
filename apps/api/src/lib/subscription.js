@@ -471,9 +471,11 @@ async function getUsageSnapshot(tenantId, tenantType) {
         [tenantId]
       ),
       query(`SELECT COUNT(*) as c FROM restaurant_team WHERE restaurant_id = $1`, [tenantId]),
-      query(`SELECT COUNT(*) as c FROM branch WHERE tenant_id = $1 AND is_active = TRUE`, [
-        tenantId,
-      ]),
+      query(
+        `SELECT COUNT(*) as c FROM tenant_account_link
+         WHERE parent_tenant_id = $1 AND parent_tenant_type = 'RESTAURANT'`,
+        [tenantId]
+      ),
       query(`SELECT COUNT(*) as c FROM supplier_follow WHERE restaurant_id = $1`, [tenantId]),
       query(
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND meter_type = 'storage_mb' AND period_start_date = $2`,
@@ -487,7 +489,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
     usage.restaurant_inventory_skus = parseInt(inv.rows[0]?.c || 0)
     usage.orders_per_day = parseInt(orders.rows[0]?.c || 0)
     usage.users = 1 + parseInt(team.rows[0]?.c || 0)
-    usage.branches = parseInt(branches.rows[0]?.c || 0)
+    usage.branches = 1 + parseInt(branches.rows[0]?.c || 0, 10)
     usage.suppliers_per_restaurant = parseInt(suppliers.rows[0]?.c || 0)
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
     meterRows.rows.forEach((r) => {
@@ -599,6 +601,42 @@ export async function getEntitlements(tenantId, tenantType) {
     })),
     usage,
     usageWindowMeta,
+  }
+}
+
+/**
+ * Check headroom and record bytes against storage_mb (cumulative meter).
+ * Call when a file is committed (presign approved, attachment saved, etc.).
+ * @returns {Promise<{ allowed: boolean, current?: number, limit?: number|null, sizeMb?: number }>}
+ */
+export async function ensureStorageForUpload(tenantId, tenantType, sizeBytes) {
+  const bytes = Number(sizeBytes) || 0
+  if (bytes <= 0) {
+    return { allowed: true }
+  }
+
+  const sizeMb = Math.ceil(bytes / (1024 * 1024))
+  const storageCheck = await checkLimit(tenantId, tenantType, 'storage_mb')
+
+  if (
+    !storageCheck.isUnlimited &&
+    storageCheck.limit != null &&
+    storageCheck.current + sizeMb > storageCheck.limit
+  ) {
+    return {
+      allowed: false,
+      current: storageCheck.current,
+      limit: storageCheck.limit,
+      sizeMb,
+    }
+  }
+
+  await incrementStorageUsage(tenantId, tenantType, bytes)
+  return {
+    allowed: true,
+    current: storageCheck.current,
+    limit: storageCheck.limit,
+    sizeMb,
   }
 }
 

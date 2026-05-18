@@ -1864,6 +1864,28 @@ router.post('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
       })
     }
 
+    const fileSizeBytes = payload.fileSize != null ? Math.max(0, Number(payload.fileSize) || 0) : 0
+    if (fileSizeBytes > 0 && req.userData.role !== 'ADMIN') {
+      const { ensureStorageForUpload } = await import('../lib/subscription.js')
+      const metered = await ensureStorageForUpload(restaurantId, 'RESTAURANT', fileSizeBytes)
+      if (!metered.allowed) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'LIMIT_EXCEEDED',
+            message: `Storage limit reached (${metered.current}/${metered.limit} MB). Upgrade for more storage.`,
+            details: {
+              limitKey: 'storage_mb',
+              limitValue: metered.limit ?? 0,
+              currentUsage: metered.current ?? 0,
+            },
+          },
+          requestId: req.requestId,
+        })
+      }
+    }
+
     const { rows } = await query(
       `
           INSERT INTO staff_document (

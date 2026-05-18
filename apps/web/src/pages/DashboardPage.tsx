@@ -23,12 +23,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Tooltip,
-} from 'recharts'
+import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { CalendarView } from '../components/CalendarView'
@@ -96,7 +91,16 @@ interface KpiCardProps {
   sparkColor: string
 }
 
-function KpiCard({ label, value, iconBg, iconColor, Icon, meta, sparkData, sparkColor }: KpiCardProps) {
+function KpiCard({
+  label,
+  value,
+  iconBg,
+  iconColor,
+  Icon,
+  meta,
+  sparkData,
+  sparkColor,
+}: KpiCardProps) {
   return (
     <div
       className="kpi-card"
@@ -118,7 +122,14 @@ function KpiCard({ label, value, iconBg, iconColor, Icon, meta, sparkData, spark
         el.style.boxShadow = ''
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 8,
+        }}
+      >
         <span
           style={{
             fontSize: 11,
@@ -151,9 +162,7 @@ function KpiCard({ label, value, iconBg, iconColor, Icon, meta, sparkData, spark
           value
         )}
       </div>
-      {meta && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{meta}</div>
-      )}
+      {meta && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{meta}</div>}
       <Sparkline data={sparkData} color={sparkColor} />
     </div>
   )
@@ -212,7 +221,11 @@ export function DashboardPage() {
     skip: user?.role !== 'ADMIN',
   })
   const isAdminNotImpersonating = user?.role === 'ADMIN' && !impersonation?.active
-  const { data: stats, isLoading, error } = useGetDashboardStatsQuery(undefined, {
+  const {
+    data: stats,
+    isLoading,
+    error,
+  } = useGetDashboardStatsQuery(undefined, {
     skip: isAdminNotImpersonating,
   })
 
@@ -243,13 +256,11 @@ export function DashboardPage() {
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
   const planName = entitlementsData?.entitlements?.plan?.name ?? 'Free'
-  const firstName =
-    (user?.displayName || user?.email || '').split(/[\s@]/)[0] || 'there'
+  const firstName = (user?.displayName || user?.email || '').split(/[\s@]/)[0] || 'there'
 
   const now = new Date()
   const hour = now.getHours()
-  const greeting =
-    hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const formattedDate = now.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -292,7 +303,10 @@ export function DashboardPage() {
             Use the Admin Dashboard to manage tenants, plans, and support. To see a restaurant or
             supplier view, use &quot;Impersonate&quot; from the Admin Dashboard.
           </p>
-          <Button asChild style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}>
+          <Button
+            asChild
+            style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}
+          >
             <Link to="/app/admin">Open Admin Dashboard</Link>
           </Button>
         </div>
@@ -303,7 +317,10 @@ export function DashboardPage() {
   // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} data-testid="dashboard-page">
+      <div
+        style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+        data-testid="dashboard-page"
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Skeleton className="h-7 w-48" style={{ background: 'var(--brand-ultra)' }} />
@@ -358,15 +375,19 @@ export function DashboardPage() {
   const orders = recentOrders?.orders || []
   const orderAmounts = orders.map((o: any) => Number(o.total_amount) || 0)
   const syntheticRamp = (n: number, peak: number) =>
-    Array.from({ length: 7 }, (_, i) => Math.round((peak || 100) * (0.3 + (i / 6) * 0.7) * (0.7 + Math.random() * 0.3)))
-      .slice(0, n)
+    Array.from({ length: 7 }, (_, i) =>
+      Math.round((peak || 100) * (0.3 + (i / 6) * 0.7) * (0.7 + Math.random() * 0.3))
+    ).slice(0, n)
   const revenueSparkData =
     orderAmounts.length >= 4
       ? [...orderAmounts.slice(-7).reverse()]
       : syntheticRamp(7, (stats?.totalRevenue as number) || 500)
   const ordersSparkData = syntheticRamp(7, (stats?.totalOrders as number) || 10)
   const pendingSparkData = syntheticRamp(7, (stats?.pendingOrders as number) || 5)
-  const counterpartSparkData = syntheticRamp(7, (isSupplier ? stats?.totalRestaurants : stats?.totalSuppliers) as number || 5)
+  const counterpartSparkData = syntheticRamp(
+    7,
+    ((isSupplier ? stats?.totalRestaurants : stats?.totalSuppliers) as number) || 5
+  )
 
   const spendTrend = Array.isArray(invoiceAnalytics?.points)
     ? invoiceAnalytics.points.map((p: any) => ({
@@ -468,7 +489,12 @@ export function DashboardPage() {
   return (
     <div
       data-testid="dashboard-page"
-      style={{ display: 'flex', flexDirection: 'column', gap: 16, fontFamily: "'Inter', system-ui, sans-serif" }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
     >
       {/* Post-onboarding CTAs */}
       {isRestaurant && (stats?.totalOrders ?? 0) === 0 && (
@@ -485,12 +511,22 @@ export function DashboardPage() {
           }}
         >
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>You&apos;re all set</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+              You&apos;re all set
+            </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               Create your first order to start receiving from suppliers.
             </div>
           </div>
-          <Button asChild style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff', flexShrink: 0 }}>
+          <Button
+            asChild
+            style={{
+              background: 'var(--brand)',
+              borderColor: 'var(--brand)',
+              color: '#fff',
+              flexShrink: 0,
+            }}
+          >
             <Link to="/app/cart">
               <ShoppingCart style={{ width: 14, height: 14, marginRight: 6 }} />
               Create first order
@@ -512,12 +548,22 @@ export function DashboardPage() {
           }}
         >
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>You&apos;re all set</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+              You&apos;re all set
+            </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               Add your first product so restaurants can order from you.
             </div>
           </div>
-          <Button asChild style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff', flexShrink: 0 }}>
+          <Button
+            asChild
+            style={{
+              background: 'var(--brand)',
+              borderColor: 'var(--brand)',
+              color: '#fff',
+              flexShrink: 0,
+            }}
+          >
             <Link to="/app/products">
               <Package style={{ width: 14, height: 14, marginRight: 6 }} />
               Add first product
@@ -533,7 +579,8 @@ export function DashboardPage() {
             {greeting}, {firstName} ☀️
           </h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-            {formattedDate} &nbsp;·&nbsp; {effectiveRole?.toLowerCase() ?? 'user'} &nbsp;·&nbsp; {planName}
+            {formattedDate} &nbsp;·&nbsp; {effectiveRole?.toLowerCase() ?? 'user'} &nbsp;·&nbsp;{' '}
+            {planName}
           </p>
         </div>
         {/* Period selector — UI only */}
@@ -578,52 +625,34 @@ export function DashboardPage() {
 
       {/* 3-col content row */}
       <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: 12 }}>
-
         {/* Col 1 — Recent Orders */}
         <SectionCard
           title="Recent Orders"
           action={
             <Link
               to="/app/orders"
-              style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}
+              style={{
+                fontSize: 11,
+                color: 'var(--brand)',
+                textDecoration: 'none',
+                fontWeight: 600,
+              }}
             >
               View all →
             </Link>
           }
         >
-          {/* Mini bar chart */}
-          {orders.length > 0 && (
-            <div style={{ height: 48, marginBottom: 10 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={orders.slice(0, 7).map((o: any, i: number) => ({
-                    name: `#${i + 1}`,
-                    v: Number(o.total_amount) || 0,
-                  }))}
-                  margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                  barSize={16}
-                >
-                  <Bar dataKey="v" fill="var(--brand-mid)" radius={[3, 3, 0, 0]} opacity={0.7} />
-                  <Tooltip
-                    contentStyle={{
-                      background: 'var(--surface)',
-                      border: '1px solid var(--app-border)',
-                      borderRadius: 6,
-                      fontSize: 11,
-                      color: 'var(--text)',
-                    }}
-                    formatter={(v: any) => [formatCurrency(v), 'Amount']}
-                    labelFormatter={() => ''}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
           {/* Order list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {orders.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  textAlign: 'center',
+                  padding: '16px 0',
+                }}
+              >
                 No recent orders
               </p>
             ) : (
@@ -668,7 +697,15 @@ export function DashboardPage() {
                         : `From: ${o.supplier_name || o.supplierName || 'Supplier'}`}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      gap: 3,
+                      flexShrink: 0,
+                    }}
+                  >
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
                       {formatCurrency(o.total_amount)}
                     </span>
@@ -685,17 +722,34 @@ export function DashboardPage() {
           <SectionCard title="Order Status">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
               {[
-                { label: 'Completed', value: stats?.completedOrders ?? 0, color: 'var(--mint-mid)' },
+                {
+                  label: 'Completed',
+                  value: stats?.completedOrders ?? 0,
+                  color: 'var(--mint-mid)',
+                },
                 { label: 'Pending', value: stats?.pendingOrders ?? 0, color: 'var(--amber-mid)' },
-                { label: 'Processing', value: Math.max(0, (stats?.totalOrders ?? 0) - (stats?.completedOrders ?? 0) - (stats?.pendingOrders ?? 0)), color: 'var(--brand-mid)' },
+                {
+                  label: 'Processing',
+                  value: Math.max(
+                    0,
+                    (stats?.totalOrders ?? 0) -
+                      (stats?.completedOrders ?? 0) -
+                      (stats?.pendingOrders ?? 0)
+                  ),
+                  color: 'var(--brand-mid)',
+                },
               ].map(({ label, value, color }) => {
                 const total = stats?.totalOrders || 1
                 const pct = Math.round((value / total) * 100)
                 return (
                   <div key={label}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+                        <div
+                          style={{ width: 8, height: 8, borderRadius: '50%', background: color }}
+                        />
                         <span style={{ fontSize: 12, color: 'var(--text-mid)', fontWeight: 500 }}>
                           {label}
                         </span>
@@ -744,9 +798,10 @@ export function DashboardPage() {
             </div>
           </SectionCard>
         ) : (
-          <SectionCard title="Spend Trend" action={
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>30 days</span>
-          }>
+          <SectionCard
+            title="Spend Trend"
+            action={<span style={{ fontSize: 10, color: 'var(--text-muted)' }}>30 days</span>}
+          >
             {spendTrend.length > 0 ? (
               <div style={{ height: 120 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -755,7 +810,12 @@ export function DashboardPage() {
                     margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
                     barSize={4}
                   >
-                    <Bar dataKey="value" fill="var(--brand-mid)" radius={[2, 2, 0, 0]} opacity={0.75} />
+                    <Bar
+                      dataKey="value"
+                      fill="var(--brand-mid)"
+                      radius={[2, 2, 0, 0]}
+                      opacity={0.75}
+                    />
                     <Tooltip
                       contentStyle={{
                         background: 'var(--surface)',
@@ -770,7 +830,14 @@ export function DashboardPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '32px 0' }}>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  textAlign: 'center',
+                  padding: '32px 0',
+                }}
+              >
                 No spend data yet
               </p>
             )}
@@ -799,7 +866,12 @@ export function DashboardPage() {
             isRestaurant && (reorderSuggestions?.suggestions?.length ?? 0) > 0 ? (
               <Link
                 to="/app/quick-lists"
-                style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}
+                style={{
+                  fontSize: 11,
+                  color: 'var(--brand)',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                }}
               >
                 Add all →
               </Link>
@@ -809,14 +881,20 @@ export function DashboardPage() {
           {isRestaurant ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {(reorderSuggestions?.suggestions?.length ?? 0) === 0 ? (
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    textAlign: 'center',
+                    padding: '16px 0',
+                  }}
+                >
                   No reorder suggestions
                 </p>
               ) : (
                 reorderSuggestions!.suggestions.slice(0, 3).map((s: any, idx: number) => {
                   const qty =
-                    s.suggested_reorder_qty ??
-                    Math.max(1, Math.ceil(s.avg_daily_usage_30day * 3))
+                    s.suggested_reorder_qty ?? Math.max(1, Math.ceil(s.avg_daily_usage_30day * 3))
                   const urgencyColor =
                     idx === 0 ? 'var(--red)' : idx === 1 ? 'var(--amber)' : 'var(--mint-mid)'
                   const isAdding = addingSuggestionId === s.id

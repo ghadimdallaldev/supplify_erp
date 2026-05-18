@@ -25,16 +25,29 @@ import {
   settingsFeaturesTabPath,
 } from '../lib/externallyControlledFeatures'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
+import { useCartActions } from '../hooks/useCartActions'
+import {
+  formatAtPlanLimitMessage,
+  formatPlanBlockNudgeMessage,
+  getLimitLabel,
+} from '../lib/planComparison'
 
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
+  const { rehydrateCart } = useCartActions()
 
   useEffect(() => {
     dispatch(refreshBlockedCount())
   }, [dispatch])
+
+  useEffect(() => {
+    if (user?.email) {
+      rehydrateCart()
+    }
+  }, [user?.email, rehydrateCart])
   const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
     skip: user?.role !== 'ADMIN',
   })
@@ -43,6 +56,7 @@ export function Layout() {
   })
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const blockedCountLast7d = useAppSelector((state) => state.monetization.blockedCountLast7d)
+  const recentBlockedSummary = useAppSelector((state) => state.monetization.recentBlockedSummary)
 
   const entitlementsRef = useRef(entitlementsData?.entitlements)
   useEffect(() => {
@@ -150,6 +164,21 @@ export function Layout() {
     .filter(({ pct }) => pct >= 80 && pct < 100)
     .slice(0, 3)
 
+  const atLimitKeys = Object.entries(limits)
+    .filter(([_, limit]) => limit != null && limit !== -1)
+    .filter(([key, limit]) => (usage[key] ?? 0) >= (limit as number))
+    .map(([key]) => key)
+    .slice(0, 3)
+
+  const recentBlockLimitKeys = recentBlockedSummary.limitKeys.map((x) => x.key)
+  const recentBlockFeatureKeys = recentBlockedSummary.featureKeys.map((x) => x.key)
+  const planBlockNudgeMessage =
+    formatPlanBlockNudgeMessage(recentBlockLimitKeys, recentBlockFeatureKeys) ??
+    formatAtPlanLimitMessage(atLimitKeys) ??
+    (blockedCountLast7d >= 3
+      ? "You've hit your plan limits several times this week. Check usage in settings and upgrade for more room."
+      : null)
+
   return (
     <BranchProvider>
       <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -220,8 +249,9 @@ export function Layout() {
               <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
                 <span className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
-                  Usage near limit:{' '}
-                  {nearLimitKeys.map(({ key }) => key.replace(/_/g, ' ')).join(', ')}.{' '}
+                  Usage near limit: {nearLimitKeys
+                    .map(({ key }) => getLimitLabel(key))
+                    .join(', ')}.{' '}
                   <button
                     type="button"
                     className="font-medium underline hover:no-underline"
@@ -260,15 +290,12 @@ export function Layout() {
                 </button>
               </div>
             )}
-            {user?.role !== 'ADMIN' && blockedCountLast7d >= 3 && (
+            {user?.role !== 'ADMIN' && blockedCountLast7d >= 3 && planBlockNudgeMessage && (
               <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)]">
-                <span>
-                  You&apos;ve hit plan limits several times recently. Upgrade for higher limits and
-                  more features.
-                </span>
+                <span>{planBlockNudgeMessage}</span>
                 <button
                   type="button"
-                  className="font-medium underline hover:no-underline"
+                  className="font-medium underline hover:no-underline shrink-0"
                   onClick={() => {
                     recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
                     openBrowseUpgrade(dispatch, { currentPlan: e?.plan?.name })

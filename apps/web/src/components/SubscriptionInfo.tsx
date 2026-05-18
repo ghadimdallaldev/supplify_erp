@@ -15,6 +15,7 @@ import { Skeleton } from './ui/skeleton'
 import { AlertCircle, AlertTriangle, Infinity, Layers, Lock, TrendingUp } from 'lucide-react'
 import { RecommendedBadge } from './RecommendedBadge'
 import { getPlanSubtitle } from '../lib/planComparison'
+import { getUsageMeterDisplay } from '../lib/usageDisplay'
 import {
   getExternallyDisabledFeatures,
   getPlanTierDisabledFeatures,
@@ -189,13 +190,15 @@ export function SubscriptionInfo() {
                 const current = usage[limitKey] ?? 0
                 const effectiveLimit: number | null = limit === -1 ? null : limit
                 if (effectiveLimit === null) return null
-                const limitNum = effectiveLimit
-                const pct = limitNum > 0 ? (current / limitNum) * 100 : 0
-                return { limitKey, limit: limitNum, current, pct }
+                const meter = getUsageMeterDisplay(current, effectiveLimit)
+                return { limitKey, limit: meter.limit, current: meter.actual, pct: meter.pct }
               })
               .filter((x): x is NonNullable<typeof x> => x !== null)
             const topNearLimit = [...withPct]
-              .filter(({ pct }) => pct >= 50 && pct < 100)
+              .filter(({ pct, current, limit }) => {
+                const meter = getUsageMeterDisplay(current, limit)
+                return !meter.atCap && pct >= 50 && pct < 100
+              })
               .sort((a, b) => b.pct - a.pct)
               .slice(0, 3)
             if (topNearLimit.length > 0) {
@@ -249,10 +252,8 @@ export function SubscriptionInfo() {
             const current = usage[limitKey] ?? 0
             const effectiveLimit: number | null = limit === -1 ? null : limit
             if (effectiveLimit === null) return null
-            const limitNum = effectiveLimit
-            const pct = limitNum > 0 ? (current / limitNum) * 100 : 0
-            const isOver = current >= limitNum
-            const isWarning = pct >= 80 && pct < 100
+            const meter = getUsageMeterDisplay(current, effectiveLimit)
+            const isWarning = meter.pct >= 80 && !meter.atCap
             const label = LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')
             return (
               <div key={limitKey} className="space-y-2">
@@ -260,23 +261,31 @@ export function SubscriptionInfo() {
                   <span>{label}</span>
                   <span
                     className={
-                      isOver ? 'text-[var(--red)] font-medium' : isWarning ? 'text-amber-600' : ''
+                      meter.atCap ? 'text-amber-700 font-medium' : isWarning ? 'text-amber-600' : ''
                     }
                   >
-                    {current} / {limitNum}
+                    {meter.display} / {meter.limit}
                   </span>
                 </div>
                 <Progress
-                  value={Math.min(pct, 100)}
-                  className={isOver ? 'bg-red-200' : isWarning ? 'bg-amber-100' : ''}
+                  value={meter.pct}
+                  className={meter.atCap ? 'bg-amber-100' : isWarning ? 'bg-amber-100' : ''}
                 />
-                {isOver && (
-                  <div className="flex items-center gap-2 text-sm text-[var(--red)]">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    Limit exceeded
+                {meter.atCap && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-amber-800">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      At plan limit
+                    </div>
+                    {meter.grandfathered && (
+                      <p className="text-xs text-[var(--text-muted)] pl-6">
+                        {meter.actual} on file; your plan allows {meter.limit}. Remove an extra
+                        account or upgrade to add more.
+                      </p>
+                    )}
                   </div>
                 )}
-                {isWarning && !isOver && (
+                {isWarning && !meter.atCap && (
                   <div className="flex items-center justify-between gap-2 text-sm text-amber-600">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -297,8 +306,8 @@ export function SubscriptionInfo() {
                             type: 'limit',
                             payload: {
                               limitKey,
-                              limitValue: limitNum,
-                              currentUsage: current,
+                              limitValue: meter.limit,
+                              currentUsage: meter.actual,
                               currentPlan: e.plan?.name ?? null,
                               recommendedPlans: [],
                               upgradeUrl: '/app/settings',

@@ -225,8 +225,8 @@ describe('Subscription lib', () => {
         .mockResolvedValueOnce({
           rows: [
             { code: 'free', name: 'Free', limits: { orders_per_day: 3 }, features: {} },
-            { code: 'bronze', name: 'Bronze', limits: { orders_per_day: 100 }, features: {} },
-            { code: 'gold', name: 'Gold', limits: { orders_per_day: 500 }, features: {} },
+            { code: 'bronze', name: 'Bronze', limits: { orders_per_day: 20 }, features: {} },
+            { code: 'gold', name: 'Gold', limits: { orders_per_day: 50 }, features: {} },
             { code: 'platinum', name: 'Platinum', limits: { orders_per_day: -1 }, features: {} },
           ],
         })

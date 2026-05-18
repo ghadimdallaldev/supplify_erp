@@ -268,18 +268,12 @@ elseif ($cmd -eq "seed") {
     node (Join-Path $RepoRoot "scripts\ensure-native-env.mjs")
     docker inspect supplify-api *> $null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "Running SQL migrations (Docker API)..."
-        docker exec supplify-api node apps/api/scripts/run-migration.js
-        Write-Host "Running database seed..."
-        docker exec supplify-api node apps/api/scripts/seed.js
-        Write-Host "Syncing Keycloak demo users..."
-        docker exec -e KEYCLOAK_BASE_URL=http://keycloak:8080 -e KEYCLOAK_ADMIN_PASSWORD=admin supplify-api node apps/api/scripts/seed-demo-users.js
+        Write-Host "Running full feature seed (migrations + prod-like data + chats + Keycloak)..."
+        docker exec -e ALLOW_PRODLIKE_SEED=true -e KEYCLOAK_BASE_URL=http://keycloak:8080 -e KEYCLOAK_ADMIN_PASSWORD=admin supplify-api node apps/api/scripts/seed-full.mjs
     } else {
-        Write-Host "API container not running — seeding via host Node/pnpm..."
+        Write-Host "API container not running — full feature seed via host Node/pnpm..."
         node (Join-Path $RepoRoot "scripts\dev-infra.mjs")
-        npx --yes pnpm@8.15.9 db:migrate
-        npx --yes pnpm@8.15.9 db:seed
-        npx --yes pnpm@8.15.9 seed:demo-users
+        npx --yes pnpm@8.15.9 seed:full
     }
     Write-Host "Bootstrap finished. Log in as restaurant@supplify.com / SupplifyRestaurant1!"
 }

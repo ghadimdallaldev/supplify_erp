@@ -15,22 +15,22 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { ShoppingCart, Trash2, Plus, Minus, Save, Calendar, FileText } from 'lucide-react'
-import { useAppDispatch } from '../hooks/redux'
-import {
-  updateQuantity,
-  removeItem,
-  clearCart,
-  saveDraft,
-  loadDraft,
-  deleteDraft,
-} from '../features/cart/cartSlice'
+import { useCartActions } from '../hooks/useCartActions'
 import toast from 'react-hot-toast'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { formatPrice } from '../utils/format'
 
 export function CartPage() {
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
-  const dispatch = useAppDispatch()
+  const {
+    updateQuantity,
+    removeItem,
+    clearCart,
+    saveDraft,
+    loadDraft,
+    deleteDraft,
+    rehydrateCart,
+  } = useCartActions()
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [createOrder] = useCreateOrderMutation()
 
@@ -44,12 +44,16 @@ export function CartPage() {
   const [deliveryDate, setDeliveryDate] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
 
+  useEffect(() => {
+    rehydrateCart()
+  }, [rehydrateCart])
+
   const handleUpdateQuantity = (productId: string, quantity: number) => {
-    dispatch(updateQuantity({ productId, quantity }))
+    updateQuantity(productId, quantity)
   }
 
   const handleRemoveItem = (productId: string) => {
-    dispatch(removeItem(productId))
+    removeItem(productId)
     toast.success('Item removed from cart')
   }
 
@@ -58,20 +62,20 @@ export function CartPage() {
       toast.error('Please enter a name for your draft')
       return
     }
-    dispatch(saveDraft({ name: draftName }))
+    saveDraft(draftName)
     setShowSaveDraft(false)
     setDraftName('')
     toast.success('Cart saved as draft!')
   }
 
   const handleLoadDraft = (draftId: string) => {
-    dispatch(loadDraft(draftId))
+    loadDraft(draftId)
     setShowLoadDraft(false)
     toast.success('Draft loaded into cart')
   }
 
   const handleDeleteDraft = (draftId: string) => {
-    dispatch(deleteDraft(draftId))
+    deleteDraft(draftId)
     toast.success('Draft deleted')
   }
 
@@ -102,7 +106,7 @@ export function CartPage() {
         notes: deliveryNotes || undefined,
       }).unwrap()
 
-      dispatch(clearCart())
+      clearCart()
       setShowOrderDetails(false)
       setDeliveryDate('')
       setDeliveryNotes('')
@@ -188,7 +192,7 @@ export function CartPage() {
             <Save className="h-4 w-4 mr-2" />
             Save Draft
           </Button>
-          <Button variant="outline" onClick={() => dispatch(clearCart())}>
+          <Button variant="outline" onClick={() => clearCart()}>
             Clear Cart
           </Button>
         </div>

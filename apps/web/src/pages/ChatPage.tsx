@@ -1,12 +1,45 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { io } from 'socket.io-client'
-import { useGetConversationsQuery, useGetMessagesQuery, useSendMessageMutation, useCreateConversationMutation, useMarkConversationReadMutation, useGetPresignedUrlMutation, useGetOrdersQuery, usePinConversationMutation, useArchiveConversationMutation, useDeleteConversationMutation } from '../services/api'
+import {
+  useGetConversationsQuery,
+  useGetMessagesQuery,
+  useSendMessageMutation,
+  useCreateConversationMutation,
+  useMarkConversationReadMutation,
+  useGetPresignedUrlMutation,
+  useGetOrdersQuery,
+  usePinConversationMutation,
+  useArchiveConversationMutation,
+  useDeleteConversationMutation,
+} from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { useAppSelector } from '../hooks/redux'
-import { MessageSquare, Send, Clock, Building2, Search, X, Reply, ChevronDown, Paperclip, Image as ImageIcon, Smile, ShoppingCart, FileText, Download, Eye, Pin, PinOff, Archive, ArchiveRestore, Trash2, MoreVertical } from 'lucide-react'
+import {
+  MessageSquare,
+  Send,
+  Clock,
+  Building2,
+  Search,
+  X,
+  Reply,
+  ChevronDown,
+  Paperclip,
+  Image as ImageIcon,
+  Smile,
+  ShoppingCart,
+  FileText,
+  Download,
+  Eye,
+  Pin,
+  PinOff,
+  Archive,
+  ArchiveRestore,
+  Trash2,
+  MoreVertical,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { format, isToday, isYesterday } from 'date-fns'
@@ -44,21 +77,33 @@ export function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { data: conversationsData, isLoading: conversationsLoading, refetch: refetchConversations } = useGetConversationsQuery()
+  const {
+    data: conversationsData,
+    isLoading: conversationsLoading,
+    refetch: refetchConversations,
+  } = useGetConversationsQuery()
 
-  const { data: messagesData, isLoading: messagesLoading, refetch: refetchMessages } = useGetMessagesQuery(
+  const {
+    data: messagesData,
+    isLoading: messagesLoading,
+    refetch: refetchMessages,
+  } = useGetMessagesQuery(
     { conversationId: selectedConversation! },
     { skip: !selectedConversation }
   )
 
   const [sendMessage, { isLoading: isSendingMessage }] = useSendMessageMutation()
-  const [createConversation, { isLoading: isCreatingConversation }] = useCreateConversationMutation()
+  const [createConversation, { isLoading: isCreatingConversation }] =
+    useCreateConversationMutation()
   const [markConversationRead] = useMarkConversationReadMutation()
   const [generatePresignedUrl, { isLoading: isUploadingFile }] = useGetPresignedUrlMutation()
   const [pinConversation] = usePinConversationMutation()
   const [archiveConversation] = useArchiveConversationMutation()
   const [deleteConversation] = useDeleteConversationMutation()
-  const { data: ordersData } = useGetOrdersQuery({ limit: 100, offset: 0 }, { skip: !selectedConversation })
+  const { data: ordersData } = useGetOrdersQuery(
+    { limit: 100, offset: 0 },
+    { skip: !selectedConversation }
+  )
 
   const conversations = conversationsData?.conversations || []
   const messages = messagesData?.messages || []
@@ -89,7 +134,11 @@ export function ChatPage() {
       })
 
       socketRef.current.on('user_typing', (data: any) => {
-        if (data.conversationId === selectedConversation && data.userId !== socketRef.current?.id && data.userId !== user?.id) {
+        if (
+          data.conversationId === selectedConversation &&
+          data.userId !== socketRef.current?.id &&
+          data.userId !== user?.id
+        ) {
           setOtherPartyTyping(data.isTyping)
         }
       })
@@ -117,10 +166,10 @@ export function ChatPage() {
         return
       }
       // Find existing conversation with this supplier
-      const existingConv = conversationsData?.conversations?.find((conv: any) => 
-        conv.supplier_id === supplierId
+      const existingConv = conversationsData?.conversations?.find(
+        (conv: any) => conv.supplier_id === supplierId
       )
-      
+
       if (existingConv) {
         setSelectedConversation(existingConv.id)
         // Remove supplier param from URL
@@ -145,7 +194,15 @@ export function ChatPage() {
           })
       }
     }
-  }, [searchParams, user?.role, conversationsData, conversationsLoading, isCreatingConversation, navigate, createConversation])
+  }, [
+    searchParams,
+    user?.role,
+    conversationsData,
+    conversationsLoading,
+    isCreatingConversation,
+    navigate,
+    createConversation,
+  ])
 
   // Auto-select conversation from URL params
   useEffect(() => {
@@ -263,8 +320,9 @@ export function ChatPage() {
 
   const handleDeleteConversation = async () => {
     if (!selectedConversation) return
-    if (!confirm('Are you sure you want to delete this conversation? This cannot be undone.')) return
-    
+    if (!confirm('Are you sure you want to delete this conversation? This cannot be undone.'))
+      return
+
     try {
       await deleteConversation(selectedConversation).unwrap()
       setSelectedConversation(null)
@@ -298,12 +356,12 @@ export function ChatPage() {
   useEffect(() => {
     if (selectedConversation && socketRef.current?.connected) {
       socketRef.current.emit('join_conversation', selectedConversation)
-      
+
       // Mark conversation as read when viewing
       markConversationRead(selectedConversation).catch((error: any) => {
         console.error('Failed to mark conversation as read:', error)
       })
-      
+
       // Reset search when changing conversation
       setSearchQuery('')
       setReplyingTo(null)
@@ -311,10 +369,10 @@ export function ChatPage() {
       setShowConversationMenu(false)
       setShowEmojiPicker(false)
       setShowOrderPicker(false)
-      
+
       // Scroll to bottom on conversation change
       setTimeout(() => scrollToBottom(), 100)
-      
+
       return () => {
         if (socketRef.current?.connected) {
           socketRef.current.emit('leave_conversation', selectedConversation)
@@ -324,10 +382,122 @@ export function ChatPage() {
   }, [selectedConversation, markConversationRead])
 
   // Emoji picker - simple emoji list
-  const commonEmojis = ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾']
+  const commonEmojis = [
+    '😀',
+    '😃',
+    '😄',
+    '😁',
+    '😆',
+    '😅',
+    '😂',
+    '🤣',
+    '😊',
+    '😇',
+    '🙂',
+    '🙃',
+    '😉',
+    '😌',
+    '😍',
+    '🥰',
+    '😘',
+    '😗',
+    '😙',
+    '😚',
+    '😋',
+    '😛',
+    '😝',
+    '😜',
+    '🤪',
+    '🤨',
+    '🧐',
+    '🤓',
+    '😎',
+    '🤩',
+    '🥳',
+    '😏',
+    '😒',
+    '😞',
+    '😔',
+    '😟',
+    '😕',
+    '🙁',
+    '☹️',
+    '😣',
+    '😖',
+    '😫',
+    '😩',
+    '🥺',
+    '😢',
+    '😭',
+    '😤',
+    '😠',
+    '😡',
+    '🤬',
+    '🤯',
+    '😳',
+    '🥵',
+    '🥶',
+    '😱',
+    '😨',
+    '😰',
+    '😥',
+    '😓',
+    '🤗',
+    '🤔',
+    '🤭',
+    '🤫',
+    '🤥',
+    '😶',
+    '😐',
+    '😑',
+    '😬',
+    '🙄',
+    '😯',
+    '😦',
+    '😧',
+    '😮',
+    '😲',
+    '🥱',
+    '😴',
+    '🤤',
+    '😪',
+    '😵',
+    '🤐',
+    '🥴',
+    '🤢',
+    '🤮',
+    '🤧',
+    '😷',
+    '🤒',
+    '🤕',
+    '🤑',
+    '🤠',
+    '😈',
+    '👿',
+    '👹',
+    '👺',
+    '🤡',
+    '💩',
+    '👻',
+    '💀',
+    '☠️',
+    '👽',
+    '👾',
+    '🤖',
+    '🎃',
+    '😺',
+    '😸',
+    '😹',
+    '😻',
+    '😼',
+    '😽',
+    '🙀',
+    '😿',
+    '😾',
+  ]
 
   const insertEmoji = (emoji: string) => {
-    setMessage(prev => prev + emoji)
+    setMessage((prev) => prev + emoji)
     setShowEmojiPicker(false)
   }
 
@@ -336,7 +506,7 @@ export function ChatPage() {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
-    const validFiles = files.filter(file => {
+    const validFiles = files.filter((file) => {
       const maxSize = 10 * 1024 * 1024 // 10MB
       if (file.size > maxSize) {
         toast.error(`${file.name} is too large (max 10MB)`)
@@ -345,18 +515,18 @@ export function ChatPage() {
       return true
     })
 
-    setSelectedFiles(prev => [...prev, ...validFiles])
-    
+    setSelectedFiles((prev) => [...prev, ...validFiles])
+
     // Create previews
-    validFiles.forEach(file => {
+    validFiles.forEach((file) => {
       if (file.type.startsWith('image/')) {
         const reader = new FileReader()
         reader.onloadend = () => {
-          setFilePreviews(prev => [...prev, reader.result as string])
+          setFilePreviews((prev) => [...prev, reader.result as string])
         }
         reader.readAsDataURL(file)
       } else {
-        setFilePreviews(prev => [...prev, ''])
+        setFilePreviews((prev) => [...prev, ''])
       }
     })
 
@@ -366,16 +536,18 @@ export function ChatPage() {
   }
 
   const removeFile = (index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
-    setFilePreviews(prev => prev.filter((_, i) => i !== index))
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSendMessage = async () => {
-    if ((!message.trim() && selectedFiles.length === 0 && !selectedOrder) || !selectedConversation) return
-    
-    const messageContent = message.trim() || (selectedOrder ? `📦 Order #${selectedOrder.id.slice(0, 8)}` : '')
+    if ((!message.trim() && selectedFiles.length === 0 && !selectedOrder) || !selectedConversation)
+      return
+
+    const messageContent =
+      message.trim() || (selectedOrder ? `📦 Order #${selectedOrder.id.slice(0, 8)}` : '')
     const replyToId = replyingTo?.id || null
-    
+
     try {
       const attachments: any[] = []
 
@@ -390,7 +562,13 @@ export function ChatPage() {
             }).unwrap()
 
             // Upload to S3/MinIO
-            const uploadResponse = await fetch(presignedResponse.url, {
+            const uploadUrl =
+              presignedResponse.presignedUrl || (presignedResponse as { url?: string }).url
+            if (!uploadUrl) {
+              throw new Error('Missing upload URL from server')
+            }
+
+            const uploadResponse = await fetch(uploadUrl, {
               method: 'PUT',
               body: file,
               headers: {
@@ -402,7 +580,7 @@ export function ChatPage() {
               throw new Error('Failed to upload file')
             }
 
-            const fileUrl = presignedResponse.url.split('?')[0]
+            const fileUrl = uploadUrl.split('?')[0]
             attachments.push({
               fileUrl,
               fileType: file.type,
@@ -424,7 +602,7 @@ export function ChatPage() {
         orderId: selectedOrder?.id || undefined,
         messageType: selectedOrder ? 'ORDER_REFERENCE' : undefined,
       }).unwrap()
-      
+
       // Stop typing indicator
       if (typingTimeout) {
         clearTimeout(typingTimeout)
@@ -433,7 +611,7 @@ export function ChatPage() {
         conversationId: selectedConversation,
         isTyping: false,
       })
-      
+
       setMessage('')
       setReplyingTo(null)
       setSelectedFiles([])
@@ -441,7 +619,7 @@ export function ChatPage() {
       setSelectedOrder(null)
       // Refetch messages and conversations so UI shows persisted message immediately
       await Promise.all([refetchMessages(), refetchConversations()])
-      
+
       // Scroll to bottom after sending
       setTimeout(() => scrollToBottom(), 100)
     } catch (error: any) {
@@ -451,16 +629,14 @@ export function ChatPage() {
 
   // Filter messages by search query
   const filteredMessages = searchQuery
-    ? messages.filter((msg: any) =>
-        msg.content.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? messages.filter((msg: any) => msg.content.toLowerCase().includes(searchQuery.toLowerCase()))
     : messages
 
   // Group messages by date
   const groupedMessages = filteredMessages.reduce((groups: any[], msg: any) => {
     const date = new Date(msg.created_at).toDateString()
     const lastGroup = groups[groups.length - 1]
-    
+
     if (!lastGroup || lastGroup.date !== date) {
       groups.push({
         date,
@@ -469,7 +645,7 @@ export function ChatPage() {
     } else {
       lastGroup.messages.push(msg)
     }
-    
+
     return groups
   }, [])
 
@@ -504,7 +680,9 @@ export function ChatPage() {
                   <p className="font-medium">No conversations yet</p>
                   {user?.role === 'RESTAURANT' && (
                     <>
-                      <p className="text-xs">Browse suppliers and click "Message" to start chatting</p>
+                      <p className="text-xs">
+                        Browse suppliers and click "Message" to start chatting
+                      </p>
                       <Link to="/app/suppliers">
                         <Button variant="outline" size="sm" className="mt-2">
                           <Building2 className="h-4 w-4 mr-2" />
@@ -515,51 +693,53 @@ export function ChatPage() {
                   )}
                 </div>
               ) : (
-                [...conversations].sort((a: any, b: any) => {
-                  // Pinned conversations first
-                  if (a.is_pinned && !b.is_pinned) return -1
-                  if (!a.is_pinned && b.is_pinned) return 1
-                  return 0
-                }).map((conv: any) => (
-                  <button
-                    key={conv.id}
-                    onClick={() => setSelectedConversation(conv.id)}
-                    className={`w-full p-4 text-left hover:bg-accent transition-colors border-l-2 ${
-                      selectedConversation === conv.id 
-                        ? 'bg-accent border-l-primary' 
-                        : conv.is_pinned 
-                          ? 'border-l-[var(--brand-mid)] bg-[var(--brand-ultra)]/50 dark:bg-[var(--brand)]/20' 
-                          : 'border-l-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2 font-medium">
-                        {conv.is_pinned && (
-                          <Pin className="h-3 w-3 text-[var(--brand-mid)] dark:text-[var(--brand-light)] fill-current" />
+                [...conversations]
+                  .sort((a: any, b: any) => {
+                    // Pinned conversations first
+                    if (a.is_pinned && !b.is_pinned) return -1
+                    if (!a.is_pinned && b.is_pinned) return 1
+                    return 0
+                  })
+                  .map((conv: any) => (
+                    <button
+                      key={conv.id}
+                      onClick={() => setSelectedConversation(conv.id)}
+                      className={`w-full p-4 text-left hover:bg-accent transition-colors border-l-2 ${
+                        selectedConversation === conv.id
+                          ? 'bg-accent border-l-primary'
+                          : conv.is_pinned
+                            ? 'border-l-[var(--brand-mid)] bg-[var(--brand-ultra)]/50 dark:bg-[var(--brand)]/20'
+                            : 'border-l-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2 font-medium">
+                          {conv.is_pinned && (
+                            <Pin className="h-3 w-3 text-[var(--brand-mid)] dark:text-[var(--brand-light)] fill-current" />
+                          )}
+                          {conv.participant_name}
+                        </div>
+                        {conv.unread_count > 0 && (
+                          <span className="bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] text-white text-xs rounded-full px-2 py-0.5 font-semibold shadow-sm">
+                            {conv.unread_count}
+                          </span>
                         )}
-                        {conv.participant_name}
                       </div>
-                      {conv.unread_count > 0 && (
-                        <span className="bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] text-white text-xs rounded-full px-2 py-0.5 font-semibold shadow-sm">
-                          {conv.unread_count}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-[var(--text-muted)] truncate">
-                      {conv.last_message_preview || 'No messages yet'}
-                    </div>
-                    <div className="text-xs text-[var(--text-muted)] mt-1">
-                      {conv.last_message_at ? (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatConversationDate(conv.last_message_at)}
-                        </span>
-                      ) : (
-                        <span>No messages</span>
-                      )}
-                    </div>
-                  </button>
-                ))
+                      <div className="text-sm text-[var(--text-muted)] truncate">
+                        {conv.last_message_preview || 'No messages yet'}
+                      </div>
+                      <div className="text-xs text-[var(--text-muted)] mt-1">
+                        {conv.last_message_at ? (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatConversationDate(conv.last_message_at)}
+                          </span>
+                        ) : (
+                          <span>No messages</span>
+                        )}
+                      </div>
+                    </button>
+                  ))
               )}
             </div>
           </CardContent>
@@ -576,7 +756,8 @@ export function ChatPage() {
                       {conversations.find((c: any) => c.id === selectedConversation)?.is_pinned && (
                         <Pin className="h-4 w-4 text-[var(--brand-mid)] dark:text-[var(--brand-light)] fill-current" />
                       )}
-                      {conversations.find((c: any) => c.id === selectedConversation)?.participant_name || 'Chat'}
+                      {conversations.find((c: any) => c.id === selectedConversation)
+                        ?.participant_name || 'Chat'}
                     </CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
@@ -593,8 +774,8 @@ export function ChatPage() {
                           onClick={() => setSearchQuery('')}
                           className="absolute right-2 top-1/2 transform -translate-y-1/2"
                         >
-                            <X className="h-4 w-4 text-[var(--text-muted)]" />
-                          </button>
+                          <X className="h-4 w-4 text-[var(--text-muted)]" />
+                        </button>
                       )}
                     </div>
                     <div className="relative conversation-menu-container">
@@ -615,7 +796,8 @@ export function ChatPage() {
                             }}
                             className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--brand-ultra)] text-sm transition-colors"
                           >
-                            {conversations.find((c: any) => c.id === selectedConversation)?.is_pinned ? (
+                            {conversations.find((c: any) => c.id === selectedConversation)
+                              ?.is_pinned ? (
                               <>
                                 <PinOff className="h-4 w-4" />
                                 Unpin
@@ -664,7 +846,9 @@ export function ChatPage() {
                     <div className="text-center text-[var(--text-muted)]">Loading messages...</div>
                   ) : filteredMessages.length === 0 ? (
                     <div className="text-center text-[var(--text-muted)]">
-                      {searchQuery ? 'No messages found' : 'No messages yet. Start the conversation!'}
+                      {searchQuery
+                        ? 'No messages found'
+                        : 'No messages yet. Start the conversation!'}
                     </div>
                   ) : (
                     <>
@@ -673,22 +857,32 @@ export function ChatPage() {
                           {/* Date Separator */}
                           <div className="flex items-center justify-center my-6">
                             <div className="bg-gradient-to-r from-[var(--brand-ultra)] to-[var(--brand-pale)] dark:from-[var(--brand)] dark:to-[var(--text)] px-4 py-1.5 rounded-full text-xs font-medium text-[var(--brand-mid)] dark:text-[var(--brand-light)] shadow-sm border border-[var(--app-border)] dark:border-[var(--brand)]">
-                              {isToday(new Date(group.date)) ? '📅 Today' : isYesterday(new Date(group.date)) ? '📅 Yesterday' : `📅 ${format(new Date(group.date), 'MMMM d, yyyy')}`}
+                              {isToday(new Date(group.date))
+                                ? '📅 Today'
+                                : isYesterday(new Date(group.date))
+                                  ? '📅 Yesterday'
+                                  : `📅 ${format(new Date(group.date), 'MMMM d, yyyy')}`}
                             </div>
                           </div>
-                          
+
                           {group.messages.map((msg: any, msgIndex: number) => {
                             const isMyMessage = msg.sender_type === user?.role?.toUpperCase()
                             const prevMsg = msgIndex > 0 ? group.messages[msgIndex - 1] : null
-                            const showSender = !prevMsg || prevMsg.sender_id !== msg.sender_id || 
-                              new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() > 300000 // 5 minutes
-                            
+                            const showSender =
+                              !prevMsg ||
+                              prevMsg.sender_id !== msg.sender_id ||
+                              new Date(msg.created_at).getTime() -
+                                new Date(prevMsg.created_at).getTime() >
+                                300000 // 5 minutes
+
                             return (
                               <div
                                 key={msg.id}
                                 className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} mb-1`}
                               >
-                                <div className={`max-w-[75%] ${isMyMessage ? 'flex flex-col items-end' : 'flex flex-col items-start'}`}>
+                                <div
+                                  className={`max-w-[75%] ${isMyMessage ? 'flex flex-col items-end' : 'flex flex-col items-start'}`}
+                                >
                                   {replyingTo?.id === msg.id && (
                                     <div className="text-xs text-[var(--text-muted)] mb-1 px-2">
                                       Replying to: {msg.content.substring(0, 50)}...
@@ -702,38 +896,54 @@ export function ChatPage() {
                                     }`}
                                   >
                                     {msg.reply_to && msg.reply_to_content && (
-                                      <div className={`text-xs mb-1 pb-1 border-b ${isMyMessage ? 'border-white/20' : 'border-[var(--app-border)]'} opacity-70`}>
+                                      <div
+                                        className={`text-xs mb-1 pb-1 border-b ${isMyMessage ? 'border-white/20' : 'border-[var(--app-border)]'} opacity-70`}
+                                      >
                                         <div className="flex items-start gap-1">
                                           <Reply className="h-3 w-3 mt-0.5 flex-shrink-0" />
                                           <div className="flex-1 min-w-0">
                                             <div className="font-medium">
-                                              {msg.reply_to_sender_type === user?.role?.toUpperCase() ? 'You' : 
-                                               msg.reply_to_supplier_name || msg.reply_to_restaurant_name || 'User'}
+                                              {msg.reply_to_sender_type ===
+                                              user?.role?.toUpperCase()
+                                                ? 'You'
+                                                : msg.reply_to_supplier_name ||
+                                                  msg.reply_to_restaurant_name ||
+                                                  'User'}
                                             </div>
                                             <div className="truncate">{msg.reply_to_content}</div>
                                           </div>
                                         </div>
                                       </div>
                                     )}
-                                    
+
                                     {/* Order Details */}
                                     {msg.order_id && (
-                                      <div className={`mb-2 p-3 rounded-lg border-2 ${
-                                        isMyMessage 
-                                          ? 'bg-white/10 border-white/20' 
-                                          : 'bg-[var(--brand-ultra)] dark:bg-[var(--text)] border-[var(--app-border-mid)] dark:border-[var(--app-border-mid)]'
-                                      }`}>
+                                      <div
+                                        className={`mb-2 p-3 rounded-lg border-2 ${
+                                          isMyMessage
+                                            ? 'bg-white/10 border-white/20'
+                                            : 'bg-[var(--brand-ultra)] dark:bg-[var(--text)] border-[var(--app-border-mid)] dark:border-[var(--app-border-mid)]'
+                                        }`}
+                                      >
                                         <div className="flex items-center gap-2 mb-2">
-                                          <ShoppingCart className={`h-4 w-4 ${isMyMessage ? 'text-white' : 'text-[var(--brand-mid)]'}`} />
-                                          <span className={`font-semibold text-sm ${isMyMessage ? 'text-white' : 'text-[var(--text)]'}`}>
+                                          <ShoppingCart
+                                            className={`h-4 w-4 ${isMyMessage ? 'text-white' : 'text-[var(--brand-mid)]'}`}
+                                          />
+                                          <span
+                                            className={`font-semibold text-sm ${isMyMessage ? 'text-white' : 'text-[var(--text)]'}`}
+                                          >
                                             Order Reference
                                           </span>
                                         </div>
-                                        <div className={`text-xs ${isMyMessage ? 'text-white/90' : 'text-[var(--text-muted)] dark:text-[var(--text-muted)]'}`}>
+                                        <div
+                                          className={`text-xs ${isMyMessage ? 'text-white/90' : 'text-[var(--text-muted)] dark:text-[var(--text-muted)]'}`}
+                                        >
                                           Order ID: {msg.order_id.slice(0, 8)}...
                                         </div>
-                                        {ordersData?.orders?.find((o: any) => o.id === msg.order_id) && (
-                                          <Link 
+                                        {ordersData?.orders?.find(
+                                          (o: any) => o.id === msg.order_id
+                                        ) && (
+                                          <Link
                                             to={`/app/orders/${msg.order_id}`}
                                             className="text-xs mt-1 inline-flex items-center gap-1 underline"
                                           >
@@ -743,32 +953,42 @@ export function ChatPage() {
                                         )}
                                       </div>
                                     )}
-                                    
+
                                     {/* Attachments */}
                                     {msg.attachments && msg.attachments.length > 0 && (
                                       <div className="mb-2 space-y-2">
                                         {msg.attachments.map((att: any, attIndex: number) => (
-                                          <div key={att.id || attIndex} className="rounded-lg overflow-hidden">
+                                          <div
+                                            key={att.id || attIndex}
+                                            className="rounded-lg overflow-hidden"
+                                          >
                                             {att.fileType?.startsWith('image/') ? (
-                                              <a href={att.fileUrl} target="_blank" rel="noopener noreferrer" className="block">
-                                                <img 
-                                                  src={att.fileUrl} 
-                                                  alt={att.fileName || 'Attachment'} 
+                                              <a
+                                                href={att.fileUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="block"
+                                              >
+                                                <img
+                                                  src={att.fileUrl}
+                                                  alt={att.fileName || 'Attachment'}
                                                   className="max-w-full h-auto max-h-64 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                                 />
                                               </a>
                                             ) : (
-                                              <a 
-                                                href={att.fileUrl} 
+                                              <a
+                                                href={att.fileUrl}
                                                 download={att.fileName}
                                                 className={`flex items-center gap-2 p-2 rounded-lg border ${
-                                                  isMyMessage 
-                                                    ? 'bg-white/10 border-white/20 text-white hover:bg-white/20' 
+                                                  isMyMessage
+                                                    ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
                                                     : 'bg-[var(--brand-ultra)] border-[var(--app-border-mid)] hover:bg-[var(--brand-pale)]'
                                                 } transition-colors`}
                                               >
                                                 <FileText className="h-4 w-4" />
-                                                <span className="text-sm truncate">{att.fileName}</span>
+                                                <span className="text-sm truncate">
+                                                  {att.fileName}
+                                                </span>
                                                 <Download className="h-3 w-3 ml-auto" />
                                               </a>
                                             )}
@@ -776,8 +996,10 @@ export function ChatPage() {
                                         ))}
                                       </div>
                                     )}
-                                    
-                                    <div className="text-sm break-words whitespace-pre-wrap">{msg.content}</div>
+
+                                    <div className="text-sm break-words whitespace-pre-wrap">
+                                      {msg.content}
+                                    </div>
                                     <div
                                       className={`text-xs mt-1 flex items-center gap-1 ${
                                         isMyMessage ? 'text-white/70' : 'text-[var(--text-muted)]'
@@ -809,22 +1031,33 @@ export function ChatPage() {
                           })}
                         </div>
                       ))}
-                      
+
                       {/* Typing Indicator - Only show when OTHER party is typing */}
                       {otherPartyTyping && (
                         <div className="flex justify-start mb-2">
                           <div className="bg-gradient-to-br from-[var(--brand-ultra)] to-[var(--app-border-mid)] rounded-2xl px-4 py-2.5 shadow-sm border border-[var(--app-border)]">
                             <div className="flex gap-1.5 items-center">
                               <span className="text-base">✍️</span>
-                              <div className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                              <div className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                              <div className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                              <span className="text-xs text-[var(--text-muted)] ml-2">typing...</span>
+                              <div
+                                className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce"
+                                style={{ animationDelay: '0ms' }}
+                              />
+                              <div
+                                className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce"
+                                style={{ animationDelay: '150ms' }}
+                              />
+                              <div
+                                className="w-2 h-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] rounded-full animate-bounce"
+                                style={{ animationDelay: '300ms' }}
+                              />
+                              <span className="text-xs text-[var(--text-muted)] ml-2">
+                                typing...
+                              </span>
                             </div>
                           </div>
                         </div>
                       )}
-                      
+
                       <div ref={messagesEndRef} />
                     </>
                   )}
@@ -864,9 +1097,16 @@ export function ChatPage() {
                 {(selectedFiles.length > 0 || selectedOrder) && (
                   <div className="border-t px-4 py-3 bg-[var(--brand-ultra)]/30 space-y-2">
                     {selectedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-background rounded-lg border">
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 p-2 bg-background rounded-lg border"
+                      >
                         {filePreviews[index] ? (
-                          <img src={filePreviews[index]} alt={file.name} className="h-12 w-12 rounded object-cover" />
+                          <img
+                            src={filePreviews[index]}
+                            alt={file.name}
+                            className="h-12 w-12 rounded object-cover"
+                          />
                         ) : (
                           <div className="h-12 w-12 rounded bg-[var(--brand-ultra)] flex items-center justify-center">
                             <FileText className="h-6 w-6 text-[var(--text-muted)]" />
@@ -874,7 +1114,9 @@ export function ChatPage() {
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm truncate">{file.name}</div>
-                          <div className="text-xs text-[var(--text-muted)]">{(file.size / 1024).toFixed(1)} KB</div>
+                          <div className="text-xs text-[var(--text-muted)]">
+                            {(file.size / 1024).toFixed(1)} KB
+                          </div>
                         </div>
                         <Button
                           variant="ghost"
@@ -890,9 +1132,13 @@ export function ChatPage() {
                       <div className="flex items-center gap-2 p-2 bg-background rounded-lg border">
                         <ShoppingCart className="h-5 w-5 text-[var(--brand-mid)]" />
                         <div className="flex-1">
-                          <div className="text-sm font-medium">Order #{selectedOrder.id.slice(0, 8)}</div>
+                          <div className="text-sm font-medium">
+                            Order #{selectedOrder.id.slice(0, 8)}
+                          </div>
                           <div className="text-xs text-[var(--text-muted)]">
-                            {selectedOrder.total_amount ? formatPrice(selectedOrder.total_amount) : 'View details'}
+                            {selectedOrder.total_amount
+                              ? formatPrice(selectedOrder.total_amount)
+                              : 'View details'}
                           </div>
                         </div>
                         <Button
@@ -926,7 +1172,7 @@ export function ChatPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="flex gap-2 items-end">
                     <div className="flex gap-1">
                       <input
@@ -982,23 +1228,33 @@ export function ChatPage() {
                           handleSendMessage()
                         }
                       }}
-                      placeholder={replyingTo ? `Reply to ${replyingTo.sender_type === user?.role?.toUpperCase() ? 'yourself' : 'message'}...` : "Type a message..."}
+                      placeholder={
+                        replyingTo
+                          ? `Reply to ${replyingTo.sender_type === user?.role?.toUpperCase() ? 'yourself' : 'message'}...`
+                          : 'Type a message...'
+                      }
                       className="flex-1 min-h-[36px]"
                       disabled={isSendingMessage || isUploadingFile}
                     />
-                    <Button 
-                      onClick={handleSendMessage} 
-                      disabled={(!message.trim() && selectedFiles.length === 0 && !selectedOrder) || isSendingMessage || isUploadingFile}
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={
+                        (!message.trim() && selectedFiles.length === 0 && !selectedOrder) ||
+                        isSendingMessage ||
+                        isUploadingFile
+                      }
                       className="h-9 px-4 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] hover:opacity-90 text-white shadow-md"
                     >
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   {/* Order Picker */}
                   {showOrderPicker && ordersData?.orders && (
                     <div className="order-picker-container mt-2 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-[var(--app-border)] dark:border-[var(--app-border-mid)]">
-                      <div className="text-xs font-medium mb-2 text-[var(--text-muted)]">Select an order to share:</div>
+                      <div className="text-xs font-medium mb-2 text-[var(--text-muted)]">
+                        Select an order to share:
+                      </div>
                       <div className="space-y-1">
                         {ordersData.orders.slice(0, 5).map((order: any) => (
                           <button
@@ -1011,7 +1267,8 @@ export function ChatPage() {
                           >
                             <div className="font-medium">Order #{order.id.slice(0, 8)}</div>
                             <div className="text-xs text-[var(--text-muted)]">
-                              {order.total_amount ? formatPrice(order.total_amount) : 'No amount'} • {order.status}
+                              {order.total_amount ? formatPrice(order.total_amount) : 'No amount'} •{' '}
+                              {order.status}
                             </div>
                           </button>
                         ))}

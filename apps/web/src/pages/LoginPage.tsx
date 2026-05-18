@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Alert, AlertDescription } from '../components/ui/alert'
-import { Badge } from '../components/ui/badge'
 import {
   Loader2,
   LogIn,
@@ -15,8 +14,9 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { SupplifyLogo } from '../components/SupplifyLogo'
+import { DemoLoginAccountsPanel } from '../components/DemoLoginAccountsPanel'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
 
 export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -47,30 +47,6 @@ export function LoginPage() {
     { icon: Shield, title: 'Secure', desc: 'Enterprise-grade security' },
   ]
 
-  const demoAccounts = [
-    {
-      role: 'Admin',
-      email: 'admin@supplify.com',
-      password: 'SupplifyAdmin1!',
-      bg: 'var(--brand-pale)',
-      color: 'var(--brand-mid)',
-    },
-    {
-      role: 'Supplier',
-      email: 'supplier@supplify.com',
-      password: 'SupplifySupplier1!',
-      bg: 'var(--brand-pale)',
-      color: 'var(--brand-mid)',
-    },
-    {
-      role: 'Restaurant',
-      email: 'restaurant@supplify.com',
-      password: 'SupplifyRestaurant1!',
-      bg: 'var(--mint-pale)',
-      color: 'var(--mint)',
-    },
-  ]
-
   return (
     <div className="min-h-screen flex">
       {/* Left side - Branding and Features */}
@@ -83,12 +59,31 @@ export function LoginPage() {
             <SupplifyLogo size={48} variant="lockup" theme="dark" tagline={true} />
           </div>
 
-          <h2 style={{ fontSize: 40, fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 16, lineHeight: 1.1 }}>
-            Connect.<br />Order.<br />Grow.
+          <h2
+            style={{
+              fontSize: 40,
+              fontWeight: 900,
+              letterSpacing: '-0.03em',
+              marginBottom: 16,
+              lineHeight: 1.1,
+            }}
+          >
+            Connect.
+            <br />
+            Order.
+            <br />
+            Grow.
           </h2>
-          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.75)', maxWidth: 360, lineHeight: 1.6 }}>
-            The platform connecting restaurants with trusted F&amp;B suppliers. Streamline operations,
-            reduce costs, scale your business.
+          <p
+            style={{
+              fontSize: 16,
+              color: 'rgba(255,255,255,0.75)',
+              maxWidth: 360,
+              lineHeight: 1.6,
+            }}
+          >
+            The platform connecting restaurants with trusted F&amp;B suppliers. Streamline
+            operations, reduce costs, scale your business.
           </p>
         </div>
 
@@ -111,7 +106,16 @@ export function LoginPage() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            color: 'rgba(255,255,255,0.5)',
+            fontSize: 13,
+            marginTop: 24,
+          }}
+        >
           <CheckCircle2 style={{ width: 14, height: 14, color: '#10b981' }} />
           <span>Trusted by 100+ restaurants and suppliers</span>
         </div>
@@ -119,22 +123,30 @@ export function LoginPage() {
 
       {/* Right side - Login Form */}
       <div
-        className="flex-1 flex items-center justify-center p-8"
+        className="flex-1 flex items-start lg:items-center justify-center p-4 sm:p-8 overflow-y-auto"
         style={{ background: 'var(--bg)' }}
         data-testid="login-page"
       >
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full max-w-lg space-y-6 py-4">
           {/* Mobile Logo */}
           <div className="lg:hidden flex justify-center mb-8">
             <SupplifyLogo size={44} variant="lockup" theme="light" tagline={true} />
           </div>
 
-          <Card style={{ border: '1px solid var(--app-border)', boxShadow: '0 8px 32px rgba(91,33,182,0.10)' }}>
+          <Card
+            style={{
+              border: '1px solid var(--app-border)',
+              boxShadow: '0 8px 32px rgba(91,33,182,0.10)',
+            }}
+          >
             <CardHeader className="space-y-1 pb-4">
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                 <SupplifyLogo size={56} variant="mark" />
               </div>
-              <CardTitle className="text-2xl text-center" style={{ color: 'var(--text)', fontWeight: 900, letterSpacing: '-0.02em' }}>
+              <CardTitle
+                className="text-2xl text-center"
+                style={{ color: 'var(--text)', fontWeight: 900, letterSpacing: '-0.02em' }}
+              >
                 Welcome back
               </CardTitle>
               <CardDescription className="text-center" style={{ color: 'var(--text-muted)' }}>
@@ -190,52 +202,7 @@ export function LoginPage() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <p className="text-xs text-center text-[var(--text-muted)] mb-4">
-                  Try these demo accounts to explore different roles
-                </p>
-                {demoAccounts.map((account, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: 8,
-                      background: account.bg,
-                      border: `1px solid ${account.color}33`,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: account.color,
-                          background: 'white',
-                          borderRadius: 4,
-                          padding: '2px 7px',
-                          letterSpacing: '0.04em',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {account.role}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span
-                        style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}
-                      >
-                        {account.email}
-                      </span>
-                      <span style={{ color: 'var(--text-muted)' }}>
-                        Password:{' '}
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          {account.password}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <DemoLoginAccountsPanel />
 
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-center space-x-6 text-xs text-[var(--text-muted)]">

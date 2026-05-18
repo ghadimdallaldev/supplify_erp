@@ -1,12 +1,21 @@
 import { useState, useMemo } from 'react'
-import { useGetQuickListsQuery, useCreateQuickListMutation, useDeleteQuickListMutation, useGetProductsQuery, useAddItemToQuickListMutation, useScheduleQuickListMutation, useUnscheduleQuickListMutation, useGetQuickListQuery } from '../services/api'
+import {
+  useGetQuickListsQuery,
+  useCreateQuickListMutation,
+  useDeleteQuickListMutation,
+  useGetProductsQuery,
+  useAddItemToQuickListMutation,
+  useScheduleQuickListMutation,
+  useUnscheduleQuickListMutation,
+  useGetQuickListQuery,
+} from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
-import { 
-  List, 
-  Plus, 
+import {
+  List,
+  Plus,
   ShoppingCart,
   Trash2,
   Edit,
@@ -22,14 +31,21 @@ import {
   Eye,
   Filter,
   Zap,
-  TrendingUp
+  TrendingUp,
 } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import toast from 'react-hot-toast'
 import { useAppDispatch } from '../hooks/redux'
-import { addItem } from '../features/cart/cartSlice'
+import { useCartActions } from '../hooks/useCartActions'
 import { useNavigate } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
 
@@ -46,17 +62,22 @@ export function QuickListsPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'scheduled' | 'unscheduled'>('all')
   const [newListName, setNewListName] = useState('')
   const [newListDescription, setNewListDescription] = useState('')
-  const [scheduleFrequency, setScheduleFrequency] = useState<'DAILY' | 'WEEKLY' | 'WEEKLY_3X' | 'BIWEEKLY' | 'MONTHLY'>('WEEKLY')
+  const [scheduleFrequency, setScheduleFrequency] = useState<
+    'DAILY' | 'WEEKLY' | 'WEEKLY_3X' | 'BIWEEKLY' | 'MONTHLY'
+  >('WEEKLY')
   const [scheduleDays, setScheduleDays] = useState<string[]>(['MONDAY', 'WEDNESDAY', 'FRIDAY'])
   const [scheduleTime, setScheduleTime] = useState('09:00')
   const [autoCreateOrder, setAutoCreateOrder] = useState(true)
-  
+
   const dispatch = useAppDispatch()
+  const { addItem } = useCartActions()
   const navigate = useNavigate()
-  
+
   const { data, isLoading, refetch } = useGetQuickListsQuery()
   const { data: productsData } = useGetProductsQuery({ limit: 1000 })
-  const { data: selectedListDetailsData } = useGetQuickListQuery(selectedListForDetails?.id || '', { skip: !selectedListForDetails })
+  const { data: selectedListDetailsData } = useGetQuickListQuery(selectedListForDetails?.id || '', {
+    skip: !selectedListForDetails,
+  })
   const selectedListDetails = selectedListDetailsData?.quickList
   const [createQuickList] = useCreateQuickListMutation()
   const [deleteQuickList] = useDeleteQuickListMutation()
@@ -74,7 +95,7 @@ export function QuickListsPage() {
       await createQuickList({
         name: newListName,
         description: newListDescription,
-        items: []
+        items: [],
       }).unwrap()
       toast.success('Quick list created!')
       setShowCreateDialog(false)
@@ -93,7 +114,7 @@ export function QuickListsPage() {
 
   const handleAddProductToList = async (product: any) => {
     if (!selectedListId) return
-    
+
     try {
       await addItemToQuickList({
         quickListId: selectedListId,
@@ -101,8 +122,8 @@ export function QuickListsPage() {
           productId: product.id,
           supplierId: product.supplier_id,
           quantity: 1,
-          notes: ''
-        }
+          notes: '',
+        },
       }).unwrap()
       toast.success(`Added ${product.name} to list!`)
       refetch()
@@ -111,9 +132,10 @@ export function QuickListsPage() {
     }
   }
 
-  const filteredProducts = productsData?.products?.filter((product: any) =>
-    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(productSearch.toLowerCase())
+  const filteredProducts = productsData?.products?.filter(
+    (product: any) =>
+      product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.sku?.toLowerCase().includes(productSearch.toLowerCase())
   )
 
   const handleDeleteList = async (listId: string, listName: string) => {
@@ -134,29 +156,29 @@ export function QuickListsPage() {
       toast.error('List not found')
       return
     }
-    
+
     // If list doesn't have items array, fetch it from API
     if (!list.items || list.items.length === 0) {
       toast.error('This list has no items')
       return
     }
-    
+
     try {
       // Add all items from the quick list to cart
       for (const item of list.items) {
         // Fetch product details
         const product = productsData?.products?.find((p: any) => p.id === item.product_id)
         if (product) {
-          dispatch(addItem({
+          addItem({
             productId: product.id,
             product,
             quantity: parseFloat(item.quantity) || 1,
-          }))
+          })
         }
       }
-      
+
       toast.success(`Added ${list.items?.length || 0} items from "${list.name}" to cart!`)
-      
+
       // Optionally navigate to cart
       setTimeout(() => {
         navigate('/app/cart')
@@ -165,24 +187,29 @@ export function QuickListsPage() {
       toast.error('Failed to add items to cart')
     }
   }
-  
+
   const handleScheduleOrder = (list: any) => {
     setSelectedListForSchedule(list)
-    
+
     // Pre-populate with existing schedule if available, otherwise use defaults
     if (list.is_scheduled && list.frequency) {
       setScheduleFrequency(list.frequency)
       if (list.days_of_week) {
         try {
-          const days = typeof list.days_of_week === 'string' 
-            ? JSON.parse(list.days_of_week) 
-            : list.days_of_week
+          const days =
+            typeof list.days_of_week === 'string'
+              ? JSON.parse(list.days_of_week)
+              : list.days_of_week
           setScheduleDays(Array.isArray(days) ? days : [])
         } catch {
-          setScheduleDays(list.frequency === 'WEEKLY' ? ['MONDAY'] : ['MONDAY', 'WEDNESDAY', 'FRIDAY'])
+          setScheduleDays(
+            list.frequency === 'WEEKLY' ? ['MONDAY'] : ['MONDAY', 'WEDNESDAY', 'FRIDAY']
+          )
         }
       } else {
-        setScheduleDays(list.frequency === 'WEEKLY' ? ['MONDAY'] : ['MONDAY', 'WEDNESDAY', 'FRIDAY'])
+        setScheduleDays(
+          list.frequency === 'WEEKLY' ? ['MONDAY'] : ['MONDAY', 'WEDNESDAY', 'FRIDAY']
+        )
       }
       setScheduleTime(list.preferred_time ? list.preferred_time.slice(0, 5) : '09:00')
       setAutoCreateOrder(list.auto_create_order !== false)
@@ -193,28 +220,33 @@ export function QuickListsPage() {
       setScheduleTime('09:00')
       setAutoCreateOrder(true)
     }
-    
+
     setShowScheduledOrder(true)
   }
-  
+
   const handleCreateScheduledOrder = async () => {
     if (!selectedListForSchedule) return
-    
+
     try {
       await scheduleQuickList({
         quickListId: selectedListForSchedule.id,
         body: {
           frequency: scheduleFrequency,
-          daysOfWeek: (scheduleFrequency === 'WEEKLY' || scheduleFrequency === 'WEEKLY_3X' || scheduleFrequency === 'BIWEEKLY') ? scheduleDays : undefined,
+          daysOfWeek:
+            scheduleFrequency === 'WEEKLY' ||
+            scheduleFrequency === 'WEEKLY_3X' ||
+            scheduleFrequency === 'BIWEEKLY'
+              ? scheduleDays
+              : undefined,
           preferredTime: scheduleTime,
           autoCreateOrder,
-        }
+        },
       }).unwrap()
-      
+
       toast.success(`Scheduled "${selectedListForSchedule.name}" successfully!`, {
         duration: 3000,
       })
-      
+
       setShowScheduledOrder(false)
       setSelectedListForSchedule(null)
       setScheduleFrequency('WEEKLY')
@@ -227,12 +259,12 @@ export function QuickListsPage() {
 
   const toggleScheduleDay = (day: string) => {
     if (scheduleDays.includes(day)) {
-      setScheduleDays(scheduleDays.filter(d => d !== day))
+      setScheduleDays(scheduleDays.filter((d) => d !== day))
     } else {
       // For WEEKLY (once per week), only allow one day
       if (scheduleFrequency === 'WEEKLY') {
         setScheduleDays([day])
-      } 
+      }
       // For WEEKLY_3X (three times per week), only allow maximum 3 days
       else if (scheduleFrequency === 'WEEKLY_3X') {
         if (scheduleDays.length < 3) {
@@ -240,7 +272,7 @@ export function QuickListsPage() {
         } else {
           toast.error('You can only select up to 3 days for "Three times per week"')
         }
-      } 
+      }
       // For other frequencies, allow multiple days
       else {
         setScheduleDays([...scheduleDays, day])
@@ -253,23 +285,24 @@ export function QuickListsPage() {
   // Filter and search lists
   const filteredLists = useMemo(() => {
     let lists = data?.quickLists || []
-    
+
     // Filter by status
     if (filterStatus === 'scheduled') {
       lists = lists.filter((l: any) => l.is_scheduled && l.status === 'ACTIVE')
     } else if (filterStatus === 'unscheduled') {
       lists = lists.filter((l: any) => !l.is_scheduled)
     }
-    
+
     // Search filter
     if (listSearch.trim()) {
       const searchLower = listSearch.toLowerCase()
-      lists = lists.filter((l: any) => 
-        l.name.toLowerCase().includes(searchLower) ||
-        l.description?.toLowerCase().includes(searchLower)
+      lists = lists.filter(
+        (l: any) =>
+          l.name.toLowerCase().includes(searchLower) ||
+          l.description?.toLowerCase().includes(searchLower)
       )
     }
-    
+
     return lists
   }, [data?.quickLists, filterStatus, listSearch])
 
@@ -280,18 +313,18 @@ export function QuickListsPage() {
       total: lists.length,
       scheduled: lists.filter((l: any) => l.is_scheduled && l.status === 'ACTIVE').length,
       active: lists.filter((l: any) => l.status === 'ACTIVE').length,
-      totalItems: lists.reduce((sum: number, l: any) => sum + Number(l.item_count ?? 0), 0)
+      totalItems: lists.reduce((sum: number, l: any) => sum + Number(l.item_count ?? 0), 0),
     }
   }, [data?.quickLists])
 
   // Format next execution date
   const formatNextExecution = (list: any) => {
     if (!list.next_execution_date) return null
-    
+
     // Parse the date - handle various formats from PostgreSQL
     let date: Date | null = null
     const dateValue = list.next_execution_date
-    
+
     try {
       // If it's already a Date object
       if (dateValue instanceof Date) {
@@ -299,7 +332,7 @@ export function QuickListsPage() {
       } else {
         // Convert to string and parse
         const dateStr = String(dateValue).trim()
-        
+
         // Try different parsing strategies
         if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
           // Pure YYYY-MM-DD format (PostgreSQL DATE type)
@@ -314,7 +347,7 @@ export function QuickListsPage() {
           date = new Date(dateStr)
         }
       }
-      
+
       // Validate date
       if (!date || isNaN(date.getTime())) {
         // Last resort: try manual parsing
@@ -325,20 +358,20 @@ export function QuickListsPage() {
           date = new Date(year, month - 1, day)
         }
       }
-      
+
       // Final validation
       if (!date || isNaN(date.getTime())) {
         return null // Return null instead of "Invalid date" to hide it
       }
-      
+
       // Format date nicely
-      const formattedDate = date.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
+      const formattedDate = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
         day: 'numeric',
-        year: 'numeric'
+        year: 'numeric',
       })
-      
+
       // Format time if available (preferred_time is TIME type: HH:MM:SS or HH:MM)
       if (list.preferred_time) {
         const timeStr = String(list.preferred_time)
@@ -354,7 +387,7 @@ export function QuickListsPage() {
           return `${formattedDate} at ${formattedTime}`
         }
       }
-      
+
       return formattedDate
     } catch (error) {
       console.error('Error formatting date:', error, dateValue)
@@ -365,12 +398,18 @@ export function QuickListsPage() {
   // Format frequency text
   const formatFrequency = (freq: string, days?: any) => {
     switch (freq) {
-      case 'DAILY': return 'Daily'
-      case 'WEEKLY': return 'Weekly'
-      case 'WEEKLY_3X': return '3x per week'
-      case 'BIWEEKLY': return 'Biweekly'
-      case 'MONTHLY': return 'Monthly'
-      default: return freq
+      case 'DAILY':
+        return 'Daily'
+      case 'WEEKLY':
+        return 'Weekly'
+      case 'WEEKLY_3X':
+        return '3x per week'
+      case 'BIWEEKLY':
+        return 'Biweekly'
+      case 'MONTHLY':
+        return 'Monthly'
+      default:
+        return freq
     }
   }
 
@@ -406,7 +445,9 @@ export function QuickListsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Quick Lists</h1>
-          <p className="text-[var(--text-muted)] mt-2">Create lists for recurring orders and save time</p>
+          <p className="text-[var(--text-muted)] mt-2">
+            Create lists for recurring orders and save time
+          </p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
@@ -514,7 +555,9 @@ export function QuickListsPage() {
             <div className="text-center">
               <List className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No quick lists yet</h3>
-              <p className="text-[var(--text-muted)] mb-6">Create your first quick list to save products for recurring orders</p>
+              <p className="text-[var(--text-muted)] mb-6">
+                Create your first quick list to save products for recurring orders
+              </p>
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Quick List
@@ -528,8 +571,16 @@ export function QuickListsPage() {
             <div className="text-center">
               <Search className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No lists found</h3>
-              <p className="text-[var(--text-muted)] mb-6">Try adjusting your search or filter criteria</p>
-              <Button variant="outline" onClick={() => { setListSearch(''); setFilterStatus('all'); }}>
+              <p className="text-[var(--text-muted)] mb-6">
+                Try adjusting your search or filter criteria
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setListSearch('')
+                  setFilterStatus('all')
+                }}
+              >
                 <X className="h-4 w-4 mr-2" />
                 Clear Filters
               </Button>
@@ -587,9 +638,14 @@ export function QuickListsPage() {
                       <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Products:</p>
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {list.items.slice(0, 5).map((item: any) => {
-                          const product = productsData?.products?.find((p: any) => p.id === item.product_id)
+                          const product = productsData?.products?.find(
+                            (p: any) => p.id === item.product_id
+                          )
                           return (
-                            <div key={item.id} className="flex items-center justify-between text-xs p-1.5 bg-[var(--brand-ultra)] rounded">
+                            <div
+                              key={item.id}
+                              className="flex items-center justify-between text-xs p-1.5 bg-[var(--brand-ultra)] rounded"
+                            >
                               <span className="font-medium text-[var(--text-mid)] flex-1 truncate">
                                 {product?.name || item.product_name || 'Unknown Product'}
                               </span>
@@ -608,7 +664,9 @@ export function QuickListsPage() {
                     </div>
                   ) : (
                     <div className="border-t pt-3">
-                      <p className="text-xs text-[var(--text-muted)] text-center">No products added</p>
+                      <p className="text-xs text-[var(--text-muted)] text-center">
+                        No products added
+                      </p>
                     </div>
                   )}
 
@@ -643,8 +701,8 @@ export function QuickListsPage() {
 
                   {/* Actions */}
                   <div className="flex gap-2 flex-wrap">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => handleViewDetails(list)}
                       className="flex-1 min-w-[80px]"
@@ -652,14 +710,10 @@ export function QuickListsPage() {
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleAddProducts(list.id)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => handleAddProducts(list.id)}>
                       <Plus className="h-4 w-4" />
                     </Button>
-                    <Button 
+                    <Button
                       className="flex-1"
                       size="sm"
                       onClick={() => handleOrderFromList(list.id)}
@@ -759,7 +813,8 @@ export function QuickListsPage() {
 
             <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
               <p className="text-sm text-[var(--brand-mid)]">
-                💡 <strong>Tip:</strong> After creating the list, you can add products and then quickly reorder them anytime!
+                💡 <strong>Tip:</strong> After creating the list, you can add products and then
+                quickly reorder them anytime!
               </p>
             </div>
           </div>
@@ -811,10 +866,7 @@ export function QuickListsPage() {
                       {formatPrice(product.price)} / {product.unit}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => handleAddProductToList(product)}
-                  >
+                  <Button size="sm" onClick={() => handleAddProductToList(product)}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add
                   </Button>
@@ -822,9 +874,7 @@ export function QuickListsPage() {
               ))}
 
               {(!filteredProducts || filteredProducts.length === 0) && (
-                <div className="text-center py-8 text-[var(--text-muted)]">
-                  No products found
-                </div>
+                <div className="text-center py-8 text-[var(--text-muted)]">No products found</div>
               )}
             </div>
           </div>
@@ -846,7 +896,7 @@ export function QuickListsPage() {
               Set up automatic ordering from "{selectedListForSchedule?.name}"
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label>Frequency</Label>
@@ -856,7 +906,7 @@ export function QuickListsPage() {
                 onChange={(e) => {
                   const newFrequency = e.target.value as any
                   setScheduleFrequency(newFrequency)
-                  
+
                   // Adjust days based on new frequency
                   if (newFrequency === 'WEEKLY') {
                     // Once per week: keep only first day or default to MONDAY
@@ -879,22 +929,26 @@ export function QuickListsPage() {
               </select>
             </div>
 
-            {(scheduleFrequency === 'WEEKLY' || scheduleFrequency === 'WEEKLY_3X' || scheduleFrequency === 'BIWEEKLY') && (
+            {(scheduleFrequency === 'WEEKLY' ||
+              scheduleFrequency === 'WEEKLY_3X' ||
+              scheduleFrequency === 'BIWEEKLY') && (
               <div>
                 <Label>
-                  {scheduleFrequency === 'WEEKLY' 
-                    ? 'Select One Day' 
+                  {scheduleFrequency === 'WEEKLY'
+                    ? 'Select One Day'
                     : scheduleFrequency === 'WEEKLY_3X'
-                    ? `Select up to 3 Days (${scheduleDays.length} selected)`
-                    : `Days of Week (${scheduleDays.length} selected)`}
+                      ? `Select up to 3 Days (${scheduleDays.length} selected)`
+                      : `Days of Week (${scheduleDays.length} selected)`}
                 </Label>
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   {daysOfWeek.map((day) => {
                     const isSelected = scheduleDays.includes(day)
-                    const isDisabled = 
-                      (scheduleFrequency === 'WEEKLY_3X' && !isSelected && scheduleDays.length >= 3) ||
+                    const isDisabled =
+                      (scheduleFrequency === 'WEEKLY_3X' &&
+                        !isSelected &&
+                        scheduleDays.length >= 3) ||
                       (scheduleFrequency === 'WEEKLY' && !isSelected && scheduleDays.length >= 1)
-                    
+
                     return (
                       <label
                         key={day}
@@ -902,8 +956,8 @@ export function QuickListsPage() {
                           isSelected
                             ? 'bg-[var(--brand)] text-white border-[var(--brand)] cursor-pointer'
                             : isDisabled
-                            ? 'bg-[var(--brand-ultra)] text-[var(--text-muted)] border-[var(--app-border)] cursor-not-allowed'
-                            : 'bg-white border-[var(--app-border-mid)] hover:bg-[var(--brand-ultra)] cursor-pointer'
+                              ? 'bg-[var(--brand-ultra)] text-[var(--text-muted)] border-[var(--app-border)] cursor-not-allowed'
+                              : 'bg-white border-[var(--app-border-mid)] hover:bg-[var(--brand-ultra)] cursor-pointer'
                         }`}
                       >
                         <input
@@ -925,10 +979,14 @@ export function QuickListsPage() {
                   <p className="text-sm text-[var(--red)] mt-1">Please select at least one day</p>
                 )}
                 {scheduleFrequency === 'WEEKLY' && scheduleDays.length > 0 && (
-                  <p className="text-sm text-[var(--text-muted)] mt-1">Selecting a different day will replace the current selection</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    Selecting a different day will replace the current selection
+                  </p>
                 )}
                 {scheduleFrequency === 'WEEKLY_3X' && scheduleDays.length >= 3 && (
-                  <p className="text-sm text-[var(--text-muted)] mt-1">Maximum of 3 days selected. Deselect a day to select a different one.</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    Maximum of 3 days selected. Deselect a day to select a different one.
+                  </p>
                 )}
               </div>
             )}
@@ -958,27 +1016,37 @@ export function QuickListsPage() {
 
             <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
               <p className="text-sm text-[var(--brand-mid)]">
-                <strong>Note:</strong> Orders will be {autoCreateOrder ? 'automatically created' : 'reminders sent'} for "{selectedListForSchedule?.name}"
-                {scheduleFrequency === 'DAILY' && ' every day'}
+                <strong>Note:</strong> Orders will be{' '}
+                {autoCreateOrder ? 'automatically created' : 'reminders sent'} for "
+                {selectedListForSchedule?.name}"{scheduleFrequency === 'DAILY' && ' every day'}
                 {scheduleFrequency === 'WEEKLY' && ` every week on ${scheduleDays.join(', ')}`}
-                {scheduleFrequency === 'WEEKLY_3X' && ` 3 times per week on ${scheduleDays.join(', ')}`}
+                {scheduleFrequency === 'WEEKLY_3X' &&
+                  ` 3 times per week on ${scheduleDays.join(', ')}`}
                 {scheduleFrequency === 'BIWEEKLY' && ` every 2 weeks on ${scheduleDays.join(', ')}`}
-                {scheduleFrequency === 'MONTHLY' && ' on the same date each month'}
-                {' '}at {scheduleTime}.
+                {scheduleFrequency === 'MONTHLY' && ' on the same date each month'} at{' '}
+                {scheduleTime}.
               </p>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowScheduledOrder(false)
-              setSelectedListForSchedule(null)
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowScheduledOrder(false)
+                setSelectedListForSchedule(null)
+              }}
+            >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleCreateScheduledOrder}
-              disabled={(scheduleFrequency === 'WEEKLY' || scheduleFrequency === 'WEEKLY_3X' || scheduleFrequency === 'BIWEEKLY') && scheduleDays.length === 0}
+              disabled={
+                (scheduleFrequency === 'WEEKLY' ||
+                  scheduleFrequency === 'WEEKLY_3X' ||
+                  scheduleFrequency === 'BIWEEKLY') &&
+                scheduleDays.length === 0
+              }
             >
               <Repeat className="h-4 w-4 mr-2" />
               Schedule Recurring Order
@@ -1011,26 +1079,32 @@ export function QuickListsPage() {
                   <CardContent className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-[var(--text-muted)]">Status:</span>
-                      <Badge variant={selectedListDetails.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                      <Badge
+                        variant={selectedListDetails.status === 'ACTIVE' ? 'default' : 'secondary'}
+                      >
                         {selectedListDetails.status}
                       </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-[var(--text-muted)]">Frequency:</span>
                       <span className="text-sm font-medium">
-                        {formatFrequency(selectedListDetails.frequency, selectedListDetails.days_of_week)}
+                        {formatFrequency(
+                          selectedListDetails.frequency,
+                          selectedListDetails.days_of_week
+                        )}
                       </span>
                     </div>
-                    {selectedListDetails.days_of_week && selectedListDetails.days_of_week.length > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-[var(--text-muted)]">Days:</span>
-                        <span className="text-sm font-medium">
-                          {JSON.parse(selectedListDetails.days_of_week).map((d: string) => 
-                            d.charAt(0) + d.slice(1).toLowerCase()
-                          ).join(', ')}
-                        </span>
-                      </div>
-                    )}
+                    {selectedListDetails.days_of_week &&
+                      selectedListDetails.days_of_week.length > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-[var(--text-muted)]">Days:</span>
+                          <span className="text-sm font-medium">
+                            {JSON.parse(selectedListDetails.days_of_week)
+                              .map((d: string) => d.charAt(0) + d.slice(1).toLowerCase())
+                              .join(', ')}
+                          </span>
+                        </div>
+                      )}
                     {selectedListDetails.preferred_time && (
                       <div className="flex justify-between">
                         <span className="text-sm text-[var(--text-muted)]">Preferred Time:</span>
@@ -1039,14 +1113,15 @@ export function QuickListsPage() {
                         </span>
                       </div>
                     )}
-                    {selectedListDetails.next_execution_date && formatNextExecution(selectedListDetails) && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-[var(--text-muted)]">Next Execution:</span>
-                        <span className="text-sm font-medium">
-                          {formatNextExecution(selectedListDetails)}
-                        </span>
-                      </div>
-                    )}
+                    {selectedListDetails.next_execution_date &&
+                      formatNextExecution(selectedListDetails) && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-[var(--text-muted)]">Next Execution:</span>
+                          <span className="text-sm font-medium">
+                            {formatNextExecution(selectedListDetails)}
+                          </span>
+                        </div>
+                      )}
                     {selectedListDetails.last_execution_date && (
                       <div className="flex justify-between">
                         <span className="text-sm text-[var(--text-muted)]">Last Execution:</span>
@@ -1057,7 +1132,9 @@ export function QuickListsPage() {
                     )}
                     <div className="flex justify-between">
                       <span className="text-sm text-[var(--text-muted)]">Auto Create Order:</span>
-                      <Badge variant={selectedListDetails.auto_create_order ? 'default' : 'secondary'}>
+                      <Badge
+                        variant={selectedListDetails.auto_create_order ? 'default' : 'secondary'}
+                      >
                         {selectedListDetails.auto_create_order ? 'Yes' : 'No'}
                       </Badge>
                     </div>
@@ -1077,13 +1154,20 @@ export function QuickListsPage() {
                   {selectedListDetails.items && selectedListDetails.items.length > 0 ? (
                     <div className="space-y-3">
                       {selectedListDetails.items.map((item: any) => {
-                        const product = productsData?.products?.find((p: any) => p.id === item.product_id)
+                        const product = productsData?.products?.find(
+                          (p: any) => p.id === item.product_id
+                        )
                         return (
-                          <div key={item.id} className="flex items-center justify-between p-3 border rounded-md">
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between p-3 border rounded-md"
+                          >
                             <div className="flex-1">
                               <p className="font-medium">{product?.name || 'Product not found'}</p>
                               {product?.sku && (
-                                <p className="text-sm text-[var(--text-muted)]">SKU: {product.sku}</p>
+                                <p className="text-sm text-[var(--text-muted)]">
+                                  SKU: {product.sku}
+                                </p>
                               )}
                             </div>
                             <div className="text-right">
@@ -1126,10 +1210,17 @@ export function QuickListsPage() {
               Close
             </Button>
             {selectedListForDetails && (
-              <Button onClick={() => {
-                setShowListDetails(false)
-                handleOrderFromList(selectedListForDetails.id)
-              }} disabled={!selectedListDetails || !selectedListDetails.items || selectedListDetails.items.length === 0}>
+              <Button
+                onClick={() => {
+                  setShowListDetails(false)
+                  handleOrderFromList(selectedListForDetails.id)
+                }}
+                disabled={
+                  !selectedListDetails ||
+                  !selectedListDetails.items ||
+                  selectedListDetails.items.length === 0
+                }
+              >
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Order Now
               </Button>
@@ -1140,4 +1231,3 @@ export function QuickListsPage() {
     </div>
   )
 }
-

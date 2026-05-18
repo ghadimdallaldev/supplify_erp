@@ -5,24 +5,23 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Package, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useAppDispatch } from '../hooks/redux'
-import { addItem } from '../features/cart/cartSlice'
+import { useCartActions } from '../hooks/useCartActions'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const dispatch = useAppDispatch()
-  
+  const { addItem } = useCartActions()
+
   const { data, isLoading, error } = useGetProductQuery(id!)
 
   const handleAddToCart = () => {
     if (data?.product) {
-      dispatch(addItem({
+      addItem({
         productId: data.product.id,
         product: data.product,
         quantity: 1,
-      }))
+      })
       toast.success('Added to cart')
     }
   }
@@ -101,7 +100,9 @@ export function ProductDetailPage() {
                 </div>
                 <div>
                   <p className="font-medium text-[var(--text-muted)]">Stock</p>
-                  <p>{product.available_qty || 0} {product.unit || 'units'}</p>
+                  <p>
+                    {product.available_qty || 0} {product.unit || 'units'}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -130,9 +131,7 @@ export function ProductDetailPage() {
               Add to Cart
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/app/cart">
-                View Cart
-              </Link>
+              <Link to="/app/cart">View Cart</Link>
             </Button>
           </div>
         </div>

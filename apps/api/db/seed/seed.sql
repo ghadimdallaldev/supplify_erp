@@ -29,21 +29,23 @@ INSERT INTO product (supplier_id, sku, name, name_ar, description, description_a
 ('550e8400-e29b-41d4-a716-446655440001', 'FF004', 'Basmati Rice', 'أرز بسمتي', 'Premium basmati rice', 'أرز بسمتي عالي الجودة', 'Fresh Foods', 'Grains', 'kg'),
 ('550e8400-e29b-41d4-a716-446655440001', 'FF005', 'Olive Oil', 'زيت زيتون', 'Extra virgin olive oil', 'زيت زيتون بكر ممتاز', 'Fresh Foods', 'Oils', 'bottle');
 
--- Insert sample prices
+-- Insert sample prices (scope by demo supplier — other tenants may reuse SKUs)
 INSERT INTO price (product_id, currency, amount, min_qty) VALUES 
-((SELECT id FROM product WHERE sku = 'FF001'), 'USD', 2.50, 1),
-((SELECT id FROM product WHERE sku = 'FF002'), 'USD', 1.80, 1),
-((SELECT id FROM product WHERE sku = 'FF003'), 'USD', 8.50, 1),
-((SELECT id FROM product WHERE sku = 'FF004'), 'USD', 3.20, 1),
-((SELECT id FROM product WHERE sku = 'FF005'), 'USD', 12.00, 1);
+((SELECT id FROM product WHERE sku = 'FF001' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 'USD', 2.50, 1),
+((SELECT id FROM product WHERE sku = 'FF002' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 'USD', 1.80, 1),
+((SELECT id FROM product WHERE sku = 'FF003' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 'USD', 8.50, 1),
+((SELECT id FROM product WHERE sku = 'FF004' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 'USD', 3.20, 1),
+((SELECT id FROM product WHERE sku = 'FF005' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 'USD', 12.00, 1)
+ON CONFLICT DO NOTHING;
 
 -- Insert sample inventory
 INSERT INTO inventory (product_id, available_qty) VALUES 
-((SELECT id FROM product WHERE sku = 'FF001'), 100.0),
-((SELECT id FROM product WHERE sku = 'FF002'), 50.0),
-((SELECT id FROM product WHERE sku = 'FF003'), 25.0),
-((SELECT id FROM product WHERE sku = 'FF004'), 200.0),
-((SELECT id FROM product WHERE sku = 'FF005'), 30.0);
+((SELECT id FROM product WHERE sku = 'FF001' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 100.0),
+((SELECT id FROM product WHERE sku = 'FF002' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 50.0),
+((SELECT id FROM product WHERE sku = 'FF003' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 25.0),
+((SELECT id FROM product WHERE sku = 'FF004' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 200.0),
+((SELECT id FROM product WHERE sku = 'FF005' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 30.0)
+ON CONFLICT (product_id) DO UPDATE SET available_qty = EXCLUDED.available_qty;
 
 -- Reservation tables for restaurant
 INSERT INTO reservation_table (restaurant_id, name, capacity, position, layout, is_active)
@@ -87,11 +89,11 @@ ON CONFLICT (id) DO NOTHING;
 -- Order line items
 INSERT INTO order_item (id, order_id, product_id, supplier_id, quantity, unit_price, line_total, notes)
 VALUES
-('11111111-aaaa-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', (SELECT id FROM product WHERE sku = 'FF001'), '550e8400-e29b-41d4-a716-446655440001', 30.0, 2.50, 75.00, 'Priority delivery'),
-('11111111-bbbb-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', (SELECT id FROM product WHERE sku = 'FF005'), '550e8400-e29b-41d4-a716-446655440001', 3.0, 12.00, 36.00, NULL),
-('22222222-aaaa-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', (SELECT id FROM product WHERE sku = 'FF003'), '550e8400-e29b-41d4-a716-446655440001', 8.0, 8.50, 68.00, 'Prep for weekend rush'),
-('22222222-bbbb-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', (SELECT id FROM product WHERE sku = 'FF002'), '550e8400-e29b-41d4-a716-446655440001', 6.0, 1.80, 10.80, NULL),
-('33333333-aaaa-4333-8333-333333333333', '33333333-3333-4333-8333-333333333333', (SELECT id FROM product WHERE sku = 'FF004'), '550e8400-e29b-41d4-a716-446655440001', 10.0, 3.20, 32.00, 'Cancelled due to change in menu')
+('11111111-aaaa-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', (SELECT id FROM product WHERE sku = 'FF001' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), '550e8400-e29b-41d4-a716-446655440001', 30.0, 2.50, 75.00, 'Priority delivery'),
+('11111111-bbbb-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', (SELECT id FROM product WHERE sku = 'FF005' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), '550e8400-e29b-41d4-a716-446655440001', 3.0, 12.00, 36.00, NULL),
+('22222222-aaaa-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', (SELECT id FROM product WHERE sku = 'FF003' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), '550e8400-e29b-41d4-a716-446655440001', 8.0, 8.50, 68.00, 'Prep for weekend rush'),
+('22222222-bbbb-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', (SELECT id FROM product WHERE sku = 'FF002' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), '550e8400-e29b-41d4-a716-446655440001', 6.0, 1.80, 10.80, NULL),
+('33333333-aaaa-4333-8333-333333333333', '33333333-3333-4333-8333-333333333333', (SELECT id FROM product WHERE sku = 'FF004' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), '550e8400-e29b-41d4-a716-446655440001', 10.0, 3.20, 32.00, 'Cancelled due to change in menu')
 ON CONFLICT (id) DO NOTHING;
 
 -- Sample invoices linked to orders
@@ -435,6 +437,37 @@ INSERT INTO staff_payroll_export (
   '{"regularHours":128,"overtimeHours":12,"breakMinutes":340}'::jsonb
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- Settings team (restaurant_team) — aligns with Staff app seeded members
+INSERT INTO restaurant_team (restaurant_id, branch_id, name, email, phone, role, is_primary)
+VALUES
+(
+  '550e8400-e29b-41d4-a716-446655440002',
+  '770e8400-e29b-41d4-a716-4466554400aa',
+  'Golden Fork Owner',
+  'restaurant@supplify.com',
+  '+971507654321',
+  'owner',
+  true
+),
+(
+  '550e8400-e29b-41d4-a716-446655440002',
+  '770e8400-e29b-41d4-a716-4466554400aa',
+  'Sara Malik',
+  'sara.malik@goldenfork.com',
+  '+971507654322',
+  'manager',
+  false
+),
+(
+  '550e8400-e29b-41d4-a716-446655440002',
+  NULL,
+  'Imran Khalid',
+  'imran.khalid@goldenfork.com',
+  '+971507654399',
+  'kitchen',
+  false
+);
 
 -- Ensure demo supplier/restaurant contact emails match Keycloak users (for /auth/me)
 UPDATE supplier SET contact_email = 'supplier@supplify.com' WHERE slug = 'fresh-foods-co';

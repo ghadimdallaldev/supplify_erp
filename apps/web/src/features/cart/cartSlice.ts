@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { CartItem, CartGroup } from '../../types'
+import { loadCartFromStorage, saveCartToStorage } from './cartPersistence'
 
 interface CartState {
   items: CartItem[]
@@ -13,6 +14,36 @@ interface CartState {
   }>
 }
 
+function recomputeGroups(state: CartState) {
+  const supplierMap = new Map<string, CartGroup>()
+
+  state.items.forEach((item) => {
+    const supplierId = item.product.supplier_id
+    const supplierName = item.product.supplier_name || 'Unknown Supplier'
+
+    if (!supplierMap.has(supplierId)) {
+      supplierMap.set(supplierId, {
+        supplierId,
+        supplierName,
+        items: [],
+        subtotal: 0,
+      })
+    }
+
+    const group = supplierMap.get(supplierId)!
+    group.items.push(item)
+    const unitPrice = item.product.current_price || 0
+    group.subtotal += unitPrice * item.quantity
+  })
+
+  state.groups = Array.from(supplierMap.values())
+  state.total = state.groups.reduce((sum, group) => sum + group.subtotal, 0)
+}
+
+function persist(state: CartState, ownerEmail?: string | null) {
+  saveCartToStorage(ownerEmail, { items: state.items, drafts: state.drafts })
+}
+
 const initialState: CartState = {
   items: [],
   groups: [],
@@ -24,89 +55,93 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
-    addItem: (state, action: PayloadAction<CartItem>) => {
-      const existingItem = state.items.find(
-        item => item.productId === action.payload.productId
-      )
-      
+    /** Restore cart from localStorage after login or hard refresh (scoped per user email). */
+    rehydrateCart: (state, action: PayloadAction<{ email?: string | null }>) => {
+      const saved = loadCartFromStorage(action.payload.email)
+      if (!saved) return
+      state.items = saved.items
+      state.drafts = saved.drafts
+      recomputeGroups(state)
+    },
+    addItem: (state, action: PayloadAction<{ item: CartItem; ownerEmail?: string | null }>) => {
+      const { item, ownerEmail } = action.payload
+      const existingItem = state.items.find((i) => i.productId === item.productId)
+
       if (existingItem) {
-        existingItem.quantity += action.payload.quantity
+        existingItem.quantity += item.quantity
       } else {
-        state.items.push(action.payload)
+        state.items.push(item)
       }
-      
-      cartSlice.caseReducers.updateGroups(state)
+
+      recomputeGroups(state)
+      persist(state, ownerEmail)
     },
-    removeItem: (state, action: PayloadAction<string>) => {
-      state.items = state.items.filter(item => item.productId !== action.payload)
-      cartSlice.caseReducers.updateGroups(state)
+    removeItem: (
+      state,
+      action: PayloadAction<{ productId: string; ownerEmail?: string | null }>
+    ) => {
+      state.items = state.items.filter((item) => item.productId !== action.payload.productId)
+      recomputeGroups(state)
+      persist(state, action.payload.ownerEmail)
     },
-    updateQuantity: (state, action: PayloadAction<{ productId: string; quantity: number }>) => {
-      const item = state.items.find(item => item.productId === action.payload.productId)
+    updateQuantity: (
+      state,
+      action: PayloadAction<{ productId: string; quantity: number; ownerEmail?: string | null }>
+    ) => {
+      const { productId, quantity, ownerEmail } = action.payload
+      const item = state.items.find((i) => i.productId === productId)
       if (item) {
-        if (action.payload.quantity <= 0) {
-          state.items = state.items.filter(item => item.productId !== action.payload.productId)
+        if (quantity <= 0) {
+          state.items = state.items.filter((i) => i.productId !== productId)
         } else {
-          item.quantity = action.payload.quantity
+          item.quantity = quantity
         }
-        cartSlice.caseReducers.updateGroups(state)
+        recomputeGroups(state)
+        persist(state, ownerEmail)
       }
     },
-    clearCart: (state) => {
+    clearCart: (state, action: PayloadAction<{ ownerEmail?: string | null } | undefined>) => {
       state.items = []
       state.groups = []
       state.total = 0
+      persist(state, action?.payload?.ownerEmail)
     },
-    saveDraft: (state, action: PayloadAction<{ name: string }>) => {
+    saveDraft: (state, action: PayloadAction<{ name: string; ownerEmail?: string | null }>) => {
       const draft = {
         id: Date.now().toString(),
         name: action.payload.name,
-        items: state.items,
+        items: [...state.items],
         createdAt: new Date().toISOString(),
       }
       state.drafts.push(draft)
+      persist(state, action.payload.ownerEmail)
     },
-    loadDraft: (state, action: PayloadAction<string>) => {
-      const draft = state.drafts.find(d => d.id === action.payload)
+    loadDraft: (state, action: PayloadAction<{ draftId: string; ownerEmail?: string | null }>) => {
+      const draft = state.drafts.find((d) => d.id === action.payload.draftId)
       if (draft) {
-        state.items = draft.items
-        cartSlice.caseReducers.updateGroups(state)
+        state.items = [...draft.items]
+        recomputeGroups(state)
+        persist(state, action.payload.ownerEmail)
       }
     },
-    deleteDraft: (state, action: PayloadAction<string>) => {
-      state.drafts = state.drafts.filter(d => d.id !== action.payload)
-    },
-    updateGroups: (state) => {
-      // Group items by supplier
-      const supplierMap = new Map<string, CartGroup>()
-      
-      state.items.forEach(item => {
-        const supplierId = item.product.supplier_id
-        const supplierName = item.product.supplier_name || 'Unknown Supplier'
-        
-        if (!supplierMap.has(supplierId)) {
-          supplierMap.set(supplierId, {
-            supplierId,
-            supplierName,
-            items: [],
-            subtotal: 0,
-          })
-        }
-        
-        const group = supplierMap.get(supplierId)!
-        group.items.push(item)
-        
-        // Calculate line total
-        const unitPrice = item.product.current_price || 0
-        const lineTotal = unitPrice * item.quantity
-        group.subtotal += lineTotal
-      })
-      
-      state.groups = Array.from(supplierMap.values())
-      state.total = state.groups.reduce((sum, group) => sum + group.subtotal, 0)
+    deleteDraft: (
+      state,
+      action: PayloadAction<{ draftId: string; ownerEmail?: string | null }>
+    ) => {
+      state.drafts = state.drafts.filter((d) => d.id !== action.payload.draftId)
+      persist(state, action.payload.ownerEmail)
     },
   },
 })
 
-export const { addItem, removeItem, updateQuantity, clearCart, saveDraft, loadDraft, deleteDraft } = cartSlice.actions
+export const {
+  addItem,
+  removeItem,
+  updateQuantity,
+  clearCart,
+  saveDraft,
+  loadDraft,
+  deleteDraft,
+  rehydrateCart,
+} = cartSlice.actions
 export default cartSlice.reducer
