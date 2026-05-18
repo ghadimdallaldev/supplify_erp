@@ -1,48 +1,48 @@
-name: Deploy Staging
+name: Deploy Pre-Production
 
 on:
   push:
-    branches: [staging]
+    branches: [preprod]
   workflow_dispatch:
 
 jobs:
   deploy-infra:
-    name: Deploy Staging Infrastructure
+    name: Deploy Pre-Production Infrastructure
     runs-on: ubuntu-latest
     environment: staging
-    
+
     permissions:
       id-token: write
       contents: read
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - uses: pnpm/action-setup@v2
         with:
           version: 8
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
           aws-region: ${{ secrets.AWS_REGION || 'me-south-1' }}
-          role-session-name: GitHubActions-Deploy-Staging
-      
+          role-session-name: GitHubActions-Deploy-Preprod
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Install CDK dependencies
         run: |
           cd infra
           pnpm install --frozen-lockfile
-      
+
       - name: Bootstrap CDK (if needed)
         run: |
           cd infra
@@ -50,7 +50,7 @@ jobs:
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'me-south-1' }}
-      
+
       - name: Synthesize CDK stacks
         run: |
           cd infra
@@ -58,7 +58,7 @@ jobs:
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'me-south-1' }}
-      
+
       - name: Deploy CDK stacks
         run: |
           cd infra
@@ -68,45 +68,45 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION || 'me-south-1' }}
 
   deploy-api:
-    name: Deploy Staging API
+    name: Deploy Pre-Production API
     runs-on: ubuntu-latest
     needs: deploy-infra
     environment: staging
-    
+
     permissions:
       id-token: write
       contents: read
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
           aws-region: ${{ secrets.AWS_REGION || 'me-south-1' }}
-          role-session-name: GitHubActions-Deploy-Staging
-      
+          role-session-name: GitHubActions-Deploy-Preprod
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      
+
       - uses: pnpm/action-setup@v2
         with:
           version: 8
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-      
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Build packages
         run: pnpm build
-      
+
       - name: Get ECR repository
         id: get-ecr
         run: |
@@ -117,7 +117,7 @@ jobs:
             echo "repository=$REPO" >> $GITHUB_OUTPUT
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Build and push Docker image
         if: steps.get-ecr.outputs.skip != 'true' && hashFiles('apps/api/Dockerfile') != ''
         env:
@@ -131,7 +131,7 @@ jobs:
             docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
             docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           fi
-      
+
       - name: Update ECS service
         if: steps.get-ecr.outputs.skip != 'true'
         env:
@@ -145,44 +145,44 @@ jobs:
             --region ${{ secrets.AWS_REGION || 'me-south-1' }} || echo "ECS service update skipped"
 
   deploy-web:
-    name: Deploy Staging Web
+    name: Deploy Pre-Production Web
     runs-on: ubuntu-latest
     needs: deploy-infra
     environment: staging
-    
+
     permissions:
       id-token: write
       contents: read
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
           aws-region: ${{ secrets.AWS_REGION || 'me-south-1' }}
-          role-session-name: GitHubActions-Deploy-Staging
-      
+          role-session-name: GitHubActions-Deploy-Preprod
+
       - uses: pnpm/action-setup@v2
         with:
           version: 8
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-      
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Build web app
         run: |
           cd apps/web
           pnpm install
           pnpm build
-      
+
       - name: Get S3 bucket and CloudFront ID
         id: get-s3
         run: |
@@ -195,7 +195,7 @@ jobs:
             echo "cf_id=$CF_ID" >> $GITHUB_OUTPUT
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Deploy to S3 + CloudFront
         if: steps.get-s3.outputs.skip != 'true'
         env:

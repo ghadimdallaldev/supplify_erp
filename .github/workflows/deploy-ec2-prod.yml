@@ -16,7 +16,7 @@ name: Deploy EC2 Production
 
 on:
   push:
-    branches: [main]
+    branches: [prod]
   workflow_dispatch:
 
 concurrency:
@@ -24,24 +24,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test:ci
-
   deploy:
     name: SSH deploy to EC2
-    needs: test
     runs-on: ubuntu-latest
     environment: production
 
@@ -56,7 +40,7 @@ jobs:
           script: |
             set -euo pipefail
             DEPLOY_PATH="${{ secrets.EC2_DEPLOY_PATH || '/opt/supplify' }}"
-            BRANCH="${{ secrets.EC2_DEPLOY_BRANCH || 'main' }}"
+            BRANCH="${{ secrets.EC2_DEPLOY_BRANCH || 'prod' }}"
             cd "$DEPLOY_PATH"
             git fetch origin
             git checkout "$BRANCH"

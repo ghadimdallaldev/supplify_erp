@@ -2,11 +2,13 @@
 
 One-command deploy per environment (run from repo root on the server):
 
-| Environment | Command |
-|---|---|
-| Dev | `sudo ./deploy/scripts/deploy-dev.sh` |
-| Staging | `sudo ./deploy/scripts/deploy-staging.sh` |
-| Production | `sudo ./deploy/scripts/deploy-prod.sh` |
+| Environment    | Git branch | Command                                   |
+| -------------- | ---------- | ----------------------------------------- |
+| Dev            | `dev`      | `sudo ./deploy/scripts/deploy-dev.sh`     |
+| Pre-production | `preprod`  | `sudo ./deploy/scripts/deploy-preprod.sh` |
+| Production     | `prod`     | `sudo ./deploy/scripts/deploy-prod.sh`    |
+
+Legacy: `deploy-staging.sh` remains for servers already on staging compose files (same as preprod).
 
 Each script bootstraps Docker, creates `deploy/env/.env.<env>`, builds images, starts infra (Postgres, Redis, MinIO, Keycloak), runs migrations + Keycloak realm init, then starts the app behind nginx.
 
@@ -56,10 +58,10 @@ sudo systemctl enable --now supplify   # production
 
 This repo has **two deploy paths**:
 
-| Path | Workflows | Target |
-|------|-----------|--------|
-| **EC2 + Docker Compose** | `deploy-ec2-prod.yml`, `deploy-ec2-dev.yml` | Your VM running `deploy/scripts/deploy-*.sh` |
-| **AWS CDK / ECS / S3** | `deploy-prod.yml`, `deploy-dev.yml`, `deploy.yml` | ECR, ECS, CloudFront (legacy CDK infra) |
+| Path                     | Workflows                                         | Target                                       |
+| ------------------------ | ------------------------------------------------- | -------------------------------------------- |
+| **EC2 + Docker Compose** | `deploy-ec2-prod.yml`, `deploy-ec2-dev.yml`       | Your VM running `deploy/scripts/deploy-*.sh` |
+| **AWS CDK / ECS / S3**   | `deploy-prod.yml`, `deploy-dev.yml`, `deploy.yml` | ECR, ECS, CloudFront (legacy CDK infra)      |
 
 For **EC2**, use the new workflows.
 
@@ -87,13 +89,13 @@ ssh-keygen -t ed25519 -f supplify-deploy -N ""
 - Add `supplify-deploy.pub` to the EC2 instance: `~/.ssh/authorized_keys`
 - Add **private** key contents to GitHub → **Settings → Secrets and variables → Actions**
 
-| Secret | Example |
-|--------|---------|
-| `EC2_HOST` | `3.28.x.x` or `app.example.com` |
-| `EC2_USER` | `ubuntu` or `ec2-user` |
-| `EC2_SSH_KEY` | full PEM private key |
-| `EC2_DEPLOY_PATH` | `/opt/supplify` (optional) |
-| `EC2_DEPLOY_BRANCH` | `main` or `dev` (optional) |
+| Secret              | Example                         |
+| ------------------- | ------------------------------- |
+| `EC2_HOST`          | `3.28.x.x` or `app.example.com` |
+| `EC2_USER`          | `ubuntu` or `ec2-user`          |
+| `EC2_SSH_KEY`       | full PEM private key            |
+| `EC2_DEPLOY_PATH`   | `/opt/supplify` (optional)      |
+| `EC2_DEPLOY_BRANCH` | `main` or `dev` (optional)      |
 
 Use **GitHub Environments** (`production`, `dev`) so dev and prod can use different hosts/secrets.
 
@@ -106,11 +108,11 @@ The workflow runs `git pull` on EC2. Allow that once:
 
 ### 4) What runs automatically
 
-| Event | Workflow |
-|-------|----------|
-| Push to `dev` | `Deploy EC2 Dev` → `deploy-dev.sh` |
+| Event          | Workflow                                           |
+| -------------- | -------------------------------------------------- |
+| Push to `dev`  | `Deploy EC2 Dev` → `deploy-dev.sh`                 |
 | Push to `main` | `Deploy EC2 Production` → tests + `deploy-prod.sh` |
-| Manual | Actions tab → **Run workflow** |
+| Manual         | Actions tab → **Run workflow**                     |
 
 ### 5) Security group
 
@@ -118,10 +120,10 @@ EC2 security group: allow **22** from GitHub Actions IPs (or a bastion), **80** 
 
 ## Files
 
-| Path | Purpose |
-|---|---|
-| `deploy/docker-compose.{dev,staging,prod}.yml` | Full 12-service stack per env |
-| `deploy/env/.env.{dev,staging,prod}.example` | Env templates |
-| `deploy/scripts/_common.sh` | Bootstrap helpers (Docker, swap, secrets) |
-| `deploy/scripts/deploy-*.sh` | One-command deploy |
-| `docker-compose.yml` | Local dev stack (repo root) |
+| Path                                           | Purpose                                   |
+| ---------------------------------------------- | ----------------------------------------- |
+| `deploy/docker-compose.{dev,staging,prod}.yml` | Full 12-service stack per env             |
+| `deploy/env/.env.{dev,staging,prod}.example`   | Env templates                             |
+| `deploy/scripts/_common.sh`                    | Bootstrap helpers (Docker, swap, secrets) |
+| `deploy/scripts/deploy-*.sh`                   | One-command deploy                        |
+| `docker-compose.yml`                           | Local dev stack (repo root)               |
