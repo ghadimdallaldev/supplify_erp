@@ -49,7 +49,6 @@ import { billingRoutes } from './routes/billing.routes.js'
 import { ensureReservationsSchema, ensureStaffAppSchema } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
-import { e2eRoutes } from './routes/e2e.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 
 if (config.NODE_ENV !== 'test') {
@@ -220,9 +219,6 @@ app.use('/api/subscriptions', subscriptionsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/public', publicRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
-if (config.E2E_SECRET) {
-  app.use('/api/e2e', e2eRoutes)
-}
 app.use('/api/branches', branchesRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)

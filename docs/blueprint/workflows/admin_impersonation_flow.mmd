@@ -1,8 +1,0 @@
-flowchart LR
-  Admin[Admin] --> Start[POST /impersonate\ntenantId, tenantType]
-  Start --> Check{Cannot impersonate ADMIN}
-  Check -->|ok| Token[Short-lived JWT cookie]
-  Token --> Request[Requests use effective tenant]
-  Request --> Banner[ImpersonationBanner]
-  Admin --> Stop[POST /impersonate/stop\nor logout clears cookie]
-  Stop --> Clear[Clear cookie, audit IMPERSONATION_END]
