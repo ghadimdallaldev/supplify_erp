@@ -11,7 +11,11 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkWarehouseLimit, createAuditLog } from '../lib/plan-enforcement.js'
 import { requireFeature } from '../lib/subscription.js'
-import { getWarehouseSupplierColumn, isDefaultWarehouse } from '../lib/warehouse-helpers.js'
+import {
+  getWarehouseSupplierColumn,
+  getWarehouseOwnerInsertSpec,
+  isDefaultWarehouse,
+} from '../lib/warehouse-helpers.js'
 import { buildSimulationFromPayload } from '../services/warehouseRouting.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { withTransaction } from '../lib/db.js'
@@ -408,24 +412,43 @@ router.post(
         notes,
       } = req.body
 
-      const supplierCol = await getWarehouseSupplierColumn()
+      if (!name?.trim()) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Warehouse name is required' },
+          requestId: req.requestId,
+        })
+      }
+
+      const owner = await getWarehouseOwnerInsertSpec()
       const { rows: existing } = await query(
-        `SELECT id FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
+        `SELECT id FROM warehouse WHERE ${owner.filterColumn} = $1 AND is_active = TRUE`,
         [supplierId]
       )
       const isFirst = existing.length === 0
+      const warehouseCode =
+        (typeof code === 'string' && code.trim()) ||
+        `WH-${String(Date.now()).slice(-8).toUpperCase()}`
+
+      const addressValue =
+        address == null || address === ''
+          ? null
+          : typeof address === 'string'
+            ? { line1: address }
+            : address
 
       const { rows: newWarehouse } = await query(
         `INSERT INTO warehouse (
-          ${supplierCol}, name, code, address, capacity, contact_name, contact_email, contact_phone,
-          type, capacity_sqm, operating_hours, notes, is_default, is_main
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
+          ${owner.columns}, name, code, address, capacity, contact_name, contact_email, contact_phone,
+          type, capacity_sqm, operating_hours, notes, is_default, is_main, is_active
+        ) VALUES (${owner.placeholders}, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, TRUE)
         RETURNING *`,
         [
           supplierId,
-          name,
-          code || null,
-          address || null,
+          name.trim(),
+          warehouseCode,
+          addressValue,
           capacity || null,
           contact_name || null,
           contact_email || null,
