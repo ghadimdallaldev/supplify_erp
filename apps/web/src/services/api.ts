@@ -85,7 +85,6 @@ function redirectToLoginForAuthError(error: ApiErrorBody['error'], requestUrl: s
 }
 
 // Custom baseQuery to unwrap API response envelope
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
     baseUrl: API_URL,
@@ -378,12 +377,15 @@ export const api = createApi({
         }
       },
       invalidatesTags: (_result, _error, { id, data }) => {
-        const tags: Array<{ type: 'Order'; id: string } | 'Order' | 'Receiving'> = [
+        const tags: Array<{ type: 'Order'; id: string } | 'Order' | 'Receiving' | 'Fulfillment'> = [
           { type: 'Order', id },
           'Order',
         ]
         if (data?.status === 'COMPLETED') {
           tags.push('Receiving')
+        }
+        if (data?.delivery_status) {
+          tags.push('Fulfillment')
         }
         return tags
       },
@@ -566,25 +568,6 @@ export const api = createApi({
         method: 'POST',
       }),
       invalidatesTags: ['Fulfillment'],
-    }),
-    getFulfillmentWaves: builder.query<
-      {
-        waves: Array<{
-          id: string
-          waveNumber: string
-          scheduledDate: string
-          status: string
-          orderCount: number
-        }>
-      },
-      { warehouseId?: string } | void
-    >({
-      query: (arg) => {
-        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
-        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
-        return `/api/fulfillment/waves${qs}`
-      },
-      providesTags: ['Fulfillment'],
     }),
     getFulfillmentRoutes: builder.query<
       {
@@ -1373,8 +1356,7 @@ export const api = createApi({
       },
       string
     >({
-      query: (token) =>
-        `/api/public/invitations/branch?token=${encodeURIComponent(token)}`,
+      query: (token) => `/api/public/invitations/branch?token=${encodeURIComponent(token)}`,
     }),
     acceptBranchInvite: builder.mutation<
       { user?: { email?: string; displayName?: string }; activeSupplierId: string },
@@ -2764,7 +2746,6 @@ export const {
   useUpdateOrderMutation,
   useSendOrderReminderMutation,
   useGetFulfillmentBoardQuery,
-  useGetFulfillmentWavesQuery,
   useGetFulfillmentRoutesQuery,
   useGetFulfillmentExceptionsQuery,
   useGetFulfillmentDispatchQuery,
@@ -2773,7 +2754,7 @@ export const {
   useUpdateDriverMutation,
   useDeactivateDriverMutation,
   useAssignDriverToOrderMutation,
-  useReassignDriverToOrderMutation,
+  useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
   useSubmitOrderProofOfDeliveryMutation,
   useResolveFulfillmentExceptionMutation,
@@ -3002,5 +2983,4 @@ export const {
   useGetTenantFeatureOverridesQuery,
   useSetTenantFeatureOverrideMutation,
   useClearTenantFeatureOverrideMutation,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } = api as any

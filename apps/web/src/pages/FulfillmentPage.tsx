@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -16,7 +16,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Input } from '../components/ui/input'
 import { formatPrice } from '../utils/format'
 import {
-  Package,
   MapPin,
   CheckCircle,
   AlertCircle,
@@ -30,7 +29,7 @@ import {
 import {
   useGetOrdersQuery,
   useGetFulfillmentBoardQuery,
-  useGetFulfillmentWavesQuery,
+  useGetFulfillmentDispatchQuery,
   useGetFulfillmentRoutesQuery,
   useGetFulfillmentExceptionsQuery,
   useGetWarehousesQuery,
@@ -40,6 +39,7 @@ import { useEntitlements } from '../hooks/useEntitlements'
 import { isMultiWarehouseActive } from '../lib/planLimits'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { DriverDispatchBoard } from '../components/fulfillment/DriverDispatchBoard'
 import {
   Dialog,
   DialogContent,
@@ -146,12 +146,12 @@ export function FulfillmentPage() {
   const { data: ordersData } = useGetOrdersQuery({ limit: 1000, offset: 0 })
   const { data: boardResponse, isLoading: boardLoading } =
     useGetFulfillmentBoardQuery(warehouseFilter)
-  const { data: wavesResponse } = useGetFulfillmentWavesQuery(warehouseFilter)
+  const { data: dispatchData, isLoading: dispatchLoading } =
+    useGetFulfillmentDispatchQuery(warehouseFilter)
   const { data: routesResponse } = useGetFulfillmentRoutesQuery(warehouseFilter)
   const { data: exceptionsResponse } = useGetFulfillmentExceptionsQuery(warehouseFilter)
 
   const boardData = (boardResponse as DispatchBoard | undefined) ?? null
-  const waves = wavesResponse?.waves ?? []
   const routeSummaries = routesResponse?.routes ?? []
   const exceptions = exceptionsResponse?.exceptions ?? []
 
@@ -268,7 +268,7 @@ export function FulfillmentPage() {
       <div>
         <h1 className="text-[21px] font-black text-[var(--text)]">Fulfillment & Logistics</h1>
         <p className="text-[var(--text-muted)] mt-2">
-          Wave planning, mobile pick lists, and driver dispatch.
+          Pick lists, driver dispatch, and delivery tracking.
         </p>
       </div>
 
@@ -294,86 +294,33 @@ export function FulfillmentPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="dispatch">Driver Dispatch</TabsTrigger>
-          <TabsTrigger value="waves">Waves</TabsTrigger>
           <TabsTrigger value="picklists">Pick Lists</TabsTrigger>
           <TabsTrigger value="routes">Routes</TabsTrigger>
           <TabsTrigger value="tracking">Delivery Tracking</TabsTrigger>
-          <TabsTrigger value="exceptions">Exceptions</TabsTrigger>
+          <TabsTrigger value="exceptions" className="relative">
+            Exceptions
+            {(exceptionsResponse?.openCount ?? 0) > 0 && (
+              <span className="ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--red)] px-1 text-[10px] font-bold text-white">
+                {exceptionsResponse?.openCount}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dispatch" className="space-y-4">
-          {boardLoading || !boardData ? (
+          {dispatchData ? (
+            <DriverDispatchBoard
+              data={dispatchData}
+              warehouseId={warehouseFilter?.warehouseId}
+              isLoading={dispatchLoading}
+            />
+          ) : (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-10 w-10 animate-spin text-[var(--brand-mid)]" />
             </div>
-          ) : (
-            <DispatchBoardView
-              board={boardData}
-              columns={columnData}
-              sensors={sensors}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onRouteStatusChange={handleRouteStatusChange}
-              onStopStatusChange={handleStopStatusChange}
-              onCaptureProof={setProofStop}
-              activeDrag={activeDrag}
-            />
           )}
-        </TabsContent>
-
-        <TabsContent value="waves" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Delivery Waves
-                  </CardTitle>
-                  <CardDescription>Batch orders for efficient picking</CardDescription>
-                </div>
-                <Button>Create New Wave</Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {waves.length === 0 ? (
-                  <div className="text-center py-8 text-[var(--text-muted)]">
-                    No delivery waves scheduled yet.
-                  </div>
-                ) : (
-                  waves.map((wave) => (
-                    <div key={wave.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="font-semibold">{wave.waveNumber}</h4>
-                            <Badge variant={wave.status === 'PICKING' ? 'default' : 'secondary'}>
-                              {wave.status}
-                            </Badge>
-                          </div>
-                          <div className="text-sm text-[var(--text-muted)] space-y-1">
-                            <p>Scheduled: {wave.scheduledDate}</p>
-                            <p>Orders: {wave.orderCount}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            View
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="picklists" className="space-y-4">
@@ -574,14 +521,14 @@ export function FulfillmentPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h4 className="font-semibold">
-                            {ex.orderLabel} — {ex.exceptionType.replace(/_/g, ' ')}
+                            {ex.orderLabel} â€” {ex.exceptionType.replace(/_/g, ' ')}
                           </h4>
                           <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
                             {ex.productName && <p>Product: {ex.productName}</p>}
                             {(ex.quantityExpected != null || ex.quantityActual != null) && (
                               <p>
-                                Expected: {ex.quantityExpected ?? '—'}, Actual:{' '}
-                                {ex.quantityActual ?? '—'}
+                                Expected: {ex.quantityExpected ?? 'â€”'}, Actual:{' '}
+                                {ex.quantityActual ?? 'â€”'}
                               </p>
                             )}
                             {ex.damageDescription && <p>{ex.damageDescription}</p>}
@@ -829,8 +776,8 @@ function DispatchColumn({
             <div>
               <p className="font-medium text-[var(--text)]">{route.route_number}</p>
               <p>
-                <span className="font-semibold text-[var(--text)]">{route.status}</span> • Scheduled{' '}
-                {new Date(route.scheduled_date).toLocaleDateString()}
+                <span className="font-semibold text-[var(--text)]">{route.status}</span> â€¢
+                Scheduled {new Date(route.scheduled_date).toLocaleDateString()}
               </p>
             </div>
           </div>

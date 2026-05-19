@@ -9,10 +9,6 @@ import { AddBranchModal } from '../components/org/AddBranchModal'
 
 export function OrgOverviewPage() {
   const { user } = useAppSelector((state) => state.auth)
-  if (user?.role === 'RESTAURANT') {
-    return <RestaurantOrgOverviewPage />
-  }
-
   const navigate = useNavigate()
   const { entitlements } = useEntitlements()
   const multiBranch = entitlements?.features?.multi_branch === true
@@ -21,6 +17,10 @@ export function OrgOverviewPage() {
   })
   const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchOrgBranchContextMutation()
+
+  if (user?.role === 'RESTAURANT') {
+    return <RestaurantOrgOverviewPage />
+  }
 
   const orgRole = data?.orgRole
   const canView = orgRole === 'Org Owner' || orgRole === 'Org Manager' || user?.role === 'ADMIN'

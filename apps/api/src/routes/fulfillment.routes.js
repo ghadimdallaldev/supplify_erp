@@ -8,16 +8,24 @@ import {
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { isFeatureEnabled } from '../lib/subscription.js'
+import { isFeatureEnabled, requireFeature } from '../lib/subscription.js'
 import { isMultiWarehouseFulfillmentActive } from '../lib/warehouse-helpers.js'
+import { z } from 'zod'
 
 const router = express.Router()
+
+const fulfillmentFeature = requireFeature(
+  'fulfillment',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType || 'SUPPLIER'
+)
 
 router.use(
   requireAuth,
   resolveTenantContext,
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('FULFILLMENT_VIEW')
+  requirePermission('FULFILLMENT_VIEW'),
+  fulfillmentFeature
 )
 
 function parseWarehouseFilter(req) {
@@ -270,70 +278,6 @@ router.get('/board', async (req, res) => {
   }
 })
 
-router.get('/waves', async (req, res) => {
-  try {
-    const supplierId = await resolveSupplierId(req)
-    if (!supplierId) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
-        requestId: req.requestId,
-      })
-    }
-
-    const whFilter = await warehouseFilterClause(req, supplierId, 2)
-    const waveParams = [supplierId, ...whFilter.params]
-    const waveWarehouseClause = whFilter.warehouseId
-      ? ` AND EXISTS (
-          SELECT 1 FROM pick_list pl2
-          JOIN order_warehouse_assignment owa ON owa.order_id = pl2.order_id
-          WHERE pl2.wave_id = dw.id AND owa.warehouse_id = $2
-        )`
-      : ''
-
-    const { rows } = await query(
-      `
-      SELECT
-        dw.id,
-        dw.wave_number,
-        dw.scheduled_date,
-        dw.status,
-        COUNT(pl.id)::int AS order_count
-      FROM delivery_wave dw
-      LEFT JOIN pick_list pl ON pl.wave_id = dw.id
-      WHERE dw.supplier_id = $1${waveWarehouseClause}
-      GROUP BY dw.id
-      ORDER BY dw.scheduled_date DESC, dw.wave_number
-      `,
-      waveParams
-    )
-
-    res.json({
-      ok: true,
-      data: {
-        waves: rows.map((row) => ({
-          id: row.id,
-          waveNumber: row.wave_number,
-          scheduledDate: row.scheduled_date,
-          status: row.status,
-          orderCount: row.order_count ?? 0,
-        })),
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get fulfillment waves error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to load delivery waves' },
-      requestId: req.requestId,
-    })
-  }
-})
-
 router.get('/routes', async (req, res) => {
   try {
     const supplierId = await resolveSupplierId(req)
@@ -402,7 +346,34 @@ router.get('/routes', async (req, res) => {
   }
 })
 
-router.get('/exceptions', async (req, res) => {
+function mapDispatchOrder(row) {
+  return {
+    id: row.id,
+    status: row.order_status,
+    total_amount: parseFloat(row.total_amount) || 0,
+    created_at: row.created_at,
+    restaurant_name: row.restaurant_name,
+    item_count: row.item_count ?? 0,
+    assignment: row.assignment_id
+      ? {
+          id: row.assignment_id,
+          status: row.assignment_status,
+          driver: {
+            id: row.driver_id,
+            full_name: row.driver_name,
+            phone: row.driver_phone,
+            vehicle_type: row.vehicle_type,
+            vehicle_plate: row.vehicle_plate,
+          },
+          assigned_at: row.assigned_at,
+          delivered_at: row.delivered_at,
+        }
+      : null,
+    has_pod: row.has_pod === true,
+  }
+}
+
+router.get('/dispatch', async (req, res) => {
   try {
     const supplierId = await resolveSupplierId(req)
     if (!supplierId) {
@@ -415,60 +386,287 @@ router.get('/exceptions', async (req, res) => {
     }
 
     const whFilter = await warehouseFilterClause(req, supplierId, 2)
-    const exceptionParams = [supplierId, ...whFilter.params]
+    const params = [supplierId, ...whFilter.params]
 
-    const { rows } = await query(
-      `
-      SELECT
-        de.id,
-        de.order_id,
-        de.exception_type,
-        de.quantity_expected,
-        de.quantity_actual,
-        de.damage_description,
-        de.notes,
-        de.created_at,
-        p.name AS product_name
-      FROM delivery_exception de
-      JOIN customer_order o ON o.id = de.order_id
+    const baseSelect = `
+      SELECT DISTINCT ON (o.id)
+        o.id,
+        o.status AS order_status,
+        o.total_amount,
+        COALESCE(o.placed_at, o.created_at) AS created_at,
+        r.name AS restaurant_name,
+        (SELECT COUNT(*)::int FROM order_item oi WHERE oi.order_id = o.id AND oi.supplier_id = $1) AS item_count,
+        da.id AS assignment_id,
+        da.status AS assignment_status,
+        da.assigned_at,
+        da.delivered_at,
+        d.id AS driver_id,
+        d.full_name AS driver_name,
+        d.phone AS driver_phone,
+        d.vehicle_type,
+        d.vehicle_plate,
+        EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id) AS has_pod
+      FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-      LEFT JOIN product p ON p.id = de.product_id
-      WHERE EXISTS (
-        SELECT 1 FROM order_item oi2
-        WHERE oi2.order_id = de.order_id AND oi2.supplier_id = $1
-      )${whFilter.clause}
-      ORDER BY de.created_at DESC
-      LIMIT 100
-      `,
-      exceptionParams
-    )
+      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN LATERAL (
+        SELECT * FROM driver_assignments da2
+        WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned')
+        ORDER BY da2.created_at DESC
+        LIMIT 1
+      ) da ON true
+      LEFT JOIN drivers d ON d.id = da.driver_id
+      WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED')
+        ${whFilter.clause}
+    `
+
+    const [
+      { rows: unassigned },
+      { rows: assigned },
+      { rows: outForDelivery },
+      { rows: deliveredToday },
+    ] = await Promise.all([
+      query(
+        `${baseSelect}
+           AND (da.id IS NULL OR da.status IN ('failed'))
+           AND o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
+           ORDER BY o.id, o.created_at DESC`,
+        params
+      ),
+      query(
+        `${baseSelect}
+           AND da.status = 'assigned'
+           ORDER BY o.id, da.assigned_at DESC`,
+        params
+      ),
+      query(
+        `${baseSelect}
+           AND da.status IN ('picked_up', 'out_for_delivery')
+           ORDER BY o.id, da.updated_at DESC`,
+        params
+      ),
+      query(
+        `${baseSelect}
+           AND da.status = 'delivered'
+           AND da.delivered_at >= date_trunc('day', now())
+           ORDER BY o.id, da.delivered_at DESC`,
+        params
+      ),
+    ])
 
     res.json({
       ok: true,
       data: {
+        pending: unassigned.map(mapDispatchOrder),
+        assigned: assigned.map(mapDispatchOrder),
+        out_for_delivery: outForDelivery.map(mapDispatchOrder),
+        delivered_today: deliveredToday.map(mapDispatchOrder),
+        stats: {
+          pending: unassigned.length,
+          assigned: assigned.length,
+          outForDelivery: outForDelivery.length,
+          deliveredToday: deliveredToday.length,
+        },
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get fulfillment dispatch error:', {
+      message: error?.message,
+      code: error?.code,
+      detail: error?.detail,
+    })
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to load dispatch board' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/exceptions', async (req, res) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const statusFilter = req.query.status
+    const typeFilter = req.query.type
+    const whFilter = await warehouseFilterClause(req, supplierId, 2)
+    const exceptionParams = [supplierId, ...whFilter.params]
+    let paramIdx = exceptionParams.length + 1
+    let extraClause = ''
+
+    if (statusFilter) {
+      extraClause += ` AND fe.status = $${paramIdx++}`
+      exceptionParams.push(statusFilter)
+    }
+    if (typeFilter) {
+      extraClause += ` AND fe.type = $${paramIdx++}`
+      exceptionParams.push(typeFilter)
+    }
+    if (whFilter.warehouseId) {
+      extraClause += ` AND fe.warehouse_id = $${paramIdx++}`
+      exceptionParams.push(whFilter.warehouseId)
+    }
+
+    const { rows } = await query(
+      `
+      SELECT
+        fe.id,
+        fe.order_id,
+        fe.type,
+        fe.status,
+        fe.description,
+        fe.resolution_notes,
+        fe.created_at,
+        fe.resolved_at,
+        r.name AS restaurant_name
+      FROM fulfillment_exceptions fe
+      LEFT JOIN customer_order o ON o.id = fe.order_id
+      LEFT JOIN restaurant r ON r.id = o.restaurant_id
+      WHERE fe.supplier_id = $1${extraClause}
+      ORDER BY fe.created_at DESC
+      LIMIT 200
+      `,
+      exceptionParams
+    )
+
+    const openCount = rows.filter((r) => r.status === 'open').length
+
+    res.json({
+      ok: true,
+      data: {
+        openCount,
         exceptions: rows.map((row) => ({
           id: row.id,
           orderId: row.order_id,
-          orderLabel: row.order_id.slice(0, 8).toUpperCase(),
-          exceptionType: row.exception_type,
-          productName: row.product_name,
-          quantityExpected:
-            row.quantity_expected != null ? parseFloat(row.quantity_expected) : null,
-          quantityActual: row.quantity_actual != null ? parseFloat(row.quantity_actual) : null,
-          damageDescription: row.damage_description,
-          notes: row.notes,
+          orderLabel: row.order_id ? row.order_id.slice(0, 8).toUpperCase() : '—',
+          restaurantName: row.restaurant_name,
+          exceptionType: row.type,
+          status: row.status,
+          description: row.description,
+          resolutionNotes: row.resolution_notes,
           createdAt: row.created_at,
+          resolvedAt: row.resolved_at,
         })),
       },
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
-    logger.error('Get fulfillment exceptions error:', error)
+    logger.error('Get fulfillment exceptions error:', {
+      message: error?.message,
+      code: error?.code,
+      detail: error?.detail,
+    })
     res.status(500).json({
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to load delivery exceptions' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post(
+  '/exceptions/:id/resolve',
+  requirePermission('FULFILLMENT_MANAGE'),
+  async (req, res) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const body = z.object({ resolution_notes: z.string().optional() }).parse(req.body ?? {})
+      const { rows } = await query(
+        `UPDATE fulfillment_exceptions
+         SET status = 'resolved',
+             resolution_notes = COALESCE($1, resolution_notes),
+             resolved_by = $2,
+             resolved_at = now(),
+             updated_at = now()
+         WHERE id = $3 AND supplier_id = $4
+         RETURNING *`,
+        [body.resolution_notes ?? null, req.userData.id, req.params.id, supplierId]
+      )
+      if (!rows.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Exception not found' },
+          requestId: req.requestId,
+        })
+      }
+      res.json({
+        ok: true,
+        data: { exception: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Resolve fulfillment exception error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to resolve exception' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.post('/exceptions/:id/ignore', requirePermission('FULFILLMENT_MANAGE'), async (req, res) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const { rows } = await query(
+      `UPDATE fulfillment_exceptions
+         SET status = 'ignored', resolved_by = $1, resolved_at = now(), updated_at = now()
+         WHERE id = $2 AND supplier_id = $3
+         RETURNING *`,
+      [req.userData.id, req.params.id, supplierId]
+    )
+    if (!rows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Exception not found' },
+        requestId: req.requestId,
+      })
+    }
+    res.json({
+      ok: true,
+      data: { exception: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Ignore fulfillment exception error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to ignore exception' },
       requestId: req.requestId,
     })
   }

@@ -58,6 +58,7 @@ import {
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { formatAddressLine, normalizeAddress } from '../lib/address'
 import { ActivityLogTab } from '../components/ActivityLogTab'
+import { DriversSettingsPanel } from '../components/fulfillment/DriversSettingsPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import {
   useGetSupplierMeQuery,
@@ -581,6 +582,9 @@ export function SupplierSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="delivery" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Delivery Zones
+          </TabsTrigger>
+          <TabsTrigger value="drivers" className="flex-1 min-w-[5.5rem] sm:flex-none">
+            Drivers
           </TabsTrigger>
           <TabsTrigger value="branches" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Branches
@@ -1241,6 +1245,11 @@ export function SupplierSettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="drivers" className="space-y-4">
+          <DriversSettingsPanel />
+        </TabsContent>
+
         {can('SETTINGS_VIEW') && (
           <TabsContent value="activity" className="space-y-4">
             <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
