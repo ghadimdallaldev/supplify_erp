@@ -47,6 +47,8 @@ import type {
   StaffShiftSwap,
   StaffTimeEntry,
   PublicReservationDetails,
+  DriverRecord,
+  DispatchOrderCard,
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
@@ -203,6 +205,8 @@ export const api = createApi({
     'Notification',
     'Branch',
     'BranchInvitations',
+    'RestaurantInvitations',
+    'RestaurantOrg',
     'Org',
     'RestaurantTeam',
     'Subscription',
@@ -214,6 +218,7 @@ export const api = createApi({
     'OrdersCalendar',
     'QuickList',
     'Fulfillment',
+    'Driver',
     'Approvals',
     'Reviews',
     'Reports',
@@ -421,6 +426,147 @@ export const api = createApi({
       },
       providesTags: ['Fulfillment'],
     }),
+    getFulfillmentDispatch: builder.query<
+      {
+        pending: DispatchOrderCard[]
+        assigned: DispatchOrderCard[]
+        out_for_delivery: DispatchOrderCard[]
+        delivered_today: DispatchOrderCard[]
+        stats: {
+          pending: number
+          assigned: number
+          outForDelivery: number
+          deliveredToday: number
+        }
+      },
+      { warehouseId?: string } | void
+    >({
+      query: (arg) => {
+        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
+        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
+        return `/api/fulfillment/dispatch${qs}`
+      },
+      providesTags: ['Fulfillment'],
+    }),
+    getDrivers: builder.query<
+      {
+        drivers: Array<{
+          id: string
+          fullName: string
+          phone?: string | null
+          vehicleType?: string | null
+          vehiclePlate?: string | null
+          warehouseId?: string | null
+          warehouseName?: string | null
+          isActive: boolean
+          notes?: string | null
+        }>
+      },
+      { warehouseId?: string; active?: boolean } | void
+    >({
+      query: (arg) => {
+        const params = new URLSearchParams()
+        if (arg && typeof arg === 'object') {
+          if (arg.warehouseId) params.set('warehouse_id', arg.warehouseId)
+          if (arg.active === false) params.set('active', 'false')
+        }
+        const qs = params.toString()
+        return `/api/drivers${qs ? `?${qs}` : ''}`
+      },
+      providesTags: ['Driver'],
+    }),
+    createDriver: builder.mutation<
+      { driver: { id: string; fullName: string } },
+      {
+        full_name: string
+        phone?: string
+        vehicle_type?: string
+        vehicle_plate?: string
+        warehouse_id?: string
+        notes?: string
+      }
+    >({
+      query: (body) => ({ url: '/api/drivers', method: 'POST', body }),
+      invalidatesTags: ['Driver', 'Fulfillment'],
+    }),
+    updateDriver: builder.mutation<
+      { driver: { id: string } },
+      {
+        id: string
+        data: Partial<{
+          full_name: string
+          phone: string
+          vehicle_type: string
+          vehicle_plate: string
+          warehouse_id: string
+          notes: string
+          is_active: boolean
+        }>
+      }
+    >({
+      query: ({ id, data }) => ({ url: `/api/drivers/${id}`, method: 'PATCH', body: data }),
+      invalidatesTags: ['Driver', 'Fulfillment'],
+    }),
+    deactivateDriver: builder.mutation<{ driver: { id: string } }, string>({
+      query: (id) => ({ url: `/api/drivers/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Driver', 'Fulfillment'],
+    }),
+    assignDriverToOrder: builder.mutation<
+      { assignment: unknown },
+      { orderId: string; driver_id: string }
+    >({
+      query: ({ orderId, driver_id }) => ({
+        url: `/api/orders/${orderId}/assign-driver`,
+        method: 'POST',
+        body: { driver_id },
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    reassignDriverOnOrder: builder.mutation<
+      { assignment: unknown },
+      { orderId: string; driver_id: string; reason?: string }
+    >({
+      query: ({ orderId, driver_id, reason }) => ({
+        url: `/api/orders/${orderId}/reassign-driver`,
+        method: 'POST',
+        body: { driver_id, reason },
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    submitOrderProofOfDelivery: builder.mutation<
+      { proof: unknown },
+      {
+        orderId: string
+        recipient_name?: string
+        notes?: string
+        file_key?: string
+      }
+    >({
+      query: ({ orderId, ...body }) => ({
+        url: `/api/orders/${orderId}/proof-of-delivery`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    resolveFulfillmentException: builder.mutation<
+      { exception: unknown },
+      { id: string; resolution_notes?: string }
+    >({
+      query: ({ id, resolution_notes }) => ({
+        url: `/api/fulfillment/exceptions/${id}/resolve`,
+        method: 'POST',
+        body: { resolution_notes },
+      }),
+      invalidatesTags: ['Fulfillment'],
+    }),
+    ignoreFulfillmentException: builder.mutation<{ exception: unknown }, string>({
+      query: (id) => ({
+        url: `/api/fulfillment/exceptions/${id}/ignore`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Fulfillment'],
+    }),
     getFulfillmentWaves: builder.query<
       {
         waves: Array<{
@@ -463,27 +609,54 @@ export const api = createApi({
     }),
     getFulfillmentExceptions: builder.query<
       {
+        openCount?: number
         exceptions: Array<{
           id: string
           orderId: string
           orderLabel: string
           exceptionType: string
+          status?: string
+          restaurantName?: string | null
+          description?: string | null
+          resolutionNotes?: string | null
           productName?: string | null
           quantityExpected?: number | null
           quantityActual?: number | null
           damageDescription?: string | null
           notes?: string | null
           createdAt: string
+          resolvedAt?: string | null
         }>
       },
-      { warehouseId?: string } | void
+      { warehouseId?: string; status?: string; type?: string } | void
     >({
       query: (arg) => {
-        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
-        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
+        const params = new URLSearchParams()
+        if (arg && typeof arg === 'object') {
+          if (arg.warehouseId) params.set('warehouse_id', arg.warehouseId)
+          if (arg.status) params.set('status', arg.status)
+          if (arg.type) params.set('type', arg.type)
+        }
+        const qs = params.toString() ? `?${params.toString()}` : ''
         return `/api/fulfillment/exceptions${qs}`
       },
       providesTags: ['Fulfillment'],
+    }),
+    updateOrderDeliveryStatus: builder.mutation<
+      { assignment: unknown },
+      {
+        orderId: string
+        status: 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed'
+        notes?: string
+        failure_reason?: string
+      }
+    >({
+      query: ({ orderId, status, notes, failure_reason }) => ({
+        url: `/api/orders/${orderId}/delivery-status`,
+        method: 'PATCH',
+        body: { status, notes, failure_reason },
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
     }),
 
     // Supplier endpoints
@@ -1212,6 +1385,197 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+    }),
+    validateInvite: builder.query<
+      {
+        valid: boolean
+        reason?: string
+        branch_name?: string
+        restaurant_name?: string
+        org_name?: string
+        invited_name?: string
+        role_name?: string
+        invited_email?: string
+        expires_at?: string
+      },
+      { token: string; type: string }
+    >({
+      query: ({ token, type }) =>
+        `/api/public/invitations?token=${encodeURIComponent(token)}&type=${encodeURIComponent(type)}`,
+    }),
+    acceptInvite: builder.mutation<
+      {
+        user?: { email?: string; displayName?: string }
+        activeSupplierId?: string
+        activeRestaurantId?: string
+      },
+      {
+        token: string
+        type: string
+        full_name?: string
+        email?: string
+        password?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/public/invitations/accept',
+        method: 'POST',
+        body,
+      }),
+    }),
+    getRestaurantOrg: builder.query<
+      {
+        organization: { id: string; name: string }
+        orgRole: string
+        branches: Array<Record<string, unknown>>
+        primaryRestaurantId: string
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org',
+      providesTags: ['RestaurantOrg', 'Branch'],
+    }),
+    getRestaurantOrgBranches: builder.query<
+      {
+        branches: Array<Record<string, unknown>>
+        activeRestaurantId: string | null
+        organizationId: string
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org/branches',
+      providesTags: ['RestaurantOrg', 'Branch'],
+    }),
+    createRestaurantOrgBranch: builder.mutation<any, Record<string, unknown>>({
+      query: (body) => ({ url: '/api/restaurant-org/branches', method: 'POST', body }),
+      invalidatesTags: ['RestaurantOrg', 'Branch', 'Restaurant'],
+    }),
+    switchRestaurantOrgBranchContext: builder.mutation<
+      { activeRestaurantId: string | null; tenantName?: string },
+      { restaurant_id: string | null }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-org/context/switch',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantOrg', 'Branch', 'Restaurant', 'Order', 'Notification'],
+    }),
+    deactivateRestaurantOrgBranch: builder.mutation<{ deactivated: boolean }, string>({
+      query: (restaurantId) => ({
+        url: `/api/restaurant-org/branches/${restaurantId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['RestaurantOrg', 'Branch'],
+    }),
+    getRestaurantMemberInviteRoles: builder.query<
+      { roles: Array<{ id: string; name: string; description?: string }> },
+      void
+    >({
+      query: () => '/api/restaurants/invitations/members/roles',
+    }),
+    getRestaurantBranchInviteRoles: builder.query<
+      { roles: Array<{ id: string; name: string; description?: string }> },
+      { restaurant_id: string }
+    >({
+      query: ({ restaurant_id }) =>
+        `/api/restaurants/invitations/branches/roles?restaurant_id=${encodeURIComponent(restaurant_id)}`,
+    }),
+    getRestaurantMemberInvitations: builder.query<
+      {
+        invitations: Array<{
+          id: string
+          invited_name?: string
+          invited_email?: string
+          status: string
+          invitation_type: string
+          expires_at: string
+          created_at: string
+          accepted_at?: string
+          role_name: string
+          accepted_by_name?: string
+        }>
+      },
+      void
+    >({
+      query: () => '/api/restaurants/invitations/members',
+      providesTags: ['RestaurantInvitations'],
+    }),
+    createRestaurantMemberInvitation: builder.mutation<
+      { invitation_id: string; invite_url: string; expires_at: string },
+      { invited_name?: string; invited_email?: string; role_id: string }
+    >({
+      query: (body) => ({
+        url: '/api/restaurants/invitations/members',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInvitations'],
+    }),
+    revokeRestaurantMemberInvitation: builder.mutation<{ revoked: boolean }, string>({
+      query: (id) => ({ url: `/api/restaurants/invitations/members/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['RestaurantInvitations'],
+    }),
+    regenerateRestaurantMemberInvitation: builder.mutation<
+      { invitation_id: string; invite_url: string; expires_at: string },
+      string
+    >({
+      query: (id) => ({
+        url: `/api/restaurants/invitations/members/${id}/regenerate`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['RestaurantInvitations'],
+    }),
+    getRestaurantBranchInvitations: builder.query<
+      {
+        invitations: Array<{
+          id: string
+          restaurant_id: string
+          invited_name?: string
+          invited_email?: string
+          status: string
+          expires_at: string
+          created_at: string
+          accepted_at?: string
+          branch_name: string
+          role_name: string
+          accepted_by_name?: string
+        }>
+      },
+      void
+    >({
+      query: () => '/api/restaurants/invitations/branches',
+      providesTags: ['RestaurantInvitations'],
+    }),
+    createRestaurantBranchInvitation: builder.mutation<
+      { invitation_id: string; invite_url: string; expires_at: string },
+      {
+        restaurant_id: string
+        invited_name?: string
+        invited_email?: string
+        role_id: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurants/invitations/branches',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInvitations'],
+    }),
+    revokeRestaurantBranchInvitation: builder.mutation<{ revoked: boolean }, string>({
+      query: (id) => ({ url: `/api/restaurants/invitations/branches/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['RestaurantInvitations'],
+    }),
+    regenerateRestaurantBranchInvitation: builder.mutation<
+      { invitation_id: string; invite_url: string; expires_at: string },
+      string
+    >({
+      query: (id) => ({
+        url: `/api/restaurants/invitations/branches/${id}/regenerate`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['RestaurantInvitations'],
     }),
 
     getRestaurantTeam: builder.query<
@@ -2403,6 +2767,17 @@ export const {
   useGetFulfillmentWavesQuery,
   useGetFulfillmentRoutesQuery,
   useGetFulfillmentExceptionsQuery,
+  useGetFulfillmentDispatchQuery,
+  useGetDriversQuery,
+  useCreateDriverMutation,
+  useUpdateDriverMutation,
+  useDeactivateDriverMutation,
+  useAssignDriverToOrderMutation,
+  useReassignDriverToOrderMutation,
+  useUpdateOrderDeliveryStatusMutation,
+  useSubmitOrderProofOfDeliveryMutation,
+  useResolveFulfillmentExceptionMutation,
+  useIgnoreFulfillmentExceptionMutation,
   useGetSuppliersQuery,
   useGetSupplierQuery,
   useGetSupplierStatisticsQuery,
@@ -2490,6 +2865,23 @@ export const {
   useRegenerateBranchInvitationMutation,
   useValidateBranchInviteQuery,
   useAcceptBranchInviteMutation,
+  useValidateInviteQuery,
+  useAcceptInviteMutation,
+  useGetRestaurantOrgQuery,
+  useGetRestaurantOrgBranchesQuery,
+  useCreateRestaurantOrgBranchMutation,
+  useSwitchRestaurantOrgBranchContextMutation,
+  useDeactivateRestaurantOrgBranchMutation,
+  useGetRestaurantMemberInviteRolesQuery,
+  useGetRestaurantBranchInviteRolesQuery,
+  useGetRestaurantMemberInvitationsQuery,
+  useCreateRestaurantMemberInvitationMutation,
+  useRevokeRestaurantMemberInvitationMutation,
+  useRegenerateRestaurantMemberInvitationMutation,
+  useGetRestaurantBranchInvitationsQuery,
+  useCreateRestaurantBranchInvitationMutation,
+  useRevokeRestaurantBranchInvitationMutation,
+  useRegenerateRestaurantBranchInvitationMutation,
   useGetRestaurantTeamQuery,
   useAddRestaurantTeamMemberMutation,
   useDeleteRestaurantTeamMemberMutation,

@@ -53,6 +53,8 @@ import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { e2eRoutes } from './routes/e2e.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
+import { driversRoutes } from './routes/drivers.routes.js'
+import { runFulfillmentExceptionChecks } from './jobs/fulfillment-exceptions.job.js'
 import { approvalsRoutes } from './routes/approvals.routes.js'
 import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
@@ -65,7 +67,10 @@ import { reportsRoutes } from './routes/reports.routes.js'
 import { tenantRolesRoutes } from './routes/tenant-roles.routes.js'
 import branchInvitationsRoutes from './routes/branch-invitations.routes.js'
 import branchInvitationsPublicRoutes from './routes/branch-invitations-public.routes.js'
+import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
+import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { expireOldBranchInvitations } from './lib/branch-invitations.js'
+import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
 
 if (config.NODE_ENV === 'production') {
   validateProductionConfig()
@@ -269,9 +274,12 @@ if (config.E2E_SECRET) {
 app.use('/api/branches', branchesRoutes)
 app.use('/api/org', orgRoutes)
 app.use('/api/org/invitations', branchInvitationsRoutes)
+app.use('/api/restaurant-org', restaurantOrgRoutes)
+app.use('/api/restaurants/invitations', restaurantInvitationsRoutes)
 app.use('/api/public/invitations', branchInvitationsPublicRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
+app.use('/api/drivers', driversRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -365,18 +373,26 @@ server.listen(PORT, () => {
   )
   logger.info('Promotions expiry job started (runs every 30 min)')
 
-  expireOldBranchInvitations().catch((err) =>
-    logger.error('Branch invitation expiry job failed on startup:', err)
+  const runInvitationExpiry = () =>
+    Promise.all([expireOldBranchInvitations(), expireOldRestaurantInvitations()]).catch((err) =>
+      logger.error('Invitation expiry job failed:', err)
+    )
+  runInvitationExpiry()
+  setInterval(runInvitationExpiry, 60 * 60 * 1000)
+  logger.info('Invitation expiry job started (runs every 1h)')
+
+  runFulfillmentExceptionChecks().catch((err) =>
+    logger.error('Fulfillment exceptions job failed on startup:', err)
   )
   setInterval(
     () => {
-      expireOldBranchInvitations().catch((err) =>
-        logger.error('Branch invitation expiry job failed:', err)
+      runFulfillmentExceptionChecks().catch((err) =>
+        logger.error('Fulfillment exceptions job failed:', err)
       )
     },
-    60 * 60 * 1000
+    30 * 60 * 1000
   )
-  logger.info('Branch invitation expiry job started (runs every 1h)')
+  logger.info('Fulfillment exceptions job started (runs every 30 min)')
 })
 
 export default app

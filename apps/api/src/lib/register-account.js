@@ -1,6 +1,10 @@
 import { query, withTransaction } from './db.js'
 import { assignDefaultRoleForTenant } from './rbac.js'
 import { ensureOrgSystemRoles, assignOrgUserRole } from './supplier-org.js'
+import {
+  ensureRestaurantOrgSystemRoles,
+  assignRestaurantOrgUserRole,
+} from './restaurant-org.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser } from './tenant-roles.js'
 import { createDefaultWarehouseForSupplier } from './warehouse-helpers.js'
 import { ensureKeycloakRealmRole } from './keycloak-admin.js'
@@ -161,6 +165,34 @@ export async function completeTenantRegistration({
     )
     const tenant = rows[0]
 
+    const orgSlug = `${slug}-org`
+    const { rows: orgRows } = await client.query(
+      `INSERT INTO restaurant_organizations (name, slug)
+       VALUES ($1, $2)
+       RETURNING *`,
+      [name, orgSlug]
+    )
+    const organization = orgRows[0]
+
+    await client.query(
+      `UPDATE restaurant
+       SET organization_id = $1, is_main_branch = true, updated_at = now()
+       WHERE id = $2`,
+      [organization.id, tenant.id]
+    )
+
+    await ensureRestaurantOrgSystemRoles(organization.id, client)
+    await ensureTenantSystemRoles(tenant.id, 'RESTAURANT', client)
+
+    await assignRestaurantOrgUserRole({
+      userId,
+      organizationId: organization.id,
+      roleName: 'Org Owner',
+      client,
+    })
+
+    await assignOwnerRoleForUser(userId, tenant.id, 'RESTAURANT', null, client)
+
     await client.query(
       `UPDATE app_user SET role = $1, keycloak_sub = COALESCE(keycloak_sub, $2), updated_at = now() WHERE id = $3`,
       [type, keycloakSub, userId]
@@ -168,12 +200,16 @@ export async function completeTenantRegistration({
 
     await createPendingActivationSubscription(client, tenant.id, type, 'free')
 
-    return { tenant, tenantType: type }
+    return { tenant, tenantType: type, organizationId: organization.id }
   })
 
   if (result.tenantType === 'RESTAURANT') {
-    await ensureTenantSystemRoles(result.tenant.id, result.tenantType)
-    await assignDefaultRoleForTenant(userId, result.tenant.id, result.tenantType)
+    const { invalidateRestaurantOrgPermissionCaches } = await import('./restaurant-org.js')
+    const { invalidateUserPermissionCache } = await import('./permissions.js')
+    if (result.organizationId) {
+      await invalidateRestaurantOrgPermissionCaches(userId, result.organizationId)
+    }
+    await invalidateUserPermissionCache(userId, result.tenant.id, 'RESTAURANT')
   } else {
     const { invalidateOrgPermissionCaches } = await import('./supplier-org.js')
     const { invalidateUserPermissionCache } = await import('./permissions.js')

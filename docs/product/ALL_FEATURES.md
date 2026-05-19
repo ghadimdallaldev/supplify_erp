@@ -61,7 +61,7 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 - **Tenant-scoped RBAC** — fine-grained permissions per restaurant/supplier (e.g. `INVOICES_VIEW`, `STAFF_MANAGE`).
 - **Admin impersonation** — platform admin views the app as a chosen restaurant or supplier (signed cookie).
-- **Multi-branch** — restaurants link branch accounts; suppliers use org branch accounts (`/api/org`, `/app/org`) with Regional Manager scoping.
+- **Multi-branch** — restaurants and suppliers use org branch accounts (`/api/restaurant-org`, `/api/org`, `/app/org`) with Regional Manager scoping and link-based team invites (`/invite?type=rm|rb|sb`).
 - **Multi-warehouse fulfillment** — Gold+ suppliers route order lines to warehouses (single default vs per-item routing).
 - **Subscription entitlements** — plan features and usage limits enforced on API.
 - **Account lock** — billing overdue / pending activation can block app access (billing middleware).
@@ -223,8 +223,8 @@ Restaurant **Settings** (`/app/settings`) renders **Restaurant onboarding / sett
 | Tab               | Capabilities                                         |
 | ----------------- | ---------------------------------------------------- |
 | **Profile**       | Name, contact, address, logo upload, trade license   |
-| **Team**          | Invite/manage restaurant users, roles                |
-| **Branches**      | Multi-branch CRUD, branch switching, branch accounts |
+| **Team**          | Link-based team invites (`/api/restaurants/invitations/members`), pending invitations |
+| **Branches**      | Org branches, two-step create + manager invite (`/api/restaurant-org`) |
 | **Subscription**  | Plan, usage, upgrade prompts, billing status         |
 | **Notifications** | Email, WhatsApp, in-app; per-category toggles        |
 | **Activity**      | Tenant audit log; filter by labeled action/resource  |
@@ -234,8 +234,10 @@ Also available via API (not always separate pages):
 | Feature                    | API                                  |
 | -------------------------- | ------------------------------------ |
 | Restaurant profile CRUD    | `/api/restaurants`                   |
-| Restaurant onboarding team | `/api/restaurant-onboarding/team`    |
-| Branches                   | `/api/branches`                      |
+| Restaurant onboarding team | `/api/restaurant-onboarding/team` (legacy contacts) |
+| Restaurant org & branches  | `/api/restaurant-org`, `/api/restaurant-org/branches` (flag: `multi_branch`) |
+| Restaurant invitations     | `/api/restaurants/invitations/members`, `/api/restaurants/invitations/branches`, `/invite?type=rm\|rb` |
+| Branches (legacy links)    | `/api/branches`                      |
 | Restaurant pricing view    | `/api/restaurant-pricing/my-pricing` |
 
 ---

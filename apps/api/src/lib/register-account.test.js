@@ -23,6 +23,13 @@ vi.mock('./billing/subscription-activation.js', () => ({
 
 vi.mock('./tenant-roles.js', () => ({
   ensureTenantSystemRoles: vi.fn().mockResolvedValue(undefined),
+  assignOwnerRoleForUser: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('./restaurant-org.js', () => ({
+  ensureRestaurantOrgSystemRoles: vi.fn().mockResolvedValue(undefined),
+  assignRestaurantOrgUserRole: vi.fn().mockResolvedValue(undefined),
+  invalidateRestaurantOrgPermissionCaches: vi.fn().mockResolvedValue(undefined),
 }))
 
 describe('register-account', () => {
@@ -67,8 +74,16 @@ describe('register-account', () => {
         .mockResolvedValueOnce({ rows: [{ id: 'u1', role: 'PENDING' }] })
         .mockResolvedValueOnce({ rows: [] })
 
-      mockClientQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
-        rows: [{ id: 'rest-1', name: 'Test Rest', slug: 'test-rest' }],
+      mockClientQuery.mockImplementation(async (sql) => {
+        const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('SELECT 1 FROM restaurant')) return { rows: [] }
+        if (text.includes('INSERT INTO restaurant (name')) {
+          return { rows: [{ id: 'rest-1', name: 'Test Rest', slug: 'test-rest' }] }
+        }
+        if (text.includes('INSERT INTO restaurant_organizations')) {
+          return { rows: [{ id: 'org-1', name: 'Test Rest', slug: 'test-rest-org' }] }
+        }
+        return { rows: [] }
       })
 
       const result = await completeTenantRegistration({

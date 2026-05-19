@@ -21,6 +21,7 @@
     "db:migrate": "node apps/api/scripts/migrate.js",
     "db:migrate-users-to-roles": "node apps/api/scripts/migrate-users-to-roles.js",
     "db:migrate-suppliers-to-orgs": "node apps/api/scripts/migrate-suppliers-to-orgs.js",
+    "db:migrate-restaurants-to-orgs": "node apps/api/scripts/migrate-restaurants-to-orgs.js",
     "db:seed": "pnpm --filter @supplify/api db:seed",
     "seed:prodlike": "pnpm --filter @supplify/api seed:prodlike",
     "seed:accounts": "pnpm --filter @supplify/api seed:accounts",

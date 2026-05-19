@@ -58,8 +58,11 @@ import {
   useUpdateNotificationPreferencesMutation,
   useGetEntitlementsQuery,
   useGetBranchesQuery,
+  useGetRestaurantOrgBranchesQuery,
   useCreateBranchMutation,
   useDeleteBranchMutation,
+  useDeactivateRestaurantOrgBranchMutation,
+  useSwitchRestaurantOrgBranchContextMutation,
   useGetRestaurantTeamQuery,
   useAddRestaurantTeamMemberMutation,
   useDeleteRestaurantTeamMemberMutation,
@@ -67,6 +70,9 @@ import {
 } from '../services/api'
 import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
 import { TeamRolesPanel } from '../components/TeamRolesPanel'
+import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
+import { RestaurantMemberInviteModal } from '../components/org/RestaurantMemberInviteModal'
+import { RestaurantPendingInvitations } from '../components/org/RestaurantPendingInvitations'
 import {
   canUseCustomBranding,
   customBrandingUpgradeMessage,
@@ -80,6 +86,7 @@ import { ActivityLogTab } from '../components/ActivityLogTab'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { usePermissions } from '../hooks/usePermissions'
 import { featureEnabled } from '../lib/planLimits'
+import { normalizeAddress } from '../lib/address'
 import { useGetMyReviewsQuery } from '../services/api'
 import { Star } from 'lucide-react'
 
@@ -247,12 +254,7 @@ export function RestaurantOnboardingPage() {
         vat_number: restaurant.vat_number || '',
         phone: restaurant.phone || '',
         contact_email: restaurant.contact_email || '',
-        address: restaurant.address_json || {
-          street: '',
-          city: '',
-          region: '',
-          country: '',
-        },
+        address: normalizeAddress(restaurant.address_json),
         delivery_instructions: restaurant.delivery_instructions || '',
         description: restaurant.description || '',
         website: restaurant.website || '',
@@ -356,12 +358,23 @@ export function RestaurantOnboardingPage() {
 
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
+  const multiBranchEnabled = entitlements?.features?.multi_branch === true
+  const { data: restaurantOrgBranches, refetch: refetchRestaurantOrgBranches } =
+    useGetRestaurantOrgBranchesQuery(undefined, {
+      skip: !user?.id || !multiBranchEnabled,
+    })
   const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(undefined, {
-    skip: !user?.id,
+    skip: !user?.id || Boolean(restaurantOrgBranches?.organizationId),
   })
   const [createBranch, { isLoading: isCreatingBranch }] = useCreateBranchMutation()
   const [deleteBranch] = useDeleteBranchMutation()
-  const branches = branchesData?.branches ?? []
+  const [deactivateOrgBranch] = useDeactivateRestaurantOrgBranchMutation()
+  const [switchRestaurantBranch] = useSwitchRestaurantOrgBranchContextMutation()
+  const useRestaurantOrg = Boolean(restaurantOrgBranches?.organizationId)
+  const branches = useRestaurantOrg
+    ? (restaurantOrgBranches?.branches ?? [])
+    : (branchesData?.branches ?? [])
+  const refetchBranchesList = useRestaurantOrg ? refetchRestaurantOrgBranches : refetchBranches
   const branchGate = getBranchAddGate(entitlements, branches.length + 1)
   const brandingAllowed = canUseCustomBranding(entitlements)
   const approvalsFeatureEnabled = featureEnabled(entitlements?.features?.approvals_budgets)
@@ -888,10 +901,11 @@ export function RestaurantOnboardingPage() {
             renderInviteForm={() => (
               <Button className="mt-2" onClick={() => setShowAddMemberDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Member
+                Invite via Link
               </Button>
             )}
           />
+          <RestaurantPendingInvitations />
         </TabsContent>
 
         {/* Branches Tab */}
@@ -969,8 +983,12 @@ export function RestaurantOnboardingPage() {
                         size="sm"
                         onClick={async () => {
                           try {
-                            await deleteBranch(branch.id).unwrap()
-                            refetchBranches()
+                            if (useRestaurantOrg) {
+                              await deactivateOrgBranch(String(branch.id)).unwrap()
+                            } else {
+                              await deleteBranch(String(branch.id)).unwrap()
+                            }
+                            refetchBranchesList()
                             toast.success('Branch removed')
                           } catch (error: any) {
                             toast.error(error?.data?.error?.message || 'Failed to remove branch')
@@ -1344,6 +1362,20 @@ export function RestaurantOnboardingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <RestaurantMemberInviteModal
+        open={showAddMemberDialog}
+        onClose={() => setShowAddMemberDialog(false)}
+      />
+      {useRestaurantOrg ? (
+        <RestaurantAddBranchModal
+          open={showAddBranchDialog}
+          onClose={() => {
+            setShowAddBranchDialog(false)
+            refetchBranchesList()
+          }}
+        />
+      ) : null}
     </div>
   )
 }
