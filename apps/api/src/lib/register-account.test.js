@@ -21,6 +21,10 @@ vi.mock('./billing/subscription-activation.js', () => ({
   createPendingActivationSubscription: (...args) => createPendingActivationSubscription(...args),
 }))
 
+vi.mock('./tenant-roles.js', () => ({
+  ensureTenantSystemRoles: vi.fn().mockResolvedValue(undefined),
+}))
+
 describe('register-account', () => {
   beforeEach(() => {
     mockQuery.mockReset()

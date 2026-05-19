@@ -29,10 +29,18 @@ vi.mock('./logger.js', () => ({
 
 const mockGetRolesForUser = vi.fn()
 const mockGetPermissionsForUser = vi.fn()
-vi.mock('./permissions.js', () => ({
-  getRolesForUser: (...args) => mockGetRolesForUser(...args),
-  getPermissionsForUser: (...args) => mockGetPermissionsForUser(...args),
-  hasPermission: vi.fn(),
+vi.mock('./permissions.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    getRolesForUser: (...args) => mockGetRolesForUser(...args),
+    getPermissionsForUser: (...args) => mockGetPermissionsForUser(...args),
+  }
+})
+
+vi.mock('./tenant-roles.js', () => ({
+  ensureTenantSystemRoles: vi.fn().mockResolvedValue(undefined),
+  assignOwnerRoleForUser: vi.fn().mockResolvedValue(undefined),
 }))
 
 describe('RBAC Utilities', () => {
@@ -185,10 +193,13 @@ describe('RBAC Utilities', () => {
       )
 
       expect(user).toEqual(newUser)
-      expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO app_user'),
-        ['sub-new', 'new@example.com', 'New User', null, 'PENDING']
-      )
+      expect(query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO app_user'), [
+        'sub-new',
+        'new@example.com',
+        'New User',
+        null,
+        'PENDING',
+      ])
     })
   })
 
@@ -248,8 +259,14 @@ describe('RBAC Utilities', () => {
     it('should clear auth cookies', () => {
       clearAuthCookies(res)
 
-      expect(res.clearCookie).toHaveBeenCalledWith('access_token', expect.objectContaining({ path: '/' }))
-      expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', expect.objectContaining({ path: '/' }))
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'access_token',
+        expect.objectContaining({ path: '/' })
+      )
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        expect.objectContaining({ path: '/' })
+      )
     })
   })
 

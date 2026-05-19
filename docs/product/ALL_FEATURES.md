@@ -137,6 +137,7 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 | Order reminders to supplier               | Order detail         | `POST /api/orders/:id/remind`                                       |
 | Order calendar view                       | (API-driven widgets) | `/api/orders/calendar`                                              |
 | Approvals & budgets (plan)                | `/app/approvals`     | `/api/approvals/*`, `GET /api/orders/:id/approval-status`           |
+| Tenant roles (plan)                       | Settings → Team      | `/api/roles/*` (gated); `auth/me` permissions always resolved       |
 | Manual order (supplier-created on behalf) | —                    | `POST /api/orders/manual` (supplier)                                |
 | Quick lists (saved templates)             | `/app/quick-lists`   | `/api/quick-lists`                                                  |
 | Quick list items CRUD                     | Quick Lists          | `/api/quick-lists/:id/items`                                        |
@@ -416,6 +417,7 @@ Canonical keys in `apps/api/src/lib/feature-keys.js`:
 | `inventory_management` | Inventory management                                    |
 | `waste_tracking`       | Waste tracking                                          |
 | `approvals_budgets`    | Approvals & budgets                                     |
+| `advanced_roles`       | Named tenant roles & custom role builder                |
 | `notifications`        | Notifications (tier: email / email+WhatsApp / +webhook) |
 | `api_integrations`     | API integrations                                        |
 | `support_sla`          | Support SLA                                             |
@@ -602,47 +604,48 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 
 ## 18. API route index
 
-| Prefix                       | Module                                 |
-| ---------------------------- | -------------------------------------- |
-| `/health`                    | Health check                           |
-| `/auth/*`                    | Authentication                         |
-| `/api/register/*`            | Registration completion                |
-| `/api/products`              | Catalog                                |
-| `/api/prices`                | Pricing                                |
-| `/api/inventory`             | Supplier inventory                     |
-| `/api/suppliers`             | Suppliers                              |
-| `/api/restaurants`           | Restaurants                            |
-| `/api/orders`                | Orders                                 |
-| `/api/orders/calendar`       | Order calendar                         |
-| `/api/approvals`             | Budgets, rules, order approvals        |
-| `/api/reports`               | Restaurant & supplier analytics        |
-| `/api/disputes`              | Disputes & returns                     |
-| `/api/promotions`            | Supplier promotions / restaurant deals |
-| `/api/reviews`               | Supplier reviews                       |
-| `/api/audit`                 | Tenant audit log                       |
-| `/api/push`                  | Web Push VAPID + subscriptions         |
-| `/api/files`                 | File uploads                           |
-| `/api/admin`                 | Legacy admin                           |
-| `/api/chat`                  | Messaging                              |
-| `/api/invoices`              | Invoices                               |
-| `/api/payments`              | Payments                               |
-| `/api/quick-lists`           | Quick lists                            |
-| `/api/restaurant-inventory`  | Restaurant inventory                   |
-| `/api/restaurant-onboarding` | Onboarding / team                      |
-| `/api/receiving`             | Receiving                              |
-| `/api/restaurant-finance`    | Finance                                |
-| `/api/reservations`          | Reservations (auth)                    |
-| `/api/staff`                 | Staff HR                               |
-| `/api/restaurant-pricing`    | Contract pricing                       |
-| `/api/notifications`         | Notifications                          |
-| `/api/subscriptions`         | Subscriptions                          |
-| `/api/billing`               | Billing                                |
-| `/api/public`                | Public portals                         |
-| `/api/admin-dashboard`       | Platform admin                         |
-| `/api/branches`              | Branches                               |
-| `/api/warehouses`            | Warehouses                             |
-| `/api/fulfillment`           | Fulfillment                            |
-| `/api/e2e`                   | E2E helpers (gated)                    |
+| Prefix                       | Module                                     |
+| ---------------------------- | ------------------------------------------ |
+| `/health`                    | Health check                               |
+| `/auth/*`                    | Authentication                             |
+| `/api/register/*`            | Registration completion                    |
+| `/api/products`              | Catalog                                    |
+| `/api/prices`                | Pricing                                    |
+| `/api/inventory`             | Supplier inventory                         |
+| `/api/suppliers`             | Suppliers                                  |
+| `/api/restaurants`           | Restaurants                                |
+| `/api/orders`                | Orders                                     |
+| `/api/orders/calendar`       | Order calendar                             |
+| `/api/approvals`             | Budgets, rules, order approvals            |
+| `/api/roles`                 | Tenant named roles (plan `advanced_roles`) |
+| `/api/reports`               | Restaurant & supplier analytics            |
+| `/api/disputes`              | Disputes & returns                         |
+| `/api/promotions`            | Supplier promotions / restaurant deals     |
+| `/api/reviews`               | Supplier reviews                           |
+| `/api/audit`                 | Tenant audit log                           |
+| `/api/push`                  | Web Push VAPID + subscriptions             |
+| `/api/files`                 | File uploads                               |
+| `/api/admin`                 | Legacy admin                               |
+| `/api/chat`                  | Messaging                                  |
+| `/api/invoices`              | Invoices                                   |
+| `/api/payments`              | Payments                                   |
+| `/api/quick-lists`           | Quick lists                                |
+| `/api/restaurant-inventory`  | Restaurant inventory                       |
+| `/api/restaurant-onboarding` | Onboarding / team                          |
+| `/api/receiving`             | Receiving                                  |
+| `/api/restaurant-finance`    | Finance                                    |
+| `/api/reservations`          | Reservations (auth)                        |
+| `/api/staff`                 | Staff HR                                   |
+| `/api/restaurant-pricing`    | Contract pricing                           |
+| `/api/notifications`         | Notifications                              |
+| `/api/subscriptions`         | Subscriptions                              |
+| `/api/billing`               | Billing                                    |
+| `/api/public`                | Public portals                             |
+| `/api/admin-dashboard`       | Platform admin                             |
+| `/api/branches`              | Branches                                   |
+| `/api/warehouses`            | Warehouses                                 |
+| `/api/fulfillment`           | Fulfillment                                |
+| `/api/e2e`                   | E2E helpers (gated)                        |
 
 ---
 

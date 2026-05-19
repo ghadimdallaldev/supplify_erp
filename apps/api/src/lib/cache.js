@@ -73,6 +73,18 @@ export async function setCache(key, value, ttlSeconds = 300) {
   setMemoryCache(key, value, ttlSeconds)
 }
 
+export async function deleteCache(key) {
+  if (redisClient) {
+    try {
+      await redisClient.del(key)
+      return
+    } catch (error) {
+      logger.warn('Redis del failed, clearing memory cache', { error: error.message, key })
+    }
+  }
+  memoryCache.delete(key)
+}
+
 export async function disconnectCache() {
   if (redisClient) {
     try {
@@ -82,4 +94,3 @@ export async function disconnectCache() {
     }
   }
 }
-

@@ -1,5 +1,6 @@
 import { query, withTransaction } from './db.js'
 import { assignDefaultRoleForTenant } from './rbac.js'
+import { ensureTenantSystemRoles } from './tenant-roles.js'
 import { ensureKeycloakRealmRole } from './keycloak-admin.js'
 import { ConflictError, ValidationError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
@@ -114,6 +115,7 @@ export async function completeTenantRegistration({
     return { tenant, tenantType: type }
   })
 
+  await ensureTenantSystemRoles(result.tenant.id, result.tenantType)
   await assignDefaultRoleForTenant(userId, result.tenant.id, result.tenantType)
   await ensureKeycloakRealmRole(normalizedEmail, kcRole)
 

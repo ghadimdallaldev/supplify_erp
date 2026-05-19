@@ -1,0 +1,83 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('./cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
+}))
+
+const queryMock = vi.fn()
+
+vi.mock('./db.js', () => ({
+  query: (...args) => queryMock(...args),
+}))
+
+import {
+  getPermissionsForUser,
+  invalidateUserPermissionCache,
+  permissionCacheKey,
+  hasPermission,
+  getPermissionsForTenantRole,
+} from './permissions.js'
+import { getCache, setCache, deleteCache } from './cache.js'
+
+describe('permissions resolution', () => {
+  beforeEach(() => {
+    queryMock.mockReset()
+    vi.mocked(getCache).mockResolvedValue(null)
+    vi.mocked(setCache).mockClear()
+    vi.mocked(deleteCache).mockClear()
+  })
+
+  it('resolves permissions from tenant role', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ permission: 'ORDERS_VIEW' }, { permission: 'ORDERS_CREATE' }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
+    expect(perms).toContain('ORDERS_VIEW')
+    expect(perms).toContain('ORDERS_CREATE')
+    expect(setCache).toHaveBeenCalled()
+  })
+
+  it('merges legacy permissions when tenant role exists', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ permission: 'ORDERS_VIEW' }] })
+      .mockResolvedValueOnce({ rows: [{ code: 'SETTINGS_VIEW' }] })
+
+    const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
+    expect(perms).toContain('ORDERS_VIEW')
+    expect(perms).toContain('SETTINGS_VIEW')
+  })
+
+  it('uses cache when present', async () => {
+    vi.mocked(getCache).mockResolvedValue(['INVOICES_VIEW'])
+    const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
+    expect(perms).toEqual(['INVOICES_VIEW'])
+    expect(queryMock).not.toHaveBeenCalled()
+  })
+
+  it('invalidates permission cache key', async () => {
+    await invalidateUserPermissionCache('u1', 't1', 'RESTAURANT')
+    expect(deleteCache).toHaveBeenCalledWith(permissionCacheKey('u1', 't1', 'RESTAURANT'))
+  })
+
+  it('hasPermission treats MANAGE as superset', () => {
+    expect(hasPermission(['ORDERS_MANAGE'], 'ORDERS_VIEW')).toBe(true)
+    expect(hasPermission(['ORDERS_VIEW'], 'ORDERS_MANAGE')).toBe(false)
+  })
+})
+
+describe('getPermissionsForTenantRole', () => {
+  beforeEach(() => queryMock.mockReset())
+
+  it('loads permissions for role id', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{ permission: 'STAFF_VIEW' }],
+    })
+    const perms = await getPermissionsForTenantRole('role-1')
+    expect(perms).toEqual(['STAFF_VIEW'])
+  })
+})

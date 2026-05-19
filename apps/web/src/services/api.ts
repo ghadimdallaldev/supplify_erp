@@ -218,6 +218,7 @@ export const api = createApi({
     'Disputes',
     'Promotions',
     'Audit',
+    'TenantRoles',
     'Amendments',
     'CreditNotes',
     'StaffMember',
@@ -1074,6 +1075,78 @@ export const api = createApi({
         method: 'DELETE',
       }),
       invalidatesTags: ['RestaurantTeam'],
+    }),
+
+    getTenantRoles: builder.query<
+      {
+        roles: Array<{
+          id: string
+          name: string
+          description?: string
+          is_system: boolean
+          permissions: string[]
+          user_count: number
+        }>
+      },
+      void
+    >({
+      query: () => '/api/roles',
+      providesTags: ['TenantRoles'],
+    }),
+    getTenantRoleUsers: builder.query<
+      {
+        users: Array<{
+          id: string
+          email: string
+          display_name: string
+          role_id?: string
+          role_name?: string
+        }>
+      },
+      void
+    >({
+      query: () => '/api/roles/users',
+      providesTags: ['TenantRoles'],
+    }),
+    createTenantRole: builder.mutation<
+      { role: Record<string, unknown> },
+      { name: string; description?: string; permissions: string[] }
+    >({
+      query: (body) => ({
+        url: '/api/roles',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['TenantRoles'],
+    }),
+    updateTenantRole: builder.mutation<
+      { role: Record<string, unknown> },
+      { id: string; name?: string; description?: string; permissions?: string[] }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/roles/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['TenantRoles'],
+    }),
+    deleteTenantRole: builder.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({
+        url: `/api/roles/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['TenantRoles'],
+    }),
+    assignTenantUserRole: builder.mutation<
+      { userId: string; roleId: string; roleName: string },
+      { userId: string; role_id: string }
+    >({
+      query: ({ userId, role_id }) => ({
+        url: `/api/roles/users/${userId}/assign`,
+        method: 'POST',
+        body: { role_id },
+      }),
+      invalidatesTags: ['TenantRoles', 'User'],
     }),
 
     // Notification endpoints
@@ -2214,6 +2287,12 @@ export const {
   useGetRestaurantTeamQuery,
   useAddRestaurantTeamMemberMutation,
   useDeleteRestaurantTeamMemberMutation,
+  useGetTenantRolesQuery,
+  useGetTenantRoleUsersQuery,
+  useCreateTenantRoleMutation,
+  useUpdateTenantRoleMutation,
+  useDeleteTenantRoleMutation,
+  useAssignTenantUserRoleMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
   useGetPublicRestaurantsQuery,

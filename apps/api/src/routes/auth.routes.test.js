@@ -38,7 +38,9 @@ vi.mock('../lib/auth.js', () => ({
     access_token: 'new-access-token',
     refresh_token: 'new-refresh-token',
   }),
-  getKeycloakLogoutUrl: vi.fn().mockResolvedValue('https://keycloak.example.com/logout?post_logout_redirect_uri=...'),
+  getKeycloakLogoutUrl: vi
+    .fn()
+    .mockResolvedValue('https://keycloak.example.com/logout?post_logout_redirect_uri=...'),
 }))
 
 vi.mock('../lib/rbac.js', () => ({
@@ -74,9 +76,18 @@ vi.mock('../lib/rbac.js', () => ({
     .mockResolvedValue({ id: 'user-1', email: 'test@example.com', keycloak_sub: 'sub-123' }),
 }))
 
-vi.mock('../lib/permissions.js', () => ({
-  getRolesForUser: vi.fn().mockResolvedValue(['RESTAURANT_OWNER']),
-  getPermissionsForUser: vi.fn().mockResolvedValue(['SETTINGS_VIEW', 'ORDERS_VIEW']),
+vi.mock('../lib/permissions.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    getRolesForUser: vi.fn().mockResolvedValue(['RESTAURANT_OWNER']),
+    getPermissionsForUser: vi.fn().mockResolvedValue(['SETTINGS_VIEW', 'ORDERS_VIEW']),
+  }
+})
+
+vi.mock('../lib/tenant-roles.js', () => ({
+  ensureTenantSystemRoles: vi.fn().mockResolvedValue(undefined),
+  assignOwnerRoleForUser: vi.fn().mockResolvedValue(undefined),
 }))
 
 // Import routes after mocks

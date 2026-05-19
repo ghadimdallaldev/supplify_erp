@@ -4,6 +4,7 @@ import { logger } from './logger.js'
 import { getEffectiveTenant } from './impersonation.js'
 import { getActiveTenantFromRequest, getPrimaryTenantForUser } from './tenant-switch.js'
 import { getRolesForUser, getPermissionsForUser, hasPermission } from './permissions.js'
+import { ensureTenantSystemRoles, assignOwnerRoleForUser } from './tenant-roles.js'
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -364,6 +365,8 @@ export async function assignDefaultRoleForTenant(userId, tenantId, tenantType) {
     `,
       [userId, tenantId, tenantType, roleCode]
     )
+    await ensureTenantSystemRoles(tenantId, tenantType).catch(() => {})
+    await assignOwnerRoleForUser(userId, tenantId, tenantType).catch(() => {})
     return rowCount !== undefined
   } catch (err) {
     if (err.code === '42P01') return false // tables don't exist
