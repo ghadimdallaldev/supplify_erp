@@ -212,6 +212,14 @@ export const api = createApi({
     'OrdersCalendar',
     'QuickList',
     'Fulfillment',
+    'Approvals',
+    'Reviews',
+    'Reports',
+    'Disputes',
+    'Promotions',
+    'Audit',
+    'Amendments',
+    'CreditNotes',
     'StaffMember',
     'StaffShift',
     'StaffTimeEntry',
@@ -1325,6 +1333,389 @@ export const api = createApi({
       }),
     }),
 
+    // Approvals & budgets
+    getApprovalBudgets: builder.query<
+      { periods: Array<Record<string, unknown>> },
+      { branchId?: string; year?: string } | void
+    >({
+      query: (params) => ({
+        url: '/api/approvals/budgets',
+        params: params || {},
+      }),
+      providesTags: ['Approvals'],
+    }),
+    getApprovalBudgetUsage: builder.query<Record<string, unknown>, string>({
+      query: (id) => `/api/approvals/budgets/${id}/usage`,
+      providesTags: ['Approvals'],
+    }),
+    createApprovalBudget: builder.mutation<
+      { period: Record<string, unknown> },
+      Record<string, unknown>
+    >({
+      query: (body) => ({ url: '/api/approvals/budgets', method: 'POST', body }),
+      invalidatesTags: ['Approvals'],
+    }),
+    updateApprovalBudget: builder.mutation<
+      { period: Record<string, unknown> },
+      { id: string; body: Record<string, unknown> }
+    >({
+      query: ({ id, body }) => ({ url: `/api/approvals/budgets/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Approvals'],
+    }),
+    deleteApprovalBudget: builder.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({ url: `/api/approvals/budgets/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Approvals'],
+    }),
+    getApprovalRules: builder.query<{ rules: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/approvals/rules',
+      providesTags: ['Approvals'],
+    }),
+    createApprovalRule: builder.mutation<
+      { rule: Record<string, unknown> },
+      Record<string, unknown>
+    >({
+      query: (body) => ({ url: '/api/approvals/rules', method: 'POST', body }),
+      invalidatesTags: ['Approvals'],
+    }),
+    updateApprovalRule: builder.mutation<
+      { rule: Record<string, unknown> },
+      { id: string; body: Record<string, unknown> }
+    >({
+      query: ({ id, body }) => ({ url: `/api/approvals/rules/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Approvals'],
+    }),
+    deleteApprovalRule: builder.mutation<{ deactivated: boolean }, string>({
+      query: (id) => ({ url: `/api/approvals/rules/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Approvals'],
+    }),
+    getPendingApprovals: builder.query<{ approvals: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/approvals/pending',
+      providesTags: ['Approvals', 'Order'],
+    }),
+    approveOrderRequest: builder.mutation<
+      { orderId: string; status: string },
+      { id: string; notes?: string }
+    >({
+      query: ({ id, notes }) => ({
+        url: `/api/approvals/requests/${id}/approve`,
+        method: 'POST',
+        body: { notes },
+      }),
+      invalidatesTags: ['Approvals', 'Order'],
+    }),
+    rejectOrderRequest: builder.mutation<
+      { orderId: string; status: string },
+      { id: string; notes: string }
+    >({
+      query: ({ id, notes }) => ({
+        url: `/api/approvals/requests/${id}/reject`,
+        method: 'POST',
+        body: { notes },
+      }),
+      invalidatesTags: ['Approvals', 'Order'],
+    }),
+    getOrderApprovalStatus: builder.query<
+      {
+        approval: Record<string, unknown> | null
+        orderStatus?: string
+        hasPendingApproval?: boolean
+      },
+      string
+    >({
+      query: (orderId) => `/api/orders/${orderId}/approval-status`,
+      providesTags: (_r, _e, id) => [
+        { type: 'Approvals', id },
+        { type: 'Order', id },
+      ],
+    }),
+
+    // Reports
+    getRestaurantReport: builder.query<
+      { data: Array<Record<string, unknown>>; meta?: Record<string, unknown> },
+      { path: string; from?: string; to?: string; branchId?: string; granularity?: string }
+    >({
+      query: ({ path, from, to, branchId, granularity }) => ({
+        url: `/api/reports/restaurant/${path}`,
+        params: { from, to, branch_id: branchId, granularity },
+      }),
+      providesTags: ['Reports'],
+    }),
+    getSupplierReport: builder.query<
+      { data: Array<Record<string, unknown>>; meta?: Record<string, unknown> },
+      { path: string; from?: string; to?: string; granularity?: string }
+    >({
+      query: ({ path, from, to, granularity }) => ({
+        url: `/api/reports/supplier/${path}`,
+        params: { from, to, granularity },
+      }),
+      providesTags: ['Reports'],
+    }),
+
+    // Disputes
+    getDisputes: builder.query<
+      { disputes: Array<Record<string, unknown>> },
+      { status?: string } | void
+    >({
+      query: (params) => ({ url: '/api/disputes', params: params || {} }),
+      providesTags: ['Disputes'],
+    }),
+    getIncomingDisputes: builder.query<
+      { disputes: Array<Record<string, unknown>> },
+      { status?: string } | void
+    >({
+      query: (params) => ({ url: '/api/disputes/incoming', params: params || {} }),
+      providesTags: ['Disputes'],
+    }),
+    getDispute: builder.query<Record<string, unknown>, string>({
+      query: (id) => `/api/disputes/${id}`,
+      providesTags: (_r, _e, id) => [{ type: 'Disputes', id }],
+    }),
+    createDispute: builder.mutation<Record<string, unknown>, Record<string, unknown>>({
+      query: (body) => ({ url: '/api/disputes', method: 'POST', body }),
+      invalidatesTags: ['Disputes', 'Order'],
+    }),
+    cancelDispute: builder.mutation<Record<string, unknown>, string>({
+      query: (id) => ({ url: `/api/disputes/${id}/cancel`, method: 'POST' }),
+      invalidatesTags: ['Disputes'],
+    }),
+    reviewDispute: builder.mutation<Record<string, unknown>, string>({
+      query: (id) => ({ url: `/api/disputes/${id}/review`, method: 'POST' }),
+      invalidatesTags: ['Disputes'],
+    }),
+    resolveDispute: builder.mutation<
+      Record<string, unknown>,
+      { id: string; body: Record<string, unknown> }
+    >({
+      query: ({ id, body }) => ({ url: `/api/disputes/${id}/resolve`, method: 'POST', body }),
+      invalidatesTags: ['Disputes', 'CreditNotes', 'Order'],
+    }),
+    rejectDispute: builder.mutation<
+      Record<string, unknown>,
+      { id: string; resolutionNotes: string }
+    >({
+      query: ({ id, resolutionNotes }) => ({
+        url: `/api/disputes/${id}/reject`,
+        method: 'POST',
+        body: { resolutionNotes },
+      }),
+      invalidatesTags: ['Disputes'],
+    }),
+
+    // Credit notes
+    getCreditNotes: builder.query<{ creditNotes: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/credit-notes',
+      providesTags: ['CreditNotes'],
+    }),
+    applyCreditNote: builder.mutation<
+      { creditNote: Record<string, unknown> },
+      { id: string; invoiceId?: string }
+    >({
+      query: ({ id, invoiceId }) => ({
+        url: `/api/credit-notes/${id}/apply`,
+        method: 'POST',
+        body: invoiceId ? { invoiceId } : {},
+      }),
+      invalidatesTags: ['CreditNotes', 'RestaurantFinance'],
+    }),
+
+    // Promotions
+    getPromotions: builder.query<
+      { promotions: Array<Record<string, unknown>> },
+      { status?: string } | void
+    >({
+      query: (params) => ({ url: '/api/promotions', params: params || {} }),
+      providesTags: ['Promotions'],
+    }),
+    getActivePromotions: builder.query<
+      { promotions: Array<Record<string, unknown>> },
+      { supplierId?: string } | void
+    >({
+      query: (params) => ({ url: '/api/promotions/active', params: params || {} }),
+      providesTags: ['Promotions'],
+    }),
+    createPromotion: builder.mutation<
+      { promotion: Record<string, unknown> },
+      Record<string, unknown>
+    >({
+      query: (body) => ({ url: '/api/promotions', method: 'POST', body }),
+      invalidatesTags: ['Promotions'],
+    }),
+    updatePromotion: builder.mutation<
+      { promotion: Record<string, unknown> },
+      { id: string; data: Record<string, unknown> }
+    >({
+      query: ({ id, data }) => ({ url: `/api/promotions/${id}`, method: 'PATCH', body: data }),
+      invalidatesTags: ['Promotions'],
+    }),
+    activatePromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/${id}/activate`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    pausePromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/${id}/pause`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    deletePromotion: builder.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({ url: `/api/promotions/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    getPromotionAnalytics: builder.query<{ analytics: Record<string, unknown> }, string>({
+      query: (id) => `/api/promotions/${id}/analytics`,
+      providesTags: (_r, _e, id) => [{ type: 'Promotions', id }],
+    }),
+
+    // Reviews
+    getSupplierReviews: builder.query<
+      { reviews: Array<Record<string, unknown>>; total?: number },
+      { supplierId: string; limit?: number; offset?: number }
+    >({
+      query: ({ supplierId, limit, offset }) => ({
+        url: `/api/reviews/suppliers/${supplierId}`,
+        params: { limit, offset },
+      }),
+      providesTags: (_r, _e, { supplierId }) => [{ type: 'Reviews', id: supplierId }],
+    }),
+    getSupplierRatingSummary: builder.query<{ summary: Record<string, unknown> }, string>({
+      query: (supplierId) => `/api/reviews/suppliers/${supplierId}/summary`,
+      providesTags: (_r, _e, supplierId) => [{ type: 'Reviews', id: `summary-${supplierId}` }],
+    }),
+    getMyReviews: builder.query<
+      { reviews: Array<Record<string, unknown>> },
+      { limit?: number; offset?: number } | void
+    >({
+      query: (params) => ({ url: '/api/reviews/my', params: params || {} }),
+      providesTags: ['Reviews'],
+    }),
+    createSupplierReview: builder.mutation<
+      { review: Record<string, unknown> },
+      { supplierId: string; body: Record<string, unknown> }
+    >({
+      query: ({ supplierId, body }) => ({
+        url: `/api/reviews/suppliers/${supplierId}`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { supplierId }) => [
+        { type: 'Reviews', id: supplierId },
+        { type: 'Reviews', id: `summary-${supplierId}` },
+        'Reviews',
+      ],
+    }),
+    updateReview: builder.mutation<
+      { review: Record<string, unknown> },
+      { id: string; body: Record<string, unknown> }
+    >({
+      query: ({ id, body }) => ({ url: `/api/reviews/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Reviews'],
+    }),
+    deleteReview: builder.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({ url: `/api/reviews/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Reviews'],
+    }),
+
+    // Tenant audit log
+    getTenantAuditLogs: builder.query<
+      { logs: Array<Record<string, unknown>>; total: number; limit: number; offset: number },
+      {
+        userId?: string
+        action?: string
+        resourceType?: string
+        from?: string
+        to?: string
+        limit?: number
+        offset?: number
+      } | void
+    >({
+      query: (params) => ({ url: '/api/audit/logs', params: params || {} }),
+      providesTags: ['Audit'],
+    }),
+
+    // Order amendments
+    getOrderAmendments: builder.query<{ amendments: Array<Record<string, unknown>> }, string>({
+      query: (orderId) => `/api/orders/${orderId}/amendments`,
+      providesTags: (_r, _e, orderId) => [{ type: 'Amendments', id: orderId }],
+    }),
+    createOrderAmendment: builder.mutation<
+      { amendment: Record<string, unknown> },
+      { orderId: string; body: Record<string, unknown> }
+    >({
+      query: ({ orderId, body }) => ({
+        url: `/api/orders/${orderId}/amendments`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Amendments', id: orderId }, 'Order'],
+    }),
+    acceptOrderAmendment: builder.mutation<
+      { amendment: Record<string, unknown>; orderTotal?: number },
+      { orderId: string; amendmentId: string; responseNotes?: string }
+    >({
+      query: ({ orderId, amendmentId, responseNotes }) => ({
+        url: `/api/orders/${orderId}/amendments/${amendmentId}/accept`,
+        method: 'POST',
+        body: responseNotes ? { responseNotes } : {},
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Amendments', id: orderId }, 'Order'],
+    }),
+    rejectOrderAmendment: builder.mutation<
+      { amendment: Record<string, unknown> },
+      { orderId: string; amendmentId: string; responseNotes: string }
+    >({
+      query: ({ orderId, amendmentId, responseNotes }) => ({
+        url: `/api/orders/${orderId}/amendments/${amendmentId}/reject`,
+        method: 'POST',
+        body: { responseNotes },
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Amendments', id: orderId }],
+    }),
+    cancelOrderAmendment: builder.mutation<
+      { amendment: Record<string, unknown> },
+      { orderId: string; amendmentId: string }
+    >({
+      query: ({ orderId, amendmentId }) => ({
+        url: `/api/orders/${orderId}/amendments/${amendmentId}/cancel`,
+        method: 'POST',
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Amendments', id: orderId }],
+    }),
+
+    // Web push
+    getVapidPublicKey: builder.query<{ publicKey: string }, void>({
+      query: () => '/api/push/vapid-public-key',
+    }),
+    subscribePush: builder.mutation<
+      { subscription: Record<string, unknown> },
+      { endpoint: string; keys: { p256dh: string; auth: string } }
+    >({
+      query: (body) => ({ url: '/api/push/subscribe', method: 'POST', body }),
+    }),
+    unsubscribePush: builder.mutation<{ removed: boolean }, { endpoint: string }>({
+      query: (body) => ({ url: '/api/push/unsubscribe', method: 'DELETE', body }),
+    }),
+
+    acceptWaitlistOffer: builder.mutation<
+      { reservation: Record<string, unknown>; waitlist: Record<string, unknown> },
+      string
+    >({
+      query: (token) => ({
+        url: `/api/public/reservations/waitlist/${token}/accept`,
+        method: 'POST',
+        credentials: 'omit',
+      }),
+      invalidatesTags: ['Reservation'],
+    }),
+    declineWaitlistOffer: builder.mutation<
+      { message: string; waitlist: Record<string, unknown> },
+      string
+    >({
+      query: (token) => ({
+        url: `/api/public/reservations/waitlist/${token}/decline`,
+        method: 'POST',
+        credentials: 'omit',
+      }),
+      invalidatesTags: ['Reservation'],
+    }),
+
     // Subscription endpoints
     getCurrentSubscription: builder.query<{ subscription: Subscription }, void>({
       query: () => '/api/subscriptions/current',
@@ -1860,6 +2251,56 @@ export const {
   useUnlockAdminSubscriptionMutation,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,
+  useGetApprovalBudgetsQuery,
+  useGetApprovalBudgetUsageQuery,
+  useCreateApprovalBudgetMutation,
+  useUpdateApprovalBudgetMutation,
+  useDeleteApprovalBudgetMutation,
+  useGetApprovalRulesQuery,
+  useCreateApprovalRuleMutation,
+  useUpdateApprovalRuleMutation,
+  useDeleteApprovalRuleMutation,
+  useGetPendingApprovalsQuery,
+  useApproveOrderRequestMutation,
+  useRejectOrderRequestMutation,
+  useGetOrderApprovalStatusQuery,
+  useGetRestaurantReportQuery,
+  useGetSupplierReportQuery,
+  useGetDisputesQuery,
+  useGetIncomingDisputesQuery,
+  useGetDisputeQuery,
+  useCreateDisputeMutation,
+  useCancelDisputeMutation,
+  useReviewDisputeMutation,
+  useResolveDisputeMutation,
+  useRejectDisputeMutation,
+  useGetCreditNotesQuery,
+  useApplyCreditNoteMutation,
+  useGetPromotionsQuery,
+  useGetActivePromotionsQuery,
+  useCreatePromotionMutation,
+  useUpdatePromotionMutation,
+  useActivatePromotionMutation,
+  usePausePromotionMutation,
+  useDeletePromotionMutation,
+  useGetPromotionAnalyticsQuery,
+  useGetSupplierReviewsQuery,
+  useGetSupplierRatingSummaryQuery,
+  useGetMyReviewsQuery,
+  useCreateSupplierReviewMutation,
+  useUpdateReviewMutation,
+  useDeleteReviewMutation,
+  useGetTenantAuditLogsQuery,
+  useGetOrderAmendmentsQuery,
+  useCreateOrderAmendmentMutation,
+  useAcceptOrderAmendmentMutation,
+  useRejectOrderAmendmentMutation,
+  useCancelOrderAmendmentMutation,
+  useGetVapidPublicKeyQuery,
+  useSubscribePushMutation,
+  useUnsubscribePushMutation,
+  useAcceptWaitlistOfferMutation,
+  useDeclineWaitlistOfferMutation,
   useGetAdminOverviewQuery,
   useGetAdminConversionStatsQuery,
   useGetAdminPlansQuery,

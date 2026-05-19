@@ -51,6 +51,24 @@ vi.mock('../lib/subscription.js', () => ({
   checkAndIncrementUsage: vi.fn().mockResolvedValue({ allowed: true }),
   incrementUsage: vi.fn().mockResolvedValue(true),
   isFeatureEnabled: vi.fn().mockResolvedValue(true),
+  requireFeature: () => (req, res, next) => next(),
+  getTenantSubscription: vi.fn().mockResolvedValue({ plan_name: 'gold' }),
+  getRecommendedPlanNames: vi.fn().mockResolvedValue([]),
+  buildLimitExceededPayload: vi.fn(),
+}))
+
+vi.mock('../services/approvals.service.js', () => ({
+  applyOrderApprovalGate: vi.fn().mockResolvedValue(null),
+  notifyApproverOfPendingOrder: vi.fn(),
+  getOrderApprovalStatus: vi.fn().mockResolvedValue(null),
+}))
+
+vi.mock('../services/promotions.service.js', () => ({
+  applyBestPromotionToOrder: vi.fn().mockResolvedValue(null),
+}))
+
+vi.mock('../lib/audit.js', () => ({
+  writeAuditLog: vi.fn(),
 }))
 
 vi.mock('../lib/logger.js', () => ({

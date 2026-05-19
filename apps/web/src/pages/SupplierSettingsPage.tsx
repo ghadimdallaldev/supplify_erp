@@ -53,6 +53,8 @@ import {
   customBrandingUpgradeMessage,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
+import { ActivityLogTab } from '../components/ActivityLogTab'
+import { usePermissions } from '../hooks/usePermissions'
 import {
   useGetSupplierMeQuery,
   useUpdateSupplierMutation,
@@ -115,6 +117,7 @@ const SUPPLIER_NOTIFICATION_FIELDS: Array<{
 export function SupplierSettingsPage() {
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('profile')
   const {
@@ -573,6 +576,11 @@ export function SupplierSettingsPage() {
           <TabsTrigger value="plan" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Plan & usage
           </TabsTrigger>
+          {can('SETTINGS_VIEW') && (
+            <TabsTrigger value="activity" className="flex-1 min-w-[5.5rem] sm:flex-none">
+              Activity
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
@@ -1192,6 +1200,11 @@ export function SupplierSettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {can('SETTINGS_VIEW') && (
+          <TabsContent value="activity" className="space-y-4">
+            <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Add Warehouse Dialog */}

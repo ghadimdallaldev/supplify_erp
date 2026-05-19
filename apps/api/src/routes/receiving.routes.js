@@ -3,6 +3,7 @@ import { requireAuth, requireRole, resolveTenantContext, requirePermission } fro
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
+import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
 
 const router = express.Router()
 
@@ -522,6 +523,14 @@ router.post(
         }
 
         return report
+      })
+
+      notifyLeaveReviewIfEligible({
+        orderId,
+        supplierId,
+        restaurantId,
+      }).catch((err) => {
+        logger.warn('Review prompt notification failed', { orderId, error: err.message })
       })
 
       res.status(201).json({

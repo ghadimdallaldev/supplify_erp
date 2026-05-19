@@ -8,7 +8,9 @@ import {
   useGetWarehousesQuery,
   useGetSuppliersQuery,
   useCreateInventoryAdjustmentMutation,
+  useGetActivePromotionsQuery,
 } from '../services/api'
+import { Link } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -16,7 +18,6 @@ import { Badge } from '../components/ui/badge'
 import { Label } from '../components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
 import { useCartActions } from '../hooks/useCartActions'
 import toast from 'react-hot-toast'
@@ -74,6 +75,9 @@ export function ProductsPage() {
 
   // Check if user is a supplier
   const isSupplier = user?.role === 'SUPPLIER'
+  const isRestaurant = user?.role === 'RESTAURANT'
+  const { data: activeDealsData } = useGetActivePromotionsQuery(undefined, { skip: !isRestaurant })
+  const activeDeals = activeDealsData?.promotions || []
 
   // Fetch warehouses only for suppliers (warehouse selection in product creation)
   const { data: warehousesData } = useGetWarehousesQuery(undefined, {
@@ -400,6 +404,16 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
               ? 'Manage your product catalog'
               : 'Browse and search products from suppliers'}
           </p>
+          {isRestaurant && activeDeals.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">
+                {activeDeals.length} active deal{activeDeals.length === 1 ? '' : 's'}
+              </Badge>
+              <Button variant="link" size="sm" className="h-auto p-0" asChild>
+                <Link to="/app/deals">View all deals</Link>
+              </Button>
+            </div>
+          )}
         </div>
         <div className="flex space-x-2">
           {isSupplier ? (

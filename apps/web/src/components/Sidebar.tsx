@@ -25,7 +25,13 @@ import {
   Shield,
   CalendarDays,
   UserCircle2,
+  ClipboardCheck,
+  BarChart3,
+  Scale,
+  Tag,
+  Percent,
 } from 'lucide-react'
+import { featureEnabled } from '../lib/planLimits'
 
 type NavItem = {
   name: string
@@ -75,33 +81,96 @@ export function Sidebar() {
   ).length
   const planLabel = entitlementsData?.entitlements?.plan?.name ?? ''
   const planCode = (entitlementsData?.entitlements?.plan?.code ?? 'free').toLowerCase()
+  const approvalsEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.approvals_budgets
+  )
+  const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
+  const disputesEnabled =
+    featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns) || true
 
   let sections: NavSection[] = []
 
   if (isRestaurant || impersonatingRestaurant) {
     const ops: NavItem[] = [
-      { name: 'Orders', href: '/app/orders', icon: ShoppingCart, badge: 'pending' as const, testId: 'nav-orders' },
+      {
+        name: 'Orders',
+        href: '/app/orders',
+        icon: ShoppingCart,
+        badge: 'pending' as const,
+        testId: 'nav-orders',
+      },
       { name: 'Products', href: '/app/products', icon: Package, testId: 'nav-products' },
       { name: 'Quick Lists', href: '/app/quick-lists', icon: List, testId: 'nav-quick-lists' },
       { name: 'Cart', href: '/app/cart', icon: ShoppingBag, testId: 'nav-cart' },
-      { name: 'Reservations', href: '/app/reservations', icon: CalendarDays, permission: 'RESERVATIONS_VIEW', testId: 'nav-reservations' },
+      {
+        name: 'Reservations',
+        href: '/app/reservations',
+        icon: CalendarDays,
+        permission: 'RESERVATIONS_VIEW',
+        testId: 'nav-reservations',
+      },
       { name: 'Receiving', href: '/app/receiving', icon: PackageCheck, testId: 'nav-receiving' },
     ].filter((item) => !item.permission || can(item.permission))
 
     const intel: NavItem[] = [
       { name: 'Suppliers', href: '/app/suppliers', icon: Building2, testId: 'nav-suppliers' },
-      { name: 'Invoices', href: '/app/invoices', icon: FileText, permission: 'INVOICES_VIEW', testId: 'nav-invoices' },
+      ...(approvalsEnabled
+        ? [
+            {
+              name: 'Approvals',
+              href: '/app/approvals',
+              icon: ClipboardCheck,
+              testId: 'nav-approvals',
+            },
+          ]
+        : []),
+      ...(reportsEnabled
+        ? [{ name: 'Reports', href: '/app/reports', icon: BarChart3, testId: 'nav-reports' }]
+        : []),
+      ...(disputesEnabled
+        ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
+        : []),
+      { name: 'Deals', href: '/app/deals', icon: Percent, testId: 'nav-deals' },
+      {
+        name: 'Invoices',
+        href: '/app/invoices',
+        icon: FileText,
+        permission: 'INVOICES_VIEW',
+        testId: 'nav-invoices',
+      },
       { name: 'Chat', href: '/app/chat', icon: MessageSquare, testId: 'nav-chat' },
     ].filter((item) => !item.permission || can(item.permission))
 
     const acct: NavItem[] = [
-      { name: 'Staff', href: '/app/staff', icon: UserCircle2, permission: 'STAFF_VIEW', testId: 'nav-staff' },
-      { name: 'Inventory', href: '/app/restaurant-inventory', icon: Package2, permission: 'INVENTORY_VIEW', testId: 'nav-inventory' },
+      {
+        name: 'Staff',
+        href: '/app/staff',
+        icon: UserCircle2,
+        permission: 'STAFF_VIEW',
+        testId: 'nav-staff',
+      },
+      {
+        name: 'Inventory',
+        href: '/app/restaurant-inventory',
+        icon: Package2,
+        permission: 'INVENTORY_VIEW',
+        testId: 'nav-inventory',
+      },
       { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
     ].filter((item) => !item.permission || can(item.permission))
 
     sections = [
-      { label: 'OVERVIEW', items: [{ name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, testId: 'nav-dashboard' }] },
+      {
+        label: 'OVERVIEW',
+        items: [
+          {
+            name: 'Dashboard',
+            href: '/app/dashboard',
+            icon: LayoutDashboard,
+            testId: 'nav-dashboard',
+          },
+        ],
+      },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
       { label: 'ACCOUNT', items: acct },
@@ -111,33 +180,84 @@ export function Sidebar() {
       {
         label: 'ADMIN',
         items: [
-          { name: 'Admin Dashboard', href: '/app/admin', icon: Shield, testId: 'nav-admin-dashboard' },
-          { name: 'Supplier Admin', href: '/app/admin/suppliers', icon: Building2, testId: 'nav-supplier-admin' },
-          { name: 'Restaurant Admin', href: '/app/admin/restaurants', icon: Users, testId: 'nav-restaurant-admin' },
+          {
+            name: 'Admin Dashboard',
+            href: '/app/admin',
+            icon: Shield,
+            testId: 'nav-admin-dashboard',
+          },
+          {
+            name: 'Supplier Admin',
+            href: '/app/admin/suppliers',
+            icon: Building2,
+            testId: 'nav-supplier-admin',
+          },
+          {
+            name: 'Restaurant Admin',
+            href: '/app/admin/restaurants',
+            icon: Users,
+            testId: 'nav-restaurant-admin',
+          },
         ],
       },
       {
         label: 'ACCOUNT',
-        items: [{ name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' }],
+        items: [
+          { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
+        ],
       },
     ]
   } else if (isSupplier || impersonatingSupplier) {
     const ops: NavItem[] = [
-      { name: 'Orders', href: '/app/orders', icon: ShoppingCart, badge: 'pending' as const, testId: 'nav-orders' },
+      {
+        name: 'Orders',
+        href: '/app/orders',
+        icon: ShoppingCart,
+        badge: 'pending' as const,
+        testId: 'nav-orders',
+      },
       { name: 'Products', href: '/app/products', icon: Package, testId: 'nav-products' },
       { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck, testId: 'nav-fulfillment' },
       { name: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'nav-restaurants' },
     ]
     const intel: NavItem[] = [
-      { name: 'Invoices', href: '/app/invoices', icon: FileText, permission: 'INVOICES_VIEW', testId: 'nav-invoices' },
+      ...(reportsEnabled
+        ? [{ name: 'Reports', href: '/app/reports', icon: BarChart3, testId: 'nav-reports' }]
+        : []),
+      ...(disputesEnabled
+        ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
+        : []),
+      { name: 'Promotions', href: '/app/promotions', icon: Tag, testId: 'nav-promotions' },
+      {
+        name: 'Invoices',
+        href: '/app/invoices',
+        icon: FileText,
+        permission: 'INVOICES_VIEW',
+        testId: 'nav-invoices',
+      },
       { name: 'Chat', href: '/app/chat', icon: MessageSquare, testId: 'nav-chat' },
     ].filter((item) => !item.permission || can(item.permission))
 
     sections = [
-      { label: 'OVERVIEW', items: [{ name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, testId: 'nav-dashboard' }] },
+      {
+        label: 'OVERVIEW',
+        items: [
+          {
+            name: 'Dashboard',
+            href: '/app/dashboard',
+            icon: LayoutDashboard,
+            testId: 'nav-dashboard',
+          },
+        ],
+      },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
-      { label: 'ACCOUNT', items: [{ name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' }] },
+      {
+        label: 'ACCOUNT',
+        items: [
+          { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
+        ],
+      },
     ]
   }
 
@@ -167,7 +287,9 @@ export function Sidebar() {
       }}
     >
       {/* Brand block */}
-      <div style={{ padding: '14px 14px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}>
+      <div
+        style={{ padding: '14px 14px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}
+      >
         <SupplifyLogo size={34} variant="lockup" theme="light" tagline={true} />
       </div>
 
@@ -335,9 +457,7 @@ export function Sidebar() {
           >
             {user?.displayName || user?.email}
           </div>
-          <div
-            style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}
-          >
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}>
             {user?.role?.toLowerCase()}
           </div>
         </div>

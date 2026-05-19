@@ -1,5 +1,5 @@
 import { useAppSelector } from '../hooks/redux'
-import { useCreateOrderMutation } from '../services/api'
+import { useCreateOrderMutation, useGetActivePromotionsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -22,6 +22,17 @@ import { formatPrice } from '../utils/format'
 
 export function CartPage() {
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
+  const { data: dealsData } = useGetActivePromotionsQuery()
+  const estimatedPromoDiscount = (dealsData?.promotions || []).reduce((max, p) => {
+    const val = Number(p.discount_value || 0)
+    if (p.type === 'percentage_discount') {
+      return Math.max(max, (total * val) / 100)
+    }
+    if (p.type === 'fixed_discount') {
+      return Math.max(max, val)
+    }
+    return max
+  }, 0)
   const {
     updateQuantity,
     removeItem,
@@ -297,6 +308,12 @@ export function CartPage() {
                 <span className="text-[var(--text-muted)]">Subtotal</span>
                 <span>${formatPrice(total)}</span>
               </div>
+              {estimatedPromoDiscount > 0 ? (
+                <div className="flex items-center justify-between text-sm text-[var(--mint)]">
+                  <span>Est. promotion savings</span>
+                  <span>-${formatPrice(estimatedPromoDiscount)}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-muted)]">Tax</span>
                 <span>$0.00</span>
@@ -304,9 +321,14 @@ export function CartPage() {
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between font-semibold text-lg">
                   <span>Total</span>
-                  <span>${formatPrice(total)}</span>
+                  <span>${formatPrice(Math.max(0, total - estimatedPromoDiscount))}</span>
                 </div>
               </div>
+              {estimatedPromoDiscount > 0 ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Final discount applied at checkout based on eligible supplier promotions.
+                </p>
+              ) : null}
             </CardContent>
           </Card>
 

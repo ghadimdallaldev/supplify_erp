@@ -1,15 +1,29 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useGetOrderQuery, useUpdateOrderMutation, useGetOrderInvoicesQuery, useSendOrderReminderMutation } from '../services/api'
+import {
+  useGetOrderQuery,
+  useUpdateOrderMutation,
+  useGetOrderInvoicesQuery,
+  useSendOrderReminderMutation,
+  useGetOrderApprovalStatusQuery,
+  useGetEntitlementsQuery,
+  useGetOrderAmendmentsQuery,
+  useCreateOrderAmendmentMutation,
+  useAcceptOrderAmendmentMutation,
+  useRejectOrderAmendmentMutation,
+  useCancelOrderAmendmentMutation,
+} from '../services/api'
+import { Link as RouterLink } from 'react-router-dom'
+import { featureEnabled } from '../lib/planLimits'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { 
-  ArrowLeft, 
-  Calendar, 
-  DollarSign, 
+import {
+  ArrowLeft,
+  Calendar,
+  DollarSign,
   Package,
   FileText,
   Truck,
@@ -20,7 +34,7 @@ import {
   Check,
   X,
   ClipboardList,
-  MapPin
+  MapPin,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
@@ -56,11 +70,33 @@ export function OrderDetailPage() {
   const isSupplier = user?.role === 'SUPPLIER'
   const [showPickingNotes, setShowPickingNotes] = useState(false)
   const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
-  
+
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
-  const { data: invoicesData, isLoading: isLoadingInvoices, refetch: refetchInvoices } = useGetOrderInvoicesQuery(id!, { skip: !id })
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: user?.role !== 'RESTAURANT',
+  })
+  const approvalsEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.approvals_budgets
+  )
+  const { data: approvalStatusData } = useGetOrderApprovalStatusQuery(id!, {
+    skip: !id || !approvalsEnabled,
+  })
+  const {
+    data: invoicesData,
+    isLoading: isLoadingInvoices,
+    refetch: refetchInvoices,
+  } = useGetOrderInvoicesQuery(id!, { skip: !id })
+  const { data: amendmentsData, refetch: refetchAmendments } = useGetOrderAmendmentsQuery(id!, {
+    skip: !id,
+  })
+  const [createAmendment] = useCreateOrderAmendmentMutation()
+  const [acceptAmendment] = useAcceptOrderAmendmentMutation()
+  const [rejectAmendment] = useRejectOrderAmendmentMutation()
+  const [cancelAmendment] = useCancelOrderAmendmentMutation()
   const [updateOrder] = useUpdateOrderMutation()
   const [sendReminder, { isLoading: isSendingReminder }] = useSendOrderReminderMutation()
+  const [showAmendmentForm, setShowAmendmentForm] = useState(false)
+  const [amendmentDescription, setAmendmentDescription] = useState('')
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -84,18 +120,18 @@ export function OrderDetailPage() {
   }
 
   const [isUpdating, setIsUpdating] = useState(false)
-  
+
   const handleStatusUpdate = async (newStatus: string) => {
     if (!id || isUpdating) return // Prevent multiple clicks
-    
+
     try {
       setIsUpdating(true) // Set immediately - button will be replaced by disabled button
       await updateOrder({ id, data: { status: newStatus } }).unwrap()
       toast.success(`Order status updated to ${newStatus}`)
-      
+
       // Refetch to get updated data
       const refetchResult = await refetch()
-      
+
       // For COMPLETED status, keep button disabled (component will show disabled "Completed" button)
       // Don't clear isUpdating immediately - let component re-render with new order.status
       if (newStatus === 'COMPLETED') {
@@ -126,7 +162,9 @@ export function OrderDetailPage() {
     if (!id || downloadingPdf) return
     setDownloadingPdf(true)
     try {
-      const res = await fetch(`${API_URL}/api/orders/${id}/packing-slip/pdf`, { credentials: 'include' })
+      const res = await fetch(`${API_URL}/api/orders/${id}/packing-slip/pdf`, {
+        credentials: 'include',
+      })
       if (!res.ok) throw new Error('Failed to download PDF')
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -145,7 +183,7 @@ export function OrderDetailPage() {
 
   const handleSendReminder = async () => {
     if (!id || isSendingReminder) return
-    
+
     try {
       await sendReminder(id).unwrap()
       toast.success('Reminder sent to supplier successfully')
@@ -172,6 +210,22 @@ export function OrderDetailPage() {
   }
 
   const order = data.order
+  const orderAny = order as Record<string, unknown>
+  const promotionInfo = (orderAny.promotion || orderAny.applied_promotion) as
+    | {
+        promotionName?: string
+        discountAmount?: number
+        promotion_name?: string
+        discount_amount?: number
+      }
+    | undefined
+  const itemsSubtotal = (order.items || []).reduce((s, i) => s + Number(i.line_total || 0), 0)
+  const promotionDiscount =
+    Number(promotionInfo?.discountAmount ?? promotionInfo?.discount_amount) ||
+    (itemsSubtotal > Number(order.total_amount) && Number(order.total_amount) > 0
+      ? itemsSubtotal - Number(order.total_amount)
+      : 0)
+  const amendments = amendmentsData?.amendments || []
   const deliveryAddress = (order as any).branch_address ?? (order as any).restaurant_address
   const deliveryInstructions =
     (order as any).branch_delivery_instructions ?? (order as any).restaurant_delivery_instructions
@@ -179,8 +233,34 @@ export function OrderDetailPage() {
   const addressLines = formatAddressLines(deliveryAddress)
   const operatingHoursLabel = formatOperatingHours((order as any).restaurant_operating_hours)
 
+  const approval = approvalStatusData?.approval as { status?: string; notes?: string } | null
+  const approvalBanner =
+    approval?.status === 'pending' || order.status === 'PENDING_APPROVAL'
+      ? { label: 'Awaiting Approval', tone: 'amber' as const }
+      : approval?.status === 'approved'
+        ? { label: 'Approved', tone: 'green' as const }
+        : approval?.status === 'rejected'
+          ? { label: 'Rejected', tone: 'red' as const }
+          : null
+
   return (
     <div className="space-y-6 p-6">
+      {approvalBanner && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            approvalBanner.tone === 'red'
+              ? 'border-red-200 bg-red-50 text-red-900'
+              : approvalBanner.tone === 'amber'
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-green-200 bg-green-50 text-green-900'
+          }`}
+        >
+          <strong>{approvalBanner.label}</strong>
+          {approval?.notes && approval.status === 'rejected' && (
+            <span className="block mt-1 text-xs">{approval.notes}</span>
+          )}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -207,21 +287,27 @@ export function OrderDetailPage() {
               disabled={isSendingReminder}
             >
               <AlertCircle className="h-4 w-4 mr-2" />
-              {isSendingReminder ? 'Sending...' : order.reminder_count > 0 ? `Send Reminder (${order.reminder_count})` : 'Send Reminder'}
+              {isSendingReminder
+                ? 'Sending...'
+                : order.reminder_count > 0
+                  ? `Send Reminder (${order.reminder_count})`
+                  : 'Send Reminder'}
+            </Button>
+          )}
+          {!isSupplier && !['CANCELLED', 'DRAFT'].includes(order.status) && (
+            <Button size="sm" variant="outline" asChild>
+              <RouterLink to={`/app/disputes?orderId=${order.id}`}>Open dispute</RouterLink>
             </Button>
           )}
           {isSupplier && (
             <div className="flex gap-2 ml-4">
               {order.status === 'PLACED' && (
                 <>
-                  <Button 
-                    size="sm"
-                    onClick={() => handleStatusUpdate('ACKNOWLEDGED')}
-                  >
+                  <Button size="sm" onClick={() => handleStatusUpdate('ACKNOWLEDGED')}>
                     Acknowledge
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => handleStatusUpdate('CANCELLED')}
                   >
@@ -230,23 +316,17 @@ export function OrderDetailPage() {
                 </>
               )}
               {order.status === 'ACKNOWLEDGED' && (
-                <Button 
-                  size="sm"
-                  onClick={() => handleStatusUpdate('PROCESSING')}
-                >
+                <Button size="sm" onClick={() => handleStatusUpdate('PROCESSING')}>
                   Start Processing
                 </Button>
               )}
               {order.status === 'PROCESSING' && (
-                <Button 
-                  size="sm"
-                  onClick={() => handleStatusUpdate('SHIPPED')}
-                >
+                <Button size="sm" onClick={() => handleStatusUpdate('SHIPPED')}>
                   Mark as Shipped
                 </Button>
               )}
               {order.status === 'SHIPPED' && !isUpdating && (
-                <Button 
+                <Button
                   size="sm"
                   variant="default"
                   onClick={() => handleStatusUpdate('COMPLETED')}
@@ -256,7 +336,7 @@ export function OrderDetailPage() {
                 </Button>
               )}
               {(isUpdating || order.status === 'COMPLETED') && (
-                <Button 
+                <Button
                   size="sm"
                   variant={order.status === 'COMPLETED' ? 'outline' : 'default'}
                   disabled
@@ -308,22 +388,16 @@ export function OrderDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-[var(--text-muted)]">Status</p>
-                      <Badge variant={getStatusColor(order.status)}>
-                        {order.status}
-                      </Badge>
+                      <Badge variant={getStatusColor(order.status)}>{order.status}</Badge>
                     </div>
                     <div>
                       <p className="text-sm text-[var(--text-muted)]">Created</p>
-                      <p className="font-medium">
-                        {new Date(order.created_at).toLocaleString()}
-                      </p>
+                      <p className="font-medium">{new Date(order.created_at).toLocaleString()}</p>
                     </div>
                     {order.placed_at && (
                       <div>
                         <p className="text-sm text-[var(--text-muted)]">Placed</p>
-                        <p className="font-medium">
-                          {new Date(order.placed_at).toLocaleString()}
-                        </p>
+                        <p className="font-medium">{new Date(order.placed_at).toLocaleString()}</p>
                       </div>
                     )}
                   </div>
@@ -340,6 +414,125 @@ export function OrderDetailPage() {
                   </CardContent>
                 </Card>
               )}
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Amendments</CardTitle>
+                  {!['CANCELLED', 'COMPLETED'].includes(order.status) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowAmendmentForm((v) => !v)}
+                    >
+                      Request change
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {showAmendmentForm && (
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Describe the requested change"
+                        value={amendmentDescription}
+                        onChange={(e) => setAmendmentDescription(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          if (!amendmentDescription.trim()) {
+                            toast.error('Description required')
+                            return
+                          }
+                          try {
+                            await createAmendment({
+                              orderId: order.id,
+                              body: {
+                                changeType: 'other',
+                                description: amendmentDescription,
+                              },
+                            }).unwrap()
+                            toast.success('Amendment requested')
+                            setAmendmentDescription('')
+                            setShowAmendmentForm(false)
+                            refetchAmendments()
+                          } catch (e: unknown) {
+                            const err = e as { data?: { error?: { message?: string } } }
+                            toast.error(err?.data?.error?.message || 'Failed to request amendment')
+                          }
+                        }}
+                      >
+                        Submit
+                      </Button>
+                    </div>
+                  )}
+                  {amendments.length === 0 ? (
+                    <p className="text-sm text-[var(--text-muted)]">No amendments on this order.</p>
+                  ) : (
+                    amendments.map((a) => (
+                      <div
+                        key={String(a.id)}
+                        className="rounded-lg border border-[var(--app-border)] p-3 text-sm"
+                      >
+                        <div className="flex justify-between gap-2">
+                          <span className="font-medium capitalize">
+                            {String(a.change_type || a.changeType).replace(/_/g, ' ')}
+                          </span>
+                          <Badge variant="outline">{String(a.status)}</Badge>
+                        </div>
+                        <p className="text-[var(--text-muted)] mt-1">{String(a.description)}</p>
+                        {a.status === 'pending' && (
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                await acceptAmendment({
+                                  orderId: order.id,
+                                  amendmentId: String(a.id),
+                                }).unwrap()
+                                toast.success('Amendment accepted')
+                                refetchAmendments()
+                                refetch()
+                              }}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                const notes = window.prompt('Rejection notes')
+                                if (!notes) return
+                                await rejectAmendment({
+                                  orderId: order.id,
+                                  amendmentId: String(a.id),
+                                  responseNotes: notes,
+                                }).unwrap()
+                                toast.success('Amendment rejected')
+                                refetchAmendments()
+                              }}
+                            >
+                              Reject
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={async () => {
+                                await cancelAmendment({
+                                  orderId: order.id,
+                                  amendmentId: String(a.id),
+                                }).unwrap()
+                                refetchAmendments()
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
             <div className="space-y-6">
@@ -350,8 +543,26 @@ export function OrderDetailPage() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-[var(--text-muted)]">Subtotal</span>
-                    <span>${formatPrice(order.total_amount)}</span>
+                    <span>
+                      $
+                      {formatPrice(
+                        promotionDiscount > 0
+                          ? Number(order.total_amount) + promotionDiscount
+                          : order.total_amount
+                      )}
+                    </span>
                   </div>
+                  {promotionDiscount > 0 ? (
+                    <div className="flex items-center justify-between text-sm text-[var(--mint)]">
+                      <span>
+                        Promotion
+                        {promotionInfo?.promotionName || promotionInfo?.promotion_name
+                          ? ` (${promotionInfo.promotionName || promotionInfo.promotion_name})`
+                          : ''}
+                      </span>
+                      <span>-${formatPrice(promotionDiscount)}</span>
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-[var(--text-muted)]">Shipping</span>
                     <span>$0.00</span>
@@ -374,19 +585,29 @@ export function OrderDetailPage() {
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {!isSupplier && (order.status === 'COMPLETED' || order.status === 'DELIVERED') && (
-                    <Button className="w-full" variant="default" asChild>
-                      <Link to={`/app/receiving?order=${order.id}`}>
-                        <Package className="h-4 w-4 mr-2" />
-                        Receive this order
-                      </Link>
-                    </Button>
-                  )}
-                  <Button className="w-full" variant="outline" onClick={() => handlePrintPackingSlip()}>
+                  {!isSupplier &&
+                    (order.status === 'COMPLETED' || order.status === 'DELIVERED') && (
+                      <Button className="w-full" variant="default" asChild>
+                        <Link to={`/app/receiving?order=${order.id}`}>
+                          <Package className="h-4 w-4 mr-2" />
+                          Receive this order
+                        </Link>
+                      </Button>
+                    )}
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => handlePrintPackingSlip()}
+                  >
                     <Printer className="h-4 w-4 mr-2" />
                     Print Packing Slip
                   </Button>
-                  <Button className="w-full" variant="outline" onClick={handleDownloadPackingSlipPdf} disabled={downloadingPdf}>
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={handleDownloadPackingSlipPdf}
+                    disabled={downloadingPdf}
+                  >
                     <Download className="h-4 w-4 mr-2" />
                     {downloadingPdf ? 'Downloading...' : 'Download PDF'}
                   </Button>
@@ -412,11 +633,16 @@ export function OrderDetailPage() {
             <CardContent>
               <div className="space-y-4">
                 {order.items?.map((item: any, idx: number) => (
-                  <div key={item.id || idx} className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]">
+                  <div
+                    key={item.id || idx}
+                    className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
+                  >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-semibold text-lg">{item.product_name || 'Product'}</h4>
+                          <h4 className="font-semibold text-lg">
+                            {item.product_name || 'Product'}
+                          </h4>
                           <Badge variant="outline">SKU: {item.product_sku || 'N/A'}</Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-4 text-sm text-[var(--text-muted)]">
@@ -424,7 +650,8 @@ export function OrderDetailPage() {
                             <span className="font-medium">Quantity:</span> {item.quantity}
                           </div>
                           <div>
-                            <span className="font-medium">Unit Price:</span> ${formatPrice(item.unit_price)}
+                            <span className="font-medium">Unit Price:</span> $
+                            {formatPrice(item.unit_price)}
                           </div>
                           {item.supplier_name && (
                             <div>
@@ -463,7 +690,9 @@ export function OrderDetailPage() {
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="h-5 w-5" />
-                      Invoice{invoicesData?.invoices && invoicesData.invoices.length > 1 ? 's' : ''}{' '}
+                      Invoice{invoicesData?.invoices && invoicesData.invoices.length > 1
+                        ? 's'
+                        : ''}{' '}
                       {invoicesData?.invoices?.length > 0 && `(${invoicesData.invoices.length})`}
                     </CardTitle>
                     <CardDescription>
@@ -490,9 +719,11 @@ export function OrderDetailPage() {
                 ) : invoicesData?.invoices && invoicesData.invoices.length > 0 ? (
                   <div className="space-y-4">
                     {invoicesData.invoices.map((invoice: any) => {
-                      const remaining = parseFloat(invoice.total_amount || 0) - parseFloat(invoice.total_paid || 0)
-                      const isOverdue = invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0
-                      
+                      const remaining =
+                        parseFloat(invoice.total_amount || 0) - parseFloat(invoice.total_paid || 0)
+                      const isOverdue =
+                        invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0
+
                       return (
                         <div
                           key={invoice.id}
@@ -507,19 +738,28 @@ export function OrderDetailPage() {
                                 <Badge variant={getStatusColor(invoice.status)}>
                                   {invoice.status}
                                 </Badge>
-                                {isOverdue && (
-                                  <Badge variant="destructive">Overdue</Badge>
-                                )}
+                                {isOverdue && <Badge variant="destructive">Overdue</Badge>}
                               </div>
-                              <p className="text-sm text-[var(--text-muted)] font-medium">{invoice.supplier_name}</p>
+                              <p className="text-sm text-[var(--text-muted)] font-medium">
+                                {invoice.supplier_name}
+                              </p>
                               <div className="flex gap-4 text-xs text-[var(--text-muted)] mt-2">
-                                <span>Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
-                                <span>Due Date: {new Date(invoice.due_date).toLocaleDateString()}</span>
+                                <span>
+                                  Invoice Date:{' '}
+                                  {new Date(invoice.invoice_date).toLocaleDateString()}
+                                </span>
+                                <span>
+                                  Due Date: {new Date(invoice.due_date).toLocaleDateString()}
+                                </span>
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-2xl font-bold">${formatPrice(invoice.total_amount)}</p>
-                              <p className={`text-sm font-semibold ${remaining > 0 ? 'text-[var(--red)]' : 'text-[var(--mint)]'}`}>
+                              <p className="text-2xl font-bold">
+                                ${formatPrice(invoice.total_amount)}
+                              </p>
+                              <p
+                                className={`text-sm font-semibold ${remaining > 0 ? 'text-[var(--red)]' : 'text-[var(--mint)]'}`}
+                              >
                                 Balance: ${formatPrice(remaining)}
                               </p>
                               {parseFloat(String(invoice.total_paid || 0)) > 0 && (
@@ -552,14 +792,22 @@ export function OrderDetailPage() {
                 ) : order.status === 'COMPLETED' ? (
                   <div className="text-center py-12">
                     <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                    <p className="text-lg font-semibold text-[var(--text)] mb-2">Invoice Not Yet Generated</p>
-                    <p className="text-[var(--text-muted)]">Invoice will be created automatically. Please check back shortly.</p>
+                    <p className="text-lg font-semibold text-[var(--text)] mb-2">
+                      Invoice Not Yet Generated
+                    </p>
+                    <p className="text-[var(--text-muted)]">
+                      Invoice will be created automatically. Please check back shortly.
+                    </p>
                   </div>
                 ) : (
                   <div className="text-center py-12">
                     <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                    <p className="text-lg font-semibold text-[var(--text)] mb-2">Invoice Not Available</p>
-                    <p className="text-[var(--text-muted)]">Invoice will be generated when the order is completed.</p>
+                    <p className="text-lg font-semibold text-[var(--text)] mb-2">
+                      Invoice Not Available
+                    </p>
+                    <p className="text-[var(--text-muted)]">
+                      Invoice will be generated when the order is completed.
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -594,14 +842,18 @@ export function OrderDetailPage() {
                         <div>
                           <p className="text-sm font-medium text-[var(--text-muted)]">Product</p>
                           <p className="font-semibold">{item.product_name}</p>
-                          <p className="text-xs text-[var(--text-muted)] mt-1">SKU: {item.product_sku}</p>
+                          <p className="text-xs text-[var(--text-muted)] mt-1">
+                            SKU: {item.product_sku}
+                          </p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-[var(--text-muted)]">Quantity</p>
                           <p className="text-lg font-bold">{item.quantity}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-[var(--text-muted)]">Warehouse Location</p>
+                          <p className="text-sm font-medium text-[var(--text-muted)]">
+                            Warehouse Location
+                          </p>
                           <p className="font-medium">{item.location_code || 'Not assigned'}</p>
                         </div>
                         <div>
@@ -611,7 +863,9 @@ export function OrderDetailPage() {
                       </div>
                       {item.picking_notes && (
                         <div className="mt-3 pt-3 border-t">
-                          <p className="text-sm font-medium text-[var(--text-muted)]">Picking Notes:</p>
+                          <p className="text-sm font-medium text-[var(--text-muted)]">
+                            Picking Notes:
+                          </p>
                           <p className="text-sm">{item.picking_notes}</p>
                         </div>
                       )}
@@ -636,11 +890,15 @@ export function OrderDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <p className="text-sm font-medium text-[var(--text-muted)] mb-1">Delivery Time Window</p>
+                    <p className="text-sm font-medium text-[var(--text-muted)] mb-1">
+                      Delivery Time Window
+                    </p>
                     <p className="text-sm">{operatingHoursLabel || 'Not specified'}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-[var(--text-muted)] mb-1">Access Instructions</p>
+                    <p className="text-sm font-medium text-[var(--text-muted)] mb-1">
+                      Access Instructions
+                    </p>
                     <p className="text-sm">{deliveryInstructions || 'Not specified'}</p>
                   </div>
                   {deliveryPhone && (
@@ -663,7 +921,9 @@ export function OrderDetailPage() {
                   <div className="space-y-2">
                     <p className="font-medium">{order.restaurant_name}</p>
                     {(order as any).branch_name && (
-                      <p className="text-sm text-[var(--text-muted)]">Branch: {(order as any).branch_name}</p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        Branch: {(order as any).branch_name}
+                      </p>
                     )}
                     {addressLines.length > 0 ? (
                       <p className="text-sm text-[var(--text-muted)]">
@@ -674,7 +934,9 @@ export function OrderDetailPage() {
                         ))}
                       </p>
                     ) : (
-                      <p className="text-sm text-[var(--text-muted)]">No delivery address on file</p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        No delivery address on file
+                      </p>
                     )}
                   </div>
                 </CardContent>
@@ -701,7 +963,11 @@ export function OrderDetailPage() {
                       <Printer className="h-4 w-4 mr-2" />
                       Print
                     </Button>
-                    <Button variant="outline" onClick={handleDownloadPackingSlipPdf} disabled={downloadingPdf}>
+                    <Button
+                      variant="outline"
+                      onClick={handleDownloadPackingSlipPdf}
+                      disabled={downloadingPdf}
+                    >
                       <Download className="h-4 w-4 mr-2" />
                       {downloadingPdf ? 'Downloading...' : 'Download PDF'}
                     </Button>
@@ -713,7 +979,9 @@ export function OrderDetailPage() {
                   {/* Header */}
                   <div className="text-center">
                     <h2 className="text-2xl font-bold">PACKING SLIP</h2>
-                    <p className="text-sm text-[var(--text-muted)]">Order #{order.id.slice(-8).toUpperCase()}</p>
+                    <p className="text-sm text-[var(--text-muted)]">
+                      Order #{order.id.slice(-8).toUpperCase()}
+                    </p>
                   </div>
 
                   {/* Ship To */}
@@ -728,12 +996,18 @@ export function OrderDetailPage() {
                           </p>
                         ))
                       ) : (
-                        <p className="text-sm text-[var(--text-muted)]">No delivery address on file</p>
+                        <p className="text-sm text-[var(--text-muted)]">
+                          No delivery address on file
+                        </p>
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-[var(--text-muted)] mb-2">ORDER DETAILS:</p>
-                      <p className="text-sm">Order Date: {new Date(order.created_at).toLocaleDateString()}</p>
+                      <p className="text-sm font-bold text-[var(--text-muted)] mb-2">
+                        ORDER DETAILS:
+                      </p>
+                      <p className="text-sm">
+                        Order Date: {new Date(order.created_at).toLocaleDateString()}
+                      </p>
                       <p className="text-sm">Status: {order.status}</p>
                       <p className="text-sm">Items: {order.items?.length || 0}</p>
                     </div>
@@ -755,10 +1029,16 @@ export function OrderDetailPage() {
                         {order.items?.map((item: any, idx: number) => (
                           <tr key={item.id || idx} className="border-b">
                             <td className="py-3 px-3 text-sm">{item.product_name}</td>
-                            <td className="py-3 px-3 text-sm text-[var(--text-muted)]">{item.product_sku}</td>
+                            <td className="py-3 px-3 text-sm text-[var(--text-muted)]">
+                              {item.product_sku}
+                            </td>
                             <td className="py-3 px-3 text-sm text-right">{item.quantity}</td>
-                            <td className="py-3 px-3 text-sm text-right">${formatPrice(item.unit_price)}</td>
-                            <td className="py-3 px-3 text-sm text-right font-medium">${formatPrice(item.line_total)}</td>
+                            <td className="py-3 px-3 text-sm text-right">
+                              ${formatPrice(item.unit_price)}
+                            </td>
+                            <td className="py-3 px-3 text-sm text-right font-medium">
+                              ${formatPrice(item.line_total)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -768,7 +1048,9 @@ export function OrderDetailPage() {
                   {/* Footer */}
                   <div className="border-t-2 pt-4 flex justify-between">
                     <div>
-                      <p className="text-sm text-[var(--text-muted)]">Thank you for your business!</p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        Thank you for your business!
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-lg">Total: ${formatPrice(order.total_amount)}</p>

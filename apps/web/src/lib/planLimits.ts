@@ -6,7 +6,7 @@ function limitNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function featureEnabled(value: unknown): boolean {
+export function featureEnabled(value: unknown): boolean {
   if (value === true) return true
   if (value === false || value == null) return false
   if (typeof value === 'string') return value !== 'false' && value.length > 0

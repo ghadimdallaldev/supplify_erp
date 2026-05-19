@@ -76,4 +76,8 @@ export const config = {
     process.env.PUBLIC_RESERVATION_BASE_URL || process.env.WEB_ORIGIN || 'http://localhost:5173',
   /** Default payment gateway: stub | manual | stripe | wish_money | bank_transfer */
   BILLING_GATEWAY: process.env.BILLING_GATEWAY || 'stub',
+  /** Web Push (VAPID) — generate with: npx web-push generate-vapid-keys */
+  VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || '',
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY || '',
+  VAPID_EMAIL: process.env.VAPID_EMAIL || 'notifications@supplify.local',
 }

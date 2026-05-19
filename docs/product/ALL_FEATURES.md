@@ -123,26 +123,27 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ### 5.2 Marketplace & ordering
 
-| Feature                                   | Web route            | API                                  |
-| ----------------------------------------- | -------------------- | ------------------------------------ |
-| Product catalog browse                    | `/app/products`      | `/api/products`                      |
-| Product detail                            | `/app/products/:id`  | `/api/products/:id`                  |
-| Categories & tags filters                 | Products page        | `/api/products/categories`, `/tags`  |
-| Shopping cart                             | `/app/cart`          | Orders + products                    |
-| Place order                               | Cart                 | `POST /api/orders`                   |
-| Orders list & filters                     | `/app/orders`        | `GET /api/orders`                    |
-| Order detail & status                     | `/app/orders/:id`    | `GET/PATCH /api/orders/:id`          |
-| Order reminders to supplier               | Order detail         | `POST /api/orders/:id/remind`        |
-| Order calendar view                       | (API-driven widgets) | `/api/orders/calendar`               |
-| Manual order (supplier-created on behalf) | —                    | `POST /api/orders/manual` (supplier) |
-| Quick lists (saved templates)             | `/app/quick-lists`   | `/api/quick-lists`                   |
-| Quick list items CRUD                     | Quick Lists          | `/api/quick-lists/:id/items`         |
-| Schedule quick list → auto order          | Quick Lists          | Schedule endpoints on quick-lists    |
-| Scheduled order execution                 | —                    | Cron: `executeScheduledOrders`       |
-| Reorder suggestions                       | —                    | Restaurant inventory API             |
-| Supplier discovery                        | `/app/suppliers`     | `/api/suppliers`                     |
-| Supplier detail & follow/block            | `/app/suppliers/:id` | follow/block endpoints               |
-| Supplier statistics                       | Supplier detail      | `GET /api/suppliers/:id/statistics`  |
+| Feature                                   | Web route            | API                                                       |
+| ----------------------------------------- | -------------------- | --------------------------------------------------------- |
+| Product catalog browse                    | `/app/products`      | `/api/products`                                           |
+| Product detail                            | `/app/products/:id`  | `/api/products/:id`                                       |
+| Categories & tags filters                 | Products page        | `/api/products/categories`, `/tags`                       |
+| Shopping cart                             | `/app/cart`          | Orders + products                                         |
+| Place order                               | Cart                 | `POST /api/orders`                                        |
+| Orders list & filters                     | `/app/orders`        | `GET /api/orders`                                         |
+| Order detail & status                     | `/app/orders/:id`    | `GET/PATCH /api/orders/:id`                               |
+| Order reminders to supplier               | Order detail         | `POST /api/orders/:id/remind`                             |
+| Order calendar view                       | (API-driven widgets) | `/api/orders/calendar`                                    |
+| Approvals & budgets (plan)                | `/app/approvals`     | `/api/approvals/*`, `GET /api/orders/:id/approval-status` |
+| Manual order (supplier-created on behalf) | —                    | `POST /api/orders/manual` (supplier)                      |
+| Quick lists (saved templates)             | `/app/quick-lists`   | `/api/quick-lists`                                        |
+| Quick list items CRUD                     | Quick Lists          | `/api/quick-lists/:id/items`                              |
+| Schedule quick list → auto order          | Quick Lists          | Schedule endpoints on quick-lists                         |
+| Scheduled order execution                 | —                    | Cron: `executeScheduledOrders`                            |
+| Reorder suggestions                       | —                    | Restaurant inventory API                                  |
+| Supplier discovery                        | `/app/suppliers`     | `/api/suppliers`                                          |
+| Supplier detail & follow/block            | `/app/suppliers/:id` | follow/block endpoints                                    |
+| Supplier statistics                       | Supplier detail      | `GET /api/suppliers/:id/statistics`                       |
 
 ### 5.3 Chat & collaboration
 
@@ -573,6 +574,11 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 | `/app/admin`                | Admin dashboard                     |
 | `/app/admin/suppliers`      | Admin → suppliers                   |
 | `/app/admin/restaurants`    | Admin → restaurants                 |
+| `/app/reports`              | Reports & analytics (plan)          |
+| `/app/disputes`             | Disputes & returns (plan)           |
+| `/app/promotions`           | Supplier promotions management      |
+| `/app/deals`                | Restaurant active supplier deals    |
+| `/app/approvals`            | Approvals & budgets (plan)          |
 | `/reserve`                  | Public booking                      |
 | `/reserve/:idOrSlug`        | Public booking by restaurant        |
 | `/reserve/confirmation`     | Booking confirmed                   |
@@ -584,40 +590,41 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 
 ## 18. API route index
 
-| Prefix                       | Module                  |
-| ---------------------------- | ----------------------- |
-| `/health`                    | Health check            |
-| `/auth/*`                    | Authentication          |
-| `/api/register/*`            | Registration completion |
-| `/api/products`              | Catalog                 |
-| `/api/prices`                | Pricing                 |
-| `/api/inventory`             | Supplier inventory      |
-| `/api/suppliers`             | Suppliers               |
-| `/api/restaurants`           | Restaurants             |
-| `/api/orders`                | Orders                  |
-| `/api/orders/calendar`       | Order calendar          |
-| `/api/files`                 | File uploads            |
-| `/api/admin`                 | Legacy admin            |
-| `/api/chat`                  | Messaging               |
-| `/api/invoices`              | Invoices                |
-| `/api/payments`              | Payments                |
-| `/api/quick-lists`           | Quick lists             |
-| `/api/restaurant-inventory`  | Restaurant inventory    |
-| `/api/restaurant-onboarding` | Onboarding / team       |
-| `/api/receiving`             | Receiving               |
-| `/api/restaurant-finance`    | Finance                 |
-| `/api/reservations`          | Reservations (auth)     |
-| `/api/staff`                 | Staff HR                |
-| `/api/restaurant-pricing`    | Contract pricing        |
-| `/api/notifications`         | Notifications           |
-| `/api/subscriptions`         | Subscriptions           |
-| `/api/billing`               | Billing                 |
-| `/api/public`                | Public portals          |
-| `/api/admin-dashboard`       | Platform admin          |
-| `/api/branches`              | Branches                |
-| `/api/warehouses`            | Warehouses              |
-| `/api/fulfillment`           | Fulfillment             |
-| `/api/e2e`                   | E2E helpers (gated)     |
+| Prefix                       | Module                          |
+| ---------------------------- | ------------------------------- |
+| `/health`                    | Health check                    |
+| `/auth/*`                    | Authentication                  |
+| `/api/register/*`            | Registration completion         |
+| `/api/products`              | Catalog                         |
+| `/api/prices`                | Pricing                         |
+| `/api/inventory`             | Supplier inventory              |
+| `/api/suppliers`             | Suppliers                       |
+| `/api/restaurants`           | Restaurants                     |
+| `/api/orders`                | Orders                          |
+| `/api/orders/calendar`       | Order calendar                  |
+| `/api/approvals`             | Budgets, rules, order approvals |
+| `/api/files`                 | File uploads                    |
+| `/api/admin`                 | Legacy admin                    |
+| `/api/chat`                  | Messaging                       |
+| `/api/invoices`              | Invoices                        |
+| `/api/payments`              | Payments                        |
+| `/api/quick-lists`           | Quick lists                     |
+| `/api/restaurant-inventory`  | Restaurant inventory            |
+| `/api/restaurant-onboarding` | Onboarding / team               |
+| `/api/receiving`             | Receiving                       |
+| `/api/restaurant-finance`    | Finance                         |
+| `/api/reservations`          | Reservations (auth)             |
+| `/api/staff`                 | Staff HR                        |
+| `/api/restaurant-pricing`    | Contract pricing                |
+| `/api/notifications`         | Notifications                   |
+| `/api/subscriptions`         | Subscriptions                   |
+| `/api/billing`               | Billing                         |
+| `/api/public`                | Public portals                  |
+| `/api/admin-dashboard`       | Platform admin                  |
+| `/api/branches`              | Branches                        |
+| `/api/warehouses`            | Warehouses                      |
+| `/api/fulfillment`           | Fulfillment                     |
+| `/api/e2e`                   | E2E helpers (gated)             |
 
 ---
 

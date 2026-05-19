@@ -20,6 +20,7 @@ import {
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
+import { writeAuditLog } from '../lib/audit.js'
 
 const router = express.Router()
 
@@ -499,6 +500,14 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         actor: req.userData.id,
       })
 
+      await writeAuditLog(req, {
+        action_type: 'product.created',
+        tenant_type: 'SUPPLIER',
+        tenant_id: supplierId,
+        target_id: product.id,
+        payload_json: { resource_type: 'product', sku: product.sku },
+      })
+
       res.status(201).json({
         ok: true,
         data: { product },
@@ -674,6 +683,14 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     logger.info('Product updated', {
       productId: rows[0].id,
       actor: req.userData.id,
+    })
+
+    await writeAuditLog(req, {
+      action_type: 'product.updated',
+      tenant_type: 'SUPPLIER',
+      tenant_id: product.supplier_id,
+      target_id: rows[0].id,
+      payload_json: { resource_type: 'product', changes: Object.keys(updateData) },
     })
 
     res.json({
