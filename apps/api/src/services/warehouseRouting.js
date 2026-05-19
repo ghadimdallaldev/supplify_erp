@@ -1,6 +1,7 @@
 /**
  * Pure routing logic + transactional assignment helpers for warehouse fulfillment.
  */
+import { reserveWarehouseStock } from './warehouseInventory.js'
 
 const RULE_PRIORITY = {
   product: 1,
@@ -181,27 +182,6 @@ async function loadRoutingContext(client, supplier, order, orderItems) {
   }
 }
 
-async function reserveWarehouseStock(client, warehouseId, productId, quantity) {
-  const { rows } = await client.query(
-    `SELECT id, quantity_available, quantity_reserved FROM warehouse_inventory
-     WHERE warehouse_id = $1 AND product_id = $2 FOR UPDATE`,
-    [warehouseId, productId]
-  )
-  if (rows.length === 0) return
-  const available = Number(rows[0].quantity_available)
-  if (available < quantity) {
-    throw new Error(`Insufficient stock at warehouse for product ${productId}`)
-  }
-  await client.query(
-    `UPDATE warehouse_inventory
-     SET quantity_available = quantity_available - $1,
-         quantity_reserved = quantity_reserved + $1,
-         updated_at = now()
-     WHERE warehouse_id = $2 AND product_id = $3`,
-    [quantity, warehouseId, productId]
-  )
-}
-
 async function insertAssignment(
   client,
   { orderId, orderItemId, warehouseId, assignedBy = 'auto' }
@@ -256,6 +236,9 @@ export async function assignWarehousesToOrder(
       orderItemId: null,
       warehouseId,
     })
+    for (const item of orderItems) {
+      await reserveWarehouseStock(client, warehouseId, item.product_id, Number(item.quantity))
+    }
     return { mode: 'single', warehouseId, assignments: [assignment] }
   }
 
