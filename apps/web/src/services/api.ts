@@ -58,7 +58,7 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
     baseUrl: API_URL,
     credentials: 'include',
     prepareHeaders: (headers) => {
-      // CSRF token will be handled by the server
+      headers.set('X-Requested-With', 'Supplify')
       return headers
     },
   })(args, api, extraOptions)
@@ -1175,7 +1175,7 @@ export const api = createApi({
 
     // Staff self-service portal
     requestStaffPortalLink: builder.mutation<
-      { sessionToken: string; expiresAt: string },
+      { message: string; sessionToken?: string; expiresAt?: string },
       { email: string }
     >({
       query: (body) => ({

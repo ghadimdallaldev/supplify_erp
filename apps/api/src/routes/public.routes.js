@@ -9,7 +9,11 @@ import {
   notifyStaffPtoRequest,
   notifyStaffSwapRequest,
 } from '../services/notification.service.js'
-import { notifyOrderStatusChange } from '../services/notification.service.js'
+import { config } from '../config/env.js'
+import {
+  sendStaffPortalMagicLink,
+  isSmtpConfigured,
+} from '../services/staff-portal-mail.service.js'
 
 const router = express.Router()
 
@@ -242,8 +246,8 @@ router.get('/restaurants/:idOrSlug', async (req, res) => {
 
     const { rows } = await query(
       byId
-        ? `SELECT id, slug, name, contact_email, phone, created_at FROM restaurant WHERE id = $1`
-        : `SELECT id, slug, name, contact_email, phone, created_at FROM restaurant WHERE slug = $1`,
+        ? `SELECT id, slug, name, phone, created_at FROM restaurant WHERE id = $1`
+        : `SELECT id, slug, name, phone, created_at FROM restaurant WHERE slug = $1`,
       [idOrSlug]
     )
 
@@ -277,7 +281,7 @@ router.get('/restaurants', async (req, res) => {
   try {
     const { rows } = await query(
       `
-        SELECT id, slug, name, contact_email, created_at
+        SELECT id, slug, name, created_at
         FROM restaurant
         ORDER BY name ASC
       `
@@ -406,10 +410,9 @@ router.post('/reservations', async (req, res) => {
 
     try {
       await notifyReservationCreated(reservation)
-      const { rows: restaurantRows } = await query(
-        'SELECT name FROM restaurant WHERE id = $1',
-        [payload.restaurantId]
-      )
+      const { rows: restaurantRows } = await query('SELECT name FROM restaurant WHERE id = $1', [
+        payload.restaurantId,
+      ])
       await notifyGuestReservationConfirmation(reservation, restaurantRows[0]?.name)
     } catch (notificationError) {
       logger.warn('Public reservation notification failed', { error: notificationError.message })
@@ -522,16 +525,19 @@ router.post('/staff/request-link', async (req, res) => {
       `
         SELECT id, display_name, restaurant_id
         FROM staff_member
-        WHERE email = $1
+        WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
       `,
       [payload.email]
     )
 
+    const genericMessage =
+      'If an account exists for this email, a sign-in link has been sent. Check your inbox.'
+
     if (!rows.length) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'STAFF_NOT_FOUND', message: 'No staff member found for this email' },
+      return res.json({
+        ok: true,
+        data: { message: genericMessage },
+        error: null,
         requestId: req.requestId,
       })
     }
@@ -547,13 +553,33 @@ router.post('/staff/request-link', async (req, res) => {
       [staff.id, expiresAt.toISOString()]
     )
 
+    const sessionToken = session.rows[0].session_token
+    const sessionExpiresAt = session.rows[0].expires_at
+
+    try {
+      await sendStaffPortalMagicLink({
+        to: payload.email,
+        displayName: staff.display_name,
+        sessionToken,
+        expiresAt: sessionExpiresAt,
+      })
+    } catch (mailError) {
+      logger.error('Staff portal magic link email failed', {
+        staffId: staff.id,
+        error: mailError.message,
+      })
+    }
+
+    const responseData = { message: genericMessage }
+    // Dev-only: expose token when SMTP is not configured (local testing without mail server)
+    if (config.NODE_ENV === 'development' && !isSmtpConfigured()) {
+      responseData.sessionToken = sessionToken
+      responseData.expiresAt = sessionExpiresAt
+    }
+
     res.json({
       ok: true,
-      data: {
-        sessionToken: session.rows[0].session_token,
-        expiresAt: session.rows[0].expires_at,
-        // In production, this would be emailed. For now we return token directly.
-      },
+      data: responseData,
       error: null,
       requestId: req.requestId,
     })
@@ -1036,7 +1062,15 @@ router.get('/reservations/manage', async (req, res) => {
     res.json({
       ok: true,
       data: {
-        reservation,
+        reservation: {
+          id: reservation.id,
+          restaurantId: reservation.restaurant_id,
+          status: reservation.status,
+          customerName: reservation.customer_name,
+          partySize: reservation.party_size,
+          scheduledAt: reservation.scheduled_at,
+          durationMinutes: reservation.duration_minutes,
+        },
       },
       error: null,
       requestId: req.requestId,
