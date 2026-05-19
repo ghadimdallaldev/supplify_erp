@@ -4,6 +4,13 @@ import { requireAuth, requireRole, resolveTenantContext, requirePermission } fro
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { formatAuditLogRow } from '../lib/audit.js'
+import {
+  buildAuditFilterOptions,
+  AUDIT_ACTION_LABELS,
+  AUDIT_RESOURCE_LABELS,
+  getAuditActionLabel,
+  getAuditResourceLabel,
+} from '../lib/audit-labels.js'
 
 const router = express.Router()
 
@@ -63,6 +70,46 @@ function buildAuditQuery(tenant, filters) {
 }
 
 router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']))
+
+router.get('/logs/filters', requirePermission('SETTINGS_VIEW'), async (req, res, next) => {
+  try {
+    const tenant = resolveTenant(req)
+    const { rows: actionRows } = await query(
+      `SELECT DISTINCT action_type FROM audit_logs
+       WHERE tenant_type = $1 AND tenant_id = $2
+       ORDER BY action_type`,
+      [tenant.tenantType, tenant.tenantId]
+    )
+    const { rows: resourceRows } = await query(
+      `SELECT DISTINCT payload_json->>'resource_type' AS resource_type
+       FROM audit_logs
+       WHERE tenant_type = $1 AND tenant_id = $2
+         AND payload_json->>'resource_type' IS NOT NULL
+       ORDER BY 1`,
+      [tenant.tenantType, tenant.tenantId]
+    )
+
+    const actions = buildAuditFilterOptions(
+      actionRows.map((r) => r.action_type),
+      AUDIT_ACTION_LABELS,
+      getAuditActionLabel
+    )
+    const resourceTypes = buildAuditFilterOptions(
+      resourceRows.map((r) => r.resource_type),
+      AUDIT_RESOURCE_LABELS,
+      getAuditResourceLabel
+    )
+
+    res.json({
+      ok: true,
+      data: { actions, resourceTypes },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
 
 router.get('/logs', requirePermission('SETTINGS_VIEW'), async (req, res, next) => {
   try {

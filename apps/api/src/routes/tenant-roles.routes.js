@@ -349,6 +349,9 @@ router.get('/users', requirePermission('SETTINGS_VIEW'), async (req, res) => {
         SELECT ur.user_id FROM user_role ur
         WHERE ur.tenant_id = $1 AND ur.tenant_type = $2
         UNION
+        SELECT tur.user_id FROM tenant_user_roles tur
+        WHERE tur.tenant_id = $1 AND tur.tenant_type = $2
+        UNION
         SELECT au.id FROM app_user au
         JOIN ${contactTable} t ON LOWER(TRIM(t.contact_email)) = LOWER(TRIM(au.email))
         WHERE t.id = $1

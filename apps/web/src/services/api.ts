@@ -1687,6 +1687,16 @@ export const api = createApi({
     }),
 
     // Tenant audit log
+    getTenantAuditLogFilters: builder.query<
+      {
+        actions: Array<{ value: string; label: string }>
+        resourceTypes: Array<{ value: string; label: string }>
+      },
+      void
+    >({
+      query: () => '/api/audit/logs/filters',
+      providesTags: ['Audit'],
+    }),
     getTenantAuditLogs: builder.query<
       { logs: Array<Record<string, unknown>>; total: number; limit: number; offset: number },
       {
@@ -2369,6 +2379,7 @@ export const {
   useCreateSupplierReviewMutation,
   useUpdateReviewMutation,
   useDeleteReviewMutation,
+  useGetTenantAuditLogFiltersQuery,
   useGetTenantAuditLogsQuery,
   useGetOrderAmendmentsQuery,
   useCreateOrderAmendmentMutation,
