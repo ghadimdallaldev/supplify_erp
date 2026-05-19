@@ -7,6 +7,7 @@ KEYCLOAK_SERVER="${KEYCLOAK_SERVER:-http://keycloak:8080}"
 KEYCLOAK_ADMIN="${KEYCLOAK_ADMIN:-admin}"
 KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}"
 PUBLIC_URL="${PUBLIC_URL:-http://localhost}"
+WEB_ORIGIN="${WEB_ORIGIN:-http://localhost:5173}"
 REALM_IMPORT="${REALM_IMPORT:-/import/realm-export.json}"
 
 echo "Waiting for Keycloak admin API at ${KEYCLOAK_SERVER}..."
@@ -53,7 +54,17 @@ get_client_uuid() {
     | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p' | head -1
 }
 
-update_client_redirects() {
+# Keycloak 19+ validates post_logout_redirect_uri against post.logout.redirect.uris (## separator).
+build_post_logout_uris() {
+  local uris="${PUBLIC_URL}/login##${PUBLIC_URL}/*"
+  uris="${uris}##${WEB_ORIGIN}/login##${WEB_ORIGIN}/*"
+  uris="${uris}##http://localhost:5173/login##http://localhost:5173/*"
+  uris="${uris}##http://localhost:4000/login##http://localhost:4000/*"
+  uris="${uris}##http://localhost/login##http://localhost/*"
+  echo "$uris"
+}
+
+update_client_oidc() {
   local client_id="$1"
   local uuid
   uuid="$(get_client_uuid "$client_id")"
@@ -61,13 +72,23 @@ update_client_redirects() {
     echo "WARN: client ${client_id} not found in realm Supplify"
     return 0
   fi
+  local post_logout patch_file
+  post_logout="$(build_post_logout_uris)"
   /opt/keycloak/bin/kcadm.sh update "clients/${uuid}" -r Supplify \
     -s "redirectUris=[\"${PUBLIC_URL}/auth/callback\",\"${PUBLIC_URL}/*\",\"http://localhost/auth/callback\",\"http://localhost/*\",\"http://localhost:5173/*\"]" \
     -s "webOrigins=[\"${PUBLIC_URL}\",\"http://localhost\",\"http://localhost:5173\"]"
-  echo "Updated ${client_id} redirect URIs for ${PUBLIC_URL}"
+  # kcadm -s does not apply nested attributes; use a JSON partial update (Keycloak 19+).
+  patch_file="/tmp/kc-post-logout-${client_id}.json"
+  cat >"${patch_file}" <<EOF
+{
+  "attributes": {
+    "post.logout.redirect.uris": "${post_logout}"
+  }
+}
+EOF
+  /opt/keycloak/bin/kcadm.sh update "clients/${uuid}" -r Supplify -f "${patch_file}"
+  echo "Updated ${client_id} redirect and post-logout URIs (PUBLIC_URL=${PUBLIC_URL}, WEB_ORIGIN=${WEB_ORIGIN})"
 }
 
-if [ -n "$PUBLIC_URL" ] && [ "$PUBLIC_URL" != "http://localhost" ]; then
-  update_client_redirects "supplify-api"
-  update_client_redirects "supplify-web"
-fi
+update_client_oidc "supplify-api"
+update_client_oidc "supplify-web"
