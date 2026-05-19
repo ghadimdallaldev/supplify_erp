@@ -4,6 +4,7 @@ import { config } from '../config/env.js'
 import { verifyToken } from './auth.js'
 import { query } from './db.js'
 import { persistMessageFromSocket } from '../services/chatSocket.service.js'
+import { userCanAccessConversation } from './chat-access.js'
 
 let io = null
 
@@ -21,13 +22,18 @@ export function initializeSocket(server) {
       const cookieHeader = socket.handshake.headers.cookie || ''
       const accessToken = cookieHeader
         .split(';')
-        .map((c) => { const i = c.indexOf('='); return [c.slice(0, i).trim(), c.slice(i + 1).trim()] })
+        .map((c) => {
+          const i = c.indexOf('=')
+          return [c.slice(0, i).trim(), c.slice(i + 1).trim()]
+        })
         .find(([k]) => k === 'access_token')?.[1]
       if (!accessToken) {
         return next(new Error('Unauthorized: no access token'))
       }
       const payload = await verifyToken(accessToken)
-      const { rows } = await query('SELECT id, role FROM app_user WHERE keycloak_sub = $1', [payload.sub])
+      const { rows } = await query('SELECT id, role FROM app_user WHERE keycloak_sub = $1', [
+        payload.sub,
+      ])
       if (rows.length === 0) {
         return next(new Error('Unauthorized: user not found'))
       }
@@ -44,6 +50,12 @@ export function initializeSocket(server) {
 
     // Handle joining a conversation
     socket.on('join_conversation', async (conversationId) => {
+      if (!conversationId || typeof conversationId !== 'string') return
+      const allowed = await userCanAccessConversation(socket.data.userId, conversationId)
+      if (!allowed) {
+        logger.warn('Socket join denied', { socketId: socket.id, conversationId })
+        return
+      }
       socket.join(`conversation_${conversationId}`)
       logger.info('Client joined conversation', { socketId: socket.id, conversationId })
     })

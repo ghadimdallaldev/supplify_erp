@@ -6,6 +6,7 @@ import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
 import { z } from 'zod'
+import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 
 const router = express.Router()
 
@@ -489,27 +490,25 @@ router.patch('/:id', requireAuth, async (req, res) => {
       })
     }
 
-    // Build update query
-    const updateFields = []
-    const updateValues = []
-    let paramIndex = 1
-
-    Object.entries(updateData).forEach(([key, value]) => {
-      if (value !== undefined) {
-        const dbField =
-          key === 'tradeLicenseNo'
-            ? 'trade_license_no'
-            : key === 'contactEmail'
-              ? 'contact_email'
-              : key === 'address'
-                ? 'address_json'
-                : key
-
-        updateFields.push(`${dbField} = $${paramIndex}`)
-        updateValues.push(dbField === 'address_json' ? JSON.stringify(value) : value)
-        paramIndex++
+    const {
+      fields: updateFields,
+      values: updateValues,
+      nextIndex: paramIndex,
+    } = buildWhitelistedUpdate(
+      updateData,
+      {
+        name: 'name',
+        slug: 'slug',
+        tradeLicenseNo: 'trade_license_no',
+        contactEmail: 'contact_email',
+        phone: 'phone',
+        address: 'address_json',
+      },
+      {
+        valueTransform: (dbField, value) =>
+          dbField === 'address_json' ? JSON.stringify(value) : value,
       }
-    })
+    )
 
     if (updateFields.length === 0) {
       return res.status(400).json({

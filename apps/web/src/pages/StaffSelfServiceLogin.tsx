@@ -21,10 +21,19 @@ export function StaffSelfServiceLogin() {
 
     try {
       const response = await requestLink({ email }).unwrap()
-      toast.success('Magic link generated. Check your email or continue below.')
-      navigate(`/staff/dashboard?token=${response.sessionToken}`)
+      if (response.sessionToken) {
+        toast.success('Magic link ready (dev mode). Opening your dashboard…')
+        navigate(`/staff/dashboard?token=${response.sessionToken}`)
+        return
+      }
+      toast.success(
+        response.message ||
+          'If an account exists for this email, a sign-in link has been sent. Check your inbox.'
+      )
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.data?.error?.message || 'Unable to generate login link')
+      toast.error(
+        error?.data?.message || error?.data?.error?.message || 'Unable to generate login link'
+      )
     }
   }
 
@@ -34,8 +43,9 @@ export function StaffSelfServiceLogin() {
         <div className="w-full space-y-4 lg:w-1/2">
           <h1 className="text-3xl font-bold tracking-tight">Supplify Staff Access</h1>
           <p className="text-sm text-[var(--text-muted)]">
-            View your schedule, request time off, and stay in sync with your restaurant. Enter your work email to receive a
-            magic link. Keep this page open—you&apos;ll be redirected automatically once the link is generated.
+            View your schedule, request time off, and stay in sync with your restaurant. Enter your
+            work email to receive a magic link. Keep this page open—you&apos;ll be redirected
+            automatically once the link is generated.
           </p>
           <div className="rounded-2xl border border-white/10 bg-slate-800/60 p-5 text-sm">
             <p className="font-semibold text-[var(--text-muted)]">What you can do</p>
@@ -52,7 +62,8 @@ export function StaffSelfServiceLogin() {
           <CardHeader>
             <CardTitle>Request secure login link</CardTitle>
             <CardDescription>
-              We’ll send a one-time access link to your work email. No passwords, just a simple RSVP back to the team.
+              We’ll send a one-time access link to your work email. No passwords, just a simple RSVP
+              back to the team.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -80,4 +91,3 @@ export function StaffSelfServiceLogin() {
 }
 
 export default StaffSelfServiceLogin
-

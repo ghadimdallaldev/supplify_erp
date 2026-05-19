@@ -31,13 +31,18 @@ export const config = {
     process.env.KEYCLOAK_PUBLIC_URL || process.env.KEYCLOAK_BASE_URL || 'http://localhost:8080',
   KEYCLOAK_REALM: process.env.KEYCLOAK_REALM || 'Supplify',
   KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID || 'supplify-api',
-  KEYCLOAK_CLIENT_SECRET: process.env.KEYCLOAK_CLIENT_SECRET || 'changeme',
+  KEYCLOAK_CLIENT_SECRET:
+    process.env.KEYCLOAK_CLIENT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'changeme'),
   KEYCLOAK_ADMIN: process.env.KEYCLOAK_ADMIN || 'admin',
   KEYCLOAK_ADMIN_PASSWORD: process.env.KEYCLOAK_ADMIN_PASSWORD || '',
-  SESSION_SECRET: process.env.SESSION_SECRET || 'supersecret',
+  SESSION_SECRET:
+    process.env.SESSION_SECRET ||
+    (process.env.NODE_ENV === 'production' ? '' : 'dev-session-secret-change-me'),
   /** Secret for signing impersonation tokens (defaults to SESSION_SECRET). */
   IMPERSONATION_SECRET:
-    process.env.IMPERSONATION_SECRET || process.env.SESSION_SECRET || 'supersecret',
+    process.env.IMPERSONATION_SECRET ||
+    process.env.SESSION_SECRET ||
+    (process.env.NODE_ENV === 'production' ? '' : 'dev-session-secret-change-me'),
   /** Max duration for an impersonation session in minutes (default 60). */
   IMPERSONATION_MAX_DURATION_MINUTES: process.env.IMPERSONATION_MAX_DURATION_MINUTES
     ? parseInt(process.env.IMPERSONATION_MAX_DURATION_MINUTES, 10)
@@ -50,6 +55,16 @@ export const config = {
   /** Test-only: secret for E2E reset-seed endpoint. When set, POST /api/e2e/reset-seed is enabled. */
   E2E_SECRET: process.env.E2E_SECRET || '',
   SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@supplify.local',
+  SMTP_HOST: process.env.SMTP_HOST || '',
+  SMTP_PORT: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,
+  SMTP_USER: process.env.SMTP_USER || '',
+  SMTP_PASS: process.env.SMTP_PASS || '',
+  SMTP_SECURE: process.env.SMTP_SECURE === 'true',
+  /** Public web URL for staff magic links (defaults to WEB_ORIGIN). */
+  STAFF_PORTAL_BASE_URL:
+    process.env.STAFF_PORTAL_BASE_URL || process.env.WEB_ORIGIN || 'http://localhost:5173',
+  PUBLIC_RESERVATION_BASE_URL:
+    process.env.PUBLIC_RESERVATION_BASE_URL || process.env.WEB_ORIGIN || 'http://localhost:5173',
   /** Default payment gateway: stub | manual | stripe | wish_money | bank_transfer */
   BILLING_GATEWAY: process.env.BILLING_GATEWAY || 'stub',
 }

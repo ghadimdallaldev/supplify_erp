@@ -103,11 +103,9 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=no_code`)
     }
 
-    // Verify state parameter (CSRF protection) - temporarily disabled
     const expectedState = req.session.oauthState
-
-    if (expectedState && state !== expectedState) {
-      logger.warn('Invalid state parameter (CSRF)')
+    if (!expectedState || !state || state !== expectedState) {
+      logger.warn('Invalid or missing OAuth state parameter (CSRF)')
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=invalid_state`)
     }
 
