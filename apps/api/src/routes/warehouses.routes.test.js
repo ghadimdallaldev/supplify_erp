@@ -19,11 +19,19 @@ vi.mock('../lib/rbac.js', () => ({
   }),
   requireRole: () => (req, res, next) => next(),
   resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || { permissions: ['WAREHOUSES_VIEW'] }
+    req.tenantContext = req.tenantContext || {
+      tenantId: 'supplier-1',
+      tenantType: 'SUPPLIER',
+      permissions: ['WAREHOUSES_VIEW', 'WAREHOUSES_MANAGE'],
+    }
     next()
   },
   requirePermission: () => (req, res, next) => next(),
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
+}))
+
+vi.mock('../lib/subscription.js', () => ({
+  requireFeature: () => (req, res, next) => next(),
 }))
 
 vi.mock('../lib/plan-enforcement.js', () => ({

@@ -2,7 +2,7 @@
  * Per-tenant named roles: system role definitions, seeding, and helpers.
  */
 import { query, withTransaction } from './db.js'
-import { PERMISSION_KEYS } from './permissions.js'
+import { PERMISSION_KEYS } from './permission-keys.js'
 import { logger } from './logger.js'
 
 export const RESERVED_SYSTEM_ROLE_NAMES = Object.freeze([

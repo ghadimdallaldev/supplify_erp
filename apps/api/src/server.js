@@ -40,6 +40,7 @@ import { notificationsRoutes } from './routes/notifications.routes.js'
 import { subscriptionsRoutes } from './routes/subscriptions.routes.js'
 import adminDashboardRoutes from './routes/admin-dashboard.routes.js'
 import branchesRoutes from './routes/branches.routes.js'
+import orgRoutes from './routes/org.routes.js'
 import warehousesRoutes from './routes/warehouses.routes.js'
 import { executeScheduledOrders } from './services/scheduled-orders.service.js'
 import { checkOverdueInvoices } from './jobs/invoice-overdue.job.js'
@@ -111,7 +112,13 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-CSRF-Token',
+      'X-Requested-With',
+      'X-Branch-Id',
+    ],
   })
 )
 
@@ -257,6 +264,7 @@ if (config.E2E_SECRET) {
   app.use('/api/e2e', e2eRoutes)
 }
 app.use('/api/branches', branchesRoutes)
+app.use('/api/org', orgRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
 

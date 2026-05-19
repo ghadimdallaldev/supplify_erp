@@ -5,53 +5,10 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { PERMISSION_KEYS } from './permission-keys.js'
+import { getOrgRolePermissions } from './supplier-org.js'
 
-/** Permission key constants (match permission.code in DB) */
-export const PERMISSION_KEYS = Object.freeze({
-  ORDERS_VIEW: 'ORDERS_VIEW',
-  ORDERS_CREATE: 'ORDERS_CREATE',
-  ORDERS_EDIT: 'ORDERS_EDIT',
-  ORDERS_MANAGE: 'ORDERS_MANAGE',
-  INVOICES_VIEW: 'INVOICES_VIEW',
-  INVOICES_CREATE: 'INVOICES_CREATE',
-  INVOICES_EDIT: 'INVOICES_EDIT',
-  INVOICES_MANAGE: 'INVOICES_MANAGE',
-  INVENTORY_VIEW: 'INVENTORY_VIEW',
-  INVENTORY_EDIT: 'INVENTORY_EDIT',
-  INVENTORY_MANAGE: 'INVENTORY_MANAGE',
-  RESERVATIONS_VIEW: 'RESERVATIONS_VIEW',
-  RESERVATIONS_CREATE: 'RESERVATIONS_CREATE',
-  RESERVATIONS_EDIT: 'RESERVATIONS_EDIT',
-  RESERVATIONS_MANAGE: 'RESERVATIONS_MANAGE',
-  STAFF_VIEW: 'STAFF_VIEW',
-  STAFF_INVITE: 'STAFF_INVITE',
-  STAFF_EDIT: 'STAFF_EDIT',
-  STAFF_MANAGE: 'STAFF_MANAGE',
-  SETTINGS_VIEW: 'SETTINGS_VIEW',
-  SETTINGS_EDIT: 'SETTINGS_EDIT',
-  SETTINGS_MANAGE: 'SETTINGS_MANAGE',
-  CHAT_VIEW: 'CHAT_VIEW',
-  CHAT_SEND: 'CHAT_SEND',
-  CHAT_MANAGE: 'CHAT_MANAGE',
-  SUBSCRIPTIONS_VIEW: 'SUBSCRIPTIONS_VIEW',
-  SUBSCRIPTIONS_MANAGE: 'SUBSCRIPTIONS_MANAGE',
-  CATALOG_VIEW: 'CATALOG_VIEW',
-  CATALOG_EDIT: 'CATALOG_EDIT',
-  CATALOG_MANAGE: 'CATALOG_MANAGE',
-  WAREHOUSES_VIEW: 'WAREHOUSES_VIEW',
-  WAREHOUSES_EDIT: 'WAREHOUSES_EDIT',
-  WAREHOUSES_MANAGE: 'WAREHOUSES_MANAGE',
-  ADMIN_ACCESS: 'ADMIN_ACCESS',
-  ADMIN_TENANTS: 'ADMIN_TENANTS',
-  ADMIN_PLANS: 'ADMIN_PLANS',
-  ADMIN_SUPPORT: 'ADMIN_SUPPORT',
-  ADMIN_FINANCE: 'ADMIN_FINANCE',
-  ADMIN_GROWTH: 'ADMIN_GROWTH',
-  RECEIVING_VIEW: 'RECEIVING_VIEW',
-  RECEIVING_MANAGE: 'RECEIVING_MANAGE',
-  PAYMENTS_VIEW: 'PAYMENTS_VIEW',
-  PAYMENTS_MANAGE: 'PAYMENTS_MANAGE',
-})
+export { PERMISSION_KEYS }
 
 const PERMISSION_CACHE_TTL_SECONDS = 300
 
@@ -158,6 +115,33 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
 
     let named = []
     let legacy = []
+
+    if (tenantType === 'SUPPLIER') {
+      try {
+        const { rows: orgRows } = await query(
+          `SELECT organization_id FROM supplier WHERE id = $1`,
+          [tenantId]
+        )
+        const organizationId = orgRows[0]?.organization_id
+        if (organizationId) {
+          const orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
+          if (orgPerms.length > 0) {
+            await setCache(cacheKey, orgPerms, PERMISSION_CACHE_TTL_SECONDS)
+            return orgPerms
+          }
+          const { rows: hasOrgRole } = await query(
+            `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+            [userId, organizationId]
+          )
+          if (hasOrgRole.length > 0) {
+            await setCache(cacheKey, [], PERMISSION_CACHE_TTL_SECONDS)
+            return []
+          }
+        }
+      } catch (err) {
+        if (err.code !== '42P01') throw err
+      }
+    }
 
     if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
       try {

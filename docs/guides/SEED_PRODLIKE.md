@@ -2,6 +2,8 @@
 
 This seed populates the database with a **prod-like full dataset** so the UI feels "alive" across Invoices, Restaurant/Supplier Inventories, Reservations, Warehouses, and Orders.
 
+**Alternative (tier matrix):** `pnpm run seed:tier-catalog` wipes commercial data and seeds **one restaurant + one supplier per Free/Silver/Gold** with named team logins (`*-manager`, `*-purchaser`) and activity-log backfill. Use when testing plan tiers and Settings → Team / Activity. See [SETUP.md](SETUP.md) and [tenant-audit-log.md](../features/tenant-audit-log.md).
+
 ## Run instructions
 
 **From repo root:**
@@ -82,19 +84,19 @@ After running the seed:
 
 ## Volumes (minimum)
 
-| Entity | Count |
-|--------|--------|
-| Restaurants | 10 |
-| Branches | 2–4 per restaurant |
-| Restaurant staff | 6–14 per restaurant |
-| Suppliers | 50 |
-| Warehouses | 1–3 per supplier |
-| Catalog items per supplier | 30–80 |
-| Orders per restaurant | 60–180 (last 90 days) |
-| Invoices per restaurant | 20–60 (last 120 days) |
-| Reservations per restaurant | 40–150 (last 30d + next 14d) |
-| Staff shifts | 2+ per day per restaurant (last 14 days) |
-| Chats (after `seed:chats`) | 1 conversation per (restaurant, supplier) with orders; 2–6 messages per conversation |
+| Entity                      | Count                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| Restaurants                 | 10                                                                                   |
+| Branches                    | 2–4 per restaurant                                                                   |
+| Restaurant staff            | 6–14 per restaurant                                                                  |
+| Suppliers                   | 50                                                                                   |
+| Warehouses                  | 1–3 per supplier                                                                     |
+| Catalog items per supplier  | 30–80                                                                                |
+| Orders per restaurant       | 60–180 (last 90 days)                                                                |
+| Invoices per restaurant     | 20–60 (last 120 days)                                                                |
+| Reservations per restaurant | 40–150 (last 30d + next 14d)                                                         |
+| Staff shifts                | 2+ per day per restaurant (last 14 days)                                             |
+| Chats (after `seed:chats`)  | 1 conversation per (restaurant, supplier) with orders; 2–6 messages per conversation |
 
 ## Implementation details
 

@@ -86,6 +86,10 @@ vi.mock('../services/notification.service.js', () => ({
   sendNotification: vi.fn(),
 }))
 
+vi.mock('../services/warehouseRouting.js', () => ({
+  assignWarehousesToOrder: vi.fn().mockResolvedValue({ mode: 'single', assignments: [] }),
+}))
+
 // Import routes after mocks
 import { ordersRoutes } from './orders.routes.js'
 
@@ -201,6 +205,7 @@ describe('Orders Routes', () => {
             },
           ],
         })
+        .mockResolvedValueOnce({ rows: [] })
 
       const response = await request(app).get('/api/orders/order-1').expect(200)
 
@@ -283,7 +288,12 @@ describe('Orders Routes', () => {
               ],
             }) // INSERT order item
             .mockResolvedValueOnce({}) // UPDATE inventory
-            .mockResolvedValueOnce({ rows: [{ id: 'order-1', total_amount: 100.5 }] }), // UPDATE order total
+            .mockResolvedValueOnce({ rows: [{ id: 'order-1', total_amount: 100.5 }] }) // UPDATE order total
+            .mockResolvedValueOnce({
+              rows: [
+                { id: supplierId, multi_warehouse_enabled: false, fulfillment_mode: 'single' },
+              ],
+            }), // supplier for warehouse assignment
         }
         const result = await handler(mockClient)
         // Return array of created orders (the handler returns createdOrders)

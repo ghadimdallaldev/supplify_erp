@@ -6,6 +6,7 @@ import { ensureReservationsSchema, ensureStaffAppSchema } from '../src/lib/migra
 import { pool } from '../src/lib/db.js'
 import { disconnectCache } from '../src/lib/cache.js'
 import { isTenantRoleBackfillComplete } from './migrate-users-to-roles.js'
+import { isOrgMigrationComplete } from '../src/lib/supplier-org.js'
 import { isMainModule } from './lib/is-main.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -34,6 +35,15 @@ async function runMigrations() {
       logger.info('Tenant role backfill already complete — skipped')
     } else {
       await runNodeScript('migrate-users-to-roles.js')
+    }
+
+    const skipOrgMigration = process.env.SKIP_SUPPLIER_ORG_MIGRATION === '1'
+    if (skipOrgMigration) {
+      logger.info('SKIP_SUPPLIER_ORG_MIGRATION=1 — supplier org backfill skipped')
+    } else if (await isOrgMigrationComplete()) {
+      logger.info('Supplier org backfill already complete — skipped')
+    } else {
+      await runNodeScript('migrate-suppliers-to-orgs.js')
     }
 
     logger.info('SQL migrations, runtime schema checks, and tenant role backfill completed')

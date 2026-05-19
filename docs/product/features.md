@@ -42,15 +42,17 @@ RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) furth
 
 ## Marketplace & catalog
 
-| Feature     | Web route                                  | API prefix         | Notes                                 |
-| ----------- | ------------------------------------------ | ------------------ | ------------------------------------- |
-| Dashboard   | `/app/dashboard`                           | —                  | Role-specific widgets and shortcuts   |
-| Products    | `/app/products`, `/app/products/:id`       | `/api/products`    | Catalog browse; supplier-managed SKUs |
-| Prices      | —                                          | `/api/prices`      | Price lists, contract pricing         |
-| Suppliers   | `/app/suppliers`, `/app/suppliers/:id`     | `/api/suppliers`   | Restaurant view of linked suppliers   |
-| Restaurants | `/app/restaurants`, `/app/restaurants/:id` | `/api/restaurants` | Supplier view of restaurant customers |
-| Branches    | Settings / tenant config                   | `/api/branches`    | Multi-branch restaurants              |
-| Warehouses  | Supplier ops                               | `/api/warehouses`  | Supplier warehouse locations          |
+| Feature         | Web route                                  | API prefix                               | Notes                                          |
+| --------------- | ------------------------------------------ | ---------------------------------------- | ---------------------------------------------- |
+| Dashboard       | `/app/dashboard`                           | —                                        | Role-specific widgets and shortcuts            |
+| Products        | `/app/products`, `/app/products/:id`       | `/api/products`                          | Catalog browse; supplier-managed SKUs          |
+| Prices          | —                                          | `/api/prices`                            | Price lists, contract pricing                  |
+| Suppliers       | `/app/suppliers`, `/app/suppliers/:id`     | `/api/suppliers`                         | Restaurant view of linked suppliers            |
+| Restaurants     | `/app/restaurants`, `/app/restaurants/:id` | `/api/restaurants`                       | Supplier view of restaurant customers          |
+| Branches        | Settings / tenant config                   | `/api/branches`                          | Multi-branch restaurants                       |
+| Supplier org    | `/app/org`                                 | `/api/org`                               | Supplier org branches (`multi_branch`)         |
+| Warehouses      | Supplier settings → Warehouses             | `/api/warehouses`                        | CRUD, zones, inventory (`warehouses`)          |
+| Multi-warehouse | Supplier settings fulfillment toggle       | `/api/suppliers/me/fulfillment`, routing | Gold+ `multi_warehouse`; order line assignment |
 
 **Verify:** Log in as restaurant → Products loads; as supplier → Restaurants loads. API tests: `products.routes.test.js`, `suppliers.routes.test.js`, `restaurants.routes.test.js`.
 

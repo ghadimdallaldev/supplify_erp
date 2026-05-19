@@ -107,10 +107,12 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ## Warehouses & Branches
 
-| feature_key | display_name          | applies_to | permissions_required | limit_key  | backend_enforcement                                                                                                      | frontend_surfaces                                                  | plan_availability                                      |
-| ----------- | --------------------- | ---------- | -------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------ |
-| warehouses  | Warehouses (supplier) | SUPPLIER   | WAREHOUSES_VIEW      | warehouses | apps/api/src/routes/warehouses.routes.js requirePermission('WAREHOUSES_VIEW'); checkWarehouseLimit(supplierId) on create | SupplierSettingsPage (Warehouses tab), InventoryPage, ProductsPage | plan-enforcement.js eligiblePlans Bronze/Gold/Platinum |
-| branches    | Branches (restaurant) | RESTAURANT | SETTINGS_VIEW        | branches   | apps/api/src/routes/branches.routes.js requirePermission('SETTINGS_VIEW'); checkBranchLimit(restaurantId) on create      | RestaurantOnboardingPage (Branches tab), Settings, CalendarView    | plan-enforcement.js eligiblePlans Gold/Platinum        |
+| feature_key     | display_name                   | applies_to | permissions_required | limit_key  | backend_enforcement                                                                                                                                                                                         | frontend_surfaces                                                                                 | plan_availability                               |
+| --------------- | ------------------------------ | ---------- | -------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| warehouses      | Warehouses (supplier)          | SUPPLIER   | WAREHOUSES_VIEW      | warehouses | warehouses.routes.js `requireFeature('warehouses')`, `requirePermission('WAREHOUSES_VIEW')`; `checkWarehouseLimit` on create                                                                                | SupplierSettingsPage (Warehouses tab), InventoryPage, ProductsPage                                | Bronze+ (`warehouses` plan flag)                |
+| multi_warehouse | Multi-warehouse fulfillment    | SUPPLIER   | WAREHOUSES_VIEW      | —          | `requireFeature('multi_warehouse')` on routing rules, simulate, per-warehouse inventory; suppliers.routes.js PATCH `/me/fulfillment`; `warehouseRouting.js` on order create when `fulfillment_mode = multi` | SupplierSettingsPage (fulfillment toggle), OrderDetailPage (split badges / multi-location banner) | Gold+; also `supplier.multi_warehouse_enabled`  |
+| supplier_org    | Supplier org & branch accounts | SUPPLIER   | — (org roles)        | branches   | org.routes.js `requireSupplierOrgContext`; POST `/api/org/branches` requires `requireFeature('multi_branch')`; branch limit via plan `limits.branches`                                                      | OrgOverviewPage (`/app/org`), BranchSwitcher, migrate-suppliers-to-orgs.js                        | Gold+ (`multi_branch` on supplier plans)        |
+| branches        | Branches (restaurant)          | RESTAURANT | SETTINGS_VIEW        | branches   | branches.routes.js `requirePermission('SETTINGS_VIEW')`; `checkBranchLimit(restaurantId)` on create                                                                                                         | RestaurantOnboardingPage (Branches tab), Settings, CalendarView, BranchSwitcher                   | plan-enforcement.js eligiblePlans Gold/Platinum |
 
 ---
 
@@ -139,13 +141,15 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ## Settings & Tenants
 
-| feature_key       | display_name           | applies_to | permissions_required | limit_key                | backend_enforcement                                                                                                                     | frontend_surfaces                             | plan_availability |
-| ----------------- | ---------------------- | ---------- | -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ----------------- |
-| settings          | Tenant settings        | MULTI      | SETTINGS_VIEW        | —                        | branches.routes.js uses SETTINGS_VIEW; Settings page not explicitly gated by permission in code (Sidebar gates by can('SETTINGS_VIEW')) | SettingsPage.tsx, Sidebar (Settings link)     | UNKNOWN           |
-| suppliers_list    | Suppliers (restaurant) | RESTAURANT | —                    | suppliers_per_restaurant | apps/api/src/routes/suppliers.routes.js checkLimit(restaurantId, 'RESTAURANT', 'suppliers_per_restaurant') on link                      | SuppliersPage.tsx, SupplierDetailPage.tsx     | UNKNOWN           |
-| restaurants_list  | Restaurants (supplier) | SUPPLIER   | —                    | —                        | restaurants.routes.js requireAuth, requireRole                                                                                          | RestaurantsPage.tsx, RestaurantDetailPage.tsx | UNKNOWN           |
-| supplier_settings | Supplier settings      | SUPPLIER   | —                    | —                        | —                                                                                                                                       | SupplierSettingsPage.tsx                      | UNKNOWN           |
-| onboarding        | Restaurant onboarding  | RESTAURANT | —                    | users                    | restaurant-onboarding.routes.js, checkLimit users                                                                                       | RestaurantOnboardingPage.tsx                  | UNKNOWN           |
+| feature_key       | display_name           | applies_to | permissions_required | limit_key                | backend_enforcement                                                                                                                     | frontend_surfaces                             | plan_availability         |
+| ----------------- | ---------------------- | ---------- | -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------- |
+| settings          | Tenant settings        | MULTI      | SETTINGS_VIEW        | —                        | branches.routes.js uses SETTINGS_VIEW; Settings page not explicitly gated by permission in code (Sidebar gates by can('SETTINGS_VIEW')) | SettingsPage.tsx, Sidebar (Settings link)     | UNKNOWN                   |
+| suppliers_list    | Suppliers (restaurant) | RESTAURANT | —                    | suppliers_per_restaurant | apps/api/src/routes/suppliers.routes.js checkLimit(restaurantId, 'RESTAURANT', 'suppliers_per_restaurant') on link                      | SuppliersPage.tsx, SupplierDetailPage.tsx     | UNKNOWN                   |
+| restaurants_list  | Restaurants (supplier) | SUPPLIER   | —                    | —                        | restaurants.routes.js requireAuth, requireRole                                                                                          | RestaurantsPage.tsx, RestaurantDetailPage.tsx | UNKNOWN                   |
+| supplier_settings | Supplier settings      | SUPPLIER   | —                    | —                        | —                                                                                                                                       | SupplierSettingsPage.tsx                      | UNKNOWN                   |
+| onboarding        | Restaurant onboarding  | RESTAURANT | —                    | users                    | restaurant-onboarding.routes.js, checkLimit users                                                                                       | RestaurantOnboardingPage.tsx                  | UNKNOWN                   |
+| advanced_roles    | Named tenant roles     | MULTI      | SETTINGS_VIEW (list) | —                        | tenant-roles.routes.js `requireFeature('advanced_roles')`; permissions on `auth/me` always resolved                                     | TeamRolesPanel (Settings → Team)              | Silver+ / Gold plans      |
+| tenant_audit_log  | Tenant activity log    | MULTI      | SETTINGS_VIEW        | —                        | tenant-audit.routes.js GET `/api/audit/logs`, `/logs/filters`, `/logs/export` (export: SETTINGS_MANAGE)                                 | ActivityLogTab (Settings → Activity)          | Plan-gated (tenant audit) |
 
 ---
 
@@ -244,14 +248,15 @@ Canonical list of all implemented features. Single source of truth for backend e
 | suppliers_per_restaurant | RESTAURANT | suppliers.routes.js (link)                                                                                        |
 | branches                 | RESTAURANT | plan-enforcement.js checkBranchLimit; branches.routes.js                                                          |
 | warehouses               | SUPPLIER   | plan-enforcement.js checkWarehouseLimit; warehouses.routes.js                                                     |
+| branches (supplier org)  | SUPPLIER   | org.routes.js POST /branches; plan-enforcement checkBranchLimit (supplier org member count)                       |
 
 ---
 
 ## Plan / Feature Keys (UI and API)
 
 - **Plans (from migration 0022 / UI):** Free, Bronze, Gold, Platinum
-- **Feature keys in SubscriptionInfo / plan features:** chat, smart_reorder, reports, multi_branch
-- **requireFeature(featureKey)** exists in subscription.js but is **not used** on any route; only GET /api/subscriptions/features/:featureKey returns isFeatureEnabled. No route blocks access based on feature flag. **PARTIAL**.
+- **Feature keys in SubscriptionInfo / plan features:** chat, smart_reorder, reports, multi_branch, warehouses, multi_warehouse (supplier)
+- **requireFeature(featureKey)** used on: `tenant-roles` (`advanced_roles`), reservations, approvals, warehouses (`warehouses`, `multi_warehouse`), suppliers fulfillment (`multi_warehouse`), org branches (`multi_branch`), disputes, reports (partial). Other keys may still be UI-only.
 
 ---
 

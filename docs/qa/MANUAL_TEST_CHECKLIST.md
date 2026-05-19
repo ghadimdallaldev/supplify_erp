@@ -10,7 +10,10 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 2. **Recommended seed (local):**
    - `pnpm run seed:demo-users` — Keycloak users
    - `pnpm run db:seed` or `pnpm run seed:demo-tenants` — golden demo tenants
-   - `pnpm run seed:plan-tiers` — Free/Bronze/Gold/Platinum demo accounts
+   - `pnpm run seed:plan-tiers` — Free/Bronze/Gold/Platinum demo accounts (legacy slugs)
+   - `pnpm run seed:tier-catalog` — **recommended:** wipe + Free/Silver/Gold restaurant & supplier + team users + audit backfill
+   - `pnpm run seed:features` — disputes, deals, reports (after tier-catalog or Gold tenants)
+   - `pnpm run seed:audit-backfill` — activity log rows from seeded orders/products (if log empty)
    - `pnpm run seed:full` or `pnpm run seed:prodlike` — richer data (orders, inventory, chats)
    - `pnpm run seed:billing` — billing states (past due, locked) after tenants exist
 3. **Record results:** Pass / Fail / Blocked / N/A in **Pass?**; add tester name, date, build/branch, and notes.
@@ -21,18 +24,21 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## Demo credentials (local)
 
-| Account                                            | Password               | Role / notes                                               |
-| -------------------------------------------------- | ---------------------- | ---------------------------------------------------------- |
-| `admin@supplify.com`                               | `SupplifyAdmin1!`      | Platform admin                                             |
-| `restaurant@supplify.com`                          | `SupplifyRestaurant1!` | Golden Fork (demo restaurant)                              |
-| `supplier@supplify.com`                            | `SupplifySupplier1!`   | Fresh Foods Co. (demo supplier)                            |
-| `restaurant-free@supplify.com`                     | `Supplify1!`           | Free plan — calendar gated                                 |
-| `restaurant-gold@supplify.com`                     | `Supplify1!`           | Gold — full features; may be past due after `seed:billing` |
-| `restaurant-bronze@supplify.com`                   | `Supplify1!`           | Bronze tier                                                |
-| `restaurant-platinum@supplify.com`                 | `Supplify1!`           | Platinum tier                                              |
-| `supplier-free@supplify.com`                       | `Supplify1!`           | Supplier free tier                                         |
-| `supplier-gold@supplify.com`                       | `Supplify1!`           | Supplier Gold                                              |
-| `restaurant-1@test.com` … `restaurant-10@test.com` | (Keycloak)             | Prod-like seed (`seed:prodlike`)                           |
+| Account                                                           | Password               | Role / notes                                               |
+| ----------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------- |
+| `admin@supplify.com`                                              | `SupplifyAdmin1!`      | Platform admin                                             |
+| `restaurant@supplify.com`                                         | `SupplifyRestaurant1!` | Golden Fork (demo restaurant)                              |
+| `supplier@supplify.com`                                           | `SupplifySupplier1!`   | Fresh Foods Co. (demo supplier)                            |
+| `restaurant-free@supplify.com`                                    | `Supplify1!`           | Free plan — calendar gated                                 |
+| `restaurant-gold@supplify.com`                                    | `Supplify1!`           | Gold — full features; may be past due after `seed:billing` |
+| `restaurant-bronze@supplify.com`                                  | `Supplify1!`           | Bronze tier                                                |
+| `restaurant-platinum@supplify.com`                                | `Supplify1!`           | Platinum tier                                              |
+| `supplier-free@supplify.com`                                      | `Supplify1!`           | Supplier free tier                                         |
+| `supplier-gold@supplify.com`                                      | `Supplify1!`           | Supplier Gold                                              |
+| `restaurant-gold-manager@supplify.com`                            | `Supplify1!`           | Gold restaurant — Manager (`seed:tier-catalog`)            |
+| `restaurant-gold-purchaser@supplify.com`                          | `Supplify1!`           | Gold restaurant — Purchaser (own login, not owner)         |
+| `restaurant-silver@supplify.com` / `supplier-silver@supplify.com` | `Supplify1!`           | Silver tier (`tier-restaurant-silver` slugs)               |
+| `restaurant-1@test.com` … `restaurant-10@test.com`                | (Keycloak)             | Prod-like seed (`seed:prodlike`)                           |
 
 **Billing stub card:** `4242424242424242` (any future expiry/CVC) when `BILLING_GATEWAY=stub`.
 
@@ -113,30 +119,35 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 0.5 Plan limits & upgrade UX
 
-| ID     | Steps                                          | Expected                                              | Pass? |
-| ------ | ---------------------------------------------- | ----------------------------------------------------- | ----- |
-| PLN-01 | Free restaurant → Dashboard **Order calendar** | Paywall + upgrade CTA; no broken URL / “Try again”    |       |
-| PLN-02 | Gold restaurant → Order calendar               | Calendar loads; filters work                          |       |
-| PLN-03 | Hit daily order limit (or seed at limit)       | Block message; upgrade modal with limit label         |       |
-| PLN-04 | Hit chat limit                                 | Send blocked; upgrade nudge                           |       |
-| PLN-05 | Add branch over plan limit                     | Gate message references `multi_branch` / branch limit |       |
-| PLN-06 | Supplier add warehouse over limit              | Warehouse gate from plan                              |       |
-| PLN-07 | Gold/Platinum → custom branding in settings    | Logo/colors upload (Gold); white-label if Platinum    |       |
-| PLN-08 | Header **Plans** button                        | Upgrade/browse modal; plan comparison table           |       |
+| ID      | Steps                                          | Expected                                               | Pass? |
+| ------- | ---------------------------------------------- | ------------------------------------------------------ | ----- |
+| PLN-01  | Free restaurant → Dashboard **Order calendar** | Paywall + upgrade CTA; no broken URL / “Try again”     |       |
+| PLN-02  | Gold restaurant → Order calendar               | Calendar loads; filters work                           |       |
+| PLN-03  | Hit daily order limit (or seed at limit)       | Block message; upgrade modal with limit label          |       |
+| PLN-04  | Hit chat limit                                 | Send blocked; upgrade nudge                            |       |
+| PLN-05  | Add branch over plan limit                     | Gate message references `multi_branch` / branch limit  |       |
+| PLN-06  | Supplier add warehouse over limit              | Warehouse gate from plan                               |       |
+| PLN-06a | Bronze supplier → add 2nd warehouse            | Blocked or upgrade CTA (`warehouses` limit)            |       |
+| PLN-06b | Gold supplier → enable multi-warehouse         | Settings toggle; routing rules API; split order badges |       |
+| PLN-06c | Supplier org → add branch over plan limit      | `multi_branch` / branch limit message                  |       |
+| PLN-07  | Gold/Platinum → custom branding in settings    | Logo/colors upload (Gold); white-label if Platinum     |       |
+| PLN-08  | Header **Plans** button                        | Upgrade/browse modal; plan comparison table            |       |
 
 ## 0.6 Shell UI (Layout, Header, Sidebar)
 
-| ID    | Steps                                     | Expected                                             | Pass? |
-| ----- | ----------------------------------------- | ---------------------------------------------------- | ----- |
-| UX-01 | Sidebar: each visible nav item            | Correct route; active state highlight                |       |
-| UX-02 | Orders nav badge                          | Shows pending count when pending orders exist        |       |
-| UX-03 | Header notifications bell                 | Panel opens; mark read / mark all read               |       |
-| UX-04 | Header search (⌘K)                        | Opens search UX if implemented                       |       |
-| UX-05 | Header settings icon                      | Navigates to settings                                |       |
-| UX-06 | Header avatar → logout                    | Session ends                                         |       |
-| UX-07 | **Branch switcher** (multi-branch tenant) | Lists linked accounts; switch updates context        |       |
-| UX-08 | Plan badge in sidebar footer              | Shows plan name for non-free paid tiers              |       |
-| UX-09 | Mobile/narrow viewport                    | Sidebar/layout usable; tabs wrap (supplier settings) |       |
+| ID     | Steps                                     | Expected                                             | Pass? |
+| ------ | ----------------------------------------- | ---------------------------------------------------- | ----- |
+| UX-01  | Sidebar: each visible nav item            | Correct route; active state highlight                |       |
+| UX-02  | Orders nav badge                          | Shows pending count when pending orders exist        |       |
+| UX-03  | Header notifications bell                 | Panel opens; mark read / mark all read               |       |
+| UX-04  | Header search (⌘K)                        | Opens search UX if implemented                       |       |
+| UX-05  | Header settings icon                      | Navigates to settings                                |       |
+| UX-06  | Header avatar → logout                    | Session ends                                         |       |
+| UX-07  | **Branch switcher** (multi-branch tenant) | Lists linked accounts; switch updates context        |       |
+| UX-07a | Supplier with org → **All branches** link | Navigates to `/app/org` when `multi_branch` on       |       |
+| UX-07b | Org Owner → add branch on `/app/org`      | New branch appears in switcher; stats load           |       |
+| UX-08  | Plan badge in sidebar footer              | Shows plan name for non-free paid tiers              |       |
+| UX-09  | Mobile/narrow viewport                    | Sidebar/layout usable; tabs wrap (supplier settings) |       |
 
 ## 0.7 Notifications preferences
 
@@ -310,15 +321,18 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 2.13 Settings & onboarding (`/app/settings`, `/app/onboarding`)
 
-| ID     | Steps                                         | Expected                                 | Pass? |
-| ------ | --------------------------------------------- | ---------------------------------------- | ----- |
-| RST-61 | Tab: Profile — edit name, address, logo       | Saves via API                            |       |
-| RST-62 | Tab: Team — invite users, assign tenant roles | RBAC roles applied                       |       |
-| RST-63 | Tab: Branches — add/switch linked accounts    | Respects plan branch limit               |       |
-| RST-64 | Tab: Subscription — plan, usage, billing CTA  | Matches entitlements                     |       |
-| RST-65 | Tab: Notifications                            | Same as UX-10                            |       |
-| RST-66 | Custom branding (Gold+)                       | Logo/colors; preview                     |       |
-| RST-67 | `/app/onboarding`                             | Same flows as settings (duplicate entry) |       |
+| ID      | Steps                                         | Expected                                                                | Pass? |
+| ------- | --------------------------------------------- | ----------------------------------------------------------------------- | ----- |
+| RST-61  | Tab: Profile — edit name, address, logo       | Saves via API                                                           |       |
+| RST-62  | Tab: Team — invite users, assign tenant roles | RBAC roles applied                                                      |       |
+| RST-63  | Tab: Branches — add/switch linked accounts    | Respects plan branch limit                                              |       |
+| RST-64  | Tab: Subscription — plan, usage, billing CTA  | Matches entitlements                                                    |       |
+| RST-65  | Tab: Notifications                            | Same as UX-10                                                           |       |
+| RST-65a | Tab: Activity — no date filters, Refresh      | Rows show (e.g. Order placed) after `seed:audit-backfill` or live order |       |
+| RST-65b | Tab: Activity — Action / Resource dropdowns   | Human-readable labels; filter narrows list                              |       |
+| RST-65c | Tab: Activity — Clear filters / date range    | Full day included on **To** date                                        |       |
+| RST-66  | Custom branding (Gold+)                       | Logo/colors; preview                                                    |       |
+| RST-67  | `/app/onboarding`                             | Same flows as settings (duplicate entry)                                |       |
 
 ## 2.14 Restaurant RBAC spot checks
 
@@ -420,20 +434,21 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | SUP-37 | **Quick replies** (if enabled)      | Insert template   |       |
 | SUP-38 | Send/receive messages               | Same as RST-58–60 |       |
 
-## 3.10 Supplier settings (`/app/settings` — 8 tabs)
+## 3.10 Supplier settings (`/app/settings` — 9 tabs)
 
-| ID     | Steps                            | Expected                            | Pass? |
-| ------ | -------------------------------- | ----------------------------------- | ----- |
-| SUP-39 | Tab: Profile                     | Company info saves                  |       |
-| SUP-40 | Tab: Contacts                    | Contact persons CRUD                |       |
-| SUP-41 | Tab: Business                    | Tax, terms, policies                |       |
-| SUP-42 | Tab: Warehouses                  | Add/edit warehouse; plan limit gate |       |
-| SUP-43 | Tab: Delivery                    | Zones, lead times, fees             |       |
-| SUP-44 | Tab: Branches                    | Multi-account linking               |       |
-| SUP-45 | Tab: Notifications               | Preferences save                    |       |
-| SUP-46 | Tab: Plan & billing              | Subscription + payment modal        |       |
-| SUP-47 | All tabs visible without overlap | Tabs wrap on narrow screens         |       |
-| SUP-48 | `/app/supplier-settings`         | Same as `/app/settings`             |       |
+| ID      | Steps                            | Expected                                            | Pass? |
+| ------- | -------------------------------- | --------------------------------------------------- | ----- |
+| SUP-39  | Tab: Profile                     | Company info saves                                  |       |
+| SUP-40  | Tab: Contacts                    | Contact persons CRUD                                |       |
+| SUP-41  | Tab: Business                    | Tax, terms, policies                                |       |
+| SUP-42  | Tab: Warehouses                  | Add/edit warehouse; plan limit gate                 |       |
+| SUP-43  | Tab: Delivery                    | Zones, lead times, fees                             |       |
+| SUP-44  | Tab: Branches                    | Multi-account linking                               |       |
+| SUP-45  | Tab: Notifications               | Preferences save                                    |       |
+| SUP-46  | Tab: Plan & billing              | Subscription + payment modal                        |       |
+| SUP-46a | Tab: Activity — filters & list   | Same as RST-65a–65c (product.created for suppliers) |       |
+| SUP-47  | All tabs visible without overlap | Tabs wrap on narrow screens                         |       |
+| SUP-48  | `/app/supplier-settings`         | Same as `/app/settings`                             |       |
 
 ## 3.11 Supplier RBAC spot checks
 

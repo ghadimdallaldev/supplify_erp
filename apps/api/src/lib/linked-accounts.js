@@ -68,12 +68,21 @@ export async function createLinkedBranchAccount({
     const addressJson = address ? JSON.stringify(address) : '{}'
 
     let tenant
+    let parentOrgId = null
+    if (tenantType === 'SUPPLIER') {
+      const { rows: parentRows } = await client.query(
+        `SELECT organization_id FROM supplier WHERE id = $1`,
+        [parentTenantId]
+      )
+      parentOrgId = parentRows[0]?.organization_id || null
+    }
+
     if (tenantType === 'SUPPLIER') {
       const { rows } = await client.query(
-        `INSERT INTO supplier (name, slug, contact_email, phone, address_json)
-         VALUES ($1, $2, $3, $4, $5::jsonb)
+        `INSERT INTO supplier (name, slug, contact_email, phone, address_json, organization_id, is_main_branch)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, false)
          RETURNING *`,
-        [name, slug, normalizedEmail, phone || null, addressJson]
+        [name, slug, normalizedEmail, phone || null, addressJson, parentOrgId]
       )
       tenant = rows[0]
       await client.query(
