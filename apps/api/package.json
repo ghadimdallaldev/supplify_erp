@@ -29,6 +29,8 @@
     "seed:billing": "node scripts/seed-billing.js",
     "seed:prodlike-team": "node scripts/seed-prodlike-team-backfill.js",
     "seed:full": "node scripts/seed-full.mjs",
+    "seed:features": "node scripts/seed-feature-demos.js",
+    "seed:tier-catalog": "node scripts/seed-tier-catalog.js",
     "reduce-to-single-tenant": "node scripts/reduce-to-single-tenant.js",
     "db:reset": "node scripts/reset.js",
     "db:init-subs": "node scripts/initialize-subscriptions.js",

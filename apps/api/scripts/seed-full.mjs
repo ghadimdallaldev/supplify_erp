@@ -70,6 +70,8 @@ runStep('Quick lists (per restaurant)', 'seed-quick-lists.js')
 
 runStep('Chats (restaurant ↔ supplier with orders)', 'seed-chats.js')
 
+runStep('Reports, disputes & promotions/deals', 'seed-feature-demos.js')
+
 if (process.env.SKIP_KEYCLOAK === 'true') {
   console.log('\n⏭  Skipping Keycloak (SKIP_KEYCLOAK=true)')
 } else {
