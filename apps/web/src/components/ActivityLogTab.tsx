@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
-import { useGetTenantAuditLogsQuery } from '../services/api'
+import { Select, SelectContent, SelectItem, SelectTrigger } from './ui/select'
+import { useGetTenantAuditLogFiltersQuery, useGetTenantAuditLogsQuery } from '../services/api'
 import { downloadCsv } from '../utils/csvExport'
 import { Loader2, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -19,6 +20,10 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
   const [resourceType, setResourceType] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+
+  const { data: filterOptions } = useGetTenantAuditLogFiltersQuery()
+  const actionOptions = filterOptions?.actions ?? []
+  const resourceOptions = filterOptions?.resourceTypes ?? []
 
   const filters = useMemo(
     () => ({
@@ -66,8 +71,8 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
       ['Time', 'Action', 'Resource', 'User', 'Email'],
       logs.map((row) => [
         String(row.created_at || ''),
-        String(row.action || ''),
-        String(row.resource_type || ''),
+        String(row.action_label || row.action || ''),
+        String(row.resource_type_label || row.resource_type || ''),
         String(row.user_name || ''),
         String(row.user_email || ''),
       ])
@@ -97,19 +102,33 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
             <Label>Action</Label>
-            <Input
-              value={action}
-              onChange={(e) => setAction(e.target.value)}
-              placeholder="order.created"
-            />
+            <Select value={action} onValueChange={setAction}>
+              <SelectTrigger placeholder="All actions">
+                <SelectContent>
+                  <SelectItem value="">All actions</SelectItem>
+                  {actionOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </SelectTrigger>
+            </Select>
           </div>
           <div>
             <Label>Resource type</Label>
-            <Input
-              value={resourceType}
-              onChange={(e) => setResourceType(e.target.value)}
-              placeholder="order"
-            />
+            <Select value={resourceType} onValueChange={setResourceType}>
+              <SelectTrigger placeholder="All resources">
+                <SelectContent>
+                  <SelectItem value="">All resources</SelectItem>
+                  {resourceOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </SelectTrigger>
+            </Select>
           </div>
           <div>
             <Label>From</Label>
@@ -144,9 +163,9 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
                     <td className="py-2 pr-4 whitespace-nowrap">
                       {row.created_at ? new Date(String(row.created_at)).toLocaleString() : '—'}
                     </td>
-                    <td className="py-2 pr-4 font-mono text-xs">{String(row.action || '')}</td>
+                    <td className="py-2 pr-4">{String(row.action_label || row.action || '')}</td>
                     <td className="py-2 pr-4">
-                      {String(row.resource_type || '—')}
+                      {String(row.resource_type_label || row.resource_type || '—')}
                       {row.resource_id ? (
                         <span className="block text-xs text-[var(--text-muted)] truncate max-w-[140px]">
                           {String(row.resource_id)}

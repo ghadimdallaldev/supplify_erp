@@ -4,6 +4,7 @@
  */
 import { query } from './db.js'
 import { logger } from './logger.js'
+import { getAuditActionLabel, getAuditResourceLabel } from './audit-labels.js'
 
 export function maskIpAddress(ip) {
   if (!ip || typeof ip !== 'string') return null
@@ -21,10 +22,14 @@ export function maskIpAddress(ip) {
 
 export function formatAuditLogRow(row) {
   const payload = row.payload_json || {}
+  const action = row.action_type
+  const resource_type = payload.resource_type || null
   return {
     id: row.id,
-    action: row.action_type,
-    resource_type: payload.resource_type || null,
+    action,
+    action_label: getAuditActionLabel(action),
+    resource_type,
+    resource_type_label: getAuditResourceLabel(resource_type),
     resource_id: row.target_id || payload.resource_id || null,
     user_name: row.user_name || null,
     user_email: row.user_email || null,
