@@ -1,6 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import {
   notifyReservationCreated,
@@ -12,6 +12,11 @@ import {
 import { config } from '../config/env.js'
 import { sendStaffPortalMagicLink } from '../services/staff-portal-mail.service.js'
 import { isEmailConfigured } from '../services/mailer.service.js'
+import {
+  acceptWaitlistOffer,
+  declineWaitlistOffer,
+  assignWaitlistPosition,
+} from '../services/waitlistPromotion.js'
 
 const router = express.Router()
 
@@ -457,8 +462,10 @@ router.post('/reservations/waitlist', async (req, res) => {
       })
     }
 
-    const { rows } = await query(
-      `
+    const waitlistRow = await withTransaction(async (client) => {
+      const position = await assignWaitlistPosition(client, payload.restaurantId)
+      const { rows } = await client.query(
+        `
         INSERT INTO reservation_waitlist (
           restaurant_id,
           customer_name,
@@ -466,20 +473,25 @@ router.post('/reservations/waitlist', async (req, res) => {
           party_size,
           preferred_time,
           notes,
-          status
+          status,
+          position
         )
-        VALUES ($1, $2, $3, $4, $5, $6, 'WAITING')
-        RETURNING id, restaurant_id, customer_name, party_size, status
+        VALUES ($1, $2, $3, $4, $5, $6, 'WAITING', $7)
+        RETURNING id, restaurant_id, customer_name, party_size, status, position
       `,
-      [
-        payload.restaurantId,
-        payload.customerName,
-        payload.customerPhone ?? null,
-        payload.partySize,
-        preferredTime ? preferredTime.toISOString() : null,
-        payload.notes ?? null,
-      ]
-    )
+        [
+          payload.restaurantId,
+          payload.customerName,
+          payload.customerPhone ?? null,
+          payload.partySize,
+          preferredTime ? preferredTime.toISOString() : null,
+          payload.notes ?? null,
+          position,
+        ]
+      )
+      return rows[0]
+    })
+    const rows = [waitlistRow]
 
     const waitlist = rows[0]
 
@@ -511,6 +523,93 @@ router.post('/reservations/waitlist', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'PUBLIC_WAITLIST_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/reservations/waitlist/:token/accept', async (req, res) => {
+  try {
+    const { token } = req.params
+    if (!token) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'TOKEN_REQUIRED', message: 'Offer token is required' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { reservation, waitlist } = await acceptWaitlistOffer(token)
+
+    try {
+      await notifyReservationCreated(reservation)
+      const { rows: restaurantRows } = await query('SELECT name FROM restaurant WHERE id = $1', [
+        reservation.restaurant_id,
+      ])
+      await notifyGuestReservationConfirmation(reservation, restaurantRows[0]?.name)
+    } catch (notificationError) {
+      logger.warn('Waitlist accept notification failed', { error: notificationError.message })
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        reservation: {
+          id: reservation.id,
+          status: reservation.status,
+          scheduledAt: reservation.scheduled_at,
+          partySize: reservation.party_size,
+        },
+        waitlist: { id: waitlist.id, status: waitlist.status, offerStatus: waitlist.offer_status },
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Waitlist offer accept failed', { error: error.message })
+    const status =
+      error.message.includes('not found') || error.message.includes('expired') ? 410 : 400
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: { name: 'WAITLIST_ACCEPT_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/reservations/waitlist/:token/decline', async (req, res) => {
+  try {
+    const { token } = req.params
+    if (!token) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'TOKEN_REQUIRED', message: 'Offer token is required' },
+        requestId: req.requestId,
+      })
+    }
+
+    const waitlist = await declineWaitlistOffer(token)
+
+    res.json({
+      ok: true,
+      data: {
+        message: 'Offer declined. The next guest on the waitlist may be contacted.',
+        waitlist: { id: waitlist.id, status: waitlist.status, offerStatus: waitlist.offer_status },
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Waitlist offer decline failed', { error: error.message })
+    const status =
+      error.message.includes('not found') || error.message.includes('expired') ? 410 : 400
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: { name: 'WAITLIST_DECLINE_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }

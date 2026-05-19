@@ -70,6 +70,8 @@ sed -i \
   -e "s|^FRONTEND_IMAGE=.*|FRONTEND_IMAGE=${FRONTEND_IMAGE}|" \
   "$ENV_FILE"
 
+apply_vapid_env "$ENV_FILE"
+
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"

@@ -44,12 +44,22 @@ import warehousesRoutes from './routes/warehouses.routes.js'
 import { executeScheduledOrders } from './services/scheduled-orders.service.js'
 import { checkOverdueInvoices } from './jobs/invoice-overdue.job.js'
 import { runSubscriptionBillingJob } from './jobs/subscription-billing.job.js'
+import { checkExpiredWaitlistOffers } from './services/waitlistPromotion.js'
 import { billingAccessMiddleware } from './middlewares/billingAccess.js'
 import { billingRoutes } from './routes/billing.routes.js'
 import { ensureReservationsSchema, ensureStaffAppSchema } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
+import { approvalsRoutes } from './routes/approvals.routes.js'
+import { promotionsRoutes } from './routes/promotions.routes.js'
+import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
+import { runDeactivateExpiredPromotionsJob } from './jobs/promotions-expiry.job.js'
+import { disputesRoutes } from './routes/disputes.routes.js'
+import { creditNotesRoutes } from './routes/credit-notes.routes.js'
+import { pushRoutes } from './routes/push.routes.js'
+import { reviewsRoutes } from './routes/reviews.routes.js'
+import { reportsRoutes } from './routes/reports.routes.js'
 
 if (config.NODE_ENV === 'production') {
   validateProductionConfig()
@@ -212,6 +222,14 @@ app.use('/api/suppliers', suppliersRoutes)
 app.use('/api/restaurants', restaurantsRoutes)
 app.use('/api/orders/calendar', ordersCalendarRoutes)
 app.use('/api/orders', ordersRoutes)
+app.use('/api/approvals', approvalsRoutes)
+app.use('/api/promotions', promotionsRoutes)
+app.use('/api/audit', tenantAuditRoutes)
+app.use('/api/disputes', disputesRoutes)
+app.use('/api/credit-notes', creditNotesRoutes)
+app.use('/api/push', pushRoutes)
+app.use('/api/reviews', reviewsRoutes)
+app.use('/api/reports', reportsRoutes)
 app.use('/api/files', filesRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/chat', chatSendLimiter)
@@ -303,6 +321,30 @@ server.listen(PORT, () => {
     60 * 60 * 1000
   )
   logger.info('Subscription billing job started (runs every 1h)')
+
+  const WAITLIST_OFFER_INTERVAL = 15 * 60 * 1000
+  checkExpiredWaitlistOffers().catch((err) =>
+    logger.error('Waitlist expired-offers job failed on startup:', err)
+  )
+  setInterval(() => {
+    checkExpiredWaitlistOffers().catch((err) =>
+      logger.error('Waitlist expired-offers job failed:', err)
+    )
+  }, WAITLIST_OFFER_INTERVAL)
+  logger.info('Waitlist expired-offers job started (runs every 15 minutes)')
+
+  runDeactivateExpiredPromotionsJob().catch((err) =>
+    logger.error('Promotions expiry job failed on startup:', err)
+  )
+  setInterval(
+    () => {
+      runDeactivateExpiredPromotionsJob().catch((err) =>
+        logger.error('Promotions expiry job failed:', err)
+      )
+    },
+    30 * 60 * 1000
+  )
+  logger.info('Promotions expiry job started (runs every 30 min)')
 })
 
 export default app

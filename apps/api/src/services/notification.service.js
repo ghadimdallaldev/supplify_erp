@@ -4,6 +4,7 @@ import { sendMail } from './mailer.service.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
 import { getEntitlements } from '../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from './whatsapp.service.js'
+import { sendWebPushToUser, isPushConfigured } from './push.service.js'
 
 /**
  * Notification Service — email via Twilio SendGrid or SMTP; WhatsApp via Twilio (with wa.me fallback in metadata).
@@ -21,9 +22,6 @@ const emailService = {
     }
   },
 }
-
-// Push notifications disabled for now
-// const pushService = { ... }
 
 const DEFAULT_NOTIFICATION_PREFS = {
   email_enabled: true,
@@ -82,6 +80,9 @@ const CATEGORY_PREF_MAP = {
   staff_announcement: 'notify_staff_announcement',
   staff_document: 'notify_staff_document',
   scheduled_order: 'notify_scheduled_order',
+  dispute_opened: 'notify_system_updates',
+  dispute_resolved: 'notify_system_updates',
+  dispute_rejected: 'notify_system_updates',
   test: 'notify_system_updates',
 }
 
@@ -319,7 +320,7 @@ export async function sendNotification({
         isPrefEnabled(prefs, 'whatsapp_enabled') &&
         !!contact?.phone,
       sms: false,
-      push: false,
+      push: isPushConfigured() && isPrefEnabled(prefs, 'push_enabled', false),
       inApp: isPrefEnabled(prefs, 'in_app_enabled'),
     }
 
@@ -391,15 +392,32 @@ export async function sendNotification({
       ])
     }
 
-    // Push notifications disabled for now
-    // if (channels.push && (contact?.fcm_token || contact?.apns_token)) {
-    //   try {
-    //     await pushService.send(contact.fcm_token, contact.apns_token, title, message, metadata);
-    //     results.push = true;
-    //   } catch (error) {
-    //     logger.error('Push send failed', { error: error.message });
-    //   }
-    // }
+    if (channels.push) {
+      const pushUrl =
+        referenceType === 'DISPUTE'
+          ? `/app/disputes/${referenceId}`
+          : referenceType === 'ORDER'
+            ? `/app/orders/${referenceId}`
+            : '/app/notifications'
+      sendWebPushToUser({
+        userId,
+        title,
+        message,
+        referenceId,
+        referenceType,
+        url: pushUrl,
+      })
+        .then((pushResult) => {
+          if (pushResult?.sent > 0) {
+            query(`UPDATE notification_log SET push_sent = true WHERE id = $1`, [
+              notification.id,
+            ]).catch(() => {})
+          }
+        })
+        .catch((error) => {
+          logger.error('Push send failed', { error: error.message })
+        })
+    }
 
     // Update notification log with actual send results
     await query(

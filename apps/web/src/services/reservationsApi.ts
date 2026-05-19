@@ -77,6 +77,20 @@ export const reservationsApi = api.injectEndpoints({
         },
       }),
     }),
+    getReservationWaitlist: build.query<{ waitlist: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/reservations/waitlist',
+      providesTags: [{ type: 'Reservation' as const, id: 'WAITLIST' }],
+    }),
+    manuallyPromoteWaitlist: build.mutation<{ waitlist: Record<string, unknown> }, string>({
+      query: (id) => ({
+        url: `/api/reservations/waitlist/${id}/manually-promote`,
+        method: 'POST',
+      }),
+      invalidatesTags: [
+        { type: 'Reservation' as const, id: 'WAITLIST' },
+        { type: 'Reservation' as const, id: 'BOARD' },
+      ],
+    }),
     getGuestIntelligence: build.query<
       {
         recentGuests: Array<Record<string, unknown>>
@@ -103,4 +117,6 @@ export const {
   useUpdateReservationStatusMutation,
   useGetReservationAnalyticsQuery,
   useGetGuestIntelligenceQuery,
+  useGetReservationWaitlistQuery,
+  useManuallyPromoteWaitlistMutation,
 } = reservationsApi

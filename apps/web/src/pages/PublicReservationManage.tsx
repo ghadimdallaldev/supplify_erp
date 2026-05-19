@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Label } from '../components/ui/label'
@@ -12,6 +12,8 @@ import {
   useGetPublicReservationAvailabilityQuery,
   useReschedulePublicReservationMutation,
   useCancelPublicReservationMutation,
+  useAcceptWaitlistOfferMutation,
+  useDeclineWaitlistOfferMutation,
 } from '../services/api'
 
 function formatDateTime(iso: string) {
@@ -21,8 +23,11 @@ function formatDateTime(iso: string) {
 
 export function PublicReservationManage() {
   const params = useParams<{ token: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = params.token ?? ''
+  const waitlistToken = searchParams.get('waitlistOffer') || searchParams.get('waitlist')
+  const waitlistAccepted = searchParams.get('waitlistAccepted') === 'true'
 
   const { data, isLoading, refetch } = useGetPublicReservationDetailsQuery(token, { skip: !token })
   const reservation = data?.reservation
@@ -34,11 +39,14 @@ export function PublicReservationManage() {
   const partySize = reservation?.party_size ?? 2
   const { data: availability } = useGetPublicReservationAvailabilityQuery(
     { restaurantId: reservation?.restaurant_id ?? '', partySize, date: rescheduleDate },
-    { skip: !reservation },
+    { skip: !reservation }
   )
 
-  const [rescheduleReservation, { isLoading: rescheduling }] = useReschedulePublicReservationMutation()
+  const [rescheduleReservation, { isLoading: rescheduling }] =
+    useReschedulePublicReservationMutation()
   const [cancelReservation, { isLoading: cancelling }] = useCancelPublicReservationMutation()
+  const [acceptWaitlistOffer, { isLoading: acceptingOffer }] = useAcceptWaitlistOfferMutation()
+  const [declineWaitlistOffer, { isLoading: decliningOffer }] = useDeclineWaitlistOfferMutation()
 
   const slots = useMemo(() => availability?.slots ?? [], [availability?.slots])
 
@@ -64,7 +72,9 @@ export function PublicReservationManage() {
         <Card className="w-full max-w-md border-white/10 bg-white/95 text-[var(--text-muted)] shadow-xl">
           <CardHeader>
             <CardTitle>Reservation not found</CardTitle>
-            <CardDescription>The management link may have expired or already been used.</CardDescription>
+            <CardDescription>
+              The management link may have expired or already been used.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" onClick={() => navigate('/reserve')}>
@@ -89,7 +99,9 @@ export function PublicReservationManage() {
       setRescheduleSlot('')
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.data?.error?.message || 'Unable to reschedule reservation')
+      toast.error(
+        error?.data?.message || error?.data?.error?.message || 'Unable to reschedule reservation'
+      )
     }
   }
 
@@ -100,12 +112,76 @@ export function PublicReservationManage() {
       toast.success('Reservation cancelled')
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.message || error?.data?.error?.message || 'Unable to cancel reservation')
+      toast.error(
+        error?.data?.message || error?.data?.error?.message || 'Unable to cancel reservation'
+      )
     }
+  }
+
+  if (waitlistToken && !reservation) {
+    return (
+      <div className="min-h-screen bg-slate-900/90 py-12 px-4 flex items-center justify-center">
+        <Card className="w-full max-w-md bg-white/95 text-[var(--text)] shadow-xl">
+          <CardHeader>
+            <CardTitle>Table available</CardTitle>
+            <CardDescription>
+              A table has opened up for your party. Accept within 2 hours to confirm your
+              reservation.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {waitlistAccepted ? (
+              <p className="text-sm text-[var(--mint)] font-medium">
+                Your table is confirmed. Check your email for reservation details.
+              </p>
+            ) : (
+              <>
+                <Button
+                  className="w-full"
+                  disabled={acceptingOffer}
+                  onClick={async () => {
+                    try {
+                      await acceptWaitlistOffer(waitlistToken).unwrap()
+                      toast.success('Table confirmed!')
+                      navigate(`/reserve/manage/${waitlistToken}?waitlistAccepted=true`)
+                    } catch (e: unknown) {
+                      const err = e as { data?: { error?: { message?: string } } }
+                      toast.error(err?.data?.error?.message || 'Could not accept offer')
+                    }
+                  }}
+                >
+                  {acceptingOffer ? 'Confirming…' : 'Accept table'}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={decliningOffer}
+                  onClick={async () => {
+                    try {
+                      await declineWaitlistOffer(waitlistToken).unwrap()
+                      toast.success('Offer declined')
+                    } catch {
+                      toast.error('Could not decline offer')
+                    }
+                  }}
+                >
+                  Decline
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-slate-900/90 py-12 px-4 text-white">
+      {waitlistAccepted && (
+        <div className="mx-auto max-w-5xl mb-4 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-900">
+          Your waitlist offer was accepted and your reservation is confirmed.
+        </div>
+      )}
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 lg:flex-row">
         <Card className="w-full bg-white/95 text-[var(--text-muted)] shadow-xl lg:w-2/5">
           <CardHeader>
@@ -123,7 +199,9 @@ export function PublicReservationManage() {
             </div>
             <div>
               <Label>When</Label>
-              <p className="mt-1 font-semibold text-[var(--text)]">{formatDateTime(reservation.scheduled_at)}</p>
+              <p className="mt-1 font-semibold text-[var(--text)]">
+                {formatDateTime(reservation.scheduled_at)}
+              </p>
             </div>
             <div>
               <Label>Guests</Label>
@@ -131,7 +209,11 @@ export function PublicReservationManage() {
             </div>
             <div>
               <Label>Special notes</Label>
-              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional" />
+              <Textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional"
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Button variant="destructive" disabled={cancelling} onClick={handleCancel}>
@@ -147,7 +229,9 @@ export function PublicReservationManage() {
         <Card className="w-full bg-white/95 text-[var(--text-muted)] shadow-xl lg:w-3/5">
           <CardHeader>
             <CardTitle>Reschedule reservation</CardTitle>
-            <CardDescription>Pick a new date and time. Availability updates in real-time.</CardDescription>
+            <CardDescription>
+              Pick a new date and time. Availability updates in real-time.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={handleReschedule}>
@@ -174,7 +258,8 @@ export function PublicReservationManage() {
                 <Label>Available times</Label>
                 {slots.length === 0 ? (
                   <p className="text-xs text-[var(--text-muted)]">
-                    No availability for the selected date. Try a different day or contact the restaurant.
+                    No availability for the selected date. Try a different day or contact the
+                    restaurant.
                   </p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
@@ -192,9 +277,18 @@ export function PublicReservationManage() {
                         disabled={!slot.isAvailable}
                         onClick={() => setRescheduleSlot(slot.startTime)}
                       >
-                        <span className="font-semibold">{new Date(slot.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="font-semibold">
+                          {new Date(slot.startTime).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
                         <span>Up to {slot.capacityAvailable} seats</span>
-                        {!slot.isAvailable ? <span className="text-[10px] uppercase text-[var(--red)]">Unavailable</span> : null}
+                        {!slot.isAvailable ? (
+                          <span className="text-[10px] uppercase text-[var(--red)]">
+                            Unavailable
+                          </span>
+                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -213,4 +307,3 @@ export function PublicReservationManage() {
 }
 
 export default PublicReservationManage
-

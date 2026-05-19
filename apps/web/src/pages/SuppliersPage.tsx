@@ -1,13 +1,38 @@
 import { useState, useMemo } from 'react'
-import { useGetSuppliersQuery, useFollowSupplierMutation, useUnfollowSupplierMutation } from '../services/api'
+import {
+  useGetSuppliersQuery,
+  useFollowSupplierMutation,
+  useUnfollowSupplierMutation,
+} from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
-import { 
-  Building2, Mail, Phone, MapPin, Search, Star, Package, Heart, Ban, Eye, 
-  Grid3x3, List, Filter, TrendingUp, ShoppingCart, MessageCircle, Calendar,
-  Award, CheckCircle, ArrowUpDown, Sparkles, Users, Store, Clock
+import {
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  Search,
+  Star,
+  Package,
+  Heart,
+  Ban,
+  Eye,
+  Grid3x3,
+  List,
+  Filter,
+  TrendingUp,
+  ShoppingCart,
+  MessageCircle,
+  Calendar,
+  Award,
+  CheckCircle,
+  ArrowUpDown,
+  Sparkles,
+  Users,
+  Store,
+  Clock,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { Link, useNavigate } from 'react-router-dom'
@@ -22,16 +47,16 @@ export function SuppliersPage() {
   const [sortBy, setSortBy] = useState<'name' | 'products' | 'recent' | 'followed'>('name')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filterBy, setFilterBy] = useState<'all' | 'followed' | 'new'>('all')
-  
+
   const isRestaurant = user?.role === 'RESTAURANT'
-  
+
   const { data, isLoading, error, refetch } = useGetSuppliersQuery({
     q: search || undefined,
     city: cityFilter || undefined,
     limit: 50,
     offset: 0,
   })
-  
+
   const [followSupplier] = useFollowSupplierMutation()
   const [unfollowSupplier] = useUnfollowSupplierMutation()
 
@@ -42,14 +67,17 @@ export function SuppliersPage() {
       total: suppliers.length,
       followed: suppliers.filter((s: any) => s.is_followed).length,
       withProducts: suppliers.filter((s: any) => Number(s.product_count || 0) > 0).length,
-      totalProducts: suppliers.reduce((sum: number, s: any) => sum + Number(s.product_count || 0), 0)
+      totalProducts: suppliers.reduce(
+        (sum: number, s: any) => sum + Number(s.product_count || 0),
+        0
+      ),
     }
   }, [data?.suppliers])
 
   // Filter and sort suppliers
   const filteredSuppliers = useMemo(() => {
     let suppliers = data?.suppliers || []
-    
+
     // Filter by status
     if (filterBy === 'followed') {
       suppliers = suppliers.filter((s: any) => s.is_followed)
@@ -61,7 +89,7 @@ export function SuppliersPage() {
         return daysSince <= 30
       })
     }
-    
+
     // Sort
     suppliers = [...suppliers].sort((a: any, b: any) => {
       switch (sortBy) {
@@ -78,7 +106,7 @@ export function SuppliersPage() {
           return a.name.localeCompare(b.name)
       }
     })
-    
+
     return suppliers
   }, [data?.suppliers, filterBy, sortBy])
 
@@ -130,7 +158,9 @@ export function SuppliersPage() {
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Suppliers</h1>
           <p className="text-[var(--text-muted)] mt-2">
-            {isRestaurant ? 'Discover and connect with trusted suppliers' : 'Manage suppliers in the marketplace'}
+            {isRestaurant
+              ? 'Discover and connect with trusted suppliers'
+              : 'Manage suppliers in the marketplace'}
           </p>
         </div>
         {isRestaurant && (
@@ -255,7 +285,11 @@ export function SuppliersPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setSortBy(sortBy === 'name' ? 'products' : sortBy === 'products' ? 'recent' : 'name')}
+                  onClick={() =>
+                    setSortBy(
+                      sortBy === 'name' ? 'products' : sortBy === 'products' ? 'recent' : 'name'
+                    )
+                  }
                 >
                   <ArrowUpDown className="h-4 w-4 mr-1" />
                   {sortBy === 'name' ? 'Name' : sortBy === 'products' ? 'Products' : 'Recent'}
@@ -274,16 +308,19 @@ export function SuppliersPage() {
               <Building2 className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No suppliers found</h3>
               <p className="text-[var(--text-muted)] mb-6">
-                {search || cityFilter || filterBy !== 'all' 
-                  ? 'Try adjusting your search or filter criteria' 
+                {search || cityFilter || filterBy !== 'all'
+                  ? 'Try adjusting your search or filter criteria'
                   : 'No suppliers available in the marketplace'}
               </p>
               {(search || cityFilter || filterBy !== 'all') && (
-                <Button variant="outline" onClick={() => {
-                  setSearch('')
-                  setCityFilter('')
-                  setFilterBy('all')
-                }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearch('')
+                    setCityFilter('')
+                    setFilterBy('all')
+                  }}
+                >
                   Clear Filters
                 </Button>
               )}
@@ -293,7 +330,10 @@ export function SuppliersPage() {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSuppliers.map((supplier: any) => (
-            <Card key={supplier.id} className="hover:shadow-lg transition-all duration-200 relative group">
+            <Card
+              key={supplier.id}
+              className="hover:shadow-lg transition-all duration-200 relative group"
+            >
               {/* Follow Badge */}
               {isRestaurant && supplier.is_followed && (
                 <div className="absolute top-4 right-4 z-10">
@@ -324,9 +364,9 @@ export function SuppliersPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
                   {supplier.logo_url ? (
-                    <img 
-                      src={supplier.logo_url} 
-                      alt={supplier.name} 
+                    <img
+                      src={supplier.logo_url}
+                      alt={supplier.name}
                       className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                       onError={(e) => {
                         // Fallback to gradient if image fails to load
@@ -337,11 +377,21 @@ export function SuppliersPage() {
                       }}
                     />
                   ) : null}
-                  <div className={`h-12 w-12 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-lg shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
+                  <div
+                    className={`h-12 w-12 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-lg shadow-md ${supplier.logo_url ? 'hidden' : ''}`}
+                  >
                     {supplier.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg truncate">{supplier.name}</CardTitle>
+                    <CardTitle className="text-lg truncate flex items-center gap-2">
+                      <span className="truncate">{supplier.name}</span>
+                      {supplier.avg_rating != null && Number(supplier.avg_rating) > 0 ? (
+                        <span className="inline-flex items-center gap-0.5 text-sm font-normal text-amber-600 shrink-0">
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          {Number(supplier.avg_rating).toFixed(1)}
+                        </span>
+                      ) : null}
+                    </CardTitle>
                     <CardDescription className="truncate">{supplier.slug}</CardDescription>
                   </div>
                 </div>
@@ -355,7 +405,9 @@ export function SuppliersPage() {
                       <Package className="h-4 w-4 text-[var(--brand-mid)]" />
                       <span className="text-xs font-medium text-[var(--brand-mid)]">Products</span>
                     </div>
-                    <p className="text-xl font-bold text-[var(--text)]">{Number(supplier.product_count || 0)}</p>
+                    <p className="text-xl font-bold text-[var(--text)]">
+                      {Number(supplier.product_count || 0)}
+                    </p>
                   </div>
                   {supplier.avg_price > 0 && (
                     <div className="bg-[var(--mint-pale)] rounded-lg p-3 border border-[var(--mint)]/25">
@@ -383,7 +435,7 @@ export function SuppliersPage() {
                 {/* Contact Quick Access */}
                 <div className="flex items-center gap-2 text-sm">
                   {supplier.contact_email && (
-                    <a 
+                    <a
                       href={`mailto:${supplier.contact_email}`}
                       className="flex items-center gap-1 text-[var(--brand-mid)] hover:text-[var(--brand-mid)] hover:underline"
                     >
@@ -396,32 +448,23 @@ export function SuppliersPage() {
                 {/* Actions */}
                 <div className="flex gap-2 pt-2 border-t flex-wrap">
                   {isRestaurant && (
-                    <Button 
-                      variant="default" 
-                      size="sm" 
-                      className="flex-1 min-w-0"
-                      asChild
-                    >
+                    <Button variant="default" size="sm" className="flex-1 min-w-0" asChild>
                       <Link to={`/app/chat?supplier=${supplier.id}`}>
                         <MessageCircle className="h-4 w-4 mr-1 shrink-0" />
                         Message
                       </Link>
                     </Button>
                   )}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1 min-w-0"
                     onClick={() => handleViewProducts(supplier.id)}
                   >
                     <Package className="h-4 w-4 mr-1 shrink-0" />
                     Products
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    asChild
-                  >
+                  <Button variant="outline" size="sm" asChild>
                     <Link to={`/app/suppliers/${supplier.id}`}>
                       <Eye className="h-4 w-4 mr-1 shrink-0" />
                       View
@@ -430,8 +473,8 @@ export function SuppliersPage() {
                   {isRestaurant && (
                     <>
                       {!supplier.is_followed ? (
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => handleFollow(supplier.id)}
                           className="text-[var(--red)] hover:text-[var(--red)] hover:bg-[var(--red-pale)]"
@@ -439,8 +482,8 @@ export function SuppliersPage() {
                           <Heart className="h-4 w-4" />
                         </Button>
                       ) : (
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => handleUnfollow(supplier.id)}
                           className="text-[var(--red)] bg-[var(--red-pale)] hover:bg-[var(--red-pale)]"
@@ -454,9 +497,7 @@ export function SuppliersPage() {
 
                 {/* Additional Info */}
                 <div className="flex items-center justify-between text-xs text-[var(--text-muted)] pt-2 border-t">
-                  {supplier.vat_no && (
-                    <span>VAT: {supplier.vat_no}</span>
-                  )}
+                  {supplier.vat_no && <span>VAT: {supplier.vat_no}</span>}
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {new Date(supplier.created_at).toLocaleDateString()}
@@ -474,9 +515,9 @@ export function SuppliersPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
                     {supplier.logo_url ? (
-                      <img 
-                        src={supplier.logo_url} 
-                        alt={supplier.name} 
+                      <img
+                        src={supplier.logo_url}
+                        alt={supplier.name}
                         className="h-16 w-16 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
@@ -486,7 +527,9 @@ export function SuppliersPage() {
                         }}
                       />
                     ) : null}
-                    <div className={`h-16 w-16 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}>
+                    <div
+                      className={`h-16 w-16 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-xl shadow-md ${supplier.logo_url ? 'hidden' : ''}`}
+                    >
                       {supplier.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -521,30 +564,22 @@ export function SuppliersPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {isRestaurant && (
-                      <Button 
-                        variant="default" 
-                        size="sm"
-                        asChild
-                      >
+                      <Button variant="default" size="sm" asChild>
                         <Link to={`/app/chat?supplier=${supplier.id}`}>
                           <MessageCircle className="h-4 w-4 mr-1" />
                           Message
                         </Link>
                       </Button>
                     )}
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => handleViewProducts(supplier.id)}
                     >
                       <Package className="h-4 w-4 mr-1" />
                       View Products
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      asChild
-                    >
+                    <Button variant="outline" size="sm" asChild>
                       <Link to={`/app/suppliers/${supplier.id}`}>
                         <Eye className="h-4 w-4 mr-1" />
                         Details
@@ -553,8 +588,8 @@ export function SuppliersPage() {
                     {isRestaurant && (
                       <>
                         {!supplier.is_followed ? (
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => handleFollow(supplier.id)}
                           >
@@ -562,8 +597,8 @@ export function SuppliersPage() {
                             Follow
                           </Button>
                         ) : (
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => handleUnfollow(supplier.id)}
                             className="text-[var(--red)]"

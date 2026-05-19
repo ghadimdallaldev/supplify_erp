@@ -73,6 +73,13 @@ import {
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch } from '../hooks/redux'
+import { ApprovalsSettingsTab } from './approvals/ApprovalsSettingsTab'
+import { ActivityLogTab } from '../components/ActivityLogTab'
+import { usePushNotifications } from '../hooks/usePushNotifications'
+import { usePermissions } from '../hooks/usePermissions'
+import { featureEnabled } from '../lib/planLimits'
+import { useGetMyReviewsQuery } from '../services/api'
+import { Star } from 'lucide-react'
 
 const DEFAULT_NOTIFICATION_PREFS = {
   emailEnabled: true,
@@ -190,10 +197,17 @@ export function RestaurantOnboardingPage() {
   )
 
   const [activeTab, setActiveTab] = useState('profile')
+  const { can } = usePermissions()
+  const isOwner = user?.tenantRoles?.includes('RESTAURANT_OWNER') || can('SETTINGS_MANAGE')
+  const push = usePushNotifications()
+  const { data: myReviewsData } = useGetMyReviewsQuery({ limit: 20 })
 
   useEffect(() => {
     const tab = searchParams.get('tab')
-    if (tab && ['profile', 'team', 'branches', 'subscription', 'notifications'].includes(tab)) {
+    if (
+      tab &&
+      ['profile', 'team', 'branches', 'subscription', 'notifications', 'approvals'].includes(tab)
+    ) {
       setActiveTab(tab)
     }
   }, [searchParams])
@@ -348,6 +362,7 @@ export function RestaurantOnboardingPage() {
   const branches = branchesData?.branches ?? []
   const branchGate = getBranchAddGate(entitlements, branches.length + 1)
   const brandingAllowed = canUseCustomBranding(entitlements)
+  const approvalsFeatureEnabled = featureEnabled(entitlements?.features?.approvals_budgets)
   const canAddBranch = branchGate.canAdd
 
   // Notification preferences
@@ -536,7 +551,15 @@ export function RestaurantOnboardingPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList
+          className={`grid w-full ${
+            approvalsFeatureEnabled && isOwner
+              ? 'grid-cols-8'
+              : approvalsFeatureEnabled || isOwner
+                ? 'grid-cols-7'
+                : 'grid-cols-6'
+          }`}
+        >
           <TabsTrigger value="profile">
             <Building2 className="h-4 w-4 mr-2" />
             Profile
@@ -556,6 +579,22 @@ export function RestaurantOnboardingPage() {
           <TabsTrigger value="notifications">
             <Settings className="h-4 w-4 mr-2" />
             Notifications
+          </TabsTrigger>
+          {approvalsFeatureEnabled && (
+            <TabsTrigger value="approvals">
+              <FileText className="h-4 w-4 mr-2" />
+              Approvals
+            </TabsTrigger>
+          )}
+          {isOwner && (
+            <TabsTrigger value="activity">
+              <FileText className="h-4 w-4 mr-2" />
+              Activity
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="reviews">
+            <Star className="h-4 w-4 mr-2" />
+            My Reviews
           </TabsTrigger>
         </TabsList>
 
@@ -1090,6 +1129,31 @@ export function RestaurantOnboardingPage() {
                     </div>
                   </div>
 
+                  <div className="border-t pt-6">
+                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">Browser push</h4>
+                    <p className="text-xs text-[var(--text-muted)] mt-1 mb-3">
+                      Get real-time alerts even when Supplify is in the background.
+                    </p>
+                    {push.pushAvailable ? (
+                      <div className="flex items-center justify-between rounded-xl border p-4">
+                        <span className="text-sm">Enable push notifications</span>
+                        <Button
+                          type="button"
+                          variant={push.subscribed ? 'outline' : 'default'}
+                          size="sm"
+                          disabled={push.subscribing || push.unsubscribing}
+                          onClick={() => (push.subscribed ? push.disablePush() : push.enablePush())}
+                        >
+                          {push.subscribed ? 'Disable' : 'Enable'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Push is not configured on this server.
+                      </p>
+                    )}
+                  </div>
+
                   <Button
                     onClick={handleSaveNotifications}
                     className="w-full"
@@ -1107,7 +1171,72 @@ export function RestaurantOnboardingPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {approvalsFeatureEnabled && (
+          <TabsContent value="approvals" className="space-y-4">
+            <ApprovalsSettingsTab />
+          </TabsContent>
+        )}
+
+        {isOwner && (
+          <TabsContent value="activity" className="space-y-4">
+            <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
+          </TabsContent>
+        )}
+
+        <TabsContent value="reviews" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>My supplier reviews</CardTitle>
+              <CardDescription>Reviews you have submitted after completed orders</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(myReviewsData?.reviews || []).length === 0 ? (
+                <p className="text-sm text-[var(--text-muted)]">
+                  You have not written any reviews yet.
+                </p>
+              ) : (
+                (myReviewsData?.reviews || []).map((r: Record<string, unknown>) => (
+                  <div key={String(r.id)} className="rounded-lg border p-3 text-sm">
+                    <div className="flex items-center gap-1 text-amber-600">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${i < Number(r.overall_rating || 0) ? 'fill-amber-400' : 'text-amber-200'}`}
+                        />
+                      ))}
+                    </div>
+                    <p className="font-medium mt-1">{String(r.supplier_name || 'Supplier')}</p>
+                    {r.comment ? (
+                      <p className="text-[var(--text-muted)] mt-1">{String(r.comment)}</p>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {push.bannerVisible && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border bg-white p-4 shadow-lg">
+          <p className="text-sm font-medium">Enable push notifications?</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">
+            Stay updated on orders and messages.
+          </p>
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={() => push.enablePush().catch(() => toast.error('Could not enable push'))}
+            >
+              Enable
+            </Button>
+            <Button size="sm" variant="outline" onClick={push.dismissBanner}>
+              Not now
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Add Team Member Dialog */}
       <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
