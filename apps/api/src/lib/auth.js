@@ -96,6 +96,27 @@ export async function exchangeCodeForTokens(code, redirectUri) {
   }
 }
 
+/** Resource-owner password grant (invite acceptance, tests). */
+export async function exchangePasswordForTokens(username, password) {
+  const config = await getKeycloakConfig()
+  const { KEYCLOAK_CLIENT_ID, KEYCLOAK_CLIENT_SECRET } = getKeycloakValues()
+
+  const params = new URLSearchParams({
+    grant_type: 'password',
+    client_id: KEYCLOAK_CLIENT_ID,
+    client_secret: KEYCLOAK_CLIENT_SECRET,
+    username,
+    password,
+    scope: 'openid profile email',
+  })
+
+  const response = await axios.post(config.token_endpoint, params, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
+  })
+  return response.data
+}
+
 // Refresh access token
 export async function refreshAccessToken(refreshToken) {
   try {

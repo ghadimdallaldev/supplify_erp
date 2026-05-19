@@ -8,7 +8,7 @@ export function BranchSwitcher() {
   const { user } = useAppSelector((state) => state.auth)
   const { entitlements } = useEntitlements()
   const multiBranch = entitlements?.features?.multi_branch === true
-  const { accounts, activeAccountId, activeAccount, isLoading, isSwitching, switchAccount } =
+  const { accounts, activeAccountId, activeAccount, isLoading, isSwitching, switchAccount, isOrgScope } =
     useBranchContext()
 
   if (user?.role !== 'RESTAURANT' && user?.role !== 'SUPPLIER') {
@@ -36,7 +36,7 @@ export function BranchSwitcher() {
       )}
       <select
         className="bg-transparent border-none outline-none text-sm max-w-[180px] truncate cursor-pointer"
-        value={activeAccountId ?? accounts[0]?.id ?? ''}
+        value={activeAccountId ?? ''}
         onChange={(event) => {
           const nextId = event.target.value || null
           switchAccount(nextId).catch(() => {})
@@ -44,19 +44,22 @@ export function BranchSwitcher() {
         disabled={isLoading || isSwitching}
         aria-label="Active account"
       >
+        {isOrgScope && multiBranch && (
+          <option value="">All branches</option>
+        )}
         {accounts.map((account) => (
           <option key={account.id} value={account.id}>
             {account.isPrimary ? `${account.name} (main)` : account.name}
           </option>
         ))}
       </select>
-      {user?.role === 'SUPPLIER' && multiBranch && accounts.length > 1 && (
+      {user?.role === 'SUPPLIER' && multiBranch && isOrgScope && accounts.length > 1 && (
         <Link
           to="/app/org"
           className="text-xs text-[var(--brand)] whitespace-nowrap hover:underline"
           title="Organization overview"
         >
-          All branches
+          Manage
         </Link>
       )}
       <span className="sr-only">{activeAccount?.name ?? 'Main account'}</span>
