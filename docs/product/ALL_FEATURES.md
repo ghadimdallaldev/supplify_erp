@@ -226,6 +226,7 @@ Restaurant **Settings** (`/app/settings`) renders **Restaurant onboarding / sett
 | **Branches**      | Multi-branch CRUD, branch switching, branch accounts |
 | **Subscription**  | Plan, usage, upgrade prompts, billing status         |
 | **Notifications** | Email, WhatsApp, in-app; per-category toggles        |
+| **Activity**      | Tenant audit log; filter by labeled action/resource  |
 
 Also available via API (not always separate pages):
 
@@ -260,7 +261,7 @@ Also available via API (not always separate pages):
 | Chat                                    | `/app/chat`              | `/api/chat`                                               |
 | Promotions management (plan)            | `/app/promotions`        | `/api/promotions` (supplier CRUD, restaurant eligibility) |
 | Reports & analytics (plan)              | `/app/reports`           | `/api/reports/supplier/*`                                 |
-| Tenant audit log (plan)                 | Settings / admin views   | `/api/audit`                                              |
+| Tenant audit log (plan)                 | Settings → Activity      | `/api/audit` (labeled filter dropdowns)                   |
 | Supplier profile & settings             | `/app/supplier-settings` | `/api/suppliers`                                          |
 
 ### 6.2 Supplier settings hub tabs
@@ -275,6 +276,7 @@ Also available via API (not always separate pages):
 | **Branches**      | Supplier branch accounts                                                                                 |
 | **Notifications** | Channel + category preferences                                                                           |
 | **Plan**          | Subscription & usage                                                                                     |
+| **Activity**      | Tenant audit log; human-readable action/resource filters                                                 |
 
 | Feature                              | API                                              |
 | ------------------------------------ | ------------------------------------------------ |
@@ -513,46 +515,46 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 
 ## 15. Integrations & infrastructure
 
-| Integration                 | Use                                                        |
-| --------------------------- | ---------------------------------------------------------- |
+| Integration                 | Use                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Keycloak**                | OIDC login, roles, self-registration, SSO logout (`post.logout.redirect.uris` on `supplify-api` / `supplify-web`; seeded in `realm-export.json`, applied by `keycloak-init.sh`) |
-| **PostgreSQL**              | Primary database (~65 migrations)                          |
-| **Redis**                   | Order calendar cache                                       |
-| **S3 / MinIO**              | Object storage for uploads                                 |
-| **Twilio**                  | WhatsApp outbound                                          |
-| **SendGrid (Twilio Email)** | Transactional email (preferred over SMTP when configured)  |
-| **Web Push (VAPID)**        | Browser push notifications (`VAPID_*` env on API)          |
-| **Socket.IO**               | Realtime chat + layout notifications                       |
-| **Docker Compose**          | Local full stack (Postgres, Redis, Keycloak, MinIO, nginx) |
-| **AWS CDK** (`infra/`)      | Cloud deployment (dev/staging/prod)                        |
-| **GitHub Actions**          | CI (lint, tests, guards)                                   |
-| **Playwright**              | E2E tests (`tests/e2e`)                                    |
-| **Semantic release**        | Versioning (root config)                                   |
+| **PostgreSQL**              | Primary database (~65 migrations)                                                                                                                                               |
+| **Redis**                   | Order calendar cache                                                                                                                                                            |
+| **S3 / MinIO**              | Object storage for uploads                                                                                                                                                      |
+| **Twilio**                  | WhatsApp outbound                                                                                                                                                               |
+| **SendGrid (Twilio Email)** | Transactional email (preferred over SMTP when configured)                                                                                                                       |
+| **Web Push (VAPID)**        | Browser push notifications (`VAPID_*` env on API)                                                                                                                               |
+| **Socket.IO**               | Realtime chat + layout notifications                                                                                                                                            |
+| **Docker Compose**          | Local full stack (Postgres, Redis, Keycloak, MinIO, nginx)                                                                                                                      |
+| **AWS CDK** (`infra/`)      | Cloud deployment (dev/staging/prod)                                                                                                                                             |
+| **GitHub Actions**          | CI (lint, tests, guards)                                                                                                                                                        |
+| **Playwright**              | E2E tests (`tests/e2e`)                                                                                                                                                         |
+| **Semantic release**        | Versioning (root config)                                                                                                                                                        |
 
 ---
 
 ## 16. Developer, QA & deployment tooling
 
-| Capability                 | Command / location                                 |
-| -------------------------- | -------------------------------------------------- |
-| Monorepo (pnpm workspaces) | `apps/api`, `apps/web`, `infra`                    |
+| Capability                 | Command / location                                           |
+| -------------------------- | ------------------------------------------------------------ |
+| Monorepo (pnpm workspaces) | `apps/api`, `apps/web`, `infra`                              |
 | DB migrate                 | `pnpm db:migrate` (skips tenant role backfill when complete) |
-| Tenant role backfill       | `pnpm db:migrate-users-to-roles`                   |
-| Fast dev restart           | `pnpm dev -- --no-migrate`                         |
-| DB seed (many scenarios)   | `pnpm db:seed`, `seed:full`, `seed:demo-*`, etc.   |
-| API unit tests (Vitest)    | `pnpm test:ci` (~207+ tests)                       |
-| Web unit tests             | Vitest in `apps/web`                               |
-| E2E API tests              | `pnpm e2e`                                         |
-| E2E Playwright             | `pnpm e2e:playwright`                              |
-| E2E reset-seed endpoint    | `POST /api/e2e/reset-seed` (when `E2E_SECRET` set) |
-| OpenAPI generation         | `pnpm openapi:gen`                                 |
-| Local dev (native)         | `pnpm dev`                                         |
-| Local Docker stack         | `pnpm local:up`                                    |
-| Deploy scripts             | `deploy:dev`, `deploy:staging`, `deploy:prod`      |
-| Branch deploy model        | `dev` → `preprod` → `prod`                         |
-| Manual QA checklist        | `docs/qa/MANUAL_TEST_CHECKLIST.md`                 |
-| Security audit notes       | `docs/security/SECURITY_AUDIT_REPORT.md`           |
-| Twilio setup guide         | `docs/integrations/TWILIO.md`                      |
+| Tenant role backfill       | `pnpm db:migrate-users-to-roles`                             |
+| Fast dev restart           | `pnpm dev -- --no-migrate`                                   |
+| DB seed (many scenarios)   | `pnpm db:seed`, `seed:full`, `seed:demo-*`, etc.             |
+| API unit tests (Vitest)    | `pnpm test:ci` (~207+ tests)                                 |
+| Web unit tests             | Vitest in `apps/web`                                         |
+| E2E API tests              | `pnpm e2e`                                                   |
+| E2E Playwright             | `pnpm e2e:playwright`                                        |
+| E2E reset-seed endpoint    | `POST /api/e2e/reset-seed` (when `E2E_SECRET` set)           |
+| OpenAPI generation         | `pnpm openapi:gen`                                           |
+| Local dev (native)         | `pnpm dev`                                                   |
+| Local Docker stack         | `pnpm local:up`                                              |
+| Deploy scripts             | `deploy:dev`, `deploy:staging`, `deploy:prod`                |
+| Branch deploy model        | `dev` → `preprod` → `prod`                                   |
+| Manual QA checklist        | `docs/qa/MANUAL_TEST_CHECKLIST.md`                           |
+| Security audit notes       | `docs/security/SECURITY_AUDIT_REPORT.md`                     |
+| Twilio setup guide         | `docs/integrations/TWILIO.md`                                |
 
 ---
 

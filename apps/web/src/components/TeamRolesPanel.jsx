@@ -204,14 +204,14 @@ export function TeamRolesPanel({
                         </td>
                         <td className="p-3">
                           <Select
-                            value={u.role_id || viewerRole?.id || ''}
+                            value={u.role_id || ''}
                             onValueChange={(roleId) => {
                               const role = roles.find((r) => r.id === roleId)
                               handleAssignRole(u.id, roleId, role?.name)
                             }}
                           >
-                            <SelectTrigger className="w-[200px]">
-                              <SelectValue placeholder="Select role" />
+                            <SelectTrigger className="w-[200px]" placeholder="Select role">
+                              <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               {roleOptions.map((r) => (
@@ -229,11 +229,11 @@ export function TeamRolesPanel({
               </div>
             )}
 
-            {teamMembers.length === 0 ? (
+            {teamMembers.length === 0 && !(advancedRolesEnabled && roleUsers.length > 0) ? (
               <p className="text-sm text-[var(--text-muted)] text-center py-6">
                 No team contacts yet.
               </p>
-            ) : (
+            ) : teamMembers.length > 0 ? (
               <div className="space-y-3">
                 {teamMembers.map((member) => (
                   <div
@@ -257,7 +257,7 @@ export function TeamRolesPanel({
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
             {renderInviteForm?.({
               advancedRolesEnabled,
               viewerRoleId: viewerRole?.id,

@@ -8,15 +8,24 @@ Restaurant and supplier owners can review activity in their tenant via the unifi
 
 Requires auth and tenant context (`RESTAURANT` or `SUPPLIER`).
 
-| Method | Path                     | Permission        | Description                                                               |
-| ------ | ------------------------ | ----------------- | ------------------------------------------------------------------------- |
-| GET    | `/api/audit/logs`        | `SETTINGS_VIEW`   | Paginated logs; filters: `userId`, `action`, `resourceType`, `from`, `to` |
-| GET    | `/api/audit/logs/export` | `SETTINGS_MANAGE` | CSV export (max 5000 rows)                                                |
+| Method | Path                      | Permission        | Description                                                                |
+| ------ | ------------------------- | ----------------- | -------------------------------------------------------------------------- |
+| GET    | `/api/audit/logs/filters` | `SETTINGS_VIEW`   | Dropdown options: `actions[]`, `resourceTypes[]` (`value` + human `label`) |
+| GET    | `/api/audit/logs`         | `SETTINGS_VIEW`   | Paginated logs; filters: `userId`, `action`, `resourceType`, `from`, `to`  |
+| GET    | `/api/audit/logs/export`  | `SETTINGS_MANAGE` | CSV export (max 5000 rows)                                                 |
+
+### UI filters (Settings → Activity)
+
+- **Action** and **Resource type** are select dropdowns with human-readable labels (e.g. “Order placed”, “Order”), not free-text codes.
+- Options merge the known catalog (`apps/api/src/lib/audit-labels.js`) with distinct values already stored for the tenant.
+- **From** / **To** remain date pickers.
 
 ### Response fields
 
-- `action` — `action_type` from DB
+- `action` — machine id (`action_type` from DB)
+- `action_label` — display label for UI/CSV
 - `resource_type` / `resource_id` — from `payload_json` and `target_id`
+- `resource_type_label` — display label for resource type
 - `user_name`, `user_email` — joined from `app_user`
 - `ip_address` — masked (/24 for IPv4)
 - `metadata` — full `payload_json`
