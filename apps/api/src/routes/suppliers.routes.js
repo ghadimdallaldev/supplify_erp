@@ -5,6 +5,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
+import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import {
@@ -491,6 +492,7 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
     )
 
     await createPendingActivationSubscription(query, rows[0].id, 'SUPPLIER', 'free')
+    await ensureTenantSystemRoles(rows[0].id, 'SUPPLIER')
 
     logger.info('Supplier created', {
       supplierId: rows[0].id,

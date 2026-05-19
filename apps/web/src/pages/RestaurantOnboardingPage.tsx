@@ -63,8 +63,10 @@ import {
   useGetRestaurantTeamQuery,
   useAddRestaurantTeamMemberMutation,
   useDeleteRestaurantTeamMemberMutation,
+  useGetTenantRolesQuery,
 } from '../services/api'
 import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
+import { TeamRolesPanel } from '../components/TeamRolesPanel'
 import {
   canUseCustomBranding,
   customBrandingUpgradeMessage,
@@ -332,7 +334,7 @@ export function RestaurantOnboardingPage() {
     name: '',
     email: '',
     phone: '',
-    role: 'manager',
+    role: 'viewer',
     isPrimary: false,
   })
   const {
@@ -363,6 +365,11 @@ export function RestaurantOnboardingPage() {
   const branchGate = getBranchAddGate(entitlements, branches.length + 1)
   const brandingAllowed = canUseCustomBranding(entitlements)
   const approvalsFeatureEnabled = featureEnabled(entitlements?.features?.approvals_budgets)
+  const advancedRolesEnabled = featureEnabled(entitlements?.features?.advanced_roles)
+  const { data: tenantRolesData } = useGetTenantRolesQuery(undefined, {
+    skip: !advancedRolesEnabled,
+  })
+  const tenantRoles = tenantRolesData?.roles ?? []
   const canAddBranch = branchGate.canAdd
 
   // Notification preferences
@@ -873,77 +880,18 @@ export function RestaurantOnboardingPage() {
 
         {/* Team Tab */}
         <TabsContent value="team" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Team Members</CardTitle>
-                  <CardDescription>Manage your team contacts</CardDescription>
-                </div>
-                <Button onClick={() => setShowAddMemberDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Member
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoadingTeam ? (
-                <div className="flex items-center justify-center py-12 text-[var(--text-muted)]">
-                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  Loading team…
-                </div>
-              ) : teamMembers.length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
-                  <Users className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                  <p className="text-[var(--text-muted)]">No team members added yet</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-2">
-                    Seeded staff appear under Staff; team contacts (owner, manager, etc.) show here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {teamMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="font-medium">{member.name}</p>
-                          {member.is_primary && <Badge variant="default">Primary</Badge>}
-                          <Badge variant="outline" className="capitalize">
-                            {member.role}
-                          </Badge>
-                          {member.branch_name && (
-                            <Badge variant="secondary">{member.branch_name}</Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {member.email}
-                          </span>
-                          {member.phone && (
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {member.phone}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveMember(member.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TeamRolesPanel
+            tenantType="RESTAURANT"
+            teamMembers={teamMembers}
+            teamMembersLoading={isLoadingTeam}
+            onRemoveMember={handleRemoveMember}
+            renderInviteForm={() => (
+              <Button className="mt-2" onClick={() => setShowAddMemberDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Member
+              </Button>
+            )}
+          />
         </TabsContent>
 
         {/* Branches Tab */}
@@ -1286,12 +1234,24 @@ export function RestaurantOnboardingPage() {
                 value={newMember.role}
                 onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
               >
-                <option value="owner">Owner</option>
-                <option value="manager">Manager</option>
-                <option value="purchasing">Purchasing</option>
-                <option value="finance">Finance</option>
-                <option value="kitchen">Kitchen</option>
+                {advancedRolesEnabled ? (
+                  tenantRoles.map((r) => (
+                    <option key={r.id} value={r.name.toLowerCase()}>
+                      {r.name}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="owner">Owner</option>
+                    <option value="viewer">Viewer</option>
+                  </>
+                )}
               </select>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                {advancedRolesEnabled
+                  ? 'Invite email will mention their assigned role.'
+                  : 'Owner has full access; Viewer is read-only.'}
+              </p>
             </div>
 
             <Label className="flex items-center gap-2 cursor-pointer">

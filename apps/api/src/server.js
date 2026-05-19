@@ -60,6 +60,7 @@ import { creditNotesRoutes } from './routes/credit-notes.routes.js'
 import { pushRoutes } from './routes/push.routes.js'
 import { reviewsRoutes } from './routes/reviews.routes.js'
 import { reportsRoutes } from './routes/reports.routes.js'
+import { tenantRolesRoutes } from './routes/tenant-roles.routes.js'
 
 if (config.NODE_ENV === 'production') {
   validateProductionConfig()
@@ -230,6 +231,7 @@ app.use('/api/credit-notes', creditNotesRoutes)
 app.use('/api/push', pushRoutes)
 app.use('/api/reviews', reviewsRoutes)
 app.use('/api/reports', reportsRoutes)
+app.use('/api/roles', tenantRolesRoutes)
 app.use('/api/files', filesRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/chat', chatSendLimiter)

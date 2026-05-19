@@ -60,7 +60,8 @@ function pruneApiScripts() {
   const dir = path.join(ROOT, 'apps/api/scripts')
   if (!fs.existsSync(dir)) return
   for (const name of fs.readdirSync(dir)) {
-    if (name !== 'migrate.js') {
+    const keep = new Set(['migrate.js', 'run-migration.js', 'migrate-users-to-roles.js', 'lib'])
+    if (!keep.has(name)) {
       rm(path.join('apps/api/scripts', name))
     }
   }
