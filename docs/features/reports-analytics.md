@@ -1,0 +1,58 @@
+# Reports & Analytics
+
+Plan feature key: `reports` (Silver+). Waste report additionally requires `waste_tracking`.
+
+## Query parameters
+
+All report endpoints accept:
+
+| Param         | Description                                     |
+| ------------- | ----------------------------------------------- |
+| `from`        | Start date (ISO date); default ~30 days ago     |
+| `to`          | End date; default today                         |
+| `branch_id`   | Optional branch filter (restaurant reports)     |
+| `granularity` | `day`, `week`, or `month` (time-series reports) |
+
+## Response shape
+
+```json
+{
+  "ok": true,
+  "data": [ ... ],
+  "meta": {
+    "from": "2026-01-01",
+    "to": "2026-01-31",
+    "branchId": null,
+    "granularity": "day",
+    "rowCount": 12
+  }
+}
+```
+
+## Restaurant endpoints (`/api/reports/restaurant/...`)
+
+| Path                | Description                                                            |
+| ------------------- | ---------------------------------------------------------------------- |
+| `spend-by-supplier` | Spend and order count by supplier                                      |
+| `spend-by-category` | Spend by product category                                              |
+| `order-volume`      | Orders and totals over time                                            |
+| `cogs-trend`        | Cost of goods (order line totals) over time                            |
+| `top-products`      | Top 20 products by spend                                               |
+| `receiving-quality` | Avg quality score and fill rate from `receiving_report`                |
+| `waste`             | Waste/spoilage from `inventory_adjustment` (requires `waste_tracking`) |
+| `invoice-aging`     | Open invoice balances by aging bucket                                  |
+
+## Supplier endpoints (`/api/reports/supplier/...`)
+
+| Path                      | Description                       |
+| ------------------------- | --------------------------------- |
+| `revenue-trend`           | Revenue and order count over time |
+| `top-restaurants`         | Top 20 restaurants by revenue     |
+| `top-products`            | Top 20 products by revenue        |
+| `fulfillment-performance` | Order counts by status            |
+| `order-volume`            | Distinct order count over time    |
+| `invoice-collection`      | Invoices grouped by status        |
+
+## Database
+
+Migration: `0071_reports_analytics_indexes.sql` — supporting indexes only (no new tables).

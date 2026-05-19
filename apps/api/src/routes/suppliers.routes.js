@@ -7,8 +7,27 @@ import { ValidationError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
+import {
+  getSupplierRatingSummary,
+  getRecentReviewsForSupplier,
+} from '../services/reviews.service.js'
 
 const router = express.Router()
+
+async function attachReviewFields(suppliers) {
+  return Promise.all(
+    suppliers.map(async (s) => {
+      const summary = await getSupplierRatingSummary(s.id)
+      const recent_reviews = await getRecentReviewsForSupplier(s.id, 3)
+      return {
+        ...s,
+        avg_overall: Number(summary.avg_overall) || 0,
+        review_count: summary.review_count ?? 0,
+        recent_reviews,
+      }
+    })
+  )
+}
 
 // Validation schemas
 const supplierCreateSchema = z.object({
@@ -166,6 +185,8 @@ router.get('/', optionalAuth, async (req, res) => {
     const { rows } = await query(sql, queryParams)
     logger.debug('Supplier list result', { count: rows.length })
 
+    const suppliersWithReviews = await attachReviewFields(rows)
+
     // Get total count
     // Build count params separately - exclude is_followed param and limit/offset
     // The count query uses the same whereClause but doesn't need is_followed
@@ -192,7 +213,7 @@ router.get('/', optionalAuth, async (req, res) => {
     res.json({
       ok: true,
       data: {
-        suppliers: rows,
+        suppliers: suppliersWithReviews,
         pagination: {
           total: parseInt(countRows[0].total),
           limit: params.limit,
@@ -406,6 +427,14 @@ router.get('/:id', requireAuth, async (req, res) => {
     }
 
     const supplier = rows[0]
+    const summary = await getSupplierRatingSummary(supplier.id)
+    const recent_reviews = await getRecentReviewsForSupplier(supplier.id, 5)
+    const enriched = {
+      ...supplier,
+      avg_overall: Number(summary.avg_overall) || 0,
+      review_count: summary.review_count ?? 0,
+      recent_reviews,
+    }
 
     // Check access permissions
     if (req.userData.role === 'SUPPLIER' && supplier.contact_email !== req.userData.email) {
@@ -422,7 +451,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     res.json({
       ok: true,
-      data: { supplier },
+      data: { supplier: enriched },
       error: null,
       requestId: req.requestId,
     })

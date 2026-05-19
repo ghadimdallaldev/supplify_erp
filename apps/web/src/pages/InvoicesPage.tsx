@@ -2,10 +2,25 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
-import { 
-  FileText, DollarSign, Clock, CheckCircle, XCircle, Search, Filter, Download, 
-  Loader2, TrendingUp, TrendingDown, Calendar, CreditCard, Building2, AlertTriangle,
-  Plus, ArrowRightLeft, Receipt
+import {
+  FileText,
+  DollarSign,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Search,
+  Filter,
+  Download,
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  CreditCard,
+  Building2,
+  AlertTriangle,
+  Plus,
+  ArrowRightLeft,
+  Receipt,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -16,27 +31,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
-import {
-  Select,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select'
+import { Select, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { useAppSelector } from '../hooks/redux'
 import { formatCurrency, formatPrice } from '../utils/format'
-import { 
-  useGetRestaurantInvoicesQuery, 
-  useGetRestaurantInvoiceQuery, 
+import {
+  useGetRestaurantInvoicesQuery,
+  useGetRestaurantInvoiceQuery,
   useMarkInvoicePaidMutation,
   useGetInvoiceCreditsQuery,
   useGetInvoiceAnalyticsQuery,
   useGetOverdueInvoicesQuery,
   useGetSupplierInvoicesQuery,
+  useGetCreditNotesQuery,
+  useApplyCreditNoteMutation,
+  useGetEntitlementsQuery,
 } from '../services/api'
+import { featureEnabled } from '../lib/planLimits'
 import { Link } from 'react-router-dom'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -50,7 +64,7 @@ export function InvoicesPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'credit'>('full')
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null)
-  
+
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
   const [creditAmount, setCreditAmount] = useState<number>(0)
@@ -61,27 +75,48 @@ export function InvoicesPage() {
   const [paymentNotes, setPaymentNotes] = useState('')
   const [paidByHQ, setPaidByHQ] = useState(false)
   const [hqNotes, setHqNotes] = useState('')
-  
+
   const { user } = useAppSelector((state) => state.auth)
   const isRestaurant = user?.role === 'RESTAURANT'
-  
+
   // Fetch invoices from database
-  const { data: restaurantInvoicesData, isLoading: isLoadingRestaurant, refetch: refetchRestaurant } = useGetRestaurantInvoicesQuery({}, { skip: !isRestaurant })
-  const { data: supplierInvoicesData, isLoading: isLoadingSupplier, refetch: refetchSupplier } = useGetSupplierInvoicesQuery({}, { skip: isRestaurant })
+  const {
+    data: restaurantInvoicesData,
+    isLoading: isLoadingRestaurant,
+    refetch: refetchRestaurant,
+  } = useGetRestaurantInvoicesQuery({}, { skip: !isRestaurant })
+  const {
+    data: supplierInvoicesData,
+    isLoading: isLoadingSupplier,
+    refetch: refetchSupplier,
+  } = useGetSupplierInvoicesQuery({}, { skip: isRestaurant })
   const invoicesData = isRestaurant ? restaurantInvoicesData : supplierInvoicesData
   const isLoading = isRestaurant ? isLoadingRestaurant : isLoadingSupplier
   const refetch = isRestaurant ? refetchRestaurant : refetchSupplier
-  const { data: invoiceDetail, isLoading: isLoadingDetail, refetch: refetchDetail } = useGetRestaurantInvoiceQuery(
-    selectedInvoice?.id || '',
-    { skip: !selectedInvoice?.id }
+  const {
+    data: invoiceDetail,
+    isLoading: isLoadingDetail,
+    refetch: refetchDetail,
+  } = useGetRestaurantInvoiceQuery(selectedInvoice?.id || '', { skip: !selectedInvoice?.id })
+  const { data: creditsData } = useGetInvoiceCreditsQuery(selectedInvoice?.id || '', {
+    skip: !selectedInvoice?.id || paymentMode !== 'credit',
+  })
+  const { data: analyticsData } = useGetInvoiceAnalyticsQuery(
+    { period: 30 },
+    { skip: !isRestaurant }
   )
-  const { data: creditsData } = useGetInvoiceCreditsQuery(
-    selectedInvoice?.id || '',
-    { skip: !selectedInvoice?.id || paymentMode !== 'credit' }
-  )
-  const { data: analyticsData } = useGetInvoiceAnalyticsQuery({ period: 30 }, { skip: !isRestaurant })
   const { data: overdueData } = useGetOverdueInvoicesQuery(undefined, { skip: !isRestaurant })
   const [markPaid, { isLoading: isProcessingPayment }] = useMarkInvoicePaidMutation()
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const { data: tenantCreditNotesData, refetch: refetchCreditNotes } = useGetCreditNotesQuery(
+    undefined,
+    {
+      skip: !disputesEnabled,
+    }
+  )
+  const [applyCreditNote] = useApplyCreditNoteMutation()
+  const tenantCreditNotes = tenantCreditNotesData?.creditNotes || []
 
   const invoices = invoicesData?.invoices || []
   const analytics = analyticsData?.analytics || {}
@@ -89,35 +124,48 @@ export function InvoicesPage() {
   const creditNotes = creditsData?.creditNotes || []
 
   // Calculate remaining balance for selected invoice
-  const remainingBalance = selectedInvoice 
+  const remainingBalance = selectedInvoice
     ? parseFloat(selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0)
     : 0
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ISSUED': return 'default'
-      case 'PARTIALLY_PAID': return 'secondary'
-      case 'PAID': return 'default'
-      case 'OVERDUE': return 'destructive'
-      case 'VOID': return 'outline'
-      default: return 'secondary'
+      case 'ISSUED':
+        return 'default'
+      case 'PARTIALLY_PAID':
+        return 'secondary'
+      case 'PAID':
+        return 'default'
+      case 'OVERDUE':
+        return 'destructive'
+      case 'VOID':
+        return 'outline'
+      default:
+        return 'secondary'
     }
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'ISSUED': return <FileText className="h-4 w-4" />
-      case 'PARTIALLY_PAID': return <Clock className="h-4 w-4" />
-      case 'PAID': return <CheckCircle className="h-4 w-4" />
-      case 'OVERDUE': return <XCircle className="h-4 w-4" />
-      case 'VOID': return <XCircle className="h-4 w-4" />
-      default: return <FileText className="h-4 w-4" />
+      case 'ISSUED':
+        return <FileText className="h-4 w-4" />
+      case 'PARTIALLY_PAID':
+        return <Clock className="h-4 w-4" />
+      case 'PAID':
+        return <CheckCircle className="h-4 w-4" />
+      case 'OVERDUE':
+        return <XCircle className="h-4 w-4" />
+      case 'VOID':
+        return <XCircle className="h-4 w-4" />
+      default:
+        return <FileText className="h-4 w-4" />
     }
   }
 
-  const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
-                         invoice.supplier_name?.toLowerCase().includes(search.toLowerCase())
+  const filteredInvoices = invoices.filter((invoice) => {
+    const matchesSearch =
+      invoice.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
+      invoice.supplier_name?.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === 'ALL' || invoice.status === statusFilter
     const matchesSupplier = supplierFilter === 'ALL' || invoice.supplier_id === supplierFilter
     return matchesSearch && matchesStatus && matchesSupplier
@@ -125,13 +173,20 @@ export function InvoicesPage() {
 
   // Get unique suppliers for filter
   const suppliers = Array.from(
-    new Map(invoices.map((inv: any) => [inv.supplier_id, { id: inv.supplier_id, name: inv.supplier_name }])).values()
+    new Map(
+      invoices.map((inv: any) => [
+        inv.supplier_id,
+        { id: inv.supplier_id, name: inv.supplier_name },
+      ])
+    ).values()
   ).filter((s: any) => s.id && s.name)
 
   const stats = {
     total: invoices.length,
     unpaid: invoices.filter((i: any) => i.status !== 'PAID' && i.status !== 'VOID').length,
-    overdue: invoices.filter((i: any) => i.status === 'OVERDUE' || (i.days_overdue && i.days_overdue > 0)).length,
+    overdue: invoices.filter(
+      (i: any) => i.status === 'OVERDUE' || (i.days_overdue && i.days_overdue > 0)
+    ).length,
     totalAmount: invoices.reduce((sum: number, i: any) => sum + parseFloat(i.total_amount || 0), 0),
     totalOutstanding: invoices
       .filter((i: any) => i.status !== 'PAID' && i.status !== 'VOID')
@@ -158,7 +213,7 @@ export function InvoicesPage() {
 
   const handleRecordPayment = async () => {
     if (!selectedInvoice) return
-    
+
     let finalPaymentAmount = paymentAmount
     if (paymentMode === 'full') {
       finalPaymentAmount = remainingBalance
@@ -172,11 +227,11 @@ export function InvoicesPage() {
       return
     }
 
-    if ((finalPaymentAmount + creditAmount) > remainingBalance) {
+    if (finalPaymentAmount + creditAmount > remainingBalance) {
       toast.error('Total payment amount exceeds remaining balance')
       return
     }
-    
+
     try {
       await markPaid({
         invoiceId: selectedInvoice.id,
@@ -191,9 +246,9 @@ export function InvoicesPage() {
           creditNoteId: selectedCreditNoteId || undefined,
           paidByHQ: paidByHQ,
           hqNotes: hqNotes || undefined,
-        }
+        },
       }).unwrap()
-      
+
       toast.success('Payment recorded successfully!')
       setShowPaymentDialog(false)
       setShowInvoiceDetail(false)
@@ -218,7 +273,9 @@ export function InvoicesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Invoice Dashboard</h1>
-          <p className="text-[var(--text-muted)] mt-2">Manage billing, payments, and financial analytics</p>
+          <p className="text-[var(--text-muted)] mt-2">
+            Manage billing, payments, and financial analytics
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => refetch()}>
@@ -227,6 +284,68 @@ export function InvoicesPage() {
           </Button>
         </div>
       </div>
+
+      {disputesEnabled && tenantCreditNotes.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              Credit notes
+            </CardTitle>
+            <CardDescription>
+              Issued from resolved disputes — apply to open invoices
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-[var(--text-muted)]">
+                    <th className="py-2">Number</th>
+                    <th className="py-2">Amount</th>
+                    <th className="py-2">Status</th>
+                    <th className="py-2 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tenantCreditNotes.map((cn: Record<string, unknown>) => (
+                    <tr key={String(cn.id)} className="border-b border-[var(--app-border)]">
+                      <td className="py-2 font-mono text-xs">
+                        {String(cn.credit_note_number || cn.id).slice(-12)}
+                      </td>
+                      <td className="py-2">${formatPrice(Number(cn.amount || 0))}</td>
+                      <td className="py-2">
+                        <Badge variant="outline">{String(cn.status || 'available')}</Badge>
+                      </td>
+                      <td className="py-2 text-right">
+                        {cn.status !== 'applied' && cn.status !== 'APPLIED' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                await applyCreditNote({ id: String(cn.id) }).unwrap()
+                                toast.success('Credit note applied')
+                                refetchCreditNotes()
+                                refetch()
+                              } catch (e: unknown) {
+                                const err = e as { data?: { error?: { message?: string } } }
+                                toast.error(err?.data?.error?.message || 'Failed to apply')
+                              }
+                            }}
+                          >
+                            Apply
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Comprehensive Analytics Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -244,7 +363,7 @@ export function InvoicesPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -261,27 +380,24 @@ export function InvoicesPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className={stats.overdue > 0 ? 'border-[var(--red)]/40' : ''}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-[var(--text-muted)]">Overdue</p>
-                <p className="text-2xl font-bold text-[var(--red)]">
-                  {stats.overdue}
-                </p>
+                <p className="text-2xl font-bold text-[var(--red)]">{stats.overdue}</p>
                 <p className="text-xs text-[var(--red)] mt-1">
-                  {overdueData?.summary?.totalOverdue 
+                  {overdueData?.summary?.totalOverdue
                     ? formatPrice(overdueData.summary.totalOverdue)
-                    : 'All current'
-                  }
+                    : 'All current'}
                 </p>
               </div>
               <AlertTriangle className="h-10 w-10 text-[var(--red)]" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -309,17 +425,16 @@ export function InvoicesPage() {
                 <div>
                   <p className="text-sm text-[var(--text-muted)]">Avg Days to Pay</p>
                   <p className="text-xl font-semibold">
-                    {analytics.avg_days_to_pay 
+                    {analytics.avg_days_to_pay
                       ? `${parseInt(analytics.avg_days_to_pay)} days`
-                      : 'N/A'
-                    }
+                      : 'N/A'}
                   </p>
                 </div>
                 <Calendar className="h-8 w-8 text-[var(--text-muted)]" />
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -333,7 +448,7 @@ export function InvoicesPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -381,7 +496,9 @@ export function InvoicesPage() {
                   <SelectTrigger className="w-[200px]" placeholder="Supplier">
                     <SelectItem value="ALL">All Suppliers</SelectItem>
                     {suppliers.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
                     ))}
                   </SelectTrigger>
                 </Select>
@@ -392,9 +509,13 @@ export function InvoicesPage() {
         <CardContent>
           <div className="space-y-4">
             {filteredInvoices.map((invoice: any) => {
-              const remaining = parseFloat(invoice.balance_due || invoice.total_amount || 0) - parseFloat(invoice.total_paid || 0)
-              const isOverdue = invoice.days_overdue > 0 || (invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0)
-              
+              const remaining =
+                parseFloat(invoice.balance_due || invoice.total_amount || 0) -
+                parseFloat(invoice.total_paid || 0)
+              const isOverdue =
+                invoice.days_overdue > 0 ||
+                (invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0)
+
               return (
                 <div
                   key={invoice.id}
@@ -421,12 +542,16 @@ export function InvoicesPage() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-[var(--text-muted)] font-medium">{invoice.supplier_name}</p>
+                      <p className="text-sm text-[var(--text-muted)] font-medium">
+                        {invoice.supplier_name}
+                      </p>
                       <div className="flex gap-4 text-xs text-[var(--text-muted)] mt-2">
-                        <span>Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
+                        <span>
+                          Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()}
+                        </span>
                         <span>Due Date: {new Date(invoice.due_date).toLocaleDateString()}</span>
                         {invoice.order_id && (
-                          <Link 
+                          <Link
                             to={`/app/orders/${invoice.order_id}`}
                             onClick={(e) => e.stopPropagation()}
                             className="text-[var(--brand-mid)] hover:underline flex items-center gap-1"
@@ -439,7 +564,9 @@ export function InvoicesPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-semibold">{formatPrice(invoice.total_amount)}</p>
-                      <p className={`text-sm ${remaining > 0 ? 'text-[var(--red)] font-semibold' : 'text-[var(--mint)]'}`}>
+                      <p
+                        className={`text-sm ${remaining > 0 ? 'text-[var(--red)] font-semibold' : 'text-[var(--mint)]'}`}
+                      >
                         Balance: {formatPrice(remaining)}
                       </p>
                       {parseFloat(invoice.total_paid || 0) > 0 && (
@@ -519,25 +646,29 @@ export function InvoicesPage() {
                   )}
                   PDF
                 </Button>
-                {isRestaurant && selectedInvoice && parseFloat(selectedInvoice.balance_due || selectedInvoice.total_amount || 0) - parseFloat(selectedInvoice.total_paid || 0) > 0 && (
-                  <Button 
-                    size="sm"
-                    onClick={() => {
-                      setShowInvoiceDetail(false)
-                      handleOpenPaymentDialog(selectedInvoice)
-                    }}
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Make Payment
-                  </Button>
-                )}
+                {isRestaurant &&
+                  selectedInvoice &&
+                  parseFloat(selectedInvoice.balance_due || selectedInvoice.total_amount || 0) -
+                    parseFloat(selectedInvoice.total_paid || 0) >
+                    0 && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setShowInvoiceDetail(false)
+                        handleOpenPaymentDialog(selectedInvoice)
+                      }}
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Make Payment
+                    </Button>
+                  )}
               </div>
             </DialogTitle>
             <DialogDescription>
               Comprehensive invoice details, payment history, and order information
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedInvoice && (
             <Tabs defaultValue="details" className="w-full">
               <TabsList>
@@ -545,7 +676,7 @@ export function InvoicesPage() {
                 <TabsTrigger value="payments">Payment History</TabsTrigger>
                 <TabsTrigger value="order">Related Order</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="details" className="space-y-6">
                 {isLoadingDetail ? (
                   <div className="flex items-center justify-center py-12">
@@ -559,35 +690,46 @@ export function InvoicesPage() {
                         <h3 className="font-semibold mb-2">Bill From:</h3>
                         <p className="font-medium">{invoiceDetail.invoice.supplier_name}</p>
                         {invoiceDetail.invoice.supplier_address && (
-                          <p className="text-sm text-[var(--text-muted)] mt-1">{invoiceDetail.invoice.supplier_address}</p>
+                          <p className="text-sm text-[var(--text-muted)] mt-1">
+                            {invoiceDetail.invoice.supplier_address}
+                          </p>
                         )}
                         {invoiceDetail.invoice.supplier_phone && (
-                          <p className="text-sm text-[var(--text-muted)]">{invoiceDetail.invoice.supplier_phone}</p>
+                          <p className="text-sm text-[var(--text-muted)]">
+                            {invoiceDetail.invoice.supplier_phone}
+                          </p>
                         )}
                         {invoiceDetail.invoice.supplier_email && (
-                          <p className="text-sm text-[var(--text-muted)]">{invoiceDetail.invoice.supplier_email}</p>
+                          <p className="text-sm text-[var(--text-muted)]">
+                            {invoiceDetail.invoice.supplier_email}
+                          </p>
                         )}
                       </div>
                       <div className="text-right">
                         <div className="space-y-3">
                           <div>
                             <p className="text-sm text-[var(--text-muted)]">Invoice Date</p>
-                            <p className="font-semibold">{new Date(invoiceDetail.invoice.invoice_date).toLocaleDateString()}</p>
+                            <p className="font-semibold">
+                              {new Date(invoiceDetail.invoice.invoice_date).toLocaleDateString()}
+                            </p>
                           </div>
                           <div>
                             <p className="text-sm text-[var(--text-muted)]">Due Date</p>
-                            <p className={`font-semibold ${
-                              new Date(invoiceDetail.invoice.due_date) < new Date() && remainingBalance > 0
-                                ? 'text-[var(--red)]'
-                                : ''
-                            }`}>
+                            <p
+                              className={`font-semibold ${
+                                new Date(invoiceDetail.invoice.due_date) < new Date() &&
+                                remainingBalance > 0
+                                  ? 'text-[var(--red)]'
+                                  : ''
+                              }`}
+                            >
                               {new Date(invoiceDetail.invoice.due_date).toLocaleDateString()}
                             </p>
                           </div>
                           {invoiceDetail.invoice.order_id && (
                             <div>
                               <p className="text-sm text-[var(--text-muted)]">Order</p>
-                              <Link 
+                              <Link
                                 to={`/app/orders/${invoiceDetail.invoice.order_id}`}
                                 className="font-semibold text-[var(--brand-mid)] hover:underline"
                               >
@@ -609,7 +751,9 @@ export function InvoicesPage() {
                               <th className="text-left py-3 px-4 text-sm font-medium">Product</th>
                               <th className="text-left py-3 px-4 text-sm font-medium">SKU</th>
                               <th className="text-right py-3 px-4 text-sm font-medium">Quantity</th>
-                              <th className="text-right py-3 px-4 text-sm font-medium">Unit Price</th>
+                              <th className="text-right py-3 px-4 text-sm font-medium">
+                                Unit Price
+                              </th>
                               <th className="text-right py-3 px-4 text-sm font-medium">Tax</th>
                               <th className="text-right py-3 px-4 text-sm font-medium">Total</th>
                             </tr>
@@ -618,9 +762,13 @@ export function InvoicesPage() {
                             {invoiceDetail.lineItems?.map((item: any) => (
                               <tr key={item.id} className="border-b hover:bg-[var(--brand-ultra)]">
                                 <td className="py-3 px-4">{item.description}</td>
-                                <td className="py-3 px-4 text-sm text-[var(--text-muted)]">{item.sku || 'N/A'}</td>
+                                <td className="py-3 px-4 text-sm text-[var(--text-muted)]">
+                                  {item.sku || 'N/A'}
+                                </td>
                                 <td className="py-3 px-4 text-right">{item.quantity}</td>
-                                <td className="py-3 px-4 text-right">{formatPrice(item.unit_price)}</td>
+                                <td className="py-3 px-4 text-right">
+                                  {formatPrice(item.unit_price)}
+                                </td>
                                 <td className="py-3 px-4 text-right">
                                   {parseFloat(item.tax_amount || 0) > 0 && (
                                     <span className="text-xs text-[var(--text-muted)]">
@@ -649,7 +797,10 @@ export function InvoicesPage() {
                         {parseFloat(invoiceDetail.invoice.tax_amount || 0) > 0 && (
                           <div className="flex justify-between">
                             <span className="text-[var(--text-muted)]">
-                              Tax {invoiceDetail.invoice.tax_rate ? `(${invoiceDetail.invoice.tax_rate}%)` : ''}
+                              Tax{' '}
+                              {invoiceDetail.invoice.tax_rate
+                                ? `(${invoiceDetail.invoice.tax_rate}%)`
+                                : ''}
                             </span>
                             <span>{formatPrice(invoiceDetail.invoice.tax_amount)}</span>
                           </div>
@@ -682,13 +833,15 @@ export function InvoicesPage() {
                     {invoiceDetail.invoice.notes && (
                       <div className="border rounded-lg p-4 bg-[var(--brand-ultra)]">
                         <p className="text-sm font-medium text-[var(--text-mid)] mb-1">Notes</p>
-                        <p className="text-sm text-[var(--text-muted)]">{invoiceDetail.invoice.notes}</p>
+                        <p className="text-sm text-[var(--text-muted)]">
+                          {invoiceDetail.invoice.notes}
+                        </p>
                       </div>
                     )}
                   </>
                 ) : null}
               </TabsContent>
-              
+
               <TabsContent value="payments" className="space-y-4">
                 <h3 className="font-semibold">Payment History</h3>
                 {invoiceDetail?.payments && invoiceDetail.payments.length > 0 ? (
@@ -700,7 +853,7 @@ export function InvoicesPage() {
                             <div>
                               <p className="font-medium">{payment.payment_method}</p>
                               <p className="text-sm text-[var(--text-muted)]">
-                                {new Date(payment.payment_date).toLocaleDateString()} • 
+                                {new Date(payment.payment_date).toLocaleDateString()} •
                                 {payment.payment_number && ` ${payment.payment_number}`}
                               </p>
                               {payment.payment_reference && (
@@ -709,10 +862,14 @@ export function InvoicesPage() {
                                 </p>
                               )}
                               {payment.notes && (
-                                <p className="text-xs text-[var(--text-muted)] mt-1">{payment.notes}</p>
+                                <p className="text-xs text-[var(--text-muted)] mt-1">
+                                  {payment.notes}
+                                </p>
                               )}
                               {payment.bank_name && (
-                                <p className="text-xs text-[var(--text-muted)]">Bank: {payment.bank_name}</p>
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  Bank: {payment.bank_name}
+                                </p>
                               )}
                             </div>
                             <div className="text-right">
@@ -750,7 +907,7 @@ export function InvoicesPage() {
                     <CreditCard className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
                     <p className="text-[var(--text-muted)]">No payments recorded yet</p>
                     {isRestaurant && remainingBalance > 0 && (
-                      <Button 
+                      <Button
                         className="mt-4"
                         onClick={() => {
                           setShowInvoiceDetail(false)
@@ -763,7 +920,7 @@ export function InvoicesPage() {
                   </div>
                 )}
               </TabsContent>
-              
+
               <TabsContent value="order" className="space-y-4">
                 {invoiceDetail?.invoice?.order_id ? (
                   <div>
@@ -785,12 +942,18 @@ export function InvoicesPage() {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-[var(--text-muted)]">Order Status</span>
-                            <Badge variant="outline">{invoiceDetail.invoice.order_status || 'N/A'}</Badge>
+                            <Badge variant="outline">
+                              {invoiceDetail.invoice.order_status || 'N/A'}
+                            </Badge>
                           </div>
                           {invoiceDetail.invoice.order_placed_at && (
                             <div className="flex justify-between">
                               <span className="text-[var(--text-muted)]">Placed</span>
-                              <span>{new Date(invoiceDetail.invoice.order_placed_at).toLocaleDateString()}</span>
+                              <span>
+                                {new Date(
+                                  invoiceDetail.invoice.order_placed_at
+                                ).toLocaleDateString()}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -824,7 +987,7 @@ export function InvoicesPage() {
               Record full payment, partial payment, or apply credit notes
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedInvoice && (
             <div className="space-y-6">
               {/* Payment Summary */}
@@ -832,12 +995,18 @@ export function InvoicesPage() {
                 <CardContent className="pt-4">
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="text-sm text-[var(--text)]">Invoice {selectedInvoice.invoice_number}</p>
-                      <p className="text-sm text-[var(--brand-mid)]">Due {new Date(selectedInvoice.due_date).toLocaleDateString()}</p>
+                      <p className="text-sm text-[var(--text)]">
+                        Invoice {selectedInvoice.invoice_number}
+                      </p>
+                      <p className="text-sm text-[var(--brand-mid)]">
+                        Due {new Date(selectedInvoice.due_date).toLocaleDateString()}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-[var(--brand-mid)]">Remaining Balance</p>
-                      <p className="text-2xl font-bold text-[var(--text)]">{formatPrice(remainingBalance)}</p>
+                      <p className="text-2xl font-bold text-[var(--text)]">
+                        {formatPrice(remainingBalance)}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -861,10 +1030,11 @@ export function InvoicesPage() {
                   <div className="bg-[var(--mint-pale)] border border-[var(--mint)]/35 rounded-lg p-4">
                     <p className="text-sm text-[var(--mint)]">
                       <CheckCircle className="h-4 w-4 inline mr-2" />
-                      Paying full remaining balance: <strong>{formatPrice(remainingBalance)}</strong>
+                      Paying full remaining balance:{' '}
+                      <strong>{formatPrice(remainingBalance)}</strong>
                     </p>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Payment Method *</Label>
@@ -880,14 +1050,10 @@ export function InvoicesPage() {
                         </SelectTrigger>
                       </Select>
                     </div>
-                    
+
                     <div>
                       <Label>Payment Date *</Label>
-                      <Input
-                        type="date"
-                        value={new Date().toISOString().split('T')[0]}
-                        required
-                      />
+                      <Input type="date" value={new Date().toISOString().split('T')[0]} required />
                     </div>
                   </div>
 
@@ -947,7 +1113,7 @@ export function InvoicesPage() {
                       Remaining after payment: {formatPrice(remainingBalance - paymentAmount)}
                     </p>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Payment Method *</Label>
@@ -963,14 +1129,10 @@ export function InvoicesPage() {
                         </SelectTrigger>
                       </Select>
                     </div>
-                    
+
                     <div>
                       <Label>Payment Date *</Label>
-                      <Input
-                        type="date"
-                        value={new Date().toISOString().split('T')[0]}
-                        required
-                      />
+                      <Input type="date" value={new Date().toISOString().split('T')[0]} required />
                     </div>
                   </div>
 
@@ -1023,14 +1185,21 @@ export function InvoicesPage() {
                             type="number"
                             step="0.01"
                             min="0"
-                            max={creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0}
+                            max={
+                              creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)
+                                ?.remaining_amount || 0
+                            }
                             placeholder="Amount to apply"
                             value={creditAmount || ''}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value)
-                              const maxCredit = creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0
+                              const maxCredit =
+                                creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)
+                                  ?.remaining_amount || 0
                               if (!isNaN(val) && val > 0) {
-                                setCreditAmount(Math.min(val, maxCredit, remainingBalance - paymentAmount))
+                                setCreditAmount(
+                                  Math.min(val, maxCredit, remainingBalance - paymentAmount)
+                                )
                               } else {
                                 setCreditAmount(0)
                               }
@@ -1050,17 +1219,26 @@ export function InvoicesPage() {
                     <>
                       <div>
                         <Label>Select Credit Note *</Label>
-                        <Select value={selectedCreditNoteId} onValueChange={(value) => {
-                          setSelectedCreditNoteId(value)
-                          const creditNote = creditNotes.find((cn: any) => cn.id === value)
-                          if (creditNote) {
-                            setCreditAmount(Math.min(parseFloat(creditNote.remaining_amount || 0), remainingBalance))
-                          }
-                        }}>
+                        <Select
+                          value={selectedCreditNoteId}
+                          onValueChange={(value) => {
+                            setSelectedCreditNoteId(value)
+                            const creditNote = creditNotes.find((cn: any) => cn.id === value)
+                            if (creditNote) {
+                              setCreditAmount(
+                                Math.min(
+                                  parseFloat(creditNote.remaining_amount || 0),
+                                  remainingBalance
+                                )
+                              )
+                            }
+                          }}
+                        >
                           <SelectTrigger placeholder="Select credit note...">
                             {creditNotes.map((cn: any) => (
                               <SelectItem key={cn.id} value={cn.id}>
-                                {cn.credit_note_number} - {formatPrice(cn.remaining_amount)} available
+                                {cn.credit_note_number} - {formatPrice(cn.remaining_amount)}{' '}
+                                available
                                 {cn.reason && ` (${cn.reason})`}
                               </SelectItem>
                             ))}
@@ -1075,12 +1253,17 @@ export function InvoicesPage() {
                             type="number"
                             step="0.01"
                             min="0.01"
-                            max={creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0}
+                            max={
+                              creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)
+                                ?.remaining_amount || 0
+                            }
                             placeholder="Amount to apply"
                             value={creditAmount || ''}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value)
-                              const maxCredit = creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount || 0
+                              const maxCredit =
+                                creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)
+                                  ?.remaining_amount || 0
                               if (!isNaN(val) && val > 0) {
                                 setCreditAmount(Math.min(val, maxCredit, remainingBalance))
                               } else {
@@ -1089,7 +1272,11 @@ export function InvoicesPage() {
                             }}
                           />
                           <p className="text-xs text-[var(--text-muted)] mt-1">
-                            Available: {formatPrice(creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)?.remaining_amount)}
+                            Available:{' '}
+                            {formatPrice(
+                              creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)
+                                ?.remaining_amount
+                            )}
                           </p>
                         </div>
                       )}
@@ -1116,7 +1303,9 @@ export function InvoicesPage() {
                     <div className="border rounded-lg p-8 text-center bg-[var(--brand-ultra)]">
                       <CreditCard className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
                       <p className="text-[var(--text-muted)] mb-2">No available credit notes</p>
-                      <p className="text-xs text-[var(--text-muted)]">You can switch to full or partial payment instead</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        You can switch to full or partial payment instead
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1162,16 +1351,26 @@ export function InvoicesPage() {
                       {creditAmount > 0 && (
                         <div className="flex justify-between">
                           <span className="text-[var(--text-muted)]">Credit Applied</span>
-                          <span className="font-medium text-[var(--mint)]">{formatPrice(creditAmount)}</span>
+                          <span className="font-medium text-[var(--mint)]">
+                            {formatPrice(creditAmount)}
+                          </span>
                         </div>
                       )}
                       <div className="flex justify-between font-semibold text-lg border-t pt-2">
                         <span>Total Payment</span>
-                        <span className="text-[var(--mint)]">{formatPrice(paymentAmount + creditAmount)}</span>
+                        <span className="text-[var(--mint)]">
+                          {formatPrice(paymentAmount + creditAmount)}
+                        </span>
                       </div>
                       <div className="flex justify-between text-sm border-t pt-2">
                         <span>New Balance</span>
-                        <span className={remainingBalance - paymentAmount - creditAmount > 0 ? 'text-[var(--amber)]' : 'text-[var(--mint)]'}>
+                        <span
+                          className={
+                            remainingBalance - paymentAmount - creditAmount > 0
+                              ? 'text-[var(--amber)]'
+                              : 'text-[var(--mint)]'
+                          }
+                        >
                           {formatPrice(remainingBalance - paymentAmount - creditAmount)}
                         </span>
                       </div>
@@ -1186,9 +1385,13 @@ export function InvoicesPage() {
             <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleRecordPayment}
-              disabled={isProcessingPayment || (paymentMode === 'credit' && creditAmount <= 0) || (paymentMode === 'partial' && paymentAmount <= 0)}
+              disabled={
+                isProcessingPayment ||
+                (paymentMode === 'credit' && creditAmount <= 0) ||
+                (paymentMode === 'partial' && paymentAmount <= 0)
+              }
             >
               {isProcessingPayment ? (
                 <>

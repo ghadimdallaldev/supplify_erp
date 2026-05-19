@@ -32,6 +32,11 @@ import { StaffSelfServiceLogin } from './pages/StaffSelfServiceLogin'
 import { StaffSelfServiceDashboard } from './pages/StaffSelfServiceDashboard'
 import { RegisterCompletePage } from './pages/RegisterCompletePage'
 import { AccountActivationPage } from './pages/AccountActivationPage'
+import { ApprovalsPage } from './pages/approvals/ApprovalsPage'
+import { ReportsPage } from './pages/reports/ReportsPage'
+import { DisputesPage } from './pages/disputes/DisputesPage'
+import { PromotionsPage } from './pages/promotions/PromotionsPage'
+import { DealsPage } from './pages/deals/DealsPage'
 
 const router = createBrowserRouter(
   [
@@ -106,6 +111,26 @@ const router = createBrowserRouter(
         {
           path: 'app/orders/:id',
           element: <OrderDetailPage />,
+        },
+        {
+          path: 'app/approvals',
+          element: <ApprovalsPage />,
+        },
+        {
+          path: 'app/reports',
+          element: <ReportsPage />,
+        },
+        {
+          path: 'app/disputes',
+          element: <DisputesPage />,
+        },
+        {
+          path: 'app/promotions',
+          element: <PromotionsPage />,
+        },
+        {
+          path: 'app/deals',
+          element: <DealsPage />,
         },
         {
           path: 'app/cart',

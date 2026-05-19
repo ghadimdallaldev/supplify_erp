@@ -9,6 +9,11 @@ import {
   notifyReservationWaitlist,
   notifyGuestReservationConfirmation,
 } from '../services/notification.service.js'
+import {
+  handleReservationCancelled,
+  manuallyPromoteWaitlistEntry,
+  assignWaitlistPosition,
+} from '../services/waitlistPromotion.js'
 
 const router = express.Router()
 
@@ -57,6 +62,7 @@ const reservationCreateSchema = z.object({
 const reservationStatusSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'CANCELLED', 'WAITLIST']),
   notes: z.string().optional(),
+  cancellationReason: z.string().optional(),
 })
 
 const analyticsQuerySchema = z.object({
@@ -143,7 +149,7 @@ router.get('/board', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
           FROM reservation_waitlist
           WHERE restaurant_id = $1
             AND status IN ('WAITING','NOTIFIED')
-          ORDER BY requested_at
+          ORDER BY position ASC NULLS LAST, requested_at ASC
         `,
       [restaurantId]
     )
@@ -368,6 +374,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
       )
 
       if (waitlist) {
+        const position = await assignWaitlistPosition(client, restaurantId)
         await client.query(
           `
               INSERT INTO reservation_waitlist (
@@ -377,9 +384,10 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
                 customer_phone,
                 party_size,
                 preferred_time,
-                notes
+                notes,
+                position
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             `,
           [
             restaurantId,
@@ -389,6 +397,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
             payload.partySize,
             scheduledAt.toISOString(),
             payload.notes || null,
+            position,
           ]
         )
       }
@@ -451,11 +460,16 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
           SET status = $1,
               notes = COALESCE($2, notes),
               waitlist = CASE WHEN $1 = 'WAITLIST' THEN TRUE ELSE waitlist END,
+              cancelled_at = CASE WHEN $1 = 'CANCELLED' THEN COALESCE(cancelled_at, now()) ELSE cancelled_at END,
+              cancellation_reason = CASE
+                WHEN $1 = 'CANCELLED' THEN COALESCE($5, cancellation_reason)
+                ELSE cancellation_reason
+              END,
               updated_at = now()
           WHERE id = $3 AND restaurant_id = $4
           RETURNING *
         `,
-      [payload.status, payload.notes || null, id, restaurantId]
+      [payload.status, payload.notes || null, id, restaurantId, payload.cancellationReason || null]
     )
 
     if (!rows.length) {
@@ -468,6 +482,19 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
     }
 
     const reservation = rows[0]
+
+    if (payload.status === 'CANCELLED') {
+      try {
+        await handleReservationCancelled(reservation, {
+          cancellationReason: payload.cancellationReason || payload.notes || null,
+        })
+      } catch (promotionError) {
+        logger.warn('Waitlist auto-promotion failed after cancellation', {
+          error: promotionError.message,
+          reservationId: reservation.id,
+        })
+      }
+    }
 
     if (payload.status === 'CONFIRMED' || payload.status === 'WAITLIST') {
       try {
@@ -498,6 +525,65 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
     })
   }
 })
+
+router.get('/waitlist', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await resolveRestaurantId(req.userData.email)
+    const { rows } = await query(
+      `
+        SELECT *
+        FROM reservation_waitlist
+        WHERE restaurant_id = $1
+          AND status IN ('WAITING', 'NOTIFIED')
+        ORDER BY position ASC NULLS LAST, requested_at ASC
+      `,
+      [restaurantId]
+    )
+
+    res.json({
+      ok: true,
+      data: { waitlist: rows },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Waitlist fetch failed', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'WAITLIST_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post(
+  '/waitlist/:id/manually-promote',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const restaurantId = await resolveRestaurantId(req.userData.email)
+      const offered = await manuallyPromoteWaitlistEntry(id, restaurantId)
+
+      res.json({
+        ok: true,
+        data: { waitlist: offered },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Manual waitlist promotion failed', { error: error.message })
+      res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'WAITLIST_PROMOTE_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
 
 router.get(
   '/guest-intelligence',

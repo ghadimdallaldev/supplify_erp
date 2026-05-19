@@ -3,6 +3,8 @@ import {
   useGetReservationBoardQuery,
   useGetReservationAnalyticsQuery,
   useGetGuestIntelligenceQuery,
+  useGetReservationWaitlistQuery,
+  useManuallyPromoteWaitlistMutation,
 } from '../services/reservationsApi'
 import { useGetRestaurantMeQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -28,6 +30,8 @@ export function ReservationsPage() {
   } = useGetReservationBoardQuery({ date: selectedDate })
   const { data: analytics, refetch: refetchAnalytics } = useGetReservationAnalyticsQuery({ range })
   const { data: guestIntel, isLoading: guestIntelLoading } = useGetGuestIntelligenceQuery({})
+  const { data: waitlistData, refetch: refetchWaitlist } = useGetReservationWaitlistQuery()
+  const [promoteWaitlist, { isLoading: promoting }] = useManuallyPromoteWaitlistMutation()
   const { data: restaurantMe } = useGetRestaurantMeQuery()
 
   const bookingLink = useMemo(() => {
@@ -184,6 +188,61 @@ export function ReservationsPage() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Waitlist queue</CardTitle>
+          <CardDescription>
+            Offer status and manual promotion for guests waiting for a table
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(waitlistData?.waitlist || []).length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No guests on the waitlist.</p>
+          ) : (
+            <div className="space-y-2">
+              {(waitlistData?.waitlist || []).map((entry: Record<string, unknown>) => (
+                <div
+                  key={String(entry.id)}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
+                >
+                  <div>
+                    <p className="font-medium">{String(entry.customer_name)}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {String(entry.party_size)} guests · #{String(entry.position ?? '—')} in queue
+                    </p>
+                    {entry.offer_status && String(entry.offer_status) !== 'none' ? (
+                      <Badge variant="outline" className="mt-1 capitalize">
+                        Offer: {String(entry.offer_status)}
+                        {entry.offer_expires_at
+                          ? ` · expires ${new Date(String(entry.offer_expires_at)).toLocaleString()}`
+                          : ''}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={promoting || entry.offer_status === 'offered'}
+                    onClick={async () => {
+                      try {
+                        await promoteWaitlist(String(entry.id)).unwrap()
+                        toast.success('Offer sent to guest')
+                        refetchWaitlist()
+                        refetch()
+                      } catch {
+                        toast.error('Could not promote guest')
+                      }
+                    }}
+                  >
+                    Promote
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {boardLoading ? (
         <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-[var(--app-border)]">
           <Loader2 className="mr-2 h-5 w-5 animate-spin text-[var(--brand-mid)]" />
@@ -258,7 +317,9 @@ export function ReservationsPage() {
                         className="flex flex-col gap-1 rounded-xl border border-[var(--app-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div>
-                          <p className="font-medium text-[var(--text)]">{String(guest.customer_name)}</p>
+                          <p className="font-medium text-[var(--text)]">
+                            {String(guest.customer_name)}
+                          </p>
                           <p className="text-xs text-[var(--text-muted)]">
                             {Number(guest.visit_count)} visits · last{' '}
                             {guest.last_visit

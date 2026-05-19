@@ -18,6 +18,15 @@ import {
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyOrderStatusChange } from '../services/notification.service.js'
+import { requireFeature } from '../lib/subscription.js'
+import {
+  applyOrderApprovalGate,
+  notifyApproverOfPendingOrder,
+  getOrderApprovalStatus,
+} from '../services/approvals.service.js'
+import { applyBestPromotionToOrder } from '../services/promotions.service.js'
+import { writeAuditLog } from '../lib/audit.js'
+import { orderAmendmentsRouter } from './order-amendments.routes.js'
 
 const router = express.Router()
 
@@ -706,6 +715,54 @@ router.get('/', async (req, res) => {
   }
 })
 
+router.use('/:orderId/amendments', orderAmendmentsRouter)
+
+// Approval status for an order (approvals_budgets feature)
+router.get(
+  '/:id/approval-status',
+  requireAuth,
+  requireFeature(
+    'approvals_budgets',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const { id } = req.params
+      const tenant = await getRequestTenant(req)
+      const { rows: orders } = await query(
+        `SELECT restaurant_id FROM customer_order WHERE id = $1`,
+        [id]
+      )
+      if (!orders.length) throw new NotFoundError('Order not found')
+      if (tenant?.tenantType === 'RESTAURANT' && orders[0].restaurant_id !== tenant.tenantId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
+          requestId: req.requestId,
+        })
+      }
+      const { rows: orderRows } = await query(`SELECT status FROM customer_order WHERE id = $1`, [
+        id,
+      ])
+      const approval = await getOrderApprovalStatus(id)
+      res.json({
+        ok: true,
+        data: {
+          approval,
+          orderStatus: orderRows[0]?.status,
+          hasPendingApproval: approval?.status === 'pending',
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
 // Get order by ID
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
@@ -1045,7 +1102,54 @@ router.post(
             )
           }
 
-          createdOrders.push({ ...order, total_amount: totalAmount, items: orderItems })
+          let appliedPromotion = null
+          if (orderStatus === 'PLACED') {
+            const promoLines = items.map((item) => ({
+              productId: item.productId,
+              categoryId: item.product.category_id,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              lineTotal: item.unitPrice * item.quantity,
+            }))
+            appliedPromotion = await applyBestPromotionToOrder({
+              client,
+              orderId: order.id,
+              supplierId,
+              restaurantId,
+              subtotal: totalAmount,
+              lineItems: promoLines,
+            })
+            if (appliedPromotion) {
+              totalAmount = appliedPromotion.totalAfterDiscount
+            }
+          }
+
+          let finalOrder = {
+            ...order,
+            total_amount: totalAmount,
+            items: orderItems,
+            status: orderStatus,
+            appliedPromotion,
+          }
+
+          if (orderStatus === 'PLACED') {
+            const gate = await applyOrderApprovalGate({
+              client,
+              order: { ...order, total_amount: totalAmount },
+              restaurantId,
+              requestedByUserId: req.userData.id,
+            })
+            if (gate) {
+              finalOrder = {
+                ...finalOrder,
+                status: 'PENDING_APPROVAL',
+                approvalId: gate.approval.id,
+                approverId: gate.approverId,
+              }
+            }
+          }
+
+          createdOrders.push(finalOrder)
         }
 
         return createdOrders
@@ -1065,7 +1169,33 @@ router.post(
           actor: req.userData.id,
         })
 
-        // Send notification to supplier about new order (only if PLACED, not DRAFT)
+        if (order.status === 'PLACED' || order.status === 'PENDING_APPROVAL') {
+          await writeAuditLog(req, {
+            action_type: 'order.created',
+            tenant_type: 'RESTAURANT',
+            tenant_id: order.restaurant_id,
+            target_id: order.id,
+            payload_json: {
+              resource_type: 'order',
+              total_amount: order.total_amount,
+              promotion: order.appliedPromotion || null,
+            },
+          })
+        }
+
+        if (order.status === 'PENDING_APPROVAL' && order.approverId) {
+          try {
+            await notifyApproverOfPendingOrder({
+              approverId: order.approverId,
+              orderId: order.id,
+              orderTotal: order.total_amount,
+            })
+          } catch (notifError) {
+            logger.error('Failed to send approval notification', { error: notifError.message })
+          }
+        }
+
+        // Send notification to supplier about new order (only if PLACED, not DRAFT/pending approval)
         if (order.status === 'PLACED' && order.items.length > 0) {
           try {
             const supplierId = order.items[0].supplier_id
