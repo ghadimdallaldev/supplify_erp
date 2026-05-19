@@ -17,7 +17,9 @@ vi.mock('../lib/logger.js', () => ({
 }))
 vi.mock('../services/staff-portal-mail.service.js', () => ({
   sendStaffPortalMagicLink: vi.fn().mockResolvedValue({ delivered: true }),
-  isSmtpConfigured: vi.fn().mockReturnValue(true),
+}))
+vi.mock('../services/mailer.service.js', () => ({
+  isEmailConfigured: vi.fn().mockReturnValue(true),
 }))
 
 describe('POST /api/public/staff/request-link', () => {

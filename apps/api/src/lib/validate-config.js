@@ -51,8 +51,16 @@ export function validateProductionConfig() {
       'WEB_ORIGINS uses only http:// in production — use https:// behind TLS termination when exposed to the internet'
     )
   }
-  if (!process.env.SMTP_HOST) {
-    issues.push('SMTP_HOST must be set in production so staff portal magic links can be emailed')
+  const emailConfigured = Boolean(process.env.SENDGRID_API_KEY) || Boolean(process.env.SMTP_HOST)
+  if (!emailConfigured) {
+    issues.push(
+      'SENDGRID_API_KEY (Twilio Email) or SMTP_HOST must be set in production for outbound email'
+    )
+  }
+  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+    logger.warn(
+      'TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set — WhatsApp notifications will not be delivered'
+    )
   }
 
   if (issues.length > 0) {

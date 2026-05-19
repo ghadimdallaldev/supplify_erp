@@ -1,5 +1,5 @@
 import { config } from '../config/env.js'
-import { sendMail } from './mailer.service.js'
+import { sendMail, isEmailConfigured } from './mailer.service.js'
 import { logger } from '../lib/logger.js'
 
 export function buildStaffPortalLoginUrl(sessionToken) {
@@ -11,8 +11,9 @@ export function buildStaffPortalLoginUrl(sessionToken) {
   return `${base}/staff/dashboard?token=${encodeURIComponent(sessionToken)}`
 }
 
+/** @deprecated Use isEmailConfigured from mailer.service.js */
 export function isSmtpConfigured() {
-  return Boolean(process.env.SMTP_HOST)
+  return isEmailConfigured()
 }
 
 /**
@@ -48,9 +49,9 @@ This link expires at ${expiresLabel}. If you did not request it, you can ignore 
 </body>
 </html>`
 
-  if (!isSmtpConfigured()) {
+  if (!isEmailConfigured()) {
     if (config.NODE_ENV === 'development') {
-      logger.info('Staff portal magic link (SMTP not configured)', { loginUrl })
+      logger.info('Staff portal magic link (email not configured)', { loginUrl })
     }
     return { delivered: false, loginUrl, preview: true }
   }

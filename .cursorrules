@@ -52,9 +52,56 @@
   - architecture notes if flow changes
 - Update comments only when they add clarity; avoid redundant commentary.
 
+## Git deploy workflow (MANDATORY after every completed change)
+
+When the user asks to ship work—or when you finish a task that changes code, config, or docs—**commit and push through all three branches** unless the user explicitly says not to.
+
+### 1. Commit on `dev` (development branch)
+
+- Work only on `dev` for feature/fix commits.
+- Stage relevant files only (never `.env` with secrets).
+- Write a concise commit message (why, not a file list).
+- Push: `git push origin dev`
+
+### 2. Promote to `preprod`
+
+```bash
+git checkout preprod
+git merge dev -m "merge(dev): <short summary>"
+node scripts/prune-release-tree.mjs --tier preprod
+git add -A
+git commit -m "chore(preprod): prune release tree"
+git push origin preprod
+```
+
+### 3. Promote to `prod`
+
+```bash
+git checkout prod
+git merge preprod -m "merge(preprod): <short summary>"
+node scripts/prune-release-tree.mjs --tier prod
+git add -A
+git commit -m "chore(prod): prune release tree"
+git push origin prod
+```
+
+### 4. Return to `dev`
+
+```bash
+git checkout dev
+```
+
+### Rules
+
+- **Never** develop directly on `preprod` or `prod` (deploy-only, pruned trees).
+- **Always** run `prune-release-tree.mjs` after merging into `preprod`/`prod` and commit the prune result before pushing.
+- Resolve merge conflicts on release branches by keeping release-branch deploy assets (README, slim `package.json`, workflows) while taking application code from `dev`.
+- Do **not** force-push `main`, `master`, `prod`, or `preprod` unless the user explicitly requests it.
+
 ## Output rules (how you respond)
 - Always include:
   - what changed
   - where tests were added/updated
   - how to run tests
   - docs updated (and where)
+  - git branches pushed (`dev`, `preprod`, `prod`) when the deploy workflow ran
