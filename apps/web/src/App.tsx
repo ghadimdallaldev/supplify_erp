@@ -41,12 +41,21 @@ import { OrgOverviewPage } from './pages/OrgOverviewPage'
 import { BranchDetailPage } from './pages/BranchDetailPage'
 import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 import { InviteAcceptPage } from './pages/InviteAcceptPage'
+import { OAuthRedirect } from './components/OAuthRedirect'
 
 const router = createBrowserRouter(
   [
     {
       path: '/login',
       element: <LoginPage />,
+    },
+    {
+      path: '/auth/login',
+      element: <OAuthRedirect flow="login" />,
+    },
+    {
+      path: '/auth/register',
+      element: <OAuthRedirect flow="register" />,
     },
     {
       path: '/reserve/confirmation',
