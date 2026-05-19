@@ -215,7 +215,12 @@ const router = createBrowserRouter(
       ],
     },
   ],
-  { future: { v7_startTransition: true } as Record<string, unknown> }
+  {
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    },
+  }
 )
 
 export function App() {
