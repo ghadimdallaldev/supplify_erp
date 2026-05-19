@@ -63,6 +63,9 @@ import { pushRoutes } from './routes/push.routes.js'
 import { reviewsRoutes } from './routes/reviews.routes.js'
 import { reportsRoutes } from './routes/reports.routes.js'
 import { tenantRolesRoutes } from './routes/tenant-roles.routes.js'
+import branchInvitationsRoutes from './routes/branch-invitations.routes.js'
+import branchInvitationsPublicRoutes from './routes/branch-invitations-public.routes.js'
+import { expireOldBranchInvitations } from './lib/branch-invitations.js'
 
 if (config.NODE_ENV === 'production') {
   validateProductionConfig()
@@ -265,6 +268,8 @@ if (config.E2E_SECRET) {
 }
 app.use('/api/branches', branchesRoutes)
 app.use('/api/org', orgRoutes)
+app.use('/api/org/invitations', branchInvitationsRoutes)
+app.use('/api/public/invitations', branchInvitationsPublicRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
 
@@ -359,6 +364,19 @@ server.listen(PORT, () => {
     30 * 60 * 1000
   )
   logger.info('Promotions expiry job started (runs every 30 min)')
+
+  expireOldBranchInvitations().catch((err) =>
+    logger.error('Branch invitation expiry job failed on startup:', err)
+  )
+  setInterval(
+    () => {
+      expireOldBranchInvitations().catch((err) =>
+        logger.error('Branch invitation expiry job failed:', err)
+      )
+    },
+    60 * 60 * 1000
+  )
+  logger.info('Branch invitation expiry job started (runs every 1h)')
 })
 
 export default app

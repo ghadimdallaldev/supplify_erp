@@ -58,6 +58,64 @@ export async function assignKeycloakRealmRole(token, userId, roleName) {
   }
 }
 
+export async function getKeycloakRealmRole(token, roleName) {
+  const roleUrl = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/roles/${roleName}`
+  const roleRes = await fetch(roleUrl, { headers: { Authorization: `Bearer ${token}` } })
+  if (!roleRes.ok) throw new Error(`Get Keycloak role ${roleName} failed: ${roleRes.status}`)
+  return roleRes.json()
+}
+
+export async function createKeycloakUserWithPassword({
+  email,
+  firstName,
+  lastName,
+  password,
+  realmRoleName = 'SUPPLIER',
+}) {
+  const adminToken = await getKeycloakAdminToken()
+  const existing = await findKeycloakUserByEmail(adminToken, email)
+  if (existing?.id) {
+    return { userId: existing.id, created: false }
+  }
+
+  const username = email.split('@')[0] || email
+  const url = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      username,
+      email,
+      firstName: firstName || '',
+      lastName: lastName || '',
+      enabled: true,
+      emailVerified: true,
+      credentials: [{ type: 'password', value: password, temporary: false }],
+    }),
+  })
+  if (res.status === 409) {
+    const again = await findKeycloakUserByEmail(adminToken, email)
+    if (again?.id) return { userId: again.id, created: false }
+    throw new Error('Keycloak user already exists')
+  }
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Create Keycloak user failed: ${res.status} ${text}`)
+  }
+  const location = res.headers.get('Location')
+  const userId = location ? location.split('/').pop() : null
+  if (!userId) throw new Error('No Keycloak user id in response')
+
+  if (realmRoleName) {
+    await assignKeycloakRealmRole(adminToken, userId, realmRoleName)
+  }
+
+  return { userId, created: true }
+}
+
 export async function ensureKeycloakRealmRole(email, roleName) {
   try {
     const token = await getKeycloakAdminToken()

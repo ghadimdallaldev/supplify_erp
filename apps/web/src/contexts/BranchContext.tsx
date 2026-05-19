@@ -26,6 +26,7 @@ interface BranchContextValue {
   activeAccount: LinkedAccountRecord | null
   isLoading: boolean
   isSwitching: boolean
+  isOrgScope: boolean
   switchAccount: (accountId: string | null) => Promise<void>
 }
 
@@ -37,18 +38,23 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const isTenantUser = user?.role === 'RESTAURANT' || user?.role === 'SUPPLIER'
   const isSupplier = user?.role === 'SUPPLIER'
   const { entitlements } = useEntitlements()
-  const useOrgBranches = isSupplier && entitlements?.features?.multi_branch === true
+  const multiBranchFeature = entitlements?.features?.multi_branch === true
+
+  const {
+    data: orgData,
+    isLoading: orgLoading,
+    isError: orgError,
+    refetch: refetchOrg,
+  } = useGetOrgBranchesQuery(undefined, { skip: !isSupplier })
+
+  const useOrgBranches =
+    isSupplier && !orgError && Boolean(orgData?.organizationId) && (orgData?.branches?.length ?? 0) > 0
 
   const {
     data: linkedData,
     isLoading: linkedLoading,
     refetch: refetchLinked,
   } = useGetBranchesQuery(undefined, { skip: !isTenantUser || useOrgBranches })
-  const {
-    data: orgData,
-    isLoading: orgLoading,
-    refetch: refetchOrg,
-  } = useGetOrgBranchesQuery(undefined, { skip: !useOrgBranches })
   const [switchBranchAccount, { isLoading: isSwitchingLinked }] = useSwitchBranchAccountMutation()
   const [switchOrgBranch, { isLoading: isSwitchingOrg }] = useSwitchOrgBranchContextMutation()
 
@@ -110,6 +116,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     [dispatch, switchBranchAccount, switchOrgBranch, useOrgBranches, user?.role]
   )
 
+  const isOrgScope = useOrgBranches && multiBranchFeature
+
   const value = useMemo(
     () => ({
       accounts,
@@ -118,6 +126,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       activeAccount,
       isLoading,
       isSwitching,
+      isOrgScope,
       switchAccount,
     }),
     [
@@ -127,6 +136,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       activeAccount,
       isLoading,
       isSwitching,
+      isOrgScope,
       switchAccount,
     ]
   )

@@ -145,7 +145,10 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | UX-06  | Header avatar → logout                    | Session ends                                         |       |
 | UX-07  | **Branch switcher** (multi-branch tenant) | Lists linked accounts; switch updates context        |       |
 | UX-07a | Supplier with org → **All branches** link | Navigates to `/app/org` when `multi_branch` on       |       |
-| UX-07b | Org Owner → add branch on `/app/org`      | New branch appears in switcher; stats load           |       |
+| UX-07b | Org Owner → add branch on `/app/org`      | Two-step modal: branch details → invite link copy    |       |
+| UX-07c | Branch settings → Invitations tab       | List/revoke/resend; copy link works                    |       |
+| UX-07d | Open `/invite/branch?token=…` (valid)   | Signup or accept while logged in; lands on dashboard |       |
+| UX-07e | Expired / revoked invite link           | Correct error state; no account created              |       |
 | UX-08  | Plan badge in sidebar footer              | Shows plan name for non-free paid tiers              |       |
 | UX-09  | Mobile/narrow viewport                    | Sidebar/layout usable; tabs wrap (supplier settings) |       |
 

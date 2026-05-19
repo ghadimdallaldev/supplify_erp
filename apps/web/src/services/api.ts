@@ -202,6 +202,7 @@ export const api = createApi({
     'RestaurantFinance',
     'Notification',
     'Branch',
+    'BranchInvitations',
     'Org',
     'RestaurantTeam',
     'Subscription',
@@ -1129,6 +1130,88 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Branch', 'Org', 'Restaurant', 'Supplier', 'Order', 'Notification'],
+    }),
+    getBranchInviteRoles: builder.query<
+      { roles: Array<{ id: string; name: string; description?: string }> },
+      { supplier_id: string }
+    >({
+      query: ({ supplier_id }) =>
+        `/api/org/invitations/roles?supplier_id=${encodeURIComponent(supplier_id)}`,
+    }),
+    getBranchInvitations: builder.query<
+      {
+        invitations: Array<{
+          id: string
+          supplier_id: string
+          invited_name?: string
+          invited_email?: string
+          status: string
+          expires_at: string
+          created_at: string
+          accepted_at?: string
+          branch_name: string
+          role_name: string
+          accepted_by_name?: string
+        }>
+      },
+      { supplier_id?: string } | void
+    >({
+      query: (params) => {
+        const supplierId = params && 'supplier_id' in params ? params.supplier_id : undefined
+        return supplierId
+          ? `/api/org/invitations?supplier_id=${encodeURIComponent(supplierId)}`
+          : '/api/org/invitations'
+      },
+      providesTags: ['BranchInvitations'],
+    }),
+    createBranchInvitation: builder.mutation<
+      { invitation_id: string; invite_url: string; expires_at: string },
+      {
+        supplier_id: string
+        invited_name?: string
+        invited_email?: string
+        role_id: string
+      }
+    >({
+      query: (body) => ({ url: '/api/org/invitations', method: 'POST', body }),
+      invalidatesTags: ['BranchInvitations'],
+    }),
+    revokeBranchInvitation: builder.mutation<{ revoked: boolean }, string>({
+      query: (id) => ({ url: `/api/org/invitations/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['BranchInvitations'],
+    }),
+    regenerateBranchInvitation: builder.mutation<
+      { invitation_id: string; invite_url: string; expires_at: string },
+      string
+    >({
+      query: (id) => ({ url: `/api/org/invitations/${id}/regenerate`, method: 'POST' }),
+      invalidatesTags: ['BranchInvitations'],
+    }),
+    validateBranchInvite: builder.query<
+      {
+        valid: boolean
+        reason?: string
+        branch_name?: string
+        org_name?: string
+        invited_name?: string
+        role_name?: string
+        invited_email?: string
+        expires_at?: string
+      },
+      string
+    >({
+      query: (token) =>
+        `/api/public/invitations/branch?token=${encodeURIComponent(token)}`,
+    }),
+    acceptBranchInvite: builder.mutation<
+      { user?: { email?: string; displayName?: string }; activeSupplierId: string },
+      { token: string; full_name?: string; email?: string; password?: string }
+    >({
+      query: (body) => ({
+        url: '/api/public/invitations/branch/accept',
+        method: 'POST',
+        body,
+      }),
     }),
 
     getRestaurantTeam: builder.query<
@@ -2400,6 +2483,13 @@ export const {
   useGetOrgBranchesQuery,
   useCreateOrgBranchMutation,
   useSwitchOrgBranchContextMutation,
+  useGetBranchInviteRolesQuery,
+  useGetBranchInvitationsQuery,
+  useCreateBranchInvitationMutation,
+  useRevokeBranchInvitationMutation,
+  useRegenerateBranchInvitationMutation,
+  useValidateBranchInviteQuery,
+  useAcceptBranchInviteMutation,
   useGetRestaurantTeamQuery,
   useAddRestaurantTeamMemberMutation,
   useDeleteRestaurantTeamMemberMutation,
