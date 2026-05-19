@@ -25,7 +25,8 @@
       "attributes": {
         "access.token.lifespan": "3600",
         "access.token.lifespan.for.implicit.flow": "3600",
-        "client.secret.creation.time": "1700000000"
+        "client.secret.creation.time": "1700000000",
+        "post.logout.redirect.uris": "http://localhost:5173/login##http://localhost:5173/*##http://localhost:4000/login##http://localhost:4000/*##http://localhost/login##http://localhost/*##http://localhost:8180/login"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
@@ -42,7 +43,10 @@
       ],
       "webOrigins": ["+"],
       "protocol": "openid-connect",
-      "attributes": { "pkce.code.challenge.method": "S256" },
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/login##http://localhost:5173/*##http://localhost:4000/login##http://localhost:4000/*##http://localhost/login##http://localhost/*##http://localhost:8180/login"
+      },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
     }

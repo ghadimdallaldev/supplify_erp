@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import { logger } from '../src/lib/logger.js'
 import { ensureReservationsSchema, ensureStaffAppSchema } from '../src/lib/migrator.js'
 import { pool } from '../src/lib/db.js'
+import { disconnectCache } from '../src/lib/cache.js'
+import { isTenantRoleBackfillComplete } from './migrate-users-to-roles.js'
 import { isMainModule } from './lib/is-main.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -23,14 +25,23 @@ function runNodeScript(scriptName) {
 async function runMigrations() {
   try {
     await runNodeScript('run-migration.js')
-    await ensureStaffAppSchema()
-    await ensureReservationsSchema()
-    await runNodeScript('migrate-users-to-roles.js')
+    await Promise.all([ensureStaffAppSchema(), ensureReservationsSchema()])
+
+    const skipRoleBackfill = process.env.SKIP_TENANT_ROLE_BACKFILL === '1'
+    if (skipRoleBackfill) {
+      logger.info('SKIP_TENANT_ROLE_BACKFILL=1 — tenant role backfill skipped')
+    } else if (await isTenantRoleBackfillComplete()) {
+      logger.info('Tenant role backfill already complete — skipped')
+    } else {
+      await runNodeScript('migrate-users-to-roles.js')
+    }
+
     logger.info('SQL migrations, runtime schema checks, and tenant role backfill completed')
   } catch (error) {
     logger.error('Migration failed:', error)
     process.exitCode = 1
   } finally {
+    await disconnectCache()
     await pool.end()
   }
 }
