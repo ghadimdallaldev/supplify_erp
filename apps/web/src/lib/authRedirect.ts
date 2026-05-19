@@ -1,19 +1,22 @@
+import { apiUrl } from './apiBase'
+
+const DEV_API_ORIGIN = 'http://localhost:4000'
+
 /**
- * Start OAuth via full-page navigation (never inside an iframe).
+ * URL that starts the OIDC flow (full-page navigation, never inside an iframe).
  * Cursor preview / chrome error pages block framed navigations to /auth/login.
  */
-export function getAuthBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '')
-  if (configured) return configured
-  if (import.meta.env.DEV) {
-    return typeof window !== 'undefined' ? window.location.origin : ''
+export function getOAuthStartUrl(path: 'login' | 'register'): string {
+  const url = apiUrl(`/auth/${path}`)
+  // Vite dev serves index.html for /auth/* before the proxy on full-page navigations.
+  if (import.meta.env.DEV && !import.meta.env.VITE_API_URL && url.startsWith('/')) {
+    return `${DEV_API_ORIGIN}${url}`
   }
-  return 'http://localhost:4000'
+  return url
 }
 
 export function redirectToAuth(path: 'login' | 'register'): void {
-  const base = getAuthBaseUrl()
-  const url = `${base}/auth/${path}`
+  const url = getOAuthStartUrl(path)
 
   try {
     if (window.top && window.top !== window.self) {

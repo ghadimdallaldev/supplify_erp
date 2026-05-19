@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
-import { createMockApp, setupMocks, getMockDb } from '../test/helpers.js'
+import { createMockApp, setupMocks, clearAllMocks, mockSupplierUser } from '../test/helpers.js'
 
-vi.mock('../lib/db.js', () => ({
-  query: vi.fn(),
-  withTransaction: vi.fn(),
-}))
+vi.mock('../lib/db.js', () => {
+  const queryMock = vi.fn()
+  return {
+    query: queryMock,
+    pool: { query: queryMock },
+  }
+})
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (_req, _res, next) => next(),
   isFeatureEnabled: vi.fn().mockResolvedValue(true),
@@ -28,17 +31,23 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
     requireAuth: (_req, _res, next) => next(),
   }
 })
+vi.mock('../lib/logger.js', () => ({
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}))
 
 describe('drivers routes', () => {
   let app
   let db
 
   beforeEach(async () => {
-    vi.clearAllMocks()
+    clearAllMocks()
     db = setupMocks()
+    const dbModule = await import('../lib/db.js')
+    vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))
+
     const { driversRoutes } = await import('./drivers.routes.js')
     app = createMockApp(driversRoutes, {
-      userData: { id: 'user-1', role: 'SUPPLIER', email: 's@test.com' },
+      userData: { ...mockSupplierUser, id: 'user-1', email: 's@test.com' },
     })
   })
 
@@ -60,9 +69,13 @@ describe('drivers routes', () => {
   })
 
   it('DELETE /:id blocks when active deliveries exist', async () => {
-    db.query.mockResolvedValueOnce({
-      rows: [{ id: 'a1', order_id: 'o1', order_status: 'PROCESSING' }],
-    })
+    db.query
+      .mockResolvedValueOnce({
+        rows: [{ id: 'd1', supplier_id: 'supplier-1', full_name: 'Alex', is_active: true }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'a1' }],
+      })
     const res = await request(app).delete('/d1')
     expect(res.status).toBe(409)
     expect(res.body.error.name).toBe('ACTIVE_DELIVERIES')

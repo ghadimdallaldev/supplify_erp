@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Button } from '../ui/button'
+import { Badge } from '../ui/badge'
 import { Loader2, Flag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -10,8 +10,8 @@ import {
   useGetTenantFeatureOverridesQuery,
   useSetTenantFeatureOverrideMutation,
   useUpdateAdminFeatureFlagMutation,
-} from '@/services/api'
-import type { EffectiveFeature } from '@/types'
+} from '../../services/api'
+import type { EffectiveFeature } from '../../types'
 
 type TenantType = 'RESTAURANT' | 'SUPPLIER'
 
@@ -170,13 +170,16 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
         <CardHeader>
           <CardTitle>Per-tenant overrides</CardTitle>
           <p className="text-sm text-[var(--text-muted)]">
-            Overrides win over global settings and plan features for a single restaurant or supplier.
+            Overrides win over global settings and plan features for a single restaurant or
+            supplier.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--text-mid)]">Tenant type</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text-mid)]">
+                Tenant type
+              </label>
               <select
                 className="rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 value={tenantType}
@@ -190,7 +193,9 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
               </select>
             </div>
             <div className="min-w-[220px] flex-1">
-              <label className="mb-1 block text-sm font-medium text-[var(--text-mid)]">Tenant</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--text-mid)]">
+                Tenant
+              </label>
               <select
                 className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
                 value={selectedTenantId}
@@ -229,13 +234,17 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
                 <tbody>
                   {effectiveFeatures.map((feature) => (
                     <tr key={feature.featureKey} className="border-b last:border-0">
-                      <td className="py-3 pr-4 font-medium text-[var(--text)]">{feature.featureName}</td>
+                      <td className="py-3 pr-4 font-medium text-[var(--text)]">
+                        {feature.featureName}
+                      </td>
                       <td className="py-3 pr-4">
                         <Badge variant={feature.enabled ? 'default' : 'secondary'}>
                           {feature.enabled ? 'On' : 'Off'}
                         </Badge>
                       </td>
-                      <td className="py-3 pr-4 text-[var(--text-muted)]">{sourceBadge(feature.source)}</td>
+                      <td className="py-3 pr-4 text-[var(--text-muted)]">
+                        {sourceBadge(feature.source)}
+                      </td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
                           <Button
