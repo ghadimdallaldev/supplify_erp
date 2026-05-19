@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/ghadimdallaldev/supplify_erp/compare/v1.0.0...v1.0.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **web:** resolve /auth/login 404 and OAuth redirect in dev ([fbc8e3b](https://github.com/ghadimdallaldev/supplify_erp/commit/fbc8e3be82ab390ebe9326b3897e01656c9cc380))
+
 # 1.0.0 (2026-05-19)
 
 
