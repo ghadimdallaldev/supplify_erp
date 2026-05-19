@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react'
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardHeader, CardContent, CardTitle } from '../components/ui/card'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+} from '../components/ui/dialog'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   api,
   useGetAdminOverviewQuery,
@@ -28,7 +28,7 @@ import {
   useGetAdminRestaurantsQuery,
   useStartImpersonationMutation,
   useUnlockAdminSubscriptionMutation,
-} from '@/services/api'
+} from '../services/api'
 import {
   Loader2,
   Plus,
@@ -61,10 +61,10 @@ import {
   ListOrdered,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { SubscriptionPlan } from '@/types'
+import type { SubscriptionPlan } from '../types'
 import { getPlanSubtitle, getFeatureLabel, formatPlanFeatureCell } from '../lib/planComparison'
-import { formatCurrency } from '@/utils/format'
-import { AdminFeatureFlagsPanel } from '@/components/admin/AdminFeatureFlagsPanel'
+import { formatCurrency } from '../utils/format'
+import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
 
 interface AdminDashboardPageProps {
   initialTab?: string
