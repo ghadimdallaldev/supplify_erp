@@ -7,10 +7,20 @@ SQL migrations live in `apps/api/db/migrations/` and run in lexical order. Appli
 | Environment | Command |
 |-------------|---------|
 | Docker stack (recommended) | `scripts\run-local.cmd seed` or automatic via `supplify-migrate` on `docker compose up` |
-| Host against Docker Postgres | `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/supplify node apps/api/scripts/run-migration.js` |
+| Host against Docker Postgres | `DATABASE_URL=postgresql://postgres:postgres@localhost:5433/supplify node apps/api/scripts/run-migration.js` (port must match `docker/.env` `POSTGRES_PORT`) |
 | pnpm (uses `migrate.js` wrapper) | `pnpm db:migrate` |
 
-`apps/api/scripts/migrate.js` runs `run-migration.js` then runtime schema checks (reservations, staff app) from `src/lib/migrator.js`.
+`apps/api/scripts/migrate.js` runs:
+
+1. `run-migration.js` (SQL files in lexical order)
+2. Runtime schema checks (reservations, staff app) from `src/lib/migrator.js` — in parallel
+3. `migrate-users-to-roles.js` when tenant role backfill is not already complete (skipped on subsequent `pnpm dev` runs when DB is up to date)
+
+| Script | Command |
+|--------|---------|
+| SQL + runtime checks + role backfill (if needed) | `pnpm db:migrate` |
+| Role backfill only | `pnpm db:migrate-users-to-roles` |
+| Skip role backfill | `SKIP_TENANT_ROLE_BACKFILL=1 pnpm db:migrate` |
 
 ## Fresh database checklist
 

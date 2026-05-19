@@ -1,5 +1,24 @@
 # Performance and indexing (Phase D)
 
+Indexes, query patterns, and local dev startup optimizations.
+
+## Local dev startup (`pnpm dev`)
+
+| Optimization | Effect |
+|--------------|--------|
+| Tenant role backfill skip | `migrate.js` skips `migrate-users-to-roles.js` when all tenants have Owner system roles and legacy `user_role` rows are mirrored in `tenant_user_roles` (~7s saved per start). |
+| Parallel runtime schema checks | Reservations + staff app schema checks run in parallel. |
+| Redis disconnect in migration scripts | Migration child processes call `disconnectCache()` and exit so `pnpm dev` is not blocked after migrations. |
+| Faster backfill when needed | Tenant processing uses bounded concurrency; permission rows are batch-inserted per role. |
+
+Force full role backfill: `pnpm db:migrate-users-to-roles`. Skip entirely: `SKIP_TENANT_ROLE_BACKFILL=1 pnpm db:migrate`. Skip migrations on restart: `pnpm dev -- --no-migrate`.
+
+## Docker Postgres port
+
+Use `docker compose --env-file docker/.env` so `POSTGRES_PORT=5433` matches `apps/api/.env` `DATABASE_URL`. A port mismatch causes connection failures and slow failed retries.
+
+## Indexes and query patterns
+
 Indexes and query patterns for admin dashboards and usage/subscription flows.
 
 ## Indexes (migrations 0046, 0047)

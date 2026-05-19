@@ -515,7 +515,7 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 
 | Integration                 | Use                                                        |
 | --------------------------- | ---------------------------------------------------------- |
-| **Keycloak**                | OIDC login, roles, self-registration                       |
+| **Keycloak**                | OIDC login, roles, self-registration, SSO logout (`post.logout.redirect.uris` on `supplify-api` / `supplify-web`; seeded in `realm-export.json`, applied by `keycloak-init.sh`) |
 | **PostgreSQL**              | Primary database (~65 migrations)                          |
 | **Redis**                   | Order calendar cache                                       |
 | **S3 / MinIO**              | Object storage for uploads                                 |
@@ -536,7 +536,9 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 | Capability                 | Command / location                                 |
 | -------------------------- | -------------------------------------------------- |
 | Monorepo (pnpm workspaces) | `apps/api`, `apps/web`, `infra`                    |
-| DB migrate                 | `pnpm db:migrate`                                  |
+| DB migrate                 | `pnpm db:migrate` (skips tenant role backfill when complete) |
+| Tenant role backfill       | `pnpm db:migrate-users-to-roles`                   |
+| Fast dev restart           | `pnpm dev -- --no-migrate`                         |
 | DB seed (many scenarios)   | `pnpm db:seed`, `seed:full`, `seed:demo-*`, etc.   |
 | API unit tests (Vitest)    | `pnpm test:ci` (~207+ tests)                       |
 | Web unit tests             | Vitest in `apps/web`                               |

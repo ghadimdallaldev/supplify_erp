@@ -118,6 +118,7 @@ services:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
     entrypoint:
       - /bin/bash
       - /scripts/keycloak-init.sh

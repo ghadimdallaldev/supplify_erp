@@ -134,6 +134,7 @@ services:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
     volumes:
       - ./infra/keycloak/realm-export.json:/import/realm-export.json:ro
       - ./deploy/scripts/keycloak-init.sh:/scripts/keycloak-init.sh:ro

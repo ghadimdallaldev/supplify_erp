@@ -300,15 +300,15 @@ export function getSystemRoleDefinitions(tenantType) {
   return tenantType === 'SUPPLIER' ? SUPPLIER_SYSTEM_ROLES : RESTAURANT_SYSTEM_ROLES
 }
 
-async function insertRolePermissions(client, roleId, permissions) {
-  for (const permission of permissions) {
-    await client.query(
-      `INSERT INTO tenant_role_permissions (role_id, permission)
-       VALUES ($1, $2)
-       ON CONFLICT (role_id, permission) DO NOTHING`,
-      [roleId, permission]
-    )
-  }
+async function insertRolePermissions(roleId, permissions) {
+  if (!permissions?.length) return
+  const placeholders = permissions.map((_, i) => `($1, $${i + 2})`).join(', ')
+  await query(
+    `INSERT INTO tenant_role_permissions (role_id, permission)
+     VALUES ${placeholders}
+     ON CONFLICT (role_id, permission) DO NOTHING`,
+    [roleId, ...permissions]
+  )
 }
 
 /**
@@ -339,7 +339,7 @@ export async function ensureTenantSystemRoles(tenantId, tenantType) {
         roleId = inserted[0].id
       }
       const perms = resolveRolePermissionList(def, tenantType)
-      await insertRolePermissions(query, roleId, perms)
+      await insertRolePermissions(roleId, perms)
     }
   } catch (err) {
     if (err.code === '42P01') return

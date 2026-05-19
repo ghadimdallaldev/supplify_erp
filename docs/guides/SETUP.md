@@ -204,7 +204,7 @@ The API follows RESTful conventions with:
 ```bash
 PORT=4000
 WEB_ORIGIN=http://localhost:5173
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/supplify
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/supplify
 KEYCLOAK_BASE_URL=http://localhost:8080
 KEYCLOAK_REALM=Supplify
 KEYCLOAK_CLIENT_ID=supplify-api

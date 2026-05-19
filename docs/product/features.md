@@ -9,6 +9,8 @@ pnpm setup
 pnpm dev
 ```
 
+**Fast dev restarts:** `pnpm dev -- --no-migrate` skips SQL/runtime checks. On a normal start, tenant role backfill is skipped automatically when the DB is already migrated (see [PERFORMANCE.md](../operations/PERFORMANCE.md)).
+
 | Service                            | URL (native dev)                                     |
 | ---------------------------------- | ---------------------------------------------------- |
 | Web (Vite)                         | http://localhost:5173 (or next free port, e.g. 5174) |
