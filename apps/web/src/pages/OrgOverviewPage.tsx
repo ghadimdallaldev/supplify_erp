@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Building2, Plus, Settings } from 'lucide-react'
+import { Building2, Plus } from 'lucide-react'
+import { RestaurantOrgOverviewPage } from './RestaurantOrgOverviewPage'
 import { Link, useNavigate } from 'react-router-dom'
 import { useGetOrgQuery, useSwitchOrgBranchContextMutation } from '../services/api'
 import { useAppSelector } from '../hooks/redux'
@@ -7,8 +8,8 @@ import { useEntitlements } from '../hooks/useEntitlements'
 import { AddBranchModal } from '../components/org/AddBranchModal'
 
 export function OrgOverviewPage() {
-  const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
+  const navigate = useNavigate()
   const { entitlements } = useEntitlements()
   const multiBranch = entitlements?.features?.multi_branch === true
   const { data, isLoading } = useGetOrgQuery(undefined, {
@@ -16,6 +17,10 @@ export function OrgOverviewPage() {
   })
   const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchOrgBranchContextMutation()
+
+  if (user?.role === 'RESTAURANT') {
+    return <RestaurantOrgOverviewPage />
+  }
 
   const orgRole = data?.orgRole
   const canView = orgRole === 'Org Owner' || orgRole === 'Org Manager' || user?.role === 'ADMIN'

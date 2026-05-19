@@ -2,8 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, type ReactN
 import {
   useGetBranchesQuery,
   useGetOrgBranchesQuery,
+  useGetRestaurantOrgBranchesQuery,
   useSwitchBranchAccountMutation,
   useSwitchOrgBranchContextMutation,
+  useSwitchRestaurantOrgBranchContextMutation,
   api,
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
@@ -37,18 +39,37 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const { user } = useAppSelector((state) => state.auth)
   const isTenantUser = user?.role === 'RESTAURANT' || user?.role === 'SUPPLIER'
   const isSupplier = user?.role === 'SUPPLIER'
+  const isRestaurant = user?.role === 'RESTAURANT'
   const { entitlements } = useEntitlements()
   const multiBranchFeature = entitlements?.features?.multi_branch === true
 
   const {
-    data: orgData,
-    isLoading: orgLoading,
-    isError: orgError,
-    refetch: refetchOrg,
+    data: supplierOrgData,
+    isLoading: supplierOrgLoading,
+    isError: supplierOrgError,
+    refetch: refetchSupplierOrg,
   } = useGetOrgBranchesQuery(undefined, { skip: !isSupplier })
 
-  const useOrgBranches =
-    isSupplier && !orgError && Boolean(orgData?.organizationId) && (orgData?.branches?.length ?? 0) > 0
+  const {
+    data: restaurantOrgData,
+    isLoading: restaurantOrgLoading,
+    isError: restaurantOrgError,
+    refetch: refetchRestaurantOrg,
+  } = useGetRestaurantOrgBranchesQuery(undefined, { skip: !isRestaurant })
+
+  const useSupplierOrgBranches =
+    isSupplier &&
+    !supplierOrgError &&
+    Boolean(supplierOrgData?.organizationId) &&
+    (supplierOrgData?.branches?.length ?? 0) > 0
+
+  const useRestaurantOrgBranches =
+    isRestaurant &&
+    !restaurantOrgError &&
+    Boolean(restaurantOrgData?.organizationId) &&
+    (restaurantOrgData?.branches?.length ?? 0) > 0
+
+  const useOrgBranches = useSupplierOrgBranches || useRestaurantOrgBranches
 
   const {
     data: linkedData,
@@ -56,12 +77,27 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     refetch: refetchLinked,
   } = useGetBranchesQuery(undefined, { skip: !isTenantUser || useOrgBranches })
   const [switchBranchAccount, { isLoading: isSwitchingLinked }] = useSwitchBranchAccountMutation()
-  const [switchOrgBranch, { isLoading: isSwitchingOrg }] = useSwitchOrgBranchContextMutation()
+  const [switchSupplierOrgBranch, { isLoading: isSwitchingSupplierOrg }] =
+    useSwitchOrgBranchContextMutation()
+  const [switchRestaurantOrgBranch, { isLoading: isSwitchingRestaurantOrg }] =
+    useSwitchRestaurantOrgBranchContextMutation()
 
-  const data = useOrgBranches ? orgData : linkedData
-  const isLoading = useOrgBranches ? orgLoading : linkedLoading
-  const isSwitching = useOrgBranches ? isSwitchingOrg : isSwitchingLinked
-  const refetch = useOrgBranches ? refetchOrg : refetchLinked
+  const orgData = useSupplierOrgBranches ? supplierOrgData : restaurantOrgData
+  const isLoading = useOrgBranches
+    ? useSupplierOrgBranches
+      ? supplierOrgLoading
+      : restaurantOrgLoading
+    : linkedLoading
+  const isSwitching = useOrgBranches
+    ? useSupplierOrgBranches
+      ? isSwitchingSupplierOrg
+      : isSwitchingRestaurantOrg
+    : isSwitchingLinked
+  const refetch = useOrgBranches
+    ? useSupplierOrgBranches
+      ? refetchSupplierOrg
+      : refetchRestaurantOrg
+    : refetchLinked
 
   const rawBranches = useOrgBranches
     ? (orgData?.branches ?? [])
@@ -81,7 +117,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   }) as LinkedAccountRecord[]
 
   const activeAccountId = useOrgBranches
-    ? (orgData?.activeSupplierId ?? null)
+    ? useSupplierOrgBranches
+      ? (supplierOrgData?.activeSupplierId ?? null)
+      : (restaurantOrgData?.activeRestaurantId ?? null)
     : (linkedData?.activeAccountId ?? linkedData?.primaryAccountId ?? null)
   const primaryAccount =
     accounts.find((account) => account.isPrimary) ??
@@ -102,7 +140,11 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const switchAccount = useCallback(
     async (accountId: string | null) => {
       if (useOrgBranches) {
-        await switchOrgBranch({ supplier_id: accountId }).unwrap()
+        if (useSupplierOrgBranches) {
+          await switchSupplierOrgBranch({ supplier_id: accountId }).unwrap()
+        } else {
+          await switchRestaurantOrgBranch({ restaurant_id: accountId }).unwrap()
+        }
       } else {
         const tenantType = user?.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
         await switchBranchAccount({
@@ -113,7 +155,15 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       dispatch(api.util.resetApiState())
       window.location.reload()
     },
-    [dispatch, switchBranchAccount, switchOrgBranch, useOrgBranches, user?.role]
+    [
+      dispatch,
+      switchBranchAccount,
+      switchSupplierOrgBranch,
+      switchRestaurantOrgBranch,
+      useOrgBranches,
+      useSupplierOrgBranches,
+      user?.role,
+    ]
   )
 
   const isOrgScope = useOrgBranches && multiBranchFeature

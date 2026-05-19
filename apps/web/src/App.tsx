@@ -40,6 +40,7 @@ import { DealsPage } from './pages/deals/DealsPage'
 import { OrgOverviewPage } from './pages/OrgOverviewPage'
 import { BranchDetailPage } from './pages/BranchDetailPage'
 import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
+import { InviteAcceptPage } from './pages/InviteAcceptPage'
 
 const router = createBrowserRouter(
   [
@@ -74,6 +75,10 @@ const router = createBrowserRouter(
     {
       path: '/invite/branch',
       element: <BranchInviteAcceptPage />,
+    },
+    {
+      path: '/invite',
+      element: <InviteAcceptPage />,
     },
     {
       path: '/staff/dashboard',

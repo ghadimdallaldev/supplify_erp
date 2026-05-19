@@ -1,4 +1,5 @@
 import { query, withTransaction } from '../lib/db.js'
+import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
 import { sendNotification } from './notification.service.js'
@@ -253,6 +254,18 @@ export async function createDispute({
   })
 
   await notifyDisputeOpened(result)
+
+  try {
+    await createFulfillmentException(null, {
+      supplierId,
+      orderId,
+      type: 'dispute_raised',
+      description: `Restaurant opened dispute: ${type}`,
+    })
+  } catch {
+    /* non-blocking */
+  }
+
   return loadDisputeDetail(result.id, { restaurantId })
 }
 

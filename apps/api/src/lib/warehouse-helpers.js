@@ -1,8 +1,9 @@
 import { query } from './db.js'
 
 let cachedSupplierCol = null
+let cachedOwnerInsert = null
 
-/** Resolve warehouse.supplier_id vs warehouse.tenant_id column name. */
+/** Resolve warehouse.supplier_id vs warehouse.tenant_id column name (for filters). */
 export async function getWarehouseSupplierColumn(db = query) {
   if (cachedSupplierCol) return cachedSupplierCol
   const { rows } = await db(
@@ -14,6 +15,39 @@ export async function getWarehouseSupplierColumn(db = query) {
   )
   cachedSupplierCol = rows[0]?.column_name || 'supplier_id'
   return cachedSupplierCol
+}
+
+/**
+ * INSERT spec when legacy supplier_id and tenant_id both exist (same supplier UUID).
+ */
+export async function getWarehouseOwnerInsertSpec(db = query) {
+  if (cachedOwnerInsert) return cachedOwnerInsert
+  const { rows } = await db(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'warehouse'
+       AND column_name IN ('supplier_id', 'tenant_id')`
+  )
+  const names = new Set(rows.map((r) => r.column_name))
+  if (names.has('tenant_id') && names.has('supplier_id')) {
+    cachedOwnerInsert = {
+      columns: 'tenant_id, supplier_id',
+      placeholders: '$1, $1',
+      filterColumn: 'tenant_id',
+    }
+  } else if (names.has('tenant_id')) {
+    cachedOwnerInsert = {
+      columns: 'tenant_id',
+      placeholders: '$1',
+      filterColumn: 'tenant_id',
+    }
+  } else {
+    cachedOwnerInsert = {
+      columns: 'supplier_id',
+      placeholders: '$1',
+      filterColumn: 'supplier_id',
+    }
+  }
+  return cachedOwnerInsert
 }
 
 export function warehouseBelongsToSupplier(warehouse, supplierId) {
@@ -55,14 +89,16 @@ export async function createDefaultWarehouseForSupplier(client, supplier, db = q
       ? async () => getWarehouseSupplierColumn(db)
       : async () => getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
 
-  const supplierCol = await getCol()
+  const owner = await getWarehouseOwnerInsertSpec(
+    (sql, params) => client.query(sql, params)
+  )
   const address = formatAddressForWarehouse(supplier.address_json)
   const warehouseName = `${supplier.name} Warehouse`
 
   const { rows } = await client.query(
     `INSERT INTO warehouse (
-      ${supplierCol}, name, code, address, is_default, is_main, is_active
-    ) VALUES ($1, $2, 'MAIN', $3, TRUE, TRUE, TRUE)
+      ${owner.columns}, name, code, address, is_default, is_main, is_active
+    ) VALUES (${owner.placeholders}, $2, 'MAIN', $3, TRUE, TRUE, TRUE)
     RETURNING id`,
     [supplier.id, warehouseName, address]
   )

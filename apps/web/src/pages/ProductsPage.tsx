@@ -96,10 +96,15 @@ export function ProductsPage() {
   const { data: categoriesData } = useGetProductCategoriesQuery()
   const { data: tagsData } = useGetProductTagsQuery()
 
-  // Use API suppliers if available, otherwise fall back to unique suppliers from products
-  const uniqueSuppliers = isSupplier
-    ? [] // Suppliers don't need supplier filter
-    : suppliersData?.suppliers?.map((s) => ({ name: s.name, email: s.contact_email })) || []
+  // Dedupe by id — org branches often share the same contact_email
+  const uniqueSuppliers = useMemo(() => {
+    if (isSupplier) return []
+    const byId = new Map<string, { id: string; name: string }>()
+    for (const s of suppliersData?.suppliers ?? []) {
+      if (!byId.has(s.id)) byId.set(s.id, { id: s.id, name: s.name })
+    }
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [isSupplier, suppliersData?.suppliers])
 
   // Build query params with all filters
   const queryParams = useMemo(
@@ -123,11 +128,9 @@ export function ProductsPage() {
     ? data?.products.filter((p) => p.supplier_email === user?.email)
     : data?.products || []
 
-  // Apply supplier filter for restaurants (client-side filter for supplier name)
+  // Apply supplier filter for restaurants (by supplier_id)
   if (!isSupplier && supplierFilter) {
-    filteredProducts = filteredProducts.filter((p) =>
-      p.supplier_name?.toLowerCase().includes(supplierFilter.toLowerCase())
-    )
+    filteredProducts = filteredProducts.filter((p) => p.supplier_id === supplierFilter)
   }
 
   const handleAddToCart = (product: any) => {
@@ -457,8 +460,8 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
                 >
                   <option value="">All Suppliers</option>
-                  {uniqueSuppliers.map((supplier: any) => (
-                    <option key={supplier.email} value={supplier.name}>
+                  {uniqueSuppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
                       {supplier.name}
                     </option>
                   ))}

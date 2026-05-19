@@ -1,22 +1,21 @@
-import crypto from 'crypto'
 import { query, withTransaction } from './db.js'
-import { config } from '../config/env.js'
 import { createKeycloakUserWithPassword } from './keycloak-admin.js'
-
-const INVITE_TTL_DAYS = 7
+import {
+  buildInviteUrl,
+  evaluateInvitationState,
+  generateInviteToken,
+  inviteExpiresAt,
+} from '../services/invitationTokens.js'
 
 export function generateBranchInviteToken() {
-  return crypto.randomBytes(48).toString('hex')
+  return generateInviteToken()
 }
 
 export function buildBranchInviteUrl(token) {
-  const base = (config.WEB_ORIGIN || 'http://localhost:5173').replace(/\/$/, '')
-  return `${base}/invite/branch?token=${encodeURIComponent(token)}`
+  return buildInviteUrl(token, 'supplier_branch')
 }
 
-export function inviteExpiresAt() {
-  return new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
-}
+export { inviteExpiresAt }
 
 export async function expireOldBranchInvitations() {
   const { rowCount } = await query(
@@ -46,21 +45,8 @@ export async function getInvitationByToken(token) {
 }
 
 export function evaluateInvitationPublicState(invitation) {
-  if (!invitation) {
-    return { valid: false, reason: 'invalid' }
-  }
-  if (invitation.status === 'accepted') {
-    return { valid: false, reason: 'invalid' }
-  }
-  if (invitation.status === 'revoked') {
-    return { valid: false, reason: 'invalid' }
-  }
-  if (invitation.status === 'expired' || new Date(invitation.expires_at) < new Date()) {
-    return { valid: false, reason: 'expired' }
-  }
-  if (invitation.status !== 'pending') {
-    return { valid: false, reason: 'invalid' }
-  }
+  const state = evaluateInvitationState(invitation)
+  if (!state.valid) return state
   return {
     valid: true,
     branch_name: invitation.branch_name,
@@ -117,7 +103,7 @@ export async function createBranchInvitation({
   invitedEmail,
   roleId,
 }) {
-  const token = generateBranchInviteToken()
+  const token = generateInviteToken()
   const expiresAt = inviteExpiresAt()
   const { rows } = await query(
     `
@@ -160,7 +146,7 @@ export async function revokeBranchInvitation(invitationId, organizationId) {
 }
 
 export async function regenerateBranchInvitation(invitationId, organizationId) {
-  const token = generateBranchInviteToken()
+  const token = generateInviteToken()
   const expiresAt = inviteExpiresAt()
   const { rows } = await query(
     `

@@ -34,6 +34,8 @@ export const ORG_SYSTEM_ROLES = [
       'SETTINGS_VIEW',
       'CHAT_VIEW',
       'CHAT_SEND',
+      'FULFILLMENT_VIEW',
+      'FULFILLMENT_MANAGE',
     ],
   },
   {
@@ -46,6 +48,7 @@ export const ORG_SYSTEM_ROLES = [
       'INVOICES_VIEW',
       'INVENTORY_VIEW',
       'SETTINGS_VIEW',
+      'FULFILLMENT_VIEW',
     ],
   },
   {
@@ -69,6 +72,8 @@ export const ORG_SYSTEM_ROLES = [
       'SETTINGS_VIEW',
       'CHAT_VIEW',
       'CHAT_SEND',
+      'FULFILLMENT_VIEW',
+      'FULFILLMENT_MANAGE',
     ],
   },
 ]

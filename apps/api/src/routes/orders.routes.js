@@ -28,9 +28,16 @@ import {
 import { applyBestPromotionToOrder } from '../services/promotions.service.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { orderAmendmentsRouter } from './order-amendments.routes.js'
+import { ordersDriverRoutes } from './orders-driver.routes.js'
 import { assignWarehousesToOrder } from '../services/warehouseRouting.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from '../services/warehouseInventory.js'
 import { hasPermission } from '../lib/permissions.js'
+import {
+  updateDriverDeliveryStatus,
+  getSupplierIdForOrder,
+  orderHasProofOfDelivery,
+} from '../lib/driver-delivery.js'
+import { getSupplierIdForRequest } from '../lib/rbac.js'
 
 const router = express.Router()
 
@@ -119,6 +126,14 @@ const supplierOrderCreateSchema = z.object({
   notes: z.string().optional(),
 })
 
+const deliveryStatusSchema = z.enum([
+  'assigned',
+  'picked_up',
+  'out_for_delivery',
+  'delivered',
+  'failed',
+])
+
 const orderUpdateSchema = z.object({
   status: z
     .enum([
@@ -136,6 +151,8 @@ const orderUpdateSchema = z.object({
     ])
     .optional(),
   notes: z.string().optional(),
+  delivery_status: deliveryStatusSchema.optional(),
+  failure_reason: z.string().optional(),
 })
 
 const orderListSchema = z.object({
@@ -720,6 +737,7 @@ router.get('/', async (req, res) => {
 })
 
 router.use('/:orderId/amendments', orderAmendmentsRouter)
+router.use(ordersDriverRoutes)
 
 // Approval status for an order (approvals_budgets feature)
 router.get(
@@ -1660,6 +1678,50 @@ router.patch('/:id', async (req, res) => {
 
     const order = orders[0]
 
+    if (updateData.delivery_status) {
+      if (!hasPermission(req.tenantContext?.permissions ?? [], 'FULFILLMENT_MANAGE')) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Missing permission: FULFILLMENT_MANAGE',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const supplierId = (await getSupplierIdForRequest(req)) || (await getSupplierIdForOrder(id))
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const assignment = await updateDriverDeliveryStatus({
+        orderId: id,
+        supplierId,
+        status: updateData.delivery_status,
+        notes: updateData.notes,
+        failureReason: updateData.failure_reason,
+        actorUserId: req.userData.id,
+      })
+      const { rows: refreshed } = await query(`SELECT * FROM customer_order WHERE id = $1`, [id])
+      const hasPod = await orderHasProofOfDelivery(id)
+      return res.json({
+        ok: true,
+        data: {
+          order: refreshed[0],
+          assignment,
+          podRequired: updateData.delivery_status === 'delivered',
+          hasPod,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
     // Get supplier_id from order items (first item's supplier)
     const { rows: firstItem } = await query(
       `
@@ -1722,7 +1784,9 @@ router.patch('/:id', async (req, res) => {
       // Suppliers can acknowledge, process, ship, and complete orders
       if (
         updateData.status &&
-        !['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED'].includes(updateData.status)
+        !['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(
+          updateData.status
+        )
       ) {
         return res.status(403).json({
           ok: false,

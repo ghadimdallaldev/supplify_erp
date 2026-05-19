@@ -144,9 +144,48 @@ export interface UpdateOrderRequest {
     | 'ACKNOWLEDGED'
     | 'PROCESSING'
     | 'SHIPPED'
+    | 'DELIVERED'
     | 'COMPLETED'
     | 'CANCELLED'
   notes?: string
+  delivery_status?: 'assigned' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed'
+  failure_reason?: string
+}
+
+export interface DriverRecord {
+  id: string
+  supplier_id: string
+  warehouse_id?: string | null
+  full_name: string
+  phone?: string | null
+  vehicle_type?: string | null
+  vehicle_plate?: string | null
+  notes?: string | null
+  is_active?: boolean
+  warehouse_name?: string | null
+}
+
+export interface DispatchOrderCard {
+  id: string
+  status: string
+  total_amount: number
+  created_at: string
+  restaurant_name: string
+  item_count: number
+  has_pod?: boolean
+  assignment?: {
+    id: string
+    status: string
+    assigned_at?: string
+    delivered_at?: string
+    driver: {
+      id: string
+      full_name: string
+      phone?: string | null
+      vehicle_type?: string | null
+      vehicle_plate?: string | null
+    }
+  } | null
 }
 
 export interface OrderFilters {

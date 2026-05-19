@@ -134,16 +134,29 @@ export async function resolveAllFeaturesForTenant(tenantId, tenantType, planFeat
 }
 
 /** Used by requireFeature middleware (via subscription.js). */
+const FEATURE_ALIASES = {
+  fulfillment: 'fulfillment_tools',
+  driver_management: 'fulfillment_tools',
+}
+
 export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey) {
   try {
     const { getTenantSubscription } = await import('./subscription.js')
     const subscription = await getTenantSubscription(tenantId, tenantType)
-    const result = await resolveFeatureEnabled(
+    let result = await resolveFeatureEnabled(
       tenantId,
       tenantType,
       featureKey,
       subscription?.features
     )
+    if (!result.enabled && FEATURE_ALIASES[featureKey]) {
+      result = await resolveFeatureEnabled(
+        tenantId,
+        tenantType,
+        FEATURE_ALIASES[featureKey],
+        subscription?.features
+      )
+    }
     return result.enabled
   } catch (error) {
     logger.error('isFeatureEnabledForTenant error', { error: error.message, featureKey })

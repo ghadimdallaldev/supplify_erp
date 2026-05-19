@@ -53,7 +53,10 @@ export function BranchSwitcher() {
           </option>
         ))}
       </select>
-      {user?.role === 'SUPPLIER' && multiBranch && isOrgScope && accounts.length > 1 && (
+      {(user?.role === 'SUPPLIER' || user?.role === 'RESTAURANT') &&
+        multiBranch &&
+        isOrgScope &&
+        accounts.length > 1 && (
         <Link
           to="/app/org"
           className="text-xs text-[var(--brand)] whitespace-nowrap hover:underline"
