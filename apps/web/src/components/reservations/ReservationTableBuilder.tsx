@@ -1009,7 +1009,7 @@ export function ReservationTableBuilder({
                 variant="outline"
                 className="border-white/60 bg-white/80 text-[9px] font-medium text-[var(--text-muted)]"
               >
-                {f.replaceAll('_', ' ')}
+                {f.replace(/_/g, ' ')}
               </Badge>
             ))}
           </div>

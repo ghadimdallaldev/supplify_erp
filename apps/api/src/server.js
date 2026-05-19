@@ -10,6 +10,7 @@ import { validateProductionConfig } from './lib/validate-config.js'
 import { logger } from './lib/logger.js'
 import { createSessionStore } from './lib/session-store.js'
 import { requestContext } from './middlewares/requestContext.js'
+import { requestLogger } from './middlewares/requestLogger.js'
 import { impersonationContext } from './middlewares/impersonationContext.js'
 import { activeTenantContext } from './middlewares/activeTenantContext.js'
 import { errorHandler } from './middlewares/errorHandler.js'
@@ -198,8 +199,9 @@ app.use(
   })
 )
 
-// Request context middleware
+// Request context + one log line per HTTP request
 app.use(requestContext)
+app.use(requestLogger)
 
 // Impersonation: read signed cookie and set req.impersonationContext when admin is "viewing as" a tenant
 app.use(impersonationContext)
@@ -305,9 +307,12 @@ const server = http.createServer(app)
 initializeSocket(server)
 
 server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`)
-  logger.info(`Environment: ${config.NODE_ENV}`)
-  logger.info(`Web origin: ${config.WEB_ORIGIN}`)
+  logger.info({
+    msg: `Server started on port ${PORT}`,
+    port: PORT,
+    env: config.NODE_ENV,
+    webOrigin: config.WEB_ORIGIN,
+  })
 
   // Start scheduled orders cron job
   // Run every 5 minutes to check for scheduled orders (for testing)

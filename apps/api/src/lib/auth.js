@@ -158,8 +158,6 @@ export async function verifyToken(token) {
     const config = await getKeycloakConfig()
     const { KEYCLOAK_CLIENT_ID } = getKeycloakValues()
 
-    logger.debug('Verifying token')
-
     // Decode the token manually to extract payload (for issuer/audience handling)
     const parts = token.split('.')
     const headerPart = parts[0]
@@ -167,8 +165,6 @@ export async function verifyToken(token) {
 
     const header = JSON.parse(Buffer.from(headerPart, 'base64url').toString())
     const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString())
-
-    logger.debug('Token decoded')
 
     const expectedIssuer = normalizeIssuer(config.issuer)
     const tokenIssuer = normalizeIssuer(payload.iss)
@@ -185,14 +181,14 @@ export async function verifyToken(token) {
     const tokenAud = payload.aud
     const tokenAzp = payload.azp
     const audList = Array.isArray(tokenAud) ? tokenAud : tokenAud ? [tokenAud] : []
-    const hasValidAud = audList.some((a) => acceptableAudiences.includes(a)) || acceptableAudiences.includes(tokenAzp)
+    const hasValidAud =
+      audList.some((a) => acceptableAudiences.includes(a)) || acceptableAudiences.includes(tokenAzp)
 
     try {
       await jwtVerify(token, JWKS, {
         issuer: verifyIssuer,
         audience: KEYCLOAK_CLIENT_ID,
       })
-      logger.debug('Token verification successful')
       return payload
     } catch (firstError) {
       const msg = firstError?.message || ''
@@ -202,14 +198,12 @@ export async function verifyToken(token) {
         msg.includes('audience') ||
         msg.includes('aud')
       ) {
-        logger.debug('Verifying token without strict audience')
         await jwtVerify(token, JWKS, { issuer: verifyIssuer })
         if (!hasValidAud && (tokenAzp || audList.length > 0)) {
           throw new Error(
             `Token audience mismatch. Expected one of: ${acceptableAudiences.join(', ')}, Got azp: ${tokenAzp}, aud: ${JSON.stringify(tokenAud)}`
           )
         }
-        logger.debug('Token verification successful (audience ok)')
         return payload
       }
       throw firstError
@@ -220,7 +214,11 @@ export async function verifyToken(token) {
     const errorCode = error?.code || 'Unknown'
 
     // If token is expired, throw a specific error that can be caught for refresh
-    if (errorCode === 'ERR_JWT_EXPIRED' || errorName === 'JWTExpired' || errorMessage.includes('expired')) {
+    if (
+      errorCode === 'ERR_JWT_EXPIRED' ||
+      errorName === 'JWTExpired' ||
+      errorMessage.includes('expired')
+    ) {
       logger.debug('Token expired, refresh will be attempted')
       const expiredError = new Error('Token expired')
       expiredError.name = 'JWTExpired'
@@ -228,7 +226,11 @@ export async function verifyToken(token) {
       throw expiredError
     }
 
-    logger.error('Token verification failed', { message: errorMessage, name: errorName, code: errorCode })
+    logger.error('Token verification failed', {
+      message: errorMessage,
+      name: errorName,
+      code: errorCode,
+    })
     throw new Error('Invalid token')
   }
 }
@@ -289,7 +291,9 @@ export async function getUserInfo(accessToken, idToken = null) {
     const fromAccess = userInfoFromClaims(claimsFromJwt(accessToken))
     if (fromAccess) return fromAccess
 
-    throw new Error(`Userinfo unavailable and token missing sub/email (status: ${status ?? 'unknown'})`)
+    throw new Error(
+      `Userinfo unavailable and token missing sub/email (status: ${status ?? 'unknown'})`
+    )
   }
 }
 

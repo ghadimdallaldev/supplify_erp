@@ -31,14 +31,16 @@ export function initializeSocket(server) {
         return next(new Error('Unauthorized: no access token'))
       }
       const payload = await verifyToken(accessToken)
-      const { rows } = await query('SELECT id, role FROM app_user WHERE keycloak_sub = $1', [
-        payload.sub,
-      ])
+      const { rows } = await query(
+        `SELECT id, role, supplier_id, restaurant_id FROM app_user WHERE keycloak_sub = $1`,
+        [payload.sub]
+      )
       if (rows.length === 0) {
         return next(new Error('Unauthorized: user not found'))
       }
       socket.data.userId = rows[0].id
       socket.data.role = rows[0].role
+      socket.data.tenantId = rows[0].supplier_id || rows[0].restaurant_id || null
       next()
     } catch {
       next(new Error('Unauthorized: invalid token'))
@@ -46,7 +48,13 @@ export function initializeSocket(server) {
   })
 
   io.on('connection', (socket) => {
-    logger.info('Client connected', { socketId: socket.id, userId: socket.data.userId })
+    logger.info({
+      msg: 'WebSocket client connected',
+      socketId: socket.id,
+      userId: socket.data.userId,
+      role: socket.data.role,
+      tenantId: socket.data.tenantId,
+    })
 
     // Handle joining a conversation
     socket.on('join_conversation', async (conversationId) => {
@@ -136,7 +144,13 @@ export function initializeSocket(server) {
     })
 
     socket.on('disconnect', () => {
-      logger.info('Client disconnected', { socketId: socket.id })
+      logger.info({
+        msg: 'WebSocket client disconnected',
+        socketId: socket.id,
+        userId: socket.data.userId,
+        role: socket.data.role,
+        tenantId: socket.data.tenantId,
+      })
     })
   })
 

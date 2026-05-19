@@ -47,7 +47,7 @@ export async function query(text, params = []) {
   try {
     const result = await pool.query(text, params)
     const duration = Date.now() - start
-    if (duration > 5000) {
+    if (duration > 500) {
       logger.warn('Slow query', {
         durationMs: duration,
         rowCount: result.rowCount,

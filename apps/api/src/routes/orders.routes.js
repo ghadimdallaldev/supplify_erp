@@ -637,8 +637,6 @@ router.get('/', async (req, res) => {
     let items = []
     if (orderIds.length > 0) {
       try {
-        logger.debug('Fetching order items', { count: orderIds.length })
-
         const { rows: itemsRows } = await query(
           `
           SELECT 
@@ -653,7 +651,6 @@ router.get('/', async (req, res) => {
         )
 
         items = itemsRows
-        logger.debug('Fetched order items', { count: items.length })
       } catch (itemError) {
         logger.error({
           message: 'Failed to fetch order items',

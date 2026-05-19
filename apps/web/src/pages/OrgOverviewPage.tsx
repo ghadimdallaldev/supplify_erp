@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Plus } from 'lucide-react'
+import { Building2, Plus, Settings } from 'lucide-react'
 import { RestaurantOrgOverviewPage } from './RestaurantOrgOverviewPage'
 import { Link, useNavigate } from 'react-router-dom'
 import { useGetOrgQuery, useSwitchOrgBranchContextMutation } from '../services/api'

@@ -1,6 +1,7 @@
 import { verifyToken, refreshAccessToken } from './auth.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
+import { syncRequestLogContext } from './request-log-context.js'
 import { getEffectiveTenant } from './impersonation.js'
 import { getActiveTenantFromRequest, getPrimaryTenantForUser } from './tenant-switch.js'
 import { getRolesForUser, getPermissionsForUser, hasPermission } from './permissions.js'
@@ -164,6 +165,7 @@ export async function requireAuth(req, res, next) {
       }
 
       req.userData = user
+      syncRequestLogContext(req)
       next()
     } catch (error) {
       logger.debug('Token verification failed, attempting refresh')
@@ -228,6 +230,7 @@ export async function requireAuth(req, res, next) {
       }
 
       req.userData = user
+      syncRequestLogContext(req)
       next()
     }
   } catch (error) {
@@ -265,6 +268,7 @@ export async function optionalAuth(req, res, next) {
       const user = await getUserBySub(payload.sub)
       if (user) {
         req.userData = user
+        syncRequestLogContext(req)
       }
     } catch (error) {
       // Token is invalid or expired, try to refresh
@@ -287,6 +291,7 @@ export async function optionalAuth(req, res, next) {
             const user = await getUserBySub(payload.sub)
             if (user) {
               req.userData = user
+              syncRequestLogContext(req)
             }
           }
         } catch (refreshError) {
@@ -496,6 +501,7 @@ export function resolveTenantContext(req, res, next) {
         roles,
         permissions,
       }
+      syncRequestLogContext(req)
       next()
     })
     .catch((err) => {
