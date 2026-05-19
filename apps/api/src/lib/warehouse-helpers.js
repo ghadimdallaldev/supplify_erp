@@ -33,3 +33,50 @@ export function isMultiWarehouseFulfillmentActive(supplier, planMultiWarehouseEn
     supplier.fulfillment_mode === 'multi'
   )
 }
+
+function formatAddressForWarehouse(addressJson) {
+  if (!addressJson || typeof addressJson !== 'object') return null
+  const parts = [
+    addressJson.street,
+    addressJson.city,
+    addressJson.region,
+    addressJson.country,
+    addressJson.postalCode ?? addressJson.zip,
+  ].filter(Boolean)
+  return parts.length ? parts.join(', ') : null
+}
+
+/**
+ * Create the default warehouse for a new supplier branch (transaction-safe).
+ */
+export async function createDefaultWarehouseForSupplier(client, supplier, db = query) {
+  const getCol =
+    db === query
+      ? async () => getWarehouseSupplierColumn(db)
+      : async () => getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
+
+  const supplierCol = await getCol()
+  const address = formatAddressForWarehouse(supplier.address_json)
+  const warehouseName = `${supplier.name} Warehouse`
+
+  const { rows } = await client.query(
+    `INSERT INTO warehouse (
+      ${supplierCol}, name, code, address, is_default, is_main, is_active
+    ) VALUES ($1, $2, 'MAIN', $3, TRUE, TRUE, TRUE)
+    RETURNING id`,
+    [supplier.id, warehouseName, address]
+  )
+
+  const warehouseId = rows[0].id
+
+  await client.query(
+    `UPDATE supplier
+     SET default_warehouse_id = $1,
+         fulfillment_mode = 'single',
+         updated_at = now()
+     WHERE id = $2`,
+    [warehouseId, supplier.id]
+  )
+
+  return warehouseId
+}

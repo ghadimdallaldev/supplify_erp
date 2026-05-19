@@ -93,17 +93,19 @@ function resolveOrgRolePermissions(roleDef) {
   return roleDef.permissions
 }
 
-export async function ensureOrgSystemRoles(organizationId) {
+export async function ensureOrgSystemRoles(organizationId, client = null) {
   if (!organizationId) return
+  const db = client ? (sql, params) => client.query(sql, params) : query
+
   for (const def of ORG_SYSTEM_ROLES) {
-    const { rows: existing } = await query(
+    const { rows: existing } = await db(
       `SELECT id FROM org_roles
        WHERE organization_id = $1 AND name = $2 AND is_system = true`,
       [organizationId, def.name]
     )
     let roleId = existing[0]?.id
     if (!roleId) {
-      const { rows: inserted } = await query(
+      const { rows: inserted } = await db(
         `INSERT INTO org_roles (organization_id, name, description, is_system)
          VALUES ($1, $2, $3, true)
          RETURNING id`,
@@ -113,7 +115,7 @@ export async function ensureOrgSystemRoles(organizationId) {
     }
     const perms = resolveOrgRolePermissions(def)
     for (const permission of perms) {
-      await query(
+      await db(
         `INSERT INTO org_role_permissions (role_id, permission, branch_scope)
          VALUES ($1, $2, $3)
          ON CONFLICT (role_id, permission) DO UPDATE SET branch_scope = EXCLUDED.branch_scope`,
@@ -123,8 +125,9 @@ export async function ensureOrgSystemRoles(organizationId) {
   }
 }
 
-export async function getOrgRoleIdByName(organizationId, roleName) {
-  const { rows } = await query(
+export async function getOrgRoleIdByName(organizationId, roleName, client = null) {
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rows } = await db(
     `SELECT id FROM org_roles WHERE organization_id = $1 AND name = $2 LIMIT 1`,
     [organizationId, roleName]
   )
@@ -283,12 +286,19 @@ export async function listOrgBranchesForUser(userId, organizationId) {
   return rows
 }
 
-export async function assignOrgUserRole({ userId, organizationId, roleName, assignedBy = null }) {
-  await ensureOrgSystemRoles(organizationId)
-  const roleId = await getOrgRoleIdByName(organizationId, roleName)
+export async function assignOrgUserRole({
+  userId,
+  organizationId,
+  roleName,
+  assignedBy = null,
+  client = null,
+}) {
+  await ensureOrgSystemRoles(organizationId, client)
+  const roleId = await getOrgRoleIdByName(organizationId, roleName, client)
   if (!roleId) throw new Error(`Org role not found: ${roleName}`)
 
-  await query(
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  await db(
     `
     INSERT INTO org_user_roles (user_id, organization_id, role_id, assigned_by)
     VALUES ($1, $2, $3, $4)
@@ -298,7 +308,9 @@ export async function assignOrgUserRole({ userId, organizationId, roleName, assi
     [userId, organizationId, roleId, assignedBy]
   )
 
-  await invalidateOrgPermissionCaches(userId, organizationId)
+  if (!client) {
+    await invalidateOrgPermissionCaches(userId, organizationId)
+  }
 }
 
 export async function grantOrgBranchAccess({

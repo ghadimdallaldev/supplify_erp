@@ -411,9 +411,13 @@ export const api = createApi({
         }>
         stats: { pending: number; outForDelivery: number; deliveredToday: number }
       },
-      void
+      { warehouseId?: string } | void
     >({
-      query: () => '/api/fulfillment/board',
+      query: (arg) => {
+        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
+        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
+        return `/api/fulfillment/board${qs}`
+      },
       providesTags: ['Fulfillment'],
     }),
     getFulfillmentWaves: builder.query<
@@ -426,9 +430,13 @@ export const api = createApi({
           orderCount: number
         }>
       },
-      void
+      { warehouseId?: string } | void
     >({
-      query: () => '/api/fulfillment/waves',
+      query: (arg) => {
+        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
+        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
+        return `/api/fulfillment/waves${qs}`
+      },
       providesTags: ['Fulfillment'],
     }),
     getFulfillmentRoutes: builder.query<
@@ -443,9 +451,13 @@ export const api = createApi({
           scheduledDate?: string
         }>
       },
-      void
+      { warehouseId?: string } | void
     >({
-      query: () => '/api/fulfillment/routes',
+      query: (arg) => {
+        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
+        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
+        return `/api/fulfillment/routes${qs}`
+      },
       providesTags: ['Fulfillment'],
     }),
     getFulfillmentExceptions: builder.query<
@@ -463,9 +475,13 @@ export const api = createApi({
           createdAt: string
         }>
       },
-      void
+      { warehouseId?: string } | void
     >({
-      query: () => '/api/fulfillment/exceptions',
+      query: (arg) => {
+        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
+        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
+        return `/api/fulfillment/exceptions${qs}`
+      },
       providesTags: ['Fulfillment'],
     }),
 
