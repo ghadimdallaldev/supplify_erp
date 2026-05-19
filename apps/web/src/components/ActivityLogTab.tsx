@@ -65,6 +65,15 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
     }
   }
 
+  const hasFilters = Boolean(action || resourceType || from || to)
+
+  const clearFilters = () => {
+    setAction('')
+    setResourceType('')
+    setFrom('')
+    setTo('')
+  }
+
   const handleQuickCsv = () => {
     downloadCsv(
       'activity-log.csv',
@@ -83,10 +92,15 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle>Activity log</CardTitle>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             Refresh
           </Button>
+          {hasFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleQuickCsv}>
             <Download className="h-4 w-4 mr-1" />
             CSV
@@ -143,9 +157,30 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
         {isLoading ? (
           <Loader2 className="h-6 w-6 animate-spin" />
         ) : logs.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">
-            No activity recorded for these filters.
-          </p>
+          <div className="text-sm text-[var(--text-muted)] space-y-2 py-2">
+            <p>No activity recorded for these filters.</p>
+            {hasFilters ? (
+              <p>
+                Try{' '}
+                <button
+                  type="button"
+                  className="underline text-[var(--brand-mid)]"
+                  onClick={clearFilters}
+                >
+                  clearing filters
+                </button>{' '}
+                or widening the date range. Seeded demo orders do not appear until you run{' '}
+                <code className="text-xs">pnpm run seed:audit-backfill</code> or place a new order
+                in the app.
+              </p>
+            ) : (
+              <p>
+                The log only records actions through the app (e.g. placing an order). For tier demo
+                data, run <code className="text-xs">pnpm run seed:audit-backfill</code> once, then
+                refresh.
+              </p>
+            )}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
