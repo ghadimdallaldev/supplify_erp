@@ -1,21 +1,51 @@
 import { logger } from '../lib/logger.js'
+import {
+  formatWhatsAppAddress,
+  getTwilioClient,
+  getTwilioWhatsAppFrom,
+  isTwilioWhatsAppConfigured,
+} from '../lib/twilio-client.js'
 
 /**
- * Send a WhatsApp message server-side.
- * Currently a no-op skeleton. When ready to integrate, replace the body
- * with a Meta Cloud API or Twilio WhatsApp call.
- *
- * TODO: integrate Meta Cloud API (or Twilio) here
- *   Meta: POST https://graph.facebook.com/v18.0/{phone_number_id}/messages
- *   Twilio: client.messages.create({ from: 'whatsapp:+14155238886', to: `whatsapp:${to}`, body: message })
+ * Send a WhatsApp message server-side via Twilio Programmable Messaging.
+ * Requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_WHATSAPP_FROM.
  */
 export async function sendWhatsAppMessage({ to, message }) {
   if (!to) return { sent: false, reason: 'NO_PHONE' }
+  if (!message || !String(message).trim()) {
+    return { sent: false, reason: 'NO_MESSAGE' }
+  }
 
-  logger.info('[WhatsApp skeleton] Would send message — provider not configured', {
-    to: to.slice(0, 6) + '***',
-    messageLength: message?.length ?? 0,
-  })
+  if (!isTwilioWhatsAppConfigured()) {
+    logger.debug('WhatsApp not configured — skipping Twilio send')
+    return { sent: false, reason: 'NOT_CONFIGURED' }
+  }
 
-  return { sent: false, reason: 'NOT_CONFIGURED' }
+  const toAddress = formatWhatsAppAddress(to)
+  const fromAddress = getTwilioWhatsAppFrom()
+  if (!toAddress || !fromAddress) {
+    return { sent: false, reason: 'INVALID_PHONE' }
+  }
+
+  try {
+    const client = getTwilioClient()
+    const result = await client.messages.create({
+      from: fromAddress,
+      to: toAddress,
+      body: String(message).trim(),
+    })
+
+    logger.info('WhatsApp message sent via Twilio', {
+      sid: result.sid,
+      status: result.status,
+    })
+
+    return { sent: true, sid: result.sid, status: result.status }
+  } catch (error) {
+    logger.error('Twilio WhatsApp send failed', {
+      code: error.code,
+      message: error.message,
+    })
+    return { sent: false, reason: 'SEND_FAILED', error: error.message }
+  }
 }

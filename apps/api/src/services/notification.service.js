@@ -6,7 +6,7 @@ import { getEntitlements } from '../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from './whatsapp.service.js'
 
 /**
- * Notification Service — email via nodemailer (SMTP), WhatsApp via wa.me deep links.
+ * Notification Service — email via Twilio SendGrid or SMTP; WhatsApp via Twilio (with wa.me fallback in metadata).
  */
 
 const emailService = {

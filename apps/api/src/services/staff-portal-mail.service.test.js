@@ -8,8 +8,10 @@ vi.mock('../config/env.js', () => ({
   },
 }))
 
+const isEmailConfigured = vi.fn()
 vi.mock('./mailer.service.js', () => ({
   sendMail: vi.fn().mockResolvedValue({ messageId: 'test-id' }),
+  isEmailConfigured: () => isEmailConfigured(),
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -19,7 +21,7 @@ vi.mock('../lib/logger.js', () => ({
 describe('staff-portal-mail.service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    delete process.env.SMTP_HOST
+    isEmailConfigured.mockReturnValue(false)
   })
 
   it('buildStaffPortalLoginUrl encodes token in dashboard URL', async () => {
@@ -30,8 +32,8 @@ describe('staff-portal-mail.service', () => {
     )
   })
 
-  it('sendStaffPortalMagicLink sends email when SMTP is configured', async () => {
-    process.env.SMTP_HOST = 'smtp.test'
+  it('sendStaffPortalMagicLink sends email when email provider is configured', async () => {
+    isEmailConfigured.mockReturnValue(true)
     const { sendStaffPortalMagicLink } = await import('./staff-portal-mail.service.js')
     const { sendMail } = await import('./mailer.service.js')
 
@@ -51,7 +53,7 @@ describe('staff-portal-mail.service', () => {
     )
   })
 
-  it('sendStaffPortalMagicLink skips send when SMTP is not configured', async () => {
+  it('sendStaffPortalMagicLink skips send when email is not configured', async () => {
     const { sendStaffPortalMagicLink } = await import('./staff-portal-mail.service.js')
     const { sendMail } = await import('./mailer.service.js')
 

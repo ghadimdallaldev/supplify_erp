@@ -54,6 +54,15 @@ export const config = {
   REDIS_URL: process.env.REDIS_URL || '',
   /** Test-only: secret for E2E reset-seed endpoint. When set, POST /api/e2e/reset-seed is enabled. */
   E2E_SECRET: process.env.E2E_SECRET || '',
+  /** Twilio Programmable Messaging (WhatsApp). */
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
+  /** Sender, e.g. whatsapp:+14155238886 or +14155238886 */
+  TWILIO_WHATSAPP_FROM: process.env.TWILIO_WHATSAPP_FROM || '',
+  /** Twilio Email (SendGrid API key from Twilio console). */
+  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
+  SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL || '',
+  SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME || 'Supplify',
   SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@supplify.local',
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,

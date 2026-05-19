@@ -51,6 +51,37 @@ import type {
 
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
 
+type ApiErrorBody = { error?: { name?: string; message?: string } }
+
+function requestPath(args: unknown): string {
+  if (typeof args === 'string') return args
+  if (args && typeof args === 'object' && 'url' in args) {
+    return String((args as { url: string }).url)
+  }
+  return ''
+}
+
+/** True when the user had a session that is no longer valid (not merely "never logged in"). */
+function isSessionExpiredAuthError(error: ApiErrorBody['error']): boolean {
+  if (!error?.name) return false
+  if (error.name === 'JWT_EXPIRED') return true
+  if (error.name !== 'UNAUTHORIZED') return false
+  const msg = (error.message || '').toLowerCase()
+  return msg.includes('expired') || msg.includes('refresh failed') || msg.includes('invalid token')
+}
+
+function redirectToLoginForAuthError(error: ApiErrorBody['error'], requestUrl: string): void {
+  if (typeof window === 'undefined' || window.location.pathname.includes('/login')) {
+    return
+  }
+  // AuthGuard already sends unauthenticated users to /login without a full reload.
+  if (requestUrl === '/auth/me' && !isSessionExpiredAuthError(error)) {
+    return
+  }
+  const suffix = isSessionExpiredAuthError(error) ? '?expired=true' : ''
+  window.location.href = `/login${suffix}`
+}
+
 // Custom baseQuery to unwrap API response envelope
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
@@ -63,19 +94,16 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
     },
   })(args, api, extraOptions)
 
-  // Handle 401 Unauthorized errors (token expired or invalid)
+  const requestUrl = requestPath(args)
+
+  // Handle 401 — distinguish "not logged in" from "session expired"
   const err = result.error as { status?: number | string; data?: unknown } | undefined
-  if (err && (err.status === 401 || err.status === 'FETCH_ERROR')) {
-    // Check if it's an authentication error
+  if (err?.status === 401) {
     const errorData = err.data
-    if (
-      typeof errorData === 'object' &&
-      (errorData as { error?: { name?: string } })?.error?.name === 'UNAUTHORIZED'
-    ) {
-      // Token expired or invalid - redirect to login
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        // Clear any auth state
-        window.location.href = '/login?expired=true'
+    if (typeof errorData === 'object' && errorData !== null) {
+      const apiError = (errorData as ApiErrorBody).error
+      if (apiError?.name === 'UNAUTHORIZED' || apiError?.name === 'JWT_EXPIRED') {
+        redirectToLoginForAuthError(apiError, requestUrl)
         return { ...result }
       }
     }
@@ -90,12 +118,8 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
       // Return the actual data
       return { ...result, data: data.data }
     } else {
-      // Check for authentication errors in the response
       if (data.error?.name === 'UNAUTHORIZED' || data.error?.name === 'JWT_EXPIRED') {
-        // Redirect to login on auth errors
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          window.location.href = '/login?expired=true'
-        }
+        redirectToLoginForAuthError(data.error, requestUrl)
       }
       // Dispatch monetization soft-wall when blocked by plan/limit (Phase B)
       const respErr = data.error

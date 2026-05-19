@@ -10,10 +10,8 @@ import {
   notifyStaffSwapRequest,
 } from '../services/notification.service.js'
 import { config } from '../config/env.js'
-import {
-  sendStaffPortalMagicLink,
-  isSmtpConfigured,
-} from '../services/staff-portal-mail.service.js'
+import { sendStaffPortalMagicLink } from '../services/staff-portal-mail.service.js'
+import { isEmailConfigured } from '../services/mailer.service.js'
 
 const router = express.Router()
 
@@ -572,7 +570,7 @@ router.post('/staff/request-link', async (req, res) => {
 
     const responseData = { message: genericMessage }
     // Dev-only: expose token when SMTP is not configured (local testing without mail server)
-    if (config.NODE_ENV === 'development' && !isSmtpConfigured()) {
+    if (config.NODE_ENV === 'development' && !isEmailConfigured()) {
       responseData.sessionToken = sessionToken
       responseData.expiresAt = sessionExpiresAt
     }
