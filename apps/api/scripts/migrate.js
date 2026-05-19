@@ -25,7 +25,8 @@ async function runMigrations() {
     await runNodeScript('run-migration.js')
     await ensureStaffAppSchema()
     await ensureReservationsSchema()
-    logger.info('SQL migrations and runtime schema checks completed successfully')
+    await runNodeScript('migrate-users-to-roles.js')
+    logger.info('SQL migrations, runtime schema checks, and tenant role backfill completed')
   } catch (error) {
     logger.error('Migration failed:', error)
     process.exitCode = 1
