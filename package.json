@@ -7,8 +7,8 @@
   "scripts": {
     "build": "pnpm --filter @supplify/api build && pnpm --filter @supplify/web build",
     "db:migrate": "node apps/api/scripts/migrate.js",
-    "deploy:preprod": "bash deploy/scripts/deploy-preprod.sh",
-    "docker:preprod:up": "docker compose --env-file deploy/env/.env.staging -f deploy/docker-compose.staging.yml up -d",
+    "deploy:prod": "bash deploy/scripts/deploy-prod.sh",
+    "docker:prod:up": "docker compose --env-file deploy/env/.env.prod -f deploy/docker-compose.prod.yml up -d",
     "setup": "node scripts/ensure-pnpm.mjs && node scripts/pnpm-run.mjs install"
   },
   "engines": {
