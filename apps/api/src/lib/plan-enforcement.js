@@ -215,12 +215,7 @@ async function checkLinkedAccountLimit(tenantId, tenantType, currentUsage = null
 
     const subscription = subscriptionRows[0]
     const limits = subscription.plan_limits || {}
-    const branchLimit =
-      limits.branches !== undefined
-        ? parseInt(limits.branches, 10)
-        : limits.warehouses !== undefined
-          ? parseInt(limits.warehouses, 10)
-          : 0
+    const branchLimit = limits.branches !== undefined ? parseInt(limits.branches, 10) : -1
 
     let branchCount = currentUsage?.branches_count
     if (branchCount === undefined || branchCount === null) {
@@ -231,7 +226,8 @@ async function checkLinkedAccountLimit(tenantId, tenantType, currentUsage = null
       `,
         [tenantId]
       )
-      branchCount = parseInt(countRows[0]?.count || 0, 10)
+      const linked = parseInt(countRows[0]?.count || 0, 10)
+      branchCount = 1 + linked
     }
 
     if (branchLimit === -1) {

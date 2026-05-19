@@ -36,6 +36,10 @@ export const PERMISSION_LABELS = {
   RECEIVING_MANAGE: 'Manage receiving',
   PAYMENTS_VIEW: 'View payments',
   PAYMENTS_MANAGE: 'Process payments',
+  FULFILLMENT_VIEW: 'View fulfillment board',
+  FULFILLMENT_MANAGE: 'Manage fulfillment',
+  PROMOTIONS_VIEW: 'View promotions',
+  PROMOTIONS_MANAGE: 'Manage promotions',
   ADMIN_ACCESS: 'Platform admin access',
 }
 
@@ -57,6 +61,8 @@ export const PERMISSION_DOMAINS = {
   Warehouses: ['WAREHOUSES_VIEW', 'WAREHOUSES_EDIT', 'WAREHOUSES_MANAGE'],
   Receiving: ['RECEIVING_VIEW', 'RECEIVING_MANAGE'],
   Payments: ['PAYMENTS_VIEW', 'PAYMENTS_MANAGE'],
+  Fulfillment: ['FULFILLMENT_VIEW', 'FULFILLMENT_MANAGE'],
+  Promotions: ['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE'],
 }
 
 export const RESTAURANT_PERMISSION_DOMAINS = {
@@ -84,6 +90,8 @@ export const SUPPLIER_PERMISSION_DOMAINS = {
   Subscriptions: PERMISSION_DOMAINS.Subscriptions,
   Receiving: PERMISSION_DOMAINS.Receiving,
   Payments: PERMISSION_DOMAINS.Payments,
+  Fulfillment: PERMISSION_DOMAINS.Fulfillment,
+  Promotions: PERMISSION_DOMAINS.Promotions,
 }
 
 export function labelForPermission(key) {

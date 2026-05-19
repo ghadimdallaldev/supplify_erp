@@ -37,6 +37,7 @@ import { ReportsPage } from './pages/reports/ReportsPage'
 import { DisputesPage } from './pages/disputes/DisputesPage'
 import { PromotionsPage } from './pages/promotions/PromotionsPage'
 import { DealsPage } from './pages/deals/DealsPage'
+import { OrgOverviewPage } from './pages/OrgOverviewPage'
 
 const router = createBrowserRouter(
   [
@@ -179,6 +180,10 @@ const router = createBrowserRouter(
         {
           path: 'app/settings',
           element: <SettingsPage />,
+        },
+        {
+          path: 'app/org',
+          element: <OrgOverviewPage />,
         },
         {
           path: 'app/chat',

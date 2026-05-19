@@ -45,7 +45,7 @@ export async function userCanAccessTenant(userId, email, tenantId, tenantType) {
 
   const { rows: direct } = await query(
     `SELECT id FROM ${table} WHERE id = $1 AND LOWER(TRIM(contact_email)) = $2`,
-    [tenantId, normalizedEmail],
+    [tenantId, normalizedEmail]
   )
   if (direct.length) return true
 
@@ -55,7 +55,7 @@ export async function userCanAccessTenant(userId, email, tenantId, tenantType) {
       WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3
       LIMIT 1
     `,
-    [userId, tenantId, tenantType],
+    [userId, tenantId, tenantType]
   )
   if (roleRows.length) return true
 
@@ -71,9 +71,42 @@ export async function userCanAccessTenant(userId, email, tenantId, tenantType) {
         AND child_tenant_type = $2
       LIMIT 1
     `,
-    [primary.id, tenantType, tenantId],
+    [primary.id, tenantType, tenantId]
   )
-  return linkRows.length > 0
+  if (linkRows.length > 0) return true
+
+  if (tenantType === 'SUPPLIER') {
+    const { rows: targetOrg } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [
+      tenantId,
+    ])
+    if (targetOrg[0]?.organization_id) {
+      const { rows: orgRole } = await query(
+        `SELECT orgr.name, orp.branch_scope
+         FROM org_user_roles our
+         JOIN org_roles orgr ON orgr.id = our.role_id
+         JOIN org_role_permissions orp ON orp.role_id = orgr.id
+         WHERE our.user_id = $1 AND our.organization_id = $2
+         LIMIT 1`,
+        [userId, targetOrg[0].organization_id]
+      )
+      if (orgRole.length) {
+        if (
+          orgRole[0].branch_scope === 'all' ||
+          ['Org Owner', 'Org Manager', 'Org Viewer'].includes(orgRole[0].name)
+        ) {
+          return true
+        }
+        const { rows: assigned } = await query(
+          `SELECT 1 FROM org_user_branch_access
+           WHERE user_id = $1 AND supplier_id = $2`,
+          [userId, tenantId]
+        )
+        return assigned.length > 0
+      }
+    }
+  }
+
+  return false
 }
 
 export async function getPrimaryTenantForUser(email, tenantType) {
@@ -90,7 +123,7 @@ export async function getPrimaryTenantForUser(email, tenantType) {
       ORDER BY t.created_at ASC
       LIMIT 1
     `,
-    [email, tenantType],
+    [email, tenantType]
   )
   if (rows.length) return rows[0]
 
@@ -101,7 +134,7 @@ export async function getPrimaryTenantForUser(email, tenantType) {
       ORDER BY created_at ASC
       LIMIT 1
     `,
-    [email],
+    [email]
   )
   return fallback[0] || null
 }
@@ -115,7 +148,7 @@ export async function getActiveTenantFromRequest(req) {
     req.userData.id,
     req.userData.email,
     ctx.tenantId,
-    ctx.tenantType,
+    ctx.tenantType
   )
   if (!allowed) return null
 

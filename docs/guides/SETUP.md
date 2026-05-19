@@ -59,6 +59,15 @@ pnpm run seed:accounts    # Keycloak logins for all tenants (password: Supplify1
 pnpm run seed:quick-lists # Quick lists for all restaurants
 ```
 
+**Optional: Tier catalog (clean slate, 3 users per tenant)**  
+Wipes commercial data and seeds one restaurant + one supplier per **Free / Silver / Gold** with prod-like volume. Password for all tier accounts: `Supplify1!` (e.g. `restaurant-gold@supplify.com`, `restaurant-gold-manager@supplify.com`, `restaurant-gold-purchaser@supplify.com`). Activity log rows are backfilled at end of seed. See [tenant-audit-log.md](../features/tenant-audit-log.md).
+
+```bash
+pnpm run seed:tier-catalog   # migrate + wipe + seed + Keycloak (if up)
+pnpm run seed:features         # disputes, promotions/deals, reports (Gold tiers)
+pnpm run seed:audit-backfill   # only if activity log empty after older seeds
+```
+
 ### 5. Start Development Servers
 
 ```bash
@@ -133,8 +142,8 @@ The application uses Keycloak for authentication with server-side OIDC flow:
 
 | Role           | Email                   | Password             |
 | -------------- | ----------------------- | -------------------- |
-| **Admin**      | admin@supplify.com      | SupplifyAdmin1!     |
-| **Supplier**   | supplier@supplify.com   | SupplifySupplier1!  |
+| **Admin**      | admin@supplify.com      | SupplifyAdmin1!      |
+| **Supplier**   | supplier@supplify.com   | SupplifySupplier1!   |
 | **Restaurant** | restaurant@supplify.com | SupplifyRestaurant1! |
 
 If **admin or demo login fails**, create or fix the demo users in Keycloak (Keycloak must be running):

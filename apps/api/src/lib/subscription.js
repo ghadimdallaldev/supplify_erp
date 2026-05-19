@@ -441,6 +441,7 @@ export const RESTAURANT_LIMIT_KEYS = [
   'storage_mb',
 ]
 export const SUPPLIER_LIMIT_KEYS = [
+  'branches',
   'warehouses',
   'users',
   'supplier_products_skus',
@@ -494,11 +495,16 @@ async function getUsageSnapshot(tenantId, tenantType) {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
   } else {
-    const [products, warehouses, storage, meterRows] = await Promise.all([
+    const [products, warehouses, branches, storage, meterRows] = await Promise.all([
       query(`SELECT COUNT(*) as c FROM product WHERE supplier_id = $1`, [tenantId]),
       query(`SELECT COUNT(*) as c FROM warehouse WHERE tenant_id = $1 AND is_active = TRUE`, [
         tenantId,
       ]),
+      query(
+        `SELECT COUNT(*) as c FROM tenant_account_link
+         WHERE parent_tenant_id = $1 AND parent_tenant_type = 'SUPPLIER'`,
+        [tenantId]
+      ),
       query(
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND meter_type = 'storage_mb' AND period_start_date = $2`,
         [tenantId, CUMULATIVE_PERIOD_DATE]
@@ -510,6 +516,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
     ])
     usage.supplier_products_skus = parseInt(products.rows[0]?.c || 0)
     usage.warehouses = parseInt(warehouses.rows[0]?.c || 0)
+    usage.branches = 1 + parseInt(branches.rows[0]?.c || 0, 10)
     usage.users = 1
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
     meterRows.rows.forEach((r) => {

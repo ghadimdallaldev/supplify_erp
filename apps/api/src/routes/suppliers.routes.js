@@ -1,6 +1,13 @@
 import express from 'express'
-import { requireAuth, requireRole, optionalAuth } from '../lib/rbac.js'
-import { requireFeature } from '../lib/subscription.js'
+import {
+  requireAuth,
+  requireRole,
+  optionalAuth,
+  resolveTenantContext,
+  requirePermission,
+  getSupplierIdForRequest,
+} from '../lib/rbac.js'
+import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -255,6 +262,126 @@ router.get('/', optionalAuth, async (req, res) => {
     })
   }
 })
+
+const multiWarehouseFeature = requireFeature(
+  'multi_warehouse',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType || 'SUPPLIER'
+)
+
+// Fulfillment mode (multi-warehouse toggle) — MUST be before /:id
+router.get(
+  '/me/fulfillment',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  multiWarehouseFeature,
+  requirePermission('SETTINGS_MANAGE'),
+  async (req, res) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      const { rows } = await query(
+        `SELECT id, multi_warehouse_enabled, default_warehouse_id, fulfillment_mode FROM supplier WHERE id = $1`,
+        [supplierId]
+      )
+      if (!rows.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      res.json({
+        ok: true,
+        data: { fulfillment: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get fulfillment settings error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to get fulfillment settings' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.patch(
+  '/me/fulfillment',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  multiWarehouseFeature,
+  requirePermission('SETTINGS_MANAGE'),
+  async (req, res) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      const { multi_warehouse_enabled, fulfillment_mode, confirm_disable } = req.body
+
+      const planAllows = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+      if (!planAllows && multi_warehouse_enabled) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FEATURE_DISABLED', message: 'Multi-warehouse is not on your plan' },
+          requestId: req.requestId,
+        })
+      }
+
+      if (fulfillment_mode === 'single' || multi_warehouse_enabled === false) {
+        const { rows: activeMulti } = await query(
+          `SELECT COUNT(*)::int AS cnt FROM order_warehouse_assignment owa
+           JOIN order_item oi ON oi.order_id = owa.order_id
+           WHERE oi.supplier_id = $1 AND owa.order_item_id IS NOT NULL
+             AND owa.status IN ('pending', 'picking', 'packed')`,
+          [supplierId]
+        )
+        if (activeMulti[0]?.cnt > 0 && !confirm_disable) {
+          return res.status(409).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'ACTIVE_MULTI_ORDERS',
+              message:
+                'Active split orders in progress. Confirm to switch to single-warehouse mode.',
+              details: { activeCount: activeMulti[0].cnt },
+            },
+            requestId: req.requestId,
+          })
+        }
+      }
+
+      const { rows } = await query(
+        `UPDATE supplier SET
+          multi_warehouse_enabled = COALESCE($1, multi_warehouse_enabled),
+          fulfillment_mode = COALESCE($2, fulfillment_mode),
+          updated_at = now()
+         WHERE id = $3
+         RETURNING id, multi_warehouse_enabled, default_warehouse_id, fulfillment_mode`,
+        [multi_warehouse_enabled, fulfillment_mode, supplierId]
+      )
+
+      res.json({
+        ok: true,
+        data: { fulfillment: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Update fulfillment settings error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to update fulfillment settings' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
 
 // Get current supplier (for settings page) - MUST be before /:id route
 router.get('/me', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
