@@ -42,3 +42,12 @@ Audited mutations include (non-exhaustive):
 - Order amendment lifecycle
 
 `resource_type` is stored in `payload_json`; no extra migration (`0075`) required.
+
+## Demo / seed data
+
+Tier catalog and other seeds insert orders and products **directly in SQL**, so they do not call `writeAuditLog`. The activity log stays empty until:
+
+1. Users perform real actions in the app (e.g. place an order), or
+2. You run **`pnpm run seed:audit-backfill`** once to create `order.created` / `product.created` rows from existing seed data (timestamps match `placed_at` / `created_at`).
+
+`seed:tier-catalog` runs the backfill automatically at the end.

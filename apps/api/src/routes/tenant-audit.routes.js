@@ -59,11 +59,11 @@ function buildAuditQuery(tenant, filters) {
   }
   if (filters.from) {
     params.push(filters.from)
-    conditions.push(`al.created_at >= $${params.length}::timestamptz`)
+    conditions.push(`al.created_at >= $${params.length}::date`)
   }
   if (filters.to) {
     params.push(filters.to)
-    conditions.push(`al.created_at <= $${params.length}::timestamptz`)
+    conditions.push(`al.created_at < ($${params.length}::date + interval '1 day')`)
   }
 
   return { where: conditions.join(' AND '), params }
