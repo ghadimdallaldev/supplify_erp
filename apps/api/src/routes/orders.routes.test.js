@@ -90,6 +90,10 @@ vi.mock('../services/warehouseRouting.js', () => ({
   assignWarehousesToOrder: vi.fn().mockResolvedValue({ mode: 'single', assignments: [] }),
 }))
 
+vi.mock('../services/warehouseInventory.js', () => ({
+  syncWarehouseFulfillmentOnOrderStatus: vi.fn().mockResolvedValue(undefined),
+}))
+
 // Import routes after mocks
 import { ordersRoutes } from './orders.routes.js'
 
@@ -362,6 +366,12 @@ describe('Orders Routes', () => {
         })
         .mockResolvedValueOnce({
           rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }], // UPDATE order (RESTAURANT can only cancel)
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'restaurant-1', name: 'Test Restaurant' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'supplier-1', name: 'Test Supplier' }],
         })
 
       const response = await request(app)

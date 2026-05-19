@@ -19,6 +19,20 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   }),
   requireRole: () => (req, res, next) => next(),
+  resolveTenantContext: (req, res, next) => {
+    req.tenantContext = req.tenantContext || {
+      permissions: ['SETTINGS_MANAGE', 'WAREHOUSES_MANAGE'],
+      tenantId: 'supplier-1',
+      tenantType: 'SUPPLIER',
+    }
+    next()
+  },
+  requirePermission: () => (req, res, next) => next(),
+  getRequestTenant: vi.fn().mockResolvedValue({
+    tenantId: 'supplier-1',
+    tenantType: 'SUPPLIER',
+    tenantName: 'Test Supplier',
+  }),
   optionalAuth: vi.fn(async (req, res, next) => {
     // optionalAuth should set req.userData if available, but not fail if missing
     // In tests, we set it in the middleware, so optionalAuth just passes through

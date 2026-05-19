@@ -300,10 +300,10 @@ export function getSystemRoleDefinitions(tenantType) {
   return tenantType === 'SUPPLIER' ? SUPPLIER_SYSTEM_ROLES : RESTAURANT_SYSTEM_ROLES
 }
 
-async function insertRolePermissions(roleId, permissions) {
+async function insertRolePermissions(roleId, permissions, db = query) {
   if (!permissions?.length) return
   const placeholders = permissions.map((_, i) => `($1, $${i + 2})`).join(', ')
-  await query(
+  await db(
     `INSERT INTO tenant_role_permissions (role_id, permission)
      VALUES ${placeholders}
      ON CONFLICT (role_id, permission) DO NOTHING`,
@@ -314,14 +314,16 @@ async function insertRolePermissions(roleId, permissions) {
 /**
  * Seed system roles for a tenant if missing. Idempotent.
  */
-export async function ensureTenantSystemRoles(tenantId, tenantType) {
+export async function ensureTenantSystemRoles(tenantId, tenantType, client = null) {
   if (!tenantId || !tenantType) return
   if (tenantType !== 'RESTAURANT' && tenantType !== 'SUPPLIER') return
+
+  const db = client ? (sql, params) => client.query(sql, params) : query
 
   try {
     const definitions = getSystemRoleDefinitions(tenantType)
     for (const def of definitions) {
-      const { rows: existing } = await query(
+      const { rows: existing } = await db(
         `SELECT id FROM tenant_roles
          WHERE tenant_id = $1 AND tenant_type = $2 AND name = $3 AND is_system = true`,
         [tenantId, tenantType, def.name]
@@ -330,7 +332,7 @@ export async function ensureTenantSystemRoles(tenantId, tenantType) {
       if (existing.length > 0) {
         roleId = existing[0].id
       } else {
-        const { rows: inserted } = await query(
+        const { rows: inserted } = await db(
           `INSERT INTO tenant_roles (tenant_type, tenant_id, name, description, is_system)
            VALUES ($1, $2, $3, $4, true)
            RETURNING id`,
@@ -339,7 +341,7 @@ export async function ensureTenantSystemRoles(tenantId, tenantType) {
         roleId = inserted[0].id
       }
       const perms = resolveRolePermissionList(def, tenantType)
-      await insertRolePermissions(roleId, perms)
+      await insertRolePermissions(roleId, perms, db)
     }
   } catch (err) {
     if (err.code === '42P01') return
@@ -348,8 +350,9 @@ export async function ensureTenantSystemRoles(tenantId, tenantType) {
   }
 }
 
-export async function getOwnerRoleId(tenantId, tenantType) {
-  const { rows } = await query(
+export async function getOwnerRoleId(tenantId, tenantType, client = null) {
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rows } = await db(
     `SELECT id FROM tenant_roles
      WHERE tenant_id = $1 AND tenant_type = $2 AND name = 'Owner' AND is_system = true
      LIMIT 1`,
@@ -399,10 +402,28 @@ export async function userHasOwnerRole(userId, tenantId, tenantType) {
   return rows.length > 0
 }
 
-export async function assignOwnerRoleForUser(userId, tenantId, tenantType, assignedBy = null) {
-  await ensureTenantSystemRoles(tenantId, tenantType)
-  const ownerRoleId = await getOwnerRoleId(tenantId, tenantType)
+export async function assignOwnerRoleForUser(
+  userId,
+  tenantId,
+  tenantType,
+  assignedBy = null,
+  client = null
+) {
+  await ensureTenantSystemRoles(tenantId, tenantType, client)
+  const ownerRoleId = await getOwnerRoleId(tenantId, tenantType, client)
   if (!ownerRoleId) return false
+
+  if (client) {
+    await client.query(
+      `INSERT INTO tenant_user_roles (user_id, role_id, tenant_type, tenant_id, assigned_by)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id, tenant_id, tenant_type)
+       DO UPDATE SET role_id = EXCLUDED.role_id, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
+      [userId, ownerRoleId, tenantType, tenantId, assignedBy]
+    )
+    return true
+  }
+
   await assignTenantUserRole({
     userId,
     roleId: ownerRoleId,

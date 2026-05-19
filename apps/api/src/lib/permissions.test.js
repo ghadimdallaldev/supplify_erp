@@ -12,6 +12,12 @@ vi.mock('./db.js', () => ({
   query: (...args) => queryMock(...args),
 }))
 
+const getOrgRolePermissionsMock = vi.fn()
+
+vi.mock('./supplier-org.js', () => ({
+  getOrgRolePermissions: (...args) => getOrgRolePermissionsMock(...args),
+}))
+
 import {
   getPermissionsForUser,
   invalidateUserPermissionCache,
@@ -24,6 +30,7 @@ import { getCache, setCache, deleteCache } from './cache.js'
 describe('permissions resolution', () => {
   beforeEach(() => {
     queryMock.mockReset()
+    getOrgRolePermissionsMock.mockReset()
     vi.mocked(getCache).mockResolvedValue(null)
     vi.mocked(setCache).mockClear()
     vi.mocked(deleteCache).mockClear()
@@ -67,6 +74,32 @@ describe('permissions resolution', () => {
   it('hasPermission treats MANAGE as superset', () => {
     expect(hasPermission(['ORDERS_MANAGE'], 'ORDERS_VIEW')).toBe(true)
     expect(hasPermission(['ORDERS_VIEW'], 'ORDERS_MANAGE')).toBe(false)
+  })
+
+  it('merges org and branch permissions for supplier users', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+    getOrgRolePermissionsMock.mockResolvedValue(['ORDERS_VIEW', 'CATALOG_VIEW'])
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ permission: 'INVENTORY_VIEW' }] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const perms = await getPermissionsForUser('u1', 'supplier-1', 'SUPPLIER')
+    expect(perms).toContain('ORDERS_VIEW')
+    expect(perms).toContain('CATALOG_VIEW')
+    expect(perms).toContain('INVENTORY_VIEW')
+  })
+
+  it('denies supplier access when no org or branch roles', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const perms = await getPermissionsForUser('u1', 'supplier-1', 'SUPPLIER')
+    expect(perms).toEqual([])
   })
 })
 

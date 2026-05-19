@@ -1,14 +1,12 @@
 import { query, withTransaction } from './db.js'
 import { assignDefaultRoleForTenant } from './rbac.js'
-import {
-  createSupplierOrganization,
-  assignOrgUserRole,
-  linkSupplierToOrganization,
-} from './supplier-org.js'
-import { ensureTenantSystemRoles } from './tenant-roles.js'
+import { ensureOrgSystemRoles, assignOrgUserRole } from './supplier-org.js'
+import { ensureTenantSystemRoles, assignOwnerRoleForUser } from './tenant-roles.js'
+import { createDefaultWarehouseForSupplier } from './warehouse-helpers.js'
 import { ensureKeycloakRealmRole } from './keycloak-admin.js'
 import { ConflictError, ValidationError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
+import { sendNotification } from '../services/notification.service.js'
 
 const KC_ROLE = { RESTAURANT: 'restaurant', SUPPLIER: 'supplier', ADMIN: 'admin' }
 
@@ -44,6 +42,63 @@ export async function userNeedsTenantSetup(user) {
     query('SELECT id FROM supplier WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1', [email]),
   ])
   return restaurants.length === 0 && suppliers.length === 0
+}
+
+async function completeSupplierRegistration(
+  client,
+  { userId, keycloakSub, normalizedEmail, name, slug, phone }
+) {
+  const { rows: supplierRows } = await client.query(
+    `INSERT INTO supplier (name, slug, contact_email, phone, address_json)
+     VALUES ($1, $2, $3, $4, '{}'::jsonb)
+     RETURNING *`,
+    [name, slug, normalizedEmail, phone || null]
+  )
+  const tenant = supplierRows[0]
+
+  await client.query(`INSERT INTO catalog (supplier_id, name, is_active) VALUES ($1, $2, true)`, [
+    tenant.id,
+    `${name} Catalog`,
+  ])
+
+  const orgSlug = `${slug}-org`
+  const { rows: orgRows } = await client.query(
+    `INSERT INTO supplier_organizations (name, slug)
+     VALUES ($1, $2)
+     RETURNING *`,
+    [name, orgSlug]
+  )
+  const organization = orgRows[0]
+
+  await client.query(
+    `UPDATE supplier
+     SET organization_id = $1, is_main_branch = true, updated_at = now()
+     WHERE id = $2`,
+    [organization.id, tenant.id]
+  )
+
+  await createDefaultWarehouseForSupplier(client, tenant)
+
+  await ensureOrgSystemRoles(organization.id, client)
+  await ensureTenantSystemRoles(tenant.id, 'SUPPLIER', client)
+
+  await assignOrgUserRole({
+    userId,
+    organizationId: organization.id,
+    roleName: 'Org Owner',
+    client,
+  })
+
+  await assignOwnerRoleForUser(userId, tenant.id, 'SUPPLIER', null, client)
+
+  await client.query(
+    `UPDATE app_user SET role = 'SUPPLIER', keycloak_sub = COALESCE(keycloak_sub, $1), updated_at = now() WHERE id = $2`,
+    [keycloakSub, userId]
+  )
+
+  await createPendingActivationSubscription(client, tenant.id, 'SUPPLIER', 'free')
+
+  return { tenant, tenantType: 'SUPPLIER', organizationId: organization.id }
 }
 
 /**
@@ -87,28 +142,24 @@ export async function completeTenantRegistration({
   const result = await withTransaction(async (client) => {
     const slug = await uniqueSlug(client, tenantTable, baseSlug)
 
-    let tenant
     if (type === 'SUPPLIER') {
-      const { rows } = await client.query(
-        `INSERT INTO supplier (name, slug, contact_email, phone, address_json)
-         VALUES ($1, $2, $3, $4, '{}'::jsonb)
-         RETURNING *`,
-        [name, slug, normalizedEmail, phone || null]
-      )
-      tenant = rows[0]
-      await client.query(
-        `INSERT INTO catalog (supplier_id, name, is_active) VALUES ($1, $2, true)`,
-        [tenant.id, `${name} Catalog`]
-      )
-    } else {
-      const { rows } = await client.query(
-        `INSERT INTO restaurant (name, slug, contact_email, phone, address_json)
-         VALUES ($1, $2, $3, $4, '{}'::jsonb)
-         RETURNING *`,
-        [name, slug, normalizedEmail, phone || null]
-      )
-      tenant = rows[0]
+      return completeSupplierRegistration(client, {
+        userId,
+        keycloakSub,
+        normalizedEmail,
+        name,
+        slug,
+        phone,
+      })
     }
+
+    const { rows } = await client.query(
+      `INSERT INTO restaurant (name, slug, contact_email, phone, address_json)
+       VALUES ($1, $2, $3, $4, '{}'::jsonb)
+       RETURNING *`,
+      [name, slug, normalizedEmail, phone || null]
+    )
+    const tenant = rows[0]
 
     await client.query(
       `UPDATE app_user SET role = $1, keycloak_sub = COALESCE(keycloak_sub, $2), updated_at = now() WHERE id = $3`,
@@ -120,23 +171,32 @@ export async function completeTenantRegistration({
     return { tenant, tenantType: type }
   })
 
-  await ensureTenantSystemRoles(result.tenant.id, result.tenantType)
-  await assignDefaultRoleForTenant(userId, result.tenant.id, result.tenantType)
-
-  if (result.tenantType === 'SUPPLIER') {
-    const org = await createSupplierOrganization({
-      name: result.tenant.name,
-      slug: `${result.tenant.slug}-org`,
-    })
-    await linkSupplierToOrganization(result.tenant.id, org.id, { isMain: true })
-    await assignOrgUserRole({
-      userId,
-      organizationId: org.id,
-      roleName: 'Org Owner',
-    })
+  if (result.tenantType === 'RESTAURANT') {
+    await ensureTenantSystemRoles(result.tenant.id, result.tenantType)
+    await assignDefaultRoleForTenant(userId, result.tenant.id, result.tenantType)
+  } else {
+    const { invalidateOrgPermissionCaches } = await import('./supplier-org.js')
+    const { invalidateUserPermissionCache } = await import('./permissions.js')
+    await invalidateOrgPermissionCaches(userId, result.organizationId)
+    await invalidateUserPermissionCache(userId, result.tenant.id, 'SUPPLIER')
   }
 
   await ensureKeycloakRealmRole(normalizedEmail, kcRole)
+
+  try {
+    await sendNotification({
+      userId,
+      type: 'account.welcome',
+      title: 'Welcome to Supplify',
+      message:
+        result.tenantType === 'SUPPLIER'
+          ? `Your supplier account "${name}" is ready.`
+          : `Your restaurant account "${name}" is ready.`,
+      metadata: { tenantId: result.tenant.id, tenantType: result.tenantType },
+    })
+  } catch {
+    // Non-blocking welcome notification
+  }
 
   return result
 }

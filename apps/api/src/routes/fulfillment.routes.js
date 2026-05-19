@@ -1,11 +1,54 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext, getRequestTenant } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  getRequestTenant,
+  requirePermission,
+} from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { isFeatureEnabled } from '../lib/subscription.js'
+import { isMultiWarehouseFulfillmentActive } from '../lib/warehouse-helpers.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requireRole(['SUPPLIER', 'ADMIN']))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('FULFILLMENT_VIEW')
+)
+
+function parseWarehouseFilter(req) {
+  const raw = req.query.warehouse_id ?? req.query.warehouseId
+  if (!raw || typeof raw !== 'string') return null
+  return raw
+}
+
+async function warehouseFilterClause(req, supplierId, paramIndex = 1) {
+  const warehouseId = parseWarehouseFilter(req)
+  if (!warehouseId) return { clause: '', params: [], warehouseId: null }
+
+  const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+  const { rows: supplierRows } = await query(
+    `SELECT multi_warehouse_enabled, fulfillment_mode FROM supplier WHERE id = $1`,
+    [supplierId]
+  )
+  const supplier = supplierRows[0] || {}
+  if (!isMultiWarehouseFulfillmentActive(supplier, multiActive)) {
+    return { clause: '', params: [], warehouseId: null }
+  }
+
+  return {
+    clause: ` AND EXISTS (
+      SELECT 1 FROM order_warehouse_assignment owa
+      WHERE owa.order_id = o.id AND owa.warehouse_id = $${paramIndex}
+    )`,
+    params: [warehouseId],
+    warehouseId,
+  }
+}
 
 function mapStopStatus(dbStatus) {
   switch (dbStatus) {
@@ -30,8 +73,17 @@ async function resolveSupplierId(req) {
   return null
 }
 
-async function loadStopsForRoutes(routeIds) {
+async function loadStopsForRoutes(routeIds, warehouseId = null) {
   if (!routeIds.length) return new Map()
+  const params = [routeIds]
+  let warehouseClause = ''
+  if (warehouseId) {
+    warehouseClause = ` AND EXISTS (
+      SELECT 1 FROM order_warehouse_assignment owa
+      WHERE owa.order_id = rs.order_id AND owa.warehouse_id = $2
+    )`
+    params.push(warehouseId)
+  }
   const { rows } = await query(
     `
     SELECT
@@ -48,10 +100,10 @@ async function loadStopsForRoutes(routeIds) {
     FROM route_stop rs
     JOIN customer_order o ON o.id = rs.order_id
     JOIN restaurant r ON r.id = o.restaurant_id
-    WHERE rs.route_id = ANY($1::uuid[])
+    WHERE rs.route_id = ANY($1::uuid[])${warehouseClause}
     ORDER BY rs.route_id, rs.sequence_number
     `,
-    [routeIds]
+    params
   )
   const byRoute = new Map()
   for (const row of rows) {
@@ -82,6 +134,9 @@ router.get('/board', async (req, res) => {
         requestId: req.requestId,
       })
     }
+
+    const whFilter = await warehouseFilterClause(req, supplierId, 2)
+    const unassignedParams = [supplierId, ...whFilter.params]
 
     const [{ rows: routes }, { rows: unassignedRows }, { rows: statsRows }] = await Promise.all([
       query(
@@ -114,10 +169,10 @@ router.get('/board', async (req, res) => {
             WHERE rs.order_id = o.id
               AND dr.supplier_id = $1
               AND dr.status IN ('PLANNED', 'IN_PROGRESS')
-          )
+          )${whFilter.clause}
         ORDER BY o.id, o.created_at DESC
         `,
-        [supplierId]
+        unassignedParams
       ),
       query(
         `
@@ -151,7 +206,7 @@ router.get('/board', async (req, res) => {
     ])
 
     const routeIds = routes.map((r) => r.id)
-    const stopsByRoute = await loadStopsForRoutes(routeIds)
+    const stopsByRoute = await loadStopsForRoutes(routeIds, whFilter.warehouseId)
 
     const routePayload = routes.map((route) => ({
       id: route.id,
@@ -227,6 +282,16 @@ router.get('/waves', async (req, res) => {
       })
     }
 
+    const whFilter = await warehouseFilterClause(req, supplierId, 2)
+    const waveParams = [supplierId, ...whFilter.params]
+    const waveWarehouseClause = whFilter.warehouseId
+      ? ` AND EXISTS (
+          SELECT 1 FROM pick_list pl2
+          JOIN order_warehouse_assignment owa ON owa.order_id = pl2.order_id
+          WHERE pl2.wave_id = dw.id AND owa.warehouse_id = $2
+        )`
+      : ''
+
     const { rows } = await query(
       `
       SELECT
@@ -237,11 +302,11 @@ router.get('/waves', async (req, res) => {
         COUNT(pl.id)::int AS order_count
       FROM delivery_wave dw
       LEFT JOIN pick_list pl ON pl.wave_id = dw.id
-      WHERE dw.supplier_id = $1
+      WHERE dw.supplier_id = $1${waveWarehouseClause}
       GROUP BY dw.id
       ORDER BY dw.scheduled_date DESC, dw.wave_number
       `,
-      [supplierId]
+      waveParams
     )
 
     res.json({
@@ -281,6 +346,16 @@ router.get('/routes', async (req, res) => {
       })
     }
 
+    const whFilter = await warehouseFilterClause(req, supplierId, 2)
+    const routeParams = [supplierId, ...whFilter.params]
+    const routeWarehouseClause = whFilter.warehouseId
+      ? ` AND EXISTS (
+          SELECT 1 FROM route_stop rs2
+          JOIN order_warehouse_assignment owa ON owa.order_id = rs2.order_id
+          WHERE rs2.route_id = dr.id AND owa.warehouse_id = $2
+        )`
+      : ''
+
     const { rows } = await query(
       `
       SELECT
@@ -293,11 +368,11 @@ router.get('/routes', async (req, res) => {
         COUNT(rs.id)::int AS stops
       FROM delivery_route dr
       LEFT JOIN route_stop rs ON rs.route_id = dr.id
-      WHERE dr.supplier_id = $1
+      WHERE dr.supplier_id = $1${routeWarehouseClause}
       GROUP BY dr.id
       ORDER BY dr.scheduled_date DESC, dr.route_number
       `,
-      [supplierId]
+      routeParams
     )
 
     res.json({
@@ -339,6 +414,9 @@ router.get('/exceptions', async (req, res) => {
       })
     }
 
+    const whFilter = await warehouseFilterClause(req, supplierId, 2)
+    const exceptionParams = [supplierId, ...whFilter.params]
+
     const { rows } = await query(
       `
       SELECT
@@ -358,11 +436,11 @@ router.get('/exceptions', async (req, res) => {
       WHERE EXISTS (
         SELECT 1 FROM order_item oi2
         WHERE oi2.order_id = de.order_id AND oi2.supplier_id = $1
-      )
+      )${whFilter.clause}
       ORDER BY de.created_at DESC
       LIMIT 100
       `,
-      [supplierId]
+      exceptionParams
     )
 
     res.json({
@@ -374,7 +452,8 @@ router.get('/exceptions', async (req, res) => {
           orderLabel: row.order_id.slice(0, 8).toUpperCase(),
           exceptionType: row.exception_type,
           productName: row.product_name,
-          quantityExpected: row.quantity_expected != null ? parseFloat(row.quantity_expected) : null,
+          quantityExpected:
+            row.quantity_expected != null ? parseFloat(row.quantity_expected) : null,
           quantityActual: row.quantity_actual != null ? parseFloat(row.quantity_actual) : null,
           damageDescription: row.damage_description,
           notes: row.notes,

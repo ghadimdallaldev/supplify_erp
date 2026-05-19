@@ -116,6 +116,9 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
     let named = []
     let legacy = []
 
+    let orgPerms = []
+    let hasOrgRole = false
+
     if (tenantType === 'SUPPLIER') {
       try {
         const { rows: orgRows } = await query(
@@ -124,18 +127,13 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
         )
         const organizationId = orgRows[0]?.organization_id
         if (organizationId) {
-          const orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
-          if (orgPerms.length > 0) {
-            await setCache(cacheKey, orgPerms, PERMISSION_CACHE_TTL_SECONDS)
-            return orgPerms
-          }
-          const { rows: hasOrgRole } = await query(
+          const { rows: orgMembership } = await query(
             `SELECT 1 FROM org_user_roles WHERE user_id = $1 AND organization_id = $2`,
             [userId, organizationId]
           )
-          if (hasOrgRole.length > 0) {
-            await setCache(cacheKey, [], PERMISSION_CACHE_TTL_SECONDS)
-            return []
+          hasOrgRole = orgMembership.length > 0
+          if (hasOrgRole) {
+            orgPerms = await getOrgRolePermissions(userId, organizationId, tenantId)
           }
         }
       } catch (err) {
@@ -157,7 +155,20 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
       if (err.code !== '42P01') throw err
     }
 
-    const permissions = mergeUniquePermissions(named, legacy)
+    const branchPerms = mergeUniquePermissions(named, legacy)
+
+    if (tenantType === 'SUPPLIER' && hasOrgRole) {
+      const permissions = mergeUniquePermissions(orgPerms, branchPerms)
+      await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
+      return permissions
+    }
+
+    if (tenantType === 'SUPPLIER' && !hasOrgRole && branchPerms.length === 0) {
+      await setCache(cacheKey, [], PERMISSION_CACHE_TTL_SECONDS)
+      return []
+    }
+
+    const permissions = branchPerms
     await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
     return permissions
   } catch (err) {

@@ -292,6 +292,7 @@ describe('Subscription lib', () => {
         .mockResolvedValueOnce({ rows: [{ c: 0 }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ current_value: 5 }] })
+        .mockResolvedValueOnce({ rows: [] })
 
       const result = await getEntitlements('tenant-1', 'SUPPLIER')
 

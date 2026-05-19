@@ -632,7 +632,7 @@ router.delete(
             data: null,
             error: {
               name: 'DEFAULT_WAREHOUSE',
-              message: 'Reassign default warehouse before deactivating this one',
+              message: 'Set another warehouse as default before deactivating this one',
             },
             requestId: req.requestId,
           })

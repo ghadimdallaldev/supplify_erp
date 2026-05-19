@@ -50,6 +50,11 @@ export function OrgOverviewPage() {
     await createBranch({ name: name.trim() }).unwrap()
   }
 
+  if (user?.role === 'SUPPLIER' && !multiBranch && !isLoading) {
+    navigate('/app/dashboard', { replace: true })
+    return null
+  }
+
   if (!multiBranch) {
     return (
       <div className="p-6 max-w-3xl">

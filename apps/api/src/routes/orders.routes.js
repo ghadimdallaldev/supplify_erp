@@ -29,6 +29,8 @@ import { applyBestPromotionToOrder } from '../services/promotions.service.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { orderAmendmentsRouter } from './order-amendments.routes.js'
 import { assignWarehousesToOrder } from '../services/warehouseRouting.js'
+import { syncWarehouseFulfillmentOnOrderStatus } from '../services/warehouseInventory.js'
+import { hasPermission } from '../lib/permissions.js'
 
 const router = express.Router()
 
@@ -1625,7 +1627,7 @@ router.post('/manual', requireAuth, requireRole(['SUPPLIER']), async (req, res) 
 })
 
 // Update order status
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params
     logger.info('Order update request', {
@@ -1704,6 +1706,19 @@ router.patch('/:id', requireAuth, async (req, res) => {
         })
       }
     } else if (req.userData.role === 'SUPPLIER') {
+      const supplierPerms = req.tenantContext?.permissions ?? []
+      if (!hasPermission(supplierPerms, 'ORDERS_EDIT')) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Missing permission: ORDERS_EDIT',
+          },
+          requestId: req.requestId,
+        })
+      }
+
       // Suppliers can acknowledge, process, ship, and complete orders
       if (
         updateData.status &&
@@ -1754,15 +1769,23 @@ router.patch('/:id', requireAuth, async (req, res) => {
     // Now add the WHERE clause with the order id
     updateValues.push(id)
 
-    const { rows } = await query(
-      `
-      UPDATE customer_order 
-      SET ${updateFields.join(', ')}
-      WHERE id = $${updateValues.length}
-      RETURNING *
-    `,
-      updateValues
-    )
+    const rows = await withTransaction(async (client) => {
+      const { rows: updated } = await client.query(
+        `
+        UPDATE customer_order
+        SET ${updateFields.join(', ')}
+        WHERE id = $${updateValues.length}
+        RETURNING *
+      `,
+        updateValues
+      )
+
+      if (updateData.status && updateData.status !== order.status) {
+        await syncWarehouseFulfillmentOnOrderStatus(client, id, updateData.status, order.status)
+      }
+
+      return updated
+    })
 
     logger.info('Order updated', {
       orderId: rows[0].id,

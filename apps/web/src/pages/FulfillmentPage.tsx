@@ -7,19 +7,9 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
@@ -37,10 +27,26 @@ import {
   Clock,
   ClipboardSignature,
 } from 'lucide-react'
-import { useGetOrdersQuery, useGetFulfillmentBoardQuery, useGetFulfillmentWavesQuery, useGetFulfillmentRoutesQuery, useGetFulfillmentExceptionsQuery } from '../services/api'
+import {
+  useGetOrdersQuery,
+  useGetFulfillmentBoardQuery,
+  useGetFulfillmentWavesQuery,
+  useGetFulfillmentRoutesQuery,
+  useGetFulfillmentExceptionsQuery,
+  useGetWarehousesQuery,
+  useGetSupplierFulfillmentQuery,
+} from '../services/api'
+import { useEntitlements } from '../hooks/useEntitlements'
+import { isMultiWarehouseActive } from '../lib/planLimits'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 
@@ -121,17 +127,28 @@ type DispatchBoard = {
 
 export function FulfillmentPage() {
   const [activeTab, setActiveTab] = useState('dispatch')
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('')
   const [proofStop, setProofStop] = useState<DispatchStop | null>(null)
   const [recipientName, setRecipientName] = useState('')
   const [proofNotes, setProofNotes] = useState('')
   const [capturingProof, setCapturingProof] = useState(false)
   const [activeDrag, setActiveDrag] = useState<ActiveDragItem | null>(null)
 
+  const { entitlements } = useEntitlements()
+  const { data: warehousesData } = useGetWarehousesQuery()
+  const { data: fulfillmentData } = useGetSupplierFulfillmentQuery()
+
+  const warehouses = warehousesData?.warehouses ?? []
+  const multiWarehouseActive = isMultiWarehouseActive(entitlements, fulfillmentData?.fulfillment)
+  const warehouseFilter =
+    multiWarehouseActive && selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined
+
   const { data: ordersData } = useGetOrdersQuery({ limit: 1000, offset: 0 })
-  const { data: boardResponse, isLoading: boardLoading } = useGetFulfillmentBoardQuery()
-  const { data: wavesResponse } = useGetFulfillmentWavesQuery()
-  const { data: routesResponse } = useGetFulfillmentRoutesQuery()
-  const { data: exceptionsResponse } = useGetFulfillmentExceptionsQuery()
+  const { data: boardResponse, isLoading: boardLoading } =
+    useGetFulfillmentBoardQuery(warehouseFilter)
+  const { data: wavesResponse } = useGetFulfillmentWavesQuery(warehouseFilter)
+  const { data: routesResponse } = useGetFulfillmentRoutesQuery(warehouseFilter)
+  const { data: exceptionsResponse } = useGetFulfillmentExceptionsQuery(warehouseFilter)
 
   const boardData = (boardResponse as DispatchBoard | undefined) ?? null
   const waves = wavesResponse?.waves ?? []
@@ -147,26 +164,38 @@ export function FulfillmentPage() {
   const shippedOrders = useMemo(() => {
     if (!ordersData?.orders) return []
     return ordersData.orders
-      .filter((order: { status: string }) => ['SHIPPED', 'ACKNOWLEDGED', 'PROCESSING'].includes(order.status))
-      .map((order: { id: string; status: string; restaurant_name?: string; total_amount?: number; items?: unknown[]; placed_at?: string; created_at?: string }) => {
-        const restaurantName = order.restaurant_name || 'Restaurant'
-        const totalAmount = Number(order.total_amount) || 0
-        const itemCount = Array.isArray(order.items) ? order.items.length : 0
+      .filter((order: { status: string }) =>
+        ['SHIPPED', 'ACKNOWLEDGED', 'PROCESSING'].includes(order.status)
+      )
+      .map(
+        (order: {
+          id: string
+          status: string
+          restaurant_name?: string
+          total_amount?: number
+          items?: unknown[]
+          placed_at?: string
+          created_at?: string
+        }) => {
+          const restaurantName = order.restaurant_name || 'Restaurant'
+          const totalAmount = Number(order.total_amount) || 0
+          const itemCount = Array.isArray(order.items) ? order.items.length : 0
 
-        return {
-          id: order.id,
-          orderNumber: order.id.slice(0, 8).toUpperCase(),
-          restaurantName,
-          restaurant_name: restaurantName,
-          status: order.status,
-          totalAmount,
-          total_amount: totalAmount,
-          itemCount,
-          item_count: itemCount,
-          placedAt: order.placed_at || order.created_at,
-          order,
+          return {
+            id: order.id,
+            orderNumber: order.id.slice(0, 8).toUpperCase(),
+            restaurantName,
+            restaurant_name: restaurantName,
+            status: order.status,
+            totalAmount,
+            total_amount: totalAmount,
+            itemCount,
+            item_count: itemCount,
+            placedAt: order.placed_at || order.created_at,
+            order,
+          }
         }
-      })
+      )
   }, [ordersData])
 
   const columnData = useMemo(() => {
@@ -238,8 +267,31 @@ export function FulfillmentPage() {
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-[21px] font-black text-[var(--text)]">Fulfillment & Logistics</h1>
-        <p className="text-[var(--text-muted)] mt-2">Wave planning, mobile pick lists, and driver dispatch.</p>
+        <p className="text-[var(--text-muted)] mt-2">
+          Wave planning, mobile pick lists, and driver dispatch.
+        </p>
       </div>
+
+      {multiWarehouseActive && warehouses.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor="fulfillment-warehouse" className="text-sm font-medium text-[var(--text)]">
+            Warehouse
+          </label>
+          <select
+            id="fulfillment-warehouse"
+            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm min-w-[220px]"
+            value={selectedWarehouseId}
+            onChange={(e) => setSelectedWarehouseId(e.target.value)}
+          >
+            <option value="">All warehouses</option>
+            {warehouses.map((wh: { id: string; name: string }) => (
+              <option key={wh.id} value={wh.id}>
+                {wh.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
@@ -288,33 +340,37 @@ export function FulfillmentPage() {
             <CardContent>
               <div className="space-y-4">
                 {waves.length === 0 ? (
-                  <div className="text-center py-8 text-[var(--text-muted)]">No delivery waves scheduled yet.</div>
-                ) : waves.map((wave) => (
-                  <div key={wave.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold">{wave.waveNumber}</h4>
-                          <Badge variant={wave.status === 'PICKING' ? 'default' : 'secondary'}>
-                            {wave.status}
-                          </Badge>
+                  <div className="text-center py-8 text-[var(--text-muted)]">
+                    No delivery waves scheduled yet.
+                  </div>
+                ) : (
+                  waves.map((wave) => (
+                    <div key={wave.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-semibold">{wave.waveNumber}</h4>
+                            <Badge variant={wave.status === 'PICKING' ? 'default' : 'secondary'}>
+                              {wave.status}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-[var(--text-muted)] space-y-1">
+                            <p>Scheduled: {wave.scheduledDate}</p>
+                            <p>Orders: {wave.orderCount}</p>
+                          </div>
                         </div>
-                        <div className="text-sm text-[var(--text-muted)] space-y-1">
-                          <p>Scheduled: {wave.scheduledDate}</p>
-                          <p>Orders: {wave.orderCount}</p>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm">
+                            View
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            Edit
+                          </Button>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          View
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          Edit
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -337,12 +393,16 @@ export function FulfillmentPage() {
             <CardContent>
               {shippedOrders.length === 0 ? (
                 <div className="text-center py-8 text-[var(--text-muted)]">
-                  No orders ready for picking. Orders will appear here when they reach SHIPPED status.
+                  No orders ready for picking. Orders will appear here when they reach SHIPPED
+                  status.
                 </div>
               ) : (
                 <div className="space-y-4">
                   {shippedOrders.map((order) => (
-                    <div key={order.id} className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]">
+                    <div
+                      key={order.id}
+                      className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
@@ -356,8 +416,8 @@ export function FulfillmentPage() {
                                 order.status === 'SHIPPED'
                                   ? 'default'
                                   : order.status === 'PROCESSING'
-                                  ? 'secondary'
-                                  : 'outline'
+                                    ? 'secondary'
+                                    : 'outline'
                               }
                             >
                               {order.status}
@@ -405,35 +465,41 @@ export function FulfillmentPage() {
             <CardContent>
               <div className="space-y-4">
                 {routeSummaries.length === 0 ? (
-                  <div className="text-center py-8 text-[var(--text-muted)]">No delivery routes planned yet.</div>
-                ) : routeSummaries.map((route) => (
-                  <div key={route.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold">{route.routeNumber}</h4>
-                          <Badge variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}>
-                            {route.status}
-                          </Badge>
+                  <div className="text-center py-8 text-[var(--text-muted)]">
+                    No delivery routes planned yet.
+                  </div>
+                ) : (
+                  routeSummaries.map((route) => (
+                    <div key={route.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-semibold">{route.routeNumber}</h4>
+                            <Badge
+                              variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}
+                            >
+                              {route.status}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-[var(--text-muted)] space-y-1">
+                            <p>Driver: {route.driver}</p>
+                            <p>
+                              Vehicle: {route.vehicle} | Stops: {route.stops}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-sm text-[var(--text-muted)] space-y-1">
-                          <p>Driver: {route.driver}</p>
-                          <p>
-                            Vehicle: {route.vehicle} | Stops: {route.stops}
-                          </p>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm">
+                            View Map
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            Manifest
+                          </Button>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          View Map
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          Manifest
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -450,7 +516,9 @@ export function FulfillmentPage() {
             </CardHeader>
             <CardContent>
               {shippedOrders.length === 0 ? (
-                <div className="text-center py-8 text-[var(--text-muted)]">No deliveries currently in transit</div>
+                <div className="text-center py-8 text-[var(--text-muted)]">
+                  No deliveries currently in transit
+                </div>
               ) : (
                 <div className="space-y-4">
                   {shippedOrders
@@ -497,7 +565,9 @@ export function FulfillmentPage() {
             <CardContent>
               <div className="space-y-4">
                 {exceptions.length === 0 ? (
-                  <div className="text-center py-8 text-[var(--text-muted)]">No delivery exceptions recorded.</div>
+                  <div className="text-center py-8 text-[var(--text-muted)]">
+                    No delivery exceptions recorded.
+                  </div>
                 ) : (
                   exceptions.map((ex) => (
                     <div key={ex.id} className="border rounded-lg p-4">
@@ -510,7 +580,8 @@ export function FulfillmentPage() {
                             {ex.productName && <p>Product: {ex.productName}</p>}
                             {(ex.quantityExpected != null || ex.quantityActual != null) && (
                               <p>
-                                Expected: {ex.quantityExpected ?? '—'}, Actual: {ex.quantityActual ?? '—'}
+                                Expected: {ex.quantityExpected ?? '—'}, Actual:{' '}
+                                {ex.quantityActual ?? '—'}
                               </p>
                             )}
                             {ex.damageDescription && <p>{ex.damageDescription}</p>}
@@ -619,7 +690,9 @@ function DispatchBoardView({
             <CardDescription>Stops currently en route</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold text-[var(--text)]">{board.stats.outForDelivery}</p>
+            <p className="text-2xl font-semibold text-[var(--text)]">
+              {board.stats.outForDelivery}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -628,7 +701,9 @@ function DispatchBoardView({
             <CardDescription>Completed drops with proof</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold text-[var(--text)]">{board.stats.deliveredToday}</p>
+            <p className="text-2xl font-semibold text-[var(--text)]">
+              {board.stats.deliveredToday}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -761,12 +836,20 @@ function DispatchColumn({
           </div>
           <div className="flex gap-1">
             {route.status === 'PLANNED' && (
-              <Button variant="outline" size="sm" onClick={() => onRouteStatusChange(route.id, 'IN_PROGRESS')}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onRouteStatusChange(route.id, 'IN_PROGRESS')}
+              >
                 Start
               </Button>
             )}
             {route.status === 'IN_PROGRESS' && (
-              <Button variant="outline" size="sm" onClick={() => onRouteStatusChange(route.id, 'COMPLETED')}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onRouteStatusChange(route.id, 'COMPLETED')}
+              >
                 Complete
               </Button>
             )}
@@ -793,9 +876,13 @@ function EmptyState({ message }: { message: string }) {
 
 function OrderCard({ order, compact = false }: { order: DispatchOrderSummary; compact?: boolean }) {
   return (
-    <div className={`rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm ${compact ? 'w-64' : ''}`}>
+    <div
+      className={`rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm ${compact ? 'w-64' : ''}`}
+    >
       <p className="text-sm font-semibold text-[var(--text)]">{order.restaurant_name}</p>
-      <p className="text-xs text-[var(--text-muted)] mb-2">Order #{order.id.slice(0, 6).toUpperCase()}</p>
+      <p className="text-xs text-[var(--text-muted)] mb-2">
+        Order #{order.id.slice(0, 6).toUpperCase()}
+      </p>
       <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
         <span>{formatPrice(order.total_amount)}</span>
         <span>{order.item_count} items</span>
@@ -823,7 +910,9 @@ function StopCard({
   }
 
   return (
-    <div className={`rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm ${compact ? 'w-64' : ''}`}>
+    <div
+      className={`rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm ${compact ? 'w-64' : ''}`}
+    >
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-[var(--text)]">{stop.restaurant_name}</p>
         <span
@@ -834,7 +923,9 @@ function StopCard({
           {stop.status.replace(/_/g, ' ')}
         </span>
       </div>
-      <p className="text-xs text-[var(--text-muted)] mb-2">Order #{stop.order_id.slice(0, 6).toUpperCase()}</p>
+      <p className="text-xs text-[var(--text-muted)] mb-2">
+        Order #{stop.order_id.slice(0, 6).toUpperCase()}
+      </p>
       <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
         <span>{formatPrice(stop.total_amount)}</span>
         {stop.eta_seconds ? <span>{Math.round(stop.eta_seconds / 60)} min eta</span> : null}
@@ -842,13 +933,21 @@ function StopCard({
       {!compact && onStatusChange && (
         <div className="mt-3 flex flex-wrap gap-2">
           {stop.status === 'PLANNED' && (
-            <Button size="sm" variant="outline" onClick={() => onStatusChange(stop.id, 'OUT_FOR_DELIVERY')}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onStatusChange(stop.id, 'OUT_FOR_DELIVERY')}
+            >
               <Clock className="mr-1 h-3 w-3" />
               Out for delivery
             </Button>
           )}
           {stop.status === 'OUT_FOR_DELIVERY' && (
-            <Button size="sm" variant="outline" onClick={() => onStatusChange(stop.id, 'DELIVERED')}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onStatusChange(stop.id, 'DELIVERED')}
+            >
               <CheckCircle className="mr-1 h-3 w-3" />
               Delivered
             </Button>
@@ -873,7 +972,13 @@ function DragOverlayCard({ children }: { children: React.ReactNode }) {
   )
 }
 
-function DraggableOrderCard({ order, columnId }: { order: DispatchOrderSummary; columnId: ColumnId }) {
+function DraggableOrderCard({
+  order,
+  columnId,
+}: {
+  order: DispatchOrderSummary
+  columnId: ColumnId
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `order-${order.id}`,
     data: {
