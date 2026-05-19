@@ -73,6 +73,8 @@ sed -i \
   -e "s|^FRONTEND_IMAGE=.*|FRONTEND_IMAGE=${FRONTEND_IMAGE}|" \
   "$ENV_FILE"
 
+apply_vapid_env "$ENV_FILE"
+
 set -a
 source "$ENV_FILE"
 set +a

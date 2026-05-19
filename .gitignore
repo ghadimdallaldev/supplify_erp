@@ -112,6 +112,7 @@ Thumbs.db
 deploy/env/.env
 deploy/env/.env.dev
 deploy/env/.env.preprod
+deploy/env/.env.vapid
 deploy/backups/
 backups-dev/
 backups-preprod/

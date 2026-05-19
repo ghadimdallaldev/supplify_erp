@@ -75,3 +75,28 @@ wait_healthy() {
   docker logs "$container" --tail=20 2>&1 || true
   return 1
 }
+
+# Merge VAPID keys from deploy/env/.env.vapid into the target env file (gitignored secrets file).
+apply_vapid_env() {
+  local env_file="$1"
+  local vapid_file="${2:-${REPO_ROOT:-}/deploy/env/.env.vapid}"
+  if [ ! -f "$vapid_file" ] || [ ! -f "$env_file" ]; then
+    return 0
+  fi
+  set -a
+  # shellcheck disable=SC1090
+  source "$vapid_file"
+  set +a
+  for key in VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_EMAIL; do
+  eval "val=\${$key:-}"
+    if [ -z "$val" ]; then
+      continue
+    fi
+    if grep -q "^${key}=" "$env_file" 2>/dev/null; then
+      sed -i "s|^${key}=.*|${key}=${val}|" "$env_file"
+    else
+      echo "${key}=${val}" >> "$env_file"
+    fi
+  done
+  echo "  Applied VAPID keys from $(basename "$vapid_file") to $(basename "$env_file")"
+}
