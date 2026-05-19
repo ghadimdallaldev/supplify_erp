@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { io } from 'socket.io-client'
 import {
   useGetConversationsQuery,
   useGetMessagesQuery,
@@ -44,13 +43,7 @@ import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { format, isToday, isYesterday } from 'date-fns'
 import { formatPrice } from '../utils/format'
-
-/** Same host as API in dev (Vite proxies /api and /socket.io); explicit URL when set. */
-function getChatSocketBaseUrl(): string {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
-  if (typeof window !== 'undefined') return window.location.origin
-  return 'http://localhost:4000'
-}
+import { getChatSocket, releaseChatSocket } from '../lib/chatSocket'
 
 export function ChatPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -108,49 +101,54 @@ export function ChatPage() {
   const conversations = conversationsData?.conversations || []
   const messages = messagesData?.messages || []
 
-  // Initialize socket
+  const refetchMessagesRef = useRef(refetchMessages)
+  refetchMessagesRef.current = refetchMessages
+  const selectedConversationRef = useRef(selectedConversation)
+  selectedConversationRef.current = selectedConversation
+  const userIdRef = useRef(user?.id)
+  userIdRef.current = user?.id
+
+  // Shared socket — listeners only; no disconnect on Strict Mode remount
   useEffect(() => {
-    if (!socketRef.current) {
-      socketRef.current = io(getChatSocketBaseUrl(), {
-        path: '/socket.io',
-        transports: ['websocket', 'polling'],
-        withCredentials: true,
-      })
-
-      socketRef.current.on('connect', () => {})
-
-      socketRef.current.on('disconnect', () => {})
-
-      socketRef.current.on('new_message', (_data: any) => {
-        refetchMessages()
-      })
-
-      socketRef.current.on('message_read_update', (_data: any) => {
-        refetchMessages()
-      })
-
-      socketRef.current.on('messages_read_update', (_data: any) => {
-        refetchMessages()
-      })
-
-      socketRef.current.on('user_typing', (data: any) => {
-        if (
-          data.conversationId === selectedConversation &&
-          data.userId !== socketRef.current?.id &&
-          data.userId !== user?.id
-        ) {
-          setOtherPartyTyping(data.isTyping)
-        }
-      })
+    if (!user?.id) {
+      releaseChatSocket()
+      socketRef.current = null
+      return
     }
 
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect()
-        socketRef.current = null
+    const socket = getChatSocket(user.id)
+    socketRef.current = socket
+
+    const onMessagesChanged = () => {
+      refetchMessagesRef.current()
+    }
+
+    const onUserTyping = (data: {
+      conversationId?: string
+      userId?: string
+      isTyping?: boolean
+    }) => {
+      if (
+        data.conversationId === selectedConversationRef.current &&
+        data.userId !== socket.id &&
+        data.userId !== userIdRef.current
+      ) {
+        setOtherPartyTyping(Boolean(data.isTyping))
       }
     }
-  }, [refetchMessages])
+
+    socket.on('new_message', onMessagesChanged)
+    socket.on('message_read_update', onMessagesChanged)
+    socket.on('messages_read_update', onMessagesChanged)
+    socket.on('user_typing', onUserTyping)
+
+    return () => {
+      socket.off('new_message', onMessagesChanged)
+      socket.off('message_read_update', onMessagesChanged)
+      socket.off('messages_read_update', onMessagesChanged)
+      socket.off('user_typing', onUserTyping)
+    }
+  }, [user?.id])
 
   // Handle supplier query param - auto-create conversation
   useEffect(() => {
