@@ -1,6 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useRef } from 'react'
-import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
@@ -34,6 +33,7 @@ import {
   formatPlanBlockNudgeMessage,
   getLimitLabel,
 } from '../lib/planComparison'
+import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
 
 export function Layout() {
   const location = useLocation()
@@ -84,17 +84,12 @@ export function Layout() {
   }, [user])
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) {
+      releaseLayoutSocket()
+      return
+    }
 
-    const baseUrl =
-      import.meta.env.VITE_API_URL ||
-      (typeof window !== 'undefined' ? window.location.origin : '') ||
-      ''
-    const socket = io(baseUrl, {
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-      withCredentials: true,
-    })
+    const socket = getLayoutSocket(user.id)
 
     const onEntitlementsRefresh = (payload: {
       reason?: string
@@ -148,7 +143,6 @@ export function Layout() {
     socket.on('entitlements_refresh', onEntitlementsRefresh)
     return () => {
       socket.off('entitlements_refresh', onEntitlementsRefresh)
-      socket.disconnect()
     }
   }, [user?.id, dispatch])
 

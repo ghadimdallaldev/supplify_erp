@@ -53,6 +53,7 @@ import {
   customBrandingUpgradeMessage,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
+import { formatAddressLine, normalizeAddress } from '../lib/address'
 import { ActivityLogTab } from '../components/ActivityLogTab'
 import { usePermissions } from '../hooks/usePermissions'
 import {
@@ -240,12 +241,7 @@ export function SupplierSettingsPage() {
         trade_license_no: supplier.trade_license_no || '',
         phone: supplier.phone || '',
         contact_email: supplier.contact_email || '',
-        address: supplier.address_json || {
-          street: '',
-          city: '',
-          region: '',
-          country: '',
-        },
+        address: normalizeAddress(supplier.address_json),
         description: supplier.description || '',
         website: supplier.website || '',
       })
@@ -1065,10 +1061,10 @@ export function SupplierSettingsPage() {
                             <h4 className="font-semibold">{wh.name}</h4>
                             {wh.code && <Badge variant="outline">{wh.code}</Badge>}
                           </div>
-                          {wh.address && (
+                          {formatAddressLine(wh.address) && (
                             <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
                               <MapPin className="h-4 w-4" />
-                              <span>{wh.address}</span>
+                              <span>{formatAddressLine(wh.address)}</span>
                             </div>
                           )}
                         </div>

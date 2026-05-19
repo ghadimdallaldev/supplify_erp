@@ -90,20 +90,22 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ## 4. Authentication & account lifecycle
 
-| Feature                                  | Web / flow                | API                        |
-| ---------------------------------------- | ------------------------- | -------------------------- |
-| Login (Keycloak OIDC)                    | `/login` → `/auth/login`  | `GET /auth/login`          |
-| Self-registration (Keycloak hosted form) | Login page → register     | `GET /auth/register`       |
-| OAuth callback                           | —                         | `GET /auth/callback`       |
-| Current user profile + tenant RBAC       | AuthGuard loads user      | `GET /auth/me`             |
-| Token refresh                            | Automatic (cookies)       | `POST /auth/refresh`       |
-| Logout (+ Keycloak SSO logout URL)       | Header logout             | `POST /auth/logout`        |
-| Complete tenant setup after signup       | `/register/complete`      | `GET/POST /api/register/*` |
-| Account activation (billing lock)        | `/app/activate`           | Billing/subscription flows |
-| Demo login panel (dev)                   | Login page                | —                          |
-| Session store (OAuth state)              | —                         | PostgreSQL `session` table |
-| CSRF protection (API)                    | `X-Requested-With` header | Middleware                 |
-| Security headers                         | —                         | Helmet (CSP, HSTS prod)    |
+| Feature                                  | Web / flow                       | API                                                                                                                                                        |
+| ---------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Login (Keycloak OIDC)                    | `/login` → `/auth/login`         | `GET /auth/login`                                                                                                                                          |
+| Self-registration (Keycloak hosted form) | Login page → register            | `GET /auth/register`                                                                                                                                       |
+| OAuth callback                           | —                                | `GET /auth/callback`                                                                                                                                       |
+| Current user profile + tenant RBAC       | AuthGuard loads user             | `GET /auth/me`                                                                                                                                             |
+| Token refresh                            | Automatic (cookies)              | `POST /auth/refresh`                                                                                                                                       |
+| Logout (+ Keycloak SSO logout URL)       | Header logout                    | `POST /auth/logout`                                                                                                                                        |
+| Complete tenant setup after signup       | `/register/complete`             | `GET/POST /api/register/*`                                                                                                                                 |
+| Account activation (billing lock)        | `/app/activate`                  | Billing/subscription flows                                                                                                                                 |
+| Demo login panel (dev)                   | Login page                       | —                                                                                                                                                          |
+| OAuth full-page redirect (iframe-safe)   | Login / register buttons         | `redirectToAuth()` → `/auth/login` or `/auth/register` via `getAuthBaseUrl()` (uses `VITE_API_URL` or same origin in dev; breaks out of embedded previews) |
+| Session expired / auth error messaging   | `/login?expired=true`, `?error=` | —                                                                                                                                                          |
+| Session store (OAuth state)              | —                                | PostgreSQL `session` table                                                                                                                                 |
+| CSRF protection (API)                    | `X-Requested-With` header        | Middleware                                                                                                                                                 |
+| Security headers                         | —                                | Helmet (CSP, HSTS prod)                                                                                                                                    |
 
 **Auth cookies:** `access_token`, `refresh_token` (httpOnly). **Impersonation cookie:** `impersonation_token`.
 
@@ -123,40 +125,45 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ### 5.2 Marketplace & ordering
 
-| Feature                                   | Web route            | API                                                       |
-| ----------------------------------------- | -------------------- | --------------------------------------------------------- |
-| Product catalog browse                    | `/app/products`      | `/api/products`                                           |
-| Product detail                            | `/app/products/:id`  | `/api/products/:id`                                       |
-| Categories & tags filters                 | Products page        | `/api/products/categories`, `/tags`                       |
-| Shopping cart                             | `/app/cart`          | Orders + products                                         |
-| Place order                               | Cart                 | `POST /api/orders`                                        |
-| Orders list & filters                     | `/app/orders`        | `GET /api/orders`                                         |
-| Order detail & status                     | `/app/orders/:id`    | `GET/PATCH /api/orders/:id`                               |
-| Order reminders to supplier               | Order detail         | `POST /api/orders/:id/remind`                             |
-| Order calendar view                       | (API-driven widgets) | `/api/orders/calendar`                                    |
-| Approvals & budgets (plan)                | `/app/approvals`     | `/api/approvals/*`, `GET /api/orders/:id/approval-status` |
-| Manual order (supplier-created on behalf) | —                    | `POST /api/orders/manual` (supplier)                      |
-| Quick lists (saved templates)             | `/app/quick-lists`   | `/api/quick-lists`                                        |
-| Quick list items CRUD                     | Quick Lists          | `/api/quick-lists/:id/items`                              |
-| Schedule quick list → auto order          | Quick Lists          | Schedule endpoints on quick-lists                         |
-| Scheduled order execution                 | —                    | Cron: `executeScheduledOrders`                            |
-| Reorder suggestions                       | —                    | Restaurant inventory API                                  |
-| Supplier discovery                        | `/app/suppliers`     | `/api/suppliers`                                          |
-| Supplier detail & follow/block            | `/app/suppliers/:id` | follow/block endpoints                                    |
-| Supplier statistics                       | Supplier detail      | `GET /api/suppliers/:id/statistics`                       |
+| Feature                                   | Web route            | API                                                                 |
+| ----------------------------------------- | -------------------- | ------------------------------------------------------------------- |
+| Product catalog browse                    | `/app/products`      | `/api/products`                                                     |
+| Product detail                            | `/app/products/:id`  | `/api/products/:id`                                                 |
+| Categories & tags filters                 | Products page        | `/api/products/categories`, `/tags`                                 |
+| Shopping cart                             | `/app/cart`          | Orders + products                                                   |
+| Place order                               | Cart                 | `POST /api/orders`                                                  |
+| Orders list & filters                     | `/app/orders`        | `GET /api/orders`                                                   |
+| Order detail & status                     | `/app/orders/:id`    | `GET/PATCH /api/orders/:id`                                         |
+| Order reminders to supplier               | Order detail         | `POST /api/orders/:id/remind`                                       |
+| Order calendar view                       | (API-driven widgets) | `/api/orders/calendar`                                              |
+| Approvals & budgets (plan)                | `/app/approvals`     | `/api/approvals/*`, `GET /api/orders/:id/approval-status`           |
+| Manual order (supplier-created on behalf) | —                    | `POST /api/orders/manual` (supplier)                                |
+| Quick lists (saved templates)             | `/app/quick-lists`   | `/api/quick-lists`                                                  |
+| Quick list items CRUD                     | Quick Lists          | `/api/quick-lists/:id/items`                                        |
+| Schedule quick list → auto order          | Quick Lists          | Schedule endpoints on quick-lists                                   |
+| Scheduled order execution                 | —                    | Cron: `executeScheduledOrders`                                      |
+| Reorder suggestions                       | —                    | Restaurant inventory API                                            |
+| Supplier discovery                        | `/app/suppliers`     | `/api/suppliers`                                                    |
+| Supplier detail & follow/block            | `/app/suppliers/:id` | follow/block endpoints                                              |
+| Supplier statistics                       | Supplier detail      | `GET /api/suppliers/:id/statistics`                                 |
+| Reports & analytics (plan)                | `/app/reports`       | `/api/reports/restaurant/*` (spend, categories, top products, etc.) |
+| Disputes & returns (plan)                 | `/app/disputes`      | `/api/disputes` (create, list, status workflow)                     |
+| Active supplier deals / promotions        | `/app/deals`         | `/api/promotions` (restaurant view of active deals)                 |
+| Supplier reviews                          | Supplier detail      | `/api/reviews/suppliers/:id`, summary, `POST` review                |
 
 ### 5.3 Chat & collaboration
 
-| Feature                        | Web route   | API                                  |
-| ------------------------------ | ----------- | ------------------------------------ |
-| Conversations list             | `/app/chat` | `GET /api/chat/conversations`        |
-| Messages (REST)                | Chat        | `GET/POST .../messages`              |
-| Real-time messages (Socket.IO) | Chat        | `send_message`, `new_message` events |
-| Read receipts                  | Chat        | PATCH read endpoints                 |
-| Message replies                | Chat        | `replyTo` on messages                |
-| Attachments in chat            | Chat        | Files + chat                         |
-| Delete conversation            | Chat        | `DELETE .../conversations/:id`       |
-| Admin-started conversations    | —           | Admin chat endpoints                 |
+| Feature                        | Web route    | API                                                                                                            |
+| ------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------- |
+| Conversations list             | `/app/chat`  | `GET /api/chat/conversations`                                                                                  |
+| Messages (REST)                | Chat         | `GET/POST .../messages`                                                                                        |
+| Real-time messages (Socket.IO) | Chat         | `send_message`, `new_message` events                                                                           |
+| Shared Socket.IO client        | Chat, Layout | `getChatSocket` / `getLayoutSocket` + `getSocketBaseUrl()` (one connection per user; avoids Strict Mode churn) |
+| Read receipts                  | Chat         | PATCH read endpoints                                                                                           |
+| Message replies                | Chat         | `replyTo` on messages                                                                                          |
+| Attachments in chat            | Chat         | Files + chat                                                                                                   |
+| Delete conversation            | Chat         | `DELETE .../conversations/:id`                                                                                 |
+| Admin-started conversations    | —            | Admin chat endpoints                                                                                           |
 
 ### 5.4 Inventory & receiving
 
@@ -234,36 +241,39 @@ Also available via API (not always separate pages):
 
 ### 6.1 Navigation & operations
 
-| Feature                                 | Web route                | API                          |
-| --------------------------------------- | ------------------------ | ---------------------------- |
-| Dashboard                               | `/app/dashboard`         | Stats                        |
-| Products catalog management             | `/app/products`          | `/api/products` POST/PATCH   |
-| Product images / files                  | Products                 | `/api/files/presign`, attach |
-| Prices & price lists                    | —                        | `/api/prices`                |
-| Supplier inventory & stock              | `/app/inventory`         | `/api/inventory`             |
-| Stock adjustments & alerts              | Inventory                | adjustments, `/alerts`       |
-| Warehouses                              | Settings → Warehouses    | `/api/warehouses`            |
-| Orders (incoming)                       | `/app/orders`            | `/api/orders`                |
-| Fulfillment board                       | `/app/fulfillment`       | `/api/fulfillment/board`     |
-| Fulfillment waves / routes / exceptions | Fulfillment              | `/api/fulfillment/*`         |
-| Restaurants (customers)                 | `/app/restaurants`       | `/api/restaurants`           |
-| Restaurant-specific pricing tiers       | —                        | `/api/restaurant-pricing`    |
-| Invoices                                | `/app/invoices`          | `/api/invoices`              |
-| Chat                                    | `/app/chat`              | `/api/chat`                  |
-| Supplier profile & settings             | `/app/supplier-settings` | `/api/suppliers`             |
+| Feature                                 | Web route                | API                                                       |
+| --------------------------------------- | ------------------------ | --------------------------------------------------------- |
+| Dashboard                               | `/app/dashboard`         | Stats                                                     |
+| Products catalog management             | `/app/products`          | `/api/products` POST/PATCH                                |
+| Product images / files                  | Products                 | `/api/files/presign`, attach                              |
+| Prices & price lists                    | —                        | `/api/prices`                                             |
+| Supplier inventory & stock              | `/app/inventory`         | `/api/inventory`                                          |
+| Stock adjustments & alerts              | Inventory                | adjustments, `/alerts`                                    |
+| Warehouses                              | Settings → Warehouses    | `/api/warehouses`                                         |
+| Orders (incoming)                       | `/app/orders`            | `/api/orders`                                             |
+| Fulfillment board                       | `/app/fulfillment`       | `/api/fulfillment/board`                                  |
+| Fulfillment waves / routes / exceptions | Fulfillment              | `/api/fulfillment/*`                                      |
+| Restaurants (customers)                 | `/app/restaurants`       | `/api/restaurants`                                        |
+| Restaurant-specific pricing tiers       | —                        | `/api/restaurant-pricing`                                 |
+| Invoices                                | `/app/invoices`          | `/api/invoices`                                           |
+| Chat                                    | `/app/chat`              | `/api/chat`                                               |
+| Promotions management (plan)            | `/app/promotions`        | `/api/promotions` (supplier CRUD, restaurant eligibility) |
+| Reports & analytics (plan)              | `/app/reports`           | `/api/reports/supplier/*`                                 |
+| Tenant audit log (plan)                 | Settings / admin views   | `/api/audit`                                              |
+| Supplier profile & settings             | `/app/supplier-settings` | `/api/suppliers`                                          |
 
 ### 6.2 Supplier settings hub tabs
 
-| Tab               | Capabilities                        |
-| ----------------- | ----------------------------------- |
-| **Profile**       | Business profile, logo              |
-| **Contacts**      | Contact persons                     |
-| **Business**      | VAT, legal, onboarding fields       |
-| **Warehouses**    | Warehouse locations (plan limits)   |
-| **Delivery**      | Delivery zones / logistics settings |
-| **Branches**      | Supplier branch accounts            |
-| **Notifications** | Channel + category preferences      |
-| **Plan**          | Subscription & usage                |
+| Tab               | Capabilities                                                                                             |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| **Profile**       | Business profile, logo; address fields normalized from API JSON (`street` / `line1`, `region` / `state`) |
+| **Contacts**      | Contact persons                                                                                          |
+| **Business**      | VAT, legal, onboarding fields                                                                            |
+| **Warehouses**    | Warehouse locations (plan limits); formatted address lines via `formatAddressLine`                       |
+| **Delivery**      | Delivery zones / logistics settings                                                                      |
+| **Branches**      | Supplier branch accounts                                                                                 |
+| **Notifications** | Channel + category preferences                                                                           |
+| **Plan**          | Subscription & usage                                                                                     |
 
 | Feature                              | API                                              |
 | ------------------------------------ | ------------------------------------------------ |
@@ -321,23 +331,24 @@ Also available via API (not always separate pages):
 
 ## 8. Cross-cutting platform services
 
-| Service                       | Description                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------- |
-| **File storage**              | S3/MinIO presigned uploads; product images; attachments; storage quota metering |
-| **Notifications**             | In-app log, email (SendGrid/SMTP), WhatsApp (Twilio); user preferences          |
-| **Realtime**                  | Socket.IO for chat (cookie JWT auth on handshake)                               |
-| **Audit logging**             | Admin actions, impersonation, plan changes                                      |
-| **Conversion events**         | Upgrade funnel analytics (view plans, blocked limits, etc.)                     |
-| **System events**             | API error observability                                                         |
-| **Redis**                     | Order calendar cache                                                            |
-| **Rate limiting**             | Global, auth, public, staff-link, chat-send limiters                            |
-| **Plan enforcement**          | `requireFeature()`, `checkLimit()`, usage meters                                |
-| **Billing access middleware** | Locked tenants → billing/subscription routes only                               |
-| **Monetization UI**           | Upgrade modals, limit banners, pay-overdue modal                                |
-| **Impersonation banner**      | Visual indicator when admin is viewing as tenant                                |
-| **Branch context**            | Active branch cookie/header for multi-site ops                                  |
-| **i18n-ready product data**   | Product `name_ar`, `description_ar` fields                                      |
-| **Demo data & seeds**         | Extensive seed scripts for dev/demo                                             |
+| Service                       | Description                                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| **File storage**              | S3/MinIO presigned uploads; product images; attachments; storage quota metering              |
+| **Notifications**             | In-app log, email (SendGrid/SMTP), WhatsApp (Twilio), Web Push (VAPID); user preferences     |
+| **Web Push (PWA)**            | `usePushNotifications`, service worker `static/sw.js`, `/api/push/*` (opt-in `push_enabled`) |
+| **Realtime**                  | Socket.IO for chat + layout events (cookie JWT auth; shared client per user)                 |
+| **Audit logging**             | Admin actions, impersonation, plan changes                                                   |
+| **Conversion events**         | Upgrade funnel analytics (view plans, blocked limits, etc.)                                  |
+| **System events**             | API error observability                                                                      |
+| **Redis**                     | Order calendar cache                                                                         |
+| **Rate limiting**             | Global, auth, public, staff-link, chat-send limiters                                         |
+| **Plan enforcement**          | `requireFeature()`, `checkLimit()`, usage meters                                             |
+| **Billing access middleware** | Locked tenants → billing/subscription routes only                                            |
+| **Monetization UI**           | Upgrade modals, limit banners, pay-overdue modal                                             |
+| **Impersonation banner**      | Visual indicator when admin is viewing as tenant                                             |
+| **Branch context**            | Active branch cookie/header for multi-site ops                                               |
+| **i18n-ready product data**   | Product `name_ar`, `description_ar` fields                                                   |
+| **Demo data & seeds**         | Extensive seed scripts for dev/demo                                                          |
 
 ---
 
@@ -463,12 +474,12 @@ Overrides: admin can set per-tenant limit overrides; API returns `LIMIT_EXCEEDED
 
 ### Channels
 
-| Channel  | Technology                                                        |
-| -------- | ----------------------------------------------------------------- |
-| In-app   | `notification_log` table + header bell                            |
-| Email    | Twilio SendGrid API (preferred) or SMTP                           |
-| WhatsApp | Twilio Programmable Messaging (+ wa.me link in metadata fallback) |
-| Push     | Disabled (stubbed)                                                |
+| Channel  | Technology                                                                                                           |
+| -------- | -------------------------------------------------------------------------------------------------------------------- |
+| In-app   | `notification_log` table + header bell                                                                               |
+| Email    | Twilio SendGrid API (preferred) or SMTP                                                                              |
+| WhatsApp | Twilio Programmable Messaging (+ wa.me link in metadata fallback)                                                    |
+| Push     | Web Push via VAPID (`web-push`); `GET /api/push/vapid-public-key`, subscribe/unsubscribe; service worker at `/sw.js` |
 
 ### Notification categories (preference keys)
 
@@ -507,8 +518,9 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 | **Redis**                   | Order calendar cache                                       |
 | **S3 / MinIO**              | Object storage for uploads                                 |
 | **Twilio**                  | WhatsApp outbound                                          |
-| **SendGrid (Twilio Email)** | Transactional email                                        |
-| **Socket.IO**               | Realtime chat                                              |
+| **SendGrid (Twilio Email)** | Transactional email (preferred over SMTP when configured)  |
+| **Web Push (VAPID)**        | Browser push notifications (`VAPID_*` env on API)          |
+| **Socket.IO**               | Realtime chat + layout notifications                       |
 | **Docker Compose**          | Local full stack (Postgres, Redis, Keycloak, MinIO, nginx) |
 | **AWS CDK** (`infra/`)      | Cloud deployment (dev/staging/prod)                        |
 | **GitHub Actions**          | CI (lint, tests, guards)                                   |
@@ -590,41 +602,47 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 
 ## 18. API route index
 
-| Prefix                       | Module                          |
-| ---------------------------- | ------------------------------- |
-| `/health`                    | Health check                    |
-| `/auth/*`                    | Authentication                  |
-| `/api/register/*`            | Registration completion         |
-| `/api/products`              | Catalog                         |
-| `/api/prices`                | Pricing                         |
-| `/api/inventory`             | Supplier inventory              |
-| `/api/suppliers`             | Suppliers                       |
-| `/api/restaurants`           | Restaurants                     |
-| `/api/orders`                | Orders                          |
-| `/api/orders/calendar`       | Order calendar                  |
-| `/api/approvals`             | Budgets, rules, order approvals |
-| `/api/files`                 | File uploads                    |
-| `/api/admin`                 | Legacy admin                    |
-| `/api/chat`                  | Messaging                       |
-| `/api/invoices`              | Invoices                        |
-| `/api/payments`              | Payments                        |
-| `/api/quick-lists`           | Quick lists                     |
-| `/api/restaurant-inventory`  | Restaurant inventory            |
-| `/api/restaurant-onboarding` | Onboarding / team               |
-| `/api/receiving`             | Receiving                       |
-| `/api/restaurant-finance`    | Finance                         |
-| `/api/reservations`          | Reservations (auth)             |
-| `/api/staff`                 | Staff HR                        |
-| `/api/restaurant-pricing`    | Contract pricing                |
-| `/api/notifications`         | Notifications                   |
-| `/api/subscriptions`         | Subscriptions                   |
-| `/api/billing`               | Billing                         |
-| `/api/public`                | Public portals                  |
-| `/api/admin-dashboard`       | Platform admin                  |
-| `/api/branches`              | Branches                        |
-| `/api/warehouses`            | Warehouses                      |
-| `/api/fulfillment`           | Fulfillment                     |
-| `/api/e2e`                   | E2E helpers (gated)             |
+| Prefix                       | Module                                 |
+| ---------------------------- | -------------------------------------- |
+| `/health`                    | Health check                           |
+| `/auth/*`                    | Authentication                         |
+| `/api/register/*`            | Registration completion                |
+| `/api/products`              | Catalog                                |
+| `/api/prices`                | Pricing                                |
+| `/api/inventory`             | Supplier inventory                     |
+| `/api/suppliers`             | Suppliers                              |
+| `/api/restaurants`           | Restaurants                            |
+| `/api/orders`                | Orders                                 |
+| `/api/orders/calendar`       | Order calendar                         |
+| `/api/approvals`             | Budgets, rules, order approvals        |
+| `/api/reports`               | Restaurant & supplier analytics        |
+| `/api/disputes`              | Disputes & returns                     |
+| `/api/promotions`            | Supplier promotions / restaurant deals |
+| `/api/reviews`               | Supplier reviews                       |
+| `/api/audit`                 | Tenant audit log                       |
+| `/api/push`                  | Web Push VAPID + subscriptions         |
+| `/api/files`                 | File uploads                           |
+| `/api/admin`                 | Legacy admin                           |
+| `/api/chat`                  | Messaging                              |
+| `/api/invoices`              | Invoices                               |
+| `/api/payments`              | Payments                               |
+| `/api/quick-lists`           | Quick lists                            |
+| `/api/restaurant-inventory`  | Restaurant inventory                   |
+| `/api/restaurant-onboarding` | Onboarding / team                      |
+| `/api/receiving`             | Receiving                              |
+| `/api/restaurant-finance`    | Finance                                |
+| `/api/reservations`          | Reservations (auth)                    |
+| `/api/staff`                 | Staff HR                               |
+| `/api/restaurant-pricing`    | Contract pricing                       |
+| `/api/notifications`         | Notifications                          |
+| `/api/subscriptions`         | Subscriptions                          |
+| `/api/billing`               | Billing                                |
+| `/api/public`                | Public portals                         |
+| `/api/admin-dashboard`       | Platform admin                         |
+| `/api/branches`              | Branches                               |
+| `/api/warehouses`            | Warehouses                             |
+| `/api/fulfillment`           | Fulfillment                            |
+| `/api/e2e`                   | E2E helpers (gated)                    |
 
 ---
 

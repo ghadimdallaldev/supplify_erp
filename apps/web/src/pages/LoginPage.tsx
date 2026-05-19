@@ -15,12 +15,20 @@ import {
 } from 'lucide-react'
 import { SupplifyLogo } from '../components/SupplifyLogo'
 import { DemoLoginAccountsPanel } from '../components/DemoLoginAccountsPanel'
-
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
+import { redirectToAuth } from '../lib/authRedirect'
 
 export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [inEmbeddedFrame, setInEmbeddedFrame] = useState(false)
+
+  useEffect(() => {
+    try {
+      setInEmbeddedFrame(window.self !== window.top)
+    } catch {
+      setInEmbeddedFrame(true)
+    }
+  }, [])
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -35,12 +43,12 @@ export function LoginPage() {
 
   const handleLogin = () => {
     setIsLoading(true)
-    window.location.href = `${API_URL}/auth/login`
+    redirectToAuth('login')
   }
 
   const handleSignup = () => {
     setIsLoading(true)
-    window.location.href = `${API_URL}/auth/register`
+    redirectToAuth('register')
   }
 
   const features = [
@@ -157,6 +165,24 @@ export function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {inEmbeddedFrame && (
+                <Alert>
+                  <AlertDescription>
+                    Open{' '}
+                    <a
+                      href="/login"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline"
+                    >
+                      {typeof window !== 'undefined' ? window.location.origin : ''}/login
+                    </a>{' '}
+                    in your browser (Chrome or Edge). Sign-in does not work inside embedded
+                    previews.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert variant="destructive" className="animate-in slide-in-from-top-2">
                   <AlertDescription>{error}</AlertDescription>

@@ -69,13 +69,14 @@ Push is fire-and-forget (does not block the API response). Stale endpoints (`410
 
 Migration: `0073_push_subscriptions.sql` — table `push_subscriptions` keyed by `(user_id, endpoint)`.
 
-## Frontend (planned)
+## Frontend
 
-- `usePushNotifications` hook: permission banner, subscribe via service worker
-- Service worker `push` handler for notification display and click-through
-- Settings → Notifications: **Push** toggle maps to `push_enabled`
+- **Hook:** `apps/web/src/hooks/usePushNotifications.ts` — registers `/sw.js`, fetches VAPID public key, subscribes via `pushManager`
+- **Service worker:** `apps/web/static/sw.js` (served at `/sw.js` in dev and production builds)
+- **Settings:** Restaurant onboarding / notifications — **Push** toggle maps to `push_enabled` preference
+- Permission banner can be dismissed; subscription stored in `push_subscriptions` table
 
-Prompt for permission only after ~30 seconds of activity.
+If VAPID is not configured on the server, subscribe calls receive `503` and push delivery is skipped.
 
 ## User preferences
 

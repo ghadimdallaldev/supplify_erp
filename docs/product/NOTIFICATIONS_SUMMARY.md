@@ -2,12 +2,12 @@
 
 ## Delivery channels
 
-| Channel | Implementation | Notes |
-|---------|----------------|-------|
-| **Email** | [nodemailer](https://nodemailer.com/) over SMTP | Configure `SMTP_*` env vars on the API |
-| **WhatsApp** | `wa.me` deep links | Opens WhatsApp with a pre-filled message; not server-push |
-| **In-app** | `notification_log` table | Bell icon in header; supports “Open in WhatsApp” when link present |
-| **Push** | Disabled | Planned for a later release |
+| Channel      | Implementation                                                                | Notes                                                                                                            |
+| ------------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Email**    | Twilio SendGrid API (preferred) or [nodemailer](https://nodemailer.com/) SMTP | `SENDGRID_API_KEY` or `SMTP_*` on the API                                                                        |
+| **WhatsApp** | Twilio Programmable Messaging (+ `wa.me` fallback in metadata)                | Outbound when configured; in-app “Open in WhatsApp” when link present                                            |
+| **In-app**   | `notification_log` table                                                      | Bell icon in header                                                                                              |
+| **Push**     | Web Push (VAPID) via `web-push`                                               | Opt-in (`push_enabled`); requires `VAPID_*` env — see [push-notifications.md](../features/push-notifications.md) |
 
 ### SMTP environment variables
 
@@ -41,17 +41,17 @@ Guest reservation confirmations:
 
 ### Orders
 
-| Event | Recipient | Category key |
-|-------|-----------|--------------|
-| Order placed / cancelled | Supplier | `PLACED`, `CANCELLED` |
-| Acknowledged, processing, shipped, delivered | Restaurant | matching status |
+| Event                                        | Recipient  | Category key          |
+| -------------------------------------------- | ---------- | --------------------- |
+| Order placed / cancelled                     | Supplier   | `PLACED`, `CANCELLED` |
+| Acknowledged, processing, shipped, delivered | Restaurant | matching status       |
 
 ### Reservations
 
-| Event | Recipient |
-|-------|-----------|
-| New reservation | Restaurant owner |
-| Waitlist | Restaurant owner |
+| Event                        | Recipient                   |
+| ---------------------------- | --------------------------- |
+| New reservation              | Restaurant owner            |
+| Waitlist                     | Restaurant owner            |
 | Confirmed / waitlist (guest) | Guest email + WhatsApp link |
 
 ### Other
@@ -69,14 +69,14 @@ Preference toggles map to `notify_*` keys (e.g. `notify_order_new`, `notify_rese
 
 ## API endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/notifications` | List notifications |
-| GET | `/api/notifications/preferences` | Read preferences |
-| PATCH | `/api/notifications/preferences` | Update preferences (`emailEnabled`, `whatsappEnabled`, `inAppEnabled`, …) |
-| POST | `/api/notifications/:id/read` | Mark one read |
-| POST | `/api/notifications/read-all` | Mark all read |
-| POST | `/api/notifications/test` | Send test notification |
+| Method | Path                             | Purpose                                                                   |
+| ------ | -------------------------------- | ------------------------------------------------------------------------- |
+| GET    | `/api/notifications`             | List notifications                                                        |
+| GET    | `/api/notifications/preferences` | Read preferences                                                          |
+| PATCH  | `/api/notifications/preferences` | Update preferences (`emailEnabled`, `whatsappEnabled`, `inAppEnabled`, …) |
+| POST   | `/api/notifications/:id/read`    | Mark one read                                                             |
+| POST   | `/api/notifications/read-all`    | Mark all read                                                             |
+| POST   | `/api/notifications/test`        | Send test notification                                                    |
 
 ---
 
