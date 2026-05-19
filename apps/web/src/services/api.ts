@@ -202,6 +202,7 @@ export const api = createApi({
     'RestaurantFinance',
     'Notification',
     'Branch',
+    'Org',
     'RestaurantTeam',
     'Subscription',
     'Billing',
@@ -652,6 +653,7 @@ export const api = createApi({
         contact_name?: string
         contact_email?: string
         contact_phone?: string
+        type?: string
       }
     >({
       query: (body) => ({
@@ -660,6 +662,46 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Inventory'],
+    }),
+    setDefaultWarehouse: builder.mutation<{ warehouse: any }, string>({
+      query: (id) => ({ url: `/api/warehouses/${id}/set-default`, method: 'POST' }),
+      invalidatesTags: ['Inventory'],
+    }),
+    getSupplierFulfillment: builder.query<{ fulfillment: any }, void>({
+      query: () => '/api/suppliers/me/fulfillment',
+    }),
+    updateSupplierFulfillment: builder.mutation<
+      { fulfillment: any },
+      {
+        multi_warehouse_enabled?: boolean
+        fulfillment_mode?: 'single' | 'multi'
+        confirm_disable?: boolean
+      }
+    >({
+      query: (body) => ({ url: '/api/suppliers/me/fulfillment', method: 'PATCH', body }),
+      invalidatesTags: ['User'],
+    }),
+    getWarehouseRoutingRules: builder.query<{ rules: any[] }, void>({
+      query: () => '/api/warehouses/routing/rules',
+    }),
+    simulateWarehouseRouting: builder.mutation<
+      { preview: any[] },
+      { items: Array<{ productId: string; quantity: number }>; restaurant_id?: string }
+    >({
+      query: (body) => ({
+        url: '/api/warehouses/routing/simulate',
+        method: 'POST',
+        body: {
+          items: body.items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
+          restaurant_id: body.restaurant_id,
+        },
+      }),
+    }),
+    getOrderWarehouseAssignments: builder.query<
+      { assignments: any[]; multiLocation: boolean },
+      string
+    >({
+      query: (orderId) => `/api/orders/${orderId}/warehouses`,
     }),
 
     // Admin endpoints
@@ -1033,6 +1075,44 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Branch', 'Restaurant', 'Supplier', 'Order', 'Reservation', 'Notification'],
+    }),
+    getOrg: builder.query<
+      {
+        organization: { id: string; name: string }
+        orgRole: string
+        branches: Array<Record<string, unknown>>
+        primarySupplierId: string
+      },
+      void
+    >({
+      query: () => '/api/org',
+      providesTags: ['Branch', 'Org'],
+    }),
+    getOrgBranches: builder.query<
+      {
+        branches: Array<Record<string, unknown>>
+        activeSupplierId: string | null
+        organizationId: string
+      },
+      void
+    >({
+      query: () => '/api/org/branches',
+      providesTags: ['Branch', 'Org'],
+    }),
+    createOrgBranch: builder.mutation<any, Record<string, unknown>>({
+      query: (body) => ({ url: '/api/org/branches', method: 'POST', body }),
+      invalidatesTags: ['Branch', 'Org', 'Supplier'],
+    }),
+    switchOrgBranchContext: builder.mutation<
+      { activeSupplierId: string | null; tenantName?: string },
+      { supplier_id: string | null }
+    >({
+      query: (body) => ({
+        url: '/api/org/context/switch',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Branch', 'Org', 'Restaurant', 'Supplier', 'Order', 'Notification'],
     }),
 
     getRestaurantTeam: builder.query<
@@ -2246,6 +2326,12 @@ export const {
   useCreateInventoryAdjustmentMutation,
   useGetWarehousesQuery,
   useCreateWarehouseMutation,
+  useSetDefaultWarehouseMutation,
+  useGetSupplierFulfillmentQuery,
+  useUpdateSupplierFulfillmentMutation,
+  useGetWarehouseRoutingRulesQuery,
+  useSimulateWarehouseRoutingMutation,
+  useGetOrderWarehouseAssignmentsQuery,
   useGetDashboardStatsQuery,
   useGetAuditLogsQuery,
   useGeneratePresignedUrlMutation,
@@ -2294,6 +2380,10 @@ export const {
   useUpdateBranchMutation,
   useDeleteBranchMutation,
   useSwitchBranchAccountMutation,
+  useGetOrgQuery,
+  useGetOrgBranchesQuery,
+  useCreateOrgBranchMutation,
+  useSwitchOrgBranchContextMutation,
   useGetRestaurantTeamQuery,
   useAddRestaurantTeamMemberMutation,
   useDeleteRestaurantTeamMemberMutation,

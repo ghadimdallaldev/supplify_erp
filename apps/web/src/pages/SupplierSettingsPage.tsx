@@ -51,6 +51,9 @@ import {
   canAddWarehouses,
   canUseCustomBranding,
   customBrandingUpgradeMessage,
+  warehousesFeatureEnabled,
+  multiWarehousePlanEnabled,
+  isMultiWarehouseActive,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { formatAddressLine, normalizeAddress } from '../lib/address'
@@ -69,6 +72,10 @@ import {
   useGetEntitlementsQuery,
   useGetWarehousesQuery,
   useCreateWarehouseMutation,
+  useSetDefaultWarehouseMutation,
+  useGetSupplierFulfillmentQuery,
+  useUpdateSupplierFulfillmentMutation,
+  useSimulateWarehouseRoutingMutation,
 } from '../services/api'
 
 const SUPPLIER_NOTIFICATION_DEFAULTS = {
@@ -156,14 +163,26 @@ export function SupplierSettingsPage() {
   const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] =
     useUpdateNotificationPreferencesMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
-  const { data: warehousesData, refetch: refetchWarehouses } = useGetWarehousesQuery()
-  const [createWarehouse, { isLoading: isCreatingWarehouse }] = useCreateWarehouseMutation()
   const entitlements = entitlementsData?.entitlements
-  // Main warehouse placeholder counts as one location under plan limits.
-  const canAddWarehouse = canAddWarehouses(entitlements, 1)
-  const brandingAllowed = canUseCustomBranding(entitlements)
-
   const supplier = supplierData?.supplier
+  const warehousesEnabled = warehousesFeatureEnabled(entitlements)
+  const multiWarehousePlan = multiWarehousePlanEnabled(entitlements)
+  const { data: warehousesData, refetch: refetchWarehouses } = useGetWarehousesQuery(undefined, {
+    skip: !warehousesEnabled,
+  })
+  const { data: fulfillmentData, refetch: refetchFulfillment } = useGetSupplierFulfillmentQuery(
+    undefined,
+    { skip: !multiWarehousePlan }
+  )
+  const [createWarehouse, { isLoading: isCreatingWarehouse }] = useCreateWarehouseMutation()
+  const [setDefaultWarehouse] = useSetDefaultWarehouseMutation()
+  const [updateFulfillment, { isLoading: isUpdatingFulfillment }] =
+    useUpdateSupplierFulfillmentMutation()
+  const fulfillment = fulfillmentData?.fulfillment
+  const multiWarehouseActive = isMultiWarehouseActive(entitlements, fulfillment ?? supplier)
+  const warehouseCount = warehousesData?.warehouses?.length ?? 0
+  const canAddWarehouse = canAddWarehouses(entitlements, warehouseCount)
+  const brandingAllowed = canUseCustomBranding(entitlements)
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
@@ -1005,76 +1024,102 @@ export function SupplierSettingsPage() {
         </TabsContent>
 
         <TabsContent value="warehouses" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Warehouse className="h-5 w-5" />
-                    Warehouses
-                  </CardTitle>
-                  <CardDescription>Manage your warehouse locations</CardDescription>
-                </div>
+          {!warehousesEnabled ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-[var(--text-muted)] mb-3">
+                  Warehouse management requires Bronze or higher.
+                </p>
                 <Button
-                  disabled={!canAddWarehouse}
-                  onClick={() => {
-                    if (!canAddWarehouse) {
-                      openBrowseUpgrade(dispatch, {
-                        currentPlan: entitlements?.plan?.name ?? null,
-                        upgradeUrl: '/app/settings?tab=plan',
-                      })
-                      return
-                    }
-                    setShowAddWarehouse(true)
-                  }}
+                  variant="outline"
+                  onClick={() =>
+                    openBrowseUpgrade(dispatch, {
+                      currentPlan: entitlements?.plan?.name ?? null,
+                      upgradeUrl: '/app/settings?tab=plan',
+                    })
+                  }
                 >
-                  <Warehouse className="h-4 w-4 mr-2" />
-                  Add Warehouse
+                  View plans
                 </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!canAddWarehouse && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  Additional warehouses are not available on the Free plan. Upgrade to Bronze or
-                  higher to add warehouse locations.
-                </div>
-              )}
-              <div className="space-y-3">
-                {(warehousesData?.warehouses ?? []).length === 0 ? (
-                  <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
-                    <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                    <p className="text-[var(--text-muted)]">No warehouses yet</p>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">
-                      Add a warehouse to manage multiple locations
-                    </p>
-                  </div>
-                ) : (
-                  (warehousesData?.warehouses ?? []).map((wh: any) => (
-                    <div
-                      key={wh.id}
-                      className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-semibold">{wh.name}</h4>
-                            {wh.code && <Badge variant="outline">{wh.code}</Badge>}
-                          </div>
-                          {formatAddressLine(wh.address) && (
-                            <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                              <MapPin className="h-4 w-4" />
-                              <span>{formatAddressLine(wh.address)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Warehouse className="h-5 w-5" />
+                        Warehouses
+                      </CardTitle>
+                      <CardDescription>Manage your warehouse locations</CardDescription>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                    <Button
+                      disabled={!canAddWarehouse}
+                      onClick={() => {
+                        if (!canAddWarehouse) {
+                          openBrowseUpgrade(dispatch, {
+                            currentPlan: entitlements?.plan?.name ?? null,
+                            upgradeUrl: '/app/settings?tab=plan',
+                          })
+                          return
+                        }
+                        setShowAddWarehouse(true)
+                      }}
+                    >
+                      <Warehouse className="h-4 w-4 mr-2" />
+                      Add Warehouse
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!canAddWarehouse && (
+                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      Additional warehouses are not available on the Free plan. Upgrade to Bronze or
+                      higher to add warehouse locations.
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {(warehousesData?.warehouses ?? []).length === 0 ? (
+                      <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                        <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                        <p className="text-[var(--text-muted)]">No warehouses yet</p>
+                        <p className="text-sm text-[var(--text-muted)] mt-1">
+                          Add a warehouse to manage multiple locations
+                        </p>
+                      </div>
+                    ) : (
+                      (warehousesData?.warehouses ?? []).map((wh: any) => (
+                        <div
+                          key={wh.id}
+                          className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold">{wh.name}</h4>
+                                {wh.code && <Badge variant="outline">{wh.code}</Badge>}
+                                {(wh.is_default || wh.is_main) && (
+                                  <Badge variant="secondary">Default</Badge>
+                                )}
+                              </div>
+                              {formatAddressLine(wh.address) && (
+                                <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                                  <MapPin className="h-4 w-4" />
+                                  <span>{formatAddressLine(wh.address)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="plan" className="space-y-4">

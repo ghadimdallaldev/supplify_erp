@@ -101,6 +101,17 @@ export function formatBranchGateMessage(gate: BranchAddGate): string {
     return `You've reached your branch limit on ${plan}. Upgrade for more locations.`
   }
 
+  const planLower = plan.toLowerCase()
+  if (
+    planLower.includes('gold') ||
+    planLower.includes('platinum') ||
+    planLower.includes('enterprise')
+  ) {
+    return `Branch accounts are not enabled for this ${plan} subscription. Contact support if you believe this is an error.`
+  }
+  if (planLower.includes('silver') || planLower.includes('bronze')) {
+    return `Additional branch accounts require Gold or higher. Your plan is ${plan}.`
+  }
   return `Additional branch accounts aren't included on ${plan}. Upgrade to Gold or higher to add separate locations.`
 }
 
@@ -111,12 +122,34 @@ export function canAddBranches(
   return getBranchAddGate(entitlements, currentCount).canAdd
 }
 
+/** Warehouse management feature (Bronze+). */
+export function warehousesFeatureEnabled(entitlements: Entitlements | null | undefined): boolean {
+  return featureEnabled(entitlements?.features?.warehouses)
+}
+
+/** Plan allows multi-warehouse routing (Gold+); supplier toggle is separate. */
+export function multiWarehousePlanEnabled(entitlements: Entitlements | null | undefined): boolean {
+  return featureEnabled(entitlements?.features?.multi_warehouse)
+}
+
+export function isMultiWarehouseActive(
+  entitlements: Entitlements | null | undefined,
+  supplier?: { multi_warehouse_enabled?: boolean; fulfillment_mode?: string } | null
+): boolean {
+  return (
+    multiWarehousePlanEnabled(entitlements) &&
+    Boolean(supplier?.multi_warehouse_enabled) &&
+    supplier?.fulfillment_mode === 'multi'
+  )
+}
+
 /** Whether the tenant may create another supplier warehouse under the current plan. */
 export function canAddWarehouses(
   entitlements: Entitlements | null | undefined,
   currentCount = 0
 ): boolean {
   if (!entitlements) return false
+  if (!warehousesFeatureEnabled(entitlements)) return false
   const limit = limitNumber(entitlements.limits?.warehouses)
   if (limit === 0) return false
   if (limit == null || limit === -1) return true

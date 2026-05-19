@@ -24,6 +24,9 @@ export const SUPPLIER_FEATURE_KEYS = [
   'chat',
   'order_calendar',
   'reports',
+  'multi_branch',
+  'warehouses',
+  'multi_warehouse',
   'fulfillment_tools',
   'disputes_returns',
   'quick_lists',
@@ -65,6 +68,8 @@ const DISPLAY_NAMES = {
   support_sla: 'Support SLA',
   custom_branding: 'Custom branding',
   fulfillment_tools: 'Fulfillment tools',
+  warehouses: 'Warehouses',
+  multi_warehouse: 'Multi-warehouse fulfillment',
   feature_flags_access: 'Feature flag admin',
 }
 

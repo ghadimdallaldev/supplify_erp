@@ -1,5 +1,10 @@
 import { query, withTransaction } from './db.js'
 import { assignDefaultRoleForTenant } from './rbac.js'
+import {
+  createSupplierOrganization,
+  assignOrgUserRole,
+  linkSupplierToOrganization,
+} from './supplier-org.js'
 import { ensureTenantSystemRoles } from './tenant-roles.js'
 import { ensureKeycloakRealmRole } from './keycloak-admin.js'
 import { ConflictError, ValidationError } from '../middlewares/errorHandler.js'
@@ -117,6 +122,20 @@ export async function completeTenantRegistration({
 
   await ensureTenantSystemRoles(result.tenant.id, result.tenantType)
   await assignDefaultRoleForTenant(userId, result.tenant.id, result.tenantType)
+
+  if (result.tenantType === 'SUPPLIER') {
+    const org = await createSupplierOrganization({
+      name: result.tenant.name,
+      slug: `${result.tenant.slug}-org`,
+    })
+    await linkSupplierToOrganization(result.tenant.id, org.id, { isMain: true })
+    await assignOrgUserRole({
+      userId,
+      organizationId: org.id,
+      roleName: 'Org Owner',
+    })
+  }
+
   await ensureKeycloakRealmRole(normalizedEmail, kcRole)
 
   return result

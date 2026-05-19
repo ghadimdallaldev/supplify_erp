@@ -18,7 +18,9 @@ Named roles let restaurant and supplier tenants assign **Owner**, **Manager**, a
 | FOH Staff       | Reservations           | Reservations create/edit                                              |
 | Viewer          | Read-only              | View orders, invoices, inventory, reservations, staff, settings, chat |
 
-### Supplier
+### Supplier (branch-level)
+
+Branch staff roles apply per `supplier` branch. Multi-branch suppliers also have **org-level** roles (Org Owner, Org Manager, Regional Manager, Org Viewer) — see [supplier-branches.md](./supplier-branches.md).
 
 | Role            | Description        | Highlights                                           |
 | --------------- | ------------------ | ---------------------------------------------------- |
@@ -72,4 +74,15 @@ Approval rules can target roles by name (e.g. Manager, Owner). Users with **Mana
 
 - **Settings → Team:** Users and Roles sub-tabs when `advanced_roles` is on (entitlements hook).
 - **Invite:** Role dropdown uses tenant roles when enabled; otherwise Owner / Viewer only.
+
+## Demo logins (`seed:tier-catalog`)
+
+Per tenant (e.g. Gold restaurant), owner plus team suffix accounts share password **`Supplify1!`**:
+
+- Owner: `restaurant-gold@supplify.com`
+- Manager: `restaurant-gold-manager@supplify.com`
+- Purchaser: `restaurant-gold-purchaser@supplify.com`
+
+Supplier tier seed uses `-sales` instead of purchaser. Each account is a separate Keycloak user and `app_user` row with its named role pre-assigned.
+
 - **Component:** `RolePermissionChecklist.jsx` — grouped permission toggles.

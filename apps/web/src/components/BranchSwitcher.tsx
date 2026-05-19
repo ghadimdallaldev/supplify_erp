@@ -1,14 +1,27 @@
 import { Building2, Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useBranchContext } from '../contexts/BranchContext'
 import { useAppSelector } from '../hooks/redux'
+import { useEntitlements } from '../hooks/useEntitlements'
 
 export function BranchSwitcher() {
   const { user } = useAppSelector((state) => state.auth)
+  const { entitlements } = useEntitlements()
+  const multiBranch = entitlements?.features?.multi_branch === true
   const { accounts, activeAccountId, activeAccount, isLoading, isSwitching, switchAccount } =
     useBranchContext()
 
   if (user?.role !== 'RESTAURANT' && user?.role !== 'SUPPLIER') {
     return null
+  }
+
+  if (!isLoading && accounts.length <= 1 && activeAccount) {
+    return (
+      <div className="hidden md:flex items-center gap-2 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 py-1 text-sm">
+        <Building2 className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+        <span className="max-w-[180px] truncate">{activeAccount.name}</span>
+      </div>
+    )
   }
 
   if (!isLoading && accounts.length <= 1) {
@@ -18,7 +31,9 @@ export function BranchSwitcher() {
   return (
     <div className="hidden md:flex items-center gap-2 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2 py-1 text-sm">
       <Building2 className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
-      {(isLoading || isSwitching) && <Loader2 className="h-3 w-3 animate-spin text-[var(--text-muted)]" />}
+      {(isLoading || isSwitching) && (
+        <Loader2 className="h-3 w-3 animate-spin text-[var(--text-muted)]" />
+      )}
       <select
         className="bg-transparent border-none outline-none text-sm max-w-[180px] truncate cursor-pointer"
         value={activeAccountId ?? accounts[0]?.id ?? ''}
@@ -35,6 +50,15 @@ export function BranchSwitcher() {
           </option>
         ))}
       </select>
+      {user?.role === 'SUPPLIER' && multiBranch && accounts.length > 1 && (
+        <Link
+          to="/app/org"
+          className="text-xs text-[var(--brand)] whitespace-nowrap hover:underline"
+          title="Organization overview"
+        >
+          All branches
+        </Link>
+      )}
       <span className="sr-only">{activeAccount?.name ?? 'Main account'}</span>
     </div>
   )

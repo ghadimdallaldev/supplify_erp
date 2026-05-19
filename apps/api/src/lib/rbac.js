@@ -388,6 +388,23 @@ export async function getRequestTenant(req) {
   const effective = getEffectiveTenant(req)
   if (effective) return effective
 
+  const branchHeader = req.headers['x-branch-id']
+  if (branchHeader && req.userData?.role === 'SUPPLIER') {
+    const { userCanAccessTenant } = await import('./tenant-switch.js')
+    const allowed = await userCanAccessTenant(
+      req.userData.id,
+      req.userData.email,
+      branchHeader,
+      'SUPPLIER'
+    )
+    if (allowed) {
+      const { rows } = await query(`SELECT id, name FROM supplier WHERE id = $1`, [branchHeader])
+      if (rows.length) {
+        return { tenantId: rows[0].id, tenantType: 'SUPPLIER', tenantName: rows[0].name || '' }
+      }
+    }
+  }
+
   const active = await getActiveTenantFromRequest(req)
   if (active) return active
 
