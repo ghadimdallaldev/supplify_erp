@@ -5,10 +5,10 @@ import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
 import session from 'express-session'
-import connectPgSimple from 'connect-pg-simple'
 import { config } from './config/env.js'
+import { validateProductionConfig } from './lib/validate-config.js'
 import { logger } from './lib/logger.js'
-import { pool } from './lib/db.js'
+import { createSessionStore } from './lib/session-store.js'
 import { requestContext } from './middlewares/requestContext.js'
 import { impersonationContext } from './middlewares/impersonationContext.js'
 import { activeTenantContext } from './middlewares/activeTenantContext.js'
@@ -52,6 +52,10 @@ import { publicRoutes } from './routes/public.routes.js'
 import { e2eRoutes } from './routes/e2e.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 
+if (config.NODE_ENV === 'production') {
+  validateProductionConfig()
+}
+
 if (config.NODE_ENV !== 'test') {
   try {
     await ensureReservationsSchema()
@@ -65,6 +69,7 @@ if (config.NODE_ENV !== 'test') {
 }
 
 const app = express()
+const isProduction = config.NODE_ENV === 'production'
 
 // Trust proxy for rate limiting and IP detection
 app.set('trust proxy', 1)
@@ -80,6 +85,9 @@ app.use(
         imgSrc: ["'self'", 'data:', 'https:'],
       },
     },
+    hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   })
 )
 
@@ -92,30 +100,39 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Requested-With'],
   })
 )
 
-// Rate limiting
-// Increased limits for development/testing
+// Rate limiting (stricter in production)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs (increased for testing)
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 300 : 1000,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 })
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // limit each IP to 500 auth requests per windowMs (increased for testing)
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 30 : 500,
   message: 'Too many authentication attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const staffLinkLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 10 : 100,
+  message: 'Too many staff portal link requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 })
 
 // Stricter limits for sensitive endpoints (TODO: replace with Redis-backed limiter in production)
 const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200, // public reservations + staff self-service
+  max: isProduction ? 60 : 200,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -137,20 +154,15 @@ app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use(cookieParser())
 
-// Session configuration
-const isProduction = config.NODE_ENV === 'production'
-let sessionStore
-
-// Use memory store for now to fix session persistence
-sessionStore = null
-logger.info('Using memory session store')
+// Session configuration (PostgreSQL store for OAuth state across instances)
+const sessionStore = createSessionStore()
 
 app.use(
   session({
     store: sessionStore,
     secret: config.SESSION_SECRET,
     resave: false,
-    saveUninitialized: true, // Save sessions even if they are new and unmodified
+    saveUninitialized: false,
     cookie: {
       secure: isProduction,
       httpOnly: true,
@@ -218,6 +230,7 @@ app.use('/api/restaurant-pricing', restaurantPricingRoutes)
 app.use('/api/notifications', notificationsRoutes)
 app.use('/api/subscriptions', subscriptionsRoutes)
 app.use('/api/billing', billingRoutes)
+app.use('/api/public/staff/request-link', staffLinkLimiter)
 app.use('/api/public', publicRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
 if (config.E2E_SECRET) {

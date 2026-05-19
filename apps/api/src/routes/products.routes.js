@@ -19,6 +19,7 @@ import {
   ensureStorageForUpload,
 } from '../lib/subscription.js'
 import { z } from 'zod'
+import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 
 const router = express.Router()
 
@@ -622,13 +623,28 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
       paramIndex++
     }
 
-    Object.entries(updateData).forEach(([key, value]) => {
-      if (value !== undefined && key !== 'tags' && key !== 'category_id') {
-        updateFields.push(`${key} = $${paramIndex}`)
-        updateValues.push(value)
-        paramIndex++
-      }
-    })
+    const {
+      fields: schemaFields,
+      values: schemaValues,
+      nextIndex,
+    } = buildWhitelistedUpdate(
+      updateData,
+      {
+        sku: 'sku',
+        name: 'name',
+        name_ar: 'name_ar',
+        description: 'description',
+        description_ar: 'description_ar',
+        brand: 'brand',
+        category: 'category',
+        image_url: 'image_url',
+        unit: 'unit',
+      },
+      { startIndex: paramIndex }
+    )
+    updateFields.push(...schemaFields)
+    updateValues.push(...schemaValues)
+    paramIndex = nextIndex
 
     if (updateFields.length === 0) {
       return res.status(400).json({

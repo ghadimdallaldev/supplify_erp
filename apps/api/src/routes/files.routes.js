@@ -6,6 +6,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
+import { sanitizeUploadFileName, assertUploadKeyOwnedByUser } from '../lib/sanitize-upload.js'
 
 const router = express.Router()
 
@@ -67,6 +68,21 @@ router.post(
         })
       }
 
+      let safeFileName
+      try {
+        safeFileName = sanitizeUploadFileName(fileName)
+      } catch {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid file name',
+          },
+          requestId: req.requestId,
+        })
+      }
+
       const sizeBytes = fileSize ? Number(fileSize) : 0
       const storageMeter = await meterStorageFromRequest(req, sizeBytes)
       if (!storageMeter.ok) {
@@ -79,7 +95,7 @@ router.post(
       }
 
       // Generate unique file key
-      const fileKey = `uploads/${req.userData.id}/${Date.now()}-${fileName}`
+      const fileKey = `uploads/${req.userData.id}/${Date.now()}-${safeFileName}`
 
       const command = new PutObjectCommand({
         Bucket: config.S3_BUCKET,
@@ -139,6 +155,20 @@ router.post(
           error: {
             name: 'VALIDATION_ERROR',
             message: 'fileKey and fileName are required',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      try {
+        assertUploadKeyOwnedByUser(fileKey, req.userData.id)
+      } catch {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid file key',
           },
           requestId: req.requestId,
         })
