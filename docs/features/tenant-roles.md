@@ -61,7 +61,7 @@ All management routes require `requireAuth`, `resolveTenantContext`, and `requir
 ## Migration
 
 - **SQL:** `0078_tenant_named_roles.sql`, `0079_advanced_roles_feature.sql`
-- **Script:** `node scripts/migrate-users-to-roles.js` (idempotent) — seeds system roles per tenant and assigns roles from legacy permissions (Owner fallback when needed).
+- **Script:** `node apps/api/scripts/migrate-users-to-roles.js` (idempotent; runs automatically in Docker `migrate` on deploy). From repo root: `pnpm db:migrate-users-to-roles`.
 
 ## Approvals integration
 
