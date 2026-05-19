@@ -38,6 +38,8 @@ import { DisputesPage } from './pages/disputes/DisputesPage'
 import { PromotionsPage } from './pages/promotions/PromotionsPage'
 import { DealsPage } from './pages/deals/DealsPage'
 import { OrgOverviewPage } from './pages/OrgOverviewPage'
+import { BranchDetailPage } from './pages/BranchDetailPage'
+import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 
 const router = createBrowserRouter(
   [
@@ -68,6 +70,10 @@ const router = createBrowserRouter(
     {
       path: '/register/complete',
       element: <RegisterCompletePage />,
+    },
+    {
+      path: '/invite/branch',
+      element: <BranchInviteAcceptPage />,
     },
     {
       path: '/staff/dashboard',
@@ -184,6 +190,10 @@ const router = createBrowserRouter(
         {
           path: 'app/org',
           element: <OrgOverviewPage />,
+        },
+        {
+          path: 'app/org/branches/:supplierId',
+          element: <BranchDetailPage />,
         },
         {
           path: 'app/chat',

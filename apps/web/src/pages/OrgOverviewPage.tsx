@@ -1,12 +1,10 @@
-import { Building2, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { Building2, Plus, Settings } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  useGetOrgQuery,
-  useCreateOrgBranchMutation,
-  useSwitchOrgBranchContextMutation,
-} from '../services/api'
+import { useGetOrgQuery, useSwitchOrgBranchContextMutation } from '../services/api'
 import { useAppSelector } from '../hooks/redux'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { AddBranchModal } from '../components/org/AddBranchModal'
 
 export function OrgOverviewPage() {
   const navigate = useNavigate()
@@ -16,7 +14,7 @@ export function OrgOverviewPage() {
   const { data, isLoading } = useGetOrgQuery(undefined, {
     skip: user?.role !== 'SUPPLIER',
   })
-  const [createBranch, { isLoading: creating }] = useCreateOrgBranchMutation()
+  const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchOrgBranchContextMutation()
 
   const orgRole = data?.orgRole
@@ -42,12 +40,6 @@ export function OrgOverviewPage() {
     await switchBranch({ supplier_id: supplierId }).unwrap()
     navigate('/app/dashboard')
     window.location.reload()
-  }
-
-  const handleAddBranch = async () => {
-    const name = window.prompt('Branch name')
-    if (!name?.trim()) return
-    await createBranch({ name: name.trim() }).unwrap()
   }
 
   if (user?.role === 'SUPPLIER' && !multiBranch && !isLoading) {
@@ -82,12 +74,11 @@ export function OrgOverviewPage() {
         {isOrgOwner && (
           <button
             type="button"
-            onClick={() => handleAddBranch().catch(() => {})}
-            disabled={creating}
+            onClick={() => setAddBranchOpen(true)}
             className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
           >
             <Plus className="h-4 w-4" />
-            Add branch
+            Add branch account
           </button>
         )}
       </div>
@@ -105,15 +96,13 @@ export function OrgOverviewPage() {
             order_count?: number
           }
           return (
-            <button
+            <div
               key={b.id}
-              type="button"
-              onClick={() => handleOpenBranch(b.id).catch(() => {})}
-              className="text-left rounded-lg border border-[var(--app-border)] p-4 hover:border-[var(--primary)] transition-colors"
+              className="rounded-lg border border-[var(--app-border)] p-4 hover:border-[var(--primary)] transition-colors"
             >
               <div className="flex items-start gap-3">
                 <Building2 className="h-5 w-5 text-[var(--text-muted)] shrink-0 mt-0.5" />
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="font-medium flex items-center gap-2">
                     {b.name}
                     {b.is_main_branch && (
@@ -130,12 +119,33 @@ export function OrgOverviewPage() {
                   <p className="text-sm text-[var(--text-muted)] mt-1">
                     {b.staff_count ?? 0} staff · {b.order_count ?? 0} orders
                   </p>
+                  <div className="flex flex-wrap gap-3 mt-3 text-sm">
+                    <button
+                      type="button"
+                      className="text-[var(--brand)] hover:underline"
+                      onClick={() => handleOpenBranch(b.id).catch(() => {})}
+                    >
+                      Open branch
+                    </button>
+                    {isOrgOwner && (
+                      <Link
+                        to={`/app/org/branches/${b.id}`}
+                        className="inline-flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--brand)]"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                        Invitations
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
-            </button>
+            </div>
           )
         })}
       </div>
+      {isOrgOwner && (
+        <AddBranchModal open={addBranchOpen} onClose={() => setAddBranchOpen(false)} />
+      )}
     </div>
   )
 }
