@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -16,6 +16,7 @@ import {
 import {
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
+  useGetOrderQuery,
   useCreateDisputeMutation,
   useReviewDisputeMutation,
   useResolveDisputeMutation,
@@ -45,9 +46,28 @@ function statusBadge(status: string) {
   return 'outline'
 }
 
+function formatOrderRef(orderId: unknown): string {
+  const id = String(orderId || '')
+  if (!id) return '—'
+  return `#${id.slice(0, 8).toUpperCase()}`
+}
+
+type DisputeRow = {
+  id: string
+  orderId?: string
+  order_id?: string
+  type?: string
+  status?: string
+  disputedAmount?: number | null
+  disputed_amount?: number | null
+  restaurantName?: string
+}
+
 export function DisputesPage() {
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
+  const [searchParams] = useSearchParams()
+  const orderIdFromUrl = searchParams.get('orderId') || ''
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [resolveId, setResolveId] = useState<string | null>(null)
@@ -86,6 +106,26 @@ export function DisputesPage() {
   const disputes = (isSupplier ? supplierData?.disputes : restaurantData?.disputes) || []
   const isLoading = isSupplier ? loadingSupplier : loadingRestaurant
   const refetch = isSupplier ? refetchSupplier : refetchRestaurant
+
+  const { data: orderForDispute } = useGetOrderQuery(orderIdFromUrl, {
+    skip: !orderIdFromUrl || isSupplier,
+  })
+
+  useEffect(() => {
+    if (!orderIdFromUrl || isSupplier) return
+    setCreateForm((f) => ({ ...f, orderId: orderIdFromUrl }))
+    setShowCreate(true)
+  }, [orderIdFromUrl, isSupplier])
+
+  useEffect(() => {
+    const firstItem = orderForDispute?.order?.items?.[0] as
+      | { supplier_id?: string; supplierId?: string }
+      | undefined
+    const supplierId = firstItem?.supplier_id || firstItem?.supplierId
+    if (supplierId) {
+      setCreateForm((f) => ({ ...f, supplierId }))
+    }
+  }, [orderForDispute])
 
   if (!disputesEnabled) {
     return (
@@ -224,54 +264,64 @@ export function DisputesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {disputes.map((row) => (
-                    <tr key={String(row.id)} className="border-b border-[var(--app-border)]">
-                      <td className="py-3">
-                        <Link
-                          to={`/app/orders/${row.order_id}`}
-                          className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
-                        >
-                          {String(row.order_id || '').slice(-8)}
-                        </Link>
-                      </td>
-                      <td className="capitalize">{String(row.type || '').replace(/_/g, ' ')}</td>
-                      <td>
-                        <Badge variant={statusBadge(String(row.status))}>
-                          {String(row.status)}
-                        </Badge>
-                      </td>
-                      <td>
-                        {row.disputed_amount != null
-                          ? `$${formatPrice(Number(row.disputed_amount))}`
-                          : '—'}
-                      </td>
-                      <td className="text-right space-x-2">
-                        {isSupplier && row.status === 'open' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleReview(String(row.id))}
-                          >
-                            Review
-                          </Button>
-                        )}
-                        {isSupplier && (row.status === 'open' || row.status === 'under_review') && (
-                          <>
-                            <Button size="sm" onClick={() => setResolveId(String(row.id))}>
-                              Resolve
-                            </Button>
+                  {disputes.map((row) => {
+                    const dispute = row as DisputeRow
+                    const orderId = dispute.orderId || dispute.order_id
+                    const disputedAmount = dispute.disputedAmount ?? dispute.disputed_amount
+                    return (
+                      <tr key={String(dispute.id)} className="border-b border-[var(--app-border)]">
+                        <td className="py-3">
+                          {orderId ? (
+                            <Link
+                              to={`/app/orders/${orderId}`}
+                              className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
+                            >
+                              {formatOrderRef(orderId)}
+                            </Link>
+                          ) : (
+                            <span className="text-[var(--text-muted)]">—</span>
+                          )}
+                        </td>
+                        <td className="capitalize">
+                          {String(dispute.type || '').replace(/_/g, ' ')}
+                        </td>
+                        <td>
+                          <Badge variant={statusBadge(String(dispute.status))}>
+                            {String(dispute.status)}
+                          </Badge>
+                        </td>
+                        <td>
+                          {disputedAmount != null ? `$${formatPrice(Number(disputedAmount))}` : '—'}
+                        </td>
+                        <td className="text-right space-x-2">
+                          {isSupplier && dispute.status === 'open' && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => setRejectId(String(row.id))}
+                              onClick={() => handleReview(String(dispute.id))}
                             >
-                              Reject
+                              Review
                             </Button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          )}
+                          {isSupplier &&
+                            (dispute.status === 'open' || dispute.status === 'under_review') && (
+                              <>
+                                <Button size="sm" onClick={() => setResolveId(String(dispute.id))}>
+                                  Resolve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setRejectId(String(dispute.id))}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

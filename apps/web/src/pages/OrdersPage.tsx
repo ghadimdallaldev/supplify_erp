@@ -467,7 +467,9 @@ export function OrdersPage() {
                       <div className="text-2xl font-bold text-[var(--brand-mid)]">
                         {`$${formatPrice(order.total_amount)}`}
                       </div>
-                      <div className="text-sm text-[var(--text-muted)]">{order.items?.length || 0} items</div>
+                      <div className="text-sm text-[var(--text-muted)]">
+                        {order.items?.length || 0} items
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -576,9 +578,11 @@ export function OrdersPage() {
                         </Link>
                       </Button>
                       {isSupplier && (
-                        <Button variant="outline" size="sm">
-                          <Package className="h-4 w-4 mr-1" />
-                          Packing Slip
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/app/orders/${order.id}?tab=packing`}>
+                            <Package className="h-4 w-4 mr-1" />
+                            Packing Slip
+                          </Link>
                         </Button>
                       )}
                     </div>
@@ -662,7 +666,9 @@ export function OrdersPage() {
                       <div key={item.productId} className="flex items-center justify-between p-3">
                         <div className="flex-1">
                           <p className="font-medium">{item.productName}</p>
-                          <p className="text-sm text-[var(--text-muted)]">${formatPrice(item.price)} each</p>
+                          <p className="text-sm text-[var(--text-muted)]">
+                            ${formatPrice(item.price)} each
+                          </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button

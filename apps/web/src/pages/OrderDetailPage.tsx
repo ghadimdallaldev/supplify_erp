@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import {
   useGetOrderQuery,
   useUpdateOrderMutation,
@@ -64,12 +64,23 @@ function formatOperatingHours(hours: unknown): string | null {
     .join('; ')
 }
 
+const VALID_ORDER_TABS = ['details', 'items', 'invoice', 'picking', 'delivery', 'packing'] as const
+
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
+  const [activeTab, setActiveTab] = useState<string>('details')
   const [showPickingNotes, setShowPickingNotes] = useState(false)
   const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
+
+  useEffect(() => {
+    if (tabFromUrl && VALID_ORDER_TABS.includes(tabFromUrl as (typeof VALID_ORDER_TABS)[number])) {
+      setActiveTab(tabFromUrl)
+    }
+  }, [tabFromUrl])
 
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
   const { data: entitlementsData } = useGetEntitlementsQuery()
@@ -153,21 +164,47 @@ export function OrderDetailPage() {
     }
   }
 
-  const handlePrintPackingSlip = () => {
-    window.print()
-    toast.success('Preparing packing slip for printing...')
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [printingPdf, setPrintingPdf] = useState(false)
+
+  const fetchPackingSlipPdfBlob = async () => {
+    if (!id) throw new Error('Missing order id')
+    const res = await fetch(`${API_URL}/api/orders/${id}/packing-slip/pdf`, {
+      credentials: 'include',
+    })
+    if (!res.ok) throw new Error('Failed to fetch packing slip PDF')
+    return res.blob()
   }
 
-  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const handlePrintPackingSlip = async () => {
+    if (!id || printingPdf) return
+    setPrintingPdf(true)
+    try {
+      const blob = await fetchPackingSlipPdfBlob()
+      const url = URL.createObjectURL(blob)
+      const printWindow = window.open(url, '_blank')
+      if (!printWindow) {
+        URL.revokeObjectURL(url)
+        toast.error('Allow pop-ups to print the packing slip')
+        return
+      }
+      printWindow.addEventListener('load', () => {
+        printWindow.focus()
+        printWindow.print()
+      })
+      toast.success('Opening packing slip for printing…')
+    } catch {
+      toast.error('Could not print packing slip')
+    } finally {
+      setPrintingPdf(false)
+    }
+  }
+
   const handleDownloadPackingSlipPdf = async () => {
     if (!id || downloadingPdf) return
     setDownloadingPdf(true)
     try {
-      const res = await fetch(`${API_URL}/api/orders/${id}/packing-slip/pdf`, {
-        credentials: 'include',
-      })
-      if (!res.ok) throw new Error('Failed to download PDF')
-      const blob = await res.blob()
+      const blob = await fetchPackingSlipPdfBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -359,7 +396,7 @@ export function OrderDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="details" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="details">Order Details</TabsTrigger>
           <TabsTrigger value="items">Items</TabsTrigger>
@@ -599,9 +636,10 @@ export function OrderDetailPage() {
                     className="w-full"
                     variant="outline"
                     onClick={() => handlePrintPackingSlip()}
+                    disabled={printingPdf}
                   >
                     <Printer className="h-4 w-4 mr-2" />
-                    Print Packing Slip
+                    {printingPdf ? 'Preparing…' : 'Print Packing Slip'}
                   </Button>
                   <Button
                     className="w-full"
@@ -975,9 +1013,9 @@ export function OrderDetailPage() {
                     <CardDescription>Print-ready packing slip for shipping</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={() => handlePrintPackingSlip()}>
+                    <Button onClick={() => handlePrintPackingSlip()} disabled={printingPdf}>
                       <Printer className="h-4 w-4 mr-2" />
-                      Print
+                      {printingPdf ? 'Preparing…' : 'Print'}
                     </Button>
                     <Button
                       variant="outline"
