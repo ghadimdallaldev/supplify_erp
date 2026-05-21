@@ -7,20 +7,27 @@ export function useSocket() {
 
   useEffect(() => {
     if (!socketRef.current) {
-      socketRef.current = io(getSocketBaseUrl(), {
+      const s = io(getSocketBaseUrl(), {
         path: '/socket.io',
         transports: ['websocket', 'polling'],
         withCredentials: true,
       })
+
+      s.on('connect_error', (err) => {
+        console.error('[useSocket] connection error', err.message)
+      })
+
+      socketRef.current = s
     }
 
     return () => {
       if (socketRef.current) {
+        socketRef.current.removeAllListeners()
         socketRef.current.disconnect()
         socketRef.current = null
       }
     }
   }, [])
 
-  return socketRef.current
+  return socketRef
 }

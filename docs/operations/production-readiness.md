@@ -16,6 +16,8 @@ This document merges the **status report**, **API findings**, and **PR-sized fix
 
 **Production optimizations:** Environment-aware rate limiting, graceful shutdown, error handling, build splitting/minification, nginx gzip/cache, cron intervals tied to environment.
 
+**Performance (2026-05-21):** Subscription cache (30s TTL, Redis/in-memory), N+1 fix in order delivery handler and chat attachments, migration 0091 critical indexes (subscription partial index, feature_flag_override tenant+key, usage_meter tenant-leading, subscription_plan catalog).
+
 **CI/CD:** Workflows use PostgreSQL 16.
 
 ### Known non-critical issues
@@ -55,7 +57,7 @@ This document merges the **status report**, **API findings**, and **PR-sized fix
 
 1. **Invoice GET by ID** — ensure only invoice supplier, restaurant, or admin can read (`invoices.routes.js`).
 2. **Chat messages** — ensure participant check before returning messages (`chat.routes.js`).
-3. **Order create** — batch product/price fetch instead of per-line query.
+3. **Order create** — batch product/price fetch instead of per-line query. ✅ Fixed 2026-05-21: `handleOrderDelivery` inventory update loop replaced with single batch upsert.
 4. **createInvoiceFromOrder** — batch product fetch inside transaction.
 5. **Indexes** — `customer_order(restaurant_id, created_at DESC)`, `order_item(order_id)`.
 6. **Keycloak HTTP** — axios timeouts on token/userinfo calls (`auth.js`).
@@ -64,16 +66,16 @@ This document merges the **status report**, **API findings**, and **PR-sized fix
 
 ### Tenant scoping matrix
 
-| Area | Enforced | Missing / weak (when audited) |
-|------|----------|-------------------------------|
-| Orders list/GET | ✅ | — |
-| Order POST | ✅ | — |
-| Invoices list | ✅ | — |
-| **Invoices GET :id** | — | ❌ verify tenant |
-| Chat conversations list | ✅ | — |
-| **Chat GET messages** | — | ❌ verify participant |
-| Restaurants list | ✅ | — |
-| **Restaurants GET :id** | Partial | ❌ supplier any id |
+| Area                    | Enforced | Missing / weak (when audited) |
+| ----------------------- | -------- | ----------------------------- |
+| Orders list/GET         | ✅       | —                             |
+| Order POST              | ✅       | —                             |
+| Invoices list           | ✅       | —                             |
+| **Invoices GET :id**    | —        | ❌ verify tenant              |
+| Chat conversations list | ✅       | —                             |
+| **Chat GET messages**   | —        | ❌ verify participant         |
+| Restaurants list        | ✅       | —                             |
+| **Restaurants GET :id** | Partial  | ❌ supplier any id            |
 
 ### Additional notes
 
@@ -86,10 +88,10 @@ This document merges the **status report**, **API findings**, and **PR-sized fix
 
 Each step should be a small PR.
 
-1. **Migration:** Add indexes `idx_customer_order_restaurant_created`, `idx_order_item_order_id` (use `CONCURRENTLY` in prod if required).
+1. **Migration:** Add indexes `idx_customer_order_restaurant_created`, `idx_order_item_order_id` (use `CONCURRENTLY` in prod if required). ✅ Fixed 2026-05-21: Migration 0091 adds `idx_subscription_tenant_status_active`, `idx_feature_flag_override_tenant_key`, `idx_usage_meter_tenant_id_type_meter_period`, `idx_subscription_plan_tenant_type_active`.
 2. **Invoice GET:** After load, assert supplier_id / restaurant_id matches caller (or admin).
 3. **Chat messages GET:** Assert conversation belongs to caller’s tenant.
-4. **Order POST:** Single `WHERE id = ANY($1)` (or equivalent) for products/prices; map by id in memory.
+4. **Order POST:** Single `WHERE id = ANY($1)` (or equivalent) for products/prices; map by id in memory. ✅ Fixed 2026-05-21: `handleOrderDelivery` uses single batch upsert.
 5. **createInvoiceFromOrder:** Same batching for product rows.
 6. **Auth:** `timeout: 10000` (or config) on all Keycloak-facing axios calls.
 7. **(Optional)** Supplier restaurant GET — require an order relationship.
@@ -99,4 +101,4 @@ Each step should be a small PR.
 
 ---
 
-*Consolidated from legacy `PRODUCTION_READINESS.md`, `PRODUCTION_READINESS_FINDINGS.md`, and `PRODUCTION_READINESS_FIX_PLAN.md`.*
+_Consolidated from legacy `PRODUCTION_READINESS.md`, `PRODUCTION_READINESS_FINDINGS.md`, and `PRODUCTION_READINESS_FIX_PLAN.md`._

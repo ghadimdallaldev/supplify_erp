@@ -39,12 +39,12 @@ function runStep(label, scriptName) {
 }
 
 console.log('╔══════════════════════════════════════════════════════════╗')
-console.log('║  Tier catalog seed — 1 resto + 1 supplier per plan tier    ║')
+console.log('║  Tier catalog seed — 1 resto + 1 supplier per plan tier   ║')
 console.log('╚══════════════════════════════════════════════════════════╝')
 console.log('\n⚠  Wipes all tenants and non-admin users.\n')
 
 runStep('Migrations', 'migrate.js')
-runStep('Tier catalog (Free / Silver / Gold)', 'seed-tier-catalog.js')
+runStep('Tier catalog (Free / Silver / Gold / Platinum)', 'seed-tier-catalog.js')
 runStep('Disputes, deals & reports samples', 'seed-feature-demos.js')
 
 if (process.env.SKIP_KEYCLOAK !== 'true') {

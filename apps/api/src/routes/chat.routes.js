@@ -15,6 +15,7 @@ import {
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
+  requireFeature,
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyMessageReceived } from '../services/notification.service.js'
@@ -115,7 +116,13 @@ async function getOrCreateConversation(supplierId, restaurantId) {
   return conversation
 }
 
-router.use(requireAuth, resolveTenantContext, requirePermission('CHAT_VIEW'))
+const chatFeatureGate = requireFeature(
+  'chat',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.use(requireAuth, resolveTenantContext, chatFeatureGate, requirePermission('CHAT_VIEW'))
 
 // List conversations for current user
 router.get('/conversations', async (req, res) => {
@@ -759,23 +766,26 @@ router.post(
 
         // Usage already reserved atomically in checkAndIncrementUsage above (no second increment)
 
-        // Add attachments if any
+        // Add attachments if any — batch insert avoids N+1 for multi-attachment messages
         if (messageData.attachments && messageData.attachments.length > 0) {
+          const attVals = []
+          const attParams = []
+          let ap = 1
           for (const attachment of messageData.attachments) {
-            await query(
-              `
-            INSERT INTO message_attachment (message_id, file_url, file_type, file_name, file_size)
-            VALUES ($1, $2, $3, $4, $5)
-          `,
-              [
-                message.id,
-                attachment.fileUrl,
-                attachment.fileType,
-                attachment.fileName,
-                attachment.fileSize || null,
-              ]
+            attVals.push(`($${ap},$${ap + 1},$${ap + 2},$${ap + 3},$${ap + 4})`)
+            attParams.push(
+              message.id,
+              attachment.fileUrl,
+              attachment.fileType,
+              attachment.fileName,
+              attachment.fileSize || null
             )
+            ap += 5
           }
+          await query(
+            `INSERT INTO message_attachment (message_id, file_url, file_type, file_name, file_size) VALUES ${attVals.join(', ')}`,
+            attParams
+          )
         }
 
         await query('COMMIT')

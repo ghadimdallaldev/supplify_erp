@@ -6,10 +6,22 @@ import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifyInvoiceIssued } from '../services/notification.service.js'
+import { requireFeature } from '../lib/subscription.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requirePermission('INVOICES_VIEW'))
+const financeInvoicesGate = requireFeature(
+  'finance_invoices',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  financeInvoicesGate,
+  requirePermission('INVOICES_VIEW')
+)
 
 /** Build PDF buffer for an invoice with line items */
 async function buildInvoicePdf(invoice, lineItems) {

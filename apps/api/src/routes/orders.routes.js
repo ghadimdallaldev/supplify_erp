@@ -441,37 +441,24 @@ async function handleOrderDelivery(orderId, userData, res) {
 
       const supplierItems = orderItems
 
-      // Update restaurant inventory ONLY for this supplier's items
-      for (const item of supplierItems) {
-        // Check if restaurant inventory exists for this product
-        const { rows: restaurantInventory } = await client.query(
-          `
-          SELECT * FROM restaurant_inventory 
-          WHERE restaurant_id = $1 AND product_id = $2
-        `,
-          [order.restaurant_id, item.product_id]
-        )
-
-        if (restaurantInventory.length > 0) {
-          // Update existing inventory
-          await client.query(
-            `
-            UPDATE restaurant_inventory 
-            SET quantity = quantity + $1, updated_at = now()
-            WHERE restaurant_id = $2 AND product_id = $3
-          `,
-            [item.quantity, order.restaurant_id, item.product_id]
-          )
-        } else {
-          // Create new inventory record
-          await client.query(
-            `
-            INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
-            VALUES ($1, $2, $3, now())
-          `,
-            [order.restaurant_id, item.product_id, item.quantity]
-          )
+      // Update restaurant inventory ONLY for this supplier's items (batch upsert — avoids N+1)
+      if (supplierItems.length > 0) {
+        // Build VALUES list: ($1,$2,$3), ($4,$5,$6), ...
+        const vals = []
+        const params = []
+        let p = 1
+        for (const item of supplierItems) {
+          vals.push(`($${p},$${p + 1},$${p + 2},now())`)
+          params.push(order.restaurant_id, item.product_id, item.quantity)
+          p += 3
         }
+        await client.query(
+          `INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
+           VALUES ${vals.join(', ')}
+           ON CONFLICT (restaurant_id, product_id)
+           DO UPDATE SET quantity = restaurant_inventory.quantity + EXCLUDED.quantity, updated_at = now()`,
+          params
+        )
       }
 
       // Create invoice from the order (orders are now single-supplier)

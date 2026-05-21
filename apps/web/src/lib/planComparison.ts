@@ -26,13 +26,25 @@ export const RESTAURANT_FEATURE_KEYS = [
   'reports',
   'smart_reorder',
   'multi_branch',
+  'disputes_returns',
+  'advanced_roles',
+  'approvals_budgets',
+  'supplier_reviews',
+  'tenant_audit_log',
   'custom_branding',
 ] as const
 
 export const SUPPLIER_FEATURE_KEYS = [
   'order_calendar',
   'reports',
-  'smart_reorder',
+  'warehouses',
+  'multi_warehouse',
+  'fulfillment',
+  'driver_management',
+  'disputes_returns',
+  'advanced_roles',
+  'promotions',
+  'tenant_audit_log',
   'custom_branding',
 ] as const
 
@@ -53,7 +65,17 @@ export const FEATURE_KEY_LABELS: Record<string, string> = {
   reports: 'Reports',
   smart_reorder: 'Smart reorder',
   multi_branch: 'Multi-branch',
+  disputes_returns: 'Disputes & returns',
+  advanced_roles: 'Advanced roles',
+  approvals_budgets: 'Approvals & budgets',
+  supplier_reviews: 'Supplier reviews',
+  tenant_audit_log: 'Activity log',
   custom_branding: 'Custom branding',
+  warehouses: 'Warehouses',
+  multi_warehouse: 'Multi-warehouse',
+  fulfillment: 'Fulfillment & logistics',
+  driver_management: 'Driver management',
+  promotions: 'Promotions',
 }
 
 /** Short label for plan comparison cells (tier-specific branding levels). */

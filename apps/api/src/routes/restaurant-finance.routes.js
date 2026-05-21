@@ -8,7 +8,13 @@ import { z } from 'zod'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext)
+const financeInvoicesGate = requireFeature(
+  'finance_invoices',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.use(requireAuth, resolveTenantContext, financeInvoicesGate)
 
 // Validation schemas
 const markPaidSchema = z.object({

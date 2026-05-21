@@ -33,6 +33,11 @@ export function getLayoutSocket(userId: string): Socket {
     autoConnect: true,
   })
   socketUserId = userId
+
+  socket.on('connect_error', (err) => {
+    console.error('[layoutSocket] connection error', err.message)
+  })
+
   return socket
 }
 

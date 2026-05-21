@@ -193,19 +193,21 @@ Supplify offers tiered subscription plans designed for **restaurants and supplie
 
 ### Branches (Restaurants Only)
 
-- **Free/Bronze:** 1 location (no multi-branch)
-- **Gold:** Up to 3 locations
+- **Free:** 1 location (main account only — no linked branch accounts)
+- **Bronze:** 2 locations (main + 1 linked branch account)
+- **Gold:** Up to 3 locations (main + 2 linked branch accounts)
 - **Platinum:** Unlimited locations
 
 **Enforcement:** Cannot create additional branches beyond limit. Existing branches remain accessible.
 
 ### Warehouses (Suppliers Only)
 
-- **Free/Bronze:** 0 warehouses
+- **Free:** 0 warehouses
+- **Bronze:** 1 warehouse
 - **Gold:** Up to 3 warehouses
 - **Platinum:** Unlimited warehouses
 
-**Enforcement:** Cannot create warehouses on Free/Bronze plans. Inventory defaults to "Unassigned."
+**Enforcement:** Cannot create warehouses beyond plan limit. Free plan inventory defaults to "Unassigned."
 
 ### Orders Per Day
 
@@ -225,38 +227,46 @@ Supplify offers tiered subscription plans designed for **restaurants and supplie
 
 ### Limits
 
-| Limit                           | Free   | Bronze | Gold  | Platinum  |
-| ------------------------------- | ------ | ------ | ----- | --------- |
-| **Branches** (restaurants)      | 0      | 1      | 3     | Unlimited |
-| **Warehouses** (suppliers)      | 0      | 1      | 3     | Unlimited |
-| **Users**                       | 1      | 3      | 10    | Unlimited |
-| **Orders / day**                | 5      | 50     | 200   | Unlimited |
-| **Suppliers per restaurant**    | 1      | 5      | 20    | Unlimited |
-| **Inventory SKUs** (restaurant) | 50     | 500    | 2,000 | Unlimited |
-| **Products / SKUs** (supplier)  | 50     | 500    | 2,000 | Unlimited |
-| **Chats / day**                 | 5      | 30     | 100   | Unlimited |
-| **Storage**                     | 100 MB | 1 GB   | 5 GB  | 50 GB     |
+| Limit                           | Free  | Bronze | Gold      | Platinum  |
+| ------------------------------- | ----- | ------ | --------- | --------- |
+| **Branches** (restaurants)      | 1     | 2      | 3         | Unlimited |
+| **Warehouses** (suppliers)      | 0     | 1      | 3         | Unlimited |
+| **Users**                       | 1     | 3      | 10        | Unlimited |
+| **Orders / day**                | 3     | 20     | 50        | Unlimited |
+| **Suppliers per restaurant**    | 1     | 10     | Unlimited | Unlimited |
+| **Inventory SKUs** (restaurant) | 15    | 1,000  | 1,000     | Unlimited |
+| **Products / SKUs** (supplier)  | 15    | 1,000  | 1,000     | Unlimited |
+| **Chats / day**                 | 3     | 50     | 200       | Unlimited |
+| **Storage**                     | 50 MB | 1 GB   | 5 GB      | 20 GB     |
 
 ### Features
 
-| Feature                            | Free               | Bronze                 | Gold                           | Platinum                              |
-| ---------------------------------- | ------------------ | ---------------------- | ------------------------------ | ------------------------------------- |
-| **Chat**                           | Basic (1 supplier) | Multi-supplier         | Groups + files                 | Real-time + media + read receipts     |
-| **Reports**                        | ❌                 | Basic KPIs             | Usage & cost dashboards        | Advanced forecasting + custom reports |
-| **Smart Reorder**                  | ❌                 | ❌                     | Full (90-day trends)           | AI forecast + seasonality             |
-| **Reservations** _(restaurant)_    | ❌                 | Basic (board + create) | Floor plan builder + analytics | Guest intelligence + VIP tracking     |
-| **Multi-Branch** _(restaurant)_    | ❌                 | ❌                     | ✅                             | Central purchasing                    |
-| **Inventory Management**           | Basic              | Real-time              | Multi-branch tracking          | Lot + expiry tracking                 |
-| **Waste Tracking**                 | ❌                 | Manual entry           | Analytics dashboard            | Cost vs. sales analytics              |
-| **Receiving Quality**              | Manual only        | Photos enabled         | Quality scoring                | Supplier performance reports          |
-| **Finance & Invoices**             | View only          | Record payments        | Expense analytics              | Advanced finance dashboard            |
-| **Approvals & Budgets**            | ❌                 | Single-level           | Approval + budget caps         | Multi-level approvals                 |
-| **Quick Lists**                    | Manual only        | Automated weekly       | Full schedule                  | AI smart automation                   |
-| **Fulfillment Tools** _(supplier)_ | Basic orders       | Manual + invoices      | Warehouse pick & pack          | Full routing suite                    |
-| **Notifications**                  | In-app only        | + Email                | + SMS                          | + Webhooks                            |
-| **API Integrations**               | ❌                 | ❌                     | API key access                 | Full API + webhooks                   |
-| **Support SLA**                    | Community          | 72h standard           | 24h priority                   | Same-day dedicated                    |
-| **Custom Branding**                | ❌                 | ❌                     | Logo + colors                  | White-label + custom domain           |
+| Feature                             | Free               | Bronze                 | Gold                           | Platinum                              |
+| ----------------------------------- | ------------------ | ---------------------- | ------------------------------ | ------------------------------------- |
+| **Chat**                            | Basic (1 supplier) | Multi-supplier         | Groups + files                 | Real-time + media + read receipts     |
+| **Reports**                         | ❌                 | Basic KPIs             | Usage & cost dashboards        | Advanced forecasting + custom reports |
+| **Smart Reorder**                   | ❌                 | ❌                     | Full (90-day trends)           | AI forecast + seasonality             |
+| **Reservations** _(restaurant)_     | ❌                 | Basic (board + create) | Floor plan builder + analytics | Guest intelligence + VIP tracking     |
+| **Multi-Branch** _(restaurant)_     | ❌                 | ❌                     | ✅                             | Central purchasing                    |
+| **Inventory Management**            | Basic              | Real-time              | Multi-branch tracking          | Lot + expiry tracking                 |
+| **Waste Tracking**                  | ❌                 | Manual entry           | Analytics dashboard            | Cost vs. sales analytics              |
+| **Receiving Quality**               | Manual only        | Photos enabled         | Quality scoring                | Supplier performance reports          |
+| **Finance & Invoices**              | View only          | Record payments        | Expense analytics              | Advanced finance dashboard            |
+| **Approvals & Budgets**             | ❌                 | Single-level           | Approval + budget caps         | Multi-level approvals                 |
+| **Quick Lists**                     | Manual only        | Automated weekly       | Full schedule                  | AI smart automation                   |
+| **Fulfillment Tools** _(supplier)_  | Basic orders       | Manual + invoices      | Warehouse pick & pack          | Full routing suite                    |
+| **Disputes & Returns**              | ❌                 | ✅                     | ✅                             | ✅                                    |
+| **Order Amendments**                | ✅                 | ✅                     | ✅                             | ✅                                    |
+| **Push Notifications**              | ✅                 | ✅                     | ✅                             | ✅                                    |
+| **Supplier Reviews** _(restaurant)_ | ❌                 | ✅                     | ✅                             | ✅                                    |
+| **Order Calendar**                  | ❌                 | ✅                     | ✅                             | ✅                                    |
+| **Advanced Roles**                  | ❌                 | ❌                     | ✅                             | ✅                                    |
+| **Activity Log**                    | ❌                 | ❌                     | ✅                             | ✅                                    |
+| **Promotions & Deals** _(supplier)_ | ❌                 | ✅                     | ✅                             | ✅                                    |
+| **Notifications**                   | In-app only        | + Email                | + SMS                          | + Webhooks                            |
+| **API Integrations**                | ❌                 | ❌                     | API key access                 | Full API + webhooks                   |
+| **Support SLA**                     | Community          | 72h standard           | 24h priority                   | Same-day dedicated                    |
+| **Custom Branding**                 | ❌                 | ❌                     | Logo + colors                  | White-label + custom domain           |
 
 ---
 

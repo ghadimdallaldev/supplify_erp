@@ -14,7 +14,18 @@ import { z } from 'zod'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requirePermission('INVENTORY_VIEW'))
+const inventoryManagementGate = requireFeature(
+  'inventory_management',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  inventoryManagementGate,
+  requirePermission('INVENTORY_VIEW')
+)
 
 // Validation schemas
 const adjustInventorySchema = z.object({

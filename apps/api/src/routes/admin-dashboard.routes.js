@@ -11,7 +11,12 @@ import {
   getImpersonationCookieName,
   getEffectiveTenant,
 } from '../lib/impersonation.js'
-import { getEntitlements, RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } from '../lib/subscription.js'
+import {
+  getEntitlements,
+  RESTAURANT_LIMIT_KEYS,
+  SUPPLIER_LIMIT_KEYS,
+  invalidateTenantSubscriptionCache,
+} from '../lib/subscription.js'
 import { getAllowedFeatureKeys, featureDisplayName } from '../lib/feature-keys.js'
 import {
   listGlobalFeatureFlags,
@@ -1176,6 +1181,17 @@ router.patch('/subscriptions/:id', async (req, res) => {
       )
     }
 
+    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    try {
+      const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
+      emitEntitlementsRefreshNotice({
+        tenantId: existing.tenant_id,
+        tenantType: existing.tenant_type,
+        reason: 'admin_subscription_update',
+      })
+    } catch (emitErr) {
+      logger.warn('emitEntitlementsRefreshNotice failed', { error: emitErr.message })
+    }
     res.json({
       ok: true,
       data: { subscription: updated },
@@ -1247,6 +1263,18 @@ router.post('/subscriptions/:id/unlock', async (req, res) => {
       target_id: id,
       payload_json: { reason, adminUserId: req.userData.id },
     })
+
+    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    try {
+      const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
+      emitEntitlementsRefreshNotice({
+        tenantId: existing.tenant_id,
+        tenantType: existing.tenant_type,
+        reason: 'admin_account_unlocked',
+      })
+    } catch (emitErr) {
+      logger.warn('emitEntitlementsRefreshNotice failed', { error: emitErr.message })
+    }
 
     res.json({
       ok: true,

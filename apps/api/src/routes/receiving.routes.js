@@ -3,11 +3,18 @@ import { requireAuth, requireRole, resolveTenantContext, requirePermission } fro
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
+import { requireFeature } from '../lib/subscription.js'
 import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext)
+const receivingQualityGate = requireFeature(
+  'receiving_quality',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.use(requireAuth, resolveTenantContext, receivingQualityGate)
 
 // Get delivered orders ready for receiving
 router.get(

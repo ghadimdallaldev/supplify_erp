@@ -1,6 +1,7 @@
 /**
- * Wipe commercial data and seed 1 restaurant + 1 supplier per plan tier (Free / Silver / Gold)
- * with prod-like volume, Keycloak logins, and tenant roles for Team assignment.
+ * Wipe commercial data and seed 1 restaurant + 1 supplier per plan tier
+ * (Free / Silver / Gold / Platinum) with prod-like volume, Keycloak logins,
+ * and tenant roles for Team assignment.
  *
  * Run: pnpm run seed:tier-catalog
  */
@@ -25,6 +26,7 @@ import {
   SEED_PASSWORD,
   restaurantDef,
   supplierDef,
+  applyPlanFeaturePatches,
 } from './seed/tierDefinitions.js'
 import { backfillAllCommercialAuditLogs } from './seed/audit-demo-backfill.js'
 
@@ -382,6 +384,9 @@ export async function seedTierCatalog() {
       'supplier_id',
       'tenant_id',
     ])
+
+    console.log('🔧 Patching plan features (missing keys from migrations)...')
+    await applyPlanFeaturePatches(client)
 
     console.log('📦 Seeding 1 restaurant + 1 supplier per tier (prod-like data)...\n')
 

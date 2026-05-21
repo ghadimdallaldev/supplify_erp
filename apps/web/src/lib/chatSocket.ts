@@ -33,6 +33,11 @@ export function getChatSocket(userId: string): Socket {
     autoConnect: true,
   })
   socketUserId = userId
+
+  socket.on('connect_error', (err) => {
+    console.error('[chatSocket] connection error', err.message)
+  })
+
   return socket
 }
 

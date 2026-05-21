@@ -1,5 +1,10 @@
 import express from 'express'
-import { requireAuth, requireRole, getRestaurantIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getRestaurantIdForRequest,
+  resolveTenantContext,
+} from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -9,10 +14,17 @@ import {
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
+  requireFeature,
 } from '../lib/subscription.js'
 import { z } from 'zod'
 
 const router = express.Router()
+
+const quickListsFeatureGate = requireFeature(
+  'quick_lists',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
 // Validation schemas
 const createQuickListSchema = z.object({
@@ -77,6 +89,8 @@ const addItemSchema = z.object({
   quantity: z.number().positive(),
   notes: z.string().optional(),
 })
+
+router.use(requireAuth, resolveTenantContext, quickListsFeatureGate)
 
 // Get all quick lists for restaurant
 router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {

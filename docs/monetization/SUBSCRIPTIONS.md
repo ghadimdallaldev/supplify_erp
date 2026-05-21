@@ -5,7 +5,7 @@ Plans are split by **tenant type**: each of Free, Bronze, Gold, and Platinum exi
 ## Limit keys (normalized)
 
 - **RESTAURANT:** `branches`, `users`, `orders_per_day`, `suppliers_per_restaurant`, `restaurant_inventory_skus`, `chats_per_day`, `storage_mb`
-- **SUPPLIER:** `warehouses`, `users`, `supplier_products_skus`, `chats_per_day`, `storage_mb`
+- **SUPPLIER:** `branches`, `warehouses`, `users`, `supplier_products_skus`, `chats_per_day`, `storage_mb`
 
 Legacy key `products` is no longer used; it was replaced by `restaurant_inventory_skus` (restaurant) and `supplier_products_skus` (supplier).
 
@@ -30,22 +30,24 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 
 ## Supplier plan matrix
 
-| Plan     | warehouses | users     | supplier_products_skus | chats_per_day | storage_mb | fulfillment |
-| -------- | ---------- | --------- | ---------------------- | ------------- | ---------- | ----------- |
-| Free     | 0          | 1         | 15                     | 3             | 50         | basic       |
-| Bronze   | 1          | 3         | 1,000                  | 50            | 1,000      | manual      |
-| Gold     | 3          | 10        | 1,000                  | 200           | 5,000      | warehouse   |
-| Platinum | unlimited  | unlimited | unlimited              | unlimited     | 20,000     | full        |
+| Plan     | branches  | warehouses | users     | supplier_products_skus | chats_per_day | storage_mb | fulfillment |
+| -------- | --------- | ---------- | --------- | ---------------------- | ------------- | ---------- | ----------- |
+| Free     | 1         | 0          | 1         | 15                     | 3             | 50         | basic       |
+| Bronze   | 1         | 1          | 3         | 1,000                  | 50            | 1,000      | manual      |
+| Gold     | 3         | 3          | 10        | 1,000                  | 200           | 5,000      | warehouse   |
+| Platinum | unlimited | unlimited  | unlimited | unlimited              | unlimited     | 20,000     | full        |
 
-**Free plan:** Setup and testing only. Low limits (15 products, 3 chats/day, 50 MB storage, 0 warehouses) to encourage upgrade to Gold for real usage.
+**Free plan:** Setup and testing only. Low limits (15 products, 3 chats/day, 50 MB storage, 1 branch account, 0 warehouses) to encourage upgrade to Gold for real usage.
 
 - **fulfillment:** Plan feature (e.g. `fulfillment_tools`: basic_orders, manual_orders_invoices, warehouse_pick_pack, routing_full_suite). Can be gated by plan.
 
 ## Enforcement
 
-- **Feature entitlements:** `requireFeature(featureKey)` middleware (e.g. `reports`, `smart_reorder`, `multi_branch`) returns **403** with error name **FEATURE_NOT_AVAILABLE** when the plan does not include the feature.
+- **Feature entitlements:** `requireFeature(featureKey)` middleware returns **403** with error name **FEATURE_NOT_AVAILABLE** when the plan does not include the feature. The following feature keys are currently gated on routes:
+  `chat`, `quick_lists`, `receiving_quality`, `finance_invoices`, `inventory_management`, `reports`, `disputes_returns`, `approvals_budgets`, `promotions`, `tenant_audit_log`, `push_notifications`, `supplier_reviews`, `order_amendments`, `fulfillment`, `driver_management`, `warehouses`, `multi_warehouse`, `order_calendar`, `advanced_roles`
 - **Limits:** `requireWithinLimit(limitKey, usage)` and `checkLimit()` return **403** with error name **LIMIT_EXCEEDED** when usage exceeds the plan (or override) limit.
 - **Permissions:** Routes also enforce RBAC (e.g. ORDERS_CREATE, CHAT_SEND, INVENTORY_EDIT, RECEIVING_VIEW, RECEIVING_MANAGE, PAYMENTS_MANAGE, INVOICES_VIEW). See FEATURE_CATALOG.md.
+- **Subscription cache:** Subscription rows are cached with a 30-second TTL (Redis when available, in-memory fallback). Cache is invalidated automatically on plan changes, checkouts, account unlocks, and admin updates.
 
 ## Enterprise plan
 

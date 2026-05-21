@@ -2,6 +2,15 @@ import { query, withTransaction } from './db.js'
 import { logger } from './logger.js'
 import { resolveAllFeaturesForTenant } from './feature-flags.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
+import { getCache, setCache, deleteCache } from './cache.js'
+
+/** Cache TTL for subscription data (seconds). Short enough to absorb burst traffic while staying fresh. */
+const SUBSCRIPTION_CACHE_TTL = 30
+
+/** Build a consistent cache key for a tenant subscription. */
+function subscriptionCacheKey(tenantId, tenantType) {
+  return 'sub:' + tenantType + ':' + tenantId
+}
 
 /**
  * Ensure tenant has an active subscription; if none, create one with the free plan.
@@ -46,6 +55,11 @@ async function ensureTenantSubscription(tenantId, tenantType) {
  * @returns {Promise<Object|null>} Subscription with plan details
  */
 export async function getTenantSubscription(tenantId, tenantType) {
+  // Check cache first - avoids repeated DB hits on hot paths (requireFeature, checkLimit, etc.)
+  const cacheKey = subscriptionCacheKey(tenantId, tenantType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null) return cached
+
   try {
     try {
       const { rows: subRows } = await query(
@@ -115,11 +129,25 @@ export async function getTenantSubscription(tenantId, tenantType) {
       rows = result.rows
     }
 
-    return rows[0] || null
+    const result = rows[0] || null
+    // Populate cache (TTL=30s). On cache miss (null result), do NOT cache — tenant may have
+    // just been created and ensureTenantSubscription will retry on next call.
+    if (result !== null) {
+      await setCache(cacheKey, result, SUBSCRIPTION_CACHE_TTL).catch(() => {})
+    }
+    return result
   } catch (error) {
     logger.error('Get tenant subscription error', { error: error.message })
     return null
   }
+}
+
+/**
+ * Invalidate the in-process/Redis cache for a tenant's subscription.
+ * Call this whenever a subscription is activated, upgraded, or cancelled.
+ */
+export async function invalidateTenantSubscriptionCache(tenantId, tenantType) {
+  await deleteCache(subscriptionCacheKey(tenantId, tenantType)).catch(() => {})
 }
 
 /**
@@ -1126,6 +1154,8 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
         })
       }
 
+      // Attach subscription so route handlers can reuse it without a second DB call
+      req.subscription = subscription
       next()
     } catch (error) {
       logger.error('Check feature middleware error:', error)
