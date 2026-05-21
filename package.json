@@ -37,6 +37,7 @@
     "seed:tier-catalog": "node apps/api/scripts/seed-tier-catalog.mjs",
     "seed:audit-backfill": "node apps/api/scripts/seed-audit-backfill.mjs",
     "db:reset": "pnpm --filter @supplify/api db:reset",
+    "db:wipe-commercial": "pnpm --filter @supplify/api db:wipe-commercial",
     "openapi:gen": "pnpm --filter @supplify/api openapi:gen",
     "cdk:bootstrap": "cd infra && pnpm install && pnpm bootstrap",
     "cdk:deploy": "cd infra && pnpm install && pnpm deploy",

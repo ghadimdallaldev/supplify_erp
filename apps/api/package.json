@@ -32,6 +32,7 @@
     "seed:features": "node scripts/seed-feature-demos.js",
     "seed:tier-catalog": "node scripts/seed-tier-catalog.js",
     "reduce-to-single-tenant": "node scripts/reduce-to-single-tenant.js",
+    "db:wipe-commercial": "node scripts/wipe-commercial-only.js",
     "db:reset": "node scripts/reset.js",
     "db:init-subs": "node scripts/initialize-subscriptions.js",
     "openapi:gen": "node scripts/generate-openapi.js"
