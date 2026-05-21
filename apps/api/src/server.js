@@ -72,6 +72,7 @@ import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { expireOldBranchInvitations } from './lib/branch-invitations.js'
 import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
+import { ensureObjectStorageBuckets, checkObjectStorageHealth } from './lib/object-storage.js'
 
 if (config.NODE_ENV === 'production') {
   validateProductionConfig()
@@ -86,6 +87,19 @@ if (config.NODE_ENV !== 'test') {
       error: error.message,
     })
     process.exit(1)
+  }
+
+  try {
+    const bucketResults = await ensureObjectStorageBuckets()
+    logger.info('Object storage buckets ready', {
+      buckets: bucketResults.map((r) => r.bucket),
+    })
+  } catch (error) {
+    logger.error('Object storage bucket setup failed — uploads may not work', {
+      error: error.message,
+      endpoint: config.S3_ENDPOINT,
+      bucket: config.S3_BUCKET,
+    })
   }
 }
 
@@ -220,11 +234,14 @@ app.use((req, res, next) => {
 })
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    ok: true,
-    status: 'healthy',
+app.get('/health', async (req, res) => {
+  const storage = await checkObjectStorageHealth()
+  const ok = storage.ok
+  res.status(ok ? 200 : 503).json({
+    ok,
+    status: ok ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
+    storage,
     requestId: req.requestId,
   })
 })

@@ -47,10 +47,25 @@ export const config = {
   IMPERSONATION_MAX_DURATION_MINUTES: process.env.IMPERSONATION_MAX_DURATION_MINUTES
     ? parseInt(process.env.IMPERSONATION_MAX_DURATION_MINUTES, 10)
     : 60,
+  /** MinIO API URL reachable from the API container (Docker: http://minio:9000). */
   S3_ENDPOINT: process.env.S3_ENDPOINT || 'http://localhost:9000',
+  /**
+   * Browser-facing base URL for stored objects (product images). Defaults to S3_ENDPOINT.
+   * Deploy: http://<your-host>:9000 or https://<domain>/storage if nginx proxies MinIO.
+   */
+  S3_PUBLIC_URL: process.env.S3_PUBLIC_URL || process.env.S3_ENDPOINT || 'http://localhost:9000',
+  /** Primary bucket for uploads (product images, chat files, logos). */
   S3_BUCKET: process.env.S3_BUCKET || 'supplify',
+  /**
+   * Comma-separated buckets to create on init (defaults to S3_BUCKET).
+   * Example: supplify,supplify-archive — add new names here before switching S3_BUCKET.
+   */
+  S3_BUCKETS: process.env.S3_BUCKETS || '',
+  S3_REGION: process.env.S3_REGION || 'us-east-1',
   S3_ACCESS_KEY: process.env.S3_ACCESS_KEY || 'minioadmin',
   S3_SECRET_KEY: process.env.S3_SECRET_KEY || 'minioadmin',
+  /** When true (default), buckets allow anonymous GetObject for stored URLs. Set false if using signed GET only. */
+  S3_PUBLIC_READ: process.env.S3_PUBLIC_READ !== 'false',
   REDIS_URL: process.env.REDIS_URL || '',
   /** Test-only: secret for E2E reset-seed endpoint. When set, POST /api/e2e/reset-seed is enabled. */
   E2E_SECRET: process.env.E2E_SECRET || '',

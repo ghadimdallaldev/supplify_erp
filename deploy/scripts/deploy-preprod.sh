@@ -71,6 +71,7 @@ sed -i \
   "$ENV_FILE"
 
 apply_vapid_env "$ENV_FILE"
+apply_minio_public_url "$ENV_FILE"
 
 set -a
 # shellcheck disable=SC1090
@@ -100,6 +101,7 @@ wait_healthy "supplify-staging-minio"    60 3
 
 echo ""
 echo "▶ Phase 5: Init & migrate"
+echo "  Running minio-init (buckets: ${S3_BUCKETS:-${S3_BUCKET:-supplify}})..."
 "${COMPOSE_CMD[@]}" run --rm minio-init
 "${COMPOSE_CMD[@]}" run --rm keycloak-init
 "${COMPOSE_CMD[@]}" run --rm migrate

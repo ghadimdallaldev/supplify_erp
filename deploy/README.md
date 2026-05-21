@@ -30,6 +30,28 @@ pnpm local:down
 
 App: http://localhost — Keycloak: http://localhost:8180 (realm **Supplify**)
 
+## MinIO buckets (product images, uploads)
+
+Uploads use **MinIO** (S3-compatible API). A “bucket” is only a namespace on your MinIO server—not AWS.
+
+| Variable                               | Purpose                                                                                         |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `S3_BUCKET`                            | Active bucket for new uploads (e.g. `supplify`)                                                 |
+| `S3_BUCKETS`                           | Optional comma-separated list of buckets to **create** at init (e.g. `supplify,supplify-media`) |
+| `S3_ENDPOINT`                          | MinIO URL **from the API container** (`http://minio:9000`)                                      |
+| `S3_PUBLIC_URL`                        | MinIO URL **for browsers** (`http://<host>:9000`; set automatically in deploy scripts)          |
+| `S3_PUBLIC_READ` / `MINIO_PUBLIC_READ` | When `true`, init grants public GET on bucket objects (product images)                          |
+
+Deploy and `docker compose` run `deploy/scripts/minio-init-buckets.sh`, which creates each bucket and sets **public download** so `product.image_url` works in the browser. The API also ensures buckets on startup.
+
+**Add a new bucket tomorrow:**
+
+1. Set `S3_BUCKETS=supplify,your-new-bucket` in `deploy/env/.env.<env>` (or `docker/.env` locally).
+2. Run init: `docker compose run --rm minio-init` or `pnpm storage:ensure-buckets` (API env must reach MinIO).
+3. When ready to upload into it, set `S3_BUCKET=your-new-bucket` and restart the API.
+
+Console: MinIO UI on port **9001** (see deploy script output).
+
 ## Day-2 operations
 
 Ops scripts accept optional env: `dev`, `staging`, or `prod` (default `prod`).

@@ -578,7 +578,11 @@ export function ChatPage() {
               throw new Error('Failed to upload file')
             }
 
-            const fileUrl = uploadUrl.split('?')[0]
+            const fileUrl =
+              presignedResponse.publicUrl ||
+              (presignedResponse.fileKey
+                ? `${import.meta.env.VITE_S3_ENDPOINT || 'http://localhost:9000'}/${import.meta.env.VITE_S3_BUCKET || 'supplify'}/${presignedResponse.fileKey}`
+                : uploadUrl.split('?')[0])
             attachments.push({
               fileUrl,
               fileType: file.type,

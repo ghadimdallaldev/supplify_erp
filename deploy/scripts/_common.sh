@@ -100,3 +100,20 @@ apply_vapid_env() {
   done
   echo "  Applied VAPID keys from $(basename "$vapid_file") to $(basename "$env_file")"
 }
+
+# Derive browser-facing MinIO URL from PUBLIC_URL (port 9000 exposed on host).
+apply_minio_public_url() {
+  local env_file="$1"
+  local public_url="${PUBLIC_URL:-http://localhost}"
+  public_url="${public_url%/}"
+  local minio_public="http://localhost:9000"
+  if [ "$public_url" != "http://localhost" ]; then
+    minio_public="${public_url}:9000"
+  fi
+  if grep -q "^S3_PUBLIC_URL=" "$env_file" 2>/dev/null; then
+    sed -i "s|^S3_PUBLIC_URL=.*|S3_PUBLIC_URL=${minio_public}|" "$env_file"
+  else
+    echo "S3_PUBLIC_URL=${minio_public}" >> "$env_file"
+  fi
+  echo "  S3_PUBLIC_URL=${minio_public}"
+}

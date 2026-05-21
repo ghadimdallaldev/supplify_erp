@@ -48,7 +48,10 @@ const merged = {
   SESSION_SECRET: sessionSecret,
   REDIS_URL: `redis://localhost:${redisPort}`,
   S3_ENDPOINT: `http://localhost:${minioPort}`,
+  S3_PUBLIC_URL: `http://localhost:${minioPort}`,
   S3_BUCKET: docker.S3_BUCKET || 'supplify',
+  S3_BUCKETS: docker.S3_BUCKETS || '',
+  S3_PUBLIC_READ: 'true',
   S3_ACCESS_KEY: docker.MINIO_ROOT_USER || 'minioadmin',
   S3_SECRET_KEY: docker.MINIO_ROOT_PASSWORD || 'minioadmin',
   ...apiVars,
@@ -59,6 +62,7 @@ const merged = {
   WEB_ORIGIN: 'http://localhost:5173',
   REDIS_URL: `redis://localhost:${redisPort}`,
   S3_ENDPOINT: `http://localhost:${minioPort}`,
+  S3_PUBLIC_URL: `http://localhost:${minioPort}`,
 }
 
 writeFileSync(

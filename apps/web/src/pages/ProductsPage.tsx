@@ -204,7 +204,11 @@ export function ProductsPage() {
             throw new Error('Failed to upload image')
           }
 
-          imageUrl = uploadUrl.split('?')[0]
+          imageUrl =
+            presignedResponse.publicUrl ||
+            (presignedResponse.fileKey
+              ? `${import.meta.env.VITE_S3_ENDPOINT || 'http://localhost:9000'}/${import.meta.env.VITE_S3_BUCKET || 'supplify'}/${presignedResponse.fileKey}`
+              : uploadUrl.split('?')[0])
         } catch (error: any) {
           toast.error(error?.data?.error?.message || 'Failed to upload image')
           return
