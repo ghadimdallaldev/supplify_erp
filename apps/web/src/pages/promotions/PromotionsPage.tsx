@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
+import { useGetEntitlementsQuery } from '../../services/api'
+import { featureEnabled } from '../../lib/planLimits'
 import {
   useGetPromotionsQuery,
   useCreatePromotionMutation,
@@ -29,6 +31,9 @@ const PROMO_TYPES = [
 ] as const
 
 export function PromotionsPage() {
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const promotionsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.promotions)
+
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({
@@ -49,6 +54,20 @@ export function PromotionsPage() {
   const [deletePromotion] = useDeletePromotionMutation()
 
   const promotions = data?.promotions || []
+
+  if (!promotionsEnabled) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-[21px] font-black text-[var(--text)]">Promotions</h1>
+        <Card>
+          <CardContent className="py-8 text-sm text-[var(--text-muted)]">
+            Promotions and deals are not on your plan. Upgrade to create featured listings and
+            supplier discounts.
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   const handleCreate = async () => {
     if (!form.name.trim()) {

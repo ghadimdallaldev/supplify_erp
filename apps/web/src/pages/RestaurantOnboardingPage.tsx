@@ -379,6 +379,8 @@ export function RestaurantOnboardingPage() {
   const brandingAllowed = canUseCustomBranding(entitlements)
   const approvalsFeatureEnabled = featureEnabled(entitlements?.features?.approvals_budgets)
   const advancedRolesEnabled = featureEnabled(entitlements?.features?.advanced_roles)
+  const tenantAuditEnabled = featureEnabled(entitlements?.features?.tenant_audit_log)
+  const pushNotificationsEnabled = featureEnabled(entitlements?.features?.push_notifications)
   const { data: tenantRolesData } = useGetTenantRolesQuery(undefined, {
     skip: !advancedRolesEnabled,
   })
@@ -606,7 +608,7 @@ export function RestaurantOnboardingPage() {
               Approvals
             </TabsTrigger>
           )}
-          {isOwner && (
+          {isOwner && tenantAuditEnabled && (
             <TabsTrigger value="activity">
               <FileText className="h-4 w-4 mr-2" />
               Activity
@@ -1095,30 +1097,38 @@ export function RestaurantOnboardingPage() {
                     </div>
                   </div>
 
-                  <div className="border-t pt-6">
-                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">Browser push</h4>
-                    <p className="text-xs text-[var(--text-muted)] mt-1 mb-3">
-                      Get real-time alerts even when Supplify is in the background.
-                    </p>
-                    {push.pushAvailable ? (
-                      <div className="flex items-center justify-between rounded-xl border p-4">
-                        <span className="text-sm">Enable push notifications</span>
-                        <Button
-                          type="button"
-                          variant={push.subscribed ? 'outline' : 'default'}
-                          size="sm"
-                          disabled={push.subscribing || push.unsubscribing}
-                          onClick={() => (push.subscribed ? push.disablePush() : push.enablePush())}
-                        >
-                          {push.subscribed ? 'Disable' : 'Enable'}
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Push is not configured on this server.
+                  {pushNotificationsEnabled ? (
+                    <div className="border-t pt-6">
+                      <h4 className="text-sm font-semibold text-[var(--text-mid)]">Browser push</h4>
+                      <p className="text-xs text-[var(--text-muted)] mt-1 mb-3">
+                        Get real-time alerts even when Supplify is in the background.
                       </p>
-                    )}
-                  </div>
+                      {push.pushAvailable ? (
+                        <div className="flex items-center justify-between rounded-xl border p-4">
+                          <span className="text-sm">Enable push notifications</span>
+                          <Button
+                            type="button"
+                            variant={push.subscribed ? 'outline' : 'default'}
+                            size="sm"
+                            disabled={push.subscribing || push.unsubscribing}
+                            onClick={() =>
+                              push.subscribed ? push.disablePush() : push.enablePush()
+                            }
+                          >
+                            {push.subscribed ? 'Disable' : 'Enable'}
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Push is not configured on this server.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--text-muted)] border-t pt-6">
+                      Browser push is not included on your plan. Upgrade to enable real-time alerts.
+                    </p>
+                  )}
 
                   <Button
                     onClick={handleSaveNotifications}
@@ -1144,7 +1154,7 @@ export function RestaurantOnboardingPage() {
           </TabsContent>
         )}
 
-        {isOwner && (
+        {isOwner && tenantAuditEnabled && (
           <TabsContent value="activity" className="space-y-4">
             <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
           </TabsContent>
@@ -1184,7 +1194,7 @@ export function RestaurantOnboardingPage() {
         </TabsContent>
       </Tabs>
 
-      {push.bannerVisible && (
+      {pushNotificationsEnabled && push.bannerVisible && (
         <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border bg-white p-4 shadow-lg">
           <p className="text-sm font-medium">Enable push notifications?</p>
           <p className="text-xs text-[var(--text-muted)] mt-1">

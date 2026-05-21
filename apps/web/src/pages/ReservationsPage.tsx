@@ -6,7 +6,8 @@ import {
   useGetReservationWaitlistQuery,
   useManuallyPromoteWaitlistMutation,
 } from '../services/reservationsApi'
-import { useGetRestaurantMeQuery } from '../services/api'
+import { useGetEntitlementsQuery, useGetRestaurantMeQuery } from '../services/api'
+import { featureEnabled } from '../lib/planLimits'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { ReservationBoard } from '../components/reservations/ReservationBoard'
@@ -33,6 +34,10 @@ export function ReservationsPage() {
   const { data: waitlistData, refetch: refetchWaitlist } = useGetReservationWaitlistQuery()
   const [promoteWaitlist, { isLoading: promoting }] = useManuallyPromoteWaitlistMutation()
   const { data: restaurantMe } = useGetRestaurantMeQuery()
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const waitlistAutoPromoEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.waitlist_auto_promo
+  )
 
   const bookingLink = useMemo(() => {
     const restaurant = restaurantMe?.restaurant
@@ -194,6 +199,17 @@ export function ReservationsPage() {
           <CardDescription>
             Offer status and manual promotion for guests waiting for a table
           </CardDescription>
+          {!waitlistAutoPromoEnabled ? (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+              Automatic waitlist offers when a table frees up are not on your plan. You can still
+              promote guests manually. Upgrade to enable auto-promotion.
+            </p>
+          ) : (
+            <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
+              Auto-promotion is on: when a reservation is cancelled, the next waitlisted guest may
+              receive a timed table offer.
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           {(waitlistData?.waitlist || []).length === 0 ? (

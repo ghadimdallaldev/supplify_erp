@@ -4,7 +4,12 @@ import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger } from './ui/select'
-import { useGetTenantAuditLogFiltersQuery, useGetTenantAuditLogsQuery } from '../services/api'
+import {
+  useGetEntitlementsQuery,
+  useGetTenantAuditLogFiltersQuery,
+  useGetTenantAuditLogsQuery,
+} from '../services/api'
+import { featureEnabled } from '../lib/planLimits'
 import { downloadCsv } from '../utils/csvExport'
 import { Loader2, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -16,12 +21,19 @@ type ActivityLogTabProps = {
 }
 
 export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const tenantAuditEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.tenant_audit_log
+  )
+
   const [action, setAction] = useState('')
   const [resourceType, setResourceType] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
 
-  const { data: filterOptions } = useGetTenantAuditLogFiltersQuery()
+  const { data: filterOptions } = useGetTenantAuditLogFiltersQuery(undefined, {
+    skip: !tenantAuditEnabled,
+  })
   const actionOptions = filterOptions?.actions ?? []
   const resourceOptions = filterOptions?.resourceTypes ?? []
 
@@ -37,8 +49,21 @@ export function ActivityLogTab({ canExport = false }: ActivityLogTabProps) {
     [action, resourceType, from, to]
   )
 
-  const { data, isLoading, refetch } = useGetTenantAuditLogsQuery(filters)
+  const { data, isLoading, refetch } = useGetTenantAuditLogsQuery(filters, {
+    skip: !tenantAuditEnabled,
+  })
   const logs = data?.logs || []
+
+  if (!tenantAuditEnabled) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-sm text-[var(--text-muted)]">
+          Activity log is not on your plan. Upgrade to Gold or Platinum to view tenant audit history
+          and exports.
+        </CardContent>
+      </Card>
+    )
+  }
 
   const handleExport = async () => {
     try {

@@ -1,5 +1,6 @@
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { isFeatureEnabled } from '../lib/subscription.js'
 import { config } from '../config/env.js'
 import { sendMail } from './mailer.service.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
@@ -66,6 +67,18 @@ function isEligibleForOffer(row) {
   if (!row || row.status !== 'WAITING') return false
   const offerStatus = row.offer_status || 'none'
   return ['none', 'expired', 'declined'].includes(offerStatus)
+}
+
+async function isWaitlistAutoPromoEnabled(restaurantId) {
+  if (!restaurantId) return false
+  return isFeatureEnabled(restaurantId, 'RESTAURANT', 'waitlist_auto_promo')
+}
+
+async function offerNextWaitlistEntryIfEnabled(args) {
+  if (!(await isWaitlistAutoPromoEnabled(args.restaurantId))) {
+    return null
+  }
+  return offerNextWaitlistEntry(args)
 }
 
 /**
@@ -152,7 +165,7 @@ export async function handleReservationCancelled(reservation, { cancellationReas
     [reservation.id, cancellationReason]
   )
 
-  return offerNextWaitlistEntry({ restaurantId, partySize, branchId })
+  return offerNextWaitlistEntryIfEnabled({ restaurantId, partySize, branchId })
 }
 
 export async function manuallyPromoteWaitlistEntry(waitlistId, restaurantId) {
@@ -308,7 +321,7 @@ export async function declineWaitlistOffer(token) {
     }
   })
 
-  await offerNextWaitlistEntry({
+  await offerNextWaitlistEntryIfEnabled({
     restaurantId: declined.restaurantId,
     partySize: declined.partySize,
     branchId: declined.branchId,
@@ -354,7 +367,7 @@ export async function checkExpiredWaitlistOffers() {
       await withTransaction(async (client) => {
         await expireWaitlistOffer(entry, client)
       })
-      const next = await offerNextWaitlistEntry({
+      const next = await offerNextWaitlistEntryIfEnabled({
         restaurantId: entry.restaurant_id,
         partySize: entry.party_size,
         branchId: entry.branch_id,

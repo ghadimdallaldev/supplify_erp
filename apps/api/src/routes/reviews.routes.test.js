@@ -2,6 +2,9 @@ import express from 'express'
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js'
+import { mockSubscriptionModule, resetFeatureGates } from '../test/feature-gate-mock.js'
+
+vi.mock('../lib/subscription.js', () => mockSubscriptionModule())
 
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
@@ -50,6 +53,7 @@ describe('Reviews Routes', () => {
 
   beforeEach(async () => {
     clearAllMocks()
+    resetFeatureGates({ supplier_reviews: true })
     db = setupMocks()
     const dbModule = await import('../lib/db.js')
     vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))

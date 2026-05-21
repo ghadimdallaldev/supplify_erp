@@ -250,6 +250,11 @@ export async function listMyReviews(restaurantId, { limit = 50, offset = 0 }) {
  * After receiving, prompt restaurant to review if order is delivered and no review exists.
  */
 export async function notifyLeaveReviewIfEligible({ orderId, supplierId, restaurantId }) {
+  const { isFeatureEnabled } = await import('../lib/subscription.js')
+  if (!(await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_reviews'))) {
+    return null
+  }
+
   const { rows: orders } = await query(
     `SELECT id, status FROM customer_order WHERE id = $1 AND restaurant_id = $2`,
     [orderId, restaurantId]

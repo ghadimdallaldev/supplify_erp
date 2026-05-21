@@ -87,6 +87,7 @@ export function Sidebar() {
   const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
   const disputesEnabled =
     featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns) || true
+  const promotionsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.promotions)
 
   let sections: NavSection[] = []
 
@@ -227,7 +228,9 @@ export function Sidebar() {
       ...(disputesEnabled
         ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
         : []),
-      { name: 'Promotions', href: '/app/promotions', icon: Tag, testId: 'nav-promotions' },
+      ...(promotionsEnabled
+        ? [{ name: 'Promotions', href: '/app/promotions', icon: Tag, testId: 'nav-promotions' }]
+        : []),
       {
         name: 'Invoices',
         href: '/app/invoices',

@@ -54,6 +54,7 @@ import {
   warehousesFeatureEnabled,
   multiWarehousePlanEnabled,
   isMultiWarehouseActive,
+  featureEnabled,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { formatAddressLine, normalizeAddress } from '../lib/address'
@@ -165,6 +166,7 @@ export function SupplierSettingsPage() {
     useUpdateNotificationPreferencesMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
+  const tenantAuditEnabled = featureEnabled(entitlements?.features?.tenant_audit_log)
   const supplier = supplierData?.supplier
   const warehousesEnabled = warehousesFeatureEnabled(entitlements)
   const multiWarehousePlan = multiWarehousePlanEnabled(entitlements)
@@ -595,7 +597,7 @@ export function SupplierSettingsPage() {
           <TabsTrigger value="plan" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Plan & usage
           </TabsTrigger>
-          {can('SETTINGS_VIEW') && (
+          {can('SETTINGS_VIEW') && tenantAuditEnabled && (
             <TabsTrigger value="activity" className="flex-1 min-w-[5.5rem] sm:flex-none">
               Activity
             </TabsTrigger>
@@ -1250,7 +1252,7 @@ export function SupplierSettingsPage() {
           <DriversSettingsPanel />
         </TabsContent>
 
-        {can('SETTINGS_VIEW') && (
+        {can('SETTINGS_VIEW') && tenantAuditEnabled && (
           <TabsContent value="activity" className="space-y-4">
             <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
           </TabsContent>

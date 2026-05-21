@@ -18,6 +18,11 @@ export const RESTAURANT_FEATURE_KEYS = [
   'support_sla',
   'custom_branding',
   'feature_flags_access',
+  'supplier_reviews',
+  'push_notifications',
+  'order_amendments',
+  'tenant_audit_log',
+  'waitlist_auto_promo',
 ]
 
 export const SUPPLIER_FEATURE_KEYS = [
@@ -39,6 +44,10 @@ export const SUPPLIER_FEATURE_KEYS = [
   'support_sla',
   'custom_branding',
   'feature_flags_access',
+  'promotions',
+  'push_notifications',
+  'order_amendments',
+  'tenant_audit_log',
 ]
 
 export const ALL_FEATURE_KEYS = [...new Set([...RESTAURANT_FEATURE_KEYS, ...SUPPLIER_FEATURE_KEYS])]
@@ -75,6 +84,12 @@ const DISPLAY_NAMES = {
   warehouses: 'Warehouses',
   multi_warehouse: 'Multi-warehouse fulfillment',
   feature_flags_access: 'Feature flag admin',
+  supplier_reviews: 'Supplier Reviews',
+  promotions: 'Promotions & Deals',
+  push_notifications: 'Push Notifications',
+  order_amendments: 'Order Amendments',
+  tenant_audit_log: 'Activity Log',
+  waitlist_auto_promo: 'Waitlist Auto-Promotion',
 }
 
 export function featureDisplayName(featureKey) {

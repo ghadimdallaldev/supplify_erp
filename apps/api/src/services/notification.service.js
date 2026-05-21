@@ -302,11 +302,15 @@ export async function sendNotification({
 
     // Tier enforcement: derive allowed channels from subscription plan
     let allowedChannels = new Set(['in_app']) // safe default
+    let tenantId = null
+    let pushFeatureEnabled = false
     try {
-      const tenantId = await getTenantIdForUser(userId, userType)
+      tenantId = await getTenantIdForUser(userId, userType)
       if (tenantId) {
         const entitlements = await getEntitlements(tenantId, userType)
         allowedChannels = resolveAllowedChannels(entitlements?.features?.notifications)
+        const { isFeatureEnabled } = await import('./subscription.js')
+        pushFeatureEnabled = await isFeatureEnabled(tenantId, userType, 'push_notifications')
       }
     } catch (err) {
       logger.warn('Failed to resolve notification tier, defaulting to in_app', { err: err.message })
@@ -320,7 +324,7 @@ export async function sendNotification({
         isPrefEnabled(prefs, 'whatsapp_enabled') &&
         !!contact?.phone,
       sms: false,
-      push: isPushConfigured() && isPrefEnabled(prefs, 'push_enabled', false),
+      push: isPushConfigured() && isPrefEnabled(prefs, 'push_enabled', false) && pushFeatureEnabled,
       inApp: isPrefEnabled(prefs, 'in_app_enabled'),
     }
 

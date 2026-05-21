@@ -1,6 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import {
@@ -85,6 +86,12 @@ router.get('/suppliers/:supplierId/summary', async (req, res, next) => {
 // Authenticated restaurant routes
 router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN']))
 
+const reviewsWriteGate = requireFeature(
+  'supplier_reviews',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
 router.get('/my', async (req, res, next) => {
   try {
     const restaurantId = await getRestaurantId(req)
@@ -101,7 +108,7 @@ router.get('/my', async (req, res, next) => {
   }
 })
 
-router.post('/suppliers/:supplierId', async (req, res, next) => {
+router.post('/suppliers/:supplierId', reviewsWriteGate, async (req, res, next) => {
   try {
     const restaurantId = await getRestaurantId(req)
     const body = reviewBodySchema.parse(req.body)
@@ -127,7 +134,7 @@ router.post('/suppliers/:supplierId', async (req, res, next) => {
   }
 })
 
-router.patch('/:id', async (req, res, next) => {
+router.patch('/:id', reviewsWriteGate, async (req, res, next) => {
   try {
     const body = reviewPatchSchema.parse(req.body)
     const review = await updateSupplierReview(req.params.id, req.userData.id, body)
@@ -142,7 +149,7 @@ router.patch('/:id', async (req, res, next) => {
   }
 })
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', reviewsWriteGate, async (req, res, next) => {
   try {
     const result = await deleteSupplierReview(req.params.id, req.userData.id)
     res.json({

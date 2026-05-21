@@ -72,11 +72,12 @@ export function OrderDetailPage() {
   const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
 
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
-  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: user?.role !== 'RESTAURANT',
-  })
+  const { data: entitlementsData } = useGetEntitlementsQuery()
   const approvalsEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.approvals_budgets
+  )
+  const amendmentsEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.order_amendments
   )
   const { data: approvalStatusData } = useGetOrderApprovalStatusQuery(id!, {
     skip: !id || !approvalsEnabled,
@@ -418,7 +419,7 @@ export function OrderDetailPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Amendments</CardTitle>
-                  {!['CANCELLED', 'COMPLETED'].includes(order.status) && (
+                  {!['CANCELLED', 'COMPLETED'].includes(order.status) && amendmentsEnabled && (
                     <Button
                       size="sm"
                       variant="outline"

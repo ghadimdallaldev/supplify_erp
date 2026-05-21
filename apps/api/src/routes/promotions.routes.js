@@ -5,6 +5,7 @@ import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { loadActivePromotionsForSupplier } from '../services/promotions.service.js'
 import { writeAuditLog } from '../lib/audit.js'
+import { requireFeature } from '../lib/subscription.js'
 
 const router = express.Router()
 
@@ -133,11 +134,18 @@ router.get(
 )
 
 // Supplier CRUD
+const promotionsWriteGate = requireFeature(
+  'promotions',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
 router.use(
   requireAuth,
   resolveTenantContext,
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('CATALOG_MANAGE')
+  requirePermission('CATALOG_MANAGE'),
+  promotionsWriteGate
 )
 
 router.get('/', async (req, res, next) => {

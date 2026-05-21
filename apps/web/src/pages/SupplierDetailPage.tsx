@@ -11,7 +11,9 @@ import {
   useGetSupplierReviewsQuery,
   useGetSupplierRatingSummaryQuery,
   useCreateSupplierReviewMutation,
+  useGetEntitlementsQuery,
 } from '../services/api'
+import { featureEnabled } from '../lib/planLimits'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -54,6 +56,10 @@ export function SupplierDetailPage() {
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const isRestaurant = user?.role === 'RESTAURANT'
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !isRestaurant })
+  const reviewsWriteEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.supplier_reviews
+  )
 
   const { data, isLoading, error, refetch } = useGetSupplierQuery(id!)
   const { data: restaurantsData } = useGetRestaurantsQuery()
@@ -426,10 +432,15 @@ export function SupplierDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Supplier reviews</CardTitle>
-              {isRestaurant && (
+              {isRestaurant && reviewsWriteEnabled && (
                 <Button size="sm" onClick={() => setShowReviewModal(true)}>
                   Write review
                 </Button>
+              )}
+              {isRestaurant && !reviewsWriteEnabled && (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Upgrade your plan to write supplier reviews.
+                </p>
               )}
             </CardHeader>
             <CardContent className="space-y-3">

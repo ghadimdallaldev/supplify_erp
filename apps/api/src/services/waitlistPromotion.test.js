@@ -36,9 +36,15 @@ vi.mock('../config/env.js', () => ({
   config: { WEB_ORIGIN: 'http://localhost:5173' },
 }))
 
+const isFeatureEnabledMock = vi.fn().mockResolvedValue(true)
+vi.mock('../lib/subscription.js', () => ({
+  isFeatureEnabled: (...args) => isFeatureEnabledMock(...args),
+}))
+
 describe('waitlistPromotion', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    isFeatureEnabledMock.mockResolvedValue(true)
   })
 
   describe('buildWaitlistOfferUrls', () => {
@@ -99,6 +105,24 @@ describe('waitlistPromotion', () => {
   })
 
   describe('handleReservationCancelled', () => {
+    it('skips auto promotion when waitlist_auto_promo is disabled', async () => {
+      isFeatureEnabledMock.mockResolvedValue(false)
+      queryMock.mockResolvedValueOnce({ rows: [] })
+
+      const offered = await handleReservationCancelled({
+        id: 'res-1',
+        restaurant_id: 'rest-1',
+        party_size: 2,
+      })
+
+      expect(offered).toBeNull()
+      expect(isFeatureEnabledMock).toHaveBeenCalledWith(
+        'rest-1',
+        'RESTAURANT',
+        'waitlist_auto_promo'
+      )
+    })
+
     it('records cancellation and promotes waitlist', async () => {
       queryMock
         .mockResolvedValueOnce({ rows: [] })
