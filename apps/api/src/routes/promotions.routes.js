@@ -1,6 +1,13 @@
 import express from 'express'
 import { z } from 'zod'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getSupplierIdForRequest,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { loadActivePromotionsForSupplier } from '../services/promotions.service.js'
@@ -13,15 +20,20 @@ import {
   enrichPromotionRow,
   getEligibleProductsForDeal,
   getActiveDealPromotion,
+  previewDealForCart,
 } from '../services/deal-promotions.service.js'
-import { writeAuditLog } from '../lib/audit.js'
 import {
-  requireFeature,
-  checkLimit,
-  getTenantSubscription,
-  buildLimitExceededPayload,
-  getRecommendedPlanNames,
-} from '../lib/subscription.js'
+  DEAL_STATUSES,
+  PAYMENT_STATUSES,
+  getActivationPricing,
+  isActivationPaymentRequired,
+  resolveStatusAfterApproval,
+  resolveScheduledOrActive,
+  isPendingAdminReview,
+  shouldResetApprovalOnEdit,
+} from '../services/deal-lifecycle.service.js'
+import { writeAuditLog } from '../lib/audit.js'
+import { requireFeature, requireWithinLimit } from '../lib/subscription.js'
 
 const router = express.Router()
 
@@ -58,6 +70,7 @@ const promotionBodySchema = z.object({
   targetAreas: z.array(z.string()).optional(),
   stockQuantity: z.number().int().positive().optional().nullable(),
   requiresAdminApproval: z.boolean().optional(),
+  submitForReview: z.boolean().optional(),
 })
 
 const promoteBodySchema = z.object({
@@ -75,30 +88,55 @@ const promoteBodySchema = z.object({
 })
 
 const interactBodySchema = z.object({
-  interactionType: z.enum(['view', 'click', 'order', 'coupon_used', 'message']),
+  interactionType: z.enum([
+    'view',
+    'click',
+    'order',
+    'coupon_used',
+    'message',
+    'add_to_cart',
+    'apply_to_cart',
+    'remove_from_cart',
+    'order_created',
+    'order_completed',
+    'message_supplier',
+  ]),
   metadata: z.record(z.unknown()).optional(),
 })
 
+const cartPreviewSchema = z.object({
+  supplierId: z.string().uuid(),
+  promotionId: z.string().uuid().optional(),
+  couponCode: z.string().optional(),
+  subtotal: z.number().nonnegative(),
+  lineItems: z
+    .array(
+      z.object({
+        productId: z.string().uuid().optional(),
+        categoryId: z.string().uuid().optional(),
+        quantity: z.number().nonnegative(),
+        unitPrice: z.number().nonnegative().optional(),
+        lineTotal: z.number().nonnegative().optional(),
+      })
+    )
+    .optional(),
+})
+
+const rejectBodySchema = z.object({
+  rejectionReason: z.string().min(1).max(2000).optional(),
+  adminNotes: z.string().max(2000).optional(),
+})
+
 async function getSupplierId(req) {
-  if (req.tenantContext?.tenantType === 'SUPPLIER' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Supplier not found')
-  return rows[0].id
+  const supplierId = await getSupplierIdForRequest(req)
+  if (!supplierId) throw new ValidationError('Supplier not found')
+  return supplierId
 }
 
 async function getRestaurantId(req) {
-  if (req.tenantContext?.tenantType === 'RESTAURANT' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Restaurant not found')
-  return rows[0].id
+  const restaurantId = await getRestaurantIdForRequest(req)
+  if (!restaurantId) throw new ValidationError('Restaurant not found')
+  return restaurantId
 }
 
 async function loadPromotionForSupplier(promotionId, supplierId) {
@@ -160,7 +198,7 @@ function mapPromotionInsertFields(body) {
     targetRestaurantTypes: JSON.stringify(body.targetRestaurantTypes || []),
     targetAreas: JSON.stringify(body.targetAreas || []),
     stockQuantity: body.stockQuantity ?? null,
-    requiresAdminApproval: body.requiresAdminApproval ?? false,
+    requiresAdminApproval: body.requiresAdminApproval ?? true,
   }
 }
 
@@ -169,44 +207,6 @@ const supplierDealsGate = requireFeature(
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
-
-async function respondSupplierLimitExceeded(req, res, limitCheck, limitKey, supplierId) {
-  const [subscription, recommendedPlans] = await Promise.all([
-    getTenantSubscription(supplierId, 'SUPPLIER'),
-    getRecommendedPlanNames('SUPPLIER'),
-  ])
-  const err = buildLimitExceededPayload(
-    limitCheck,
-    limitKey,
-    subscription?.plan_name || subscription?.plan_display_name,
-    recommendedPlans
-  )
-  return res.status(403).json({
-    ok: false,
-    data: null,
-    error: err,
-    requestId: req.requestId,
-  })
-}
-
-async function respondDealRedemptionLimitExceeded(req, res, limitCheck, restaurantId) {
-  const [subscription, recommendedPlans] = await Promise.all([
-    getTenantSubscription(restaurantId, 'RESTAURANT'),
-    getRecommendedPlanNames('RESTAURANT'),
-  ])
-  const err = buildLimitExceededPayload(
-    limitCheck,
-    'deal_redemptions_per_day',
-    subscription?.plan_name || subscription?.plan_display_name,
-    recommendedPlans
-  )
-  return res.status(403).json({
-    ok: false,
-    data: null,
-    error: err,
-    requestId: req.requestId,
-  })
-}
 
 router.get(
   '/active',
@@ -248,6 +248,118 @@ router.get(
   }
 )
 
+router.get('/admin/deals', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+  try {
+    const { status, supplierId, type, search, fromDate, toDate } = req.query
+    const params = []
+    const conditions = ['1=1']
+    if (status) {
+      params.push(status)
+      conditions.push(`p.status = $${params.length}`)
+    }
+    if (supplierId) {
+      params.push(supplierId)
+      conditions.push(`p.supplier_id = $${params.length}`)
+    }
+    if (type) {
+      params.push(type)
+      conditions.push(`p.type = $${params.length}`)
+    }
+    if (search) {
+      params.push(`%${String(search).toLowerCase()}%`)
+      conditions.push(
+        `(lower(p.name) LIKE $${params.length} OR lower(s.name) LIKE $${params.length})`
+      )
+    }
+    if (fromDate) {
+      params.push(fromDate)
+      conditions.push(`p.created_at >= $${params.length}::timestamptz`)
+    }
+    if (toDate) {
+      params.push(toDate)
+      conditions.push(`p.created_at <= $${params.length}::timestamptz`)
+    }
+    const { rows } = await query(
+      `
+      SELECT p.*, s.name AS supplier_name
+      FROM promotions p
+      JOIN supplier s ON s.id = p.supplier_id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY p.created_at DESC
+      LIMIT 200
+      `,
+      params
+    )
+    res.json({ ok: true, data: { deals: rows }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/admin/deals/insights', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+  try {
+    const { rows: summary } = await query(
+      `
+      SELECT
+        COUNT(*)::int AS total_deals,
+        COUNT(*) FILTER (WHERE status = 'active')::int AS active_deals,
+        COUNT(*) FILTER (WHERE status IN ('pending_approval', 'pending_admin_approval'))::int AS pending_approval,
+        COUNT(*) FILTER (WHERE status = 'approved_pending_payment')::int AS pending_payment,
+        COUNT(*) FILTER (WHERE payment_status = 'pending')::int AS unpaid_deals,
+        COUNT(*) FILTER (WHERE status = 'expired')::int AS expired_deals
+      FROM promotions
+      `
+    )
+    const { rows: interactionStats } = await query(
+      `
+      SELECT
+        COUNT(*) FILTER (WHERE interaction_type = 'view')::int AS total_views,
+        COUNT(*)::int AS total_interactions,
+        COUNT(*) FILTER (WHERE interaction_type IN ('order', 'order_created', 'order_completed'))::int AS order_interactions
+      FROM deal_interactions
+      `
+    )
+    const { rows: revenueStats } = await query(
+      `
+      SELECT
+        COUNT(DISTINCT pu.order_id)::int AS orders_from_deals,
+        COALESCE(SUM(pu.discount_applied), 0)::numeric AS total_discount_given,
+        COALESCE(SUM(co.total_amount), 0)::numeric AS total_revenue
+      FROM promotion_usages pu
+      JOIN customer_order co ON co.id = pu.order_id
+      `
+    )
+    const { rows: topDeals } = await query(
+      `
+      SELECT p.id, p.name, p.status, s.name AS supplier_name,
+        COUNT(DISTINCT pu.order_id)::int AS orders_count,
+        COALESCE(SUM(pu.discount_applied), 0)::numeric AS discount_total
+      FROM promotions p
+      JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN promotion_usages pu ON pu.promotion_id = p.id
+      GROUP BY p.id, p.name, p.status, s.name
+      ORDER BY orders_count DESC
+      LIMIT 5
+      `
+    )
+    res.json({
+      ok: true,
+      data: {
+        insights: {
+          ...summary[0],
+          ...interactionStats[0],
+          ...revenueStats[0],
+          topDeals,
+        },
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.get('/admin/pending', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
   try {
     const { rows } = await query(
@@ -255,7 +367,7 @@ router.get('/admin/pending', requireAuth, requireRole(['ADMIN']), async (req, re
       SELECT p.*, s.name AS supplier_name
       FROM promotions p
       JOIN supplier s ON s.id = p.supplier_id
-      WHERE p.status = 'pending_approval'
+      WHERE p.status IN ('pending_approval', 'pending_admin_approval')
       ORDER BY p.created_at ASC
       `
     )
@@ -265,14 +377,64 @@ router.get('/admin/pending', requireAuth, requireRole(['ADMIN']), async (req, re
   }
 })
 
-router.post('/admin/:id/approve', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.get('/admin/:id', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
   try {
     const { rows } = await query(
-      `UPDATE promotions SET status = 'active', updated_at = NOW()
-       WHERE id = $1 AND status = 'pending_approval' RETURNING *`,
+      `
+      SELECT p.*, s.name AS supplier_name
+      FROM promotions p
+      JOIN supplier s ON s.id = p.supplier_id
+      WHERE p.id = $1
+      `,
       [req.params.id]
     )
-    if (!rows.length) throw new NotFoundError('Deal not found or not pending approval')
+    if (!rows.length) throw new NotFoundError('Deal not found')
+    const deal = await enrichPromotionRow(rows[0])
+    res.json({ ok: true, data: { deal }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/admin/:id/approve', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+  try {
+    const adminId = req.userData?.id || req.userData?.userId || null
+    const { rows: existing } = await query(`SELECT * FROM promotions WHERE id = $1`, [
+      req.params.id,
+    ])
+    if (!existing.length || !isPendingAdminReview(existing[0])) {
+      throw new NotFoundError('Deal not found or not pending approval')
+    }
+    const deal = existing[0]
+    const activationPricing = await getActivationPricing()
+    const activationAmount = Number(activationPricing.amount || 0)
+    const next = resolveStatusAfterApproval(deal, { activationAmount })
+    const { rows } = await query(
+      `
+      UPDATE promotions SET
+        status = $2,
+        payment_status = $3,
+        approved_by_admin_id = $4,
+        approved_at = NOW(),
+        rejected_by_admin_id = NULL,
+        rejected_at = NULL,
+        rejection_reason = NULL,
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+      `,
+      [req.params.id, next.status, next.payment_status, adminId]
+    )
+    await writeAuditLog(req, {
+      action_type: 'deal.approved',
+      tenant_type: 'ADMIN',
+      target_id: req.params.id,
+      payload_json: {
+        status: next.status,
+        payment_status: next.payment_status,
+        activationAmount,
+      },
+    })
     res.json({ ok: true, data: { deal: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
@@ -281,12 +443,43 @@ router.post('/admin/:id/approve', requireAuth, requireRole(['ADMIN']), async (re
 
 router.post('/admin/:id/reject', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
   try {
+    const body = rejectBodySchema.parse(req.body || {})
+    const adminId = req.userData?.id || req.userData?.userId || null
     const { rows } = await query(
-      `UPDATE promotions SET status = 'draft', updated_at = NOW()
-       WHERE id = $1 AND status = 'pending_approval' RETURNING *`,
-      [req.params.id]
+      `
+      UPDATE promotions SET
+        status = 'rejected',
+        rejected_by_admin_id = $2,
+        rejected_at = NOW(),
+        rejection_reason = $3,
+        admin_notes = COALESCE($4, admin_notes),
+        updated_at = NOW()
+      WHERE id = $1 AND status IN ('pending_approval', 'pending_admin_approval')
+      RETURNING *
+      `,
+      [req.params.id, adminId, body.rejectionReason || null, body.adminNotes || null]
     )
     if (!rows.length) throw new NotFoundError('Deal not found or not pending approval')
+    await writeAuditLog(req, {
+      action_type: 'deal.rejected',
+      tenant_type: 'ADMIN',
+      target_id: req.params.id,
+      payload_json: { rejectionReason: body.rejectionReason || null },
+    })
+    res.json({ ok: true, data: { deal: rows[0] }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/admin/:id/pause', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `UPDATE promotions SET status = 'paused', updated_at = NOW()
+       WHERE id = $1 AND status IN ('active', 'scheduled') RETURNING *`,
+      [req.params.id]
+    )
+    if (!rows.length) throw new NotFoundError('Deal not found or cannot be paused')
     res.json({ ok: true, data: { deal: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
@@ -334,6 +527,40 @@ router.patch('/admin/pricing/:key', requireAuth, requireRole(['ADMIN']), async (
     next(err)
   }
 })
+
+router.post(
+  '/cart-preview',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  supplierDealsGate,
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantId(req)
+      const body = cartPreviewSchema.parse(req.body)
+      const preview = await previewDealForCart({
+        promotionId: body.promotionId,
+        couponCode: body.couponCode,
+        supplierId: body.supplierId,
+        restaurantId,
+        subtotal: body.subtotal,
+        lineItems: body.lineItems || [],
+      })
+      if (preview.eligible && body.promotionId) {
+        await recordDealInteraction({
+          dealId: body.promotionId,
+          restaurantId,
+          supplierId: body.supplierId,
+          interactionType: 'apply_to_cart',
+          metadata: { subtotal: body.subtotal, discountAmount: preview.discountAmount },
+        })
+      }
+      res.json({ ok: true, data: { preview }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 router.get(
   '/:id/detail',
@@ -425,10 +652,6 @@ router.post(
       const deal = await loadDealDetailForRestaurant(req.params.id, restaurantId)
       if (!deal) throw new NotFoundError('Deal not found or not available')
       if (!deal.coupon_code) throw new ValidationError('This deal has no coupon code')
-      const redeemLimit = await checkLimit(restaurantId, 'RESTAURANT', 'deal_redemptions_per_day')
-      if (redeemLimit.isOverLimit) {
-        return respondDealRedemptionLimitExceeded(req, res, redeemLimit, restaurantId)
-      }
       const activePromo = await getActiveDealPromotion(query, deal.id)
       await recordDealInteraction({
         dealId: deal.id,
@@ -554,6 +777,12 @@ const promotionsWriteGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+const promotionsCreateLimitGate = requireWithinLimit(
+  'promotions',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
 router.use(
   requireAuth,
   resolveTenantContext,
@@ -574,20 +803,24 @@ router.get('/', async (req, res, next) => {
     }
     sql += ' ORDER BY created_at DESC'
     const { rows } = await query(sql, params)
-    const promotions = await Promise.all(rows.map((r) => enrichPromotionRow(r)))
+    const promotions = await Promise.all(
+      rows.map(async (r) => {
+        try {
+          return await enrichPromotionRow(r)
+        } catch (err) {
+          return { ...r, is_promoted: false, active_deal_promotion_id: null }
+        }
+      })
+    )
     res.json({ ok: true, data: { promotions }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
   }
 })
 
-router.post('/', async (req, res, next) => {
+router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
-    const promotionLimit = await checkLimit(supplierId, 'SUPPLIER', 'promotions')
-    if (promotionLimit.isOverLimit) {
-      return respondSupplierLimitExceeded(req, res, promotionLimit, 'promotions', supplierId)
-    }
     const body = promotionBodySchema.parse(req.body)
     const fields = mapPromotionInsertFields(body)
     const promotion = await withTransaction(async (client) => {
@@ -597,11 +830,18 @@ router.post('/', async (req, res, next) => {
           supplier_id, name, description, type, discount_value, min_order_amount,
           max_discount_cap, buy_quantity, get_quantity, applies_to, starts_at, ends_at,
           usage_limit, is_featured, status, image_url, coupon_code, min_order_quantity,
-          cta_type, target_restaurant_types, target_areas, stock_quantity, requires_admin_approval
+          cta_type, target_restaurant_types, target_areas, stock_quantity, requires_admin_approval,
+          payment_status, submitted_at
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
-          CASE WHEN $22 THEN 'pending_approval' ELSE 'draft' END,
-          $15,$16,$17,$18,$19,$20,$21,$22
+          CASE
+            WHEN $23 THEN 'pending_approval'
+            WHEN $22 THEN 'pending_approval'
+            ELSE 'draft'
+          END,
+          $15,$16,$17,$18,$19,$20,$21,$22,
+          'not_required',
+          CASE WHEN $23 OR $22 THEN NOW() ELSE NULL END
         )
         RETURNING *
         `,
@@ -628,6 +868,7 @@ router.post('/', async (req, res, next) => {
           fields.targetAreas,
           fields.stockQuantity,
           fields.requiresAdminApproval,
+          Boolean(body.submitForReview),
         ]
       )
       const created = rows[0]
@@ -666,6 +907,8 @@ router.patch('/:id', async (req, res, next) => {
     if (existing.status === 'active' && body.discountValue !== undefined) {
       throw new ValidationError('Cannot change discount value on an active deal')
     }
+
+    const needsResubmit = shouldResetApprovalOnEdit(existing, body)
 
     const promotion = await withTransaction(async (client) => {
       const fields = []
@@ -710,6 +953,13 @@ router.patch('/:id', async (req, res, next) => {
       let updated = existing
       if (fields.length) {
         fields.push('updated_at = NOW()')
+        if (needsResubmit) {
+          fields.push(`status = 'pending_approval'`)
+          fields.push(`payment_status = 'not_required'`)
+          fields.push(`submitted_at = NOW()`)
+          fields.push(`approved_by_admin_id = NULL`)
+          fields.push(`approved_at = NULL`)
+        }
         values.push(existing.id)
         const { rows } = await client.query(
           `UPDATE promotions SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`,
@@ -744,14 +994,89 @@ router.patch('/:id', async (req, res, next) => {
   }
 })
 
+router.post('/:id/submit', async (req, res, next) => {
+  try {
+    const supplierId = await getSupplierId(req)
+    await loadPromotionForSupplier(req.params.id, supplierId)
+    const { rows } = await query(
+      `
+      UPDATE promotions SET
+        status = 'pending_approval',
+        submitted_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $1 AND supplier_id = $2 AND status IN ('draft', 'rejected')
+      RETURNING *
+      `,
+      [req.params.id, supplierId]
+    )
+    if (!rows.length) {
+      throw new ValidationError('Only draft or rejected deals can be submitted for review')
+    }
+    res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/:id/pay-activation', async (req, res, next) => {
+  try {
+    const supplierId = await getSupplierId(req)
+    const deal = await loadPromotionForSupplier(req.params.id, supplierId)
+    if (deal.status !== DEAL_STATUSES.APPROVED_PENDING_PAYMENT) {
+      throw new ValidationError('Deal is not awaiting activation payment')
+    }
+    if (deal.payment_status === PAYMENT_STATUSES.PAID) {
+      throw new ValidationError('Deal activation is already paid')
+    }
+    const activationPricing = await getActivationPricing()
+    const amount = Number(activationPricing.amount || 0)
+    if (amount <= 0) {
+      const next = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.NOT_REQUIRED })
+      const { rows } = await query(
+        `UPDATE promotions SET status = $2, payment_status = $3, updated_at = NOW() WHERE id = $1 RETURNING *`,
+        [req.params.id, next.status, next.payment_status]
+      )
+      return res.json({
+        ok: true,
+        data: { promotion: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+    return res.status(402).json({
+      ok: false,
+      data: {
+        paymentRequired: true,
+        amount,
+        pricingKey: activationPricing.pricing_key || 'deal_activation',
+        message:
+          'Payment provider is not connected yet. Deal activation payment must be confirmed on the server before the deal can go live.',
+      },
+      error: {
+        name: 'PAYMENT_REQUIRED',
+        message: 'Activation payment required before deal can become active',
+      },
+      requestId: req.requestId,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.post('/:id/activate', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
     const existing = await loadPromotionForSupplier(req.params.id, supplierId)
-    const newStatus = existing.requires_admin_approval ? 'pending_approval' : 'active'
+    if (existing.status !== 'draft' && existing.status !== 'rejected') {
+      throw new ValidationError('Only draft or rejected deals can be submitted')
+    }
     const { rows } = await query(
-      `UPDATE promotions SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [req.params.id, newStatus]
+      `
+      UPDATE promotions SET status = 'pending_approval', submitted_at = NOW(), updated_at = NOW()
+      WHERE id = $1 AND supplier_id = $2
+      RETURNING *
+      `,
+      [req.params.id, supplierId]
     )
     res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
@@ -776,11 +1101,18 @@ router.post('/:id/pause', async (req, res, next) => {
 router.post('/:id/resume', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
-    await loadPromotionForSupplier(req.params.id, supplierId)
+    const existing = await loadPromotionForSupplier(req.params.id, supplierId)
+    if (existing.status !== 'paused') throw new ValidationError('Deal is not paused')
+    if (![PAYMENT_STATUSES.PAID, PAYMENT_STATUSES.NOT_REQUIRED].includes(existing.payment_status)) {
+      throw new ValidationError('Deal cannot resume until activation payment is complete')
+    }
+    const next = resolveScheduledOrActive(existing, {
+      payment_status: existing.payment_status || PAYMENT_STATUSES.NOT_REQUIRED,
+    })
     const { rows } = await query(
-      `UPDATE promotions SET status = 'active', updated_at = NOW()
+      `UPDATE promotions SET status = $2, updated_at = NOW()
        WHERE id = $1 AND status = 'paused' RETURNING *`,
-      [req.params.id]
+      [req.params.id, next.status]
     )
     if (!rows.length) throw new ValidationError('Deal is not paused')
     res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })

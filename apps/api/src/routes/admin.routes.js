@@ -143,7 +143,9 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         { rows: totalRestaurants },
       ] = await Promise.all([
         query('SELECT COUNT(*) as count FROM product WHERE supplier_id = $1', [supplierId]),
-        query('SELECT COUNT(*) as count FROM order_item WHERE supplier_id = $1', [supplierId]),
+        query('SELECT COUNT(DISTINCT order_id) as count FROM order_item WHERE supplier_id = $1', [
+          supplierId,
+        ]),
         query(
           `
           SELECT COUNT(DISTINCT oi.order_id) as count 

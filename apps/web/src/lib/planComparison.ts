@@ -19,7 +19,10 @@ export const RESTAURANT_LIMIT_KEYS = [
 export const SUPPLIER_LIMIT_KEYS = [
   'supplier_products_skus',
   'warehouses',
+  'branches',
   'users',
+  'promotions',
+  'open_conversations',
   'chats_per_day',
   'storage_mb',
 ] as const
@@ -56,7 +59,8 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
   quick_lists: 'Quick lists',
   quick_list_items: 'Quick list products',
   scheduled_quick_lists: 'Scheduled quick lists',
-  chats_per_day: 'Daily chats',
+  chats_per_day: 'Messages (today)',
+  open_conversations: 'Open chats',
   supplier_products_skus: 'Products',
   restaurant_inventory_skus: 'Inventory SKUs',
   branches: 'Branches',
@@ -64,6 +68,7 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
   users: 'Users',
   storage_mb: 'Storage (MB)',
   suppliers_per_restaurant: 'Suppliers',
+  promotions: 'Deals & promotions',
 }
 
 export const FEATURE_KEY_LABELS: Record<string, string> = {

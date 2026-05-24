@@ -809,7 +809,9 @@ export function DashboardPage() {
                   alignItems: 'center',
                 }}
               >
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total orders</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  Total orders (all time)
+                </span>
                 <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>
                   {stats?.totalOrders ?? 0}
                 </span>

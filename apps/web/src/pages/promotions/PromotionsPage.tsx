@@ -71,7 +71,7 @@ export function PromotionsPage() {
     categoryIds: [],
   })
 
-  const { data, isLoading, refetch } = useGetPromotionsQuery(
+  const { data, isLoading, error, refetch } = useGetPromotionsQuery(
     statusFilter ? { status: statusFilter } : undefined
   )
   const [createPromotion, { isLoading: creating }] = useCreatePromotionMutation()
@@ -123,8 +123,9 @@ export function PromotionsPage() {
         productIds: targeting.appliesTo === 'specific_products' ? targeting.productIds : undefined,
         categoryIds:
           targeting.appliesTo === 'specific_categories' ? targeting.categoryIds : undefined,
+        submitForReview: true,
       }).unwrap()
-      toast.success('Promotion created (draft)')
+      toast.success('Deal submitted for admin approval')
       setShowCreate(false)
       setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
       refetch()
@@ -185,7 +186,11 @@ export function PromotionsPage() {
           <CardTitle>Your promotions</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {error ? (
+            <p className="text-sm text-[var(--red)]">
+              Could not load promotions. Refresh the page or check your plan permissions.
+            </p>
+          ) : isLoading ? (
             <Loader2 className="h-6 w-6 animate-spin" />
           ) : promotions.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]">No promotions yet.</p>
@@ -214,11 +219,11 @@ export function PromotionsPage() {
                           size="sm"
                           onClick={async () => {
                             await activatePromotion(String(p.id)).unwrap()
-                            toast.success('Activated')
+                            toast.success('Submitted for admin approval')
                             refetch()
                           }}
                         >
-                          Activate
+                          Submit for approval
                         </Button>
                         <Button
                           size="sm"

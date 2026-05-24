@@ -1,7 +1,15 @@
 import { query, withTransaction } from '../lib/db.js'
 import { calculatePromotionDiscount, isPromotionEligible } from './promotions.service.js'
+import {
+  buildDealConfigSnapshot,
+  EXTENDED_INTERACTION_TYPES,
+  isRestaurantVisibleDeal,
+  getDealDiscountDisplayLabel,
+  getRestaurantIneligibilityMessage,
+  getDealTypeLabel,
+} from './deal-lifecycle.service.js'
 
-const INTERACTION_TYPES = new Set(['view', 'click', 'order', 'coupon_used', 'message'])
+const INTERACTION_TYPES = EXTENDED_INTERACTION_TYPES
 
 export function matchesRestaurantTargeting(deal, restaurant) {
   let types = deal.target_restaurant_types || []
@@ -116,6 +124,19 @@ export async function recordDealInteraction({
     [dealId, dealPromotionId, restaurantId, supplierId, interactionType, JSON.stringify(metadata)]
   )
 
+  if (interactionType === 'view' && restaurantId) {
+    await query(
+      `
+      INSERT INTO deal_restaurant_views (deal_id, restaurant_id, first_viewed_at, last_viewed_at, view_count)
+      VALUES ($1, $2, NOW(), NOW(), 1)
+      ON CONFLICT (deal_id, restaurant_id) DO UPDATE SET
+        last_viewed_at = NOW(),
+        view_count = deal_restaurant_views.view_count + 1
+      `,
+      [dealId, restaurantId]
+    )
+  }
+
   if (dealPromotionId) {
     const counterMap = {
       view: 'impressions',
@@ -180,6 +201,7 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
       LIMIT 1
     ) dp ON TRUE
     WHERE p.status = 'active'
+      AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
       AND p.starts_at <= NOW()
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.stock_quantity IS NULL OR p.usage_count < p.stock_quantity)
@@ -369,9 +391,15 @@ export async function getDealAnalytics(dealId, supplierId) {
     [dealId]
   )
 
+  const { rows: uniqueViews } = await query(
+    `SELECT COUNT(*)::int AS unique_views FROM deal_restaurant_views WHERE deal_id = $1`,
+    [dealId]
+  )
+
   const interactionMap = Object.fromEntries(interactions.map((r) => [r.interaction_type, r.count]))
   const promo = promotionRows[0]
   const views = interactionMap.view || 0
+  const uniqueRestaurantViews = uniqueViews[0]?.unique_views || 0
   const clicks = interactionMap.click || 0
   const orders = usage[0]?.orders_influenced || 0
   const conversionRate = views > 0 ? Math.round((orders / views) * 10000) / 100 : 0
@@ -379,7 +407,10 @@ export async function getDealAnalytics(dealId, supplierId) {
   return {
     ...usage[0],
     views,
+    uniqueRestaurantViews,
     clicks,
+    addToCart: interactionMap.add_to_cart || 0,
+    applyToCart: interactionMap.apply_to_cart || 0,
     messages: interactionMap.message || 0,
     couponUses: interactionMap.coupon_used || 0,
     conversionRate,
@@ -397,6 +428,117 @@ export async function getDealAnalytics(dealId, supplierId) {
           endsAt: promo.ends_at,
         }
       : null,
+  }
+}
+
+async function insertPromotionUsageSnapshot(
+  client,
+  { promotion, orderId, restaurantId, discountAmount }
+) {
+  const deliveryDiscount = promotion.type === 'free_shipping' ? Number(discountAmount) || 0 : 0
+  const snapshot = buildDealConfigSnapshot(promotion)
+  await client.query(
+    `
+    INSERT INTO promotion_usages (
+      promotion_id, order_id, restaurant_id, discount_applied,
+      deal_title, deal_type, supplier_id, discount_type, discount_value,
+      delivery_discount_applied, deal_config_snapshot, applied_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+    `,
+    [
+      promotion.id,
+      orderId,
+      restaurantId,
+      discountAmount,
+      promotion.name,
+      promotion.type,
+      promotion.supplier_id,
+      promotion.type,
+      promotion.discount_value,
+      deliveryDiscount,
+      JSON.stringify(snapshot),
+    ]
+  )
+}
+
+export async function previewDealForCart({
+  promotionId,
+  couponCode,
+  supplierId,
+  restaurantId,
+  subtotal,
+  lineItems,
+}) {
+  let promotion = null
+  if (promotionId) {
+    const { rows } = await query(
+      `SELECT p.* FROM promotions p WHERE p.id = $1 AND p.supplier_id = $2`,
+      [promotionId, supplierId]
+    )
+    promotion = rows[0] || null
+  } else if (couponCode?.trim()) {
+    const { rows } = await query(
+      `SELECT p.* FROM promotions p
+       WHERE p.supplier_id = $1 AND lower(p.coupon_code) = lower($2)`,
+      [supplierId, couponCode.trim()]
+    )
+    promotion = rows[0] || null
+  }
+
+  if (!promotion) {
+    return { eligible: false, reason: 'Deal not found for this supplier' }
+  }
+
+  if (!isRestaurantVisibleDeal(promotion, { restaurantId })) {
+    return {
+      eligible: false,
+      reason: getRestaurantIneligibilityMessage(promotion, { restaurantId }),
+      deal: { id: promotion.id, name: promotion.name, type: promotion.type },
+    }
+  }
+
+  const discountAmount = calculatePromotionDiscount(promotion, subtotal, lineItems)
+  if (discountAmount <= 0) {
+    const minOrder = promotion.min_order_amount
+    if (minOrder != null && Number(subtotal) < Number(minOrder)) {
+      return {
+        eligible: false,
+        reason: `Minimum order value not reached ($${Number(minOrder).toFixed(2)} required)`,
+        deal: { id: promotion.id, name: promotion.name, type: promotion.type },
+      }
+    }
+    const minQty = promotion.min_order_quantity
+    if (minQty != null) {
+      const units = (lineItems || []).reduce((s, l) => s + Number(l.quantity || 0), 0)
+      if (units < Number(minQty)) {
+        return {
+          eligible: false,
+          reason: `Add ${Number(minQty) - units} more unit(s) to unlock this deal`,
+          deal: { id: promotion.id, name: promotion.name, type: promotion.type },
+        }
+      }
+    }
+    return {
+      eligible: false,
+      reason: 'This deal does not apply to your cart items',
+      deal: { id: promotion.id, name: promotion.name, type: promotion.type },
+    }
+  }
+
+  return {
+    eligible: true,
+    deal: {
+      id: promotion.id,
+      name: promotion.name,
+      type: promotion.type,
+      typeLabel: getDealTypeLabel(promotion.type),
+      startsAt: promotion.starts_at,
+      endsAt: promotion.ends_at,
+    },
+    discountAmount,
+    discountLabel: getDealDiscountDisplayLabel(promotion, discountAmount),
+    subtotal: Number(subtotal),
+    totalAfterDiscount: Math.max(0, Number(subtotal) - discountAmount),
   }
 }
 
@@ -464,13 +606,12 @@ export async function applyPromotionByIdToOrder({
     [newTotal, orderId]
   )
 
-  await client.query(
-    `
-    INSERT INTO promotion_usages (promotion_id, order_id, restaurant_id, discount_applied)
-    VALUES ($1, $2, $3, $4)
-    `,
-    [promotion.id, orderId, restaurantId, discountAmount]
-  )
+  await insertPromotionUsageSnapshot(client, {
+    promotion,
+    orderId,
+    restaurantId,
+    discountAmount,
+  })
 
   await client.query(
     `UPDATE promotions SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = $1`,
@@ -492,6 +633,7 @@ export async function applyPromotionByIdToOrder({
     promotionName: promotion.name,
     promotionType: promotion.type,
     discountAmount,
+    discountLabel: getDealDiscountDisplayLabel(promotion, discountAmount),
     totalAfterDiscount: newTotal,
   }
 }
