@@ -72,6 +72,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
               quick_list_items: 1,
               scheduled_quick_lists: 1,
               scheduled_order_grace_per_day: 1,
+              deal_redemptions_per_day: 1,
             }
           : {
               warehouses: 0,
@@ -80,6 +81,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
               chats_per_day: 10,
               storage_mb: 50,
               branches: 1,
+              promotions: 1,
             }
       const defaultLimits = Object.fromEntries(limitKeys.map((k) => [k, freeDefaults[k] ?? 0]))
       const planFeat = {

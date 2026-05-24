@@ -278,6 +278,23 @@ export async function checkLimit(tenantId, tenantType, meterType) {
         [tenantId]
       )
       current = parseInt(scheduledCount[0]?.count || 0)
+    } else if (meterType === 'deal_redemptions_per_day' && tenantType === 'RESTAURANT') {
+      const { rows: redemptionCount } = await query(
+        `
+        SELECT COUNT(*) as count
+        FROM promotion_usages pu
+        WHERE pu.restaurant_id = $1
+          AND DATE(pu.applied_at) = CURRENT_DATE
+      `,
+        [tenantId]
+      )
+      current = parseInt(redemptionCount[0]?.count || 0)
+    } else if (meterType === 'promotions' && tenantType === 'SUPPLIER') {
+      const { rows: promotionCount } = await query(
+        `SELECT COUNT(*) as count FROM promotions WHERE supplier_id = $1`,
+        [tenantId]
+      )
+      current = parseInt(promotionCount[0]?.count || 0)
     } else if (meterType === 'supplier_products_skus' && tenantType === 'SUPPLIER') {
       const { rows: productCount } = await query(
         `
@@ -365,6 +382,15 @@ async function getScheduledOrderGraceUsed(tenantId) {
     [tenantId]
   )
   return rows.length > 0 ? parseInt(rows[0].current_value || 0, 10) : 0
+}
+
+/** Whether a restaurant may apply another deal discount today. */
+export async function canApplyDealRedemption(restaurantId) {
+  const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'deal_redemptions_per_day')
+  if (limitCheck.isUnlimited || limitCheck.limit == null) {
+    return { allowed: true, limitCheck }
+  }
+  return { allowed: !limitCheck.isOverLimit, limitCheck }
 }
 
 /**
@@ -560,6 +586,7 @@ export const RESTAURANT_LIMIT_KEYS = [
   'quick_list_items',
   'scheduled_quick_lists',
   'scheduled_order_grace_per_day',
+  'deal_redemptions_per_day',
 ]
 export const SUPPLIER_LIMIT_KEYS = [
   'branches',
@@ -568,6 +595,7 @@ export const SUPPLIER_LIMIT_KEYS = [
   'supplier_products_skus',
   'chats_per_day',
   'storage_mb',
+  'promotions',
 ]
 
 /**
@@ -591,6 +619,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
       quickLists,
       quickListItems,
       scheduledQuickLists,
+      dealRedemptions,
       meterRows,
     ] = await Promise.all([
       query(
@@ -624,6 +653,11 @@ async function getUsageSnapshot(tenantId, tenantType) {
         [tenantId]
       ),
       query(
+        `SELECT COUNT(*) as c FROM promotion_usages pu
+         WHERE pu.restaurant_id = $1 AND DATE(pu.applied_at) = CURRENT_DATE`,
+        [tenantId]
+      ),
+      query(
         `SELECT meter_type, current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND period_start_date = CURRENT_DATE`,
         [tenantId]
       ),
@@ -637,11 +671,12 @@ async function getUsageSnapshot(tenantId, tenantType) {
     usage.quick_lists = parseInt(quickLists.rows[0]?.c || 0)
     usage.quick_list_items = parseInt(quickListItems.rows[0]?.c || 0)
     usage.scheduled_quick_lists = parseInt(scheduledQuickLists.rows[0]?.c || 0)
+    usage.deal_redemptions_per_day = parseInt(dealRedemptions.rows[0]?.c || 0)
     meterRows.rows.forEach((r) => {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
   } else {
-    const [products, warehouses, branches, storage, meterRows] = await Promise.all([
+    const [products, warehouses, branches, storage, promotionCount, meterRows] = await Promise.all([
       query(`SELECT COUNT(*) as c FROM product WHERE supplier_id = $1`, [tenantId]),
       query(`SELECT COUNT(*) as c FROM warehouse WHERE tenant_id = $1 AND is_active = TRUE`, [
         tenantId,
@@ -655,6 +690,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND meter_type = 'storage_mb' AND period_start_date = $2`,
         [tenantId, CUMULATIVE_PERIOD_DATE]
       ),
+      query(`SELECT COUNT(*) as c FROM promotions WHERE supplier_id = $1`, [tenantId]),
       query(
         `SELECT meter_type, current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND period_start_date = CURRENT_DATE`,
         [tenantId]
@@ -665,6 +701,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
     usage.branches = 1 + parseInt(branches.rows[0]?.c || 0, 10)
     usage.users = 1
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
+    usage.promotions = parseInt(promotionCount.rows[0]?.c || 0)
     meterRows.rows.forEach((r) => {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
@@ -721,7 +758,7 @@ export async function getEntitlements(tenantId, tenantType) {
   const usage = await getUsageSnapshot(tenantId, tenantType)
   const usageWindowMeta = {}
   limitKeys.forEach((k) => {
-    if (k === 'orders_per_day' || k === 'chats_per_day')
+    if (k === 'orders_per_day' || k === 'chats_per_day' || k === 'deal_redemptions_per_day')
       usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
   })
 

@@ -15,7 +15,13 @@ import {
   getActiveDealPromotion,
 } from '../services/deal-promotions.service.js'
 import { writeAuditLog } from '../lib/audit.js'
-import { requireFeature } from '../lib/subscription.js'
+import {
+  requireFeature,
+  checkLimit,
+  getTenantSubscription,
+  buildLimitExceededPayload,
+  getRecommendedPlanNames,
+} from '../lib/subscription.js'
 
 const router = express.Router()
 
@@ -163,6 +169,44 @@ const supplierDealsGate = requireFeature(
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
+
+async function respondSupplierLimitExceeded(req, res, limitCheck, limitKey, supplierId) {
+  const [subscription, recommendedPlans] = await Promise.all([
+    getTenantSubscription(supplierId, 'SUPPLIER'),
+    getRecommendedPlanNames('SUPPLIER'),
+  ])
+  const err = buildLimitExceededPayload(
+    limitCheck,
+    limitKey,
+    subscription?.plan_name || subscription?.plan_display_name,
+    recommendedPlans
+  )
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: err,
+    requestId: req.requestId,
+  })
+}
+
+async function respondDealRedemptionLimitExceeded(req, res, limitCheck, restaurantId) {
+  const [subscription, recommendedPlans] = await Promise.all([
+    getTenantSubscription(restaurantId, 'RESTAURANT'),
+    getRecommendedPlanNames('RESTAURANT'),
+  ])
+  const err = buildLimitExceededPayload(
+    limitCheck,
+    'deal_redemptions_per_day',
+    subscription?.plan_name || subscription?.plan_display_name,
+    recommendedPlans
+  )
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: err,
+    requestId: req.requestId,
+  })
+}
 
 router.get(
   '/active',
@@ -381,6 +425,10 @@ router.post(
       const deal = await loadDealDetailForRestaurant(req.params.id, restaurantId)
       if (!deal) throw new NotFoundError('Deal not found or not available')
       if (!deal.coupon_code) throw new ValidationError('This deal has no coupon code')
+      const redeemLimit = await checkLimit(restaurantId, 'RESTAURANT', 'deal_redemptions_per_day')
+      if (redeemLimit.isOverLimit) {
+        return respondDealRedemptionLimitExceeded(req, res, redeemLimit, restaurantId)
+      }
       const activePromo = await getActiveDealPromotion(query, deal.id)
       await recordDealInteraction({
         dealId: deal.id,
@@ -536,6 +584,10 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
+    const promotionLimit = await checkLimit(supplierId, 'SUPPLIER', 'promotions')
+    if (promotionLimit.isOverLimit) {
+      return respondSupplierLimitExceeded(req, res, promotionLimit, 'promotions', supplierId)
+    }
     const body = promotionBodySchema.parse(req.body)
     const fields = mapPromotionInsertFields(body)
     const promotion = await withTransaction(async (client) => {

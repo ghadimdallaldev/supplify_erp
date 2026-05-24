@@ -294,7 +294,11 @@ export function getPlanLimitGate(
         ? 'quick list product'
         : limitKey === 'scheduled_quick_lists'
           ? 'scheduled quick list'
-          : limitKey.replace(/_/g, ' ')
+          : limitKey === 'deal_redemptions_per_day'
+            ? 'deal redemption today'
+            : limitKey === 'promotions'
+              ? 'promotion'
+              : limitKey.replace(/_/g, ' ')
 
   return {
     canUse,
@@ -356,4 +360,34 @@ export function getOrderUsageBadge(
     atLimit: current >= limit,
     nearLimit: pct >= 80 && current < limit,
   }
+}
+
+export function canBrowseSupplierDeals(entitlements: Entitlements | null | undefined): boolean {
+  return featureEnabled(entitlements?.features?.supplier_deals)
+}
+
+export function getDealRedeemGate(entitlements: Entitlements | null | undefined) {
+  const gate = getPlanLimitGate(entitlements, 'deal_redemptions_per_day', 1)
+  return {
+    canRedeem: gate.canUse,
+    current: gate.current,
+    limit: gate.limit,
+    message: gate.message,
+    planName: entitlements?.plan?.name ?? null,
+  }
+}
+
+export function getSupplierPromotionGate(entitlements: Entitlements | null | undefined) {
+  const gate = getPlanLimitGate(entitlements, 'promotions', 1)
+  return {
+    canCreate: gate.canUse,
+    current: gate.current,
+    limit: gate.limit,
+    message: gate.message,
+    planName: entitlements?.plan?.name ?? null,
+  }
+}
+
+export function canRedeemSupplierDeals(entitlements: Entitlements | null | undefined): boolean {
+  return getDealRedeemGate(entitlements).canRedeem
 }
