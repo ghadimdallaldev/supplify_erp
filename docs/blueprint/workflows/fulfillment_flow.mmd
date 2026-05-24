@@ -1,8 +1,0 @@
-flowchart LR
-  Order[Customer order] --> Wave[Delivery wave]
-  Wave --> Pick[Pick list]
-  Pick --> Pack[Pick list items]
-  Pack --> Route[Delivery route / route_stop]
-  Route --> POD[Proof of delivery]
-  POD --> Exception[Delivery exception\nor return_pickup]
-  Exception --> Receiving[Restaurant receiving]

@@ -1,7 +1,0 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export PATH="$ROOT/node_modules/.bin:$PATH"
-
-npx lint-staged

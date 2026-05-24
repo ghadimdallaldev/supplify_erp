@@ -1,7 +1,0 @@
-flowchart LR
-  Order[Customer order] --> Ship[Supplier ships]
-  Ship --> Create[Create receiving report]
-  Create --> Lines[Receiving line items\nper order_item]
-  Lines --> Received[Update received qty]
-  Received --> Inventory[Update restaurant_inventory\nor par/current]
-  Received --> Invoice[Invoice / payment flow]

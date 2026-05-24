@@ -1,9 +1,0 @@
-flowchart LR
-  A[Cart / Quick list] --> B[Checkout]
-  B --> C[Place order]
-  C --> D{checkAndIncrementUsage\norders_per_day}
-  D -->|allowed| E[Create customer_order]
-  D -->|blocked| F[403 LIMIT_EXCEEDED\nUpgradeModal]
-  E --> G[Notify supplier]
-  G --> H[Fulfillment]
-  H --> I[Receiving]

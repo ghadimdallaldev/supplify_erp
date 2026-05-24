@@ -1,8 +1,0 @@
-flowchart LR
-  A[Restaurant or Supplier] --> B[Conversation list]
-  B --> C[Open conversation]
-  C --> D[Send message]
-  D --> E{checkUsageWithWarning\nchats_per_day}
-  E -->|under limit| F[incrementUsage\nStore message]
-  E -->|over limit| G[403 or warning\nUpgradeModal]
-  F --> H[Notify other party]
