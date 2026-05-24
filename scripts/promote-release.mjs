@@ -5,6 +5,7 @@
  *   node scripts/promote-release.mjs --tier preprod|prod
  */
 import { execSync } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -55,6 +56,9 @@ run('git fetch origin')
 run(`git checkout ${branch}`)
 run(`git merge origin/${source} -m "merge(${source}): promote to ${branch}"`)
 
+// Prune script is dev-only; restore from dev before running on the release branch.
+const pruneSrc = runCapture('git show origin/dev:scripts/prune-release-tree.mjs')
+fs.writeFileSync(path.join(ROOT, 'scripts/prune-release-tree.mjs'), pruneSrc)
 run(`node scripts/prune-release-tree.mjs --tier ${tier}`)
 
 run('git add -A')
