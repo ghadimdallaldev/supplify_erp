@@ -28,6 +28,13 @@ import toast from 'react-hot-toast'
 import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
+
+/** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
+const DASHBOARD_STACK_GAP = 24
+/** Horizontal gap between KPI cards and between the three content cards. */
+const DASHBOARD_GRID_GAP = 20
+/** Extra space above the calendar so it separates clearly from the cards row. */
+const DASHBOARD_CALENDAR_EXTRA_GAP = 12
 import { CalendarView } from '../components/CalendarView'
 import { formatCurrency } from '../utils/format'
 
@@ -308,7 +315,7 @@ export function DashboardPage() {
   if (isLoading) {
     return (
       <div
-        style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+        style={{ display: 'flex', flexDirection: 'column', gap: DASHBOARD_STACK_GAP }}
         data-testid="dashboard-page"
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -318,7 +325,13 @@ export function DashboardPage() {
           </div>
           <Skeleton className="h-8 w-36" style={{ background: 'var(--brand-ultra)' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: DASHBOARD_GRID_GAP,
+          }}
+        >
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
@@ -338,7 +351,9 @@ export function DashboardPage() {
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: 12 }}>
+        <div
+          style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: DASHBOARD_GRID_GAP }}
+        >
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
@@ -490,7 +505,7 @@ export function DashboardPage() {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
+        gap: DASHBOARD_STACK_GAP,
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
@@ -615,14 +630,16 @@ export function DashboardPage() {
       </div>
 
       {/* KPI grid — 4 columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: DASHBOARD_GRID_GAP }}
+      >
         {kpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
       </div>
 
       {/* 3-col content row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: DASHBOARD_GRID_GAP }}>
         {/* Col 1 — Recent Orders */}
         <SectionCard
           title="Recent Orders"
@@ -1065,6 +1082,7 @@ export function DashboardPage() {
       {/* Calendar row */}
       <div
         style={{
+          marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
           background: 'var(--surface)',
           border: '1px solid var(--app-border)',
           borderRadius: 12,
