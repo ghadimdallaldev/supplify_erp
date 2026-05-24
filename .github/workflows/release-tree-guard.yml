@@ -1,0 +1,44 @@
+name: Release tree guard
+
+on:
+  push:
+    branches: [preprod, prod]
+
+jobs:
+  guard:
+    name: Block dev-only files on release branches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail if forbidden paths exist
+        run: |
+          set -euo pipefail
+          FORBIDDEN=(
+            docs
+            tests
+            .cursor
+            .claude
+            .cursorrules
+            .husky
+            agent-transcripts
+            docker-compose.yml
+          )
+          FAILED=0
+          for path in "${FORBIDDEN[@]}"; do
+            if [ -e "$path" ]; then
+              echo "::error::Release branch must not contain: $path"
+              FAILED=1
+            fi
+          done
+          if find apps -name '*.test.js' -o -name '*.test.ts' -o -name '*.test.tsx' 2>/dev/null | grep -q .; then
+            echo "::error::Release branch must not contain unit test files under apps/"
+            find apps -name '*.test.js' -o -name '*.test.ts' -o -name '*.test.tsx' 2>/dev/null | head -20
+            FAILED=1
+          fi
+          if [ "$FAILED" -ne 0 ]; then
+            echo ""
+            echo "Run on dev: node scripts/promote-release.mjs --tier ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          echo "Release tree OK for ${GITHUB_REF_NAME}"

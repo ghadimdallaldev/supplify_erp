@@ -1,6 +1,8 @@
 # Supplify deployment
 
-One-command deploy per environment (run from repo root on the server):
+**Release branches (`preprod`, `prod`) contain runtime code only** — no docs, tests, or IDE/agent config. Promote from `dev` with `pnpm promote:preprod` or `pnpm promote:prod` (see `docs/BRANCHING.md`).
+
+One-command **EC2 Docker** deploy per environment (run from repo root on the server):
 
 | Environment    | Git branch | Command                                   |
 | -------------- | ---------- | ----------------------------------------- |

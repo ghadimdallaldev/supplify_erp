@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Remove development-only files from the working tree for preprod/prod branches.
- * Run from repo root after merging dev: node scripts/prune-release-tree.mjs --tier preprod|prod
+ * Run from repo root after merging dev:
+ *   node scripts/prune-release-tree.mjs --tier preprod|prod
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -82,22 +83,38 @@ function patchServerJs() {
 }
 
 function pruneWorkflows() {
-  const remove = [
-    'ci.yml',
-    'ci-guards.yml',
-    'deploy-dev.yml',
-    'deploy-ec2-dev.yml',
-    'deploy-staging.yml',
-    'release.yml',
-  ]
+  const keep =
+    tier === 'preprod'
+      ? new Set(['deploy-ec2-preprod.yml', 'release-tree-guard.yml'])
+      : new Set(['deploy-ec2-prod.yml', 'release-tree-guard.yml'])
+
+  const wfDir = path.join(ROOT, '.github/workflows')
+  if (!fs.existsSync(wfDir)) return
+  for (const file of fs.readdirSync(wfDir)) {
+    if (!keep.has(file)) {
+      rmFile(path.join('.github/workflows', file))
+    }
+  }
+}
+
+function pruneDeployArtifacts() {
   if (tier === 'preprod') {
-    remove.push('deploy-prod.yml', 'deploy-ec2-prod.yml', 'deploy.yml')
+    rm('deploy/docker-compose.dev.yml')
+    rmFile('deploy/scripts/deploy-dev.sh')
+    rmFile('deploy/scripts/deploy-prod.sh')
+    rmFile('deploy/env/.env.dev.example')
+    rmFile('deploy/env/.env.prod.example')
   } else {
-    remove.push('deploy-preprod.yml', 'deploy-ec2-preprod.yml')
+    rm('deploy/docker-compose.dev.yml')
+    rm('deploy/docker-compose.staging.yml')
+    rmFile('deploy/scripts/deploy-dev.sh')
+    rmFile('deploy/scripts/deploy-preprod.sh')
+    rmFile('deploy/scripts/deploy-staging.sh')
+    rmFile('deploy/env/.env.dev.example')
+    rmFile('deploy/env/.env.staging.example')
   }
-  for (const file of remove) {
-    rmFile(path.join('.github/workflows', file))
-  }
+  rm('docker-compose.yml')
+  rm('docker')
 }
 
 function writeJson(rel, data) {
@@ -173,25 +190,25 @@ function slimPackageJson() {
 
 function writeReadme() {
   const envLabel = tier === 'preprod' ? 'Pre-production' : 'Production'
+  const deployCmd =
+    tier === 'preprod' ? 'sudo ./deploy/scripts/deploy-preprod.sh' : 'sudo ./deploy/scripts/deploy-prod.sh'
   fs.writeFileSync(
     path.join(ROOT, 'README.md'),
     `# Supplify (${envLabel} branch)
 
-Deploy-only branch. **Do not develop here** — merge from \`dev\`, then run:
+Deploy-only branch — **do not develop here**. Merge from \`dev\` on the \`dev\` branch using:
 
 \`\`\`bash
-node scripts/prune-release-tree.mjs --tier ${tier}
+node scripts/promote-release.mjs --tier ${tier}
 \`\`\`
 
-## Deploy
+## Deploy (EC2 Docker)
 
-| Environment | Command |
-| --- | --- |
-${tier === 'preprod' ? '| Pre-production | `sudo ./deploy/scripts/deploy-preprod.sh` |' : '| Production | `sudo ./deploy/scripts/deploy-prod.sh` |'}
+\`\`\`bash
+${deployCmd}
+\`\`\`
 
-Migrations: \`pnpm db:migrate\`
-
-Branching guide: see \`docs/BRANCHING.md\` on the \`dev\` branch.
+Migrations run automatically during deploy. Branching guide: see \`docs/BRANCHING.md\` on the \`dev\` branch.
 `
   )
   console.log('wrote README.md')
@@ -202,9 +219,11 @@ const SHARED_DIRS = [
   'docs',
   'tests',
   '.claude',
+  '.cursor',
   '.husky',
   'apps/web/src/test',
   'apps/api/db/seed',
+  'agent-transcripts',
 ]
 
 const SHARED_FILES = [
@@ -215,7 +234,9 @@ const SHARED_FILES = [
   '.lintstagedrc.js',
   'releaserc.json',
   '.releaserc',
+  '.releaserc.js',
   'AGENTS.md',
+  '.cursorrules',
   'scripts/dev-native.mjs',
   'scripts/dev-apps.mjs',
   'scripts/dev-infra.mjs',
@@ -224,16 +245,19 @@ const SHARED_FILES = [
   'scripts/run-local.ps1',
   'scripts/run-local.cmd',
   'scripts/ensure-native-env.mjs',
+  'scripts/prune-release-tree.mjs',
+  'scripts/promote-release.mjs',
 ]
 
 console.log(`\nPruning release tree (tier=${tier})...\n`)
 
 for (const d of SHARED_DIRS) rm(d)
-for (const f of SHARED_FILES) rm(f)
+for (const f of SHARED_FILES) rmFile(f)
 
 removeTestFiles()
 pruneApiScripts()
 patchServerJs()
+pruneDeployArtifacts()
 pruneWorkflows()
 slimPackageJson()
 writeReadme()

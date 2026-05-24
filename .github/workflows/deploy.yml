@@ -120,7 +120,7 @@ jobs:
           IMAGE_TAG: ${{ github.ref_name || 'latest' }}
         run: |
           if [ -f "apps/api/Dockerfile" ]; then
-            docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f apps/api/Dockerfile apps/api
+            docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f apps/api/Dockerfile .
             docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           else
             echo "No Dockerfile found for API, skipping Docker build"

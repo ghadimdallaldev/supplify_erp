@@ -85,6 +85,10 @@ temp/
 # Editor directories and files
 .vscode/
 .idea/
+.cursor/
+.cursorrules
+.claude/
+agent-transcripts/
 *.swp
 *.swo
 *~
