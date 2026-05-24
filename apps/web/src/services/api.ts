@@ -3213,6 +3213,7 @@ export const {
   useGetTenantUsageQuery,
   useGetAdminAuditLogsQuery,
   useGetAdminActivityQuery,
+  useGetAdminHealthQuery,
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
   useGetSupplierUsageQuery,

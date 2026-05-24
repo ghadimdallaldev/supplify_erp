@@ -180,6 +180,12 @@ router.get('/overview', async (req, res) => {
       query(
         `SELECT COUNT(*) as count FROM subscription WHERE status='TRIALING' AND trial_ends_at BETWEEN NOW() AND NOW()+INTERVAL '7 days'`
       ),
+      // Pending deal approvals
+      query(
+        `SELECT COUNT(*) as count FROM promotions WHERE status IN ('pending_approval', 'pending_admin_approval')`
+      ),
+      query(`SELECT COUNT(*) as count FROM promotions WHERE status = 'approved_pending_payment'`),
+      query(`SELECT COUNT(*) as count FROM invoice WHERE status = 'OVERDUE' AND balance_due > 0`),
     ])
 
     const [
@@ -197,6 +203,9 @@ router.get('/overview', async (req, res) => {
       { rows: quickListStats },
       { rows: alertStats },
       { rows: trialExpStats },
+      { rows: pendingDealStats },
+      { rows: pendingPaymentDealStats },
+      { rows: overdueInvoiceStats },
     ] = results
 
     const mrr = parseFloat(revenueStats[0]?.mrr || 0)
@@ -242,6 +251,9 @@ router.get('/overview', async (req, res) => {
         alerts: {
           pastDueSubscriptions: parseInt(alertStats[0]?.count || 0),
           trialsExpiringSoon: parseInt(trialExpStats[0]?.count || 0),
+          pendingDealApprovals: parseInt(pendingDealStats[0]?.count || 0),
+          pendingDealPayments: parseInt(pendingPaymentDealStats[0]?.count || 0),
+          overdueInvoices: parseInt(overdueInvoiceStats[0]?.count || 0),
         },
         // Keep legacy field for compatibility
         activity: {
