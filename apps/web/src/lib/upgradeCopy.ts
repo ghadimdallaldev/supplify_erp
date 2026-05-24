@@ -7,6 +7,10 @@ export const FEATURE_UPGRADE_COPY: Record<string, { plan: string; value: string 
     plan: 'Gold',
     value: 'Upgrade to Gold to unlock reports and see usage and cost trends.',
   },
+  quick_lists: {
+    plan: 'Bronze',
+    value: 'Upgrade to Bronze to save recurring orders as quick lists and schedule reorders.',
+  },
   smart_reorder: {
     plan: 'Gold',
     value: 'Upgrade to Gold to unlock smart reorder and reduce manual stock decisions.',
@@ -22,6 +26,22 @@ export const FEATURE_UPGRADE_COPY: Record<string, { plan: string; value: string 
 }
 
 export const LIMIT_UPGRADE_COPY: Record<string, { plan: string; value: string }> = {
+  quick_lists: {
+    plan: 'Bronze',
+    value: 'Upgrade to Bronze for more saved quick lists and scheduled reorders.',
+  },
+  quick_list_items: {
+    plan: 'Bronze',
+    value: 'Upgrade to Bronze to add more products to your quick lists.',
+  },
+  scheduled_quick_lists: {
+    plan: 'Bronze',
+    value: 'Upgrade to Bronze to schedule more recurring quick list orders.',
+  },
+  supplier_deals: {
+    plan: 'Bronze',
+    value: 'Upgrade to Bronze to browse supplier deals and save at checkout.',
+  },
   orders_per_day: {
     plan: 'Gold',
     value: 'Upgrade to Gold for more daily orders so your team is never blocked.',

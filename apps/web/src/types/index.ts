@@ -125,6 +125,8 @@ export interface CreateOrderRequest {
     notes?: string
   }[]
   status?: 'DRAFT' | 'PLACED'
+  promotionId?: string
+  couponCode?: string
 }
 
 export interface CreateManualOrderRequest {

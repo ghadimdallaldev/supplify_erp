@@ -1,5 +1,7 @@
 import { io, type Socket } from 'socket.io-client'
 import { getSocketBaseUrl } from './socketBaseUrl'
+import { connectAuthenticatedSocket } from './socketConnect'
+import { SOCKET_IO_OPTIONS } from './socketOptions'
 
 let socket: Socket | null = null
 let socketUserId: string | null = null
@@ -26,17 +28,10 @@ export function getLayoutSocket(userId: string): Socket {
     socketUserId = null
   }
 
-  socket = io(getSocketBaseUrl(), {
-    path: '/socket.io',
-    transports: ['websocket', 'polling'],
-    withCredentials: true,
-    autoConnect: true,
-  })
+  socket = io(getSocketBaseUrl(), { ...SOCKET_IO_OPTIONS, autoConnect: false })
   socketUserId = userId
 
-  socket.on('connect_error', (err) => {
-    console.error('[layoutSocket] connection error', err.message)
-  })
+  connectAuthenticatedSocket(socket, 'layoutSocket')
 
   return socket
 }

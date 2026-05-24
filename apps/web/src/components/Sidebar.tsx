@@ -31,7 +31,7 @@ import {
   Tag,
   Percent,
 } from 'lucide-react'
-import { featureEnabled } from '../lib/planLimits'
+import { featureEnabled, getOrderUsageBadge } from '../lib/planLimits'
 
 type NavItem = {
   name: string
@@ -85,9 +85,12 @@ export function Sidebar() {
     entitlementsData?.entitlements?.features?.approvals_budgets
   )
   const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
-  const disputesEnabled =
-    featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns) || true
+  const supplierDealsEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.supplier_deals
+  )
+  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
   const promotionsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.promotions)
+  const orderUsageBadge = getOrderUsageBadge(entitlementsData?.entitlements)
 
   let sections: NavSection[] = []
 
@@ -131,7 +134,9 @@ export function Sidebar() {
       ...(disputesEnabled
         ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
         : []),
-      { name: 'Deals', href: '/app/deals', icon: Percent, testId: 'nav-deals' },
+      ...(supplierDealsEnabled
+        ? [{ name: 'Deals', href: '/app/deals', icon: Percent, testId: 'nav-deals' }]
+        : []),
       {
         name: 'Invoices',
         href: '/app/invoices',
@@ -229,7 +234,14 @@ export function Sidebar() {
         ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
         : []),
       ...(promotionsEnabled
-        ? [{ name: 'Promotions', href: '/app/promotions', icon: Tag, testId: 'nav-promotions' }]
+        ? [
+            {
+              name: 'Deals & Promotions',
+              href: '/app/promotions',
+              icon: Tag,
+              testId: 'nav-promotions',
+            },
+          ]
         : []),
       {
         name: 'Invoices',
@@ -315,6 +327,8 @@ export function Sidebar() {
               const isActive = location.pathname === item.href
               const showPendingBadge = item.badge === 'pending' && pendingOrders > 0
               const showUnreadBadge = item.badge === 'unread' && unreadCount > 0
+              const showOrderUsage =
+                item.name === 'Cart' && (isRestaurant || impersonatingRestaurant) && orderUsageBadge
 
               return (
                 <Link
@@ -410,6 +424,31 @@ export function Sidebar() {
                       }}
                     >
                       {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                  {showOrderUsage && orderUsageBadge && (
+                    <span
+                      title="Daily orders used today"
+                      style={{
+                        background: orderUsageBadge.atLimit
+                          ? 'var(--red)'
+                          : orderUsageBadge.nearLimit
+                            ? 'var(--amber-mid)'
+                            : 'var(--brand-ultra)',
+                        color: orderUsageBadge.atLimit
+                          ? '#fff'
+                          : orderUsageBadge.nearLimit
+                            ? '#000'
+                            : 'var(--text-muted)',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        borderRadius: 8,
+                        padding: '1px 5px',
+                        minWidth: 18,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {orderUsageBadge.label}
                     </span>
                   )}
                 </Link>

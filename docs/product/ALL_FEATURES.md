@@ -303,18 +303,19 @@ Also available via API (not always separate pages):
 
 ### 7.2 Admin dashboard tabs
 
-| Tab               | Capabilities                                            |
-| ----------------- | ------------------------------------------------------- |
-| **Overview**      | MRR/ARR, tenant counts, alerts, KPIs                    |
-| **Activity**      | Recent platform activity feed                           |
-| **Tenants**       | List/search suppliers & restaurants, impersonate        |
-| **Subscriptions** | All tenant subscriptions, plan changes, unlock          |
-| **Plans**         | Create/edit subscription plans (limits + features JSON) |
-| **Finance**       | GMV, outstanding, revenue by plan                       |
-| **Usage**         | Per-tenant usage meters & quota overrides               |
-| **Features**      | Global + per-tenant feature flag overrides              |
-| **Health**        | DB pool, recent errors, system health                   |
-| **Audit**         | Admin audit log search & filters                        |
+| Tab               | Capabilities                                              |
+| ----------------- | --------------------------------------------------------- |
+| **Overview**      | MRR/ARR, tenant counts, alerts, KPIs                      |
+| **Activity**      | Recent platform activity feed                             |
+| **Tenants**       | List/search suppliers & restaurants, impersonate          |
+| **Subscriptions** | All tenant subscriptions, plan changes, unlock            |
+| **Plans**         | Create/edit subscription plans (limits + features JSON)   |
+| **Finance**       | GMV, outstanding, revenue by plan                         |
+| **Usage**         | Per-tenant usage meters & quota overrides                 |
+| **Features**      | Global + per-tenant feature flag overrides                |
+| **Deals**         | Approve/reject pending supplier deals; edit boost pricing |
+| **Health**        | DB pool, recent errors, system health                     |
+| **Audit**         | Admin audit log search & filters                          |
 
 ### 7.3 Admin API capabilities (`/api/admin-dashboard`)
 

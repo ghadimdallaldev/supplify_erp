@@ -126,7 +126,7 @@
 ### 4. **Marketing Tools**
 
 - ❌ **Bulk Updates**: Can't send messages to multiple restaurants
-- ❌ **Promotions**: No promotional campaign system
+- ✅ **Deals & promotions**: Supplier-created deals with product/category targeting; paid boost campaigns; restaurant discovery feed (`/app/deals`)
 - ❌ **Announcements**: Can't broadcast to followers
 
 ### 5. **Notifications**

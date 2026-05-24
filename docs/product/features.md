@@ -85,15 +85,16 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 ## Reports, disputes, promotions & reviews
 
-| Feature             | Web route         | API prefix        | Notes                                                                                   |
-| ------------------- | ----------------- | ----------------- | --------------------------------------------------------------------------------------- |
-| Reports & analytics | `/app/reports`    | `/api/reports`    | Restaurant & supplier dashboards (plan `reports`)                                       |
-| Disputes & returns  | `/app/disputes`   | `/api/disputes`   | Open/track disputes on orders                                                           |
-| Supplier promotions | `/app/promotions` | `/api/promotions` | Supplier manages deals                                                                  |
-| Restaurant deals    | `/app/deals`      | `/api/promotions` | Active promotions from linked suppliers                                                 |
-| Supplier reviews    | Supplier detail   | `/api/reviews`    | Ratings and summaries per supplier                                                      |
-| Approvals & budgets | `/app/approvals`  | `/api/approvals`  | Plan `approvals_budgets` — see [approvals-budgets.md](../features/approvals-budgets.md) |
-| Tenant audit log    | —                 | `/api/audit`      | Tenant-scoped audit entries                                                             |
+| Feature              | Web route            | API prefix                | Notes                                                                                   |
+| -------------------- | -------------------- | ------------------------- | --------------------------------------------------------------------------------------- |
+| Reports & analytics  | `/app/reports`       | `/api/reports`            | Restaurant & supplier dashboards (plan `reports`)                                       |
+| Disputes & returns   | `/app/disputes`      | `/api/disputes`           | Open/track disputes on orders                                                           |
+| Supplier promotions  | `/app/promotions`    | `/api/promotions`         | Supplier manages deals, targeting, boosts, analytics                                    |
+| Restaurant deals     | `/app/deals`         | `/api/promotions`         | Discovery feed with CTAs; sponsored deals from non-followers                            |
+| Admin deal approvals | `/app/admin` → Deals | `/api/promotions/admin/*` | Approve/reject deals; configure boost pricing                                           |
+| Supplier reviews     | Supplier detail      | `/api/reviews`            | Ratings and summaries per supplier                                                      |
+| Approvals & budgets  | `/app/approvals`     | `/api/approvals`          | Plan `approvals_budgets` — see [approvals-budgets.md](../features/approvals-budgets.md) |
+| Tenant audit log     | —                    | `/api/audit`              | Tenant-scoped audit entries                                                             |
 
 **Verify:** Gold+ restaurant → Reports loads spend charts; supplier → Promotions CRUD. Tests: `reports.routes.test.js`, `disputes.routes.test.js`, `approvals.routes.test.js`.
 

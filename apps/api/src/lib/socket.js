@@ -1,10 +1,9 @@
 import { Server } from 'socket.io'
 import { logger } from './logger.js'
 import { config } from '../config/env.js'
-import { verifyToken } from './auth.js'
-import { query } from './db.js'
 import { persistMessageFromSocket } from '../services/chatSocket.service.js'
 import { userCanAccessConversation } from './chat-access.js'
+import { resolveSocketUserFromCookieHeader } from './socket-auth.js'
 
 let io = null
 
@@ -19,31 +18,18 @@ export function initializeSocket(server) {
 
   io.use(async (socket, next) => {
     try {
-      const cookieHeader = socket.handshake.headers.cookie || ''
-      const accessToken = cookieHeader
-        .split(';')
-        .map((c) => {
-          const i = c.indexOf('=')
-          return [c.slice(0, i).trim(), c.slice(i + 1).trim()]
-        })
-        .find(([k]) => k === 'access_token')?.[1]
-      if (!accessToken) {
-        return next(new Error('Unauthorized: no access token'))
-      }
-      const payload = await verifyToken(accessToken)
-      const { rows } = await query(
-        `SELECT id, role, supplier_id, restaurant_id FROM app_user WHERE keycloak_sub = $1`,
-        [payload.sub]
+      const { user, tenantId } = await resolveSocketUserFromCookieHeader(
+        socket.handshake.headers.cookie || ''
       )
-      if (rows.length === 0) {
-        return next(new Error('Unauthorized: user not found'))
-      }
-      socket.data.userId = rows[0].id
-      socket.data.role = rows[0].role
-      socket.data.tenantId = rows[0].supplier_id || rows[0].restaurant_id || null
+      socket.data.userId = user.id
+      socket.data.role = user.role
+      socket.data.tenantId = tenantId
       next()
-    } catch {
-      next(new Error('Unauthorized: invalid token'))
+    } catch (error) {
+      const message =
+        error?.code === 'NO_ACCESS_TOKEN' ? error.message : 'Unauthorized: invalid token'
+      logger.debug('Socket authentication failed', { message: error?.message })
+      next(new Error(message))
     }
   })
 

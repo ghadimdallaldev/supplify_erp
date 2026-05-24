@@ -677,6 +677,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
         { type: 'Supplier', id: 'LIST' },
+        'Subscription',
       ],
     }),
     unfollowSupplier: builder.mutation<any, string>({
@@ -687,6 +688,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
         { type: 'Supplier', id: 'LIST' },
+        'Subscription',
       ],
     }),
     getSupplierMe: builder.query<{ supplier: Supplier }, void>({
@@ -2134,7 +2136,7 @@ export const api = createApi({
     }),
     getActivePromotions: builder.query<
       { promotions: Array<Record<string, unknown>> },
-      { supplierId?: string } | void
+      { supplierId?: string; categoryId?: string; sort?: string; expiringSoon?: string } | void
     >({
       query: (params) => ({ url: '/api/promotions/active', params: params || {} }),
       providesTags: ['Promotions'],
@@ -2168,6 +2170,94 @@ export const api = createApi({
     getPromotionAnalytics: builder.query<{ analytics: Record<string, unknown> }, string>({
       query: (id) => `/api/promotions/${id}/analytics`,
       providesTags: (_r, _e, id) => [{ type: 'Promotions', id }],
+    }),
+    getPromotionPricing: builder.query<{ pricing: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/promotions/pricing',
+    }),
+    getDealDetail: builder.query<{ deal: Record<string, unknown> }, string>({
+      query: (id) => `/api/promotions/${id}/detail`,
+      providesTags: (_r, _e, id) => [{ type: 'Promotions', id }],
+    }),
+    getEligibleDealProducts: builder.query<
+      { products: Array<Record<string, unknown>>; dealId: string; supplierId: string },
+      string
+    >({
+      query: (id) => `/api/promotions/${id}/eligible-products`,
+    }),
+    recordDealInteraction: builder.mutation<
+      { interaction: Record<string, unknown> },
+      { id: string; interactionType: string; metadata?: Record<string, unknown> }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/promotions/${id}/interact`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    useDealCoupon: builder.mutation<
+      { couponCode: string; dealId: string; supplierId: string },
+      string
+    >({
+      query: (id) => ({ url: `/api/promotions/${id}/use-coupon`, method: 'POST' }),
+    }),
+    messageFromDeal: builder.mutation<
+      {
+        conversation: Record<string, unknown>
+        message: Record<string, unknown>
+        initialMessage: string
+      },
+      string
+    >({
+      query: (id) => ({ url: `/api/promotions/${id}/message`, method: 'POST' }),
+      invalidatesTags: ['Conversations'],
+    }),
+    promoteDeal: builder.mutation<
+      { promotion: Record<string, unknown> },
+      { id: string; pricingKey?: string; budget?: number; targetAudience?: Record<string, unknown> }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/promotions/${id}/promote`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Promotions'],
+    }),
+    resumePromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/${id}/resume`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    previewDeal: builder.query<{ deal: Record<string, unknown> }, string>({
+      query: (id) => `/api/promotions/${id}/preview`,
+    }),
+    getAdminPendingDeals: builder.query<{ deals: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/promotions/admin/pending',
+      providesTags: ['Promotions'],
+    }),
+    approveAdminDeal: builder.mutation<{ deal: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/admin/${id}/approve`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    rejectAdminDeal: builder.mutation<{ deal: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/admin/${id}/reject`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    updateAdminPromotionPricing: builder.mutation<
+      { pricing: Record<string, unknown> },
+      {
+        key: string
+        amount?: number
+        durationDays?: number
+        isActive?: boolean
+        displayName?: string
+        description?: string
+      }
+    >({
+      query: ({ key, ...body }) => ({
+        url: `/api/promotions/admin/pricing/${key}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Promotions'],
     }),
 
     // Reviews
@@ -2950,6 +3040,19 @@ export const {
   usePausePromotionMutation,
   useDeletePromotionMutation,
   useGetPromotionAnalyticsQuery,
+  useGetPromotionPricingQuery,
+  useGetDealDetailQuery,
+  useGetEligibleDealProductsQuery,
+  useRecordDealInteractionMutation,
+  useUseDealCouponMutation,
+  useMessageFromDealMutation,
+  usePromoteDealMutation,
+  useResumePromotionMutation,
+  usePreviewDealQuery,
+  useGetAdminPendingDealsQuery,
+  useApproveAdminDealMutation,
+  useRejectAdminDealMutation,
+  useUpdateAdminPromotionPricingMutation,
   useGetSupplierReviewsQuery,
   useGetSupplierRatingSummaryQuery,
   useGetMyReviewsQuery,

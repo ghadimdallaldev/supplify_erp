@@ -180,6 +180,10 @@ export async function applyBestPromotionToOrder({
   subtotal,
   lineItems,
 }) {
+  const { isFeatureEnabled } = await import('../lib/subscription.js')
+  const dealsEnabled = await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_deals')
+  if (!dealsEnabled) return null
+
   const promotions = await fetchActivePromotionsForSupplier(client, supplierId, restaurantId)
   const selected = selectBestPromotion(promotions, subtotal, lineItems, { restaurantId })
   if (!selected || selected.discountAmount <= 0) return null

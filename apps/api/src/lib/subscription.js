@@ -255,6 +255,29 @@ export async function checkLimit(tenantId, tenantType, meterType) {
         [tenantId]
       )
       current = parseInt(orderCount[0]?.count || 0)
+    } else if (meterType === 'quick_lists' && tenantType === 'RESTAURANT') {
+      const { rows: listCount } = await query(
+        `SELECT COUNT(*) as count FROM quick_list WHERE restaurant_id = $1`,
+        [tenantId]
+      )
+      current = parseInt(listCount[0]?.count || 0)
+    } else if (meterType === 'quick_list_items' && tenantType === 'RESTAURANT') {
+      const { rows: itemCount } = await query(
+        `
+        SELECT COUNT(*) as count
+        FROM quick_list_item qli
+        JOIN quick_list ql ON ql.id = qli.quick_list_id
+        WHERE ql.restaurant_id = $1
+      `,
+        [tenantId]
+      )
+      current = parseInt(itemCount[0]?.count || 0)
+    } else if (meterType === 'scheduled_quick_lists' && tenantType === 'RESTAURANT') {
+      const { rows: scheduledCount } = await query(
+        `SELECT COUNT(*) as count FROM quick_list WHERE restaurant_id = $1 AND is_scheduled = true`,
+        [tenantId]
+      )
+      current = parseInt(scheduledCount[0]?.count || 0)
     } else if (meterType === 'supplier_products_skus' && tenantType === 'SUPPLIER') {
       const { rows: productCount } = await query(
         `
@@ -326,6 +349,72 @@ export async function checkLimit(tenantId, tenantType, meterType) {
       isOverLimit: false,
       effectiveLimit: null,
     }
+  }
+}
+
+async function getScheduledOrderGraceUsed(tenantId) {
+  const { rows } = await query(
+    `
+    SELECT current_value
+    FROM usage_meter
+    WHERE tenant_id = $1
+      AND tenant_type = 'RESTAURANT'
+      AND meter_type = 'scheduled_order_grace_per_day'
+      AND period_start_date = CURRENT_DATE
+  `,
+    [tenantId]
+  )
+  return rows.length > 0 ? parseInt(rows[0].current_value || 0, 10) : 0
+}
+
+/**
+ * Whether a scheduled quick-list run may create orders when the daily cap is already reached.
+ * Free tier may use scheduled_order_grace_per_day (default 1) for overflow orders.
+ */
+export async function evaluateScheduledOrderLimit(restaurantId, ordersToCreate) {
+  const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')
+  const subscription = await getTenantSubscription(restaurantId, 'RESTAURANT')
+  const graceLimitRaw = subscription?.limits?.scheduled_order_grace_per_day
+  const graceLimit =
+    graceLimitRaw == null || graceLimitRaw === -1 ? 0 : parseInt(graceLimitRaw, 10) || 0
+
+  if (limitCheck.isUnlimited || limitCheck.limit == null) {
+    return {
+      allowed: true,
+      usesGrace: false,
+      excess: 0,
+      graceUsed: 0,
+      graceLimit,
+      limitCheck,
+      ordersToCreate,
+    }
+  }
+
+  const newTotal = limitCheck.current + ordersToCreate
+  if (newTotal <= limitCheck.limit) {
+    return {
+      allowed: true,
+      usesGrace: false,
+      excess: 0,
+      graceUsed: 0,
+      graceLimit,
+      limitCheck,
+      ordersToCreate,
+    }
+  }
+
+  const excess = newTotal - limitCheck.limit
+  const graceUsed = await getScheduledOrderGraceUsed(restaurantId)
+  const allowed = graceLimit > 0 && graceUsed + excess <= graceLimit
+
+  return {
+    allowed,
+    usesGrace: allowed,
+    excess,
+    graceUsed,
+    graceLimit,
+    limitCheck,
+    ordersToCreate,
   }
 }
 
@@ -467,6 +556,10 @@ export const RESTAURANT_LIMIT_KEYS = [
   'restaurant_inventory_skus',
   'chats_per_day',
   'storage_mb',
+  'quick_lists',
+  'quick_list_items',
+  'scheduled_quick_lists',
+  'scheduled_order_grace_per_day',
 ]
 export const SUPPLIER_LIMIT_KEYS = [
   'branches',
@@ -488,7 +581,18 @@ async function getUsageSnapshot(tenantId, tenantType) {
   const usage = Object.fromEntries(keys.map((k) => [k, 0]))
 
   if (tenantType === 'RESTAURANT') {
-    const [inv, orders, team, branches, suppliers, storage, meterRows] = await Promise.all([
+    const [
+      inv,
+      orders,
+      team,
+      branches,
+      suppliers,
+      storage,
+      quickLists,
+      quickListItems,
+      scheduledQuickLists,
+      meterRows,
+    ] = await Promise.all([
       query(
         `SELECT COUNT(DISTINCT product_id) as c FROM restaurant_inventory WHERE restaurant_id = $1`,
         [tenantId]
@@ -508,6 +612,17 @@ async function getUsageSnapshot(tenantId, tenantType) {
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND meter_type = 'storage_mb' AND period_start_date = $2`,
         [tenantId, CUMULATIVE_PERIOD_DATE]
       ),
+      query(`SELECT COUNT(*) as c FROM quick_list WHERE restaurant_id = $1`, [tenantId]),
+      query(
+        `SELECT COUNT(*) as c FROM quick_list_item qli
+         JOIN quick_list ql ON ql.id = qli.quick_list_id
+         WHERE ql.restaurant_id = $1`,
+        [tenantId]
+      ),
+      query(
+        `SELECT COUNT(*) as c FROM quick_list WHERE restaurant_id = $1 AND is_scheduled = true`,
+        [tenantId]
+      ),
       query(
         `SELECT meter_type, current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND period_start_date = CURRENT_DATE`,
         [tenantId]
@@ -519,6 +634,9 @@ async function getUsageSnapshot(tenantId, tenantType) {
     usage.branches = 1 + parseInt(branches.rows[0]?.c || 0, 10)
     usage.suppliers_per_restaurant = parseInt(suppliers.rows[0]?.c || 0)
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
+    usage.quick_lists = parseInt(quickLists.rows[0]?.c || 0)
+    usage.quick_list_items = parseInt(quickListItems.rows[0]?.c || 0)
+    usage.scheduled_quick_lists = parseInt(scheduledQuickLists.rows[0]?.c || 0)
     meterRows.rows.forEach((r) => {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
@@ -1049,6 +1167,18 @@ export function buildLimitExceededPayload(
       upgradeUrl: upgradeUrl || DEFAULT_UPGRADE_PATH,
     },
   }
+}
+
+/**
+ * Whether the plan allows scheduled / automated quick lists (Bronze+ tiers).
+ */
+export function isQuickListAutomationEnabled(featureValue) {
+  if (featureValue === true) return true
+  if (typeof featureValue === 'string') {
+    const v = featureValue.toLowerCase()
+    return v !== 'false' && v !== 'disabled' && v !== '' && v !== 'basic_manual_only'
+  }
+  return false
 }
 
 /**

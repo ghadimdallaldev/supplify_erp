@@ -1,5 +1,9 @@
-import { useAppSelector } from '../hooks/redux'
-import { useCreateOrderMutation, useGetActivePromotionsQuery } from '../services/api'
+import { useAppDispatch, useAppSelector } from '../hooks/redux'
+import {
+  useCreateOrderMutation,
+  useGetActivePromotionsQuery,
+  useGetEntitlementsQuery,
+} from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -14,15 +18,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
+import { LimitExceededBanner } from '../components/LimitExceededBanner'
 import { ShoppingCart, Trash2, Plus, Minus, Save, Calendar, FileText } from 'lucide-react'
 import { useCartActions } from '../hooks/useCartActions'
+import { formatOrderPlaceGateMessage, getOrderPlaceGate } from '../lib/planLimits'
+import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import toast from 'react-hot-toast'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
 
 export function CartPage() {
+  const [searchParams] = useSearchParams()
+  const dispatch = useAppDispatch()
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
+  const { user } = useAppSelector((state) => state.auth)
   const { data: dealsData } = useGetActivePromotionsQuery()
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !user || user.role === 'ADMIN',
+  })
+  const orderGate = useMemo(
+    () => getOrderPlaceGate(entitlementsData?.entitlements, groups.length),
+    [entitlementsData?.entitlements, groups.length]
+  )
   const estimatedPromoDiscount = (dealsData?.promotions || []).reduce((max, p) => {
     const val = Number(p.discount_value || 0)
     if (p.type === 'percentage_discount') {
@@ -54,6 +72,15 @@ export function CartPage() {
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
+  const [couponCode, setCouponCode] = useState(searchParams.get('coupon') || '')
+  const [promotionId, setPromotionId] = useState(searchParams.get('dealId') || '')
+
+  useEffect(() => {
+    const c = searchParams.get('coupon')
+    if (c) setCouponCode(c)
+    const d = searchParams.get('dealId')
+    if (d) setPromotionId(d)
+  }, [searchParams])
 
   useEffect(() => {
     rehydrateCart()
@@ -96,11 +123,27 @@ export function CartPage() {
       return
     }
 
+    if (!orderGate.canPlace) {
+      openBrowseUpgrade(dispatch, {
+        currentPlan: orderGate.planName,
+        upgradeUrl: '/app/settings?tab=subscription',
+      })
+      return
+    }
+
     // Show order details dialog
     setShowOrderDetails(true)
   }
 
   const handleConfirmOrder = async () => {
+    if (!orderGate.canPlace) {
+      openBrowseUpgrade(dispatch, {
+        currentPlan: orderGate.planName,
+        upgradeUrl: '/app/settings?tab=subscription',
+      })
+      return
+    }
+
     setIsPlacingOrder(true)
     try {
       const items = groups.flatMap((group) =>
@@ -115,6 +158,8 @@ export function CartPage() {
         items,
         deliveryDate: deliveryDate || undefined,
         notes: deliveryNotes || undefined,
+        couponCode: couponCode.trim() || undefined,
+        promotionId: promotionId || undefined,
       }).unwrap()
 
       clearCart()
@@ -208,6 +253,25 @@ export function CartPage() {
           </Button>
         </div>
       </div>
+
+      {!orderGate.canPlace && orderGate.reason === 'at_limit' && orderGate.limit != null && (
+        <LimitExceededBanner
+          limitKey="orders_per_day"
+          currentUsage={orderGate.current}
+          limitValue={orderGate.limit}
+          currentPlan={orderGate.planName}
+          upgradeUrl="/app/settings?tab=subscription"
+          className="border-red-200 bg-red-50 text-red-900 [&_p]:text-red-800"
+        />
+      )}
+      {!orderGate.canPlace && orderGate.reason === 'would_exceed' && (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="alert"
+        >
+          {formatOrderPlaceGateMessage(orderGate)}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -334,13 +398,32 @@ export function CartPage() {
 
           <Button
             onClick={handlePlaceOrder}
-            disabled={isPlacingOrder}
+            disabled={isPlacingOrder || !orderGate.canPlace}
             className="w-full"
             size="lg"
             data-testid="cart-place-order"
           >
-            {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
+            {isPlacingOrder
+              ? 'Placing Order...'
+              : !orderGate.canPlace
+                ? 'Daily order limit reached'
+                : 'Place Order'}
           </Button>
+          {!orderGate.canPlace && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() =>
+                openBrowseUpgrade(dispatch, {
+                  currentPlan: orderGate.planName,
+                  upgradeUrl: '/app/settings?tab=subscription',
+                })
+              }
+            >
+              Upgrade to place more orders
+            </Button>
+          )}
         </div>
       </div>
 

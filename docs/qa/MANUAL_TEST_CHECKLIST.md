@@ -52,24 +52,24 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 | ID       | Steps                                                                                                                                                          | Expected                                                                                                                                                                                         | Pass? |
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
-| SETUP-01 | Stop all running services (`Ctrl+C` in each terminal or `pnpm run dev` teardown)                                                                               | No API or web process running on ports 3001/5173                                                                                                                                                 |       |
-| SETUP-02 | Drop and recreate the database: run your project's DB reset script (e.g. `pnpm run db:reset` or `psql -c "DROP DATABASE supplify; CREATE DATABASE supplify;"`) | Clean empty database; no tables                                                                                                                                                                  |       |
-| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All 90+ migrations apply without error; tables exist                                                                                                                                             |       |
-| SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Bronze, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;` |       |
-| SETUP-05 | Verify plan feature patches applied: `SELECT code, tenant_type, features FROM subscription_plan WHERE tenant_type = 'RESTAURANT';`                             | All plans have `order_calendar`, `disputes_returns`, `advanced_roles` present in features JSON                                                                                                   |       |
-| SETUP-06 | Start the API: `pnpm --filter @supplify/api dev`                                                                                                               | API listening; migrations logged; no crash on startup                                                                                                                                            |       |
-| SETUP-07 | Start the web: `pnpm --filter @supplify/web dev`                                                                                                               | Dev server running at `http://localhost:5173` (or configured port)                                                                                                                               |       |
-| SETUP-08 | Health check: `GET /api/health`                                                                                                                                | `{ status: "ok" }`                                                                                                                                                                               |       |
-| SETUP-09 | Navigate to `/login` in browser                                                                                                                                | Login page loads; no errors in console                                                                                                                                                           |       |
+| SETUP-01 | Stop all running services (`Ctrl+C` in each terminal or `pnpm run dev` teardown)                                                                               | No API or web process running on ports 3001/5173                                                                                                                                                 | pass  |
+| SETUP-02 | Drop and recreate the database: run your project's DB reset script (e.g. `pnpm run db:reset` or `psql -c "DROP DATABASE supplify; CREATE DATABASE supplify;"`) | Clean empty database; no tables                                                                                                                                                                  | pass  |
+| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All 90+ migrations apply without error; tables exist                                                                                                                                             | pass  |
+| SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Bronze, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;` | pass  |
+| SETUP-05 | Verify plan feature patches applied: `SELECT code, tenant_type, features FROM subscription_plan WHERE tenant_type = 'RESTAURANT';`                             | All plans have `order_calendar`, `disputes_returns`, `advanced_roles` present in features JSON                                                                                                   | pass  |
+| SETUP-06 | Start the API: `pnpm --filter @supplify/api dev`                                                                                                               | API listening; migrations logged; no crash on startup                                                                                                                                            | pass  |
+| SETUP-07 | Start the web: `pnpm --filter @supplify/web dev`                                                                                                               | Dev server running at `http://localhost:5173` (or configured port)                                                                                                                               | pass  |
+| SETUP-08 | Health check: `GET /api/health`                                                                                                                                | `{ status: "ok" }`                                                                                                                                                                               | pass  |
+| SETUP-09 | Navigate to `/login` in browser                                                                                                                                | Login page loads; no errors in console                                                                                                                                                           | pass  |
 
 ## 0.2 Seed the platform admin account
 
 | ID       | Steps                                                                             | Expected                                          | Pass? |
 | -------- | --------------------------------------------------------------------------------- | ------------------------------------------------- | ----- |
-| SETUP-10 | Run admin seed: `pnpm run seed:demo-users` (or equivalent Keycloak user creation) | Admin user created in Keycloak with `ADMIN` role  |       |
-| SETUP-11 | Log in as `admin@supplify.com` / `SupplifyAdmin1!`                                | Redirected to `/app/admin`; admin sidebar visible |       |
-| SETUP-12 | `GET /api/auth/me`                                                                | Returns `role: "ADMIN"`, no tenantId              |       |
-| SETUP-13 | Log out                                                                           | Returns to `/login`                               |       |
+| SETUP-10 | Run admin seed: `pnpm run seed:demo-users` (or equivalent Keycloak user creation) | Admin user created in Keycloak with `ADMIN` role  | pass  |
+| SETUP-11 | Log in as `admin@supplify.com` / `SupplifyAdmin1!`                                | Redirected to `/app/admin`; admin sidebar visible | pass  |
+| SETUP-12 | `GET /api/auth/me`                                                                | Returns `role: "ADMIN"`, no tenantId              | pass  |
+| SETUP-13 | Log out                                                                           | Returns to `/login`                               | pass  |
 
 ---
 
@@ -81,31 +81,31 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 | ID      | Steps                                                                                                                      | Expected                                                                                           | Pass? |
 | ------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ----- |
-| CRST-01 | Open Keycloak registration (or `/login` → Register link); create a new user with a unique email (e.g. `newresto@test.com`) | User created in Keycloak with `PENDING` role                                                       |       |
-| CRST-02 | Log in with the new account                                                                                                | Redirected to `/register/complete` (not the app)                                                   |       |
-| CRST-03 | On `/register/complete`: enter restaurant name, select **Restaurant** as tenant type, fill required fields, submit         | Form submits; `POST /api/register/complete` returns 200; user + tenant record created              |       |
-| CRST-04 | After submit, check redirect destination                                                                                   | Either `/app/activate` (activation lock ON) or `/app/dashboard` (activation lock OFF) — note which |       |
-| CRST-05 | Open a second tab, navigate to `/app/orders`                                                                               | Either loads (if unlocked) or redirects to `/app/activate`                                         |       |
+| CRST-01 | Open Keycloak registration (or `/login` → Register link); create a new user with a unique email (e.g. `newresto@test.com`) | User created in Keycloak with `PENDING` role                                                       | Pass  |
+| CRST-02 | Log in with the new account                                                                                                | Redirected to `/register/complete` (not the app)                                                   | Pass  |
+| CRST-03 | On `/register/complete`: enter restaurant name, select **Restaurant** as tenant type, fill required fields, submit         | Form submits; `POST /api/register/complete` returns 200; user + tenant record created              | Pass  |
+| CRST-04 | After submit, check redirect destination                                                                                   | Either `/app/activate` (activation lock ON) or `/app/dashboard` (activation lock OFF) — note which | Pass  |
+| CRST-05 | Open a second tab, navigate to `/app/orders`                                                                               | Either loads (if unlocked) or redirects to `/app/activate`                                         | Pass  |
 
 ## 1.2 Activation lock & plan selection
 
 | ID      | Steps                                                                                                                                         | Expected                                                                                                        | Pass? |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----- |
-| CRST-06 | On `/app/activate`: inspect page                                                                                                              | Activation banner; **Activate free plan** and **Compare plans & pay** visible; no other app sections accessible |       |
-| CRST-07 | Click **Activate free plan** (or **Compare plans & pay** → Free → confirm)                                                                    | Subscription Free ACTIVE; `pending_activation` cleared; redirected to dashboard                                 |       |
-| CRST-08 | (Alt) Use upgrade modal: **Compare plans & pay** → Free tier **Activate free plan** → confirm (no card)                                       | Same as CRST-07                                                                                                 |       |
-| CRST-09 | (New session) Repeat CRST-01–CRST-04 with a second account; select **Bronze plan**; enter stub card `4242424242424242`, any future expiry/CVC | Subscription ACTIVE Bronze; redirected to dashboard                                                             |       |
-| CRST-10 | (New session) Repeat with **Gold plan**                                                                                                       | Subscription ACTIVE Gold; redirected to dashboard                                                               |       |
-| CRST-11 | Verify `GET /api/subscriptions/entitlements/current` for each account                                                                         | `plan.code` matches the selected plan; `features` object reflects plan tier                                     |       |
+| CRST-06 | On `/app/activate`: inspect page                                                                                                              | Activation banner; **Activate free plan** and **Compare plans & pay** visible; no other app sections accessible | Pass  |
+| CRST-07 | Click **Activate free plan** (or **Compare plans & pay** → Free → confirm)                                                                    | Subscription Free ACTIVE; `pending_activation` cleared; redirected to dashboard                                 | Pass  |
+| CRST-08 | (Alt) Use upgrade modal: **Compare plans & pay** → Free tier **Activate free plan** → confirm (no card)                                       | Same as CRST-07                                                                                                 | pass  |
+| CRST-09 | (New session) Repeat CRST-01–CRST-04 with a second account; select **Bronze plan**; enter stub card `4242424242424242`, any future expiry/CVC | Subscription ACTIVE Bronze; redirected to dashboard                                                             | pass  |
+| CRST-10 | (New session) Repeat with **Gold plan**                                                                                                       | Subscription ACTIVE Gold; redirected to dashboard                                                               | pass  |
+| CRST-11 | Verify `GET /api/subscriptions/entitlements/current` for each account                                                                         | `plan.code` matches the selected plan; `features` object reflects plan tier                                     | pass  |
 
 ## 1.3 Post-activation state (Free restaurant)
 
 | ID      | Steps                                         | Expected                                                        | Pass? |
 | ------- | --------------------------------------------- | --------------------------------------------------------------- | ----- |
-| CRST-12 | Log in as the Free restaurant; open dashboard | Dashboard loads; no crash; limited feature set                  |       |
-| CRST-13 | Navigate to `/app/orders`                     | Orders list loads (Free allows basic ordering)                  |       |
-| CRST-14 | Navigate to `/app/chat`                       | **403 or feature-gated paywall** — `chat` is not a Free feature |       |
-| CRST-15 | Navigate to `/app/quick-lists`                | **403 or paywall** — `quick_lists` gated                        |       |
+| CRST-12 | Log in as the Free restaurant; open dashboard | Dashboard loads; no crash; limited feature set                  | pass  |
+| CRST-13 | Navigate to `/app/orders`                     | Orders list loads (Free allows basic ordering)                  | pass  |
+| CRST-14 | Navigate to `/app/chat`                       | **403 or feature-gated paywall** — `chat` is not a Free feature | pass  |
+| CRST-15 | Navigate to `/app/quick-lists`                | **403 or paywall** — `quick_lists` gated                        | pass  |
 | CRST-16 | Open dashboard → Order calendar widget        | Paywall or upgrade CTA shown; calendar does not load            |       |
 | CRST-17 | Navigate to `/app/receiving`                  | **403 or paywall** — `receiving_quality` gated                  |       |
 | CRST-18 | Navigate to `/app/invoices`                   | **403 or paywall** — `finance_invoices` gated                   |       |
@@ -212,6 +212,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | GATE-R16 | `custom_branding`      | Settings branding section → hidden or locked                          | Locked (Gold+)      | Branding upload available |       |
 | GATE-R17 | `multi_branch`         | Settings → Branches: cannot add 2nd branch                            | Limited by plan     | Higher branch limit       |       |
 | GATE-R18 | `feature_flags_access` | Tenant flag override API → 403                                        | 403 (Gold+)         | 200 (if UI exposed)       |       |
+| GATE-R19 | `supplier_deals`       | `/app/deals` → 403/paywall; `GET /api/promotions/active` → 403        | Loads               | Loads                     |       |
 
 ## 3.2 Supplier feature gates
 
@@ -294,7 +295,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | ID     | Steps                                                 | Expected                                                                  | Pass? |
 | ------ | ----------------------------------------------------- | ------------------------------------------------------------------------- | ----- |
 | BIL-01 | New restaurant after register — no payment            | `/app/activate`; pending activation banner                                |       |
-| BIL-02 | On activate page → **Compare plans & pay**            | Upgrade/payment modal; `/api/billing/*` works (no 402)                    |       |
+| BIL-02 | On activate page → **Compare plans & pay**            | Upgrade/payment modal; `/api/billing/`\* works (no 402)                   |       |
 | BIL-03 | Navigate to Orders/Dashboard while locked             | Redirect to `/app/activate` or 402 `ACCOUNT_LOCKED` + `pendingActivation` |       |
 | BIL-04 | Paid checkout (stub card) for Bronze/Gold             | Unlock; full app access                                                   |       |
 | BIL-05 | Admin → Subscriptions → **Activate** on locked tenant | Unlocked without payment                                                  |       |
@@ -406,8 +407,8 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 **Primary accounts:** `restaurant@supplify.com`, `restaurant-gold@supplify.com`, `restaurant-free@supplify.com`
 
-**Sidebar:** Dashboard, Orders, Products, Quick Lists, Cart, Reservations\*, Receiving, Suppliers, Invoices\*, Chat, Staff\*, Inventory\*, Settings  
-\*Hidden without RBAC permission or feature gate.
+**Sidebar:** Dashboard, Orders, Products, Quick Lists, Cart, Reservations, Receiving, Suppliers, Invoices, Chat, Staff, Inventory, Settings  
+Hidden without RBAC permission or feature gate.
 
 ## 6.1 Dashboard (`/app/dashboard`)
 
@@ -535,7 +536,20 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | RST-65 | Unread state / read receipts           | Updates correctly                       |       |
 | RST-66 | Typing indicator                       | Shows other user's name (not socket ID) |       |
 
-## 6.13 Settings & onboarding (`/app/settings`, `/app/onboarding`)
+## 6.14 Deals & promotions (`/app/deals`) — requires `supplier_deals` feature
+
+| ID     | Steps                             | Expected                                                        | Pass? |
+| ------ | --------------------------------- | --------------------------------------------------------------- | ----- |
+| RST-74 | Free account → `/app/deals`       | 403 or paywall                                                  |       |
+| RST-75 | Bronze+ → Deals feed loads        | Cards from followed suppliers; sort/filter works                |       |
+| RST-76 | Sponsored deal visible            | Badge "Sponsored" on boosted deal from non-followed supplier    |       |
+| RST-77 | **Order now** CTA                 | Navigates to products; place order; discount on order detail    |       |
+| RST-78 | **Use coupon** CTA                | Coupon copied; apply at cart checkout; discount applied         |       |
+| RST-79 | **Message supplier** CTA          | Chat opens with prefilled deal interest message                 |       |
+| RST-80 | **View products** CTA             | Supplier catalog filtered; eligible products highlighted        |       |
+| RST-81 | Order detail shows promotion name | `GET /api/orders/:id` returns `appliedPromotion` with deal name |       |
+
+## 6.15 Settings & onboarding (`/app/settings`, `/app/onboarding`)
 
 | ID     | Steps                                         | Expected                                                             | Pass? |
 | ------ | --------------------------------------------- | -------------------------------------------------------------------- | ----- |
@@ -566,7 +580,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 **Primary accounts:** `supplier@supplify.com`, `supplier-gold@supplify.com`, `supplier-free@supplify.com`
 
-**Sidebar:** Dashboard, Orders, Products, Fulfillment, Restaurants, Invoices\*, Chat, Settings  
+**Sidebar:** Dashboard, Orders, Products, Fulfillment, Restaurants, Invoices, Chat, Settings  
 **Deep links:** `/app/inventory`, `/app/supplier-settings`
 
 ## 7.1 Dashboard (`/app/dashboard`)
@@ -678,6 +692,18 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | RBAC-S4 | Gold supplier — Settings → Team → role assignment (`advanced_roles`) | Can assign/modify roles                  |       |
 | RBAC-S5 | Free/Bronze supplier — no role management                            | Section hidden or locked                 |       |
 
+## 7.11 Deals & promotions (`/app/promotions`) — requires `promotions` feature
+
+| ID     | Steps                                        | Expected                                           | Pass? |
+| ------ | -------------------------------------------- | -------------------------------------------------- | ----- |
+| SUP-52 | Free account → `/app/promotions`             | 403 or paywall                                     |       |
+| SUP-53 | Create deal draft with **product targeting** | Select specific products; save draft               |       |
+| SUP-54 | Create deal with **category targeting**      | Select categories; save draft                      |       |
+| SUP-55 | Activate deal                                | Status active (or pending approval if configured)  |       |
+| SUP-56 | **Boost** active deal                        | Boost dialog; pricing tier; campaign active        |       |
+| SUP-57 | Deal analytics                               | Views, clicks, orders, messages, coupon uses shown |       |
+| SUP-58 | Pause / resume deal                          | Status toggles correctly                           |       |
+
 ---
 
 # Part 8 — Platform admin
@@ -761,6 +787,15 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | ADM-32 | Remove tenant override                                                        | Tenant returns to plan-defined entitlement                                        |       |
 | ADM-33 | After any flag change, check logged-in tenant receives `entitlements_refresh` | WebSocket event delivered; UI updates                                             |       |
 | ADM-34 | Audit log records every flag change                                           | Action logged under admin actor                                                   |       |
+
+### Deals tab — approvals & boost pricing
+
+| ID     | Steps                              | Expected                                     | Pass? |
+| ------ | ---------------------------------- | -------------------------------------------- | ----- |
+| ADM-35 | Open **Deals** tab on `/app/admin` | Pending deals list + pricing tiers load      |       |
+| ADM-36 | Approve pending deal               | Deal status → active; visible to restaurants |       |
+| ADM-37 | Reject pending deal                | Deal returns to draft                        |       |
+| ADM-38 | Edit boost pricing tier amount     | Saves via PATCH; suppliers see updated price |       |
 
 ### Health tab
 
@@ -857,6 +892,11 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | API-17 | `GET /api/feature-flags/global` (admin)                                     | 200 + list of all global flags                                         |       |
 | API-18 | `POST /api/feature-flags/global` (non-admin)                                | 403                                                                    |       |
 | API-19 | `GET /api/subscriptions/entitlements/current` — call 3× in quick succession | All return same data (cache hit); response time < 100ms on 2nd and 3rd |       |
+| API-20 | `GET /api/promotions/active` (Bronze+ restaurant)                           | 200 + deals array                                                      |       |
+| API-21 | `GET /api/promotions/active` (Free restaurant)                              | 403 `FEATURE_DISABLED`                                                 |       |
+| API-22 | `GET /api/promotions/admin/pending` (admin)                                 | 200 + pending deals                                                    |       |
+| API-23 | `GET /api/orders/:id` after deal-applied order                              | 200 + `appliedPromotion` on order object                               |       |
+| API-24 | `POST /api/orders` with `promotionId` + `couponCode`                        | Discount applied; `promotion_usages` recorded                          |       |
 
 ---
 

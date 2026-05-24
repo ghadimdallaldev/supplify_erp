@@ -16,6 +16,7 @@ describe('feature-flags', () => {
       expect(evaluatePlanFeatureValue(false)).toBe(false)
       expect(evaluatePlanFeatureValue('enabled')).toBe(true)
       expect(evaluatePlanFeatureValue('disabled')).toBe(false)
+      expect(evaluatePlanFeatureValue(false)).toBe(false)
       expect(evaluatePlanFeatureValue(undefined)).toBe(false)
     })
   })
@@ -31,11 +32,10 @@ describe('feature-flags', () => {
           rows: [{ feature_key: 'chat', is_enabled: true }],
         })
 
-      const { features, featureSources } = await resolveAllFeaturesForTenant(
-        't1',
-        'RESTAURANT',
-        { chat: false, reports: true }
-      )
+      const { features, featureSources } = await resolveAllFeaturesForTenant('t1', 'RESTAURANT', {
+        chat: false,
+        reports: true,
+      })
 
       expect(features.chat).toBe(true)
       expect(featureSources.chat).toBe('tenant_override')

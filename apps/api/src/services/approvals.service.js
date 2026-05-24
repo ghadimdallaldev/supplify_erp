@@ -1,6 +1,7 @@
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { sendNotification, notifyOrderStatusChange } from './notification.service.js'
+import { restoreSupplierStockForOrder } from './supplier-inventory.service.js'
 
 /**
  * Find the highest-threshold active rule that applies to an order total.
@@ -285,21 +286,13 @@ export async function rejectOrderRequest(approvalId, approverUserId, notes) {
     [approvalId, notes]
   )
 
-  const { rows: orderItems } = await query(
-    `SELECT product_id, quantity FROM order_item WHERE order_id = $1`,
-    [approval.order_id]
-  )
-
-  for (const item of orderItems) {
-    await query(
-      `UPDATE inventory SET available_qty = available_qty + $1, updated_at = NOW() WHERE product_id = $2`,
-      [item.quantity, item.product_id]
+  await withTransaction(async (client) => {
+    await restoreSupplierStockForOrder(client, approval.order_id)
+    await client.query(
+      `UPDATE customer_order SET status = 'CANCELLED', updated_at = NOW() WHERE id = $1`,
+      [approval.order_id]
     )
-  }
-
-  await query(`UPDATE customer_order SET status = 'CANCELLED', updated_at = NOW() WHERE id = $1`, [
-    approval.order_id,
-  ])
+  })
 
   return { orderId: approval.order_id, status: 'CANCELLED' }
 }

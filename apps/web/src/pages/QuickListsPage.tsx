@@ -48,6 +48,13 @@ import { useAppDispatch } from '../hooks/redux'
 import { useCartActions } from '../hooks/useCartActions'
 import { useNavigate } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
+import { useGetEntitlementsQuery } from '../services/api'
+import {
+  getPlanLimitGate,
+  isQuickListSchedulingEnabled,
+  getQuickListScheduleGate,
+} from '../lib/planLimits'
+import { LimitExceededBanner } from '../components/LimitExceededBanner'
 
 export function QuickListsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -73,6 +80,15 @@ export function QuickListsPage() {
   const { addItem } = useCartActions()
   const navigate = useNavigate()
 
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const quickListSchedulingEnabled = isQuickListSchedulingEnabled(entitlementsData?.entitlements)
+  const scheduledQuickListGate = getPlanLimitGate(
+    entitlementsData?.entitlements,
+    'scheduled_quick_lists'
+  )
+  const quickListCreateGate = getPlanLimitGate(entitlementsData?.entitlements, 'quick_lists')
+  const quickListItemGate = getPlanLimitGate(entitlementsData?.entitlements, 'quick_list_items')
+
   const { data, isLoading, refetch } = useGetQuickListsQuery()
   const { data: productsData } = useGetProductsQuery({ limit: 1000 })
   const { data: selectedListDetailsData } = useGetQuickListQuery(selectedListForDetails?.id || '', {
@@ -88,6 +104,10 @@ export function QuickListsPage() {
   const handleCreateList = async () => {
     if (!newListName.trim()) {
       toast.error('Please enter a list name')
+      return
+    }
+    if (!quickListCreateGate.canUse) {
+      toast.error(quickListCreateGate.message)
       return
     }
 
@@ -114,6 +134,10 @@ export function QuickListsPage() {
 
   const handleAddProductToList = async (product: any) => {
     if (!selectedListId) return
+    if (!quickListItemGate.canUse) {
+      toast.error(quickListItemGate.message)
+      return
+    }
 
     try {
       await addItemToQuickList({
@@ -132,10 +156,24 @@ export function QuickListsPage() {
     }
   }
 
-  const filteredProducts = productsData?.products?.filter(
-    (product: any) =>
-      product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      product.sku?.toLowerCase().includes(productSearch.toLowerCase())
+  const catalogProducts = useMemo(() => {
+    const seen = new Set<string>()
+    return (productsData?.products ?? []).filter((product: any) => {
+      const id = String(product?.id ?? '')
+      if (!id || seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+  }, [productsData?.products])
+
+  const filteredProducts = useMemo(
+    () =>
+      catalogProducts.filter(
+        (product: any) =>
+          product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+          product.sku?.toLowerCase().includes(productSearch.toLowerCase())
+      ),
+    [catalogProducts, productSearch]
   )
 
   const handleDeleteList = async (listId: string, listName: string) => {
@@ -167,7 +205,7 @@ export function QuickListsPage() {
       // Add all items from the quick list to cart
       for (const item of list.items) {
         // Fetch product details
-        const product = productsData?.products?.find((p: any) => p.id === item.product_id)
+        const product = catalogProducts.find((p: any) => p.id === item.product_id)
         if (product) {
           addItem({
             productId: product.id,
@@ -189,6 +227,11 @@ export function QuickListsPage() {
   }
 
   const handleScheduleOrder = (list: any) => {
+    const scheduleGate = getQuickListScheduleGate(entitlementsData?.entitlements, list.is_scheduled)
+    if (!scheduleGate.canSchedule) {
+      toast.error(scheduleGate.message)
+      return
+    }
     setSelectedListForSchedule(list)
 
     // Pre-populate with existing schedule if available, otherwise use defaults
@@ -253,7 +296,15 @@ export function QuickListsPage() {
       setScheduleDays(['MONDAY']) // Reset to single day for weekly
       refetch()
     } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to schedule order')
+      const apiError = error?.data?.error
+      const message =
+        apiError?.message ||
+        (apiError?.name === 'LIMIT_EXCEEDED'
+          ? `Plan limit reached (${apiError?.details?.limitKey ?? 'limit'}). Upgrade for more.`
+          : apiError?.name === 'FEATURE_NOT_AVAILABLE'
+            ? 'Scheduled quick lists require Bronze or higher on your current plan.'
+            : 'Failed to schedule order')
+      toast.error(message)
     }
   }
 
@@ -441,7 +492,35 @@ export function QuickListsPage() {
   const quickLists = data?.quickLists || []
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" data-testid="quick-lists-page">
+      {!quickListCreateGate.canUse && quickListCreateGate.limit != null && (
+        <LimitExceededBanner
+          limitKey="quick_lists"
+          currentUsage={quickListCreateGate.current}
+          limitValue={quickListCreateGate.limit}
+          currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
+          upgradeUrl="/app/settings?tab=subscription"
+        />
+      )}
+      {quickListSchedulingEnabled &&
+        scheduledQuickListGate.limit === 1 &&
+        scheduledQuickListGate.canUse && (
+          <p className="text-sm text-[var(--text-muted)] rounded-lg border border-[var(--app-border)] px-4 py-3">
+            Free plan includes 1 scheduled quick list. Upgrade to Bronze for more scheduled lists
+            and full automation.
+          </p>
+        )}
+      {quickListSchedulingEnabled &&
+        scheduledQuickListGate.limit != null &&
+        !scheduledQuickListGate.canUse && (
+          <LimitExceededBanner
+            limitKey="scheduled_quick_lists"
+            currentUsage={scheduledQuickListGate.current}
+            limitValue={scheduledQuickListGate.limit}
+            currentPlan={entitlementsData?.entitlements?.plan?.name ?? null}
+            upgradeUrl="/app/settings?tab=subscription"
+          />
+        )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Quick Lists</h1>
@@ -449,7 +528,11 @@ export function QuickListsPage() {
             Create lists for recurring orders and save time
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
+        <Button
+          onClick={() => setShowCreateDialog(true)}
+          disabled={!quickListCreateGate.canUse}
+          title={quickListCreateGate.message || undefined}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Create List
         </Button>
@@ -637,13 +720,11 @@ export function QuickListsPage() {
                     <div className="border-t pt-3 space-y-2">
                       <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Products:</p>
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        {list.items.slice(0, 5).map((item: any) => {
-                          const product = productsData?.products?.find(
-                            (p: any) => p.id === item.product_id
-                          )
+                        {list.items.slice(0, 5).map((item: any, itemIndex: number) => {
+                          const product = catalogProducts.find((p: any) => p.id === item.product_id)
                           return (
                             <div
-                              key={item.id}
+                              key={`${list.id}-${item.id ?? item.product_id}-${itemIndex}`}
                               className="flex items-center justify-between text-xs p-1.5 bg-[var(--brand-ultra)] rounded"
                             >
                               <span className="font-medium text-[var(--text-mid)] flex-1 truncate">
@@ -726,37 +807,46 @@ export function QuickListsPage() {
 
                   {/* Schedule/Unschedule */}
                   <div className="flex gap-2">
-                    {list.is_scheduled ? (
-                      <>
+                    {(quickListSchedulingEnabled || list.is_scheduled) &&
+                      (list.is_scheduled ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleScheduleOrder(list)}
+                            className="flex-1"
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit Schedule
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnschedule(list.id, list.name)}
+                            className="text-[var(--amber)] hover:text-[var(--amber-mid)]"
+                          >
+                            <Pause className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleScheduleOrder(list)}
                           className="flex-1"
+                          disabled={
+                            !getQuickListScheduleGate(entitlementsData?.entitlements, false)
+                              .canSchedule
+                          }
+                          title={
+                            getQuickListScheduleGate(entitlementsData?.entitlements, false)
+                              .message || undefined
+                          }
                         >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit Schedule
+                          <Clock className="h-4 w-4 mr-1" />
+                          Schedule Order
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUnschedule(list.id, list.name)}
-                          className="text-[var(--amber)] hover:text-[var(--amber-mid)]"
-                        >
-                          <Pause className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleScheduleOrder(list)}
-                        className="w-full"
-                      >
-                        <Clock className="h-4 w-4 mr-1" />
-                        Schedule Order
-                      </Button>
-                    )}
+                      ))}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -854,9 +944,9 @@ export function QuickListsPage() {
 
             {/* Product List */}
             <div className="border rounded-md max-h-96 overflow-y-auto divide-y">
-              {filteredProducts?.map((product: any) => (
+              {filteredProducts?.map((product: any, productIndex: number) => (
                 <div
-                  key={product.id}
+                  key={`${product.id}-${product.supplier_id ?? productIndex}`}
                   className="flex items-center justify-between p-4 hover:bg-[var(--brand-ultra)]"
                 >
                   <div className="flex-1">
@@ -1153,13 +1243,11 @@ export function QuickListsPage() {
                 <CardContent>
                   {selectedListDetails.items && selectedListDetails.items.length > 0 ? (
                     <div className="space-y-3">
-                      {selectedListDetails.items.map((item: any) => {
-                        const product = productsData?.products?.find(
-                          (p: any) => p.id === item.product_id
-                        )
+                      {selectedListDetails.items.map((item: any, itemIndex: number) => {
+                        const product = catalogProducts.find((p: any) => p.id === item.product_id)
                         return (
                           <div
-                            key={item.id}
+                            key={`${selectedListForDetails?.id ?? 'list'}-${item.id ?? item.product_id}-${itemIndex}`}
                             className="flex items-center justify-between p-3 border rounded-md"
                           >
                             <div className="flex-1">

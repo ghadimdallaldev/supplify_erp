@@ -6,6 +6,7 @@ import {
   resolveTenantContext,
   requirePermission,
   getSupplierIdForRequest,
+  getRequestTenant,
 } from '../lib/rbac.js'
 import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
@@ -876,17 +877,11 @@ router.patch('/:id', requireAuth, async (req, res) => {
 // Get followed suppliers (restaurant only)
 router.get('/followed', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
   try {
-    // Get restaurant ID from email
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const tenant = await getRequestTenant(req)
+    if (!tenant || tenant.tenantType !== 'RESTAURANT') {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
+    const restaurantId = tenant.tenantId
 
     const { rows } = await query(
       `
@@ -925,17 +920,11 @@ router.get('/followed', requireAuth, requireRole(['RESTAURANT']), async (req, re
 router.post('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
   try {
     const { id } = req.params
-    // Get restaurant ID from email
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const tenant = await getRequestTenant(req)
+    if (!tenant || tenant.tenantType !== 'RESTAURANT') {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
+    const restaurantId = tenant.tenantId
 
     // Check if already followed
     const { rows: existing } = await query(
@@ -1029,18 +1018,11 @@ router.post('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req,
 router.delete('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
   try {
     const { id } = req.params
-
-    // Get restaurant ID from email
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
+    const tenant = await getRequestTenant(req)
+    if (!tenant || tenant.tenantType !== 'RESTAURANT') {
       throw new ValidationError('Restaurant not found')
     }
-
-    const restaurantId = restaurants[0].id
+    const restaurantId = tenant.tenantId
 
     await query('DELETE FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2', [
       id,

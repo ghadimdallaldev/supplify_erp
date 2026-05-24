@@ -44,7 +44,7 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 ## Enforcement
 
 - **Feature entitlements:** `requireFeature(featureKey)` middleware returns **403** with error name **FEATURE_NOT_AVAILABLE** when the plan does not include the feature. The following feature keys are currently gated on routes:
-  `chat`, `quick_lists`, `receiving_quality`, `finance_invoices`, `inventory_management`, `reports`, `disputes_returns`, `approvals_budgets`, `promotions`, `tenant_audit_log`, `push_notifications`, `supplier_reviews`, `order_amendments`, `fulfillment`, `driver_management`, `warehouses`, `multi_warehouse`, `order_calendar`, `advanced_roles`
+  `chat`, `quick_lists`, `receiving_quality`, `finance_invoices`, `inventory_management`, `reports`, `disputes_returns`, `approvals_budgets`, `promotions`, `supplier_deals`, `tenant_audit_log`, `push_notifications`, `supplier_reviews`, `order_amendments`, `fulfillment`, `driver_management`, `warehouses`, `multi_warehouse`, `order_calendar`, `advanced_roles`
 - **Limits:** `requireWithinLimit(limitKey, usage)` and `checkLimit()` return **403** with error name **LIMIT_EXCEEDED** when usage exceeds the plan (or override) limit.
 - **Permissions:** Routes also enforce RBAC (e.g. ORDERS_CREATE, CHAT_SEND, INVENTORY_EDIT, RECEIVING_VIEW, RECEIVING_MANAGE, PAYMENTS_MANAGE, INVOICES_VIEW). See FEATURE_CATALOG.md.
 - **Subscription cache:** Subscription rows are cached with a 30-second TTL (Redis when available, in-memory fallback). Cache is invalidated automatically on plan changes, checkouts, account unlocks, and admin updates.
@@ -57,6 +57,10 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 
 - **Plans tab:** Filter by tenant type (Restaurant / Supplier). Create plan requires **code** and **tenant_type**; only limits/features relevant to that type are shown when editing. Enterprise plan is visible and assignable when changing a tenant’s subscription.
 - **Subscriptions:** When changing a tenant’s plan, the new plan’s `tenant_type` must match the subscription’s tenant (Restaurant vs Supplier). Enterprise can only be assigned by admin.
+
+## Deal boost monetization (add-on)
+
+Beyond plan entitlements, suppliers can purchase **deal promotion boosts** (paid visibility to non-follower restaurants). Pricing tiers live in `promotion_pricing_config` and are editable from **Admin → Deals**. Boost checkout is currently stubbed (`waivePayment: true`) pending billing integration; campaigns still activate for testing.
 
 ## Entitlements endpoint
 

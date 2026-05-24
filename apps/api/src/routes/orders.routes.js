@@ -26,6 +26,10 @@ import {
   getOrderApprovalStatus,
 } from '../services/approvals.service.js'
 import { applyBestPromotionToOrder } from '../services/promotions.service.js'
+import {
+  applyPromotionByIdToOrder,
+  validateCouponForOrder,
+} from '../services/deal-promotions.service.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { orderAmendmentsRouter } from './order-amendments.routes.js'
 import { ordersDriverRoutes } from './orders-driver.routes.js'
@@ -38,6 +42,10 @@ import {
   orderHasProofOfDelivery,
 } from '../lib/driver-delivery.js'
 import { getSupplierIdForRequest } from '../lib/rbac.js'
+import {
+  assertAndDeductSupplierStock,
+  restoreSupplierStockForOrder,
+} from '../services/supplier-inventory.service.js'
 
 const router = express.Router()
 
@@ -95,6 +103,8 @@ const orderCreateSchema = z.object({
       })
     )
     .min(1),
+  promotionId: z.string().uuid().optional(),
+  couponCode: z.string().max(64).optional(),
   status: z
     .enum([
       'DRAFT',
@@ -1036,6 +1046,30 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 
     const warehouseAssignments = await loadOrderWarehouseAssignments(id)
 
+    const { rows: promotionRows } = await query(
+      `
+      SELECT
+        pu.promotion_id,
+        pu.discount_applied,
+        p.name AS promotion_name,
+        p.type AS promotion_type
+      FROM promotion_usages pu
+      JOIN promotions p ON p.id = pu.promotion_id
+      WHERE pu.order_id = $1
+      LIMIT 1
+      `,
+      [id]
+    )
+    const promotionUsage = promotionRows[0]
+    const appliedPromotion = promotionUsage
+      ? {
+          promotionId: promotionUsage.promotion_id,
+          promotionName: promotionUsage.promotion_name,
+          promotionType: promotionUsage.promotion_type,
+          discountAmount: Number(promotionUsage.discount_applied),
+        }
+      : null
+
     res.json({
       ok: true,
       data: {
@@ -1044,6 +1078,8 @@ router.get('/:id', requireAuth, async (req, res, next) => {
           items,
           warehouseAssignments,
           multiLocationFulfillment: warehouseAssignments.some((a) => a.order_item_id != null),
+          appliedPromotion,
+          promotion: appliedPromotion,
         },
       },
       error: null,
@@ -1193,15 +1229,9 @@ router.post(
 
           // Process items for this supplier
           for (const item of items) {
-            // Check inventory
-            const { rows: inventory } = await client.query(
-              'SELECT available_qty FROM inventory WHERE product_id = $1 FOR UPDATE',
-              [item.productId]
-            )
-
-            if (inventory.length === 0 || Number(inventory[0].available_qty) < item.quantity) {
-              throw new ValidationError(`Insufficient inventory for product ${item.product.sku}`)
-            }
+            await assertAndDeductSupplierStock(client, item.productId, item.quantity, {
+              sku: item.product.sku,
+            })
 
             // Calculate line total
             const lineTotal = item.unitPrice * item.quantity
@@ -1229,16 +1259,6 @@ router.post(
             )
 
             orderItems.push(orderItem)
-
-            // Update inventory
-            await client.query(
-              `
-            UPDATE inventory 
-            SET available_qty = available_qty - $1, updated_at = now()
-            WHERE product_id = $2
-          `,
-              [item.quantity, item.productId]
-            )
           }
 
           // Update order total and placed_at (only if status is PLACED)
@@ -1272,14 +1292,49 @@ router.post(
               unitPrice: item.unitPrice,
               lineTotal: item.unitPrice * item.quantity,
             }))
-            appliedPromotion = await applyBestPromotionToOrder({
-              client,
-              orderId: order.id,
-              supplierId,
-              restaurantId,
-              subtotal: totalAmount,
-              lineItems: promoLines,
-            })
+
+            if (orderData.promotionId) {
+              appliedPromotion = await applyPromotionByIdToOrder({
+                client,
+                promotionId: orderData.promotionId,
+                orderId: order.id,
+                supplierId,
+                restaurantId,
+                subtotal: totalAmount,
+                lineItems: promoLines,
+              })
+            } else if (orderData.couponCode) {
+              const couponMatch = await validateCouponForOrder({
+                couponCode: orderData.couponCode,
+                supplierId,
+                restaurantId,
+                subtotal: totalAmount,
+                lineItems: promoLines,
+              })
+              if (couponMatch) {
+                appliedPromotion = await applyPromotionByIdToOrder({
+                  client,
+                  promotionId: couponMatch.promotion.id,
+                  orderId: order.id,
+                  supplierId,
+                  restaurantId,
+                  subtotal: totalAmount,
+                  lineItems: promoLines,
+                })
+              }
+            }
+
+            if (!appliedPromotion) {
+              appliedPromotion = await applyBestPromotionToOrder({
+                client,
+                orderId: order.id,
+                supplierId,
+                restaurantId,
+                subtotal: totalAmount,
+                lineItems: promoLines,
+              })
+            }
+
             if (appliedPromotion) {
               totalAmount = appliedPromotion.totalAfterDiscount
             }
@@ -1512,15 +1567,10 @@ router.post('/manual', requireAuth, requireRole(['SUPPLIER']), async (req, res) 
           throw new ValidationError(`No valid price found for product ${product.sku}`)
         }
 
-        // Check inventory
-        const { rows: inventory } = await client.query(
-          'SELECT available_qty FROM inventory WHERE product_id = $1 FOR UPDATE',
-          [item.productId]
-        )
-
-        if (inventory.length === 0 || Number(inventory[0].available_qty) < item.quantity) {
-          throw new ValidationError(`Insufficient inventory for product ${product.sku}`)
-        }
+        await assertAndDeductSupplierStock(client, item.productId, item.quantity, {
+          sku: product.sku,
+          reserve: true,
+        })
 
         // Calculate line total
         const unitPrice = Number(product.current_price)
@@ -1541,18 +1591,6 @@ router.post('/manual', requireAuth, requireRole(['SUPPLIER']), async (req, res) 
         )
 
         orderItems.push(orderItem)
-
-        // Reserve inventory (decrease available, increase reserved)
-        await client.query(
-          `
-          UPDATE inventory 
-          SET available_qty = available_qty - $1,
-              reserved_qty = reserved_qty + $1,
-              updated_at = now()
-          WHERE product_id = $2
-        `,
-          [item.quantity, item.productId]
-        )
       }
 
       // Update order total
@@ -1830,6 +1868,10 @@ router.patch('/:id', async (req, res) => {
 
       if (updateData.status && updateData.status !== order.status) {
         await syncWarehouseFulfillmentOnOrderStatus(client, id, updateData.status, order.status)
+      }
+
+      if (updateData.status === 'CANCELLED' && order.status !== 'CANCELLED') {
+        await restoreSupplierStockForOrder(client, id)
       }
 
       return updated

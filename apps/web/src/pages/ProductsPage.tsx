@@ -9,6 +9,7 @@ import {
   useGetSuppliersQuery,
   useCreateInventoryAdjustmentMutation,
   useGetActivePromotionsQuery,
+  useGetEntitlementsQuery,
 } from '../services/api'
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -30,6 +31,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { formatPrice, formatNumber } from '../utils/format'
+import { featureEnabled } from '../lib/planLimits'
 
 export function ProductsPage() {
   const [search, setSearch] = useState('')
@@ -76,7 +78,15 @@ export function ProductsPage() {
   // Check if user is a supplier
   const isSupplier = user?.role === 'SUPPLIER'
   const isRestaurant = user?.role === 'RESTAURANT'
-  const { data: activeDealsData } = useGetActivePromotionsQuery(undefined, { skip: !isRestaurant })
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !isRestaurant,
+  })
+  const supplierDealsEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.supplier_deals
+  )
+  const { data: activeDealsData } = useGetActivePromotionsQuery(undefined, {
+    skip: !isRestaurant || !supplierDealsEnabled,
+  })
   const activeDeals = activeDealsData?.promotions || []
 
   // Fetch warehouses only for suppliers (warehouse selection in product creation)

@@ -21,6 +21,22 @@ import { randomBytes } from 'crypto'
 
 const router = express.Router()
 
+function clearLocalAuthSession(req, res) {
+  clearAuthCookies(res)
+  clearImpersonationCookie(res)
+  return new Promise((resolve) => {
+    if (!req.session) {
+      resolve()
+      return
+    }
+    req.session.destroy(() => resolve())
+  })
+}
+
+function apiOrigin(req) {
+  return `${req.protocol}://${req.get('host')}`
+}
+
 // Generate login URL and redirect to Keycloak
 router.get('/login', async (req, res) => {
   try {
@@ -59,26 +75,52 @@ router.get('/login', async (req, res) => {
 
 // Redirect to Keycloak self-registration (hosted signup form)
 router.get('/register', async (req, res) => {
+  const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
   try {
+    // Keycloak blocks registration when another SSO session is active — end it first.
+    if (req.query.continue !== '1') {
+      await clearLocalAuthSession(req, res)
+      const continueUrl = `${apiOrigin(req)}/auth/register?continue=1`
+      const logoutUrl = await getKeycloakLogoutUrl(continueUrl)
+      logger.info('Registration: clearing Keycloak SSO session before signup')
+      return res.redirect(logoutUrl)
+    }
+
     const state = randomBytes(32).toString('hex')
     req.session.oauthState = state
     req.session.save((err) => {
       if (err) logger.error('Error saving session', { error: err.message })
     })
 
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`
+    const redirectUri = `${apiOrigin(req)}/auth/callback`
     const registrationUrl = await getRegistrationUrl(redirectUri, state)
 
     logger.info('Registration initiated')
     res.redirect(registrationUrl)
   } catch (error) {
     logger.error('Registration redirect error', { error: error.message })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Registration redirect failed' },
-      requestId: req.requestId,
-    })
+    res.redirect(`${webOrigin}/login?error=registration_failed`)
+  }
+})
+
+// Public sign-out: clears app cookies/session and Keycloak SSO (no auth required)
+router.get('/logout', async (req, res) => {
+  try {
+    const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+    await clearLocalAuthSession(req, res)
+
+    let redirectAfter = `${webOrigin}/login`
+    if (req.query.redirect === 'register') {
+      redirectAfter = `${webOrigin}/auth/register`
+    } else if (typeof req.query.redirect === 'string' && req.query.redirect.startsWith('http')) {
+      redirectAfter = req.query.redirect
+    }
+
+    const logoutUrl = await getKeycloakLogoutUrl(redirectAfter)
+    res.redirect(logoutUrl)
+  } catch (error) {
+    logger.error('Public logout error', { error: error.message })
+    res.redirect(`${process.env.WEB_ORIGIN || 'http://localhost:5173'}/login`)
   }
 })
 

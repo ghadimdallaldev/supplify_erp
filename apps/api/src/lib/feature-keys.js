@@ -23,6 +23,7 @@ export const RESTAURANT_FEATURE_KEYS = [
   'order_amendments',
   'tenant_audit_log',
   'waitlist_auto_promo',
+  'supplier_deals',
 ]
 
 export const SUPPLIER_FEATURE_KEYS = [
@@ -90,6 +91,7 @@ const DISPLAY_NAMES = {
   order_amendments: 'Order Amendments',
   tenant_audit_log: 'Activity Log',
   waitlist_auto_promo: 'Waitlist Auto-Promotion',
+  supplier_deals: 'Supplier deals',
 }
 
 export function featureDisplayName(featureKey) {

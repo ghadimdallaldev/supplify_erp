@@ -18,10 +18,24 @@ import {
   useCreatePromotionMutation,
   useActivatePromotionMutation,
   usePausePromotionMutation,
+  useResumePromotionMutation,
   useDeletePromotionMutation,
 } from '../../services/api'
+import { DealAnalyticsDialog } from '../../components/deals/DealAnalyticsDialog'
+import { PromoteDealDialog } from '../../components/deals/PromoteDealDialog'
+import {
+  DealTargetingPickers,
+  type DealTargetingValue,
+} from '../../components/deals/DealTargetingPickers'
 import toast from 'react-hot-toast'
-import { Loader2, Plus } from 'lucide-react'
+import { Loader2, Plus, Megaphone, BarChart3 } from 'lucide-react'
+
+const CTA_TYPES = [
+  { value: 'order_now', label: 'Order now' },
+  { value: 'use_coupon', label: 'Use coupon' },
+  { value: 'message_supplier', label: 'Message supplier' },
+  { value: 'view_products', label: 'View products' },
+] as const
 
 const PROMO_TYPES = [
   'percentage_discount',
@@ -36,13 +50,22 @@ export function PromotionsPage() {
 
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [analyticsId, setAnalyticsId] = useState<string | null>(null)
+  const [promoteId, setPromoteId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '',
     type: 'percentage_discount' as (typeof PROMO_TYPES)[number],
     discountValue: '10',
     minOrderAmount: '',
+    couponCode: '',
+    ctaType: 'order_now',
     startsAt: new Date().toISOString().slice(0, 16),
     endsAt: '',
+  })
+  const [targeting, setTargeting] = useState<DealTargetingValue>({
+    appliesTo: 'all',
+    productIds: [],
+    categoryIds: [],
   })
 
   const { data, isLoading, refetch } = useGetPromotionsQuery(
@@ -51,6 +74,7 @@ export function PromotionsPage() {
   const [createPromotion, { isLoading: creating }] = useCreatePromotionMutation()
   const [activatePromotion] = useActivatePromotionMutation()
   const [pausePromotion] = usePausePromotionMutation()
+  const [resumePromotion] = useResumePromotionMutation()
   const [deletePromotion] = useDeletePromotionMutation()
 
   const promotions = data?.promotions || []
@@ -74,18 +98,32 @@ export function PromotionsPage() {
       toast.error('Name is required')
       return
     }
+    if (targeting.appliesTo === 'specific_products' && targeting.productIds.length === 0) {
+      toast.error('Select at least one product')
+      return
+    }
+    if (targeting.appliesTo === 'specific_categories' && targeting.categoryIds.length === 0) {
+      toast.error('Select at least one category')
+      return
+    }
     try {
       await createPromotion({
         name: form.name,
         type: form.type,
         discountValue: Number(form.discountValue) || 0,
         minOrderAmount: form.minOrderAmount ? Number(form.minOrderAmount) : null,
+        couponCode: form.couponCode || null,
+        ctaType: form.ctaType,
         startsAt: new Date(form.startsAt).toISOString(),
         endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
-        appliesTo: 'all',
+        appliesTo: targeting.appliesTo,
+        productIds: targeting.appliesTo === 'specific_products' ? targeting.productIds : undefined,
+        categoryIds:
+          targeting.appliesTo === 'specific_categories' ? targeting.categoryIds : undefined,
       }).unwrap()
       toast.success('Promotion created (draft)')
       setShowCreate(false)
+      setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
@@ -97,8 +135,10 @@ export function PromotionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Promotions</h1>
-          <p className="text-xs text-[var(--text-muted)] mt-1">Create and manage supplier deals</p>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Deals & Promotions</h1>
+          <p className="text-xs text-[var(--text-muted)] mt-1">
+            Create deals and boost visibility to new restaurants
+          </p>
         </div>
         <Button onClick={() => setShowCreate(true)}>
           <Plus className="h-4 w-4 mr-2" />
@@ -116,6 +156,7 @@ export function PromotionsPage() {
           >
             <option value="">All</option>
             <option value="draft">Draft</option>
+            <option value="pending_approval">Pending approval</option>
             <option value="active">Active</option>
             <option value="paused">Paused</option>
             <option value="expired">Expired</option>
@@ -150,6 +191,7 @@ export function PromotionsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{String(p.status)}</Badge>
+                    {p.is_promoted ? <Badge variant="secondary">Boosted</Badge> : null}
                     {p.status === 'draft' && (
                       <>
                         <Button
@@ -176,16 +218,44 @@ export function PromotionsPage() {
                       </>
                     )}
                     {p.status === 'active' && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            await pausePromotion(String(p.id)).unwrap()
+                            toast.success('Paused')
+                            refetch()
+                          }}
+                        >
+                          Pause
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setPromoteId(String(p.id))}
+                        >
+                          <Megaphone className="h-3 w-3 mr-1" /> Boost
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setAnalyticsId(String(p.id))}
+                        >
+                          <BarChart3 className="h-3 w-3" />
+                        </Button>
+                      </>
+                    )}
+                    {p.status === 'paused' && (
                       <Button
                         size="sm"
-                        variant="outline"
                         onClick={async () => {
-                          await pausePromotion(String(p.id)).unwrap()
-                          toast.success('Paused')
+                          await resumePromotion(String(p.id)).unwrap()
+                          toast.success('Resumed')
                           refetch()
                         }}
                       >
-                        Pause
+                        Resume
                       </Button>
                     )}
                   </div>
@@ -197,7 +267,7 @@ export function PromotionsPage() {
       </Card>
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New promotion</DialogTitle>
           </DialogHeader>
@@ -242,6 +312,30 @@ export function PromotionsPage() {
               />
             </div>
             <div>
+              <Label>CTA</Label>
+              <select
+                className="w-full h-10 border rounded-md px-3 text-sm"
+                value={form.ctaType}
+                onChange={(e) => setForm((f) => ({ ...f, ctaType: e.target.value }))}
+              >
+                {CTA_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {form.ctaType === 'use_coupon' ? (
+              <div>
+                <Label>Coupon code</Label>
+                <Input
+                  value={form.couponCode}
+                  onChange={(e) => setForm((f) => ({ ...f, couponCode: e.target.value }))}
+                />
+              </div>
+            ) : null}
+            <DealTargetingPickers value={targeting} onChange={setTargeting} />
+            <div>
               <Label>Starts</Label>
               <Input
                 type="datetime-local"
@@ -265,6 +359,18 @@ export function PromotionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DealAnalyticsDialog
+        dealId={analyticsId}
+        open={!!analyticsId}
+        onOpenChange={(open) => !open && setAnalyticsId(null)}
+      />
+      <PromoteDealDialog
+        dealId={promoteId}
+        open={!!promoteId}
+        onOpenChange={(open) => !open && setPromoteId(null)}
+        onSuccess={() => refetch()}
+      />
     </div>
   )
 }

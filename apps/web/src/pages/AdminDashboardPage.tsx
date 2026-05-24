@@ -65,6 +65,7 @@ import type { SubscriptionPlan } from '../types'
 import { getPlanSubtitle, getFeatureLabel, formatPlanFeatureCell } from '../lib/planComparison'
 import { formatCurrency } from '../utils/format'
 import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
+import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -371,6 +372,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <TabsTrigger value="finance">Finance</TabsTrigger>
                 <TabsTrigger value="usage">Usage</TabsTrigger>
                 <TabsTrigger value="features">Features</TabsTrigger>
+                <TabsTrigger value="deals">Deals</TabsTrigger>
                 <TabsTrigger value="health">Health</TabsTrigger>
                 <TabsTrigger value="audit">Audit</TabsTrigger>
               </>
@@ -2339,6 +2341,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               name: s.name,
             }))}
           />
+        </TabsContent>
+
+        <TabsContent value="deals">
+          <AdminDealsPanel />
         </TabsContent>
 
         {/* ─── ACTIVITY FEED ──────────────────────────────────────────── */}

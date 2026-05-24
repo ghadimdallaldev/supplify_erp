@@ -7,6 +7,14 @@ import { isMainModule } from './lib/is-main.mjs'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+function readMigrationSql(filePath) {
+  const buf = readFileSync(filePath)
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+    return buf.toString('utf16le').replace(/^\uFEFF/, '')
+  }
+  return buf.toString('utf8')
+}
+
 async function runAllMigrations() {
   try {
     // Create schema_migrations table if it doesn't exist (matches 0001_init.sql: version + applied_at)
@@ -38,7 +46,7 @@ async function runAllMigrations() {
       }
 
       console.log(`Running migration: ${file}`)
-      const sql = readFileSync(join(migrationsDir, file), 'utf8')
+      const sql = readMigrationSql(join(migrationsDir, file))
       // Wrap in try-catch to handle existing tables
       try {
         await query(sql)

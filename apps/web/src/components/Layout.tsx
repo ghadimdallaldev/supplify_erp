@@ -28,12 +28,9 @@ import {
 } from '../lib/externallyControlledFeatures'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useCartActions } from '../hooks/useCartActions'
-import {
-  formatAtPlanLimitMessage,
-  formatPlanBlockNudgeMessage,
-  getLimitLabel,
-} from '../lib/planComparison'
+import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planComparison'
 import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
+import { LimitExceededBanner } from './LimitExceededBanner'
 
 export function Layout() {
   const location = useLocation()
@@ -173,17 +170,20 @@ export function Layout() {
     .filter(({ pct }) => pct >= 80 && pct < 100)
     .slice(0, 3)
 
-  const atLimitKeys = Object.entries(limits)
+  const atLimitEntries = Object.entries(limits)
     .filter(([_, limit]) => limit != null && limit !== -1)
-    .filter(([key, limit]) => (usage[key] ?? 0) >= (limit as number))
-    .map(([key]) => key)
+    .map(([key, limit]) => ({
+      key,
+      current: usage[key] ?? 0,
+      limit: limit as number,
+    }))
+    .filter(({ current, limit }) => current >= limit)
     .slice(0, 3)
 
   const recentBlockLimitKeys = recentBlockedSummary.limitKeys.map((x) => x.key)
   const recentBlockFeatureKeys = recentBlockedSummary.featureKeys.map((x) => x.key)
   const planBlockNudgeMessage =
     formatPlanBlockNudgeMessage(recentBlockLimitKeys, recentBlockFeatureKeys) ??
-    formatAtPlanLimitMessage(atLimitKeys) ??
     (blockedCountLast7d >= 3
       ? "You've hit your plan limits several times this week. Check usage in settings and upgrade for more room."
       : null)
@@ -254,6 +254,20 @@ export function Layout() {
                     Compare plans
                   </button>
                 </div>
+              </div>
+            )}
+            {user?.role !== 'ADMIN' && atLimitEntries.length > 0 && (
+              <div className="mx-6 mt-4 space-y-2">
+                {atLimitEntries.map(({ key, current, limit }) => (
+                  <LimitExceededBanner
+                    key={key}
+                    limitKey={key}
+                    currentUsage={current}
+                    limitValue={limit}
+                    currentPlan={e?.plan?.name ?? null}
+                    upgradeUrl="/app/settings?tab=subscription"
+                  />
+                ))}
               </div>
             )}
             {user?.role !== 'ADMIN' && nearLimitKeys.length > 0 && (

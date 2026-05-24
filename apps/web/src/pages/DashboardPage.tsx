@@ -28,7 +28,7 @@ import toast from 'react-hot-toast'
 import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
-
+import { featureEnabled } from '../lib/planLimits'
 /** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
 const DASHBOARD_STACK_GAP = 24
 /** Horizontal gap between KPI cards and between the three content cards. */
@@ -281,8 +281,15 @@ export function DashboardPage() {
   const { data: inventoryData } = useGetInventoryListQuery(undefined, {
     skip: isAdminNotImpersonating || !isSupplier,
   })
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !user || user.role === 'ADMIN',
+  })
+  const smartReorderEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.smart_reorder
+  )
+  const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
-    skip: !isRestaurant,
+    skip: !isRestaurant || !smartReorderEnabled,
   })
   const { data: quickListsData } = useGetQuickListsQuery(undefined, {
     skip: !isRestaurant,
@@ -291,11 +298,8 @@ export function DashboardPage() {
   const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null)
   const { data: invoiceAnalytics } = useGetInvoiceAnalyticsQuery(
     { period: 30 },
-    { skip: !isRestaurant }
+    { skip: !isRestaurant || !reportsEnabled }
   )
-  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: !user || user.role === 'ADMIN',
-  })
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
   const planName = entitlementsData?.entitlements?.plan?.name ?? 'Free'

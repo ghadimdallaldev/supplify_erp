@@ -54,12 +54,11 @@ export function RegisterCompletePage() {
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  // Only leave this page when the account is fully provisioned (not PENDING).
   useEffect(() => {
-    if (!user || user.role === 'PENDING' || user.role === 'ADMIN') return
+    if (!user || user.role === 'ADMIN') return
     if (user.role === 'RESTAURANT' || user.role === 'SUPPLIER') {
       if (status?.needsSetup === false) {
-        navigate('/app', { replace: true })
+        navigate('/app/activate', { replace: true })
       }
     }
   }, [user, status, navigate])
@@ -87,6 +86,37 @@ export function RegisterCompletePage() {
       await dispatch(api.endpoints.getRegisterStatus.initiate(undefined, { forceRefetch: true }))
       navigate('/app/activate', { replace: true })
     } catch (err: unknown) {
+      const fetchErr = err as FetchBaseQueryError
+      const isNetworkError =
+        fetchErr?.status === 'FETCH_ERROR' ||
+        fetchErr?.status === 'PARSING_ERROR' ||
+        fetchErr?.status === 'TIMEOUT_ERROR'
+
+      if (isNetworkError) {
+        try {
+          const me = await dispatch(
+            api.endpoints.getMe.initiate(undefined, { forceRefetch: true })
+          ).unwrap()
+          const regStatus = await dispatch(
+            api.endpoints.getRegisterStatus.initiate(undefined, { forceRefetch: true })
+          ).unwrap()
+          if (
+            me.role !== 'PENDING' &&
+            (me.role === 'RESTAURANT' || me.role === 'SUPPLIER') &&
+            regStatus?.needsSetup === false
+          ) {
+            navigate('/app/activate', { replace: true })
+            return
+          }
+        } catch {
+          // fall through to user-facing error
+        }
+        setError(
+          'The server restarted while saving your profile. Your account may already be set up — refresh this page, or try submitting once more.'
+        )
+        return
+      }
+
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
         'Could not complete registration. Please try again.'

@@ -4,6 +4,8 @@
  */
 
 const WIPE_TABLES = [
+  ['deal_interactions'],
+  ['deal_promotions'],
   ['promotion_usages'],
   ['promotion_restaurant_targets', 'promotion_targets'],
   ['promotions'],

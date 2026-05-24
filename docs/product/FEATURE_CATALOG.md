@@ -205,11 +205,12 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ---
 
-## Promotions
+## Promotions & deals
 
-| feature_key | display_name        | applies_to | permissions_required | limit_key | backend_enforcement                                 | frontend_surfaces  | plan_availability       |
-| ----------- | ------------------- | ---------- | -------------------- | --------- | --------------------------------------------------- | ------------------ | ----------------------- |
-| promotions  | Supplier promotions | SUPPLIER   | —                    | —         | promotions.routes.js `requireFeature('promotions')` | PromotionsPage.tsx | Bronze+ (SUPPLIER only) |
+| feature_key    | display_name     | applies_to | permissions_required | limit_key | backend_enforcement                                     | frontend_surfaces                         | plan_availability       |
+| -------------- | ---------------- | ---------- | -------------------- | --------- | ------------------------------------------------------- | ----------------------------------------- | ----------------------- |
+| promotions     | Supplier deals   | SUPPLIER   | —                    | —         | promotions.routes.js `requireFeature('promotions')`     | PromotionsPage.tsx, DealTargetingPickers  | Bronze+ (SUPPLIER only) |
+| supplier_deals | Restaurant deals | RESTAURANT | —                    | —         | promotions.routes.js `requireFeature('supplier_deals')` | DealsPage.tsx, DealCard.tsx, CartPage.tsx | Bronze+ (RESTAURANT)    |
 
 ---
 

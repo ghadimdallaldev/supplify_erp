@@ -14,4 +14,11 @@ describe('API Service', () => {
   it('should have useGetProductsQuery hook', () => {
     expect(typeof (api as any).useGetProductsQuery).toBe('function')
   })
+
+  it('should export deal promotion hooks', () => {
+    expect(typeof (api as any).useGetActivePromotionsQuery).toBe('function')
+    expect(typeof (api as any).useGetAdminPendingDealsQuery).toBe('function')
+    expect(typeof (api as any).useApproveAdminDealMutation).toBe('function')
+    expect(typeof (api as any).useUpdateAdminPromotionPricingMutation).toBe('function')
+  })
 })

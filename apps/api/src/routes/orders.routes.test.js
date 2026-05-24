@@ -92,6 +92,7 @@ vi.mock('../services/warehouseRouting.js', () => ({
 
 vi.mock('../services/warehouseInventory.js', () => ({
   syncWarehouseFulfillmentOnOrderStatus: vi.fn().mockResolvedValue(undefined),
+  releaseInventoryForOrder: vi.fn().mockResolvedValue(undefined),
 }))
 
 // Import routes after mocks
@@ -210,12 +211,61 @@ describe('Orders Routes', () => {
           ],
         })
         .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
 
       const response = await request(app).get('/api/orders/order-1').expect(200)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.order.id).toBe('order-1')
       expect(response.body.data.order.items).toHaveLength(1)
+      expect(response.body.data.order.appliedPromotion).toBeNull()
+    })
+
+    it('should include applied promotion when promotion_usages exists', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'order-1',
+              restaurant_id: 'restaurant-1',
+              status: 'PLACED',
+              total_amount: 90,
+              restaurant_name: 'Test Restaurant',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'item-1',
+              order_id: 'order-1',
+              product_id: 'prod-1',
+              quantity: 10,
+              unit_price: 10,
+              product_name: 'Test Product',
+              product_sku: 'SKU001',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              promotion_id: 'promo-1',
+              discount_applied: 10,
+              promotion_name: 'Summer Sale',
+              promotion_type: 'percentage_discount',
+            },
+          ],
+        })
+
+      const response = await request(app).get('/api/orders/order-1').expect(200)
+
+      expect(response.body.data.order.appliedPromotion).toMatchObject({
+        promotionId: 'promo-1',
+        promotionName: 'Summer Sale',
+        discountAmount: 10,
+      })
     })
 
     it('should return 404 for non-existent order', async () => {
@@ -278,6 +328,7 @@ describe('Orders Routes', () => {
               ],
             }) // INSERT order
             .mockResolvedValueOnce({ rows: [{ available_qty: 100 }] }) // Check inventory
+            .mockResolvedValueOnce({}) // Deduct inventory
             .mockResolvedValueOnce({
               rows: [
                 {
@@ -291,7 +342,6 @@ describe('Orders Routes', () => {
                 },
               ],
             }) // INSERT order item
-            .mockResolvedValueOnce({}) // UPDATE inventory
             .mockResolvedValueOnce({ rows: [{ id: 'order-1', total_amount: 100.5 }] }) // UPDATE order total
             .mockResolvedValueOnce({
               rows: [
@@ -365,8 +415,12 @@ describe('Orders Routes', () => {
           rows: [{ id: 'restaurant-1' }], // Restaurant lookup for permission check
         })
         .mockResolvedValueOnce({
-          rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }], // UPDATE order (RESTAURANT can only cancel)
+          rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }], // UPDATE order
         })
+        .mockResolvedValueOnce({
+          rows: [{ product_id: 'prod-1', quantity: 1 }], // Restore stock: order items
+        })
+        .mockResolvedValueOnce({}) // Restore stock: inventory update
         .mockResolvedValueOnce({
           rows: [{ id: 'restaurant-1', name: 'Test Restaurant' }],
         })

@@ -15,6 +15,9 @@ type LimitExceededBannerProps = {
 
 const LIMIT_LABELS: Record<string, string> = {
   orders_per_day: 'Daily orders',
+  quick_lists: 'Quick lists',
+  quick_list_items: 'Quick list products',
+  scheduled_quick_lists: 'Scheduled quick lists',
   chats_per_day: 'Daily chats',
   supplier_products_skus: 'Products',
   restaurant_inventory_skus: 'Inventory SKUs',

@@ -27,16 +27,18 @@ export function setAuthCookies(res, accessToken, refreshToken) {
   // Access token cookie (short-lived)
   res.cookie('access_token', accessToken, {
     httpOnly: true,
-    secure: isProduction, // Must match sameSite requirements
+    secure: isProduction,
     sameSite,
+    path: '/',
     maxAge: 60 * 60 * 1000, // 1 hour (increased from 5 minutes)
   })
 
   // Refresh token cookie (longer-lived)
   res.cookie('refresh_token', refreshToken, {
     httpOnly: true,
-    secure: isProduction, // Must match sameSite requirements
+    secure: isProduction,
     sameSite,
+    path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   })
 }

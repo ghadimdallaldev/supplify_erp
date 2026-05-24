@@ -316,4 +316,75 @@ describe('Subscription lib', () => {
       expect(result.overrides).toHaveLength(1)
     })
   })
+
+  describe('evaluateScheduledOrderLimit', () => {
+    beforeEach(async () => {
+      mockQuery.mockReset()
+      const { invalidateTenantSubscriptionCache } = await import('./subscription.js')
+      await invalidateTenantSubscriptionCache('rest-1', 'RESTAURANT')
+    })
+
+    function mockRestaurantSubscription(limits) {
+      return {
+        id: 'sub-1',
+        limits,
+        plan_code: 'free',
+        plan_name: 'Free',
+      }
+    }
+
+    function mockCheckLimitQueries(limits, orderCount, ordersToCreate = 1, graceUsed = 0) {
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [{ id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
+        })
+        .mockResolvedValueOnce({ rows: [mockRestaurantSubscription(limits)] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ count: orderCount }] })
+
+      if (orderCount + ordersToCreate > limits.orders_per_day) {
+        mockQuery
+          .mockResolvedValueOnce({
+            rows: [
+              { id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null },
+            ],
+          })
+          .mockResolvedValueOnce({ rows: [mockRestaurantSubscription(limits)] })
+          .mockResolvedValueOnce({
+            rows: graceUsed > 0 ? [{ current_value: graceUsed }] : [],
+          })
+      }
+    }
+
+    it('allows scheduled orders when under the daily cap', async () => {
+      const { evaluateScheduledOrderLimit } = await import('./subscription.js')
+      mockCheckLimitQueries({ orders_per_day: 3, scheduled_order_grace_per_day: 1 }, 2, 1)
+
+      const result = await evaluateScheduledOrderLimit('rest-1', 1)
+
+      expect(result.allowed).toBe(true)
+      expect(result.usesGrace).toBe(false)
+    })
+
+    it('allows one grace order on Free when daily cap is reached', async () => {
+      const { evaluateScheduledOrderLimit } = await import('./subscription.js')
+      mockCheckLimitQueries({ orders_per_day: 3, scheduled_order_grace_per_day: 1 }, 3, 1)
+
+      const result = await evaluateScheduledOrderLimit('rest-1', 1)
+
+      expect(result.allowed).toBe(true)
+      expect(result.usesGrace).toBe(true)
+      expect(result.excess).toBe(1)
+    })
+
+    it('blocks when grace is already used for the day', async () => {
+      const { evaluateScheduledOrderLimit } = await import('./subscription.js')
+      mockCheckLimitQueries({ orders_per_day: 3, scheduled_order_grace_per_day: 1 }, 3, 1, 1)
+
+      const result = await evaluateScheduledOrderLimit('rest-1', 1)
+
+      expect(result.allowed).toBe(false)
+      expect(result.usesGrace).toBe(false)
+    })
+  })
 })
