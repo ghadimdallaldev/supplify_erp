@@ -12,7 +12,8 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog'
 import { useGetEntitlementsQuery } from '../../services/api'
-import { featureEnabled } from '../../lib/planLimits'
+import { featureEnabled, getSupplierPromotionGate } from '../../lib/planLimits'
+import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import {
   useGetPromotionsQuery,
   useCreatePromotionMutation,
@@ -47,6 +48,8 @@ const PROMO_TYPES = [
 export function PromotionsPage() {
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const promotionsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.promotions)
+  const promotionGate = getSupplierPromotionGate(entitlementsData?.entitlements)
+  const promotionCopy = LIMIT_UPGRADE_COPY.promotions
 
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -140,11 +143,24 @@ export function PromotionsPage() {
             Create deals and boost visibility to new restaurants
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
+        <Button onClick={() => setShowCreate(true)} disabled={!promotionGate.canCreate}>
           <Plus className="h-4 w-4 mr-2" />
-          New promotion
+          {promotionGate.canCreate ? 'New promotion' : 'Deal limit reached'}
         </Button>
       </div>
+
+      {!promotionGate.canCreate && promotionGate.limit != null ? (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="status"
+        >
+          {promotionGate.message || promotionCopy.value}
+        </div>
+      ) : promotionGate.limit != null ? (
+        <p className="text-sm text-[var(--text-muted)]">
+          Deals on your plan: {promotionGate.current}/{promotionGate.limit}
+        </p>
+      ) : null}
 
       <Card>
         <CardContent className="pt-6">

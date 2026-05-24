@@ -40,7 +40,15 @@ export const LIMIT_UPGRADE_COPY: Record<string, { plan: string; value: string }>
   },
   supplier_deals: {
     plan: 'Bronze',
-    value: 'Upgrade to Bronze to browse supplier deals and save at checkout.',
+    value: 'Upgrade to Bronze for unlimited deal redemptions each day.',
+  },
+  deal_redemptions_per_day: {
+    plan: 'Bronze',
+    value: 'Upgrade to Bronze to apply more deal discounts each day.',
+  },
+  promotions: {
+    plan: 'Bronze',
+    value: 'Upgrade to Bronze to create more supplier deals and promotions.',
   },
   orders_per_day: {
     plan: 'Gold',

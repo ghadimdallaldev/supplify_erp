@@ -5,6 +5,8 @@ import {
   getOrderUsageBadge,
   isQuickListSchedulingEnabled,
   getQuickListScheduleGate,
+  getDealRedeemGate,
+  getSupplierPromotionGate,
 } from './planLimits'
 import type { Entitlements } from '../types'
 
@@ -112,5 +114,27 @@ describe('quick list scheduling', () => {
     } as Entitlements
     expect(getQuickListScheduleGate(ent, false).canSchedule).toBe(false)
     expect(getQuickListScheduleGate(ent, true).canSchedule).toBe(true)
+  })
+})
+
+describe('deal and promotion limits', () => {
+  it('Free restaurant can redeem one deal per day', () => {
+    const ent = {
+      ...baseEntitlements({ deal_redemptions_per_day: 1 }, { deal_redemptions_per_day: 0 }),
+      features: { supplier_deals: true },
+    } as Entitlements
+    expect(getDealRedeemGate(ent).canRedeem).toBe(true)
+    expect(getDealRedeemGate({ ...ent, usage: { deal_redemptions_per_day: 1 } }).canRedeem).toBe(
+      false
+    )
+  })
+
+  it('Free supplier can create one promotion', () => {
+    const ent = {
+      ...baseEntitlements({ promotions: 1 }, { promotions: 0 }),
+      features: { promotions: true },
+    } as Entitlements
+    expect(getSupplierPromotionGate(ent).canCreate).toBe(true)
+    expect(getSupplierPromotionGate({ ...ent, usage: { promotions: 1 } }).canCreate).toBe(false)
   })
 })
