@@ -32,6 +32,7 @@ vi.mock('../lib/rbac.js', () => ({
 
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res, next) => next(),
+  requireWithinLimit: () => (req, res, next) => next(),
   isFeatureEnabled: vi.fn().mockResolvedValue(true),
 }))
 
@@ -48,6 +49,7 @@ vi.mock('../services/deal-promotions.service.js', () => ({
   enrichPromotionRow: vi.fn(async (row) => row),
   getEligibleProductsForDeal: vi.fn(),
   getActiveDealPromotion: vi.fn(),
+  previewDealForCart: vi.fn(),
 }))
 
 vi.mock('../services/promotions.service.js', () => ({
@@ -99,24 +101,52 @@ describe('promotions.routes admin', () => {
     expect(res.body.data.deals[0].name).toBe('Test Deal')
   })
 
-  it('POST /admin/:id/approve activates pending deal', async () => {
-    db.query.mockResolvedValueOnce({
-      rows: [{ id: 'deal-1', status: 'active', name: 'Test Deal' }],
-    })
+  it('POST /admin/:id/approve moves deal to active or pending payment', async () => {
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'deal-1',
+            status: 'pending_approval',
+            starts_at: new Date(Date.now() - 86400000).toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ pricing_key: 'deal_activation', amount: 0 }] })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'deal-1', status: 'active', payment_status: 'not_required', name: 'Test Deal' },
+        ],
+      })
 
     const res = await request(app).post('/api/promotions/admin/deal-1/approve').expect(200)
 
     expect(res.body.data.deal.status).toBe('active')
   })
 
-  it('POST /admin/:id/reject returns deal to draft', async () => {
+  it('POST /admin/:id/reject marks deal rejected', async () => {
     db.query.mockResolvedValueOnce({
-      rows: [{ id: 'deal-1', status: 'draft', name: 'Test Deal' }],
+      rows: [{ id: 'deal-1', status: 'rejected', name: 'Test Deal' }],
     })
 
-    const res = await request(app).post('/api/promotions/admin/deal-1/reject').expect(200)
+    const res = await request(app)
+      .post('/api/promotions/admin/deal-1/reject')
+      .send({ rejectionReason: 'Incomplete details' })
+      .expect(200)
 
-    expect(res.body.data.deal.status).toBe('draft')
+    expect(res.body.data.deal.status).toBe('rejected')
+  })
+
+  it('GET /admin/deals lists deals with filters', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [{ id: 'deal-1', name: 'Deal A', status: 'pending_approval', supplier_name: 'Acme' }],
+    })
+
+    const res = await request(app)
+      .get('/api/promotions/admin/deals?status=pending_approval')
+      .expect(200)
+
+    expect(res.body.data.deals).toHaveLength(1)
   })
 
   it('PATCH /admin/pricing/:key updates pricing config', async () => {

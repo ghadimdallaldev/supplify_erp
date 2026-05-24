@@ -5,6 +5,7 @@ import {
   getRequestTenant,
   resolveTenantContext,
   requirePermission,
+  getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -16,6 +17,7 @@ import {
   getRecommendedPlanNames,
   buildLimitExceededPayload,
   requireFeature,
+  checkLimit,
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyMessageReceived } from '../services/notification.service.js'
@@ -51,7 +53,7 @@ const quickReplySchema = z.object({
 })
 
 // Helper: Get or create conversation between supplier and restaurant
-async function getOrCreateConversation(supplierId, restaurantId) {
+async function getOrCreateConversation(supplierId, restaurantId, { enforceOpenLimit = true } = {}) {
   let { rows: conversations } = await query(
     `
     SELECT * FROM conversation
@@ -63,6 +65,28 @@ async function getOrCreateConversation(supplierId, restaurantId) {
   let conversation
 
   if (conversations.length === 0) {
+    if (enforceOpenLimit) {
+      for (const [tenantId, tenantType] of [
+        [restaurantId, 'RESTAURANT'],
+        [supplierId, 'SUPPLIER'],
+      ]) {
+        const limitCheck = await checkLimit(tenantId, tenantType, 'open_conversations')
+        if (!limitCheck.isUnlimited && limitCheck.isOverLimit) {
+          const err = new ValidationError(
+            `Open conversation limit reached (${limitCheck.current}/${limitCheck.limit})`
+          )
+          err.name = 'LIMIT_EXCEEDED'
+          err.details = {
+            limitKey: 'open_conversations',
+            limitValue: limitCheck.limit,
+            currentUsage: limitCheck.current,
+            tenantType,
+          }
+          throw err
+        }
+      }
+    }
+
     // Create new conversation
     const { rows: newConversations } = await query(
       `
@@ -379,12 +403,8 @@ router.post(
           requestId: req.requestId,
         })
       } else if (req.userData.role === 'RESTAURANT') {
-        const { rows: restaurants } = await query(
-          'SELECT id FROM restaurant WHERE contact_email = $1',
-          [req.userData.email]
-        )
-
-        if (restaurants.length === 0) {
+        const restaurantId = await getRestaurantIdForRequest(req)
+        if (!restaurantId) {
           return res.status(403).json({
             ok: false,
             data: null,
@@ -396,7 +416,6 @@ router.post(
           })
         }
 
-        // For restaurants, validate that they're trying to create a conversation with a valid supplier
         const { rows: suppliers } = await query('SELECT id FROM supplier WHERE id = $1', [
           supplierId,
         ])
@@ -413,9 +432,8 @@ router.post(
           })
         }
 
-        // Use the resolved restaurant ID
-        resolvedRestaurantId = restaurants[0].id
-        resolvedSupplierId = supplierId
+        const resolvedRestaurantId = restaurantId
+        const resolvedSupplierId = supplierId
 
         const conversation = await getOrCreateConversation(resolvedSupplierId, resolvedRestaurantId)
 
@@ -592,27 +610,9 @@ router.post(
   async (req, res) => {
     try {
       // Check daily chat limit before sending message
-      let tenantId, tenantType
-
-      if (req.userData.role === 'RESTAURANT') {
-        const { rows: restaurants } = await query(
-          'SELECT id FROM restaurant WHERE contact_email = $1',
-          [req.userData.email]
-        )
-        if (restaurants.length > 0) {
-          tenantId = restaurants[0].id
-          tenantType = 'RESTAURANT'
-        }
-      } else if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1',
-          [req.userData.email]
-        )
-        if (suppliers.length > 0) {
-          tenantId = suppliers[0].id
-          tenantType = 'SUPPLIER'
-        }
-      }
+      const tenant = await getRequestTenant(req)
+      const tenantId = tenant?.tenantId
+      const tenantType = tenant?.tenantType
 
       if (tenantId && tenantType) {
         const usageCheck = await checkUsageWithWarning(tenantId, tenantType, 'chats_per_day')

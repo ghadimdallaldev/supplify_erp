@@ -208,45 +208,46 @@ describe('Subscription lib', () => {
     it('returns object with recommendedPlanCode, reasonCode, evidence, comparedToCurrent', async () => {
       const { recommendPlan } = await import('./subscription.js')
       mockQuery.mockReset()
-      mockQuery
-        .mockResolvedValueOnce({
-          rows: [{ id: 's1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 's1',
-              plan_id: 'p1',
-              plan_name: 'Free',
-              plan_code: 'free',
-              limits: { orders_per_day: 3 },
-              features: { reports: false },
-              tenant_type: 'RESTAURANT',
-              plan_tenant_type: 'RESTAURANT',
-              plan_price_per_month: 0,
-              plan_price_per_year: null,
-            },
-          ],
-        })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
-        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
-        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ current_value: 0 }] })
-        .mockResolvedValueOnce({
-          rows: [
-            { code: 'free', name: 'Free', limits: { orders_per_day: 3 }, features: {} },
-            { code: 'bronze', name: 'Bronze', limits: { orders_per_day: 20 }, features: {} },
-            { code: 'gold', name: 'Gold', limits: { orders_per_day: 50 }, features: {} },
-            { code: 'platinum', name: 'Platinum', limits: { orders_per_day: -1 }, features: {} },
-          ],
-        })
+      const subRow = {
+        id: 's1',
+        plan_id: 'p1',
+        plan_name: 'Free',
+        plan_code: 'free',
+        limits: { orders_per_day: 3 },
+        features: { reports: false },
+        tenant_type: 'RESTAURANT',
+        plan_tenant_type: 'RESTAURANT',
+        plan_price_per_month: 0,
+        plan_price_per_year: null,
+      }
+      mockQuery.mockImplementation((sql) => {
+        const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('plan_limit_override') || text.includes('tenant_limit_override')) {
+          return Promise.resolve({ rows: [] })
+        }
+        if (text.includes('pending_plan_id') && text.includes('FROM subscription')) {
+          return Promise.resolve({
+            rows: [{ id: 's1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
+          })
+        }
+        if (text.includes('FROM subscription s') && text.includes('JOIN subscription_plan')) {
+          return Promise.resolve({ rows: [subRow] })
+        }
+        if (text.includes('FROM subscription_plan') && text.includes('is_active')) {
+          return Promise.resolve({
+            rows: [
+              { code: 'free', name: 'Free', limits: { orders_per_day: 3 }, features: {} },
+              { code: 'bronze', name: 'Bronze', limits: { orders_per_day: 20 }, features: {} },
+              { code: 'gold', name: 'Gold', limits: { orders_per_day: 50 }, features: {} },
+              { code: 'platinum', name: 'Platinum', limits: { orders_per_day: -1 }, features: {} },
+            ],
+          })
+        }
+        if (text.includes('COUNT(*)') || text.includes('current_value')) {
+          return Promise.resolve({ rows: [{ c: 0, current_value: 0 }] })
+        }
+        return Promise.resolve({ rows: [] })
+      })
 
       const result = await recommendPlan({ tenantId: 'rest-1', tenantType: 'RESTAURANT' })
 
@@ -283,8 +284,25 @@ describe('Subscription lib', () => {
         pending_plan_id: null,
         pending_effective_at: null,
       }
-      mockQuery.mockImplementation((sql) => {
+      mockQuery.mockImplementation((sql, params) => {
         const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('plan_limit_override')) return Promise.resolve({ rows: [] })
+        if (text.includes('tenant_limit_override')) {
+          if (params?.[2] === 'chats_per_day') {
+            return Promise.resolve({
+              rows: [
+                {
+                  override_value: 20,
+                  is_active: true,
+                  expiration_date: null,
+                  reason: 'promo',
+                  id: 'o1',
+                },
+              ],
+            })
+          }
+          return Promise.resolve({ rows: [] })
+        }
         if (text.includes('pending_plan_id') && text.includes('FROM subscription'))
           return Promise.resolve({
             rows: [
@@ -293,17 +311,6 @@ describe('Subscription lib', () => {
           })
         if (text.includes('FROM subscription s') && text.includes('JOIN subscription_plan'))
           return Promise.resolve({ rows: [subRow] })
-        if (text.includes('tenant_limit_override'))
-          return Promise.resolve({
-            rows: [
-              {
-                limitKey: 'chats_per_day',
-                value: 20,
-                reason: 'promo',
-                expiresAt: new Date(Date.now() + 86400000).toISOString(),
-              },
-            ],
-          })
         if (text.includes('COUNT(*)') || text.includes('current_value'))
           return Promise.resolve({ rows: [{ c: 0, current_value: 5 }] })
         return Promise.resolve({ rows: [] })
