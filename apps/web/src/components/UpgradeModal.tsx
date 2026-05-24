@@ -7,8 +7,11 @@ import {
   useGetRecommendationQuery,
   useGetEntitlementsQuery,
   useGetSubscriptionPlansQuery,
+  useGetBillingStatusQuery,
   useRecordConversionEventMutation,
 } from '../services/api'
+import { activateFreePlanFromPlans, openFreePlanCheckout } from '../lib/activateFreePlan'
+import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -106,7 +109,11 @@ export function UpgradeModal() {
   const { data: recommendation } = useGetRecommendationQuery({ blocked }, { skip: !open })
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !open })
   const { data: plansData } = useGetSubscriptionPlansQuery(undefined, { skip: !open })
+  const { data: billingStatus } = useGetBillingStatusQuery(undefined, { skip: !open })
   const [recordConversionEvent] = useRecordConversionEventMutation()
+  const pendingActivation = Boolean(
+    billingStatus?.access?.pendingActivation && billingStatus?.access?.isLocked
+  )
 
   const entitlements = entitlementsData?.entitlements
   const TIER_ORDER = ['free', 'bronze', 'gold', 'platinum']
@@ -197,7 +204,25 @@ export function UpgradeModal() {
       ? plans.find((p) => (p.code || '').toLowerCase() === code)
       : plans.find((p) => (p.code || '').toLowerCase() === (recommendedCode ?? ''))
 
-    if (targetPlan && (targetPlan.code || '').toLowerCase() !== 'free' && targetPlan.id) {
+    if (targetPlan?.id && (targetPlan.code || '').toLowerCase() === 'free') {
+      dispatch(closeMonetizationModal())
+      schedulePayloadReset()
+      if (pendingActivation) {
+        void activateFreePlanFromPlans(dispatch, plans).then((result) => {
+          if (result.ok) {
+            toast.success('Your free plan is active.')
+            navigate('/app', { replace: true })
+          } else {
+            toast.error(result.message)
+          }
+        })
+        return
+      }
+      openFreePlanCheckout(dispatch, plans)
+      return
+    }
+
+    if (targetPlan && targetPlan.id) {
       const monthly = Number(targetPlan.price_per_month ?? 0)
       const yearly =
         targetPlan.price_per_year != null ? Number(targetPlan.price_per_year) : monthly * 12
@@ -374,12 +399,23 @@ export function UpgradeModal() {
                     <div className="flex-1" />
 
                     {isCurrent ? (
-                      <button
-                        disabled
-                        className="w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-1.5 text-xs text-[var(--text-muted)]"
-                      >
-                        Current plan
-                      </button>
+                      pendingActivation && code === 'free' && canUpgrade ? (
+                        <button
+                          type="button"
+                          className="w-full cursor-pointer rounded-md py-1.5 text-xs font-semibold text-white"
+                          style={{ background: 'var(--brand-mid)' }}
+                          onClick={() => handleUpgrade(code)}
+                        >
+                          Activate free plan
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-1.5 text-xs text-[var(--text-muted)]"
+                        >
+                          Current plan
+                        </button>
+                      )
                     ) : !canUpgrade ? (
                       <button
                         disabled

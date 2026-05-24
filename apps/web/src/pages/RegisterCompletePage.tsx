@@ -6,10 +6,12 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import {
+  api,
   useCompleteRegistrationMutation,
   useGetMeQuery,
   useGetRegisterStatusQuery,
 } from '../services/api'
+import { useAppDispatch } from '../hooks/redux'
 import { Building2, Loader2, Store, Truck } from 'lucide-react'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
 
@@ -26,6 +28,7 @@ function isUnauthorized(error: unknown): boolean {
 
 export function RegisterCompletePage() {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
   const {
     data: user,
     isLoading: userLoading,
@@ -80,6 +83,8 @@ export function RegisterCompletePage() {
         businessName: businessName.trim(),
         phone: phone.trim() || undefined,
       }).unwrap()
+      await dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap()
+      await dispatch(api.endpoints.getRegisterStatus.initiate(undefined, { forceRefetch: true }))
       navigate('/app/activate', { replace: true })
     } catch (err: unknown) {
       const message =

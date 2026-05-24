@@ -71,6 +71,31 @@ describe('register.routes', () => {
     expect(completeTenantRegistration).toHaveBeenCalled()
   })
 
+  it('POST /complete creates supplier tenant', async () => {
+    userNeedsTenantSetup.mockResolvedValue(true)
+    completeTenantRegistration.mockResolvedValue({
+      tenant: { id: 'sup-1', name: 'My Supply Co' },
+      tenantType: 'SUPPLIER',
+    })
+
+    const res = await request(app)
+      .post('/api/register/complete')
+      .send({
+        accountType: 'SUPPLIER',
+        businessName: 'My Supply Co',
+        phone: '+971500000002',
+      })
+      .expect(201)
+
+    expect(res.body.data.tenantType).toBe('SUPPLIER')
+    expect(completeTenantRegistration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountType: 'SUPPLIER',
+        businessName: 'My Supply Co',
+      })
+    )
+  })
+
   it('POST /complete returns 409 when already set up', async () => {
     userNeedsTenantSetup.mockResolvedValue(false)
 

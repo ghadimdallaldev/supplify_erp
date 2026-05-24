@@ -356,19 +356,36 @@ export async function checkoutSubscription({
 async function applyFreePlan(tenantId, tenantType, plan) {
   const subscription = await getSubscriptionForBilling(tenantId, tenantType)
   if (!subscription) return null
-  const pendingActivation = subscription.lock_reason === LOCK_REASON_PENDING_ACTIVATION
+  const wasPendingActivation = subscription.lock_reason === LOCK_REASON_PENDING_ACTIVATION
   await query(
     `UPDATE subscription SET
       plan_id = $1, plan_name = $2, status = 'ACTIVE', billing_cycle = 'MONTHLY',
       past_due_since = NULL, grace_period_ends_at = NULL,
-      account_locked_at = CASE WHEN $4 THEN account_locked_at ELSE NULL END,
-      lock_reason = CASE WHEN $4 THEN lock_reason ELSE NULL END,
+      account_locked_at = NULL,
+      lock_reason = NULL,
       current_period_start = now(), current_period_end = now() + INTERVAL '1 month',
       next_billing_date = NULL, updated_at = now()
      WHERE id = $3`,
-    [plan.id, plan.name, subscription.id, pendingActivation]
+    [plan.id, plan.name, subscription.id]
   )
-  return { success: true, plan: plan.code, pendingActivation }
+  if (wasPendingActivation) {
+    await query(
+      `INSERT INTO billing_event (subscription_id, tenant_id, tenant_type, event_type, payload)
+       VALUES ($1, $2, $3, 'account.activated', $4)`,
+      [
+        subscription.id,
+        tenantId,
+        tenantType,
+        JSON.stringify({ planCode: plan.code, unlockedBy: 'free_plan' }),
+      ]
+    )
+  }
+  return {
+    success: true,
+    plan: plan.code,
+    pendingActivation: false,
+    activated: wasPendingActivation,
+  }
 }
 
 async function getPaymentMethodForCharge(client, tenantId, tenantType, paymentMethodId) {

@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { buildAccountLockedError, computeBillingAccessState } from './billing-service.js'
+
+const mockQuery = vi.fn()
+
+vi.mock('../db.js', () => ({
+  query: (...args) => mockQuery(...args),
+  withTransaction: async (fn) => fn({ query: (...args) => mockQuery(...args) }),
+}))
 
 describe('computeBillingAccessState', () => {
   it('free plan does not require payment', () => {
@@ -77,5 +84,59 @@ describe('buildAccountLockedError', () => {
     })
     expect(err.message).toMatch(/overdue/i)
     expect(err.details.amountDue).toBe(50)
+  })
+})
+
+describe('checkoutSubscription free plan', () => {
+  beforeEach(() => {
+    mockQuery.mockReset()
+  })
+
+  it('unlocks pending_activation when confirming free plan', async () => {
+    const { checkoutSubscription } = await import('./billing-service.js')
+
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'plan-free',
+            code: 'free',
+            name: 'Free',
+            tenant_type: 'SUPPLIER',
+            is_active: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-1',
+            tenant_id: 'sup-1',
+            tenant_type: 'SUPPLIER',
+            plan_id: 'plan-free',
+            lock_reason: 'pending_activation',
+            account_locked_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const result = await checkoutSubscription({
+      tenantId: 'sup-1',
+      tenantType: 'SUPPLIER',
+      planId: 'plan-free',
+      billingCycle: 'MONTHLY',
+    })
+
+    expect(result?.success).toBe(true)
+    expect(result?.activated).toBe(true)
+    expect(result?.pendingActivation).toBe(false)
+
+    const updateCall = mockQuery.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('UPDATE subscription SET')
+    )
+    expect(updateCall?.[0]).toMatch(/account_locked_at = NULL/)
+    expect(updateCall?.[0]).toMatch(/lock_reason = NULL/)
   })
 })

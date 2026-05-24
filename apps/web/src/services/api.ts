@@ -272,7 +272,15 @@ export const api = createApi({
       }),
       transformResponse: (response: { data?: { tenantType: string; tenant: unknown } }) =>
         response.data as { tenantType: string; tenant: unknown },
-      invalidatesTags: ['User', 'RegisterStatus'],
+      invalidatesTags: ['User', 'RegisterStatus', 'Billing', 'Subscription'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          await dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap()
+        } catch {
+          // Leave cache as-is on failure
+        }
+      },
     }),
 
     // Product endpoints
