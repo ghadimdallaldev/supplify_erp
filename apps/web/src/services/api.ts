@@ -2229,6 +2229,24 @@ export const api = createApi({
     previewDeal: builder.query<{ deal: Record<string, unknown> }, string>({
       query: (id) => `/api/promotions/${id}/preview`,
     }),
+    getAdminDeals: builder.query<
+      { deals: Array<Record<string, unknown>> },
+      {
+        status?: string
+        supplierId?: string
+        type?: string
+        search?: string
+        fromDate?: string
+        toDate?: string
+      }
+    >({
+      query: (params) => ({ url: '/api/promotions/admin/deals', params: params || {} }),
+      providesTags: ['Promotions'],
+    }),
+    getAdminDealInsights: builder.query<{ insights: Record<string, unknown> }, void>({
+      query: () => '/api/promotions/admin/deals/insights',
+      providesTags: ['Promotions'],
+    }),
     getAdminPendingDeals: builder.query<{ deals: Array<Record<string, unknown>> }, void>({
       query: () => '/api/promotions/admin/pending',
       providesTags: ['Promotions'],
@@ -2237,9 +2255,36 @@ export const api = createApi({
       query: (id) => ({ url: `/api/promotions/admin/${id}/approve`, method: 'POST' }),
       invalidatesTags: ['Promotions'],
     }),
-    rejectAdminDeal: builder.mutation<{ deal: Record<string, unknown> }, string>({
-      query: (id) => ({ url: `/api/promotions/admin/${id}/reject`, method: 'POST' }),
+    rejectAdminDeal: builder.mutation<
+      { deal: Record<string, unknown> },
+      { id: string; rejectionReason?: string; adminNotes?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/promotions/admin/${id}/reject`,
+        method: 'POST',
+        body,
+      }),
       invalidatesTags: ['Promotions'],
+    }),
+    pauseAdminDeal: builder.mutation<{ deal: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/admin/${id}/pause`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    submitPromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/${id}/submit`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    previewCartDeal: builder.mutation<
+      { preview: Record<string, unknown> },
+      {
+        supplierId: string
+        subtotal: number
+        promotionId?: string
+        couponCode?: string
+        lineItems?: Array<Record<string, unknown>>
+      }
+    >({
+      query: (body) => ({ url: '/api/promotions/cart-preview', method: 'POST', body }),
     }),
     updateAdminPromotionPricing: builder.mutation<
       { pricing: Record<string, unknown> },
@@ -2258,6 +2303,82 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Promotions'],
+    }),
+
+    getAdminLimitKeys: builder.query<
+      { keys: string[] },
+      { tenantType?: 'RESTAURANT' | 'SUPPLIER' } | void
+    >({
+      query: (params) => ({
+        url: '/api/admin-dashboard/limit-keys',
+        params: params || {},
+      }),
+    }),
+    getAdminLimitOverrides: builder.query<
+      {
+        tenantOverrides: Array<Record<string, unknown>>
+        planOverrides: Array<Record<string, unknown>>
+      },
+      {
+        tenantType?: string
+        tenantId?: string
+        planId?: string
+        limitKey?: string
+        active?: string
+      } | void
+    >({
+      query: (params) => ({
+        url: '/api/admin-dashboard/limit-overrides',
+        params: params || {},
+      }),
+    }),
+    createAdminPlanLimitOverride: builder.mutation<
+      { override: Record<string, unknown> },
+      {
+        planId: string
+        limit_type: string
+        override_value: number
+        expiration_date?: string | null
+        reason?: string | null
+      }
+    >({
+      query: ({ planId, ...body }) => ({
+        url: `/api/admin-dashboard/plans/${planId}/override-limit`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    updateAdminTenantLimitOverride: builder.mutation<
+      { override: Record<string, unknown> },
+      {
+        id: string
+        override_value?: number
+        expiration_date?: string | null
+        reason?: string | null
+        is_active?: boolean
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/admin-dashboard/tenant-overrides/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+    }),
+    updateAdminPlanLimitOverride: builder.mutation<
+      { override: Record<string, unknown> },
+      {
+        id: string
+        override_value?: number
+        expiration_date?: string | null
+        reason?: string | null
+        is_active?: boolean
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/admin-dashboard/plan-overrides/${id}`,
+        method: 'PATCH',
+        body,
+      }),
     }),
 
     // Reviews
@@ -3049,9 +3170,19 @@ export const {
   usePromoteDealMutation,
   useResumePromotionMutation,
   usePreviewDealQuery,
+  useGetAdminDealsQuery,
+  useGetAdminDealInsightsQuery,
   useGetAdminPendingDealsQuery,
   useApproveAdminDealMutation,
   useRejectAdminDealMutation,
+  usePauseAdminDealMutation,
+  useSubmitPromotionMutation,
+  usePreviewCartDealMutation,
+  useGetAdminLimitKeysQuery,
+  useGetAdminLimitOverridesQuery,
+  useCreateAdminPlanLimitOverrideMutation,
+  useUpdateAdminTenantLimitOverrideMutation,
+  useUpdateAdminPlanLimitOverrideMutation,
   useUpdateAdminPromotionPricingMutation,
   useGetSupplierReviewsQuery,
   useGetSupplierRatingSummaryQuery,

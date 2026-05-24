@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { isRestaurantVisibleDeal, buildDealConfigSnapshot } from './deal-lifecycle.service.js'
 
 const ORDER_DISCOUNT_TYPES = new Set([
   'percentage_discount',
@@ -11,19 +12,7 @@ const ORDER_DISCOUNT_TYPES = new Set([
  * Whether a promotion is within its active window and not over usage limit.
  */
 export function isPromotionEligible(promotion, { now = new Date(), restaurantId } = {}) {
-  if (!promotion || promotion.status !== 'active') return false
-  const ts = now instanceof Date ? now : new Date(now)
-  if (promotion.starts_at && new Date(promotion.starts_at) > ts) return false
-  if (promotion.ends_at && new Date(promotion.ends_at) <= ts) return false
-  if (
-    promotion.usage_limit != null &&
-    Number(promotion.usage_count) >= Number(promotion.usage_limit)
-  ) {
-    return false
-  }
-  if (promotion.restaurant_ids?.length) {
-    if (!restaurantId || !promotion.restaurant_ids.includes(restaurantId)) return false
-  }
+  if (!isRestaurantVisibleDeal(promotion, { now, restaurantId })) return false
   return true
 }
 
@@ -148,6 +137,7 @@ async function fetchActivePromotionsForSupplier(db, supplierId, restaurantId) {
     FROM promotions p
     WHERE p.supplier_id = $1
       AND p.status = 'active'
+      AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
       AND p.starts_at <= NOW()
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
@@ -198,10 +188,25 @@ export async function applyBestPromotionToOrder({
 
   await client.query(
     `
-    INSERT INTO promotion_usages (promotion_id, order_id, restaurant_id, discount_applied)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO promotion_usages (
+      promotion_id, order_id, restaurant_id, discount_applied,
+      deal_title, deal_type, supplier_id, discount_type, discount_value,
+      delivery_discount_applied, deal_config_snapshot, applied_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
     `,
-    [promotion.id, orderId, restaurantId, discountAmount]
+    [
+      promotion.id,
+      orderId,
+      restaurantId,
+      discountAmount,
+      promotion.name,
+      promotion.type,
+      supplierId,
+      promotion.type,
+      promotion.discount_value,
+      promotion.type === 'free_shipping' ? discountAmount : 0,
+      JSON.stringify(buildDealConfigSnapshot(promotion)),
+    ]
   )
 
   await client.query(
@@ -219,15 +224,30 @@ export async function applyBestPromotionToOrder({
 }
 
 export async function deactivateExpiredPromotions() {
+  const { rows: scheduled } = await query(
+    `
+    UPDATE promotions
+    SET status = 'active', updated_at = NOW()
+    WHERE status = 'scheduled'
+      AND starts_at <= NOW()
+      AND COALESCE(payment_status, 'not_required') IN ('not_required', 'paid')
+    RETURNING id
+    `
+  )
+
   const { rows } = await query(
     `
     UPDATE promotions
     SET status = 'expired', updated_at = NOW()
-    WHERE status = 'active'
+    WHERE status IN ('active', 'scheduled')
       AND ends_at IS NOT NULL
       AND ends_at < NOW()
     RETURNING id
     `
   )
-  return { expiredCount: rows.length, ids: rows.map((r) => r.id) }
+  return {
+    expiredCount: rows.length,
+    activatedCount: scheduled.length,
+    ids: rows.map((r) => r.id),
+  }
 }

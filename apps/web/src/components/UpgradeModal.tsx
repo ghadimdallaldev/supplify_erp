@@ -107,8 +107,12 @@ export function UpgradeModal() {
         : undefined
 
   const { data: recommendation } = useGetRecommendationQuery({ blocked }, { skip: !open })
-  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !open })
-  const { data: plansData } = useGetSubscriptionPlansQuery(undefined, { skip: !open })
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const {
+    data: plansData,
+    isLoading: plansLoading,
+    isError: plansError,
+  } = useGetSubscriptionPlansQuery()
   const { data: billingStatus } = useGetBillingStatusQuery(undefined, { skip: !open })
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const pendingActivation = Boolean(
@@ -124,13 +128,17 @@ export function UpgradeModal() {
       const bi = TIER_ORDER.indexOf((b.code || '').toLowerCase())
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
     })
-  const tenantType = entitlements?.tenantType ?? 'RESTAURANT'
+  const tenantType =
+    entitlements?.tenantType ?? (user?.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT')
   const limitKeys = getLimitKeys(tenantType)
   const featureKeys = getFeatureKeys(tenantType)
   const currentCode = (entitlements?.plan?.code ?? 'free').toLowerCase()
   const recommendedCode = recommendation?.recommendedPlanCode?.toLowerCase() ?? null
   const currentPlanIndex = plans.findIndex((p) => (p.code || '').toLowerCase() === currentCode)
   const currentPlanRow = plans.find((p) => (p.code || '').toLowerCase() === currentCode)
+  const plansLoadingState = plansLoading && plans.length === 0
+  const showPlans = !plansLoadingState && plans.length >= 1
+  const showComparison = showPlans && plans.length >= 2
 
   useEffect(() => {
     if (open)
@@ -345,8 +353,26 @@ export function UpgradeModal() {
               </div>
             )}
 
+          {/* Loading / error states */}
+          {plansLoadingState && (
+            <div className="flex flex-col items-center gap-3 py-8 text-sm text-[var(--text-muted)]">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--brand-mid)] border-t-transparent" />
+              Loading plans…
+            </div>
+          )}
+          {!plansLoadingState && plansError && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              We could not load plan options. Try again in a moment or contact support.
+            </p>
+          )}
+          {!plansLoadingState && !plansError && plans.length === 0 && (
+            <p className="rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-3 text-sm text-[var(--text-muted)]">
+              No plans are available for your account type yet.
+            </p>
+          )}
+
           {/* Plan cards */}
-          {plans.length >= 2 && entitlements && (
+          {showPlans && (
             <div
               className="grid gap-3"
               style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}
@@ -448,7 +474,7 @@ export function UpgradeModal() {
           )}
 
           {/* Comparison table */}
-          {plans.length >= 2 && entitlements && (
+          {showComparison && (
             <div className="overflow-hidden rounded-lg border border-[var(--app-border)]">
               {/* Header row */}
               <div
@@ -493,11 +519,11 @@ export function UpgradeModal() {
                     const code = (plan.code || '').toLowerCase()
                     const isCurrent = code === currentCode
                     const rawVal = isCurrent
-                      ? (currentPlanRow?.limits?.[key] ?? entitlements.limits?.[key])
+                      ? (currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key])
                       : plan.limits?.[key]
                     const val = toLimitNum(rawVal)
                     const curVal = toLimitNum(
-                      currentPlanRow?.limits?.[key] ?? entitlements.limits?.[key]
+                      currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key]
                     )
                     const better = !isCurrent && isBetterLimit(val, curVal)
                     const worse = !isCurrent && isWorseThanCurrent(val, curVal)
@@ -535,10 +561,10 @@ export function UpgradeModal() {
                     const code = (plan.code || '').toLowerCase()
                     const isCurrent = code === currentCode
                     const rawVal = isCurrent
-                      ? (currentPlanRow?.features?.[key] ?? entitlements.features?.[key])
+                      ? (currentPlanRow?.features?.[key] ?? entitlements?.features?.[key])
                       : plan.features?.[key]
                     const cell = formatPlanFeatureCell(key, rawVal)
-                    const curRaw = currentPlanRow?.features?.[key] ?? entitlements.features?.[key]
+                    const curRaw = currentPlanRow?.features?.[key] ?? entitlements?.features?.[key]
                     const curCell = formatPlanFeatureCell(key, curRaw)
                     const better = !isCurrent && cell.enabled && !curCell.enabled
                     return (

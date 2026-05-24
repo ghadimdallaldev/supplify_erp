@@ -66,6 +66,7 @@ import { getPlanSubtitle, getFeatureLabel, formatPlanFeatureCell } from '../lib/
 import { formatCurrency } from '../utils/format'
 import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
 import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
+import { AdminLimitOverridesPanel } from '../components/admin/AdminLimitOverridesPanel'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -373,6 +374,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <TabsTrigger value="usage">Usage</TabsTrigger>
                 <TabsTrigger value="features">Features</TabsTrigger>
                 <TabsTrigger value="deals">Deals</TabsTrigger>
+                <TabsTrigger value="limits">Limits</TabsTrigger>
                 <TabsTrigger value="health">Health</TabsTrigger>
                 <TabsTrigger value="audit">Audit</TabsTrigger>
               </>
@@ -2345,6 +2347,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <TabsContent value="deals">
           <AdminDealsPanel />
+        </TabsContent>
+
+        <TabsContent value="limits">
+          <AdminLimitOverridesPanel />
         </TabsContent>
 
         {/* ─── ACTIVITY FEED ──────────────────────────────────────────── */}

@@ -32,15 +32,51 @@ import {
 } from '../lib/externallyControlledFeatures'
 
 const LIMIT_LABELS: Record<string, string> = {
-  branches: 'Branches',
+  branches: 'Branch accounts',
   users: 'Users',
-  orders_per_day: 'Orders (Today)',
+  orders_per_day: 'Orders (today)',
   suppliers_per_restaurant: 'Suppliers',
   restaurant_inventory_skus: 'Inventory SKUs',
   warehouses: 'Warehouses',
   supplier_products_skus: 'Products',
-  chats_per_day: 'Chats (Today)',
+  chats_per_day: 'Messages (today)',
   storage_mb: 'Storage (MB)',
+  promotions: 'Deals & promotions',
+  open_conversations: 'Open chats',
+}
+
+const SUPPLIER_LIMIT_LABELS: Record<string, string> = {
+  ...LIMIT_LABELS,
+  open_conversations: 'Chats',
+}
+
+/** Usage rows shown first in settings (supplier vs restaurant). */
+const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
+  SUPPLIER: [
+    'open_conversations',
+    'chats_per_day',
+    'supplier_products_skus',
+    'promotions',
+    'warehouses',
+    'branches',
+    'users',
+    'storage_mb',
+  ],
+  RESTAURANT: [
+    'orders_per_day',
+    'open_conversations',
+    'chats_per_day',
+    'suppliers_per_restaurant',
+    'restaurant_inventory_skus',
+    'branches',
+    'users',
+    'storage_mb',
+  ],
+}
+
+function getLimitLabel(tenantType: string, limitKey: string): string {
+  const labels = tenantType === 'SUPPLIER' ? SUPPLIER_LIMIT_LABELS : LIMIT_LABELS
+  return labels[limitKey] ?? limitKey.replace(/_/g, ' ')
 }
 
 export function SubscriptionInfo() {
@@ -144,9 +180,17 @@ export function SubscriptionInfo() {
     custom_branding: planTierOffNote('custom_branding'),
   } as const
 
-  const limitEntries = Object.entries(limits).filter(
-    ([_, limit]) => limit !== null && limit !== undefined
-  ) as [string, number][]
+  const limitEntries = (
+    Object.entries(limits).filter(([_, limit]) => limit !== null && limit !== undefined) as [
+      string,
+      number,
+    ][]
+  ).sort(([keyA], [keyB]) => {
+    const order = LIMIT_DISPLAY_ORDER[e.tenantType] ?? []
+    const indexA = order.indexOf(keyA)
+    const indexB = order.indexOf(keyB)
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB)
+  })
 
   return (
     <Card>
@@ -283,8 +327,8 @@ export function SubscriptionInfo() {
                     {topNearLimit.map(({ limitKey, current, limit, pct }) => (
                       <li key={limitKey} className="flex items-center justify-between gap-2">
                         <span>
-                          {LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')}: {current} /{' '}
-                          {limit} ({Math.round(pct)}%)
+                          {getLimitLabel(e.tenantType, limitKey)}: {current} / {limit} (
+                          {Math.round(pct)}%)
                         </span>
                         <Button
                           type="button"
@@ -328,7 +372,7 @@ export function SubscriptionInfo() {
             if (effectiveLimit === null) return null
             const meter = getUsageMeterDisplay(current, effectiveLimit)
             const isWarning = meter.pct >= 80 && !meter.atCap
-            const label = LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')
+            const label = getLimitLabel(e.tenantType, limitKey)
             return (
               <div key={limitKey} className="space-y-2">
                 <div className="flex justify-between text-sm">

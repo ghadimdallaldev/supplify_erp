@@ -16,7 +16,10 @@ import {
   RESTAURANT_LIMIT_KEYS,
   SUPPLIER_LIMIT_KEYS,
   invalidateTenantSubscriptionCache,
+  discoverLimitKeys,
+  checkLimit,
 } from '../lib/subscription.js'
+import { resolveEffectiveLimit } from '../lib/limit-resolution.js'
 import { getAllowedFeatureKeys, featureDisplayName } from '../lib/feature-keys.js'
 import {
   listGlobalFeatureFlags,
@@ -1704,27 +1707,60 @@ router.get('/tenants/restaurants', async (req, res) => {
 router.post('/tenants/:tenantType/:id/override-limit', async (req, res) => {
   try {
     const { id: tenantId, tenantType } = req.params
-    const { limit_type, override_value, expiration_date, reason } = req.body
+    const normalizedType = tenantType.toUpperCase()
+    if (!['RESTAURANT', 'SUPPLIER'].includes(normalizedType)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'tenantType must be RESTAURANT or SUPPLIER' },
+        requestId: req.requestId,
+      })
+    }
+    const body = z
+      .object({
+        limit_type: z.string().min(1),
+        override_value: z.number().int().nonnegative(),
+        expiration_date: z.string().datetime().optional().nullable(),
+        reason: z.string().max(500).optional().nullable(),
+      })
+      .parse(req.body)
+    const { limit_type, override_value, expiration_date, reason } = body
 
-    const { rows: existing } = await query(
-      `SELECT id FROM tenant_limit_override WHERE tenant_id = $1 AND tenant_type = $2 AND limit_type = $3`,
-      [tenantId, tenantType.toUpperCase(), limit_type]
+    const allowedKeys = await discoverLimitKeys(normalizedType)
+    if (!allowedKeys.includes(limit_type)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: `Invalid limit key: ${limit_type}` },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows: existingRows } = await query(
+      `SELECT * FROM tenant_limit_override WHERE tenant_id = $1 AND tenant_type = $2 AND limit_type = $3`,
+      [tenantId, normalizedType, limit_type]
     )
-    const isUpdate = existing.length > 0
+    const isUpdate = existingRows.length > 0
+    const oldValue = existingRows[0]?.override_value ?? null
 
     const { rows: overrides } = await query(
       `
       INSERT INTO tenant_limit_override (
-        tenant_id, tenant_type, limit_type, override_value, expiration_date, reason, created_by
+        tenant_id, tenant_type, limit_type, override_value, expiration_date, reason, created_by, is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
       ON CONFLICT (tenant_id, tenant_type, limit_type)
-      DO UPDATE SET override_value = EXCLUDED.override_value, expiration_date = EXCLUDED.expiration_date, reason = EXCLUDED.reason, updated_at = now()
+      DO UPDATE SET
+        override_value = EXCLUDED.override_value,
+        expiration_date = EXCLUDED.expiration_date,
+        reason = EXCLUDED.reason,
+        is_active = TRUE,
+        updated_at = now()
       RETURNING *
     `,
       [
         tenantId,
-        tenantType.toUpperCase(),
+        normalizedType,
         limit_type,
         override_value,
         expiration_date || null,
@@ -1733,16 +1769,25 @@ router.post('/tenants/:tenantType/:id/override-limit', async (req, res) => {
       ]
     )
 
+    await invalidateTenantSubscriptionCache(tenantId, normalizedType)
+
     await logAudit(
       req,
       isUpdate ? 'override.update' : 'OVERRIDE_LIMIT',
       isUpdate
-        ? `Updated ${limit_type} override: ${override_value}`
+        ? `Updated ${limit_type} override: ${oldValue} → ${override_value}`
         : `Granted ${limit_type} override: ${override_value}`,
-      tenantType.toUpperCase(),
+      normalizedType,
       tenantId,
-      isUpdate ? existing[0] : null,
-      { limit_type, override_value, expiration_date, reason }
+      isUpdate ? existingRows[0] : null,
+      {
+        limit_type,
+        override_value,
+        expiration_date,
+        reason,
+        old_value: oldValue,
+        new_value: override_value,
+      }
     )
 
     res.json({
@@ -1752,6 +1797,14 @@ router.post('/tenants/:tenantType/:id/override-limit', async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.errors[0]?.message || 'Invalid body' },
+        requestId: req.requestId,
+      })
+    }
     logger.error('Override limit error:', error)
     res.status(500).json({
       ok: false,
@@ -1785,6 +1838,8 @@ router.delete('/tenants/:tenantType/:id/override-limit/:overrideId', async (req,
         requestId: req.requestId,
       })
     }
+
+    await invalidateTenantSubscriptionCache(deleted[0].tenant_id, deleted[0].tenant_type)
 
     // Log audit
     await logAudit(
@@ -1848,6 +1903,444 @@ router.get('/tenants/:tenantType/:id/entitlements', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get tenant entitlements' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * GET /api/admin-dashboard/limit-keys?tenantType=RESTAURANT|SUPPLIER
+ */
+router.get('/limit-keys', async (req, res) => {
+  try {
+    const tenantType = req.query.tenantType ? String(req.query.tenantType).toUpperCase() : null
+    if (tenantType && !['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid tenantType' },
+        requestId: req.requestId,
+      })
+    }
+    const keys = await discoverLimitKeys(tenantType || undefined)
+    res.json({ ok: true, data: { keys }, error: null, requestId: req.requestId })
+  } catch (error) {
+    logger.error('List limit keys error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list limit keys' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * GET /api/admin-dashboard/limit-overrides
+ */
+router.get('/limit-overrides', async (req, res) => {
+  try {
+    const { tenantType, tenantId, planId, limitKey, active } = req.query
+    const params = []
+    const tenantClauses = []
+    if (tenantType) {
+      params.push(String(tenantType).toUpperCase())
+      tenantClauses.push(`tlo.tenant_type = $${params.length}`)
+    }
+    if (tenantId) {
+      params.push(String(tenantId))
+      tenantClauses.push(`tlo.tenant_id = $${params.length}`)
+    }
+    if (limitKey) {
+      params.push(String(limitKey))
+      tenantClauses.push(`tlo.limit_type = $${params.length}`)
+    }
+    if (active === 'true') tenantClauses.push(`tlo.is_active = TRUE`)
+    if (active === 'false') tenantClauses.push(`tlo.is_active = FALSE`)
+
+    const tenantWhere = tenantClauses.length ? `WHERE ${tenantClauses.join(' AND ')}` : ''
+
+    const { rows: tenantOverrides } = await query(
+      `
+      SELECT tlo.*, sp.name AS plan_name, sp.code AS plan_code
+      FROM tenant_limit_override tlo
+      LEFT JOIN subscription s ON s.tenant_id = tlo.tenant_id AND s.tenant_type = tlo.tenant_type
+        AND s.status IN ('ACTIVE', 'TRIALING')
+      LEFT JOIN subscription_plan sp ON sp.id = s.plan_id
+      ${tenantWhere}
+      ORDER BY tlo.updated_at DESC
+      LIMIT 200
+      `,
+      params
+    )
+
+    const planParams = []
+    const planClauses = []
+    if (planId) {
+      planParams.push(String(planId))
+      planClauses.push(`plo.plan_id = $${planParams.length}`)
+    }
+    if (limitKey) {
+      planParams.push(String(limitKey))
+      planClauses.push(`plo.limit_type = $${planParams.length}`)
+    }
+    if (active === 'true') planClauses.push(`plo.is_active = TRUE`)
+    if (active === 'false') planClauses.push(`plo.is_active = FALSE`)
+    const planWhere = planClauses.length ? `WHERE ${planClauses.join(' AND ')}` : ''
+
+    const { rows: planOverrides } = await query(
+      `
+      SELECT plo.*, sp.name AS plan_name, sp.code AS plan_code, sp.tenant_type
+      FROM plan_limit_override plo
+      JOIN subscription_plan sp ON sp.id = plo.plan_id
+      ${planWhere}
+      ORDER BY plo.updated_at DESC
+      LIMIT 200
+      `,
+      planParams
+    )
+
+    res.json({
+      ok: true,
+      data: { tenantOverrides, planOverrides },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('List limit overrides error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list overrides' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * POST /api/admin-dashboard/plans/:planId/override-limit
+ */
+router.post('/plans/:planId/override-limit', async (req, res) => {
+  try {
+    const { planId } = req.params
+    const body = z
+      .object({
+        limit_type: z.string().min(1),
+        override_value: z.number().int().nonnegative(),
+        expiration_date: z.string().datetime().optional().nullable(),
+        reason: z.string().max(500).optional().nullable(),
+      })
+      .parse(req.body)
+
+    const { rows: plans } = await query(`SELECT * FROM subscription_plan WHERE id = $1`, [planId])
+    if (!plans.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Plan not found' },
+        requestId: req.requestId,
+      })
+    }
+    const plan = plans[0]
+    const allowedKeys = await discoverLimitKeys(plan.tenant_type)
+    if (!allowedKeys.includes(body.limit_type)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: `Invalid limit key: ${body.limit_type}` },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows: existingRows } = await query(
+      `SELECT * FROM plan_limit_override WHERE plan_id = $1 AND limit_type = $2`,
+      [planId, body.limit_type]
+    )
+    const oldValue = existingRows[0]?.override_value ?? null
+
+    const { rows } = await query(
+      `
+      INSERT INTO plan_limit_override (
+        plan_id, limit_type, override_value, expiration_date, reason, created_by, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+      ON CONFLICT (plan_id, limit_type)
+      DO UPDATE SET
+        override_value = EXCLUDED.override_value,
+        expiration_date = EXCLUDED.expiration_date,
+        reason = EXCLUDED.reason,
+        is_active = TRUE,
+        updated_at = now()
+      RETURNING *
+      `,
+      [
+        planId,
+        body.limit_type,
+        body.override_value,
+        body.expiration_date || null,
+        body.reason || null,
+        req.userData.id,
+      ]
+    )
+
+    await logAudit(
+      req,
+      existingRows.length ? 'plan_override.update' : 'plan_override.create',
+      `Plan ${plan.code} ${body.limit_type}: ${oldValue ?? 'default'} → ${body.override_value}`,
+      plan.tenant_type,
+      planId,
+      existingRows[0] || null,
+      {
+        limit_type: body.limit_type,
+        old_value: oldValue,
+        new_value: body.override_value,
+        expiration_date: body.expiration_date,
+        reason: body.reason,
+      }
+    )
+
+    res.json({ ok: true, data: { override: rows[0] }, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.errors[0]?.message || 'Invalid body' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Plan override error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to set plan override' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * PATCH /api/admin-dashboard/plan-overrides/:overrideId
+ */
+router.patch('/plan-overrides/:overrideId', async (req, res) => {
+  try {
+    const body = z
+      .object({
+        override_value: z.number().int().nonnegative().optional(),
+        expiration_date: z.string().datetime().optional().nullable(),
+        reason: z.string().max(500).optional().nullable(),
+        is_active: z.boolean().optional(),
+      })
+      .parse(req.body)
+
+    const { rows: existing } = await query(`SELECT * FROM plan_limit_override WHERE id = $1`, [
+      req.params.overrideId,
+    ])
+    if (!existing.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Override not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const fields = []
+    const values = []
+    let i = 1
+    for (const [key, col] of [
+      ['override_value', 'override_value'],
+      ['expiration_date', 'expiration_date'],
+      ['reason', 'reason'],
+      ['is_active', 'is_active'],
+    ]) {
+      if (body[key] !== undefined) {
+        fields.push(`${col} = $${i++}`)
+        values.push(body[key])
+      }
+    }
+    if (!fields.length) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'No fields to update' },
+        requestId: req.requestId,
+      })
+    }
+    fields.push('updated_at = now()')
+    values.push(req.params.overrideId)
+    const { rows } = await query(
+      `UPDATE plan_limit_override SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`,
+      values
+    )
+
+    await logAudit(
+      req,
+      body.is_active === false ? 'plan_override.disable' : 'plan_override.update',
+      `Updated plan override ${existing[0].limit_type}`,
+      null,
+      existing[0].plan_id,
+      existing[0],
+      { ...body, old_value: existing[0].override_value, new_value: rows[0].override_value }
+    )
+
+    res.json({ ok: true, data: { override: rows[0] }, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.errors[0]?.message || 'Invalid body' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Update plan override error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to update plan override' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * PATCH /api/admin-dashboard/tenant-overrides/:overrideId
+ */
+router.patch('/tenant-overrides/:overrideId', async (req, res) => {
+  try {
+    const body = z
+      .object({
+        override_value: z.number().int().nonnegative().optional(),
+        expiration_date: z.string().datetime().optional().nullable(),
+        reason: z.string().max(500).optional().nullable(),
+        is_active: z.boolean().optional(),
+      })
+      .parse(req.body)
+
+    const { rows: existing } = await query(`SELECT * FROM tenant_limit_override WHERE id = $1`, [
+      req.params.overrideId,
+    ])
+    if (!existing.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Override not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const fields = []
+    const values = []
+    let i = 1
+    for (const [key, col] of [
+      ['override_value', 'override_value'],
+      ['expiration_date', 'expiration_date'],
+      ['reason', 'reason'],
+      ['is_active', 'is_active'],
+    ]) {
+      if (body[key] !== undefined) {
+        fields.push(`${col} = $${i++}`)
+        values.push(body[key])
+      }
+    }
+    if (!fields.length) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'No fields to update' },
+        requestId: req.requestId,
+      })
+    }
+    fields.push('updated_at = now()')
+    values.push(req.params.overrideId)
+    const { rows } = await query(
+      `UPDATE tenant_limit_override SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`,
+      values
+    )
+
+    await invalidateTenantSubscriptionCache(existing[0].tenant_id, existing[0].tenant_type)
+
+    await logAudit(
+      req,
+      body.is_active === false ? 'override.disable' : 'override.update',
+      `Updated tenant override ${existing[0].limit_type}`,
+      existing[0].tenant_type,
+      existing[0].tenant_id,
+      existing[0],
+      { ...body, old_value: existing[0].override_value, new_value: rows[0].override_value }
+    )
+
+    res.json({ ok: true, data: { override: rows[0] }, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.errors[0]?.message || 'Invalid body' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Update tenant override error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to update tenant override' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * GET /api/admin-dashboard/tenants/:tenantType/:id/effective-limit/:limitKey
+ */
+router.get('/tenants/:tenantType/:id/effective-limit/:limitKey', async (req, res) => {
+  try {
+    const tenantType = req.params.tenantType.toUpperCase()
+    const { id: tenantId, limitKey } = req.params
+    if (!['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid tenantType' },
+        requestId: req.requestId,
+      })
+    }
+    const entitlements = await getEntitlements(tenantId, tenantType)
+    if (!entitlements) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'No subscription' },
+        requestId: req.requestId,
+      })
+    }
+    const subscription = await query(
+      `SELECT plan_id, limits FROM subscription s JOIN subscription_plan sp ON sp.id = s.plan_id
+       WHERE s.tenant_id = $1 AND s.tenant_type = $2 AND s.status IN ('ACTIVE','TRIALING')
+       ORDER BY s.created_at DESC LIMIT 1`,
+      [tenantId, tenantType]
+    )
+    const planRow = subscription.rows[0]
+    const resolved = await resolveEffectiveLimit({
+      tenantId,
+      tenantType,
+      limitKey,
+      planId: planRow?.plan_id,
+      planLimits: planRow?.limits || {},
+    })
+    const usage = await checkLimit(tenantId, tenantType, limitKey)
+    res.json({
+      ok: true,
+      data: { resolved, usage },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Resolve effective limit error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to resolve limit' },
       requestId: req.requestId,
     })
   }
