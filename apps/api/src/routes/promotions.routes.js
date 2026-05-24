@@ -4,6 +4,7 @@ import {
   requireAuth,
   requireRole,
   resolveTenantContext,
+  resolveAdminContext,
   requirePermission,
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
@@ -18,6 +19,7 @@ import {
   createDealPromotionCampaign,
   getDealAnalytics,
   enrichPromotionRow,
+  enrichPromotionRows,
   getEligibleProductsForDeal,
   getActiveDealPromotion,
   previewDealForCart,
@@ -34,6 +36,14 @@ import {
 } from '../services/deal-lifecycle.service.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { requireFeature, requireWithinLimit } from '../lib/subscription.js'
+import { config } from '../config/env.js'
+
+const adminDealGuards = [
+  requireAuth,
+  requireRole(['ADMIN']),
+  resolveAdminContext,
+  requirePermission('ADMIN_ACCESS'),
+]
 
 const router = express.Router()
 
@@ -248,14 +258,19 @@ router.get(
   }
 )
 
-router.get('/admin/deals', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.get('/admin/deals', ...adminDealGuards, async (req, res, next) => {
   try {
     const { status, supplierId, type, search, fromDate, toDate } = req.query
     const params = []
     const conditions = ['1=1']
     if (status) {
-      params.push(status)
-      conditions.push(`p.status = $${params.length}`)
+      const statusVal = String(status)
+      if (statusVal === 'pending_approval' || statusVal === 'pending_review') {
+        conditions.push(`p.status IN ('pending_approval', 'pending_admin_approval')`)
+      } else {
+        params.push(statusVal)
+        conditions.push(`p.status = $${params.length}`)
+      }
     }
     if (supplierId) {
       params.push(supplierId)
@@ -296,7 +311,7 @@ router.get('/admin/deals', requireAuth, requireRole(['ADMIN']), async (req, res,
   }
 })
 
-router.get('/admin/deals/insights', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) => {
   try {
     const { rows: summary } = await query(
       `
@@ -360,7 +375,7 @@ router.get('/admin/deals/insights', requireAuth, requireRole(['ADMIN']), async (
   }
 })
 
-router.get('/admin/pending', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.get('/admin/pending', ...adminDealGuards, async (req, res, next) => {
   try {
     const { rows } = await query(
       `
@@ -377,7 +392,7 @@ router.get('/admin/pending', requireAuth, requireRole(['ADMIN']), async (req, re
   }
 })
 
-router.get('/admin/:id', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.get('/admin/:id', ...adminDealGuards, async (req, res, next) => {
   try {
     const { rows } = await query(
       `
@@ -396,7 +411,7 @@ router.get('/admin/:id', requireAuth, requireRole(['ADMIN']), async (req, res, n
   }
 })
 
-router.post('/admin/:id/approve', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => {
   try {
     const adminId = req.userData?.id || req.userData?.userId || null
     const { rows: existing } = await query(`SELECT * FROM promotions WHERE id = $1`, [
@@ -441,7 +456,7 @@ router.post('/admin/:id/approve', requireAuth, requireRole(['ADMIN']), async (re
   }
 })
 
-router.post('/admin/:id/reject', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.post('/admin/:id/reject', ...adminDealGuards, async (req, res, next) => {
   try {
     const body = rejectBodySchema.parse(req.body || {})
     const adminId = req.userData?.id || req.userData?.userId || null
@@ -472,7 +487,7 @@ router.post('/admin/:id/reject', requireAuth, requireRole(['ADMIN']), async (req
   }
 })
 
-router.post('/admin/:id/pause', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.post('/admin/:id/pause', ...adminDealGuards, async (req, res, next) => {
   try {
     const { rows } = await query(
       `UPDATE promotions SET status = 'paused', updated_at = NOW()
@@ -486,7 +501,7 @@ router.post('/admin/:id/pause', requireAuth, requireRole(['ADMIN']), async (req,
   }
 })
 
-router.patch('/admin/pricing/:key', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.patch('/admin/pricing/:key', ...adminDealGuards, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -791,28 +806,46 @@ router.use(
   promotionsWriteGate
 )
 
+const listQuerySchema = z.object({
+  status: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+})
+
 router.get('/', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
-    const { status } = req.query
+    const { status, limit, offset } = listQuerySchema.parse(req.query)
     const params = [supplierId]
     let sql = `SELECT * FROM promotions WHERE supplier_id = $1`
     if (status) {
       params.push(status)
       sql += ` AND status = $${params.length}`
     }
-    sql += ' ORDER BY created_at DESC'
+    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*)::int AS total')
+    const { rows: countRows } = await query(countSql, params)
+    const total = countRows[0]?.total ?? 0
+    params.push(limit, offset)
+    sql += ` ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`
     const { rows } = await query(sql, params)
-    const promotions = await Promise.all(
-      rows.map(async (r) => {
-        try {
-          return await enrichPromotionRow(r)
-        } catch (err) {
-          return { ...r, is_promoted: false, active_deal_promotion_id: null }
-        }
-      })
-    )
-    res.json({ ok: true, data: { promotions }, error: null, requestId: req.requestId })
+    let promotions
+    try {
+      promotions = await enrichPromotionRows(rows)
+    } catch {
+      promotions = rows.map((r) => ({
+        ...r,
+        is_promoted: false,
+        active_deal_promotion_id: null,
+        target_product_ids: [],
+        target_category_ids: [],
+      }))
+    }
+    res.json({
+      ok: true,
+      data: { promotions, total, limit, offset },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (err) {
     next(err)
   }
@@ -1089,8 +1122,9 @@ router.post('/:id/pause', async (req, res, next) => {
     const supplierId = await getSupplierId(req)
     await loadPromotionForSupplier(req.params.id, supplierId)
     const { rows } = await query(
-      `UPDATE promotions SET status = 'paused', updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [req.params.id]
+      `UPDATE promotions SET status = 'paused', updated_at = NOW()
+       WHERE id = $1 AND supplier_id = $2 RETURNING *`,
+      [req.params.id, supplierId]
     )
     res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
@@ -1111,8 +1145,8 @@ router.post('/:id/resume', async (req, res, next) => {
     })
     const { rows } = await query(
       `UPDATE promotions SET status = $2, updated_at = NOW()
-       WHERE id = $1 AND status = 'paused' RETURNING *`,
-      [req.params.id, next.status]
+       WHERE id = $1 AND supplier_id = $3 AND status = 'paused' RETURNING *`,
+      [req.params.id, next.status, supplierId]
     )
     if (!rows.length) throw new ValidationError('Deal is not paused')
     res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })
@@ -1134,7 +1168,9 @@ router.post('/:id/promote', async (req, res, next) => {
       startsAt: body.startsAt,
       endsAt: body.endsAt,
       targetAudience: body.targetAudience || { all: true },
-      waivePayment: true,
+      waivePayment:
+        config.NODE_ENV !== 'production' ||
+        process.env.ALLOW_WAIVE_DEAL_PROMOTION_PAYMENT === 'true',
     })
     await writeAuditLog(req, {
       action_type: 'deal.promoted',

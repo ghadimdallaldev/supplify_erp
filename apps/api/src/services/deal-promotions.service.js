@@ -543,18 +543,54 @@ export async function previewDealForCart({
 }
 
 export async function enrichPromotionRow(row) {
+  const [enriched] = await enrichPromotionRows([row])
+  return enriched
+}
+
+/**
+ * Batch-enrich promotion rows (avoids N+1 queries on list endpoints).
+ */
+export async function enrichPromotionRows(rows) {
+  if (!rows?.length) return []
+  const ids = rows.map((r) => r.id)
   const { rows: targets } = await query(
-    `SELECT product_id, category_id FROM promotion_targets WHERE promotion_id = $1`,
-    [row.id]
+    `SELECT promotion_id, product_id, category_id FROM promotion_targets WHERE promotion_id = ANY($1::uuid[])`,
+    [ids]
   )
-  const activePromo = await getActiveDealPromotion(query, row.id)
-  return {
-    ...row,
-    target_product_ids: targets.filter((t) => t.product_id).map((t) => t.product_id),
-    target_category_ids: targets.filter((t) => t.category_id).map((t) => t.category_id),
-    is_promoted: Boolean(activePromo),
-    active_deal_promotion_id: activePromo?.id || null,
+  const { rows: activePromos } = await query(
+    `
+    SELECT DISTINCT ON (deal_id) deal_id, id
+    FROM deal_promotions
+    WHERE deal_id = ANY($1::uuid[])
+      AND status = 'active'
+      AND starts_at <= NOW()
+      AND (ends_at IS NULL OR ends_at > NOW())
+    ORDER BY deal_id, created_at DESC
+    `,
+    [ids]
+  )
+  const targetsByDeal = new Map()
+  for (const t of targets) {
+    const list = targetsByDeal.get(t.promotion_id) || {
+      productIds: [],
+      categoryIds: [],
+    }
+    if (t.product_id) list.productIds.push(t.product_id)
+    if (t.category_id) list.categoryIds.push(t.category_id)
+    targetsByDeal.set(t.promotion_id, list)
   }
+  const activeByDeal = new Map(activePromos.map((p) => [p.deal_id, p.id]))
+  return rows.map((row) => {
+    const t = targetsByDeal.get(row.id) || { productIds: [], categoryIds: [] }
+    const activeId = activeByDeal.get(row.id) || null
+    return {
+      ...row,
+      target_product_ids: t.productIds,
+      target_category_ids: t.categoryIds,
+      is_promoted: Boolean(activeId),
+      active_deal_promotion_id: activeId,
+    }
+  })
 }
 
 export async function applyPromotionByIdToOrder({
