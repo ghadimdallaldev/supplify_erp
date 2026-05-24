@@ -3,13 +3,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import {
+  useGetEntitlementsQuery,
   useRecordDealInteractionMutation,
   useUseDealCouponMutation,
   useMessageFromDealMutation,
 } from '../../services/api'
-import { Building2, Tag, Megaphone, Copy, MessageCircle, ShoppingCart, Eye } from 'lucide-react'
+import {
+  Building2,
+  Tag,
+  Megaphone,
+  Copy,
+  MessageCircle,
+  ShoppingCart,
+  Eye,
+  Lock,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../../utils/format'
+import { useAppDispatch, useAppSelector } from '../../hooks/redux'
+import { getDealRedeemGate } from '../../lib/planLimits'
+import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
+import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
 
 export type DealRecord = Record<string, unknown>
 
@@ -72,8 +86,27 @@ function DealBadges({ deal, isSponsored }: { deal: DealRecord; isSponsored: bool
   )
 }
 
-export function DealCard({ deal }: { deal: DealRecord }) {
+function ctaNeedsRedeem(deal: DealRecord) {
+  const cta = deal.cta_type || 'order_now'
+  return cta === 'use_coupon' || cta === 'order_now'
+}
+
+export function DealCard({
+  deal,
+  canRedeem: canRedeemProp,
+}: {
+  deal: DealRecord
+  canRedeem?: boolean
+}) {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const { user } = useAppSelector((state) => state.auth)
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !user || user.role !== 'RESTAURANT',
+  })
+  const dealRedeemGate = getDealRedeemGate(entitlementsData?.entitlements)
+  const canRedeem = canRedeemProp ?? dealRedeemGate.canRedeem
+  const redeemCopy = LIMIT_UPGRADE_COPY.deal_redemptions_per_day
   const [recordInteraction] = useRecordDealInteractionMutation()
   const [redeemCoupon] = useUseDealCouponMutation()
   const [messageFromDeal, { isLoading: messaging }] = useMessageFromDealMutation()
@@ -93,6 +126,15 @@ export function DealCard({ deal }: { deal: DealRecord }) {
   const handleCta = async () => {
     await trackClick()
     const cta = deal.cta_type || 'order_now'
+
+    if (!canRedeem && ctaNeedsRedeem(deal)) {
+      openBrowseUpgrade(dispatch, {
+        currentPlan: dealRedeemGate.planName ?? 'Free',
+        upgradeUrl: '/app/settings?tab=subscription',
+      })
+      toast(dealRedeemGate.message || redeemCopy.value, { icon: '🔒' })
+      return
+    }
 
     if (cta === 'use_coupon') {
       try {
@@ -165,7 +207,11 @@ export function DealCard({ deal }: { deal: DealRecord }) {
         ) : null}
         {deal.coupon_code ? (
           <p className="text-xs font-mono bg-[var(--app-muted)] px-2 py-1 rounded inline-block">
-            Code: {String(deal.coupon_code)}
+            {canRedeem ? (
+              <>Code: {String(deal.coupon_code)}</>
+            ) : (
+              <>Apply limit reached — upgrade for more redemptions</>
+            )}
           </p>
         ) : null}
         {deal.description ? (
@@ -173,8 +219,12 @@ export function DealCard({ deal }: { deal: DealRecord }) {
         ) : null}
         <p className="text-xs text-[var(--text-muted)]">Valid until {formatValidUntil(deal)}</p>
         <Button size="sm" className="w-full" onClick={handleCta} disabled={messaging}>
-          <CtaIcon cta={String(deal.cta_type || 'order_now')} />
-          {ctaLabel(deal)}
+          {!canRedeem && ctaNeedsRedeem(deal) ? (
+            <Lock className="h-4 w-4 mr-2" />
+          ) : (
+            <CtaIcon cta={String(deal.cta_type || 'order_now')} />
+          )}
+          {!canRedeem && ctaNeedsRedeem(deal) ? 'Daily limit reached' : ctaLabel(deal)}
         </Button>
       </CardContent>
     </Card>
