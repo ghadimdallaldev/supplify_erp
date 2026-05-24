@@ -1,0 +1,73 @@
+# Tenant registration & account activation
+
+New users register in Keycloak, complete organization setup in Supplify, then unlock the workspace by choosing a subscription plan (including self-service **Free**).
+
+## Personas
+
+| Role after setup | Signup path                         | Default lock                          |
+| ---------------- | ----------------------------------- | ------------------------------------- |
+| **RESTAURANT**   | `/register/complete` → Restaurant   | `pending_activation` on Free plan row |
+| **SUPPLIER**     | `/register/complete` → Supplier     | Same                                  |
+| **PENDING**      | Until `POST /api/register/complete` | No tenant APIs                        |
+
+## Registration flow
+
+1. User opens **Register** on `/login` → Keycloak hosted registration (`GET /auth/register`).
+2. On first login, `app_user.role` is **PENDING**; web redirects to `/register/complete`.
+3. User selects **Restaurant** or **Supplier**, enters business name and optional phone.
+4. `POST /api/register/complete` creates tenant, org, roles, catalog (supplier), default warehouse (supplier), and a subscription row with `lock_reason = pending_activation`.
+5. User is redirected to `/app/activate` (billing middleware blocks other app routes until unlocked).
+
+`AuthGuard` sends users with `role === PENDING` or `needsSetup === true` back to `/register/complete`. After complete, the client refetches `GET /auth/me` before navigating into the app shell.
+
+## Activation flow
+
+While `pending_activation` is set (`account_locked_at` + `lock_reason` on `subscription`):
+
+| Action                           | UI                                                                                             | API                                                                   |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **Activate free plan** (no card) | `/app/activate` → **Activate free plan**, or upgrade modal **Activate free plan** on Free tier | `POST /api/billing/checkout` with Free `planId`, no `paymentMethodId` |
+| **Paid plan**                    | **Compare plans & pay** → payment modal                                                        | `POST /api/billing/checkout` with card / saved method                 |
+| **Admin unlock**                 | Admin console                                                                                  | Admin subscription unlock (unchanged)                                 |
+
+Free checkout calls `applyFreePlan`, which clears `account_locked_at` and `lock_reason` and records `account.activated` in `billing_event`.
+
+## API
+
+| Method | Path                     | Auth    | Notes                                                  |
+| ------ | ------------------------ | ------- | ------------------------------------------------------ |
+| GET    | `/api/register/status`   | Session | `{ needsSetup: boolean }`                              |
+| POST   | `/api/register/complete` | Session | Body: `accountType`, `businessName`, `phone?`          |
+| GET    | `/api/billing/status`    | Tenant  | Includes `access.pendingActivation`, `access.isLocked` |
+| POST   | `/api/billing/checkout`  | Tenant  | Free plan does not require `paymentMethodId`           |
+
+Allowed while locked: `/api/register/*`, `/api/billing/*`, `/api/subscriptions/entitlements` (GET), auth routes.
+
+## Web modules
+
+| File                        | Role                                                           |
+| --------------------------- | -------------------------------------------------------------- |
+| `RegisterCompletePage.tsx`  | Tenant type + business name form                               |
+| `AccountActivationPage.tsx` | Activation gate; free + paid CTAs                              |
+| `lib/activateFreePlan.ts`   | One-click free checkout helper                                 |
+| `UpgradeModal.tsx`          | Plan compare; pending users get **Activate free plan** on Free |
+| `PaymentModal.tsx`          | Skips card when `planCode === free` or charge is $0            |
+
+## Tests
+
+| Layer            | File                                                                |
+| ---------------- | ------------------------------------------------------------------- |
+| Unit (API)       | `apps/api/src/lib/register-account.test.js` (restaurant + supplier) |
+| Unit (API)       | `apps/api/src/routes/register.routes.test.js`                       |
+| Unit (API)       | `apps/api/src/lib/billing/billing-service.test.js` (free unlock)    |
+| Unit (API)       | `apps/api/src/routes/billing.routes.test.js`                        |
+| Unit (API)       | `apps/api/src/middlewares/billingAccess.test.js`                    |
+| Unit (web)       | `apps/web/src/lib/activateFreePlan.test.ts`                         |
+| API (Playwright) | `tests/api/registration-activation.spec.ts`                         |
+| Manual QA        | `docs/qa/MANUAL_TEST_CHECKLIST.md` — CRST-_ / CSUP-_                |
+
+## QA references
+
+- Restaurant: Part 1 (`CRST-01` … `CRST-28`)
+- Supplier: Part 2 (`CSUP-01` … `CSUP-13+`)
+- Stub card for paid tiers: `4242424242424242` when `BILLING_GATEWAY=stub`

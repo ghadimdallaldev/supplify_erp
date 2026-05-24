@@ -27,6 +27,10 @@ After seed (`scripts\run-local.cmd seed` or `pnpm db:seed` + `pnpm seed:demo-use
 | Supplier       | `supplier@supplify.com`   | same                                      |
 | Platform admin | `admin@supplify.com`      | same                                      |
 
+## New tenant signup & activation
+
+Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` (Free tier without a card, or paid checkout). See [tenant-registration-activation.md](../features/tenant-registration-activation.md) and QA Part 1–2 in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md).
+
 ## Roles & navigation
 
 The sidebar (`apps/web/src/components/Sidebar.tsx`) adapts by role and admin impersonation:

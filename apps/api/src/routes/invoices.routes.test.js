@@ -34,6 +34,7 @@ vi.mock('../lib/rbac.js', () => ({
 }))
 
 vi.mock('../lib/subscription.js', () => ({
+  requireFeature: () => (_req, _res, next) => next(),
   checkLimit: vi
     .fn()
     .mockResolvedValue({ allowed: true, current: 0, limit: 100, isOverLimit: false }),

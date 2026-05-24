@@ -9,6 +9,14 @@ vi.mock('./logger.js', () => ({
 vi.mock('./billing/subscription-activation.js', () => ({
   createPendingActivationSubscription: (...args) => mockCreatePendingActivation(...args),
 }))
+vi.mock('./cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('./feature-flags.js', () => ({
+  resolveAllFeaturesForTenant: vi.fn().mockResolvedValue({ features: {}, featureSources: {} }),
+}))
 
 describe('Subscription lib', () => {
   beforeEach(() => {
@@ -260,39 +268,46 @@ describe('Subscription lib', () => {
   describe('getEntitlements', () => {
     it('applies overrides to limits and excludes expired', async () => {
       const { getEntitlements } = await import('./subscription.js')
-      mockQuery
-        .mockResolvedValueOnce({
-          rows: [{ id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'sub-1',
-              plan_id: 'p1',
-              plan_name: 'Free',
-              plan_code: 'free',
-              limits: { chats_per_day: 10 },
-              features: {},
-              tenant_type: 'SUPPLIER',
-            },
-          ],
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              limitKey: 'chats_per_day',
-              value: 20,
-              expiresAt: new Date(Date.now() + 86400000).toISOString(),
-            },
-          ],
-        })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
-        .mockResolvedValueOnce({ rows: [{ c: 0 }] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ current_value: 5 }] })
-        .mockResolvedValueOnce({ rows: [] })
+      const subRow = {
+        id: 'sub-1',
+        plan_id: 'p1',
+        plan_name: 'Free',
+        plan_code: 'free',
+        limits: { chats_per_day: 10 },
+        features: {},
+        tenant_type: 'SUPPLIER',
+        plan_display_name: 'Free',
+        plan_price_per_month: 0,
+        plan_price_per_year: null,
+        plan_tenant_type: 'SUPPLIER',
+        pending_plan_id: null,
+        pending_effective_at: null,
+      }
+      mockQuery.mockImplementation((sql) => {
+        const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('pending_plan_id') && text.includes('FROM subscription'))
+          return Promise.resolve({
+            rows: [
+              { id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null },
+            ],
+          })
+        if (text.includes('FROM subscription s') && text.includes('JOIN subscription_plan'))
+          return Promise.resolve({ rows: [subRow] })
+        if (text.includes('tenant_limit_override'))
+          return Promise.resolve({
+            rows: [
+              {
+                limitKey: 'chats_per_day',
+                value: 20,
+                reason: 'promo',
+                expiresAt: new Date(Date.now() + 86400000).toISOString(),
+              },
+            ],
+          })
+        if (text.includes('COUNT(*)') || text.includes('current_value'))
+          return Promise.resolve({ rows: [{ c: 0, current_value: 5 }] })
+        return Promise.resolve({ rows: [] })
+      })
 
       const result = await getEntitlements('tenant-1', 'SUPPLIER')
 

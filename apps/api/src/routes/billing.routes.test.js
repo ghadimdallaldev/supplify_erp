@@ -6,6 +6,7 @@ const getBillingStatus = vi.fn()
 const listPaymentMethods = vi.fn()
 const setAutoRenew = vi.fn()
 const listBillingGateways = vi.fn()
+const checkoutSubscription = vi.fn()
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, res, next) => {
@@ -25,7 +26,7 @@ vi.mock('../lib/billing/billing-service.js', () => ({
   listPaymentMethods,
   addPaymentMethod: vi.fn(),
   removePaymentMethod: vi.fn(),
-  checkoutSubscription: vi.fn(),
+  checkoutSubscription,
   payOpenInvoices: vi.fn(),
   setAutoRenew,
 }))
@@ -49,6 +50,7 @@ describe('billing.routes', () => {
     getBillingStatus.mockReset()
     listPaymentMethods.mockReset()
     setAutoRenew.mockReset()
+    checkoutSubscription.mockReset()
     listBillingGateways.mockReturnValue(['stub', 'manual'])
 
     app = express()
@@ -96,5 +98,35 @@ describe('billing.routes', () => {
 
     expect(res.body.data.autoRenew).toBe(false)
     expect(setAutoRenew).toHaveBeenCalledWith('rest-1', 'RESTAURANT', false)
+  })
+
+  it('POST /checkout completes free plan without payment method', async () => {
+    checkoutSubscription.mockResolvedValue({
+      success: true,
+      plan: 'free',
+      pendingActivation: false,
+      activated: true,
+    })
+
+    const res = await request(app)
+      .post('/api/billing/checkout')
+      .send({
+        planId: '00000000-0000-4000-8000-000000000099',
+        billingCycle: 'MONTHLY',
+        idempotencyKey: 'free-activate-test-key-01',
+      })
+      .expect(200)
+
+    expect(res.body.data.success).toBe(true)
+    expect(res.body.data.activated).toBe(true)
+    expect(checkoutSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'rest-1',
+        tenantType: 'RESTAURANT',
+        planId: '00000000-0000-4000-8000-000000000099',
+        billingCycle: 'MONTHLY',
+        paymentMethodId: undefined,
+      })
+    )
   })
 })

@@ -109,4 +109,19 @@ describe('register.routes', () => {
 
     expect(res.body.error.name).toBe('CONFLICT')
   })
+
+  it('POST /complete validates accountType enum', async () => {
+    userNeedsTenantSetup.mockResolvedValue(true)
+
+    const res = await request(app)
+      .post('/api/register/complete')
+      .send({
+        accountType: 'INVALID',
+        businessName: 'Test',
+      })
+      .expect(400)
+
+    expect(res.body.error.name).toBe('VALIDATION_ERROR')
+    expect(completeTenantRegistration).not.toHaveBeenCalled()
+  })
 })

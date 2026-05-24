@@ -9,6 +9,18 @@ features:
       - e2e/suites/smoke/smoke.spec.ts
       - e2e/suites/critical_e2e/auth.spec.ts
 
+  - id: tenant_registration
+    name: Tenant registration
+    description: Post-Keycloak organization setup for restaurant and supplier
+    test_files:
+      - api/registration-activation.spec.ts
+
+  - id: billing_activation
+    name: Billing account activation
+    description: pending_activation lock, free plan checkout, billing API access while locked
+    test_files:
+      - api/registration-activation.spec.ts
+
   - id: rbac
     name: Role-based access control
     description: Restaurant/supplier cannot access admin UI and admin API returns 401/403

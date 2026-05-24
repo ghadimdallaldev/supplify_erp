@@ -26,8 +26,15 @@ vi.mock('../lib/impersonation.js', () => ({
 
 const mockGetEntitlements = vi.fn()
 vi.mock('../lib/audit.js', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('../lib/billing/billing-service.js', () => ({
+  unlockSubscriptionAccount: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('../lib/conversion-events.js', () => ({
+  recordConversionEvent: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('../lib/subscription.js', () => ({
   getEntitlements: (...args) => mockGetEntitlements(...args),
+  invalidateTenantSubscriptionCache: vi.fn().mockResolvedValue(undefined),
   RESTAURANT_LIMIT_KEYS: [
     'branches',
     'users',
@@ -214,7 +221,11 @@ describe('Admin Dashboard Routes', () => {
       expect(disabled).not.toContain('inventory_management')
       expect(disabled).not.toContain('approvals_budgets')
       expect(disabled).not.toContain('feature_flags_access')
-      expect(enabled.some((k) => ['custom_branding', 'approvals_budgets', 'feature_flags_access'].includes(k))).toBe(true)
+      expect(
+        enabled.some((k) =>
+          ['custom_branding', 'approvals_budgets', 'feature_flags_access'].includes(k)
+        )
+      ).toBe(true)
     })
   })
 

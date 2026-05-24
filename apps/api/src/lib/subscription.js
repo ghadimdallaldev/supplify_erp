@@ -889,15 +889,20 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
   const featureKeysToCheck = ['reports', 'smart_reorder', 'multi_branch']
   for (const fk of featureKeysToCheck) {
     if (features[fk]) continue
-    blockedFeatureKeys.push(fk)
+    let unlockedAbove = false
     for (let i = effectiveCurrentIndex + 1; i < planRows.length; i++) {
       const p = planRows[i]
       const v = p.features?.[fk]
       const enabled = typeof v === 'boolean' ? v : v && v !== 'false' && v !== 'disabled'
       if (enabled) {
+        unlockedAbove = true
         unlocksFeaturesSet.add(fk)
         break
       }
+    }
+    if (unlockedAbove) {
+      blockedFeatureKeys.push(fk)
+      if (!triggeredBy) triggeredBy = { type: 'feature', key: fk }
     }
   }
 
@@ -935,8 +940,6 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
     (blockedLimitKeys.length || blockedFeatureKeys.length)
   )
     recommendedIndex = effectiveCurrentIndex + 1
-  if (recommendedIndex >= planRows.length) recommendedIndex = planRows.length - 1
-  if (recommendedIndex <= effectiveCurrentIndex) recommendedIndex = effectiveCurrentIndex + 1
   if (recommendedIndex >= planRows.length) recommendedIndex = planRows.length - 1
 
   const recommended = planRows[recommendedIndex]

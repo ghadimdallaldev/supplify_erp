@@ -3,6 +3,8 @@
 | Feature / module        | Smoke                                      | Critical E2E                                                                                                  | Nightly                    | API                      |
 | ----------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------ |
 | **Auth**                | Login page loads; unauthenticated redirect | Session persistence; logout                                                                                   | —                          | —                        |
+| **Tenant registration** | —                                          | —                                                                                                             | —                          | Register routes 401      |
+| **Billing activation**  | —                                          | —                                                                                                             | —                          | Billing checkout 401     |
 | **RBAC**                | —                                          | Restaurant and supplier cannot access admin UI                                                                | —                          | Admin overview/plans 401 |
 | **Orders**              | —                                          | Orders→cart; supplier inbox; supplier fulfill (ack→ship→deliver); supplier decline; restaurant sees delivered | —                          | —                        |
 | **Catalog**             | —                                          | Restaurant & supplier open products; restaurant search and add to cart                                        | —                          | —                        |
@@ -15,7 +17,7 @@
 - **Smoke**: `e2e/suites/smoke/smoke.spec.ts`
 - **Critical E2E**: `e2e/suites/critical_e2e/` — `auth.spec.ts`, `rbac.spec.ts`, `orders.spec.ts`, `catalog.spec.ts`, `subscription-limits.spec.ts`
 - **Nightly**: `e2e/suites/nightly/nightly.spec.ts`
-- **API**: `api/admin-rbac.spec.ts`
+- **API**: `api/admin-rbac.spec.ts`, `api/registration-activation.spec.ts`
 
 ## Feature inventory
 

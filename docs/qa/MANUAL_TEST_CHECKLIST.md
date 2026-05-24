@@ -89,14 +89,14 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 1.2 Activation lock & plan selection
 
-| ID      | Steps                                                                                                                                         | Expected                                                                                                    | Pass? |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----- |
-| CRST-06 | On `/app/activate`: inspect page                                                                                                              | Activation banner; **Compare plans & pay** or **Activate** button visible; no other app sections accessible |       |
-| CRST-07 | Click **Compare plans & pay**                                                                                                                 | Billing/upgrade modal opens; plan comparison table shows Free, Bronze, Gold, Platinum                       |       |
-| CRST-08 | Select **Free plan** → confirm                                                                                                                | Subscription set to Free; activation lock cleared; redirected to dashboard                                  |       |
-| CRST-09 | (New session) Repeat CRST-01–CRST-04 with a second account; select **Bronze plan**; enter stub card `4242424242424242`, any future expiry/CVC | Subscription ACTIVE Bronze; redirected to dashboard                                                         |       |
-| CRST-10 | (New session) Repeat with **Gold plan**                                                                                                       | Subscription ACTIVE Gold; redirected to dashboard                                                           |       |
-| CRST-11 | Verify `GET /api/subscriptions/entitlements/current` for each account                                                                         | `plan.code` matches the selected plan; `features` object reflects plan tier                                 |       |
+| ID      | Steps                                                                                                                                         | Expected                                                                                                        | Pass? |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----- |
+| CRST-06 | On `/app/activate`: inspect page                                                                                                              | Activation banner; **Activate free plan** and **Compare plans & pay** visible; no other app sections accessible |       |
+| CRST-07 | Click **Activate free plan** (or **Compare plans & pay** → Free → confirm)                                                                    | Subscription Free ACTIVE; `pending_activation` cleared; redirected to dashboard                                 |       |
+| CRST-08 | (Alt) Use upgrade modal: **Compare plans & pay** → Free tier **Activate free plan** → confirm (no card)                                       | Same as CRST-07                                                                                                 |       |
+| CRST-09 | (New session) Repeat CRST-01–CRST-04 with a second account; select **Bronze plan**; enter stub card `4242424242424242`, any future expiry/CVC | Subscription ACTIVE Bronze; redirected to dashboard                                                             |       |
+| CRST-10 | (New session) Repeat with **Gold plan**                                                                                                       | Subscription ACTIVE Gold; redirected to dashboard                                                               |       |
+| CRST-11 | Verify `GET /api/subscriptions/entitlements/current` for each account                                                                         | `plan.code` matches the selected plan; `features` object reflects plan tier                                     |       |
 
 ## 1.3 Post-activation state (Free restaurant)
 
@@ -147,13 +147,14 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 2.2 Activation lock & plan selection
 
-| ID      | Steps                                                  | Expected                                                      | Pass? |
-| ------- | ------------------------------------------------------ | ------------------------------------------------------------- | ----- |
-| CSUP-05 | On `/app/activate`: click **Compare plans & pay**      | Plan modal shows supplier plans: Free, Bronze, Gold, Platinum |       |
-| CSUP-06 | Select **Free plan** → confirm                         | Subscription Free ACTIVE; redirected to dashboard             |       |
-| CSUP-07 | (New session) Repeat with **Bronze plan** + stub card  | Bronze ACTIVE                                                 |       |
-| CSUP-08 | (New session) Repeat with **Gold plan** + stub card    | Gold ACTIVE                                                   |       |
-| CSUP-09 | `GET /api/subscriptions/entitlements/current` for each | `plan.code` and `features` correct per plan                   |       |
+| ID       | Steps                                                         | Expected                                                                        | Pass? |
+| -------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----- |
+| CSUP-05  | On `/app/activate`: inspect page                              | **Activate free plan** and **Compare plans & pay** visible                      |       |
+| CSUP-06  | Click **Activate free plan** (no card required)               | Subscription Free ACTIVE; `pending_activation` cleared; redirected to dashboard |       |
+| CSUP-06b | (Alt) **Compare plans & pay** → Free → **Activate free plan** | Same as CSUP-06                                                                 |       |
+| CSUP-07  | (New session) Repeat with **Bronze plan** + stub card         | Bronze ACTIVE                                                                   |       |
+| CSUP-08  | (New session) Repeat with **Gold plan** + stub card           | Gold ACTIVE                                                                     |       |
+| CSUP-09  | `GET /api/subscriptions/entitlements/current` for each        | `plan.code` and `features` correct per plan                                     |       |
 
 ## 2.3 Post-activation state (Free supplier)
 
