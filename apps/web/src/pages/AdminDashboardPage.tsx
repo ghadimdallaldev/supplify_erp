@@ -67,6 +67,7 @@ import { formatCurrency } from '../utils/format'
 import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
 import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
 import { AdminLimitOverridesPanel } from '../components/admin/AdminLimitOverridesPanel'
+import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -87,13 +88,33 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [plansTenantFilter, setPlansTenantFilter] = useState<'RESTAURANT' | 'SUPPLIER' | undefined>(
     undefined
   )
-  const { data: overview, isLoading: overviewLoading } = useGetAdminOverviewQuery()
-  const { data: conversionStats } = useGetAdminConversionStatsQuery({ days: 30 })
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    refetch: refetchOverview,
+    isFetching: overviewFetching,
+  } = useGetAdminOverviewQuery(undefined, { skip: selectedTab !== 'overview' })
+  const [overviewLastUpdated, setOverviewLastUpdated] = useState<Date | null>(null)
+  const [tenantSearch, setTenantSearch] = useState('')
+
+  useEffect(() => {
+    if (overview && !overviewLoading) {
+      setOverviewLastUpdated(new Date())
+    }
+  }, [overview, overviewLoading])
+  const { data: conversionStats } = useGetAdminConversionStatsQuery(
+    { days: 30 },
+    { skip: selectedTab !== 'overview' }
+  )
   const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery(
-    plansTenantFilter ? { tenant_type: plansTenantFilter } : {}
+    plansTenantFilter ? { tenant_type: plansTenantFilter } : {},
+    { skip: selectedTab !== 'plans' }
   )
   const { data: subscriptionsData, isLoading: subscriptionsLoading } =
-    useGetAdminSubscriptionsQuery({})
+    useGetAdminSubscriptionsQuery(
+      {},
+      { skip: !['subscriptions', 'plans', 'usage'].includes(selectedTab) }
+    )
 
   // Deduplicate plans by (code, tenant_type), exclude enterprise
   const plans =
@@ -122,14 +143,17 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     data: auditLogsData,
     isLoading: auditLoading,
     refetch: refetchAudit,
-  } = useGetAdminAuditLogsQuery({
-    limit: auditPageSize,
-    offset: auditOffset,
-    ...(auditActionType !== 'all' && { actionType: auditActionType }),
-    ...(auditDateFrom && { dateFrom: auditDateFrom }),
-    ...(auditDateTo && { dateTo: auditDateTo }),
-    ...(auditSearch && { search: auditSearch }),
-  })
+  } = useGetAdminAuditLogsQuery(
+    {
+      limit: auditPageSize,
+      offset: auditOffset,
+      ...(auditActionType !== 'all' && { actionType: auditActionType }),
+      ...(auditDateFrom && { dateFrom: auditDateFrom }),
+      ...(auditDateTo && { dateTo: auditDateTo }),
+      ...(auditSearch && { search: auditSearch }),
+    },
+    { skip: selectedTab !== 'audit' }
+  )
   const [activityType, setActivityType] = useState('all')
   const [activityOffset, setActivityOffset] = useState(0)
   const activityPageSize = 30
@@ -137,28 +161,34 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     data: activityData,
     isLoading: activityLoading,
     refetch: refetchActivity,
-  } = useGetAdminActivityQuery({
-    limit: activityPageSize,
-    offset: activityOffset,
-    ...(activityType !== 'all' && { type: activityType }),
-  })
+  } = useGetAdminActivityQuery(
+    {
+      limit: activityPageSize,
+      offset: activityOffset,
+      ...(activityType !== 'all' && { type: activityType }),
+    },
+    { skip: selectedTab !== 'activity' }
+  )
 
-  const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery()
+  const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery(
+    undefined,
+    { skip: selectedTab !== 'health' }
+  )
   const { data: financeData, isLoading: financeLoading } = (
     api as any
-  ).useGetAdminFinancialOverviewQuery()
+  ).useGetAdminFinancialOverviewQuery(undefined, { skip: selectedTab !== 'finance' })
 
   // Load tenant data
   const {
     data: suppliersData,
     isLoading: suppliersLoading,
     error: suppliersError,
-  } = useGetAdminSuppliersQuery()
+  } = useGetAdminSuppliersQuery(undefined, { skip: selectedTab !== 'tenants' })
   const {
     data: restaurantsData,
     isLoading: restaurantsLoading,
     error: restaurantsError,
-  } = useGetAdminRestaurantsQuery()
+  } = useGetAdminRestaurantsQuery(undefined, { skip: selectedTab !== 'tenants' })
 
   const [createPlan] = useCreateAdminPlanMutation()
   const [updatePlan] = useUpdateAdminPlanMutation()
@@ -399,6 +429,14 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             </div>
           ) : (
             <>
+              <AdminOverviewExtras
+                overview={overview}
+                onNavigateTab={setSelectedTab}
+                onRefresh={() => refetchOverview()}
+                refreshing={overviewFetching}
+                lastUpdated={overviewLastUpdated}
+              />
+
               {/* Alerts banner — only visible if there are issues */}
               {((overview?.alerts?.pastDueSubscriptions || 0) > 0 ||
                 (overview?.alerts?.trialsExpiringSoon || 0) > 0) && (
@@ -1657,7 +1695,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         </TabsContent>
 
         <TabsContent value="tenants" className="space-y-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <h2 className="text-2xl font-bold text-[var(--text)]">
               {initialTab === 'suppliers'
                 ? 'Supplier Management'
@@ -1665,12 +1703,42 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   ? 'Restaurant Management'
                   : 'Tenant Management'}
             </h2>
+            {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
+                <Input
+                  className="pl-8 h-9"
+                  placeholder="Search suppliers or restaurants…"
+                  value={tenantSearch}
+                  onChange={(e) => setTenantSearch(e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           {(() => {
             // Show only suppliers or restaurants based on initialTab
             const showSuppliersOnly = initialTab === 'suppliers'
             const showRestaurantsOnly = initialTab === 'restaurants'
+            const q = tenantSearch.trim().toLowerCase()
+            const filteredSuppliers =
+              suppliersData?.suppliers?.filter((s: { name?: string; contact_email?: string }) => {
+                if (!q) return true
+                return (
+                  (s.name || '').toLowerCase().includes(q) ||
+                  (s.contact_email || '').toLowerCase().includes(q)
+                )
+              }) ?? []
+            const filteredRestaurants =
+              restaurantsData?.restaurants?.filter(
+                (r: { name?: string; contact_email?: string }) => {
+                  if (!q) return true
+                  return (
+                    (r.name || '').toLowerCase().includes(q) ||
+                    (r.contact_email || '').toLowerCase().includes(q)
+                  )
+                }
+              ) ?? []
 
             return (
               <div className="space-y-6">
@@ -1694,9 +1762,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <div className="flex justify-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
-                      ) : !suppliersData?.suppliers || suppliersData.suppliers.length === 0 ? (
+                      ) : !filteredSuppliers.length ? (
                         <p className="text-center py-8 text-[var(--text-muted)]">
-                          No suppliers found
+                          {q ? 'No suppliers match your search' : 'No suppliers found'}
                         </p>
                       ) : (
                         <div className="overflow-x-auto">
@@ -1727,7 +1795,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                               </tr>
                             </thead>
                             <tbody>
-                              {suppliersData.suppliers.map((supplier: any) => (
+                              {filteredSuppliers.map((supplier: any) => (
                                 <tr
                                   key={supplier.id}
                                   className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
@@ -1863,10 +1931,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <div className="flex justify-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
-                      ) : !restaurantsData?.restaurants ||
-                        restaurantsData.restaurants.length === 0 ? (
+                      ) : !filteredRestaurants.length ? (
                         <p className="text-center py-8 text-[var(--text-muted)]">
-                          No restaurants found
+                          {q ? 'No restaurants match your search' : 'No restaurants found'}
                         </p>
                       ) : (
                         <div className="overflow-x-auto">
@@ -1894,7 +1961,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                               </tr>
                             </thead>
                             <tbody>
-                              {restaurantsData.restaurants.map((restaurant: any) => (
+                              {filteredRestaurants.map((restaurant: any) => (
                                 <tr
                                   key={restaurant.id}
                                   className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"

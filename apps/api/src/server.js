@@ -186,6 +186,26 @@ const chatSendLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const skipReadOnlyRequests = (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
+
+const ordersWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 120 : 500,
+  message: 'Too many order requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipReadOnlyRequests,
+})
+
+const promotionsWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 80 : 400,
+  message: 'Too many promotion requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipReadOnlyRequests,
+})
+
 app.use('/auth', authLimiter)
 app.use('/api/public', publicLimiter)
 app.use(limiter)
@@ -257,8 +277,10 @@ app.use('/api/inventory', inventoryRoutes)
 app.use('/api/suppliers', suppliersRoutes)
 app.use('/api/restaurants', restaurantsRoutes)
 app.use('/api/orders/calendar', ordersCalendarRoutes)
+app.use('/api/orders', ordersWriteLimiter)
 app.use('/api/orders', ordersRoutes)
 app.use('/api/approvals', approvalsRoutes)
+app.use('/api/promotions', promotionsWriteLimiter)
 app.use('/api/promotions', promotionsRoutes)
 app.use('/api/audit', tenantAuditRoutes)
 app.use('/api/disputes', disputesRoutes)

@@ -27,7 +27,13 @@ vi.mock('../lib/rbac.js', () => ({
     }
     next()
   },
+  resolveAdminContext: (req, res, next) => {
+    req.adminContext = { permissions: ['ADMIN_ACCESS'] }
+    next()
+  },
   requirePermission: () => (req, res, next) => next(),
+  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
+  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -47,6 +53,7 @@ vi.mock('../services/deal-promotions.service.js', () => ({
   createDealPromotionCampaign: vi.fn(),
   getDealAnalytics: vi.fn(),
   enrichPromotionRow: vi.fn(async (row) => row),
+  enrichPromotionRows: vi.fn(async (rows) => rows),
   getEligibleProductsForDeal: vi.fn(),
   getActiveDealPromotion: vi.fn(),
   previewDealForCart: vi.fn(),

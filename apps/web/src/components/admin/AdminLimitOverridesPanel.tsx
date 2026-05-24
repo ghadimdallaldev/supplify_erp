@@ -1,6 +1,4 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Badge } from '../ui/badge'
+import { useMemo, useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
@@ -13,7 +11,8 @@ import {
   useUpdateAdminPlanLimitOverrideMutation,
 } from '../../services/api'
 import toast from 'react-hot-toast'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Search } from 'lucide-react'
+import { AdminEmptyState, AdminLoadingState, AdminStatusBadge } from './adminUi'
 
 export function AdminLimitOverridesPanel() {
   const [tenantType, setTenantType] = useState<'RESTAURANT' | 'SUPPLIER'>('RESTAURANT')
@@ -21,6 +20,8 @@ export function AdminLimitOverridesPanel() {
   const [limitKey, setLimitKey] = useState('')
   const [overrideValue, setOverrideValue] = useState('')
   const [reason, setReason] = useState('')
+  const [overrideSearch, setOverrideSearch] = useState('')
+  const [overrideScope, setOverrideScope] = useState<'all' | 'tenant' | 'plan'>('all')
 
   const { data: keysData } = useGetAdminLimitKeysQuery({ tenantType })
   const { data, isLoading, refetch } = useGetAdminLimitOverridesQuery({})
@@ -31,6 +32,38 @@ export function AdminLimitOverridesPanel() {
   const keys = keysData?.keys || []
   const tenantOverrides = data?.tenantOverrides || []
   const planOverrides = data?.planOverrides || []
+
+  const q = overrideSearch.trim().toLowerCase()
+  const filteredTenantOverrides = useMemo(() => {
+    if (overrideScope === 'plan') return []
+    return tenantOverrides.filter((row) => {
+      if (!q) return true
+      return (
+        String(row.limit_type).toLowerCase().includes(q) ||
+        String(row.tenant_id).toLowerCase().includes(q) ||
+        String(row.tenant_type).toLowerCase().includes(q) ||
+        String(row.reason || '')
+          .toLowerCase()
+          .includes(q)
+      )
+    })
+  }, [tenantOverrides, q, overrideScope])
+
+  const filteredPlanOverrides = useMemo(() => {
+    if (overrideScope === 'tenant') return []
+    return planOverrides.filter((row) => {
+      if (!q) return true
+      return (
+        String(row.limit_type).toLowerCase().includes(q) ||
+        String(row.plan_code || row.plan_name || '')
+          .toLowerCase()
+          .includes(q) ||
+        String(row.reason || '')
+          .toLowerCase()
+          .includes(q)
+      )
+    })
+  }, [planOverrides, q, overrideScope])
 
   const handleCreatePlanOverride = async () => {
     if (!planId.trim() || !limitKey || !overrideValue) {
@@ -75,21 +108,21 @@ export function AdminLimitOverridesPanel() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-      <motion.div>
+    <div className="space-y-6">
+      <div>
         <h2 className="text-lg font-bold text-[var(--text)]">Limit overrides</h2>
         <p className="text-sm text-[var(--text-muted)]">
-          Increase plan or tenant limits for testing. Overrides cannot reduce limits below the plan
-          default.
+          View and manage plan-tier and tenant-specific limit increases. Overrides cannot reduce
+          limits below the plan default.
         </p>
-      </motion.div>
+      </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Add plan-tier override</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <motion.div>
+          <div>
             <Label>Tenant type</Label>
             <select
               className="mt-1 h-10 w-full rounded-md border px-3 text-sm"
@@ -99,16 +132,16 @@ export function AdminLimitOverridesPanel() {
               <option value="RESTAURANT">Restaurant</option>
               <option value="SUPPLIER">Supplier</option>
             </select>
-          </motion.div>
-          <motion.div>
+          </div>
+          <div>
             <Label>Plan ID (UUID)</Label>
             <Input
               value={planId}
               onChange={(e) => setPlanId(e.target.value)}
               placeholder="Plan UUID"
             />
-          </motion.div>
-          <motion.div>
+          </div>
+          <div>
             <Label>Limit key</Label>
             <select
               className="mt-1 h-10 w-full rounded-md border px-3 text-sm"
@@ -122,8 +155,8 @@ export function AdminLimitOverridesPanel() {
                 </option>
               ))}
             </select>
-          </motion.div>
-          <motion.div>
+          </div>
+          <div>
             <Label>Override value</Label>
             <Input
               type="number"
@@ -131,11 +164,11 @@ export function AdminLimitOverridesPanel() {
               value={overrideValue}
               onChange={(e) => setOverrideValue(e.target.value)}
             />
-          </motion.div>
-          <motion.div className="md:col-span-2">
+          </div>
+          <div className="md:col-span-2">
             <Label>Reason / note</Label>
             <Input value={reason} onChange={(e) => setReason(e.target.value)} />
-          </motion.div>
+          </div>
           <Button onClick={handleCreatePlanOverride} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save plan override'}
           </Button>
@@ -146,93 +179,163 @@ export function AdminLimitOverridesPanel() {
         <CardHeader>
           <CardTitle className="text-base">Active overrides</CardTitle>
         </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <Loader2 className="h-6 w-6 animate-spin" />
-          ) : (
-            <div className="space-y-4">
-              <motion.div>
-                <p className="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2">
-                  Tenant overrides
-                </p>
-                {tenantOverrides.length === 0 ? (
-                  <p className="text-sm text-[var(--text-muted)]">None</p>
-                ) : (
-                  tenantOverrides.map((row) => (
-                    <div
-                      key={String(row.id)}
-                      className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-3 mb-2"
-                    >
-                      <motion.div>
-                        <p className="font-medium text-sm">
-                          {String(row.limit_type)} → {String(row.override_value)}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          {String(row.tenant_type)} · {String(row.tenant_id).slice(0, 8)}…
-                          {row.reason ? ` · ${String(row.reason)}` : ''}
-                        </p>
-                      </motion.div>
-                      <motion.div className="flex items-center gap-2">
-                        <Badge variant={row.is_active === false ? 'outline' : 'secondary'}>
-                          {row.is_active === false ? 'inactive' : 'active'}
-                        </Badge>
-                        {row.is_active !== false ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => disableTenantOverride(String(row.id))}
-                          >
-                            Disable
-                          </Button>
-                        ) : null}
-                      </motion.div>
-                    </div>
-                  ))
-                )}
-              </motion.div>
-              <motion.div>
-                <p className="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2">
-                  Plan overrides
-                </p>
-                {planOverrides.length === 0 ? (
-                  <p className="text-sm text-[var(--text-muted)]">None</p>
-                ) : (
-                  planOverrides.map((row) => (
-                    <div
-                      key={String(row.id)}
-                      className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-3 mb-2"
-                    >
-                      <motion.div>
-                        <p className="font-medium text-sm">
-                          {String(row.plan_code || row.plan_name)} · {String(row.limit_type)} →{' '}
-                          {String(row.override_value)}
-                        </p>
-                        {row.reason ? (
-                          <p className="text-xs text-[var(--text-muted)]">{String(row.reason)}</p>
-                        ) : null}
-                      </motion.div>
-                      <motion.div className="flex items-center gap-2">
-                        <Badge variant={row.is_active === false ? 'outline' : 'secondary'}>
-                          {row.is_active === false ? 'inactive' : 'active'}
-                        </Badge>
-                        {row.is_active !== false ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => disablePlanOverride(String(row.id))}
-                          >
-                            Disable
-                          </Button>
-                        ) : null}
-                      </motion.div>
-                    </div>
-                  ))
-                )}
-              </motion.div>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <div>
+              <Label>Scope</Label>
+              <select
+                className="mt-1 h-9 rounded-md border px-2 text-sm"
+                value={overrideScope}
+                onChange={(e) => setOverrideScope(e.target.value as 'all' | 'tenant' | 'plan')}
+              >
+                <option value="all">All overrides</option>
+                <option value="tenant">Tenant only</option>
+                <option value="plan">Plan tier only</option>
+              </select>
             </div>
+            <div className="flex-1 min-w-[12rem]">
+              <Label>Search</Label>
+              <div className="relative mt-1">
+                <Search className="absolute left-2 top-2 h-4 w-4 text-[var(--text-muted)]" />
+                <Input
+                  className="pl-8 h-9"
+                  placeholder="Limit key, tenant ID, plan, reason…"
+                  value={overrideSearch}
+                  onChange={(e) => setOverrideSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <AdminLoadingState label="Loading overrides…" />
+          ) : (
+            <>
+              <div>
+                <p className="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2">
+                  Tenant overrides ({filteredTenantOverrides.length})
+                </p>
+                {filteredTenantOverrides.length === 0 ? (
+                  <AdminEmptyState
+                    title="No tenant overrides"
+                    description={
+                      tenantOverrides.length === 0
+                        ? 'No limit overrides have been added for individual tenants yet.'
+                        : 'No tenant overrides match your search.'
+                    }
+                  />
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
+                          <th className="px-3 py-2">Limit key</th>
+                          <th className="px-3 py-2">Value</th>
+                          <th className="px-3 py-2">Tenant</th>
+                          <th className="px-3 py-2">Reason</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {filteredTenantOverrides.map((row) => (
+                          <tr key={String(row.id)} className="hover:bg-[var(--brand-ultra)]/30">
+                            <td className="px-3 py-2 font-medium">{String(row.limit_type)}</td>
+                            <td className="px-3 py-2">{String(row.override_value)}</td>
+                            <td className="px-3 py-2 text-[var(--text-muted)]">
+                              {String(row.tenant_type)} · {String(row.tenant_id).slice(0, 8)}…
+                            </td>
+                            <td className="px-3 py-2 text-[var(--text-muted)] max-w-[10rem] truncate">
+                              {String(row.reason || '—')}
+                            </td>
+                            <td className="px-3 py-2">
+                              <AdminStatusBadge
+                                status={row.is_active === false ? 'inactive' : 'active'}
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {row.is_active !== false && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => disableTenantOverride(String(row.id))}
+                                >
+                                  Disable
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2">
+                  Plan overrides ({filteredPlanOverrides.length})
+                </p>
+                {filteredPlanOverrides.length === 0 ? (
+                  <AdminEmptyState
+                    title="No plan overrides"
+                    description={
+                      planOverrides.length === 0
+                        ? 'No plan-tier limit overrides configured yet.'
+                        : 'No plan overrides match your search.'
+                    }
+                  />
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
+                          <th className="px-3 py-2">Plan</th>
+                          <th className="px-3 py-2">Limit key</th>
+                          <th className="px-3 py-2">Value</th>
+                          <th className="px-3 py-2">Reason</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {filteredPlanOverrides.map((row) => (
+                          <tr key={String(row.id)} className="hover:bg-[var(--brand-ultra)]/30">
+                            <td className="px-3 py-2 font-medium">
+                              {String(row.plan_code || row.plan_name || '—')}
+                            </td>
+                            <td className="px-3 py-2">{String(row.limit_type)}</td>
+                            <td className="px-3 py-2">{String(row.override_value)}</td>
+                            <td className="px-3 py-2 text-[var(--text-muted)] max-w-[10rem] truncate">
+                              {String(row.reason || '—')}
+                            </td>
+                            <td className="px-3 py-2">
+                              <AdminStatusBadge
+                                status={row.is_active === false ? 'inactive' : 'active'}
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {row.is_active !== false && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => disablePlanOverride(String(row.id))}
+                                >
+                                  Disable
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   )
 }

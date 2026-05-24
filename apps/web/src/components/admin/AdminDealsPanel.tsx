@@ -1,4 +1,4 @@
-import { Badge } from '../ui/badge'
+import React, { Fragment, useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
@@ -13,45 +13,44 @@ import {
   useUpdateAdminPromotionPricingMutation,
 } from '../../services/api'
 import toast from 'react-hot-toast'
-import { Loader2, Check, X, DollarSign, Pause, Search } from 'lucide-react'
-import { useState } from 'react'
+import { Loader2, Check, X, DollarSign, Pause, Search, RefreshCw } from 'lucide-react'
+import { AdminEmptyState, AdminLoadingState, AdminStatusBadge, formatAdminDate } from './adminUi'
 
-const STATUS_OPTIONS = [
-  '',
-  'draft',
-  'pending_approval',
-  'pending_admin_approval',
-  'rejected',
-  'approved_pending_payment',
-  'scheduled',
-  'active',
-  'paused',
-  'expired',
-  'cancelled',
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'All statuses' },
+  { value: 'pending_review', label: 'Pending review' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'pending_approval', label: 'Pending approval' },
+  { value: 'pending_admin_approval', label: 'Pending admin approval' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'approved_pending_payment', label: 'Pending payment' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'active', label: 'Active' },
+  { value: 'paused', label: 'Paused' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
-function formatDate(value: unknown) {
-  if (!value) return '—'
-  const d = new Date(String(value))
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString()
-}
-
-function statusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (status === 'active') return 'default'
-  if (status.includes('pending')) return 'secondary'
-  if (status === 'rejected' || status === 'expired') return 'destructive'
-  return 'outline'
-}
+const TYPE_OPTIONS = ['percentage_off', 'fixed_off', 'bogo', 'bundle', 'free_shipping']
 
 export function AdminDealsPanel() {
-  const [statusFilter, setStatusFilter] = useState('pending_approval')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
-  const { data, isLoading, refetch } = useGetAdminDealsQuery({
-    status: statusFilter || undefined,
+  const apiStatus =
+    statusFilter === 'pending_review' ? 'pending_approval' : statusFilter || undefined
+
+  const { data, isLoading, refetch, isFetching } = useGetAdminDealsQuery({
+    status: apiStatus,
+    type: typeFilter || undefined,
     search: search.trim() || undefined,
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
   })
   const { data: insightsData } = useGetAdminDealInsightsQuery()
   const { data: pricingData, refetch: refetchPricing } = useGetPromotionPricingQuery()
@@ -120,11 +119,20 @@ export function AdminDealsPanel() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-[var(--text)]">Deals & promotions</h2>
-        <p className="text-sm text-[var(--text-muted)]">
-          Review supplier deals, activation payment status, and platform-wide deal insights.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--text)]">Deals & promotions</h2>
+          <p className="text-sm text-[var(--text-muted)]">
+            Review supplier deals, activation payment status, and platform-wide deal insights.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+        </Button>
       </div>
 
       {insights && (
@@ -164,16 +172,49 @@ export function AdminDealsPanel() {
             <div>
               <Label>Status</Label>
               <select
-                className="mt-1 h-9 rounded-md border px-2 text-sm"
+                className="mt-1 h-9 rounded-md border px-2 text-sm min-w-[10rem]"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 {STATUS_OPTIONS.map((s) => (
-                  <option key={s || 'all'} value={s}>
-                    {s ? s.replace(/_/g, ' ') : 'All statuses'}
+                  <option key={s.value || 'all'} value={s.value}>
+                    {s.label}
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <Label>Deal type</Label>
+              <select
+                className="mt-1 h-9 rounded-md border px-2 text-sm min-w-[10rem]"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="">All types</option>
+                {TYPE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>From date</Label>
+              <Input
+                type="date"
+                className="mt-1 h-9"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>To date</Label>
+              <Input
+                type="date"
+                className="mt-1 h-9"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
             </div>
             <div className="flex-1 min-w-[12rem]">
               <Label>Search</Label>
@@ -190,79 +231,123 @@ export function AdminDealsPanel() {
           </div>
 
           {isLoading ? (
-            <Loader2 className="h-6 w-6 animate-spin" />
+            <AdminLoadingState label="Loading deals…" />
           ) : deals.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">
-              No deals match your filters. Pending deals appear when suppliers submit for review.
-            </p>
+            <AdminEmptyState
+              title="No deals found"
+              description={
+                statusFilter
+                  ? 'No deals match your filters. Try “All statuses” to see every supplier deal.'
+                  : 'No supplier deals yet. Deals appear here when suppliers create and submit promotions.'
+              }
+            />
           ) : (
-            <div className="space-y-3">
-              {deals.map((deal) => {
-                const id = String(deal.id)
-                const status = String(deal.status || '')
-                const isPending =
-                  status === 'pending_approval' || status === 'pending_admin_approval'
-                return (
-                  <div key={id} className="rounded-lg border p-4 space-y-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">{String(deal.name)}</p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          {String(deal.supplier_name || 'Supplier')} ·{' '}
-                          {String(deal.type || '').replace(/_/g, ' ')}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">
-                          Active from {formatDate(deal.starts_at)} until {formatDate(deal.ends_at)}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          Created {formatDate(deal.created_at)} · Payment:{' '}
-                          {String(deal.payment_status || 'not_required').replace(/_/g, ' ')}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={statusBadgeVariant(status)}>
-                          {status.replace(/_/g, ' ')}
-                        </Badge>
-                        {isPending && (
-                          <>
-                            <Button size="sm" onClick={() => handleApprove(id)}>
-                              <Check className="h-3 w-3 mr-1" /> Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setRejectingId(rejectingId === id ? null : id)}
-                            >
-                              <X className="h-3 w-3 mr-1" /> Reject
-                            </Button>
-                          </>
+            <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
+                    <th className="px-3 py-2 font-medium">Deal</th>
+                    <th className="px-3 py-2 font-medium">Supplier</th>
+                    <th className="px-3 py-2 font-medium">Type</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium">Payment</th>
+                    <th className="px-3 py-2 font-medium">Start</th>
+                    <th className="px-3 py-2 font-medium">End</th>
+                    <th className="px-3 py-2 font-medium">Created</th>
+                    <th className="px-3 py-2 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--app-border)]">
+                  {deals.map((deal) => {
+                    const id = String(deal.id)
+                    const status = String(deal.status || '')
+                    const isPending =
+                      status === 'pending_approval' || status === 'pending_admin_approval'
+                    return (
+                      <Fragment key={id}>
+                        <tr className="hover:bg-[var(--brand-ultra)]/40">
+                          <td className="px-3 py-2.5 font-medium text-[var(--text)] max-w-[14rem] truncate">
+                            {String(deal.name)}
+                          </td>
+                          <td className="px-3 py-2.5 text-[var(--text-muted)]">
+                            {String(deal.supplier_name || '—')}
+                          </td>
+                          <td className="px-3 py-2.5 text-[var(--text-muted)] capitalize">
+                            {String(deal.type || '—').replace(/_/g, ' ')}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <AdminStatusBadge status={status} />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <AdminStatusBadge
+                              status={String(deal.payment_status || 'not_required')}
+                            />
+                          </td>
+                          <td className="px-3 py-2.5 text-[var(--text-muted)] whitespace-nowrap">
+                            {formatAdminDate(deal.starts_at)}
+                          </td>
+                          <td className="px-3 py-2.5 text-[var(--text-muted)] whitespace-nowrap">
+                            {formatAdminDate(deal.ends_at)}
+                          </td>
+                          <td className="px-3 py-2.5 text-[var(--text-muted)] whitespace-nowrap">
+                            {formatAdminDate(deal.created_at)}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {isPending && (
+                                <>
+                                  <Button size="sm" onClick={() => handleApprove(id)}>
+                                    <Check className="h-3 w-3 mr-1" /> Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setRejectingId(rejectingId === id ? null : id)}
+                                  >
+                                    <X className="h-3 w-3 mr-1" /> Reject
+                                  </Button>
+                                </>
+                              )}
+                              {(status === 'active' || status === 'scheduled') && (
+                                <Button size="sm" variant="outline" onClick={() => handlePause(id)}>
+                                  <Pause className="h-3 w-3 mr-1" /> Pause
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {rejectingId === id && (
+                          <tr>
+                            <td colSpan={9} className="px-3 py-3 bg-[var(--app-bg-subtle)]/30">
+                              <div className="flex flex-wrap gap-2 items-end">
+                                <div className="flex-1 min-w-[12rem]">
+                                  <Label>Rejection reason</Label>
+                                  <Input
+                                    className="mt-1 h-9"
+                                    value={rejectReason}
+                                    onChange={(e) => setRejectReason(e.target.value)}
+                                    placeholder="Optional reason shown to supplier"
+                                  />
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleReject(id)}
+                                >
+                                  Confirm reject
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                        {(status === 'active' || status === 'scheduled') && (
-                          <Button size="sm" variant="outline" onClick={() => handlePause(id)}>
-                            <Pause className="h-3 w-3 mr-1" /> Pause
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    {rejectingId === id && (
-                      <div className="flex flex-wrap gap-2 items-end border-t pt-3">
-                        <div className="flex-1 min-w-[12rem]">
-                          <Label>Rejection reason</Label>
-                          <Input
-                            className="mt-1 h-9"
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                            placeholder="Optional reason shown to supplier"
-                          />
-                        </div>
-                        <Button size="sm" variant="destructive" onClick={() => handleReject(id)}>
-                          Confirm reject
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <p className="px-3 py-2 text-xs text-[var(--text-muted)] border-t">
+                Showing {deals.length} deal{deals.length !== 1 ? 's' : ''} (max 200)
+              </p>
             </div>
           )}
         </CardContent>
@@ -284,7 +369,10 @@ export function AdminDealsPanel() {
         </CardHeader>
         <CardContent>
           {pricing.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No pricing tiers configured.</p>
+            <AdminEmptyState
+              title="No pricing tiers configured"
+              description="Deal activation and boost pricing will appear here once configured."
+            />
           ) : (
             <div className="space-y-2">
               {pricing.map((tier) => {
