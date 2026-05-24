@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react'
 import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { DealCard } from '../../components/deals/DealCard'
-import { useGetActivePromotionsQuery } from '../../services/api'
+import { useGetActivePromotionsQuery, useGetEntitlementsQuery } from '../../services/api'
+import { getDealRedeemGate } from '../../lib/planLimits'
+import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import { Loader2, Sparkles } from 'lucide-react'
+import { useAppSelector } from '../../hooks/redux'
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -16,6 +19,13 @@ export function DealsPage() {
   const [sort, setSort] = useState('newest')
   const [expiringSoon, setExpiringSoon] = useState(false)
   const [supplierFilter, setSupplierFilter] = useState('')
+  const { user } = useAppSelector((state) => state.auth)
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !user || user.role !== 'RESTAURANT',
+  })
+  const dealRedeemGate = getDealRedeemGate(entitlementsData?.entitlements)
+  const canRedeem = dealRedeemGate.canRedeem
+  const redeemCopy = LIMIT_UPGRADE_COPY.deal_redemptions_per_day
 
   const queryParams = useMemo(
     () => ({
@@ -44,6 +54,18 @@ export function DealsPage() {
   return (
     <div className="space-y-6">
       <motionDealsHeader />
+      {!canRedeem ? (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="status"
+        >
+          {dealRedeemGate.message || redeemCopy.value}
+        </div>
+      ) : dealRedeemGate.limit != null ? (
+        <p className="text-sm text-[var(--text-muted)]">
+          Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
+        </p>
+      ) : null}
       <Card>
         <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
           <div>
@@ -103,7 +125,7 @@ export function DealsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {promotions.map((p) => (
-            <DealCard key={String(p.id)} deal={p} />
+            <DealCard key={String(p.id)} deal={p} canRedeem={canRedeem} />
           ))}
         </div>
       )}

@@ -21,7 +21,11 @@ import {
 import { LimitExceededBanner } from '../components/LimitExceededBanner'
 import { ShoppingCart, Trash2, Plus, Minus, Save, Calendar, FileText } from 'lucide-react'
 import { useCartActions } from '../hooks/useCartActions'
-import { formatOrderPlaceGateMessage, getOrderPlaceGate } from '../lib/planLimits'
+import {
+  formatOrderPlaceGateMessage,
+  getOrderPlaceGate,
+  getDealRedeemGate,
+} from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import toast from 'react-hot-toast'
 import { useEffect, useMemo, useState } from 'react'
@@ -41,16 +45,20 @@ export function CartPage() {
     () => getOrderPlaceGate(entitlementsData?.entitlements, groups.length),
     [entitlementsData?.entitlements, groups.length]
   )
-  const estimatedPromoDiscount = (dealsData?.promotions || []).reduce((max, p) => {
-    const val = Number(p.discount_value || 0)
-    if (p.type === 'percentage_discount') {
-      return Math.max(max, (total * val) / 100)
-    }
-    if (p.type === 'fixed_discount') {
-      return Math.max(max, val)
-    }
-    return max
-  }, 0)
+  const dealRedeemGate = getDealRedeemGate(entitlementsData?.entitlements)
+  const canRedeemDeals = dealRedeemGate.canRedeem
+  const estimatedPromoDiscount = canRedeemDeals
+    ? (dealsData?.promotions || []).reduce((max, p) => {
+        const val = Number(p.discount_value || 0)
+        if (p.type === 'percentage_discount') {
+          return Math.max(max, (total * val) / 100)
+        }
+        if (p.type === 'fixed_discount') {
+          return Math.max(max, val)
+        }
+        return max
+      }, 0)
+    : 0
   const {
     updateQuantity,
     removeItem,
@@ -158,8 +166,8 @@ export function CartPage() {
         items,
         deliveryDate: deliveryDate || undefined,
         notes: deliveryNotes || undefined,
-        couponCode: couponCode.trim() || undefined,
-        promotionId: promotionId || undefined,
+        couponCode: canRedeemDeals ? couponCode.trim() || undefined : undefined,
+        promotionId: canRedeemDeals ? promotionId || undefined : undefined,
       }).unwrap()
 
       clearCart()
@@ -377,6 +385,11 @@ export function CartPage() {
                   <span>Est. promotion savings</span>
                   <span>-${formatPrice(estimatedPromoDiscount)}</span>
                 </div>
+              ) : dealRedeemGate.limit != null ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
+                  {!canRedeemDeals && dealRedeemGate.message ? ` — ${dealRedeemGate.message}` : ''}
+                </p>
               ) : null}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-muted)]">Tax</span>
