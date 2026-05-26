@@ -7,6 +7,8 @@ import {
   getQuickListScheduleGate,
   getDealRedeemGate,
   getSupplierPromotionGate,
+  canBrowseSupplierDeals,
+  getPlanLimitGate,
 } from './planLimits'
 import type { Entitlements } from '../types'
 
@@ -118,23 +120,41 @@ describe('quick list scheduling', () => {
 })
 
 describe('deal and promotion limits', () => {
-  it('Free restaurant can redeem one deal per day', () => {
+  it('restaurant with supplier_deals can redeem until daily cap (PLN / RST-75)', () => {
     const ent = {
       ...baseEntitlements({ deal_redemptions_per_day: 1 }, { deal_redemptions_per_day: 0 }),
       features: { supplier_deals: true },
     } as Entitlements
+    expect(canBrowseSupplierDeals(ent)).toBe(true)
     expect(getDealRedeemGate(ent).canRedeem).toBe(true)
-    expect(getDealRedeemGate({ ...ent, usage: { deal_redemptions_per_day: 1 } }).canRedeem).toBe(
-      false
-    )
+    const blocked = getDealRedeemGate({ ...ent, usage: { deal_redemptions_per_day: 1 } })
+    expect(blocked.canRedeem).toBe(false)
+    expect(blocked.message).toContain('deal redemption')
   })
 
-  it('Free supplier can create one promotion', () => {
+  it('restaurant without supplier_deals cannot browse deals (GATE-R19)', () => {
+    const ent = {
+      ...baseEntitlements({}, {}),
+      features: { supplier_deals: false },
+    } as Entitlements
+    expect(canBrowseSupplierDeals(ent)).toBe(false)
+  })
+
+  it('supplier can create one promotion on capped plan (GATE-S13 / SUP-52)', () => {
     const ent = {
       ...baseEntitlements({ promotions: 1 }, { promotions: 0 }),
       features: { promotions: true },
     } as Entitlements
     expect(getSupplierPromotionGate(ent).canCreate).toBe(true)
-    expect(getSupplierPromotionGate({ ...ent, usage: { promotions: 1 } }).canCreate).toBe(false)
+    const blocked = getSupplierPromotionGate({ ...ent, usage: { promotions: 1 } })
+    expect(blocked.canCreate).toBe(false)
+    expect(blocked.message).toContain('promotion')
+  })
+
+  it('getPlanLimitGate labels deal_redemptions_per_day for upgrade messaging', () => {
+    const ent = baseEntitlements({ deal_redemptions_per_day: 1 }, { deal_redemptions_per_day: 1 })
+    const gate = getPlanLimitGate(ent, 'deal_redemptions_per_day', 1)
+    expect(gate.canUse).toBe(false)
+    expect(gate.message).toContain('deal redemption')
   })
 })

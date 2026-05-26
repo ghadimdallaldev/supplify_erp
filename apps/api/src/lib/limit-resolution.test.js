@@ -126,6 +126,7 @@ describe('limit-resolution', () => {
     expect(keys).toContain('orders_per_day')
     expect(keys).toContain('custom_meter')
     expect(keys).toContain('promotions')
+    expect(RESTAURANT_LIMIT_KEYS).toContain('deal_redemptions_per_day')
     expect(RESTAURANT_LIMIT_KEYS).toContain('open_conversations')
     expect(SUPPLIER_LIMIT_KEYS).toContain('open_conversations')
   })
@@ -146,5 +147,11 @@ describe('limit-resolution', () => {
     const limits = { chats_per_day: 50 }
     fillMissingFreeTierLimits(limits, 'SUPPLIER', 'gold')
     expect(limits.open_conversations).toBeUndefined()
+  })
+
+  it('keeps explicit restaurant deal redemption limits when set on Free tier', () => {
+    const limits = { deal_redemptions_per_day: 2 }
+    fillMissingFreeTierLimits(limits, 'RESTAURANT', 'free')
+    expect(limits.deal_redemptions_per_day).toBe(2)
   })
 })

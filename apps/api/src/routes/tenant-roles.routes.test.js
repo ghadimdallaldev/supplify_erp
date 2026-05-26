@@ -16,7 +16,8 @@ vi.mock('../lib/db.js', () => {
 const isFeatureEnabled = vi.fn().mockResolvedValue(true)
 const ensureTenantSystemRoles = vi.fn().mockResolvedValue(undefined)
 const assignTenantUserRole = vi.fn().mockResolvedValue(undefined)
-const userHasOwnerRole = vi.fn().mockResolvedValue(true)
+const assertCanAssignRole = vi.fn().mockResolvedValue({ id: 'role-1', name: 'Manager' })
+const assertCanGrantPermissions = vi.fn()
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: vi.fn(async (req, res, next) => {
@@ -53,11 +54,24 @@ vi.mock('../lib/tenant-roles.js', async (importOriginal) => {
     ...actual,
     ensureTenantSystemRoles: (...args) => ensureTenantSystemRoles(...args),
     assignTenantUserRole: (...args) => assignTenantUserRole(...args),
-    userHasOwnerRole: (...args) => userHasOwnerRole(...args),
     RESERVED_SYSTEM_ROLE_NAMES: actual.RESERVED_SYSTEM_ROLE_NAMES,
     getAllPermissionsForTenantType: actual.getAllPermissionsForTenantType,
   }
 })
+
+vi.mock('../lib/workspace-membership.js', () => ({
+  resolveWorkspaceScope: vi.fn().mockResolvedValue({
+    workspaceType: 'RESTAURANT',
+    organizationId: 'org-1',
+    homeTenantId: 'tenant-1',
+  }),
+  MAIN_ADMIN_ROLE_NAME: 'Owner',
+}))
+
+vi.mock('../lib/rbac-guards.js', () => ({
+  assertCanAssignRole: (...args) => assertCanAssignRole(...args),
+  assertCanGrantPermissions: (...args) => assertCanGrantPermissions(...args),
+}))
 
 vi.mock('../lib/permissions.js', async (importOriginal) => {
   const actual = await importOriginal()
@@ -141,7 +155,7 @@ describe('Tenant roles routes', () => {
       ],
     })
     const res = await request(app).delete('/api/roles/r1').expect(400)
-    expect(res.body.error.message).toMatch(/System roles/)
+    expect(res.body.error.message).toMatch(/Owner role cannot be deleted/)
   })
 
   it('DELETE role with users returns user list', async () => {
@@ -166,11 +180,11 @@ describe('Tenant roles routes', () => {
   })
 
   it('POST assign Owner requires owner requester', async () => {
-    userHasOwnerRole.mockResolvedValueOnce(false)
+    const { ForbiddenError } = await import('../middlewares/errorHandler.js')
+    assertCanAssignRole.mockRejectedValueOnce(
+      new ForbiddenError('Only an Owner can assign the Owner role')
+    )
     const ownerRoleId = 'a0000001-0001-4000-8000-000000000099'
-    db.query.mockResolvedValueOnce({
-      rows: [{ id: ownerRoleId, name: 'Owner', tenant_id: 'tenant-1', tenant_type: 'RESTAURANT' }],
-    })
     const res = await request(app)
       .post('/api/roles/users/a0000001-0001-4000-8000-000000000088/assign')
       .send({ role_id: ownerRoleId })
@@ -179,10 +193,12 @@ describe('Tenant roles routes', () => {
   })
 
   it('assign role calls service and invalidates cache', async () => {
-    userHasOwnerRole.mockResolvedValue(true)
     const mgrRoleId = 'a0000001-0001-4000-8000-000000000098'
-    db.query.mockResolvedValueOnce({
-      rows: [{ id: mgrRoleId, name: 'Manager', tenant_id: 'tenant-1', tenant_type: 'RESTAURANT' }],
+    assertCanAssignRole.mockResolvedValueOnce({
+      id: mgrRoleId,
+      name: 'Manager',
+      tenant_id: 'tenant-1',
+      tenant_type: 'RESTAURANT',
     })
     const res = await request(app)
       .post('/api/roles/users/a0000001-0001-4000-8000-000000000088/assign')

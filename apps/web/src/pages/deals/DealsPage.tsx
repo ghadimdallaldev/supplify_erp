@@ -53,7 +53,7 @@ export function DealsPage() {
 
   return (
     <div className="space-y-6">
-      <motionDealsHeader />
+      <MotionDealsHeader />
       {!canRedeem ? (
         <div
           className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
@@ -133,7 +133,7 @@ export function DealsPage() {
   )
 }
 
-function motionDealsHeader() {
+function MotionDealsHeader() {
   return (
     <div>
       <h1 className="text-[21px] font-black text-[var(--text)] flex items-center gap-2">

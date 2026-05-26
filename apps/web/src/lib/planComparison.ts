@@ -8,6 +8,7 @@ export const RESTAURANT_LIMIT_KEYS = [
   'quick_lists',
   'quick_list_items',
   'scheduled_quick_lists',
+  'deal_redemptions_per_day',
   'branches',
   'users',
   'suppliers_per_restaurant',
@@ -35,6 +36,7 @@ export const RESTAURANT_FEATURE_KEYS = [
   'disputes_returns',
   'advanced_roles',
   'approvals_budgets',
+  'supplier_deals',
   'supplier_reviews',
   'tenant_audit_log',
   'custom_branding',
@@ -69,6 +71,7 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
   storage_mb: 'Storage (MB)',
   suppliers_per_restaurant: 'Suppliers',
   promotions: 'Deals & promotions',
+  deal_redemptions_per_day: 'Deal redemptions (today)',
 }
 
 export const FEATURE_KEY_LABELS: Record<string, string> = {
@@ -87,6 +90,7 @@ export const FEATURE_KEY_LABELS: Record<string, string> = {
   fulfillment: 'Fulfillment & logistics',
   driver_management: 'Driver management',
   promotions: 'Promotions',
+  supplier_deals: 'Supplier deals',
 }
 
 /** Short label for plan comparison cells (tier-specific branding levels). */

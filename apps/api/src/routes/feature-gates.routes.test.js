@@ -5,6 +5,7 @@ import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js'
 import {
   resetFeatureGates,
   setFeatureEnabled,
+  setLimitBlocked,
   mockSubscriptionModule,
 } from '../test/feature-gate-mock.js'
 
@@ -40,8 +41,27 @@ vi.mock('../lib/rbac.js', () => ({
     }
     next()
   },
+  resolveAdminContext: (req, res, next) => {
+    req.adminContext = { permissions: ['ADMIN_ACCESS'] }
+    next()
+  },
   requirePermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn(async (req) => req.tenantContext),
+  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
+  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
+}))
+
+vi.mock('../services/deal-promotions.service.js', () => ({
+  discoverDealsForRestaurant: vi.fn().mockResolvedValue([]),
+  loadDealDetailForRestaurant: vi.fn(),
+  recordDealInteraction: vi.fn(),
+  createDealPromotionCampaign: vi.fn(),
+  getDealAnalytics: vi.fn(),
+  enrichPromotionRow: vi.fn(async (row) => row),
+  enrichPromotionRows: vi.fn(async (rows) => rows),
+  getEligibleProductsForDeal: vi.fn(),
+  getActiveDealPromotion: vi.fn(),
+  previewDealForCart: vi.fn(),
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -237,7 +257,7 @@ describe('promotions feature gate', () => {
 
   beforeEach(async () => {
     clearAllMocks()
-    resetFeatureGates({ promotions: true })
+    resetFeatureGates({ promotions: true, supplier_deals: true })
     const db = setupMocks()
     const dbModule = await import('../lib/db.js')
     vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))
@@ -288,5 +308,38 @@ describe('promotions feature gate', () => {
 
     const res = await request(promoApp).get('/api/promotions/active')
     expect(res.status).toBe(200)
+  })
+
+  it('blocks restaurant GET /active when supplier_deals is off (API-21, GATE-R19)', async () => {
+    setFeatureEnabled('supplier_deals', false)
+    const dbModule = await import('../lib/db.js')
+    vi.mocked(dbModule.query).mockResolvedValue({ rows: [{ id: 'restaurant-1' }] })
+
+    const promoApp = express()
+    promoApp.use(express.json())
+    promoApp.use((req, res, next) => {
+      req.requestId = 'test-request-id'
+      req.userData = { ...mockUser, id: 'user-1', role: 'RESTAURANT' }
+      req.tenantContext = { tenantId: 'restaurant-1', tenantType: 'RESTAURANT' }
+      next()
+    })
+    const { promotionsRoutes } = await import('./promotions.routes.js')
+    promoApp.use('/api/promotions', promotionsRoutes)
+
+    const res = await request(promoApp).get('/api/promotions/active')
+    expect(res.status).toBe(403)
+    expect(res.body.error?.featureKey || res.body.error?.name).toBeTruthy()
+  })
+
+  it('blocks supplier POST when promotions plan limit is exceeded (SUP-52 limit)', async () => {
+    setLimitBlocked('promotions', true)
+    const res = await request(app).post('/api/promotions').send({
+      name: 'Summer',
+      type: 'percentage_discount',
+      discountValue: 10,
+      startsAt: new Date().toISOString(),
+    })
+    expect(res.status).toBe(403)
+    expect(res.body.error?.limitKey || res.body.error?.name).toBeTruthy()
   })
 })

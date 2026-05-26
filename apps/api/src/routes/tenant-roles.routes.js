@@ -10,15 +10,17 @@ import {
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
+import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import {
   ensureTenantSystemRoles,
   RESERVED_SYSTEM_ROLE_NAMES,
   getAllPermissionsForTenantType,
   assignTenantUserRole,
-  userHasOwnerRole,
 } from '../lib/tenant-roles.js'
 import { invalidateUserPermissionCache } from '../lib/permissions.js'
+import { resolveWorkspaceScope } from '../lib/workspace-membership.js'
+import { assertCanAssignRole, assertCanGrantPermissions } from '../lib/rbac-guards.js'
+import { MAIN_ADMIN_ROLE_NAME } from '../lib/workspace-membership.js'
 
 const router = express.Router()
 
@@ -125,6 +127,12 @@ router.post('/', requirePermission('SETTINGS_MANAGE'), async (req, res) => {
       throw new ValidationError(`Invalid permissions: ${invalid.join(', ')}`)
     }
 
+    assertCanGrantPermissions(
+      req.tenantContext?.permissions || [],
+      data.permissions,
+      req.userData.role === 'ADMIN'
+    )
+
     const { rows } = await query(
       `INSERT INTO tenant_roles (tenant_type, tenant_id, name, description, is_system)
        VALUES ($1, $2, $3, $4, false)
@@ -181,6 +189,9 @@ router.patch('/:id', requirePermission('SETTINGS_MANAGE'), async (req, res) => {
     const role = roleRows[0]
 
     if (role.is_system) {
+      if (role.name === MAIN_ADMIN_ROLE_NAME && data.permissions) {
+        throw new ValidationError('The Owner role always has full access and cannot be modified')
+      }
       if (data.name && data.name !== role.name) {
         throw new ValidationError('System role names cannot be changed')
       }
@@ -216,6 +227,11 @@ router.patch('/:id', requirePermission('SETTINGS_MANAGE'), async (req, res) => {
         if (invalid.length > 0) {
           throw new ValidationError(`Invalid permissions: ${invalid.join(', ')}`)
         }
+        assertCanGrantPermissions(
+          req.tenantContext?.permissions || [],
+          data.permissions,
+          req.userData.role === 'ADMIN'
+        )
         await query(`DELETE FROM tenant_role_permissions WHERE role_id = $1`, [role.id])
         for (const permission of data.permissions) {
           await query(`INSERT INTO tenant_role_permissions (role_id, permission) VALUES ($1, $2)`, [
@@ -279,7 +295,11 @@ router.delete('/:id', requirePermission('SETTINGS_MANAGE'), async (req, res) => 
     if (roleRows.length === 0) throw new NotFoundError('Role not found')
     const role = roleRows[0]
     if (role.is_system) {
-      throw new ValidationError('System roles cannot be deleted')
+      throw new ValidationError(
+        role.name === MAIN_ADMIN_ROLE_NAME
+          ? 'The Owner role cannot be deleted'
+          : 'System roles cannot be deleted'
+      )
     }
 
     const { rows: users } = await query(
@@ -379,30 +399,17 @@ router.post('/users/:userId/assign', requirePermission('SETTINGS_MANAGE'), async
     const { role_id: roleId } = assignRoleSchema.parse(req.body)
     const targetUserId = req.params.userId
 
-    const { rows: roleRows } = await query(
-      `SELECT id, name, tenant_id, tenant_type FROM tenant_roles WHERE id = $1`,
-      [roleId]
-    )
-    if (roleRows.length === 0) throw new NotFoundError('Role not found')
-    const role = roleRows[0]
-    if (role.tenant_id !== tenantId || role.tenant_type !== tenantType) {
-      throw new ValidationError('Role does not belong to this tenant')
-    }
-
-    if (role.name === 'Owner') {
-      const requesterIsOwner = await userHasOwnerRole(req.userData.id, tenantId, tenantType)
-      if (!requesterIsOwner && req.userData.role !== 'ADMIN') {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Only an Owner can assign the Owner role',
-          },
-          requestId: req.requestId,
-        })
-      }
-    }
+    const scope = await resolveWorkspaceScope(tenantId, tenantType)
+    const role = await assertCanAssignRole({
+      requesterId: req.userData.id,
+      requesterIsPlatformAdmin: req.userData.role === 'ADMIN',
+      requesterPermissions: req.tenantContext?.permissions || [],
+      targetUserId,
+      roleId,
+      tenantId,
+      tenantType,
+      organizationId: scope.organizationId,
+    })
 
     await assignTenantUserRole({
       userId: targetUserId,
@@ -425,6 +432,14 @@ router.post('/users/:userId/assign', requirePermission('SETTINGS_MANAGE'), async
         ok: false,
         data: null,
         error: { name: 'VALIDATION_ERROR', message: 'Invalid request body' },
+        requestId: req.requestId,
+      })
+    }
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: error.message },
         requestId: req.requestId,
       })
     }

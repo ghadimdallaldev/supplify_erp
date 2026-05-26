@@ -171,12 +171,10 @@ export function OrderDetailPage() {
       // Refetch to get updated data
       const refetchResult = await refetch()
 
-      // For COMPLETED status, keep button disabled (component will show disabled "Completed" button)
-      // Don't clear isUpdating immediately - let component re-render with new order.status
-      if (newStatus === 'COMPLETED') {
-        if (refetchResult.data?.status === 'COMPLETED') {
-          // Order confirmed as COMPLETED - component will show disabled "Completed" button
-          // Clear isUpdating after a delay to allow component to re-render
+      // After delivery, keep disabled "Delivered" button visible until refetch settles
+      if (newStatus === 'DELIVERED' || newStatus === 'COMPLETED') {
+        const updated = refetchResult.data?.status
+        if (updated === 'DELIVERED' || updated === 'COMPLETED') {
           setTimeout(() => {
             setIsUpdating(false)
           }, 1000)
@@ -316,6 +314,7 @@ export function OrderDetailPage() {
   )
   const timelineEvents = buildOrderTimeline({
     order,
+    viewerRole: isSupplier ? 'SUPPLIER' : 'RESTAURANT',
     amendments,
     invoices: invoicesData?.invoices ?? [],
     disputes: orderDisputes,
@@ -410,25 +409,29 @@ export function OrderDetailPage() {
                 <Button
                   size="sm"
                   variant="default"
-                  onClick={() => handleStatusUpdate('COMPLETED')}
+                  onClick={() => handleStatusUpdate('DELIVERED')}
                   disabled={false}
                 >
-                  Complete Order
+                  Mark Delivered
                 </Button>
               )}
-              {(isUpdating || order.status === 'COMPLETED') && (
+              {(isUpdating || order.status === 'DELIVERED' || order.status === 'COMPLETED') && (
                 <Button
                   size="sm"
-                  variant={order.status === 'COMPLETED' ? 'outline' : 'default'}
+                  variant={
+                    order.status === 'DELIVERED' || order.status === 'COMPLETED'
+                      ? 'outline'
+                      : 'default'
+                  }
                   disabled
                   className="cursor-not-allowed opacity-75"
                 >
                   {isUpdating ? (
-                    <>Completing...</>
+                    <>Updating...</>
                   ) : (
                     <>
                       <Check className="h-4 w-4 mr-1" />
-                      Completed
+                      Delivered
                     </>
                   )}
                 </Button>
@@ -444,11 +447,14 @@ export function OrderDetailPage() {
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="details">Order Details</TabsTrigger>
           <TabsTrigger value="items">Items</TabsTrigger>
-          {!isSupplier && (invoicesData?.invoices?.length > 0 || order.status === 'COMPLETED') && (
-            <TabsTrigger value="invoice">
-              Invoice {invoicesData?.invoices?.length > 0 && `(${invoicesData.invoices.length})`}
-            </TabsTrigger>
-          )}
+          {!isSupplier &&
+            (invoicesData?.invoices?.length > 0 ||
+              order.status === 'COMPLETED' ||
+              order.status === 'DELIVERED') && (
+              <TabsTrigger value="invoice">
+                Invoice {invoicesData?.invoices?.length > 0 && `(${invoicesData.invoices.length})`}
+              </TabsTrigger>
+            )}
           {isSupplier && <TabsTrigger value="picking">Picking Notes</TabsTrigger>}
           {isSupplier && <TabsTrigger value="delivery">Delivery Info</TabsTrigger>}
           {isSupplier && <TabsTrigger value="packing">Packing Slip</TabsTrigger>}
@@ -456,7 +462,10 @@ export function OrderDetailPage() {
 
         {/* Timeline Tab (default) */}
         <TabsContent value="timeline">
-          <OrderOperationsTimeline events={timelineEvents} />
+          <OrderOperationsTimeline
+            events={timelineEvents}
+            viewerRole={isSupplier ? 'SUPPLIER' : 'RESTAURANT'}
+          />
         </TabsContent>
 
         {/* Order Details Tab */}
@@ -799,9 +808,11 @@ export function OrderDetailPage() {
                       {invoicesData?.invoices?.length > 0 && `(${invoicesData.invoices.length})`}
                     </CardTitle>
                     <CardDescription>
-                      {order.status === 'COMPLETED'
+                      {order.status === 'COMPLETED' ||
+                      order.status === 'DELIVERED' ||
+                      order.status === 'RECEIVED_FULL'
                         ? 'Invoice details and payment information'
-                        : 'Invoice will be generated when order is completed'}
+                        : 'Invoice will be generated after delivery and receiving'}
                     </CardDescription>
                   </div>
                   {invoicesData?.invoices?.length > 0 && (
@@ -892,14 +903,15 @@ export function OrderDetailPage() {
                       )
                     })}
                   </div>
-                ) : order.status === 'COMPLETED' ? (
+                ) : order.status === 'COMPLETED' || order.status === 'DELIVERED' ? (
                   <div className="text-center py-12">
                     <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
                     <p className="text-lg font-semibold text-[var(--text)] mb-2">
                       Invoice Not Yet Generated
                     </p>
                     <p className="text-[var(--text-muted)]">
-                      Invoice will be created automatically. Please check back shortly.
+                      Invoice is created when the restaurant confirms receiving. Check back after
+                      receipt is recorded.
                     </p>
                   </div>
                 ) : (

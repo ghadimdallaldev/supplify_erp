@@ -36,6 +36,14 @@ Branch staff roles apply per `supplier` branch. Multi-branch suppliers also have
 
 Tenants with `advanced_roles` enabled can create roles under **Settings → Team → Roles**. Reserved names (Owner, Manager, etc.) cannot be reused. Custom roles can be edited or deleted only when no users are assigned.
 
+## One workspace per user
+
+Table `user_workspace_membership` (migration `0104_user_workspace_membership.sql`) enforces **at most one** active restaurant **or** supplier account per user.
+
+- Account creator is bound as **main admin** (`is_main_admin`) with **Owner** role.
+- Invitations call `assertEmailCanJoinWorkspace` / `assertUserCanJoinWorkspace` — same organization (branch invite) is allowed; a different supplier/restaurant account is rejected.
+- Helpers: `apps/api/src/lib/workspace-membership.js`, guards in `apps/api/src/lib/rbac-guards.js` (last Owner, permission subset on assign, no self-escalation).
+
 ## Permission resolution
 
 1. `tenant_user_roles` links a user to one role per tenant.
@@ -72,8 +80,8 @@ Approval rules can target roles by name (e.g. Manager, Owner). Users with **Mana
 
 ## Frontend
 
-- **Settings → Team:** Users and Roles sub-tabs when `advanced_roles` is on (entitlements hook).
-- **Invite:** Role dropdown uses tenant roles when enabled; otherwise Owner / Viewer only.
+- **Settings → Team:** Users and Roles sub-tabs when `advanced_roles` is on (entitlements hook). Supplier: **Settings → Team & roles** tab (`TeamRolesPanel` + branch invitations).
+- **Invite:** Role dropdown uses tenant roles when enabled; otherwise Owner / Viewer only. Custom roles can be invited (not Owner via link).
 
 ## Demo logins (`seed:tier-catalog`)
 

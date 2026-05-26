@@ -114,6 +114,38 @@ Admin UI: **Admin → Deals** tab (`AdminDealsPanel`).
 
 ## Tests
 
-- `apps/api/src/services/promotions.service.test.js` — discount math
-- `apps/api/src/routes/promotions.routes.test.js` — admin approve/reject/pricing
-- `apps/api/src/routes/orders.routes.test.js` — GET order includes `appliedPromotion`
+Automated coverage maps to `docs/qa/MANUAL_TEST_CHECKLIST.md` IDs below.
+
+### API unit (Vitest)
+
+| File                                                       | Covers                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| `apps/api/src/services/promotions.service.test.js`         | Discount math, eligibility (RST-77, RST-78 order flows)          |
+| `apps/api/src/services/deal-lifecycle.service.test.js`     | Approval, visibility, ineligibility messages                     |
+| `apps/api/src/services/deal-promotions.service.test.js`    | Restaurant/audience targeting for sponsored deals (RST-76)       |
+| `apps/api/src/routes/promotions.routes.test.js`            | Admin pending/approve/reject/pricing (ADM Deals tab, API-22)     |
+| `apps/api/src/routes/promotions.supplier-security.test.js` | Supplier cannot access other tenants' deals                      |
+| `apps/api/src/routes/feature-gates.routes.test.js`         | `promotions` / `supplier_deals` 403 (GATE-S13, GATE-R19, API-21) |
+| `apps/api/src/routes/orders.routes.test.js`                | `appliedPromotion` on order detail (RST-81, API-23)              |
+| `apps/api/src/lib/limit-resolution.test.js`                | Free-tier `promotions` limit default for suppliers               |
+
+### Web unit (Vitest)
+
+| File                                   | Covers                                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| `apps/web/src/lib/planLimits.test.ts`  | `deal_redemptions_per_day`, supplier `promotions` caps (PLN upgrade UX) |
+| `apps/web/src/lib/upgradeCopy.test.ts` | Upgrade copy for deals/promotions limits                                |
+
+### Playwright API / E2E
+
+| File                                           | Covers                                                    |
+| ---------------------------------------------- | --------------------------------------------------------- |
+| `tests/api/promotions-deals-gates.spec.ts`     | Unauthenticated promotions endpoints (API-20/21/22 smoke) |
+| `tests/e2e/suites/critical_e2e/orders.spec.ts` | Place order; promotion on order when seeded               |
+| `tests/feature-inventory.yml`                  | Feature `promotions_deals` inventory entry                |
+
+### Manual-only (no automated parity yet)
+
+- RST-74–RST-80: Full deals feed CTAs and sponsored UI (E2E not implemented)
+- SUP-52–SUP-58: Supplier create/boost/analytics UI (E2E not implemented)
+- API-24: `POST /api/orders` with `promotionId` + `couponCode` (integration)

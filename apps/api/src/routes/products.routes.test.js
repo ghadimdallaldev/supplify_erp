@@ -27,6 +27,7 @@ vi.mock('../lib/rbac.js', () => ({
   resolveTenantContext: (req, res, next) => next(),
   resolveAdminContext: (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn().mockResolvedValue(null),
   checkPermission: vi.fn().mockResolvedValue(true),
   upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),

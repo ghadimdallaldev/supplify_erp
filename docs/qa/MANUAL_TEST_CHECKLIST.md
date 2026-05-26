@@ -54,7 +54,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
 | SETUP-01 | Stop all running services (`Ctrl+C` in each terminal or `pnpm run dev` teardown)                                                                               | No API or web process running on ports 3001/5173                                                                                                                                                 | pass  |
 | SETUP-02 | Drop and recreate the database: run your project's DB reset script (e.g. `pnpm run db:reset` or `psql -c "DROP DATABASE supplify; CREATE DATABASE supplify;"`) | Clean empty database; no tables                                                                                                                                                                  | pass  |
-| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All 90+ migrations apply without error; tables exist                                                                                                                                             | pass  |
+| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All migrations apply (incl. `0104_user_workspace_membership`); no errors                                                                                                                         | pass  |
 | SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Bronze, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;` | pass  |
 | SETUP-05 | Verify plan feature patches applied: `SELECT code, tenant_type, features FROM subscription_plan WHERE tenant_type = 'RESTAURANT';`                             | All plans have `order_calendar`, `disputes_returns`, `advanced_roles` present in features JSON                                                                                                   | pass  |
 | SETUP-06 | Start the API: `pnpm --filter @supplify/api dev`                                                                                                               | API listening; migrations logged; no crash on startup                                                                                                                                            | pass  |
@@ -471,13 +471,16 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.7 Receiving (`/app/receiving`) — requires `receiving_quality` feature
 
-| ID     | Steps                                       | Expected                           | Pass? |
-| ------ | ------------------------------------------- | ---------------------------------- | ----- |
-| RST-30 | Free account → navigate to `/app/receiving` | 403 or paywall                     |       |
-| RST-31 | Bronze+ → Tab: Pending deliveries           | Expected shipments listed          |       |
-| RST-32 | Receive shipment — full receive             | Status updated; inventory reflects |       |
-| RST-33 | Partial receive / discrepancies             | Recorded correctly                 |       |
-| RST-34 | Tab: History                                | Past receivings searchable         |       |
+| ID      | Steps                                                                           | Expected                                                                              | Pass? |
+| ------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- |
+| RST-30  | Free account → navigate to `/app/receiving`                                     | 403 or paywall                                                                        |       |
+| RST-31  | Bronze+ — supplier marks order **Mark Delivered** (`DELIVERED`)                 | Restaurant pending list shows order; green “Supplier marked as delivered” message     |       |
+| RST-32  | **Receive Now** on pending order — full quantities                              | Order leaves pending; appears in **History** tab; order status `RECEIVED_FULL`        |       |
+| RST-33  | Partial receive / discrepancies                                                 | `RECEIVED_PARTIAL` or report status `PARTIAL`; inventory reflects received qty only   |       |
+| RST-34  | Tab: History                                                                    | Past `receiving_report` rows listed (orders not received do not appear here)          |       |
+| RECV-01 | Order detail (DELIVERED) → **Receive this order** → `/app/receiving?order={id}` | Receive dialog opens for that order when still pending                                |       |
+| RECV-02 | Order timeline tab (DELIVERED, not yet received)                                | Delivery step completed; **Confirm receipt** current (not “Order placed” in progress) |       |
+| RECV-03 | Supplier order detail after SHIPPED                                             | Button reads **Mark Delivered** (not “Complete Order”); sets `DELIVERED`              |       |
 
 ## 6.8 Reservations (`/app/reservations`)
 
@@ -566,13 +569,17 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.14 Restaurant RBAC spot checks
 
-| ID      | Steps                                                                  | Expected                                     | Pass? |
-| ------- | ---------------------------------------------------------------------- | -------------------------------------------- | ----- |
-| RBAC-R1 | Log in as `RESTAURANT_STAFF` (limited role)                            | Only permitted nav items; APIs 403 otherwise |       |
-| RBAC-R2 | `RESTAURANT_MANAGER`                                                   | Broader access than staff; less than owner   |       |
-| RBAC-R3 | `RESTAURANT_OWNER`                                                     | Full restaurant permissions                  |       |
-| RBAC-R4 | Gold restaurant — Settings → Team → role assignment (`advanced_roles`) | Can assign/modify roles for team members     |       |
-| RBAC-R5 | Free restaurant — no role management section                           | Section hidden or locked                     |       |
+| ID      | Steps                                                                  | Expected                                      | Pass? |
+| ------- | ---------------------------------------------------------------------- | --------------------------------------------- | ----- |
+| RBAC-R1 | Log in as `RESTAURANT_STAFF` (limited role)                            | Only permitted nav items; APIs 403 otherwise  |       |
+| RBAC-R2 | `RESTAURANT_MANAGER`                                                   | Broader access than staff; less than owner    |       |
+| RBAC-R3 | `RESTAURANT_OWNER`                                                     | Full restaurant permissions                   |       |
+| RBAC-R4 | Gold restaurant — Settings → Team → role assignment (`advanced_roles`) | Can assign/modify roles for team members      |       |
+| RBAC-R5 | Free restaurant — no role management section                           | Section hidden or locked                      |       |
+| RBAC-R6 | Invite user already linked to another restaurant/supplier              | Invitation or accept returns clear conflict   |       |
+| RBAC-R7 | Creator after `/register/complete`                                     | Owner role; `user_workspace_membership` row   |       |
+| RBAC-R8 | Manager cannot assign role with permissions they lack (API/UI)         | 403 on assign; UI hides over-privileged roles |       |
+| RBAC-R9 | Cannot remove/downgrade last Owner in org                              | 400 with clear message                        |       |
 
 ---
 
@@ -598,7 +605,7 @@ Hidden without RBAC permission or feature gate.
 | ------ | --------------------------------------------- | ------------------------------------------ | ----- |
 | SUP-05 | List tabs                                     | Filter by status                           |       |
 | SUP-06 | Accept/processing workflow                    | Status moves New → Processing              |       |
-| SUP-07 | Mark shipped / completed                      | Restaurant sees updates                    |       |
+| SUP-07 | Mark shipped → **Mark Delivered**             | Restaurant sees `DELIVERED`; can receive   |       |
 | SUP-08 | **Manual order** creation (if UI/API exposed) | Order created for restaurant               |       |
 | SUP-09 | Order detail — supplier tabs                  | Picking notes, Delivery info, Packing slip |       |
 | SUP-10 | Invoice tab on order (if present)             | Linked invoice                             |       |
@@ -691,6 +698,8 @@ Hidden without RBAC permission or feature gate.
 | RBAC-S3 | `SUPPLIER_OWNER`                                                     | Full supplier access                     |       |
 | RBAC-S4 | Gold supplier — Settings → Team → role assignment (`advanced_roles`) | Can assign/modify roles                  |       |
 | RBAC-S5 | Free/Bronze supplier — no role management                            | Section hidden or locked                 |       |
+| RBAC-S6 | Settings → **Team & roles** tab (Bronze+, `advanced_roles`)          | `TeamRolesPanel` + branch invite panel   |       |
+| RBAC-S7 | Invite email already on another supplier account                     | Blocked at invite or accept              |       |
 
 ## 7.11 Deals & promotions (`/app/promotions`) — requires `promotions` feature
 
@@ -902,12 +911,13 @@ Hidden without RBAC permission or feature gate.
 
 # Part 11 — Automated tests (CI parity)
 
-| ID    | Command                                   | Expected                | Pass? |
-| ----- | ----------------------------------------- | ----------------------- | ----- |
-| CI-01 | `pnpm --filter @supplify/api test:run`    | All API unit tests pass |       |
-| CI-02 | `pnpm --filter @supplify/web test:run`    | All web unit tests pass |       |
-| CI-03 | `pnpm test:ci` (root)                     | Both packages green     |       |
-| CI-04 | `pnpm run e2e:playwright` (if configured) | E2E suite pass          |       |
+| ID    | Command                                                                             | Expected                                                 | Pass? |
+| ----- | ----------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- |
+| CI-01 | `pnpm --filter @supplify/api test:run`                                              | All API unit tests pass                                  |       |
+| CI-02 | `pnpm --filter @supplify/web test:run`                                              | All web unit tests pass                                  |       |
+| CI-03 | `pnpm test:ci` (root)                                                               | Both packages green                                      |       |
+| CI-04 | `pnpm run e2e:playwright` (if configured)                                           | E2E suite pass                                           |       |
+| CI-05 | Deals/promotions unit + API gates (see `docs/features/promotions-deals.md` § Tests) | Vitest + `tests/api/promotions-deals-gates.spec.ts` pass |       |
 
 ---
 

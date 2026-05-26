@@ -1,14 +1,16 @@
 import { query, withTransaction } from './db.js'
 import { assignDefaultRoleForTenant } from './rbac.js'
 import { ensureOrgSystemRoles, assignOrgUserRole } from './supplier-org.js'
-import {
-  ensureRestaurantOrgSystemRoles,
-  assignRestaurantOrgUserRole,
-} from './restaurant-org.js'
+import { ensureRestaurantOrgSystemRoles, assignRestaurantOrgUserRole } from './restaurant-org.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser } from './tenant-roles.js'
 import { createDefaultWarehouseForSupplier } from './warehouse-helpers.js'
 import { ensureKeycloakRealmRole } from './keycloak-admin.js'
 import { ConflictError, ValidationError } from '../middlewares/errorHandler.js'
+import {
+  bindUserToWorkspace,
+  getUserWorkspaceMembership,
+  resolveWorkspaceScope,
+} from './workspace-membership.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { sendNotification } from '../services/notification.service.js'
 
@@ -105,6 +107,56 @@ async function completeSupplierRegistration(
   return { tenant, tenantType: 'SUPPLIER', organizationId: organization.id }
 }
 
+async function completeRestaurantRegistration(
+  client,
+  { userId, keycloakSub, normalizedEmail, name, slug, phone, type }
+) {
+  const { rows } = await client.query(
+    `INSERT INTO restaurant (name, slug, contact_email, phone, address_json)
+     VALUES ($1, $2, $3, $4, '{}'::jsonb)
+     RETURNING *`,
+    [name, slug, normalizedEmail, phone || null]
+  )
+  const tenant = rows[0]
+
+  const orgSlug = `${slug}-org`
+  const { rows: orgRows } = await client.query(
+    `INSERT INTO restaurant_organizations (name, slug)
+     VALUES ($1, $2)
+     RETURNING *`,
+    [name, orgSlug]
+  )
+  const organization = orgRows[0]
+
+  await client.query(
+    `UPDATE restaurant
+     SET organization_id = $1, is_main_branch = true, updated_at = now()
+     WHERE id = $2`,
+    [organization.id, tenant.id]
+  )
+
+  await ensureRestaurantOrgSystemRoles(organization.id, client)
+  await ensureTenantSystemRoles(tenant.id, 'RESTAURANT', client)
+
+  await assignRestaurantOrgUserRole({
+    userId,
+    organizationId: organization.id,
+    roleName: 'Org Owner',
+    client,
+  })
+
+  await assignOwnerRoleForUser(userId, tenant.id, 'RESTAURANT', null, client)
+
+  await client.query(
+    `UPDATE app_user SET role = $1, keycloak_sub = COALESCE(keycloak_sub, $2), updated_at = now() WHERE id = $3`,
+    [type, keycloakSub, userId]
+  )
+
+  await createPendingActivationSubscription(client, tenant.id, type, 'free')
+
+  return { tenant, tenantType: type, organizationId: organization.id }
+}
+
 /**
  * Create restaurant or supplier tenant for an authenticated user (post–Keycloak registration).
  */
@@ -127,6 +179,13 @@ export async function completeTenantRegistration({
     throw new ValidationError('Admin accounts do not require organization setup')
   }
 
+  const existingMembership = await getUserWorkspaceMembership(userId)
+  if (existingMembership) {
+    throw new ConflictError(
+      'You are already linked to an account. A user can only belong to one supplier or restaurant.'
+    )
+  }
+
   const tenantTable = type === 'SUPPLIER' ? 'supplier' : 'restaurant'
   const { rows: existingTenant } = await query(
     `SELECT id FROM ${tenantTable} WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1`,
@@ -146,8 +205,9 @@ export async function completeTenantRegistration({
   const result = await withTransaction(async (client) => {
     const slug = await uniqueSlug(client, tenantTable, baseSlug)
 
+    let registrationResult
     if (type === 'SUPPLIER') {
-      return completeSupplierRegistration(client, {
+      registrationResult = await completeSupplierRegistration(client, {
         userId,
         keycloakSub,
         normalizedEmail,
@@ -155,52 +215,35 @@ export async function completeTenantRegistration({
         slug,
         phone,
       })
+    } else {
+      registrationResult = await completeRestaurantRegistration(client, {
+        userId,
+        keycloakSub,
+        normalizedEmail,
+        name,
+        slug,
+        phone,
+        type,
+      })
     }
 
-    const { rows } = await client.query(
-      `INSERT INTO restaurant (name, slug, contact_email, phone, address_json)
-       VALUES ($1, $2, $3, $4, '{}'::jsonb)
-       RETURNING *`,
-      [name, slug, normalizedEmail, phone || null]
+    const scope = await resolveWorkspaceScope(
+      registrationResult.tenant.id,
+      registrationResult.tenantType,
+      client
     )
-    const tenant = rows[0]
-
-    const orgSlug = `${slug}-org`
-    const { rows: orgRows } = await client.query(
-      `INSERT INTO restaurant_organizations (name, slug)
-       VALUES ($1, $2)
-       RETURNING *`,
-      [name, orgSlug]
-    )
-    const organization = orgRows[0]
-
-    await client.query(
-      `UPDATE restaurant
-       SET organization_id = $1, is_main_branch = true, updated_at = now()
-       WHERE id = $2`,
-      [organization.id, tenant.id]
+    await bindUserToWorkspace(
+      {
+        userId,
+        workspaceType: scope.workspaceType,
+        organizationId: scope.organizationId,
+        homeTenantId: scope.homeTenantId,
+        isMainAdmin: true,
+      },
+      client
     )
 
-    await ensureRestaurantOrgSystemRoles(organization.id, client)
-    await ensureTenantSystemRoles(tenant.id, 'RESTAURANT', client)
-
-    await assignRestaurantOrgUserRole({
-      userId,
-      organizationId: organization.id,
-      roleName: 'Org Owner',
-      client,
-    })
-
-    await assignOwnerRoleForUser(userId, tenant.id, 'RESTAURANT', null, client)
-
-    await client.query(
-      `UPDATE app_user SET role = $1, keycloak_sub = COALESCE(keycloak_sub, $2), updated_at = now() WHERE id = $3`,
-      [type, keycloakSub, userId]
-    )
-
-    await createPendingActivationSubscription(client, tenant.id, type, 'free')
-
-    return { tenant, tenantType: type, organizationId: organization.id }
+    return registrationResult
   })
 
   if (result.tenantType === 'RESTAURANT') {

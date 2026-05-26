@@ -8,6 +8,12 @@ import {
 } from '../services/invitationTokens.js'
 import { assignRestaurantOrgUserRole } from './restaurant-org.js'
 import { getOwnerRoleId } from './tenant-roles.js'
+import {
+  assertEmailCanJoinWorkspace,
+  assertUserCanJoinWorkspace,
+  bindUserToWorkspace,
+  resolveWorkspaceScope,
+} from './workspace-membership.js'
 
 export {
   generateInviteToken,
@@ -96,7 +102,8 @@ export async function validateRestaurantRoleForBranch(roleId, restaurantId) {
   const { rows } = await query(
     `
     SELECT id FROM tenant_roles
-    WHERE id = $1 AND tenant_id = $2 AND tenant_type = 'RESTAURANT' AND is_system = true
+    WHERE id = $1 AND tenant_id = $2 AND tenant_type = 'RESTAURANT' AND is_active = true
+      AND name != 'Owner'
     `,
     [roleId, restaurantId]
   )
@@ -104,10 +111,10 @@ export async function validateRestaurantRoleForBranch(roleId, restaurantId) {
 }
 
 export async function assertRestaurantInOrg(restaurantId, organizationId) {
-  const { rows } = await query(
-    `SELECT id FROM restaurant WHERE id = $1 AND organization_id = $2`,
-    [restaurantId, organizationId]
-  )
+  const { rows } = await query(`SELECT id FROM restaurant WHERE id = $1 AND organization_id = $2`, [
+    restaurantId,
+    organizationId,
+  ])
   return rows.length > 0
 }
 
@@ -120,6 +127,11 @@ async function insertRestaurantInvitation({
   invitedEmail,
   roleId,
 }) {
+  if (invitedEmail) {
+    const scope = await resolveWorkspaceScope(restaurantId, 'RESTAURANT')
+    await assertEmailCanJoinWorkspace(invitedEmail, scope)
+  }
+
   const token = generateInviteToken()
   const expiresAt = inviteExpiresAt()
   const { rows } = await query(
@@ -335,6 +347,8 @@ async function acceptRestaurantInvitationCore({
     keycloakSub = kcUserId
   }
 
+  const scope = await resolveWorkspaceScope(invitation.restaurant_id, 'RESTAURANT')
+
   return withTransaction(async (client) => {
     const { rows: locked } = await client.query(
       `SELECT * FROM restaurant_invitations WHERE token = $1 FOR UPDATE`,
@@ -346,6 +360,17 @@ async function acceptRestaurantInvitationCore({
       err.code = 'invalid'
       throw err
     }
+
+    await assertUserCanJoinWorkspace(
+      {
+        userId: existingUserId,
+        email: resolvedEmail,
+        workspaceType: scope.workspaceType,
+        organizationId: scope.organizationId,
+        homeTenantId: scope.homeTenantId,
+      },
+      client
+    )
 
     let userId = existingUserId
     if (!userId) {
@@ -399,6 +424,17 @@ async function acceptRestaurantInvitationCore({
        ON CONFLICT (user_id, tenant_id, tenant_type)
        DO UPDATE SET role_id = EXCLUDED.role_id, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
       [userId, roleId, row.restaurant_id, row.invited_by]
+    )
+
+    await bindUserToWorkspace(
+      {
+        userId,
+        workspaceType: scope.workspaceType,
+        organizationId: scope.organizationId,
+        homeTenantId: scope.homeTenantId,
+        isMainAdmin: false,
+      },
+      client
     )
 
     await client.query(

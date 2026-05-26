@@ -60,6 +60,8 @@ import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { formatAddressLine, normalizeAddress } from '../lib/address'
 import { ActivityLogTab } from '../components/ActivityLogTab'
 import { DriversSettingsPanel } from '../components/fulfillment/DriversSettingsPanel'
+import { TeamRolesPanel } from '../components/TeamRolesPanel'
+import { BranchInvitationsPanel } from '../components/org/BranchInvitationsPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import {
   useGetSupplierMeQuery,
@@ -576,6 +578,11 @@ export function SupplierSettingsPage() {
           <TabsTrigger value="contacts" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Contacts
           </TabsTrigger>
+          {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
+            <TabsTrigger value="team" className="flex-1 min-w-[5.5rem] sm:flex-none">
+              Team & roles
+            </TabsTrigger>
+          )}
           <TabsTrigger value="business" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Business
           </TabsTrigger>
@@ -1134,6 +1141,27 @@ export function SupplierSettingsPage() {
         <TabsContent value="branches" className="space-y-4">
           <BranchAccountsPanel entityLabel="supplier location" />
         </TabsContent>
+
+        {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
+          <TabsContent value="team" className="space-y-4">
+            <TeamRolesPanel
+              tenantType="SUPPLIER"
+              renderInviteForm={
+                can('STAFF_INVITE') && supplier?.id
+                  ? () => (
+                      <p className="text-sm text-[var(--text-muted)] mt-2">
+                        Use branch invitations below to invite staff with a role. Each person can
+                        only belong to one supplier account.
+                      </p>
+                    )
+                  : undefined
+              }
+            />
+            {can('STAFF_INVITE') && supplier?.id && (
+              <BranchInvitationsPanel supplierId={supplier.id} branchName={supplier.name} />
+            )}
+          </TabsContent>
+        )}
 
         <TabsContent value="notifications" className="space-y-4">
           <Card>

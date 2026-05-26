@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { buildRequestIdentifiers, formatRequestLogTags } from './request-log-context.js'
+import {
+  buildRequestIdentifiers,
+  formatRequestLogTags,
+  patchRequestLogTenant,
+} from './request-log-context.js'
+import { requestLogStore } from './request-log-store.js'
 
 describe('request-log-context', () => {
   it('buildRequestIdentifiers includes app user id and keycloak sub', () => {
@@ -33,5 +38,25 @@ describe('request-log-context', () => {
     expect(tags).toContain('[user:user-uuid]')
     expect(tags).toContain('[sub:kc-sub-1]')
     expect(tags).toContain('[tenant:SUPPLIER:tenant-uuid]')
+  })
+
+  it('patchRequestLogTenant updates req and AsyncLocalStorage store', () => {
+    const req = {
+      requestId: 'abc12345',
+      method: 'GET',
+      path: '/api/suppliers',
+      originalUrl: '/api/suppliers?limit=20',
+      userData: { id: 'user-uuid', role: 'RESTAURANT' },
+    }
+    let storeSnapshot
+    requestLogStore.run({ requestId: 'abc12345' }, () => {
+      patchRequestLogTenant(req, 'rest-uuid', 'RESTAURANT')
+      storeSnapshot = { ...requestLogStore.getStore() }
+    })
+    const ids = buildRequestIdentifiers(req)
+    expect(ids.tenantId).toBe('rest-uuid')
+    expect(ids.tenantType).toBe('RESTAURANT')
+    expect(storeSnapshot.tenantId).toBe('rest-uuid')
+    expect(ids.route).toBe('/api/suppliers')
   })
 })

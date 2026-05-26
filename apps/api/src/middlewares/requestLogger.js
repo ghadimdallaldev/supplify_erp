@@ -20,12 +20,15 @@ export function requestLogger(req, res, next) {
     const msg = `${req.method} ${path} → ${res.statusCode} in ${duration}ms ${tags}`
 
     const payload = {
+      event: 'http.request',
       msg,
       ...ids,
-      method: req.method,
       path,
       status: res.statusCode,
       duration,
+      ...(req.query && Object.keys(req.query).length > 0
+        ? { queryKeys: Object.keys(req.query) }
+        : {}),
     }
 
     if (res.statusCode >= 500) {
@@ -36,12 +39,14 @@ export function requestLogger(req, res, next) {
       logger.info(payload)
     }
 
-    if (duration > 1000) {
+    if (duration > 1000 && res.statusCode < 500) {
       logger.warn({
+        event: 'http.request.slow',
         msg: `Slow request: ${req.method} ${path} took ${duration}ms ${tags}`,
         ...ids,
         path,
         duration,
+        status: res.statusCode,
       })
     }
   })

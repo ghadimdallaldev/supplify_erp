@@ -4,8 +4,17 @@ import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
 import { getEffectiveTenant } from './impersonation.js'
 import { getActiveTenantFromRequest, getPrimaryTenantForUser } from './tenant-switch.js'
-import { getRolesForUser, getPermissionsForUser, hasPermission } from './permissions.js'
-import { ensureTenantSystemRoles, assignOwnerRoleForUser } from './tenant-roles.js'
+import {
+  getRolesForUser,
+  getPermissionsForUser,
+  hasPermission,
+  invalidateUserPermissionCache,
+} from './permissions.js'
+import {
+  ensureTenantSystemRoles,
+  assignOwnerRoleForUser,
+  userHasOwnerRole,
+} from './tenant-roles.js'
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -449,6 +458,36 @@ export async function getSupplierIdForRequest(req) {
 }
 
 /**
+ * Primary tenant contact (contact_email) always receives the Owner role so core flows work
+ * even if they were previously assigned a narrower role (e.g. Accountant).
+ */
+export async function ensurePrimaryContactOwnerRole(userId, email, tenantId, tenantType) {
+  if (!userId || !email || !tenantId || !tenantType) return false
+  if (tenantType !== 'RESTAURANT' && tenantType !== 'SUPPLIER') return false
+
+  const emailLower = email.trim().toLowerCase()
+  if (!emailLower) return false
+
+  const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
+  const { rows } = await query(
+    `SELECT LOWER(TRIM(contact_email)) AS contact_email FROM ${table} WHERE id = $1`,
+    [tenantId]
+  )
+  if (rows.length === 0 || rows[0].contact_email !== emailLower) return false
+
+  if (await userHasOwnerRole(userId, tenantId, tenantType)) return false
+
+  await assignOwnerRoleForUser(userId, tenantId, tenantType)
+  await invalidateUserPermissionCache(userId, tenantId, tenantType)
+  logger.info('Assigned Owner role to primary tenant contact', {
+    userId,
+    tenantId,
+    tenantType,
+  })
+  return true
+}
+
+/**
  * Resolve tenant context and attach roles + permissions for the current user in that tenant.
  * Sets req.tenantContext = { tenantId, tenantType, tenantName, roles[], permissions[] }.
  * When admin is impersonating, context is for the impersonated tenant; permissions are still for the current user
@@ -477,6 +516,13 @@ export function resolveTenantContext(req, res, next) {
           requestId: req.requestId,
         })
       }
+      await ensurePrimaryContactOwnerRole(
+        req.userData.id,
+        req.userData.email,
+        tenant.tenantId,
+        tenant.tenantType
+      )
+
       let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
       let permissions = await getPermissionsForUser(
         req.userData.id,
@@ -570,6 +616,31 @@ export function requirePermission(permissionKey) {
   }
 }
 
+/** Allow route when the user has any one of the listed permissions (or is admin). */
+export function requireAnyPermission(...permissionKeys) {
+  return (req, res, next) => {
+    const tenant = req.tenantContext
+    const admin = req.adminContext
+    const perms = tenant?.permissions ?? admin?.permissions ?? []
+    if (permissionKeys.some((key) => hasPermission(perms, key))) {
+      return next()
+    }
+    if (req.userData?.role === 'ADMIN') {
+      if (getEffectiveTenant(req)) return next()
+      if (!tenant && admin) return next()
+    }
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'FORBIDDEN',
+        message: `Missing one of: ${permissionKeys.join(', ')}`,
+      },
+      requestId: req.requestId,
+    })
+  }
+}
+
 // Check if user owns resource (for suppliers/restaurants)
 export function requireOwnership(ownerType) {
   return (req, res, next) => {
@@ -620,3 +691,20 @@ export function requireOwnership(ownerType) {
     next()
   }
 }
+
+export {
+  getUserWorkspaceMembership,
+  bindUserToWorkspace,
+  assertUserCanJoinWorkspace,
+  assertEmailCanJoinWorkspace,
+  resolveWorkspaceScope,
+  MAIN_ADMIN_ROLE_NAME,
+} from './workspace-membership.js'
+
+export {
+  requireTenantPermission,
+  requireSupplierPermission,
+  requireRestaurantPermission,
+  assertCanAssignRole,
+  assertCanGrantPermissions,
+} from './rbac-guards.js'
