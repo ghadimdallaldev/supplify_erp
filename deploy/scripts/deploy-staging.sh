@@ -123,7 +123,7 @@ echo "  Running minio-init (buckets: ${S3_BUCKETS:-${S3_BUCKET:-supplify}})..."
 echo "  Running keycloak-init (this can take 2–3 minutes on first boot)..."
 "${COMPOSE_CMD[@]}" run --rm keycloak-init
 
-echo "  Running database migrations (54 SQL files + runtime migrators)..."
+echo "  Running database migrations, tenant role backfill, and RBAC system role sync..."
 "${COMPOSE_CMD[@]}" run --rm migrate
 
 # ── Phase 6: Start application ───────────────────────────────────────────────

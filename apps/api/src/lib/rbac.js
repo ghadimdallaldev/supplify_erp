@@ -3,7 +3,12 @@ import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
 import { getEffectiveTenant } from './impersonation.js'
-import { getActiveTenantFromRequest, getPrimaryTenantForUser } from './tenant-switch.js'
+import {
+  getActiveTenantFromRequest,
+  getPrimaryTenantForUser,
+  userCanAccessTenant,
+} from './tenant-switch.js'
+import { getTenantAssignmentForUser, isPrimaryTenantContact } from './workspace-tenant.js'
 import {
   getRolesForUser,
   getPermissionsForUser,
@@ -424,6 +429,25 @@ export async function getRequestTenant(req) {
   const active = await getActiveTenantFromRequest(req)
   if (active) return active
 
+  if (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER') {
+    const assignment = await getTenantAssignmentForUser(req.userData.id, req.userData.role)
+    if (assignment?.tenantId) {
+      const allowed = await userCanAccessTenant(
+        req.userData.id,
+        req.userData.email,
+        assignment.tenantId,
+        assignment.tenantType
+      )
+      if (allowed) {
+        return {
+          tenantId: assignment.tenantId,
+          tenantType: assignment.tenantType,
+          tenantName: assignment.tenantName || '',
+        }
+      }
+    }
+  }
+
   const email = (req.userData.email || '').trim().toLowerCase()
   if (!email) return null
   if (req.userData.role === 'SUPPLIER') {
@@ -477,6 +501,21 @@ export async function ensurePrimaryContactOwnerRole(userId, email, tenantId, ten
 
   if (await userHasOwnerRole(userId, tenantId, tenantType)) return false
 
+  // Do not override explicit team roles from invitations (Viewer, Accountant, etc.)
+  const { rows: assigned } = await query(
+    `
+    SELECT tr.name
+    FROM tenant_user_roles tur
+    JOIN tenant_roles tr ON tr.id = tur.role_id
+    WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
+    LIMIT 1
+    `,
+    [userId, tenantId, tenantType]
+  )
+  if (assigned.length > 0 && assigned[0].name !== 'Owner') {
+    return false
+  }
+
   await assignOwnerRoleForUser(userId, tenantId, tenantType)
   await invalidateUserPermissionCache(userId, tenantId, tenantType)
   logger.info('Assigned Owner role to primary tenant contact', {
@@ -529,18 +568,26 @@ export function resolveTenantContext(req, res, next) {
         tenant.tenantId,
         tenant.tenantType
       )
-      // If tenant user has no role yet, assign default owner so permission checks succeed
+      // Only the primary tenant contact gets an automatic Owner role when unassigned.
       if (
         roles.length === 0 &&
         (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER')
       ) {
-        await assignDefaultRoleForTenant(req.userData.id, tenant.tenantId, tenant.tenantType)
-        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
-        permissions = await getPermissionsForUser(
+        const isPrimary = await isPrimaryTenantContact(
           req.userData.id,
+          req.userData.email,
           tenant.tenantId,
           tenant.tenantType
         )
+        if (isPrimary) {
+          await assignDefaultRoleForTenant(req.userData.id, tenant.tenantId, tenant.tenantType)
+          roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+          permissions = await getPermissionsForUser(
+            req.userData.id,
+            tenant.tenantId,
+            tenant.tenantType
+          )
+        }
       }
       req.tenantContext = {
         tenantId: tenant.tenantId,

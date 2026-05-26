@@ -19,6 +19,7 @@ import { redirectToAuth, redirectToLogout } from '../lib/authRedirect'
 export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [inviteRegistered, setInviteRegistered] = useState(false)
   const [inEmbeddedFrame, setInEmbeddedFrame] = useState(false)
 
   useEffect(() => {
@@ -33,7 +34,9 @@ export function LoginPage() {
     const urlParams = new URLSearchParams(window.location.search)
     const errorParam = urlParams.get('error')
     const expiredParam = urlParams.get('expired')
-    if (expiredParam === 'true') {
+    if (urlParams.get('registered') === '1') {
+      setInviteRegistered(true)
+    } else if (expiredParam === 'true') {
       setError('Your session expired. Please sign in again.')
     } else if (errorParam) {
       setError(
@@ -180,6 +183,15 @@ export function LoginPage() {
                     </a>{' '}
                     in your browser (Chrome or Edge). Sign-in does not work inside embedded
                     previews.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {inviteRegistered && (
+                <Alert className="animate-in slide-in-from-top-2 border-emerald-200 bg-emerald-50">
+                  <AlertDescription className="text-emerald-900">
+                    Your account was created. Sign in with the email and password you set on the
+                    invitation page.
                   </AlertDescription>
                 </Alert>
               )}

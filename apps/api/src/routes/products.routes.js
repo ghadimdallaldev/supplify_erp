@@ -30,8 +30,10 @@ const catalogReadAccess = requireAnyPermission('CATALOG_VIEW', 'ORDERS_VIEW', 'I
 router.use(requireAuth, resolveTenantContext, resolveAdminContext)
 
 router.use((req, res, next) => {
-  if (req.method === 'GET') return catalogReadAccess(req, res, next)
-  return requirePermission('CATALOG_EDIT')(req, res, next)
+  const method = req.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD') return catalogReadAccess(req, res, next)
+  if (method === 'DELETE') return requirePermission('CATALOG_MANAGE')(req, res, next)
+  return requireAnyPermission('CATALOG_EDIT', 'CATALOG_MANAGE')(req, res, next)
 })
 
 // Lazy cache: does product table have a tags column? (migration 0026 adds it)

@@ -104,6 +104,7 @@ echo "▶ Phase 5: Init & migrate"
 echo "  Running minio-init (buckets: ${S3_BUCKETS:-${S3_BUCKET:-supplify}})..."
 "${COMPOSE_CMD[@]}" run --rm minio-init
 "${COMPOSE_CMD[@]}" run --rm keycloak-init
+echo "  Running database migrations, tenant role backfill, and RBAC system role sync..."
 "${COMPOSE_CMD[@]}" run --rm migrate
 
 echo ""

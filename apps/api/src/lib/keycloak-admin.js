@@ -116,6 +116,46 @@ export async function createKeycloakUserWithPassword({
   return { userId, created: true }
 }
 
+/** Enable resource-owner password grant on supplify-api (invite signup auto-login). */
+export async function ensureApiClientDirectAccessGrants() {
+  const token = await getKeycloakAdminToken()
+  const clientId = config.KEYCLOAK_CLIENT_ID
+  const listUrl = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/clients?clientId=${encodeURIComponent(clientId)}`
+  const listRes = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } })
+  if (!listRes.ok) {
+    throw new Error(`List Keycloak client failed: ${listRes.status}`)
+  }
+  const clients = await listRes.json()
+  const summary = clients[0]
+  if (!summary?.id) {
+    throw new Error(`Keycloak client ${clientId} not found`)
+  }
+  if (summary.directAccessGrantsEnabled) {
+    return false
+  }
+  const detailUrl = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/clients/${summary.id}`
+  const detailRes = await fetch(detailUrl, { headers: { Authorization: `Bearer ${token}` } })
+  if (!detailRes.ok) {
+    throw new Error(`Get Keycloak client failed: ${detailRes.status}`)
+  }
+  const client = await detailRes.json()
+  client.directAccessGrantsEnabled = true
+  const updateRes = await fetch(detailUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(client),
+  })
+  if (!updateRes.ok) {
+    const text = await updateRes.text()
+    throw new Error(`Update Keycloak client failed: ${updateRes.status} ${text}`)
+  }
+  logger.info('Enabled directAccessGrants on Keycloak client', { clientId })
+  return true
+}
+
 export async function ensureKeycloakRealmRole(email, roleName) {
   try {
     const token = await getKeycloakAdminToken()

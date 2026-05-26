@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useValidateBranchInviteQuery, useAcceptBranchInviteMutation } from '../services/api'
-import { useAppSelector } from '../hooks/redux'
+import {
+  useValidateBranchInviteQuery,
+  useAcceptBranchInviteMutation,
+  useGetInviteSessionQuery,
+} from '../services/api'
 import { Button } from '../components/ui/button'
 import { api } from '../services/api'
 import { useAppDispatch } from '../hooks/redux'
+import {
+  formEmailMatchesInvite,
+  inviteFormEmailMismatchMessage,
+  inviteSessionEmailMismatch,
+  invitationAcceptErrorMessage,
+  finishInviteAcceptNavigation,
+} from '../lib/invite-session'
+import { InviteEmailMismatchCard } from '../components/invite/InviteEmailMismatchCard'
+import { InviteSignupEmailField } from '../components/invite/InviteSignupEmailField'
 
 export function BranchInviteAcceptPage() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { user, isAuthenticated } = useAppSelector((state) => state.auth)
+  const { data: sessionUser, isLoading: sessionLoading } = useGetInviteSessionQuery()
 
   const { data, isLoading, isError } = useValidateBranchInviteQuery(token, { skip: !token })
   const [accept, { isLoading: accepting }] = useAcceptBranchInviteMutation()
@@ -23,11 +35,16 @@ export function BranchInviteAcceptPage() {
   const [error, setError] = useState<string | null>(null)
 
   const invite = data
+  const loginHref = `/login?${searchParams.toString()}`
+  const invitePath = `/invite/branch?${searchParams.toString()}`
+
+  const requiredInviteEmail = invite?.invited_email?.trim() || ''
 
   useEffect(() => {
-    if (invite?.invited_email) setEmail((prev) => prev || invite.invited_email || '')
+    if (requiredInviteEmail) setEmail(requiredInviteEmail)
+    else if (invite?.invited_email) setEmail((prev) => prev || invite.invited_email || '')
     if (invite?.invited_name) setFullName((prev) => prev || invite.invited_name || '')
-  }, [invite?.invited_email, invite?.invited_name])
+  }, [requiredInviteEmail, invite?.invited_email, invite?.invited_name])
 
   if (!token) {
     return (
@@ -37,7 +54,7 @@ export function BranchInviteAcceptPage() {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <p>Validating your invitation…</p>
@@ -69,7 +86,7 @@ export function BranchInviteAcceptPage() {
       <div className="min-h-screen flex items-center justify-center p-6 max-w-md text-center space-y-3">
         <h1 className="text-xl font-semibold">This invite link is no longer valid.</h1>
         <p className="text-[var(--text-muted)]">If you already have an account, sign in.</p>
-        <Link to="/login" className="text-[var(--brand)] underline">
+        <Link to={loginHref} className="text-[var(--brand)] underline">
           Sign In
         </Link>
       </div>
@@ -79,12 +96,16 @@ export function BranchInviteAcceptPage() {
   const handleAcceptLoggedIn = async () => {
     setError(null)
     try {
-      await accept({ token }).unwrap()
+      const result = await accept({ token }).unwrap()
       dispatch(api.util.resetApiState())
-      navigate('/app/dashboard', { replace: true })
-      window.location.reload()
-    } catch {
-      setError('Could not accept invitation. Try signing in with a different account.')
+      finishInviteAcceptNavigation(result, navigate, searchParams)
+    } catch (err) {
+      setError(
+        invitationAcceptErrorMessage(
+          err,
+          'Could not accept invitation. Try signing in with a different account.'
+        )
+      )
     }
   }
 
@@ -99,37 +120,68 @@ export function BranchInviteAcceptPage() {
       setError('Password must be at least 8 characters')
       return
     }
+    const signupEmail = (requiredInviteEmail || email).trim()
+    if (!formEmailMatchesInvite(requiredInviteEmail || invite?.invited_email, signupEmail)) {
+      setError(inviteFormEmailMismatchMessage(requiredInviteEmail))
+      return
+    }
     try {
-      await accept({
+      const result = await accept({
         token,
         full_name: fullName.trim(),
-        email: email.trim(),
+        email: signupEmail,
         password,
       }).unwrap()
       dispatch(api.util.resetApiState())
-      navigate('/app/dashboard', { replace: true })
-      window.location.reload()
-    } catch {
-      setError('Could not create your account. The link may have expired.')
+      finishInviteAcceptNavigation(result, navigate, searchParams)
+    } catch (err) {
+      setError(
+        invitationAcceptErrorMessage(
+          err,
+          'Could not create your account. The link may have expired.'
+        )
+      )
     }
   }
 
-  if (isAuthenticated && user) {
+  const emailMismatch =
+    sessionUser && inviteSessionEmailMismatch(invite.invited_email, sessionUser.email)
+
+  if (sessionUser) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="max-w-md w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
           <h1 className="text-xl font-semibold">Accept branch invitation</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            You&apos;re logged in as {user.displayName || user.email}. This invite is for{' '}
-            <strong>{invite.branch_name}</strong> ({invite.org_name}) as {invite.role_name}.
-          </p>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="button" className="w-full" disabled={accepting} onClick={() => handleAcceptLoggedIn()}>
-            Accept & Join Branch
-          </Button>
-          <Link to="/login" className="block text-center text-sm text-[var(--brand)] underline">
-            Sign in with a different account
-          </Link>
+          {emailMismatch && invite.invited_email ? (
+            <InviteEmailMismatchCard
+              invitedEmail={invite.invited_email}
+              sessionEmail={sessionUser.email}
+              invitePath={invitePath}
+            />
+          ) : (
+            <>
+              <p className="text-sm text-[var(--text-muted)]">
+                You&apos;re logged in as {sessionUser.displayName || sessionUser.email}. This invite
+                is for <strong>{invite.branch_name}</strong> ({invite.org_name}) as{' '}
+                {invite.role_name}.
+              </p>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <Button
+                type="button"
+                className="w-full"
+                disabled={accepting}
+                onClick={() => handleAcceptLoggedIn()}
+              >
+                Accept & Join Branch
+              </Button>
+              <Link
+                to={loginHref}
+                className="block text-center text-sm text-[var(--brand)] underline"
+              >
+                Sign in with a different account
+              </Link>
+            </>
+          )}
         </div>
       </div>
     )
@@ -153,16 +205,11 @@ export function BranchInviteAcceptPage() {
               required
             />
           </label>
-          <label className="block text-sm">
-            Email
-            <input
-              type="email"
-              className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </label>
+          <InviteSignupEmailField
+            invitedEmail={requiredInviteEmail || invite?.invited_email}
+            value={email}
+            onChange={setEmail}
+          />
           <label className="block text-sm">
             Password
             <input

@@ -59,6 +59,34 @@ export async function userCanAccessTenant(userId, email, tenantId, tenantType) {
   )
   if (roleRows.length) return true
 
+  try {
+    const { rows: namedRole } = await query(
+      `
+      SELECT 1 FROM tenant_user_roles
+      WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3
+      LIMIT 1
+    `,
+      [userId, tenantId, tenantType]
+    )
+    if (namedRole.length) return true
+  } catch (err) {
+    if (err.code !== '42P01') throw err
+  }
+
+  try {
+    const { rows: membership } = await query(
+      `
+      SELECT 1 FROM user_workspace_membership
+      WHERE user_id = $1 AND home_tenant_id = $2 AND workspace_type = $3 AND status = 'active'
+      LIMIT 1
+    `,
+      [userId, tenantId, tenantType]
+    )
+    if (membership.length) return true
+  } catch (err) {
+    if (err.code !== '42P01') throw err
+  }
+
   const primary = await getPrimaryTenantForUser(normalizedEmail, tenantType)
   if (!primary) return false
 

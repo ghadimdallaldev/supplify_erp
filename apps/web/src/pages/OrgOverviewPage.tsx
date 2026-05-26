@@ -4,11 +4,14 @@ import { RestaurantOrgOverviewPage } from './RestaurantOrgOverviewPage'
 import { Link, useNavigate } from 'react-router-dom'
 import { useGetOrgQuery, useSwitchOrgBranchContextMutation } from '../services/api'
 import { useAppSelector } from '../hooks/redux'
+import { usePermissions } from '../hooks/usePermissions'
+import { RequirePermission } from '../components/RequirePermission'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { AddBranchModal } from '../components/org/AddBranchModal'
 
 export function OrgOverviewPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
   const navigate = useNavigate()
   const { entitlements } = useEntitlements()
   const multiBranch = entitlements?.features?.multi_branch === true
@@ -19,27 +22,17 @@ export function OrgOverviewPage() {
   const [switchBranch] = useSwitchOrgBranchContextMutation()
 
   if (user?.role === 'RESTAURANT') {
-    return <RestaurantOrgOverviewPage />
-  }
-
-  const orgRole = data?.orgRole
-  const canView = orgRole === 'Org Owner' || orgRole === 'Org Manager' || user?.role === 'ADMIN'
-
-  if (user?.role === 'SUPPLIER' && !canView && !isLoading) {
     return (
-      <div className="p-6">
-        <p className="text-[var(--text-muted)]">
-          Organization overview is available to Org Owner and Org Manager roles.
-        </p>
-        <Link to="/app/settings" className="text-sm underline mt-2 inline-block">
-          Back to settings
-        </Link>
-      </div>
+      <RequirePermission permission="SETTINGS_VIEW" title="organization">
+        <RestaurantOrgOverviewPage />
+      </RequirePermission>
     )
   }
 
+  const orgRole = data?.orgRole
+  const canManageOrg = can('SETTINGS_MANAGE')
+
   const branches = data?.branches ?? []
-  const isOrgOwner = orgRole === 'Org Owner'
 
   const handleOpenBranch = async (supplierId: string) => {
     await switchBranch({ supplier_id: supplierId }).unwrap()
@@ -54,103 +47,107 @@ export function OrgOverviewPage() {
 
   if (!multiBranch) {
     return (
-      <div className="p-6 max-w-3xl">
-        <h1 className="text-xl font-semibold mb-2">Organization</h1>
-        <p className="text-[var(--text-muted)]">
-          Multi-branch accounts are available on Silver and above. Upgrade your plan to add
-          locations.
-        </p>
-        <Link to="/app/settings?tab=subscription" className="text-sm underline mt-4 inline-block">
-          View subscription
-        </Link>
-      </div>
+      <RequirePermission permission="SETTINGS_VIEW" title="organization">
+        <div className="p-6 max-w-3xl">
+          <h1 className="text-xl font-semibold mb-2">Organization</h1>
+          <p className="text-[var(--text-muted)]">
+            Multi-branch accounts are available on Silver and above. Upgrade your plan to add
+            locations.
+          </p>
+          <Link to="/app/settings?tab=subscription" className="text-sm underline mt-4 inline-block">
+            View subscription
+          </Link>
+        </div>
+      </RequirePermission>
     )
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{data?.organization?.name ?? 'Organization'}</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            {branches.length} branch{branches.length === 1 ? '' : 'es'} · {orgRole}
-          </p>
-        </div>
-        {isOrgOwner && (
-          <button
-            type="button"
-            onClick={() => setAddBranchOpen(true)}
-            className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Add branch account
-          </button>
-        )}
-      </div>
-
-      {isLoading && <p className="text-sm text-[var(--text-muted)]">Loading branches…</p>}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {branches.map((branch) => {
-          const b = branch as {
-            id: string
-            name: string
-            is_main_branch?: boolean
-            is_branch_active?: boolean
-            staff_count?: number
-            order_count?: number
-          }
-          return (
-            <div
-              key={b.id}
-              className="rounded-lg border border-[var(--app-border)] p-4 hover:border-[var(--primary)] transition-colors"
+    <RequirePermission permission="SETTINGS_VIEW" title="organization">
+      <div className="p-6 max-w-5xl mx-auto space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">{data?.organization?.name ?? 'Organization'}</h1>
+            <p className="text-sm text-[var(--text-muted)]">
+              {branches.length} branch{branches.length === 1 ? '' : 'es'} · {orgRole}
+            </p>
+          </div>
+          {canManageOrg && (
+            <button
+              type="button"
+              onClick={() => setAddBranchOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] text-white px-3 py-2 text-sm"
             >
-              <div className="flex items-start gap-3">
-                <Building2 className="h-5 w-5 text-[var(--text-muted)] shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium flex items-center gap-2">
-                    {b.name}
-                    {b.is_main_branch && (
-                      <span className="text-xs rounded bg-[var(--surface-muted)] px-1.5 py-0.5">
-                        Main
-                      </span>
-                    )}
-                    {b.is_branch_active === false && (
-                      <span className="text-xs rounded bg-amber-100 text-amber-900 px-1.5 py-0.5">
-                        Inactive
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">
-                    {b.staff_count ?? 0} staff · {b.order_count ?? 0} orders
-                  </p>
-                  <div className="flex flex-wrap gap-3 mt-3 text-sm">
-                    <button
-                      type="button"
-                      className="text-[var(--brand)] hover:underline"
-                      onClick={() => handleOpenBranch(b.id).catch(() => {})}
-                    >
-                      Open branch
-                    </button>
-                    {isOrgOwner && (
-                      <Link
-                        to={`/app/org/branches/${b.id}`}
-                        className="inline-flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--brand)]"
+              <Plus className="h-4 w-4" />
+              Add branch account
+            </button>
+          )}
+        </div>
+
+        {isLoading && <p className="text-sm text-[var(--text-muted)]">Loading branches…</p>}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {branches.map((branch) => {
+            const b = branch as {
+              id: string
+              name: string
+              is_main_branch?: boolean
+              is_branch_active?: boolean
+              staff_count?: number
+              order_count?: number
+            }
+            return (
+              <div
+                key={b.id}
+                className="rounded-lg border border-[var(--app-border)] p-4 hover:border-[var(--primary)] transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <Building2 className="h-5 w-5 text-[var(--text-muted)] shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium flex items-center gap-2">
+                      {b.name}
+                      {b.is_main_branch && (
+                        <span className="text-xs rounded bg-[var(--surface-muted)] px-1.5 py-0.5">
+                          Main
+                        </span>
+                      )}
+                      {b.is_branch_active === false && (
+                        <span className="text-xs rounded bg-amber-100 text-amber-900 px-1.5 py-0.5">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      {b.staff_count ?? 0} staff · {b.order_count ?? 0} orders
+                    </p>
+                    <div className="flex flex-wrap gap-3 mt-3 text-sm">
+                      <button
+                        type="button"
+                        className="text-[var(--brand)] hover:underline"
+                        onClick={() => handleOpenBranch(b.id).catch(() => {})}
                       >
-                        <Settings className="h-3.5 w-3.5" />
-                        Invitations
-                      </Link>
-                    )}
+                        Open branch
+                      </button>
+                      {canManageOrg && (
+                        <Link
+                          to={`/app/org/branches/${b.id}`}
+                          className="inline-flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--brand)]"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                          Invitations
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
+        {canManageOrg && (
+          <AddBranchModal open={addBranchOpen} onClose={() => setAddBranchOpen(false)} />
+        )}
       </div>
-      {isOrgOwner && (
-        <AddBranchModal open={addBranchOpen} onClose={() => setAddBranchOpen(false)} />
-      )}
-    </div>
+    </RequirePermission>
   )
 }

@@ -1,5 +1,11 @@
 import express from 'express'
-import { requireAuth, requireRole, getSupplierIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  getSupplierIdForRequest,
+} from '../lib/rbac.js'
+import { orgStructureGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -110,7 +116,13 @@ async function assertBranchAccess(req, supplierId) {
   return userHasOrgBranchAccess(req.userData.id, supplierId, req.orgContext.organizationId)
 }
 
-router.use(requireAuth, requireRole(['SUPPLIER', 'ADMIN']), requireSupplierOrgContext)
+router.use(
+  requireAuth,
+  requireRole(['SUPPLIER', 'ADMIN']),
+  resolveTenantContext,
+  requireSupplierOrgContext,
+  orgStructureGuard
+)
 
 /**
  * GET /api/org

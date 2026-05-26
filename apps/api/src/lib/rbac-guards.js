@@ -5,7 +5,7 @@ import { query } from './db.js'
 import { ForbiddenError, ValidationError } from '../middlewares/errorHandler.js'
 import { MAIN_ADMIN_ROLE_NAME } from './workspace-membership.js'
 import { getAllPermissionsForTenantType } from './tenant-roles.js'
-import { hasPermission } from './permissions.js'
+import { getPermissionsForUser, hasPermission } from './permissions.js'
 
 export async function getRolePermissionSet(roleId, client = null) {
   const db = client ? (sql, params) => client.query(sql, params) : query
@@ -203,8 +203,8 @@ export function assertCanGrantPermissions(
 }
 
 export async function requireTenantPermission(userId, tenantId, tenantType, permissionKey) {
-  const allowed = await hasPermission(userId, tenantId, tenantType, permissionKey)
-  if (!allowed) {
+  const permissions = await getPermissionsForUser(userId, tenantId, tenantType)
+  if (!hasPermission(permissions, permissionKey)) {
     throw new ForbiddenError(`Missing permission: ${permissionKey}`)
   }
 }

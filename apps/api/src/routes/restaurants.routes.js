@@ -209,8 +209,21 @@ router.get('/', requireAuth, async (req, res) => {
 // Get current restaurant (for settings page) — must be before /:id so "me" is not treated as an id
 router.get('/me', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
   try {
-    const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE contact_email = $1', [
-      req.userData.email,
+    const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Restaurant workspace not found for user',
+        },
+        requestId: req.requestId,
+      })
+    }
+    const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [
+      restaurantId,
     ])
 
     if (restaurants.length === 0) {

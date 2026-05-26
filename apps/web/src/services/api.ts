@@ -247,6 +247,12 @@ export const api = createApi({
       // Cache for 5 minutes to reduce requests
       keepUnusedDataFor: 300,
     }),
+    getInviteSession: builder.query<
+      { id: string; email: string; displayName: string } | null,
+      void
+    >({
+      query: () => '/auth/session',
+    }),
     logout: builder.mutation<{ message?: string; keycloakLogoutUrl?: string }, void>({
       query: () => ({
         url: '/auth/logout',
@@ -1400,6 +1406,8 @@ export const api = createApi({
         user?: { email?: string; displayName?: string }
         activeSupplierId?: string
         activeRestaurantId?: string
+        needsManualLogin?: boolean
+        loginMessage?: string
       },
       {
         token: string
@@ -2949,6 +2957,7 @@ export const api = createApi({
 
 export const {
   useGetMeQuery,
+  useGetInviteSessionQuery,
   useGetRegisterStatusQuery,
   useCompleteRegistrationMutation,
   useLogoutMutation,

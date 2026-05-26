@@ -13,7 +13,9 @@ export function RestaurantPendingInvitations() {
   const [regenerate] = useRegenerateRestaurantMemberInvitationMutation()
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
-  const invitations = data?.invitations ?? []
+  const invitations = (data?.invitations ?? []).filter((inv) =>
+    ['pending', 'expired', 'revoked'].includes(inv.status)
+  )
   if (!invitations.length) return null
 
   const handleCopy = async (url: string, id: string) => {
@@ -88,7 +90,9 @@ export function RestaurantPendingInvitations() {
                     </Button>
                   )}
                   {inv.status === 'accepted' && (
-                    <span className="text-[var(--text-muted)]">{inv.accepted_by_name || 'Accepted'}</span>
+                    <span className="text-[var(--text-muted)]">
+                      {inv.accepted_by_name || 'Accepted'}
+                    </span>
                   )}
                 </td>
               </tr>

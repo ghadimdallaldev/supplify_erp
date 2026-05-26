@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
+import { usePermissions } from '../hooks/usePermissions'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 
@@ -58,7 +59,12 @@ export function OrdersPage() {
     }>
   >([])
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
   const isSupplier = user?.role === 'SUPPLIER'
+  const canManageOrders = can('ORDERS_MANAGE')
+  const canEditOrders = can('ORDERS_EDIT') || canManageOrders
+  const canCreateOrders = can('ORDERS_CREATE') || canManageOrders
+  const canDeclineOrder = canManageOrders
 
   const { data, isLoading, error, refetch } = useGetOrdersQuery(
     {
@@ -348,13 +354,13 @@ export function OrdersPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {isSupplier && (
+          {isSupplier && canCreateOrders && (
             <Button onClick={() => setShowManualOrderDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Order
             </Button>
           )}
-          {!isSupplier && (
+          {!isSupplier && canCreateOrders && (
             <Button asChild>
               <Link to="/app/cart" data-testid="orders-create-new-order">
                 <Plus className="h-4 w-4 mr-2" />
@@ -494,7 +500,7 @@ export function OrdersPage() {
 
                     {/* Action Buttons */}
                     <div className="flex gap-2">
-                      {isSupplier && order.status === 'PLACED' && (
+                      {isSupplier && canEditOrders && order.status === 'PLACED' && (
                         <>
                           <Button
                             size="sm"
@@ -503,17 +509,19 @@ export function OrdersPage() {
                           >
                             Acknowledge
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
-                            data-testid={`order-${order.id}-decline`}
-                          >
-                            Decline
-                          </Button>
+                          {canDeclineOrder && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
+                              data-testid={`order-${order.id}-decline`}
+                            >
+                              Decline
+                            </Button>
+                          )}
                         </>
                       )}
-                      {isSupplier && order.status === 'ACKNOWLEDGED' && (
+                      {isSupplier && canEditOrders && order.status === 'ACKNOWLEDGED' && (
                         <Button
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
@@ -522,7 +530,7 @@ export function OrdersPage() {
                           Start Processing
                         </Button>
                       )}
-                      {isSupplier && order.status === 'PROCESSING' && (
+                      {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
                         <Button
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
@@ -531,16 +539,19 @@ export function OrdersPage() {
                           Mark as Shipped
                         </Button>
                       )}
-                      {isSupplier && order.status === 'SHIPPED' && updatingOrderId !== order.id && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
-                          disabled={false}
-                          data-testid={`order-${order.id}-deliver`}
-                        >
-                          Mark Delivered
-                        </Button>
-                      )}
+                      {isSupplier &&
+                        canEditOrders &&
+                        order.status === 'SHIPPED' &&
+                        updatingOrderId !== order.id && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
+                            disabled={false}
+                            data-testid={`order-${order.id}-deliver`}
+                          >
+                            Mark Delivered
+                          </Button>
+                        )}
                       {isSupplier &&
                         (updatingOrderId === order.id || order.status === 'DELIVERED') && (
                           <Button

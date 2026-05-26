@@ -1,6 +1,7 @@
 import express from 'express'
 import PDFDocument from 'pdfkit'
 import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import { invoicesMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -20,7 +21,8 @@ router.use(
   requireAuth,
   resolveTenantContext,
   financeInvoicesGate,
-  requirePermission('INVOICES_VIEW')
+  requirePermission('INVOICES_VIEW'),
+  invoicesMutationGuard
 )
 
 /** Build PDF buffer for an invoice with line items */

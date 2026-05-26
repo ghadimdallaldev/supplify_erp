@@ -156,6 +156,7 @@ services:
         }
         "
         node apps/api/scripts/migrate-users-to-roles.js || { echo "Tenant role backfill failed"; exit 1; }
+        node apps/api/scripts/sync-system-roles.mjs || { echo "System roles sync failed"; exit 1; }
     depends_on:
       postgres:
         condition: service_healthy

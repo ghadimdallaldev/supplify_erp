@@ -758,7 +758,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('CATALOG_MANAGE'),
+  requirePermission('PROMOTIONS_VIEW'),
   async (req, res, next) => {
     try {
       const supplierId = await getSupplierId(req)
@@ -802,7 +802,7 @@ router.use(
   requireAuth,
   resolveTenantContext,
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('CATALOG_MANAGE'),
+  requirePermission('PROMOTIONS_MANAGE'),
   promotionsWriteGate
 )
 

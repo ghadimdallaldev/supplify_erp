@@ -12,7 +12,12 @@ import { userNeedsTenantSetup } from '../lib/register-account.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
 import { clearImpersonationCookie } from '../lib/impersonation.js'
-import { requireAuth, getRequestTenant, assignDefaultRoleForTenant } from '../lib/rbac.js'
+import {
+  requireAuth,
+  optionalAuth,
+  getRequestTenant,
+  assignDefaultRoleForTenant,
+} from '../lib/rbac.js'
 import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -190,6 +195,24 @@ router.get('/callback', async (req, res) => {
   }
 })
 
+/** Public invite pages: detect session without 401 when logged out. */
+router.get('/session', optionalAuth, async (req, res) => {
+  const user = req.userData
+  if (!user) {
+    return res.json({ ok: true, data: null, error: null, requestId: req.requestId })
+  }
+  return res.json({
+    ok: true,
+    data: {
+      id: user.id,
+      email: user.email,
+      displayName: user.display_name || user.displayName || user.email,
+    },
+    error: null,
+    requestId: req.requestId,
+  })
+})
+
 // Get current user info (includes tenant-scoped roles and permissions for RBAC)
 router.get('/me', requireAuth, async (req, res) => {
   try {
@@ -198,42 +221,59 @@ router.get('/me', requireAuth, async (req, res) => {
     // Get additional user data based on role
     let additionalData = {}
 
-    const emailLower = (user.email || '').trim().toLowerCase()
-    if (user.role === 'SUPPLIER' && emailLower) {
-      const { rows: suppliers } = await query(
-        'SELECT * FROM supplier WHERE LOWER(TRIM(contact_email)) = $1',
-        [emailLower]
-      )
-      if (suppliers.length > 0) {
-        additionalData.supplier = suppliers[0]
-      }
-    } else if (user.role === 'RESTAURANT' && emailLower) {
-      const { rows: restaurants } = await query(
-        'SELECT * FROM restaurant WHERE LOWER(TRIM(contact_email)) = $1',
-        [emailLower]
-      )
-      if (restaurants.length > 0) {
-        additionalData.restaurant = restaurants[0]
-      }
-    }
-
     // Tenant-scoped RBAC: roles and permissions for current tenant (or admin scope)
     let tenantRoles = []
     let tenantPermissions = []
     let adminRoles = []
     let adminPermissions = []
+    let workspace = null
     const tenant = await getRequestTenant(req)
     if (tenant) {
-      const { ensurePrimaryContactOwnerRole } = await import('../lib/rbac.js')
+      const { ensurePrimaryContactOwnerRole, assignDefaultRoleForTenant: assignDefault } =
+        await import('../lib/rbac.js')
+      const { isPrimaryTenantContact, getTenantAssignmentForUser } = await import(
+        '../lib/workspace-tenant.js'
+      )
       await ensurePrimaryContactOwnerRole(user.id, user.email, tenant.tenantId, tenant.tenantType)
 
       tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
       tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
-      // If tenant user has no role (e.g. new user or migration not run), assign default owner role so they get permissions
       if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
-        await assignDefaultRoleForTenant(user.id, tenant.tenantId, tenant.tenantType)
-        tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
-        tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
+        const isPrimary = await isPrimaryTenantContact(
+          user.id,
+          user.email,
+          tenant.tenantId,
+          tenant.tenantType
+        )
+        if (isPrimary) {
+          await assignDefault(user.id, tenant.tenantId, tenant.tenantType)
+          tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
+          tenantPermissions = await getPermissionsForUser(
+            user.id,
+            tenant.tenantId,
+            tenant.tenantType
+          )
+        }
+      }
+
+      const assignment = await getTenantAssignmentForUser(user.id, user.role)
+      workspace = {
+        tenantId: tenant.tenantId,
+        tenantType: tenant.tenantType,
+        tenantName: tenant.tenantName || assignment?.tenantName || '',
+        roleName: assignment?.roleName || tenantRoles[0] || null,
+      }
+
+      if (tenant.tenantType === 'SUPPLIER') {
+        const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [
+          tenant.tenantId,
+        ])
+        if (suppliers.length > 0) additionalData.supplier = suppliers[0]
+      } else if (tenant.tenantType === 'RESTAURANT') {
+        const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [
+          tenant.tenantId,
+        ])
+        if (restaurants.length > 0) additionalData.restaurant = restaurants[0]
       }
     }
     if (user.role === 'ADMIN') {
@@ -251,6 +291,7 @@ router.get('/me', requireAuth, async (req, res) => {
         createdAt: user.created_at,
         tenantRoles,
         tenantPermissions,
+        workspace,
         adminRoles,
         adminPermissions,
         ...additionalData,
