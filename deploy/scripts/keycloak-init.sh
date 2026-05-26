@@ -87,6 +87,10 @@ update_client_oidc() {
 }
 EOF
   /opt/keycloak/bin/kcadm.sh update "clients/${uuid}" -r Supplify -f "${patch_file}"
+  if [ "$client_id" = "supplify-api" ]; then
+    /opt/keycloak/bin/kcadm.sh update "clients/${uuid}" -r Supplify -s directAccessGrantsEnabled=true
+    echo "Enabled direct access grants on supplify-api (invite signup login)"
+  fi
   echo "Updated ${client_id} redirect and post-logout URIs (PUBLIC_URL=${PUBLIC_URL}, WEB_ORIGIN=${WEB_ORIGIN})"
 }
 

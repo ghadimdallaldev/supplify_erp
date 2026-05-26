@@ -4,7 +4,9 @@ import {
   requireRole,
   getRestaurantIdForRequest,
   resolveTenantContext,
+  requirePermission,
 } from '../lib/rbac.js'
+import { ordersCreateMutationGuard } from '../lib/route-permissions.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -123,7 +125,13 @@ async function assertCanAddQuickListItems(restaurantId, additionalCount = 1) {
   }
 }
 
-router.use(requireAuth, resolveTenantContext, quickListsFeatureGate)
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requirePermission('ORDERS_VIEW'),
+  quickListsFeatureGate,
+  ordersCreateMutationGuard
+)
 
 // Get all quick lists for restaurant
 router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {

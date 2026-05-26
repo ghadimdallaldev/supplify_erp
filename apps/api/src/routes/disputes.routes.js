@@ -1,6 +1,12 @@
 import express from 'express'
 import { z } from 'zod'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  requireAnyPermission,
+} from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -118,7 +124,7 @@ router.get(
 router.post(
   '/',
   requireRole(['RESTAURANT', 'ADMIN']),
-  requirePermission('ORDERS_CREATE'),
+  requireAnyPermission('ORDERS_CREATE', 'RECEIVING_MANAGE'),
   async (req, res, next) => {
     try {
       const body = createDisputeSchema.parse(req.body)

@@ -12,6 +12,8 @@
     {
       "clientId": "supplify-api",
       "enabled": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
       "clientAuthenticatorType": "client-secret",
       "secret": "changeme",
       "redirectUris": [

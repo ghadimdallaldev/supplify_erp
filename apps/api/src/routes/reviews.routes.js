@@ -1,6 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import { reviewsAccessGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -84,7 +85,12 @@ router.get('/suppliers/:supplierId/summary', async (req, res, next) => {
 })
 
 // Authenticated restaurant routes
-router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN']))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  reviewsAccessGuard
+)
 
 const reviewsWriteGate = requireFeature(
   'supplier_reviews',

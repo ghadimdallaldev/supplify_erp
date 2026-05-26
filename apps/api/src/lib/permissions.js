@@ -155,10 +155,23 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
       if (err.code !== '42P01') throw err
     }
 
-    const branchPerms = mergeUniquePermissions(named, legacy)
+    // When user has a named tenant role assignment, use ONLY that role's permissions (strict RBAC).
+    // Legacy user_role grants must not expand Viewer/Accountant into full owner access.
+    let hasNamedAssignment = false
+    if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+      const { rows: tur } = await query(
+        `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
+        [userId, tenantId, tenantType]
+      )
+      hasNamedAssignment = tur.length > 0
+    }
+
+    const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
 
     if (tenantType === 'SUPPLIER' && hasOrgRole) {
-      const permissions = mergeUniquePermissions(orgPerms, branchPerms)
+      const permissions = hasNamedAssignment
+        ? mergeUniquePermissions(orgPerms, named)
+        : mergeUniquePermissions(orgPerms, branchPerms)
       await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
       return permissions
     }

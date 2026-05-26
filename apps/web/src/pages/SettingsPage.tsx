@@ -4,6 +4,8 @@ import { Button } from '../components/ui/button'
 import { Switch } from '../components/ui/switch'
 import { User, Mail, Shield, Bell, Loader2, Save } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
+import { usePermissions } from '../hooks/usePermissions'
+import { RequirePermission } from '../components/RequirePermission'
 import { SupplierSettingsPage } from './SupplierSettingsPage'
 import { RestaurantOnboardingPage } from './RestaurantOnboardingPage'
 import {
@@ -66,9 +68,16 @@ const NOTIFICATION_FIELDS: Array<{
 
 export function SettingsPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
+  const canEditSettings = can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')
   const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
-  const { data: notificationPrefsData, isLoading: isLoadingNotificationPrefs, refetch: refetchNotificationPrefs } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
-  const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] = useUpdateNotificationPreferencesMutation()
+  const {
+    data: notificationPrefsData,
+    isLoading: isLoadingNotificationPrefs,
+    refetch: refetchNotificationPrefs,
+  } = useGetNotificationPreferencesQuery(undefined, { skip: !user?.id })
+  const [updateNotificationPreferences, { isLoading: isSavingNotificationPrefs }] =
+    useUpdateNotificationPreferencesMutation()
 
   useEffect(() => {
     const prefs = notificationPrefsData?.preferences
@@ -82,8 +91,10 @@ export function SettingsPage() {
         notifyMessageReceived: prefs.notifyMessageReceived ?? previous.notifyMessageReceived,
         notifyInvoiceIssued: prefs.notifyInvoiceIssued ?? previous.notifyInvoiceIssued,
         notifyLowStock: prefs.notifyLowStock ?? previous.notifyLowStock,
-        notifyReservationCreated: prefs.notifyReservationCreated ?? previous.notifyReservationCreated,
-        notifyReservationWaitlist: prefs.notifyReservationWaitlist ?? previous.notifyReservationWaitlist,
+        notifyReservationCreated:
+          prefs.notifyReservationCreated ?? previous.notifyReservationCreated,
+        notifyReservationWaitlist:
+          prefs.notifyReservationWaitlist ?? previous.notifyReservationWaitlist,
         notifyStaffPto: prefs.notifyStaffPto ?? previous.notifyStaffPto,
         notifyStaffSwap: prefs.notifyStaffSwap ?? previous.notifyStaffSwap,
         notifyScheduledOrder: prefs.notifyScheduledOrder ?? previous.notifyScheduledOrder,
@@ -107,21 +118,27 @@ export function SettingsPage() {
 
   // Show supplier-specific settings for suppliers
   if (user?.role === 'SUPPLIER') {
-    return <SupplierSettingsPage />
+    return (
+      <RequirePermission permission="SETTINGS_VIEW" title="settings">
+        <SupplierSettingsPage />
+      </RequirePermission>
+    )
   }
 
   // Show restaurant onboarding for restaurants
   if (user?.role === 'RESTAURANT') {
-    return <RestaurantOnboardingPage />
+    return (
+      <RequirePermission permission="SETTINGS_VIEW" title="settings">
+        <RestaurantOnboardingPage />
+      </RequirePermission>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-[21px] font-black tracking-tight text-[var(--text)]">Settings</h1>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          Manage your account and preferences
-        </p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">Manage your account and preferences</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -131,9 +148,7 @@ export function SettingsPage() {
               <User className="h-5 w-5" />
               <span>Profile Information</span>
             </CardTitle>
-            <CardDescription>
-              Your account details and role information
-            </CardDescription>
+            <CardDescription>Your account details and role information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -150,7 +165,9 @@ export function SettingsPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-[var(--text-mid)]">Member Since</label>
-              <p className="text-sm">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</p>
+              <p className="text-sm">
+                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -161,22 +178,20 @@ export function SettingsPage() {
               <Shield className="h-5 w-5" />
               <span>Security</span>
             </CardTitle>
-            <CardDescription>
-              Manage your account security settings
-            </CardDescription>
+            <CardDescription>Manage your account security settings</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-[var(--text-muted)]">
                 Your account is secured through Keycloak authentication.
               </p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => {
-                  const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080';
-                  const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'Supplify';
-                  window.open(`${keycloakUrl}/realms/${realm}/account`, '_blank');
+                  const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080'
+                  const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'Supplify'
+                  window.open(`${keycloakUrl}/realms/${realm}/account`, '_blank')
                 }}
               >
                 Change Password
@@ -191,9 +206,7 @@ export function SettingsPage() {
               <Bell className="h-5 w-5" />
               <span>Notifications</span>
             </CardTitle>
-            <CardDescription>
-              Configure your notification preferences
-            </CardDescription>
+            <CardDescription>Configure your notification preferences</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {isLoadingNotificationPrefs ? (
@@ -205,7 +218,10 @@ export function SettingsPage() {
               <>
                 <div className="space-y-4">
                   {NOTIFICATION_FIELDS.map(({ key, label, description }) => (
-                    <div key={key} className="flex items-start justify-between gap-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+                    <div
+                      key={key}
+                      className="flex items-start justify-between gap-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4"
+                    >
                       <div>
                         <p className="text-sm font-medium text-[var(--text)]">{label}</p>
                         <p className="text-xs text-[var(--text-muted)] mt-1">{description}</p>
@@ -214,13 +230,14 @@ export function SettingsPage() {
                         checked={notificationPrefs[key]}
                         onCheckedChange={() => handleToggleNotification(key)}
                         aria-label={label}
+                        disabled={!canEditSettings}
                       />
                     </div>
                   ))}
                 </div>
                 <Button
                   onClick={handleSaveNotifications}
-                  disabled={isSavingNotificationPrefs}
+                  disabled={isSavingNotificationPrefs || !canEditSettings}
                   className="inline-flex items-center gap-2"
                 >
                   {isSavingNotificationPrefs ? (
@@ -246,9 +263,7 @@ export function SettingsPage() {
               <Mail className="h-5 w-5" />
               <span>Support</span>
             </CardTitle>
-            <CardDescription>
-              Get help and contact support
-            </CardDescription>
+            <CardDescription>Get help and contact support</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">

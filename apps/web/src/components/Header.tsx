@@ -64,6 +64,12 @@ export function Header() {
     })
     .filter(({ pct }) => pct >= 80)
     .slice(0, 3)
+  const workspace = user?.workspace
+  const workspaceLabel =
+    workspace?.tenantName &&
+    `${workspace.tenantType === 'SUPPLIER' ? 'Supplier' : 'Restaurant'}: ${workspace.tenantName}${
+      workspace.roleName ? ` · ${workspace.roleName}` : ''
+    }`
   const showUpgrade = user?.role !== 'ADMIN' && user?.role !== 'PENDING'
   const hasUrgency = usagePressure.length > 0 || (blockedCountLast7d ?? 0) >= 1
   const settingsPlanTab =
@@ -142,6 +148,17 @@ export function Header() {
         <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400 }}>Supplify</span>
         <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
         <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{pageName}</span>
+        {workspaceLabel && (
+          <>
+            <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
+            <span
+              style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}
+              data-testid="workspace-context"
+            >
+              {workspaceLabel}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Right side controls */}

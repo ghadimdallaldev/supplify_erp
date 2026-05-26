@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { useAppSelector } from '../hooks/redux'
+import { usePermissions } from '../hooks/usePermissions'
+import { RequirePermission } from '../components/RequirePermission'
 import {
   PackageCheck,
   History,
@@ -40,6 +42,9 @@ export function ReceivingPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const orderIdFromUrl = searchParams.get('order')
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
+  const canReceive = can('RECEIVING_MANAGE')
+  const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [showDialog, setShowDialog] = useState(false)
 
@@ -224,278 +229,298 @@ export function ReceivingPage() {
   const historyReports = historyData?.reports || []
 
   return (
-    <div className="space-y-6">
-      <Card className="shadow-sm">
-        <CardContent className="space-y-4 p-4 md:p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="flex items-center gap-2 text-[21px] font-black text-[var(--text)]">
-              <PackageCheck className="h-7 w-7 shrink-0 text-[var(--brand-mid)]" />
-              Receiving & Quality Control
-            </h1>
-          </div>
+    <RequirePermission permission="RECEIVING_VIEW" title="receiving">
+      <div className="space-y-6">
+        <Card className="shadow-sm">
+          <CardContent className="space-y-4 p-4 md:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h1 className="flex items-center gap-2 text-[21px] font-black text-[var(--text)]">
+                <PackageCheck className="h-7 w-7 shrink-0 text-[var(--brand-mid)]" />
+                Receiving & Quality Control
+              </h1>
+            </div>
 
-          <Tabs defaultValue="pending" className="space-y-4">
-            <TabsList className="h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
-              <TabsTrigger value="pending" className="flex items-center gap-2">
-                <PackageCheck className="h-4 w-4" />
-                Pending Orders
-                {pendingOrders.length > 0 && (
-                  <Badge variant="destructive">{pendingOrders.length}</Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="history" className="flex items-center gap-2">
-                <History className="h-4 w-4" />
-                Receiving History
-              </TabsTrigger>
-            </TabsList>
+            <Tabs defaultValue="pending" className="space-y-4">
+              <TabsList className="h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
+                <TabsTrigger value="pending" className="flex items-center gap-2">
+                  <PackageCheck className="h-4 w-4" />
+                  Pending Orders
+                  {pendingOrders.length > 0 && (
+                    <Badge variant="destructive">{pendingOrders.length}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Receiving History
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="pending" className="space-y-4">
-              {pendingLoading ? (
-                <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
-              ) : pendingOrders.length === 0 ? (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <PackageCheck className="h-16 w-16 text-[var(--text-muted)] mb-4" />
-                    <p className="text-lg font-semibold mb-2">No Pending Orders</p>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      All delivered orders have been received
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-4">
-                  {pendingOrders.map((order: any) => {
-                    const status = (order.status?.toUpperCase() || order.status || '') as string
-                    const readyToReceive = isOrderReadyForReceiving(status)
+              <TabsContent value="pending" className="space-y-4">
+                {pendingLoading ? (
+                  <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
+                ) : pendingOrders.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <PackageCheck className="h-16 w-16 text-[var(--text-muted)] mb-4" />
+                      <p className="text-lg font-semibold mb-2">No Pending Orders</p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        All delivered orders have been received
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {pendingOrders.map((order: any) => {
+                      const status = (order.status?.toUpperCase() || order.status || '') as string
+                      const readyToReceive = isOrderReadyForReceiving(status)
 
-                    return (
-                      <Card key={order.id}>
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <CardTitle className="flex items-center gap-2">
-                                Order #{order.id.slice(0, 8)}
-                                <Badge variant="outline">{order.supplier_name}</Badge>
-                                <Badge
-                                  variant={
-                                    readyToReceive
-                                      ? 'default'
-                                      : status === 'SHIPPED'
-                                        ? 'secondary'
-                                        : status === 'PROCESSING'
+                      return (
+                        <Card key={order.id}>
+                          <CardHeader>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <CardTitle className="flex items-center gap-2">
+                                  Order #{order.id.slice(0, 8)}
+                                  <Badge variant="outline">{order.supplier_name}</Badge>
+                                  <Badge
+                                    variant={
+                                      readyToReceive
+                                        ? 'default'
+                                        : status === 'SHIPPED'
                                           ? 'secondary'
-                                          : 'outline'
-                                  }
+                                          : status === 'PROCESSING'
+                                            ? 'secondary'
+                                            : 'outline'
+                                    }
+                                  >
+                                    {order.status || 'UNKNOWN'}
+                                  </Badge>
+                                </CardTitle>
+                                <p className="text-sm text-[var(--text-muted)] mt-1">
+                                  Placed: {new Date(order.created_at).toLocaleString()}
+                                </p>
+                                {readyToReceive ? (
+                                  <div className="mt-2 flex items-center gap-2 text-sm text-[var(--mint)] bg-[var(--mint-pale)] px-2 py-1 rounded">
+                                    <CheckCircle className="h-4 w-4 shrink-0" />
+                                    <span>
+                                      {status === 'DELIVERED'
+                                        ? 'Supplier marked this order as delivered. Confirm receipt and quantities below.'
+                                        : 'Ready to confirm receipt and quantities.'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                                    {status === 'PLACED' && (
+                                      <>
+                                        <Clock className="h-4 w-4 shrink-0" />
+                                        <span>Waiting for supplier to acknowledge order</span>
+                                      </>
+                                    )}
+                                    {status === 'ACKNOWLEDGED' && (
+                                      <>
+                                        <CheckCircle className="h-4 w-4 shrink-0" />
+                                        <span>Supplier acknowledged. Order is being prepared.</span>
+                                      </>
+                                    )}
+                                    {status === 'PROCESSING' && (
+                                      <>
+                                        <PackageCheck className="h-4 w-4 shrink-0" />
+                                        <span>Supplier is processing your order</span>
+                                      </>
+                                    )}
+                                    {status === 'SHIPPED' && (
+                                      <>
+                                        <Truck className="h-4 w-4 shrink-0" />
+                                        <span>
+                                          Order is in transit. Waiting for supplier to mark as
+                                          delivered.
+                                        </span>
+                                      </>
+                                    )}
+                                    {!['PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(
+                                      status
+                                    ) && (
+                                      <>
+                                        <AlertCircle className="h-4 w-4 shrink-0" />
+                                        <span>
+                                          Order status: {status || 'unknown'}. Waiting for supplier
+                                          to mark as delivered.
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              {order.has_receiving_report || receivingOrderIds.has(order.id) ? (
+                                <Button
+                                  disabled
+                                  variant="outline"
+                                  className="cursor-not-allowed opacity-75"
                                 >
-                                  {order.status || 'UNKNOWN'}
-                                </Badge>
-                              </CardTitle>
-                              <p className="text-sm text-[var(--text-muted)] mt-1">
-                                Placed: {new Date(order.created_at).toLocaleString()}
-                              </p>
-                              {readyToReceive ? (
-                                <div className="mt-2 flex items-center gap-2 text-sm text-[var(--mint)] bg-[var(--mint-pale)] px-2 py-1 rounded">
-                                  <CheckCircle className="h-4 w-4 shrink-0" />
-                                  <span>
-                                    {status === 'DELIVERED'
-                                      ? 'Supplier marked this order as delivered. Confirm receipt and quantities below.'
-                                      : 'Ready to confirm receipt and quantities.'}
-                                  </span>
-                                </div>
+                                  <PackageCheck className="h-4 w-4 mr-2" />
+                                  Received
+                                </Button>
+                              ) : readyToReceive && canReceive ? (
+                                <Button
+                                  onClick={() => handleReceive(order)}
+                                  disabled={isCreating || receivingOrderIds.has(order.id)}
+                                >
+                                  {receivingOrderIds.has(order.id) ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      Processing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <PackageCheck className="h-4 w-4 mr-2" />
+                                      Receive Now
+                                    </>
+                                  )}
+                                </Button>
                               ) : (
-                                <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                                  {status === 'PLACED' && (
-                                    <>
-                                      <Clock className="h-4 w-4 shrink-0" />
-                                      <span>Waiting for supplier to acknowledge order</span>
-                                    </>
-                                  )}
-                                  {status === 'ACKNOWLEDGED' && (
-                                    <>
-                                      <CheckCircle className="h-4 w-4 shrink-0" />
-                                      <span>Supplier acknowledged. Order is being prepared.</span>
-                                    </>
-                                  )}
-                                  {status === 'PROCESSING' && (
-                                    <>
-                                      <PackageCheck className="h-4 w-4 shrink-0" />
-                                      <span>Supplier is processing your order</span>
-                                    </>
-                                  )}
-                                  {status === 'SHIPPED' && (
-                                    <>
-                                      <Truck className="h-4 w-4 shrink-0" />
-                                      <span>
-                                        Order is in transit. Waiting for supplier to mark as
-                                        delivered.
-                                      </span>
-                                    </>
-                                  )}
-                                  {!['PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(
-                                    status
-                                  ) && (
-                                    <>
-                                      <AlertCircle className="h-4 w-4 shrink-0" />
-                                      <span>
-                                        Order status: {status || 'unknown'}. Waiting for supplier to
-                                        mark as delivered.
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
+                                <Button
+                                  disabled
+                                  variant="outline"
+                                  className="cursor-not-allowed opacity-75"
+                                  title="Order must be marked delivered by the supplier before receiving"
+                                >
+                                  <AlertCircle className="h-4 w-4 mr-2" />
+                                  Not delivered yet
+                                </Button>
                               )}
                             </div>
-                            {order.has_receiving_report || receivingOrderIds.has(order.id) ? (
-                              <Button
-                                disabled
-                                variant="outline"
-                                className="cursor-not-allowed opacity-75"
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {order.items?.map((item: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center justify-between py-2 border-b last:border-0"
+                                >
+                                  <div>
+                                    <p className="font-medium">{item.product_name}</p>
+                                    <p className="text-sm text-[var(--text-muted)]">
+                                      {item.sku} • Qty: {item.ordered_quantity} {item.unit}
+                                    </p>
+                                  </div>
+                                  <p className="font-medium">{formatPrice(item.unit_price)}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="history" className="space-y-4">
+                {historyLoading ? (
+                  <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
+                ) : historyReports.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <History className="h-16 w-16 text-[var(--text-muted)] mb-4" />
+                      <p className="text-lg font-semibold mb-2">No Receiving History</p>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        Receiving reports will appear here
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {historyReports.map((report: any) => (
+                      <Card key={report.id}>
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle className="flex items-center gap-2">
+                                {report.order_id?.slice(0, 8) || 'N/A'}
+                                <Badge variant="outline">{report.supplier_name}</Badge>
+                              </CardTitle>
+                              <p className="text-sm text-[var(--text-muted)] mt-1">
+                                Received: {new Date(report.received_at).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {report.quality_score && (
+                                <div className="flex items-center gap-1">
+                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-sm font-medium">
+                                    {report.quality_score}
+                                  </span>
+                                </div>
+                              )}
+                              <Badge
+                                variant={report.status === 'ACCEPTED' ? 'default' : 'secondary'}
                               >
-                                <PackageCheck className="h-4 w-4 mr-2" />
-                                Received
-                              </Button>
-                            ) : readyToReceive ? (
-                              <Button
-                                onClick={() => handleReceive(order)}
-                                disabled={isCreating || receivingOrderIds.has(order.id)}
-                              >
-                                {receivingOrderIds.has(order.id) ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Processing...
-                                  </>
-                                ) : (
-                                  <>
-                                    <PackageCheck className="h-4 w-4 mr-2" />
-                                    Receive Now
-                                  </>
-                                )}
-                              </Button>
-                            ) : (
-                              <Button
-                                disabled
-                                variant="outline"
-                                className="cursor-not-allowed opacity-75"
-                                title="Order must be marked delivered by the supplier before receiving"
-                              >
-                                <AlertCircle className="h-4 w-4 mr-2" />
-                                Not delivered yet
-                              </Button>
-                            )}
+                                {report.status}
+                              </Badge>
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="space-y-2">
-                            {order.items?.map((item: any, idx: number) => (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between py-2 border-b last:border-0"
-                              >
-                                <div>
-                                  <p className="font-medium">{item.product_name}</p>
-                                  <p className="text-sm text-[var(--text-muted)]">
-                                    {item.sku} • Qty: {item.ordered_quantity} {item.unit}
-                                  </p>
-                                </div>
-                                <p className="font-medium">{formatPrice(item.unit_price)}</p>
-                              </div>
-                            ))}
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <p className="text-[var(--text-muted)]">Items Ordered</p>
+                              <p className="font-semibold">{report.total_items_ordered}</p>
+                            </div>
+                            <div>
+                              <p className="text-[var(--text-muted)]">Items Received</p>
+                              <p className="font-semibold">{report.total_items_received}</p>
+                            </div>
+                            <div>
+                              <p className="text-[var(--text-muted)]">Total Cost</p>
+                              <p className="font-semibold">
+                                {formatPrice(report.total_actual_cost)}
+                              </p>
+                            </div>
                           </div>
+                          {report.delivery_notes && (
+                            <div className="mt-4 pt-4 border-t">
+                              <p className="text-sm text-[var(--text-muted)] mb-2">
+                                Delivery Notes:
+                              </p>
+                              <p className="text-sm">{report.delivery_notes}</p>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
-                    )
-                  })}
-                </div>
-              )}
-            </TabsContent>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
 
-            <TabsContent value="history" className="space-y-4">
-              {historyLoading ? (
-                <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
-              ) : historyReports.length === 0 ? (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <History className="h-16 w-16 text-[var(--text-muted)] mb-4" />
-                    <p className="text-lg font-semibold mb-2">No Receiving History</p>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      Receiving reports will appear here
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-4">
-                  {historyReports.map((report: any) => (
-                    <Card key={report.id}>
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <CardTitle className="flex items-center gap-2">
-                              {report.order_id?.slice(0, 8) || 'N/A'}
-                              <Badge variant="outline">{report.supplier_name}</Badge>
-                            </CardTitle>
-                            <p className="text-sm text-[var(--text-muted)] mt-1">
-                              Received: {new Date(report.received_at).toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {report.quality_score && (
-                              <div className="flex items-center gap-1">
-                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                <span className="text-sm font-medium">{report.quality_score}</span>
-                              </div>
-                            )}
-                            <Badge variant={report.status === 'ACCEPTED' ? 'default' : 'secondary'}>
-                              {report.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <p className="text-[var(--text-muted)]">Items Ordered</p>
-                            <p className="font-semibold">{report.total_items_ordered}</p>
-                          </div>
-                          <div>
-                            <p className="text-[var(--text-muted)]">Items Received</p>
-                            <p className="font-semibold">{report.total_items_received}</p>
-                          </div>
-                          <div>
-                            <p className="text-[var(--text-muted)]">Total Cost</p>
-                            <p className="font-semibold">{formatPrice(report.total_actual_cost)}</p>
-                          </div>
-                        </div>
-                        {report.delivery_notes && (
-                          <div className="mt-4 pt-4 border-t">
-                            <p className="text-sm text-[var(--text-muted)] mb-2">Delivery Notes:</p>
-                            <p className="text-sm">{report.delivery_notes}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* Receiving Dialog */}
-      {selectedOrder && (
-        <ReceivingDialog
-          order={selectedOrder}
-          open={showDialog}
-          onOpenChange={setShowDialog}
-          onSubmit={handleSubmitReceiving}
-          isLoading={isCreating}
-        />
-      )}
-    </div>
+        {/* Receiving Dialog */}
+        {selectedOrder && (
+          <ReceivingDialog
+            order={selectedOrder}
+            open={showDialog}
+            onOpenChange={setShowDialog}
+            onSubmit={handleSubmitReceiving}
+            isLoading={isCreating}
+            canOpenDispute={canOpenDispute}
+            canReceive={canReceive}
+          />
+        )}
+      </div>
+    </RequirePermission>
   )
 }
 
-function ReceivingDialog({ order, open, onOpenChange, onSubmit, isLoading }: any) {
+function ReceivingDialog({
+  order,
+  open,
+  onOpenChange,
+  onSubmit,
+  isLoading,
+  canOpenDispute,
+  canReceive,
+}: any) {
   const [formData, setFormData] = useState<any>({
     deliveryNotes: '',
     qualityScore: 5,
@@ -613,13 +638,27 @@ function ReceivingDialog({ order, open, onOpenChange, onSubmit, isLoading }: any
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={() => onSubmit(formData)} disabled={isLoading}>
-            {isLoading ? 'Processing...' : 'Complete Receiving'}
-          </Button>
+        <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+          <div>
+            {canOpenDispute && (
+              <Button variant="outline" asChild>
+                <Link
+                  to={`/app/disputes?orderId=${order.id}&supplierId=${order.supplier_id || ''}`}
+                  data-testid="receiving-open-dispute"
+                >
+                  Open dispute
+                </Link>
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => onSubmit(formData)} disabled={isLoading || !canReceive}>
+              {isLoading ? 'Processing...' : 'Complete Receiving'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

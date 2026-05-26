@@ -1,5 +1,5 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -21,7 +21,7 @@ const wasteFeature = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
-router.use(requireAuth, resolveTenantContext, reportsFeature)
+router.use(requireAuth, resolveTenantContext, reportsFeature, requirePermission('ORDERS_VIEW'))
 
 async function getRestaurantId(req) {
   if (req.tenantContext?.tenantType === 'RESTAURANT' && req.tenantContext?.tenantId) {

@@ -1,6 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import { reservationsMutationGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -134,7 +135,12 @@ async function fetchReservations(restaurantId, branchId, dayStart) {
   return rows
 }
 
-router.use(requireAuth, resolveTenantContext, requirePermission('RESERVATIONS_VIEW'))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requirePermission('RESERVATIONS_VIEW'),
+  reservationsMutationGuard
+)
 
 router.get('/board', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {

@@ -6,6 +6,7 @@ import {
   resolveTenantContext,
   requirePermission,
 } from '../lib/rbac.js'
+import { subscriptionRouteGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import {
@@ -22,8 +23,8 @@ import {
 
 const router = express.Router()
 
-// Auth + tenant context for all subscription routes (permission only on sensitive endpoints)
-router.use(requireAuth, resolveTenantContext)
+// Auth + tenant context; billing permissions on plans/usage (entitlements/current stay open)
+router.use(requireAuth, resolveTenantContext, subscriptionRouteGuard)
 
 /**
  * Get canonical entitlements (plan, limits with overrides, features, usage snapshot).

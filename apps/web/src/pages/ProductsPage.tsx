@@ -32,6 +32,7 @@ import {
 } from '../components/ui/dialog'
 import { formatPrice, formatNumber } from '../utils/format'
 import { featureEnabled } from '../lib/planLimits'
+import { PermissionGate } from '../components/PermissionGate'
 
 export function ProductsPage() {
   const [search, setSearch] = useState('')
@@ -434,20 +435,24 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
         </div>
         <div className="flex space-x-2">
           {isSupplier ? (
-            <>
-              <Button onClick={() => setShowAddProduct(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Product
-              </Button>
-              <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Bulk Upload
-              </Button>
-            </>
+            <PermissionGate anyOf={['CATALOG_EDIT', 'CATALOG_MANAGE']}>
+              <>
+                <Button onClick={() => setShowAddProduct(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Product
+                </Button>
+                <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Bulk Upload
+                </Button>
+              </>
+            </PermissionGate>
           ) : (
-            <Button asChild>
-              <Link to="/app/cart">View Cart</Link>
-            </Button>
+            <PermissionGate permission="ORDERS_CREATE">
+              <Button asChild>
+                <Link to="/app/cart">View Cart</Link>
+              </Button>
+            </PermissionGate>
           )}
         </div>
       </div>

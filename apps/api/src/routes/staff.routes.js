@@ -1,6 +1,7 @@
 import express from 'express'
 import { z, ZodError } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import { staffMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getRestaurantIdByEmail } from '../lib/tenant.js'
@@ -444,7 +445,7 @@ function mapPayrollExportRow(row) {
   }
 }
 
-router.use(requireAuth, resolveTenantContext, requirePermission('STAFF_VIEW'))
+router.use(requireAuth, resolveTenantContext, requirePermission('STAFF_VIEW'), staffMutationGuard)
 
 router.get('/members', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {

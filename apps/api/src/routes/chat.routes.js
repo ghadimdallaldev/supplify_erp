@@ -7,6 +7,7 @@ import {
   requirePermission,
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
+import { chatSendGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
@@ -146,7 +147,13 @@ const chatFeatureGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
-router.use(requireAuth, resolveTenantContext, chatFeatureGate, requirePermission('CHAT_VIEW'))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  chatFeatureGate,
+  requirePermission('CHAT_VIEW'),
+  chatSendGuard
+)
 
 // List conversations for current user
 router.get('/conversations', async (req, res) => {

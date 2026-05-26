@@ -1,6 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext, getRequestTenant } from '../lib/rbac.js'
+import { billingAccessGuard } from '../lib/route-permissions.js'
 import { logger } from '../lib/logger.js'
 import {
   getBillingStatus,
@@ -17,7 +18,12 @@ import { writeAuditLog } from '../lib/audit.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
+  billingAccessGuard
+)
 
 const cardSchema = z.object({
   number: z.string().min(13).max(19).optional(),
