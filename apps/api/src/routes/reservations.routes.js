@@ -1,8 +1,8 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import { requireRestaurantId } from '../lib/tenant-resolve.js'
 import { reservationsMutationGuard } from '../lib/route-permissions.js'
-import { requireFeature } from '../lib/subscription.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import {
@@ -71,22 +71,6 @@ const analyticsQuerySchema = z.object({
   branchId: z.string().uuid().optional(),
 })
 
-async function resolveRestaurantId(email) {
-  const { rows } = await query(
-    `
-      SELECT id FROM restaurant
-      WHERE contact_email = $1
-    `,
-    [email]
-  )
-
-  if (!rows.length) {
-    throw new Error('Restaurant not found for user')
-  }
-
-  return rows[0].id
-}
-
 async function fetchTables(restaurantId, branchId) {
   const params = [restaurantId]
   let branchFilter = ''
@@ -145,7 +129,7 @@ router.use(
 router.get('/board', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const params = boardQuerySchema.parse(req.query)
-    const restaurantId = await resolveRestaurantId(req.userData.email)
+    const restaurantId = await requireRestaurantId(req)
     const tables = await fetchTables(restaurantId, params.branchId)
     const reservations = await fetchReservations(restaurantId, params.branchId, params.date)
 
@@ -185,7 +169,7 @@ router.get('/board', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
 router.post('/tables', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const payload = upsertTablesSchema.parse(req.body)
-    const restaurantId = await resolveRestaurantId(req.userData.email)
+    const restaurantId = await requireRestaurantId(req)
 
     const result = await withTransaction(async (client) => {
       const upserted = []
@@ -293,7 +277,7 @@ async function calculateAvailability(restaurantId, branchId, scheduledAt, durati
 router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const payload = reservationCreateSchema.parse(req.body)
-    const restaurantId = await resolveRestaurantId(req.userData.email)
+    const restaurantId = await requireRestaurantId(req)
     const scheduledAt = new Date(payload.scheduledAt)
 
     const reservation = await withTransaction(async (client) => {
@@ -458,7 +442,7 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
   try {
     const { id } = req.params
     const payload = reservationStatusSchema.parse(req.body)
-    const restaurantId = await resolveRestaurantId(req.userData.email)
+    const restaurantId = await requireRestaurantId(req)
 
     const { rows } = await query(
       `
@@ -534,7 +518,7 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
 
 router.get('/waitlist', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const restaurantId = await resolveRestaurantId(req.userData.email)
+    const restaurantId = await requireRestaurantId(req)
     const { rows } = await query(
       `
         SELECT *
@@ -570,7 +554,7 @@ router.post(
   async (req, res) => {
     try {
       const { id } = req.params
-      const restaurantId = await resolveRestaurantId(req.userData.email)
+      const restaurantId = await requireRestaurantId(req)
       const offered = await manuallyPromoteWaitlistEntry(id, restaurantId)
 
       res.json({
@@ -598,7 +582,7 @@ router.get(
   async (req, res) => {
     try {
       const branchId = req.query.branchId
-      const restaurantId = await resolveRestaurantId(req.userData.email)
+      const restaurantId = await requireRestaurantId(req)
 
       const params = [restaurantId]
       let branchFilter = ''
@@ -666,38 +650,29 @@ router.get(
   }
 )
 
-router.get(
-  '/analytics',
-  requireAuth,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  requireFeature(
-    'reports',
-    (req) => req.tenantContext?.tenantId,
-    (req) => req.tenantContext?.tenantType
-  ),
-  async (req, res) => {
-    try {
-      const params = analyticsQuerySchema.parse(req.query)
-      const restaurantId = await resolveRestaurantId(req.userData.email)
+router.get('/analytics', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const params = analyticsQuerySchema.parse(req.query)
+    const restaurantId = await requireRestaurantId(req)
 
-      const rangeMultiplier = {
-        day: 1,
-        week: 7,
-        month: 30,
-      }
+    const rangeMultiplier = {
+      day: 1,
+      week: 7,
+      month: 30,
+    }
 
-      const daysBack = rangeMultiplier[params.range] || 7
-      const start = new Date()
-      start.setHours(0, 0, 0, 0)
-      start.setDate(start.getDate() - (params.range === 'day' ? 0 : daysBack))
+    const daysBack = rangeMultiplier[params.range] || 7
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - (params.range === 'day' ? 0 : daysBack))
 
-      const bucketExpr =
-        params.range === 'day'
-          ? "date_trunc('hour', scheduled_at)"
-          : "date_trunc('day', scheduled_at)"
+    const bucketExpr =
+      params.range === 'day'
+        ? "date_trunc('hour', scheduled_at)"
+        : "date_trunc('day', scheduled_at)"
 
-      const { rows } = await query(
-        `
+    const { rows } = await query(
+      `
           SELECT
             ${bucketExpr} AS hour_slot,
             COUNT(*) FILTER (WHERE status = 'CONFIRMED') AS confirmed,
@@ -711,41 +686,40 @@ router.get(
           GROUP BY hour_slot
           ORDER BY hour_slot
         `,
-        params.branchId
-          ? [restaurantId, start.toISOString(), params.branchId]
-          : [restaurantId, start.toISOString()]
-      )
+      params.branchId
+        ? [restaurantId, start.toISOString(), params.branchId]
+        : [restaurantId, start.toISOString()]
+    )
 
-      const { rows: waitlistRows } = await query(
-        `
+    const { rows: waitlistRows } = await query(
+      `
           SELECT status, COUNT(*) AS total
           FROM reservation_waitlist
           WHERE restaurant_id = $1
           GROUP BY status
         `,
-        [restaurantId]
-      )
+      [restaurantId]
+    )
 
-      res.json({
-        ok: true,
-        data: {
-          periodStart: start,
-          slots: rows,
-          waitlist: waitlistRows,
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Reservation analytics error', { error: error.message })
-      res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'ANALYTICS_ERROR', message: error.message },
-        requestId: req.requestId,
-      })
-    }
+    res.json({
+      ok: true,
+      data: {
+        periodStart: start,
+        slots: rows,
+        waitlist: waitlistRows,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Reservation analytics error', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'ANALYTICS_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
   }
-)
+})
 
 export { router as reservationsRoutes }

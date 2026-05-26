@@ -399,7 +399,7 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
 }
 
 // Helper function to handle order delivery and update restaurant inventory
-async function handleOrderDelivery(orderId, userData, res) {
+async function handleOrderDelivery(orderId, userData, res, req) {
   try {
     const result = await withTransaction(async (client) => {
       // Get order first
@@ -416,17 +416,10 @@ async function handleOrderDelivery(orderId, userData, res) {
 
       const order = orders[0]
 
-      // Get supplier ID
-      const { rows: suppliers } = await client.query(
-        'SELECT id FROM supplier WHERE contact_email = $1',
-        [userData.email]
-      )
-
-      if (suppliers.length === 0) {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
         throw new ValidationError('Supplier not found')
       }
-
-      const supplierId = suppliers[0].id
 
       // Get order items (orders are now single-supplier, so all items belong to this supplier)
       const { rows: orderItems } = await client.query(
@@ -990,11 +983,8 @@ router.get('/:id', requireAuth, async (req, res, next) => {
         })
       }
     } else if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-      if (restaurants.length === 0 || restaurants[0].id !== order.restaurant_id) {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId || restaurantId !== order.restaurant_id) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -1487,12 +1477,9 @@ router.post(
     try {
       const orderData = supplierOrderCreateSchema.parse(req.body)
 
-      // Get supplier ID
-      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
+      const supplierId = await getSupplierIdForRequest(req)
 
-      if (suppliers.length === 0) {
+      if (!supplierId) {
         return res.status(400).json({
           ok: false,
           data: null,
@@ -1503,8 +1490,6 @@ router.post(
           requestId: req.requestId,
         })
       }
-
-      const supplierId = suppliers[0].id
 
       // Verify restaurant exists
       const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
@@ -1840,7 +1825,7 @@ router.patch('/:id', async (req, res) => {
 
       // If completing, update restaurant inventory
       if (updateData.status === 'COMPLETED') {
-        return await handleOrderDelivery(id, req.userData, res)
+        return await handleOrderDelivery(id, req.userData, res, req)
       }
     }
 
@@ -2024,12 +2009,9 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
 
     // Verify restaurant ownership (unless admin)
     if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
+      const restaurantId = await getRestaurantIdForRequest(req)
 
-      if (restaurants.length === 0 || restaurants[0].id !== order.restaurant_id) {
+      if (!restaurantId || restaurantId !== order.restaurant_id) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -2198,11 +2180,7 @@ router.get(
       const order = orders[0]
       let supplierId = null
       if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1',
-          [req.userData.email]
-        )
-        if (suppliers.length > 0) supplierId = suppliers[0].id
+        supplierId = await getSupplierIdForRequest(req)
       }
       const itemsQuery = supplierId
         ? `
@@ -2282,14 +2260,7 @@ router.get(
       // If supplier, verify they own items in this order and filter items
       let supplierId = null
       if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1',
-          [req.userData.email]
-        )
-
-        if (suppliers.length > 0) {
-          supplierId = suppliers[0].id
-        }
+        supplierId = await getSupplierIdForRequest(req)
       }
 
       // Get order items (filter by supplier if supplier role)

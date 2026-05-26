@@ -72,6 +72,13 @@ import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.
 import { expireOldBranchInvitations } from './lib/branch-invitations.js'
 import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
 import { ensureObjectStorageBuckets, checkObjectStorageHealth } from './lib/object-storage.js'
+import { pool, closePool } from './lib/db.js'
+import { disconnectCache, isRedisConnected } from './lib/cache.js'
+import {
+  getMemorySnapshot,
+  shouldExposeMemoryOnHealth,
+  startMemoryMonitor,
+} from './lib/memory-monitor.js'
 
 if (config.NODE_ENV === 'production') {
   validateProductionConfig()
@@ -256,13 +263,26 @@ app.use((req, res, next) => {
 app.get('/health', async (req, res) => {
   const storage = await checkObjectStorageHealth()
   const ok = storage.ok
-  res.status(ok ? 200 : 503).json({
+  const payload = {
     ok,
     status: ok ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     storage,
     requestId: req.requestId,
-  })
+  }
+
+  if (shouldExposeMemoryOnHealth()) {
+    payload.memory = getMemorySnapshot()
+    payload.dbPool = {
+      total: pool.totalCount,
+      idle: pool.idleCount,
+      waiting: pool.waitingCount,
+      max: pool.options.max,
+    }
+    payload.redis = { connected: isRedisConnected() }
+  }
+
+  res.status(ok ? 200 : 503).json(payload)
 })
 
 // API routes
@@ -337,11 +357,64 @@ app.use(errorHandler)
 // Start server
 const PORT = config.PORT || 4000
 const server = http.createServer(app)
+const cronTimers = []
+let stopMemoryMonitor = () => {}
+
+function trackInterval(fn, ms) {
+  const timer = setInterval(fn, ms)
+  cronTimers.push(timer)
+  return timer
+}
 
 // Initialize Socket.IO
 initializeSocket(server)
 
+let shuttingDown = false
+async function gracefulShutdown(signal) {
+  if (shuttingDown) return
+  shuttingDown = true
+  logger.info({ msg: 'Graceful shutdown started', signal })
+
+  for (const timer of cronTimers) {
+    clearInterval(timer)
+  }
+  stopMemoryMonitor()
+
+  await new Promise((resolve) => {
+    server.close(() => resolve())
+  })
+
+  try {
+    await closePool()
+  } catch (error) {
+    logger.warn('Error closing database pool', { error: error.message })
+  }
+
+  try {
+    await disconnectCache()
+  } catch (error) {
+    logger.warn('Error disconnecting Redis', { error: error.message })
+  }
+
+  logger.info({ msg: 'Graceful shutdown complete', signal })
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => {
+  gracefulShutdown('SIGTERM').catch((err) => {
+    logger.error('Shutdown failed', { error: err.message })
+    process.exit(1)
+  })
+})
+process.on('SIGINT', () => {
+  gracefulShutdown('SIGINT').catch((err) => {
+    logger.error('Shutdown failed', { error: err.message })
+    process.exit(1)
+  })
+})
+
 server.listen(PORT, () => {
+  stopMemoryMonitor = startMemoryMonitor()
   logger.info({
     msg: `Server started on port ${PORT}`,
     port: PORT,
@@ -358,8 +431,7 @@ server.listen(PORT, () => {
     logger.error('Error in initial scheduled orders execution:', err)
   })
 
-  // Then run every hour
-  setInterval(() => {
+  trackInterval(() => {
     executeScheduledOrders().catch((err) => {
       logger.error('Error in scheduled orders execution:', err)
     })
@@ -383,7 +455,7 @@ server.listen(PORT, () => {
   }
 
   checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed on startup:', err))
-  setInterval(
+  trackInterval(
     () => {
       checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed:', err))
     },
@@ -394,7 +466,7 @@ server.listen(PORT, () => {
   runSubscriptionBillingJob().catch((err) =>
     logger.error('Subscription billing job failed on startup:', err)
   )
-  setInterval(
+  trackInterval(
     () => {
       runSubscriptionBillingJob().catch((err) =>
         logger.error('Subscription billing job failed:', err)
@@ -408,7 +480,7 @@ server.listen(PORT, () => {
   checkExpiredWaitlistOffers().catch((err) =>
     logger.error('Waitlist expired-offers job failed on startup:', err)
   )
-  setInterval(() => {
+  trackInterval(() => {
     checkExpiredWaitlistOffers().catch((err) =>
       logger.error('Waitlist expired-offers job failed:', err)
     )
@@ -418,7 +490,7 @@ server.listen(PORT, () => {
   runDeactivateExpiredPromotionsJob().catch((err) =>
     logger.error('Promotions expiry job failed on startup:', err)
   )
-  setInterval(
+  trackInterval(
     () => {
       runDeactivateExpiredPromotionsJob().catch((err) =>
         logger.error('Promotions expiry job failed:', err)
@@ -433,13 +505,13 @@ server.listen(PORT, () => {
       logger.error('Invitation expiry job failed:', err)
     )
   runInvitationExpiry()
-  setInterval(runInvitationExpiry, 60 * 60 * 1000)
+  trackInterval(runInvitationExpiry, 60 * 60 * 1000)
   logger.info('Invitation expiry job started (runs every 1h)')
 
   runFulfillmentExceptionChecks().catch((err) =>
     logger.error('Fulfillment exceptions job failed on startup:', err)
   )
-  setInterval(
+  trackInterval(
     () => {
       runFulfillmentExceptionChecks().catch((err) =>
         logger.error('Fulfillment exceptions job failed:', err)

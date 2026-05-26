@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import {
   useLogoutMutation,
-  useGetNotificationsQuery,
   useMarkAllNotificationsReadMutation,
   useGetEntitlementsQuery,
   useRecordConversionEventMutation,
@@ -13,6 +12,7 @@ import { Bell, X, TrendingUp, Settings, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { BranchSwitcher } from './BranchSwitcher'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useNotificationBadge } from '../hooks/useNotificationBadge'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'Dashboard',
@@ -92,13 +92,7 @@ export function Header() {
     })
   }
 
-  const { data: notificationsData } = useGetNotificationsQuery(
-    { limit: 10, offset: 0 },
-    { pollingInterval: 60000, skip: !user }
-  )
-
-  const notifications = notificationsData?.notifications || []
-  const unreadCount = notifications.filter((n: { is_read?: boolean }) => !n.is_read).length
+  const { notifications, unreadCount } = useNotificationBadge()
 
   const handleLogout = async () => {
     try {

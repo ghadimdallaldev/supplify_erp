@@ -42,14 +42,6 @@ async function requireRestaurantOrgContext(req, res, next) {
   }
 
   const membership = await getUserRestaurantOrgMembership(req.userData.id)
-  if (!membership && req.userData.role !== 'ADMIN') {
-    return res.status(403).json({
-      ok: false,
-      data: null,
-      error: { name: 'FORBIDDEN', message: 'No organization membership' },
-      requestId: req.requestId,
-    })
-  }
 
   let organizationId = membership?.organization_id
   let primaryRestaurantId = null
@@ -172,10 +164,15 @@ router.get('/', async (req, res) => {
 router.get('/branches', async (req, res) => {
   try {
     if (!req.restaurantOrgContext?.organizationId) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'Organization not found' },
+      const activeRestaurantId = await getRestaurantIdForRequest(req)
+      return res.json({
+        ok: true,
+        data: {
+          branches: [],
+          activeRestaurantId: activeRestaurantId || null,
+          organizationId: null,
+        },
+        error: null,
         requestId: req.requestId,
       })
     }

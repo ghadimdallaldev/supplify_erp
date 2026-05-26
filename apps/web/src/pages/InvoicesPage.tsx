@@ -53,6 +53,7 @@ import {
   useGetEntitlementsQuery,
 } from '../services/api'
 import { featureEnabled } from '../lib/planLimits'
+import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import { Link } from 'react-router-dom'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -105,13 +106,14 @@ export function InvoicesPage() {
   const { data: creditsData } = useGetInvoiceCreditsQuery(selectedInvoice?.id || '', {
     skip: !selectedInvoice?.id || paymentMode !== 'credit',
   })
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const financeInvoicesEnabled = canUseFinanceInvoices(entitlementsData?.entitlements)
   const { data: analyticsData } = useGetInvoiceAnalyticsQuery(
     { period: 30 },
-    { skip: !isRestaurant }
+    { skip: !isRestaurant || !financeInvoicesEnabled }
   )
   const { data: overdueData } = useGetOverdueInvoicesQuery(undefined, { skip: !isRestaurant })
   const [markPaid, { isLoading: isProcessingPayment }] = useMarkInvoicePaidMutation()
-  const { data: entitlementsData } = useGetEntitlementsQuery()
   const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
   const { data: tenantCreditNotesData, refetch: refetchCreditNotes } = useGetCreditNotesQuery(
     undefined,

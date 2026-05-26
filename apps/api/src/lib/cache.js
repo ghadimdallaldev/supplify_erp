@@ -85,6 +85,10 @@ export async function deleteCache(key) {
   memoryCache.delete(key)
 }
 
+export function isRedisConnected() {
+  return Boolean(redisClient && redisClient.status === 'ready')
+}
+
 export async function disconnectCache() {
   if (redisClient) {
     try {
