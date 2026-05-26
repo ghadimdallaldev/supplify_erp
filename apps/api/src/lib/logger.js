@@ -198,4 +198,10 @@ export function createRequestLogger(requestId, ip) {
   return logger.child({ requestId, ip })
 }
 
+/** Child logger tagged with a stable module name (route, service, job). */
+export function createModuleLogger(module) {
+  return logger.child({ module })
+}
+
 export { redactObject, redactError }
+export { logEvent, summarizeQuery, logQueryDebug } from './log-helpers.js'

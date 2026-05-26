@@ -1,4 +1,16 @@
-/** Permission key constants (match permission.code in DB). No imports — safe for circular-dep-free use. */
+/**
+ * Permission key constants (match permission.code in DB). No imports — safe for circular-dep-free use.
+ *
+ * Conceptual groups (for docs/UI):
+ * - team.* → STAFF_VIEW, STAFF_INVITE, STAFF_EDIT, STAFF_MANAGE
+ * - roles.* → SETTINGS_MANAGE (create/update/delete custom roles)
+ * - products/catalog → CATALOG_*
+ * - orders → ORDERS_*
+ * - deals/promotions → PROMOTIONS_*
+ * - insights → reports use ORDERS_VIEW / tenant analytics gates
+ * - settings → SETTINGS_*
+ * - billing → SUBSCRIPTIONS_*, PAYMENTS_*, INVOICES_*
+ */
 export const PERMISSION_KEYS = Object.freeze({
   ORDERS_VIEW: 'ORDERS_VIEW',
   ORDERS_CREATE: 'ORDERS_CREATE',

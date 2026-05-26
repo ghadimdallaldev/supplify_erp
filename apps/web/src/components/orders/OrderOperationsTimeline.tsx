@@ -16,15 +16,17 @@ import {
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
-import type { TimelineEvent, TimelineEventState } from '../../lib/orderTimeline'
-import { ORDER_LIFECYCLE_LABELS } from '../../lib/orderTimeline'
+import type { TimelineEvent, TimelineEventState, TimelineViewerRole } from '../../lib/orderTimeline'
+import { RESTAURANT_LIFECYCLE_LABELS, SUPPLIER_LIFECYCLE_LABELS } from '../../lib/orderTimeline'
 
 function eventIcon(title: string) {
   const key = title.toLowerCase()
   if (key.includes('cancelled')) return AlertTriangle
   if (key.includes('approval')) return Clock
-  if (key.includes('placed')) return ShoppingCart
-  if (key.includes('confirmed')) return CheckCircle2
+  if (key.includes('placed') || (key.includes('order') && key.includes('received')))
+    return ShoppingCart
+  if (key.includes('acknowledged') || key.includes('confirmed')) return CheckCircle2
+  if (key.includes('delivered') || key.includes('marked delivered')) return PackageCheck
   if (key.includes('substitut')) return ArrowLeftRight
   if (key.includes('processing')) return Package
   if (key.includes('shipped')) return Truck
@@ -77,9 +79,29 @@ function formatEventTime(timestamp?: string | null): string | null {
   })
 }
 
+const LIFECYCLE_EVENT_IDS: Record<string, string[]> = {
+  'Order placed': ['placed'],
+  'Order received': ['placed'],
+  'Supplier confirmed': ['confirmed'],
+  Acknowledged: ['confirmed'],
+  Substitutions: ['substitution'],
+  Processing: ['processing'],
+  Picking: ['processing'],
+  Shipped: ['shipped'],
+  Delivered: ['delivered'],
+  'Goods received': ['received'],
+  'Restaurant receipt': ['restaurant-received'],
+  Dispute: ['dispute'],
+  'Credit note': ['credit'],
+  'Invoice closed': ['invoice'],
+}
+
 function lifecycleHit(events: TimelineEvent[], label: string): boolean {
-  const needle = label.split(' ')[0]?.toLowerCase() ?? ''
-  return events.some((e) => e.title.toLowerCase().includes(needle))
+  const ids = LIFECYCLE_EVENT_IDS[label]
+  if (!ids) return false
+  return events.some(
+    (e) => ids.some((id) => e.id === id || e.id.startsWith(`${id}-`)) && e.state !== 'upcoming'
+  )
 }
 
 function TimelineStep({ event, isLast }: { event: TimelineEvent; isLast: boolean }) {
@@ -162,15 +184,26 @@ function TimelineStep({ event, isLast }: { event: TimelineEvent; isLast: boolean
   )
 }
 
-export function OrderOperationsTimeline({ events }: { events: TimelineEvent[] }) {
+export function OrderOperationsTimeline({
+  events,
+  viewerRole = 'RESTAURANT',
+}: {
+  events: TimelineEvent[]
+  viewerRole?: TimelineViewerRole
+}) {
+  const lifecycleLabels =
+    viewerRole === 'SUPPLIER' ? SUPPLIER_LIFECYCLE_LABELS : RESTAURANT_LIFECYCLE_LABELS
+  const description =
+    viewerRole === 'SUPPLIER'
+      ? 'Fulfillment progress from order receipt through dispatch and delivery.'
+      : 'Order progress from placement through delivery, receiving, and billing.'
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_220px] gap-6">
       <Card>
         <CardHeader>
           <CardTitle>Operations timeline</CardTitle>
-          <CardDescription>
-            Order progress from placement through delivery, receiving, and billing.
-          </CardDescription>
+          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
           {events.length === 0 ? (
@@ -192,7 +225,7 @@ export function OrderOperationsTimeline({ events }: { events: TimelineEvent[] })
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {ORDER_LIFECYCLE_LABELS.map((label) => {
+          {lifecycleLabels.map((label) => {
             const hit = lifecycleHit(events, label)
             return (
               <div

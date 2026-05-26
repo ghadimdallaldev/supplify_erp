@@ -224,6 +224,9 @@ router.get('/me', requireAuth, async (req, res) => {
     let adminPermissions = []
     const tenant = await getRequestTenant(req)
     if (tenant) {
+      const { ensurePrimaryContactOwnerRole } = await import('../lib/rbac.js')
+      await ensurePrimaryContactOwnerRole(user.id, user.email, tenant.tenantId, tenant.tenantType)
+
       tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
       tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
       // If tenant user has no role (e.g. new user or migration not run), assign default owner role so they get permissions

@@ -1,8 +1,11 @@
-/** Socket.IO base URL — direct to the API in dev to avoid Vite ws-proxy noise on hot reload. */
+/**
+ * Socket.IO base URL.
+ * In the browser without VITE_API_URL, use the page origin so dev traffic goes through
+ * Vite's /socket.io proxy (same as /api). OAuth and explicit VITE_API_URL still target the API host.
+ */
 export function getSocketBaseUrl(): string {
   const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '')
   if (configured) return configured
-  if (import.meta.env.DEV) return 'http://localhost:4000'
   if (typeof window !== 'undefined') return window.location.origin
   return 'http://localhost:4000'
 }

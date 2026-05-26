@@ -16,5 +16,6 @@ export function requestContext(req, res, next) {
 
   res.set('X-Request-ID', req.requestId)
 
-  requestLogStore.run({ requestId: req.requestId, ip }, () => next())
+  const route = req.originalUrl?.split('?')[0] || req.path
+  requestLogStore.run({ requestId: req.requestId, ip, method: req.method, route }, () => next())
 }
