@@ -9,6 +9,13 @@ export interface User {
   tenantRoles?: string[]
   /** Tenant-scoped permission codes for RBAC nav gating */
   tenantPermissions?: string[]
+  /** Active workspace (supplier/restaurant account + role label) */
+  workspace?: {
+    tenantId: string
+    tenantType: 'SUPPLIER' | 'RESTAURANT'
+    tenantName: string
+    roleName: string | null
+  }
   /** Admin role codes when user.role === 'ADMIN' */
   adminRoles?: string[]
   /** Admin permission codes for admin nav gating */

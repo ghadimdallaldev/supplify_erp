@@ -183,6 +183,9 @@ if ($cmd -eq "up") {
     }
 
     Ensure-Env
+    Write-Host "Syncing apps/api/.env from docker/.env (native migrations + pnpm dev)..."
+    & node (Join-Path $RepoRoot "scripts\ensure-native-env.mjs")
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     Write-Host "Starting Supplify stack..."
     Invoke-Dc $buildArgs
 

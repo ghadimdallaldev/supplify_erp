@@ -61,7 +61,13 @@ function pruneApiScripts() {
   const dir = path.join(ROOT, 'apps/api/scripts')
   if (!fs.existsSync(dir)) return
   for (const name of fs.readdirSync(dir)) {
-    const keep = new Set(['migrate.js', 'run-migration.js', 'migrate-users-to-roles.js', 'lib'])
+    const keep = new Set([
+      'migrate.js',
+      'run-migration.js',
+      'migrate-users-to-roles.js',
+      'sync-system-roles.mjs',
+      'lib',
+    ])
     if (!keep.has(name)) {
       rm(path.join('apps/api/scripts', name))
     }
@@ -132,6 +138,7 @@ function slimPackageJson() {
     scripts: {
       build: 'pnpm --filter @supplify/api build && pnpm --filter @supplify/web build',
       'db:migrate': 'node apps/api/scripts/migrate.js',
+      'db:sync-roles': 'node apps/api/scripts/sync-system-roles.mjs',
       ...(tier === 'preprod'
         ? {
             'deploy:preprod': 'bash deploy/scripts/deploy-preprod.sh',

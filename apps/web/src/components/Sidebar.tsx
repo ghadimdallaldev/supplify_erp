@@ -101,11 +101,30 @@ export function Sidebar() {
         href: '/app/orders',
         icon: ShoppingCart,
         badge: 'pending' as const,
+        permission: 'ORDERS_VIEW',
         testId: 'nav-orders',
       },
-      { name: 'Products', href: '/app/products', icon: Package, testId: 'nav-products' },
-      { name: 'Quick Lists', href: '/app/quick-lists', icon: List, testId: 'nav-quick-lists' },
-      { name: 'Cart', href: '/app/cart', icon: ShoppingBag, testId: 'nav-cart' },
+      {
+        name: 'Products',
+        href: '/app/products',
+        icon: Package,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-products',
+      },
+      {
+        name: 'Quick Lists',
+        href: '/app/quick-lists',
+        icon: List,
+        permission: 'ORDERS_VIEW',
+        testId: 'nav-quick-lists',
+      },
+      {
+        name: 'Cart',
+        href: '/app/cart',
+        icon: ShoppingBag,
+        permission: 'ORDERS_CREATE',
+        testId: 'nav-cart',
+      },
       {
         name: 'Reservations',
         href: '/app/reservations',
@@ -113,29 +132,66 @@ export function Sidebar() {
         permission: 'RESERVATIONS_VIEW',
         testId: 'nav-reservations',
       },
-      { name: 'Receiving', href: '/app/receiving', icon: PackageCheck, testId: 'nav-receiving' },
+      {
+        name: 'Receiving',
+        href: '/app/receiving',
+        icon: PackageCheck,
+        permission: 'RECEIVING_VIEW',
+        testId: 'nav-receiving',
+      },
     ].filter((item) => !item.permission || can(item.permission))
 
     const intel: NavItem[] = [
-      { name: 'Suppliers', href: '/app/suppliers', icon: Building2, testId: 'nav-suppliers' },
+      {
+        name: 'Suppliers',
+        href: '/app/suppliers',
+        icon: Building2,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-suppliers',
+      },
       ...(approvalsEnabled
         ? [
             {
               name: 'Approvals',
               href: '/app/approvals',
               icon: ClipboardCheck,
+              permission: 'ORDERS_MANAGE',
               testId: 'nav-approvals',
             },
           ]
         : []),
       ...(reportsEnabled
-        ? [{ name: 'Reports', href: '/app/reports', icon: BarChart3, testId: 'nav-reports' }]
+        ? [
+            {
+              name: 'Reports',
+              href: '/app/reports',
+              icon: BarChart3,
+              permission: 'ORDERS_VIEW',
+              testId: 'nav-reports',
+            },
+          ]
         : []),
       ...(disputesEnabled
-        ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
+        ? [
+            {
+              name: 'Disputes',
+              href: '/app/disputes',
+              icon: Scale,
+              permission: 'ORDERS_VIEW',
+              testId: 'nav-disputes',
+            },
+          ]
         : []),
       ...(supplierDealsEnabled
-        ? [{ name: 'Deals', href: '/app/deals', icon: Percent, testId: 'nav-deals' }]
+        ? [
+            {
+              name: 'Deals',
+              href: '/app/deals',
+              icon: Percent,
+              permission: 'PROMOTIONS_VIEW',
+              testId: 'nav-deals',
+            },
+          ]
         : []),
       {
         name: 'Invoices',
@@ -144,7 +200,13 @@ export function Sidebar() {
         permission: 'INVOICES_VIEW',
         testId: 'nav-invoices',
       },
-      { name: 'Chat', href: '/app/chat', icon: MessageSquare, testId: 'nav-chat' },
+      {
+        name: 'Chat',
+        href: '/app/chat',
+        icon: MessageSquare,
+        permission: 'CHAT_VIEW',
+        testId: 'nav-chat',
+      },
     ].filter((item) => !item.permission || can(item.permission))
 
     const acct: NavItem[] = [
@@ -162,7 +224,13 @@ export function Sidebar() {
         permission: 'INVENTORY_VIEW',
         testId: 'nav-inventory',
       },
-      { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
+      {
+        name: 'Settings',
+        href: '/app/settings',
+        icon: Settings,
+        permission: 'SETTINGS_VIEW',
+        testId: 'nav-settings',
+      },
     ].filter((item) => !item.permission || can(item.permission))
 
     sections = [
@@ -173,9 +241,10 @@ export function Sidebar() {
             name: 'Dashboard',
             href: '/app/dashboard',
             icon: LayoutDashboard,
+            permission: 'ORDERS_VIEW',
             testId: 'nav-dashboard',
           },
-        ],
+        ].filter((item) => !item.permission || can(item.permission)),
       },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
@@ -220,18 +289,53 @@ export function Sidebar() {
         href: '/app/orders',
         icon: ShoppingCart,
         badge: 'pending' as const,
+        permission: 'ORDERS_VIEW',
         testId: 'nav-orders',
       },
-      { name: 'Products', href: '/app/products', icon: Package, testId: 'nav-products' },
-      { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck, testId: 'nav-fulfillment' },
-      { name: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'nav-restaurants' },
-    ]
+      {
+        name: 'Products',
+        href: '/app/products',
+        icon: Package,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-products',
+      },
+      {
+        name: 'Fulfillment',
+        href: '/app/fulfillment',
+        icon: Truck,
+        permission: 'FULFILLMENT_VIEW',
+        testId: 'nav-fulfillment',
+      },
+      {
+        name: 'Restaurants',
+        href: '/app/restaurants',
+        icon: Users,
+        permission: 'ORDERS_VIEW',
+        testId: 'nav-restaurants',
+      },
+    ].filter((item) => !item.permission || can(item.permission))
     const intel: NavItem[] = [
       ...(reportsEnabled
-        ? [{ name: 'Reports', href: '/app/reports', icon: BarChart3, testId: 'nav-reports' }]
+        ? [
+            {
+              name: 'Reports',
+              href: '/app/reports',
+              icon: BarChart3,
+              permission: 'ORDERS_VIEW',
+              testId: 'nav-reports',
+            },
+          ]
         : []),
       ...(disputesEnabled
-        ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
+        ? [
+            {
+              name: 'Disputes',
+              href: '/app/disputes',
+              icon: Scale,
+              permission: 'ORDERS_VIEW',
+              testId: 'nav-disputes',
+            },
+          ]
         : []),
       ...(promotionsEnabled
         ? [
@@ -239,6 +343,7 @@ export function Sidebar() {
               name: 'Deals & Promotions',
               href: '/app/promotions',
               icon: Tag,
+              permission: 'PROMOTIONS_VIEW',
               testId: 'nav-promotions',
             },
           ]
@@ -250,7 +355,13 @@ export function Sidebar() {
         permission: 'INVOICES_VIEW',
         testId: 'nav-invoices',
       },
-      { name: 'Chat', href: '/app/chat', icon: MessageSquare, testId: 'nav-chat' },
+      {
+        name: 'Chat',
+        href: '/app/chat',
+        icon: MessageSquare,
+        permission: 'CHAT_VIEW',
+        testId: 'nav-chat',
+      },
     ].filter((item) => !item.permission || can(item.permission))
 
     sections = [
@@ -261,17 +372,24 @@ export function Sidebar() {
             name: 'Dashboard',
             href: '/app/dashboard',
             icon: LayoutDashboard,
+            permission: 'ORDERS_VIEW',
             testId: 'nav-dashboard',
           },
-        ],
+        ].filter((item) => !item.permission || can(item.permission)),
       },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
       {
         label: 'ACCOUNT',
         items: [
-          { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
-        ],
+          {
+            name: 'Settings',
+            href: '/app/settings',
+            icon: Settings,
+            permission: 'SETTINGS_VIEW',
+            testId: 'nav-settings',
+          },
+        ].filter((item) => !item.permission || can(item.permission)),
       },
     ]
   }

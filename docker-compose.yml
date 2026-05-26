@@ -15,6 +15,8 @@ x-api-environment: &api-environment
   KEYCLOAK_REALM: Supplify
   KEYCLOAK_CLIENT_ID: supplify-api
   KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}
+  KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+  KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
   S3_ENDPOINT: http://minio:9000
   S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:9000}
   S3_BUCKET: ${S3_BUCKET:-supplify}
@@ -176,6 +178,7 @@ services:
           console.warn('Runtime migrator warning:', e.message);
         }
         " || true
+        node apps/api/scripts/sync-system-roles.mjs || echo "WARN: sync-system-roles"
         exit 0
     depends_on:
       postgres:

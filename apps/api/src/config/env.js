@@ -34,7 +34,9 @@ export const config = {
   KEYCLOAK_CLIENT_SECRET:
     process.env.KEYCLOAK_CLIENT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'changeme'),
   KEYCLOAK_ADMIN: process.env.KEYCLOAK_ADMIN || 'admin',
-  KEYCLOAK_ADMIN_PASSWORD: process.env.KEYCLOAK_ADMIN_PASSWORD || '',
+  /** Required for invite signup (creates Keycloak users). Defaults to admin in non-production. */
+  KEYCLOAK_ADMIN_PASSWORD:
+    process.env.KEYCLOAK_ADMIN_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : 'admin'),
   SESSION_SECRET:
     process.env.SESSION_SECRET ||
     (process.env.NODE_ENV === 'production' ? '' : 'dev-session-secret-change-me'),

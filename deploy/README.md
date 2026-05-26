@@ -12,7 +12,7 @@ One-command **EC2 Docker** deploy per environment (run from repo root on the ser
 
 Legacy: `deploy-staging.sh` remains for servers already on staging compose files (same as preprod).
 
-Each script bootstraps Docker, creates `deploy/env/.env.<env>`, builds images, starts infra (Postgres, Redis, MinIO, Keycloak), runs migrations + Keycloak realm init, then starts the app behind nginx.
+Each script bootstraps Docker, creates `deploy/env/.env.<env>`, builds images, starts infra (Postgres, Redis, MinIO, Keycloak), runs migrations + tenant role backfill + **system role sync** (`sync-system-roles.mjs`) + Keycloak realm init, then starts the app behind nginx.
 
 ## Local full stack (developer machine)
 

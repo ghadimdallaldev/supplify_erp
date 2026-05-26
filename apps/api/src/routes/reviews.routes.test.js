@@ -26,9 +26,12 @@ vi.mock('../lib/rbac.js', () => ({
     req.tenantContext = req.tenantContext || {
       tenantId: 'restaurant-1',
       tenantType: 'RESTAURANT',
+      permissions: ['ORDERS_VIEW', 'ORDERS_CREATE'],
     }
     next()
   },
+  requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
 }))
 
 vi.mock('../services/reviews.service.js', () => ({

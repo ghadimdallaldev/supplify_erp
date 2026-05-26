@@ -74,6 +74,18 @@ vi.mock('../lib/rbac.js', () => ({
   getUserBySub: vi
     .fn()
     .mockResolvedValue({ id: 'user-1', email: 'test@example.com', keycloak_sub: 'sub-123' }),
+  ensurePrimaryContactOwnerRole: vi.fn().mockResolvedValue(false),
+  assignDefaultRoleForTenant: vi.fn().mockResolvedValue(false),
+}))
+
+vi.mock('../lib/workspace-tenant.js', () => ({
+  isPrimaryTenantContact: vi.fn().mockResolvedValue(true),
+  getTenantAssignmentForUser: vi.fn().mockResolvedValue({
+    tenantId: 'restaurant-1',
+    tenantType: 'RESTAURANT',
+    tenantName: 'Test Restaurant',
+    roleName: 'Owner',
+  }),
 }))
 
 vi.mock('../lib/permissions.js', async (importOriginal) => {
@@ -327,6 +339,7 @@ describe('Auth Routes', () => {
       expect(Array.isArray(response.body.data.tenantPermissions)).toBe(true)
       expect(response.body.data.tenantRoles).toContain('RESTAURANT_OWNER')
       expect(response.body.data.tenantPermissions).toContain('SETTINGS_VIEW')
+      expect(response.body.data.workspace?.tenantName).toBe('Test Restaurant')
     })
   })
 

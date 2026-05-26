@@ -24,6 +24,14 @@ describe('tenant-roles definitions', () => {
       'RESTAURANT'
     )
     const name = matchClosestSystemRole(purchaser, 'RESTAURANT')
-    expect(['Purchaser', 'Viewer']).toContain(name)
+    expect(['Purchaser', 'Viewer', 'Receiving Staff']).toContain(name)
+  })
+
+  it('Restaurant Manager is defined with least-privilege ops', () => {
+    const mgr = RESTAURANT_SYSTEM_ROLES.find((r) => r.name === 'Restaurant Manager')
+    expect(mgr).toBeDefined()
+    const perms = resolveRolePermissionList(mgr, 'RESTAURANT')
+    expect(perms).toContain('ORDERS_CREATE')
+    expect(perms).not.toContain('SETTINGS_MANAGE')
   })
 })

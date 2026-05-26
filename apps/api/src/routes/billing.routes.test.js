@@ -13,8 +13,17 @@ vi.mock('../lib/rbac.js', () => ({
     req.userData = { id: 'user-1', role: 'RESTAURANT', email: 'r@test.com' }
     next()
   },
-  resolveTenantContext: (req, res, next) => next(),
+  resolveTenantContext: (req, res, next) => {
+    req.tenantContext = {
+      tenantId: 'rest-1',
+      tenantType: 'RESTAURANT',
+      permissions: ['SUBSCRIPTIONS_VIEW', 'SUBSCRIPTIONS_MANAGE', 'SETTINGS_MANAGE'],
+    }
+    next()
+  },
   requireRole: () => (req, res, next) => next(),
+  requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn().mockResolvedValue({
     tenantId: 'rest-1',
     tenantType: 'RESTAURANT',

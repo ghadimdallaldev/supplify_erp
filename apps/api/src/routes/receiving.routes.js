@@ -146,6 +146,7 @@ router.get(
   '/pending-orders/supplier',
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('ORDERS_VIEW'),
   async (req, res) => {
     try {
       const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [

@@ -371,6 +371,21 @@ server.listen(PORT, () => {
 
   logger.info('Scheduled orders cron job started (runs every 5 minutes for testing)')
 
+  if (config.NODE_ENV !== 'production') {
+    import('./lib/keycloak-admin.js')
+      .then(({ ensureApiClientDirectAccessGrants }) => ensureApiClientDirectAccessGrants())
+      .then((updated) => {
+        if (updated) {
+          logger.info('Keycloak supplify-api client: direct access grants enabled for invite login')
+        }
+      })
+      .catch((err) => {
+        logger.warn('Could not enable Keycloak direct access grants (invite auto-login)', {
+          error: err.message,
+        })
+      })
+  }
+
   checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed on startup:', err))
   setInterval(
     () => {

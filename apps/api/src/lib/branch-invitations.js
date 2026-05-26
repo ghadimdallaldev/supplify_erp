@@ -12,6 +12,13 @@ import {
   bindUserToWorkspace,
   resolveWorkspaceScope,
 } from './workspace-membership.js'
+import {
+  assertAcceptingEmailMatchesInvitation,
+  assertInvitationRoleForTenant,
+  assignInvitationTenantRole,
+  keycloakRealmRoleForWorkspace,
+  normalizeInvitationEmail,
+} from './invitation-accept.js'
 
 export function generateBranchInviteToken() {
   return generateInviteToken()
@@ -197,6 +204,7 @@ export async function acceptBranchInvitation({
   email,
   password,
   existingUserId = null,
+  existingUserEmail = null,
 }) {
   const invitation = await getInvitationByToken(token)
   const state = evaluateInvitationPublicState(invitation)
@@ -206,10 +214,15 @@ export async function acceptBranchInvitation({
     throw err
   }
 
-  const resolvedEmail = (email || invitation.invited_email || '').trim().toLowerCase()
+  const resolvedEmail = normalizeInvitationEmail(email || invitation.invited_email)
   if (!resolvedEmail) {
     throw new Error('Email is required')
   }
+
+  assertAcceptingEmailMatchesInvitation(invitation, {
+    email: resolvedEmail,
+    existingUserEmail,
+  })
 
   let keycloakSub = null
   if (!existingUserId) {
@@ -224,7 +237,7 @@ export async function acceptBranchInvitation({
       firstName,
       lastName,
       password,
-      realmRoleName: 'SUPPLIER',
+      realmRoleName: keycloakRealmRoleForWorkspace('SUPPLIER'),
     })
     keycloakSub = kcUserId
   }
@@ -239,9 +252,15 @@ export async function acceptBranchInvitation({
     const row = locked[0]
     if (!row || row.status !== 'pending' || new Date(row.expires_at) < new Date()) {
       const err = new Error('Invitation is no longer valid')
-      err.code = 'invalid'
+      err.code = row?.status === 'accepted' ? 'already_used' : 'invalid'
       throw err
     }
+
+    await assertInvitationRoleForTenant(client, {
+      roleId: row.role_id,
+      tenantId: row.supplier_id,
+      tenantType: 'SUPPLIER',
+    })
 
     await assertUserCanJoinWorkspace(
       {
@@ -278,13 +297,13 @@ export async function acceptBranchInvitation({
       )
     }
 
-    await client.query(
-      `INSERT INTO tenant_user_roles (user_id, role_id, tenant_type, tenant_id, assigned_by)
-       VALUES ($1, $2, 'SUPPLIER', $3, $4)
-       ON CONFLICT (user_id, tenant_id, tenant_type)
-       DO UPDATE SET role_id = EXCLUDED.role_id, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
-      [userId, row.role_id, row.supplier_id, row.invited_by]
-    )
+    await assignInvitationTenantRole(client, {
+      userId,
+      roleId: row.role_id,
+      tenantType: 'SUPPLIER',
+      tenantId: row.supplier_id,
+      assignedBy: row.invited_by,
+    })
 
     await bindUserToWorkspace(
       {
@@ -306,10 +325,16 @@ export async function acceptBranchInvitation({
       [userId, row.id]
     )
 
+    const { rows: roleRows } = await client.query(`SELECT name FROM tenant_roles WHERE id = $1`, [
+      row.role_id,
+    ])
+
     return {
       userId,
       supplierId: row.supplier_id,
       email: resolvedEmail,
+      roleId: row.role_id,
+      roleName: roleRows[0]?.name || null,
       needsLogin: !existingUserId,
       password: existingUserId ? null : password,
     }

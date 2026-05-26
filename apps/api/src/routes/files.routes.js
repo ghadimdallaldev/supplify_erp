@@ -1,5 +1,6 @@
 import express from 'express'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import { filesUploadGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
@@ -14,6 +15,8 @@ router.post(
   '/presign',
   requireAuth,
   requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
+  resolveTenantContext,
+  filesUploadGuard,
   async (req, res) => {
     try {
       const { fileName, fileType, fileSize } = req.body
@@ -137,6 +140,8 @@ router.post(
   '/product/:productId/attach',
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
+  resolveTenantContext,
+  filesUploadGuard,
   async (req, res) => {
     try {
       const { productId } = req.params

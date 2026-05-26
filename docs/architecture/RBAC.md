@@ -130,3 +130,11 @@ For ADMIN roles, `tenant_id` is NULL and `tenant_type` is `'ADMIN'`.
 - Users with `app_user.role = 'ADMIN'` get **SUPER_ADMIN** with `tenant_id` NULL and `tenant_type` 'ADMIN'.
 
 New staff or multi-tenant users must be assigned roles via `user_role` (e.g. when inviting or linking to a tenant).
+
+## Hardening pass (2026-05-27)
+
+- [RBAC permission matrix](./RBAC_PERMISSION_MATRIX.md) — default restaurant/supplier roles and codes
+- [RBAC audit report](./RBAC_AUDIT_REPORT.md) — route/page enforcement inventory and verification commands
+- [RBAC hardening QA report](../qa/RBAC_HARDENING_QA_REPORT.md) — automated + manual test checklist
+
+After deploy, system roles are synced automatically by the `migrate` container (`sync-system-roles.mjs`). On dev machines: `pnpm db:sync-roles`.

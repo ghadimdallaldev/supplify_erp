@@ -31,12 +31,15 @@ import toast from 'react-hot-toast'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
+import { usePermissions } from '../hooks/usePermissions'
 
 export function CartPage() {
   const [searchParams] = useSearchParams()
   const dispatch = useAppDispatch()
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
+  const canPlaceOrders = can('ORDERS_CREATE')
   const { data: dealsData } = useGetActivePromotionsQuery()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !user || user.role === 'ADMIN',
@@ -409,18 +412,25 @@ export function CartPage() {
             </CardContent>
           </Card>
 
+          {!canPlaceOrders ? (
+            <p className="text-sm text-[var(--text-muted)] text-center">
+              Your role does not have permission to place orders. Contact your workspace admin.
+            </p>
+          ) : null}
           <Button
             onClick={handlePlaceOrder}
-            disabled={isPlacingOrder || !orderGate.canPlace}
+            disabled={isPlacingOrder || !orderGate.canPlace || !canPlaceOrders}
             className="w-full"
             size="lg"
             data-testid="cart-place-order"
           >
             {isPlacingOrder
               ? 'Placing Order...'
-              : !orderGate.canPlace
-                ? 'Daily order limit reached'
-                : 'Place Order'}
+              : !canPlaceOrders
+                ? 'Cannot place orders'
+                : !orderGate.canPlace
+                  ? 'Daily order limit reached'
+                  : 'Place Order'}
           </Button>
           {!orderGate.canPlace && (
             <Button

@@ -119,6 +119,15 @@ membersRouter.post('/', async (req, res) => {
       })
     }
 
+    if (!invitedEmail || !String(invitedEmail).trim()) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'invited_email is required' },
+        requestId: req.requestId,
+      })
+    }
+
     const validRole = await validateRestaurantRoleForBranch(roleId, restaurantId)
     if (!validRole) {
       return res.status(400).json({
@@ -185,6 +194,7 @@ membersRouter.get('/roles', async (req, res) => {
       SELECT id, name, description
       FROM tenant_roles
       WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND is_system = true
+        AND name != 'Owner'
       ORDER BY name ASC
       `,
       [restaurantId]
@@ -378,6 +388,7 @@ branchesRouter.get('/roles', async (req, res) => {
       SELECT id, name, description
       FROM tenant_roles
       WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND is_system = true
+        AND name != 'Owner'
       ORDER BY name ASC
       `,
       [restaurantId]

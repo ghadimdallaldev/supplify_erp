@@ -28,6 +28,7 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
 }))
 
 vi.mock('../lib/subscription.js', () => ({

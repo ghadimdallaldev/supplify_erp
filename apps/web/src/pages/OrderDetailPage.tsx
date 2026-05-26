@@ -42,6 +42,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
+import { usePermissions } from '../hooks/usePermissions'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 import { buildOrderTimeline } from '../lib/orderTimeline'
@@ -85,7 +86,10 @@ export function OrderDetailPage() {
   const [searchParams] = useSearchParams()
   const tabFromUrl = searchParams.get('tab')
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
   const isSupplier = user?.role === 'SUPPLIER'
+  const canDeclineOrder = can('ORDERS_MANAGE')
+  const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [activeTab, setActiveTab] = useState<string>('timeline')
   const [showPickingNotes, setShowPickingNotes] = useState(false)
   const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
@@ -374,7 +378,7 @@ export function OrderDetailPage() {
                   : 'Send Reminder'}
             </Button>
           )}
-          {!isSupplier && !['CANCELLED', 'DRAFT'].includes(order.status) && (
+          {!isSupplier && canOpenDispute && !['CANCELLED', 'DRAFT'].includes(order.status) && (
             <Button size="sm" variant="outline" asChild>
               <RouterLink to={`/app/disputes?orderId=${order.id}`}>Open dispute</RouterLink>
             </Button>
@@ -386,13 +390,16 @@ export function OrderDetailPage() {
                   <Button size="sm" onClick={() => handleStatusUpdate('ACKNOWLEDGED')}>
                     Acknowledge
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleStatusUpdate('CANCELLED')}
-                  >
-                    Decline
-                  </Button>
+                  {canDeclineOrder && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleStatusUpdate('CANCELLED')}
+                      data-testid="order-decline"
+                    >
+                      Decline
+                    </Button>
+                  )}
                 </>
               )}
               {order.status === 'ACKNOWLEDGED' && (

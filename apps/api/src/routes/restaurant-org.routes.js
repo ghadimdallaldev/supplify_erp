@@ -1,5 +1,11 @@
 import express from 'express'
-import { requireAuth, requireRole, getRestaurantIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
+import { orgStructureGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -114,7 +120,13 @@ async function assertRestaurantBranchAccess(req, restaurantId) {
   )
 }
 
-router.use(requireAuth, requireRole(['RESTAURANT', 'ADMIN']), requireRestaurantOrgContext)
+router.use(
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  resolveTenantContext,
+  requireRestaurantOrgContext,
+  orgStructureGuard
+)
 
 router.get('/', async (req, res) => {
   try {
@@ -485,20 +497,24 @@ router.post('/users/:userId/branches', requireRestaurantOrgOwner, async (req, re
   }
 })
 
-router.delete('/users/:userId/branches/:restaurantId', requireRestaurantOrgOwner, async (req, res) => {
-  try {
-    await revokeRestaurantOrgBranchAccess(req.params.userId, req.params.restaurantId)
-    res.json({ ok: true, data: { revoked: true }, error: null, requestId: req.requestId })
-  } catch (error) {
-    logger.error('DELETE restaurant-org user branch access error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to revoke branch access' },
-      requestId: req.requestId,
-    })
+router.delete(
+  '/users/:userId/branches/:restaurantId',
+  requireRestaurantOrgOwner,
+  async (req, res) => {
+    try {
+      await revokeRestaurantOrgBranchAccess(req.params.userId, req.params.restaurantId)
+      res.json({ ok: true, data: { revoked: true }, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('DELETE restaurant-org user branch access error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to revoke branch access' },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 router.post('/users/:userId/role', requireRestaurantOrgOwner, async (req, res) => {
   try {

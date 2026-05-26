@@ -62,7 +62,7 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
   }, [roles, roleId])
 
   const handleGenerate = async () => {
-    if (!roleId) return
+    if (!roleId || !email.trim()) return
     const result = await createInvitation({
       invited_name: fullName.trim() || undefined,
       invited_email: email.trim() || undefined,
@@ -124,10 +124,11 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
               </label>
               <label className="block text-sm">
                 <span className="text-[var(--text-muted)]">
-                  Email (for your reference — no email will be sent)
+                  Email (required — invitee must sign up with this address)
                 </span>
                 <input
                   type="email"
+                  required
                   className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -160,7 +161,9 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
               <Button
                 type="button"
                 className="w-full"
-                disabled={isLoading || !roleId || roles.length === 0 || rolesLoading}
+                disabled={
+                  isLoading || !roleId || !email.trim() || roles.length === 0 || rolesLoading
+                }
                 onClick={() => handleGenerate().catch(() => {})}
               >
                 Generate Invite Link

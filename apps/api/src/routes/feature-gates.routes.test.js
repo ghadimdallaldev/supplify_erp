@@ -33,6 +33,7 @@ vi.mock('../lib/rbac.js', () => ({
       tenantType: 'RESTAURANT',
       permissions: [
         'ORDERS_VIEW',
+        'ORDERS_CREATE',
         'ORDERS_MANAGE',
         'SETTINGS_VIEW',
         'SETTINGS_MANAGE',
@@ -46,6 +47,7 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn(async (req) => req.tenantContext),
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),

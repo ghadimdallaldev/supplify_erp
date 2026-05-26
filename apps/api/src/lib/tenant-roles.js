@@ -4,17 +4,30 @@
 import { query, withTransaction } from './db.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
 import { logger } from './logger.js'
+import {
+  RESTAURANT_SYSTEM_ROLES,
+  SUPPLIER_SYSTEM_ROLES,
+  allNamesForRoleDef,
+} from './role-matrix.js'
+
+export { RESTAURANT_SYSTEM_ROLES, SUPPLIER_SYSTEM_ROLES }
 
 export const RESERVED_SYSTEM_ROLE_NAMES = Object.freeze([
   'Owner',
-  'Manager',
+  'Restaurant Manager',
+  'Supplier Manager',
   'Purchaser',
+  'Receiving Staff',
   'Accountant',
-  'Inventory Clerk',
   'FOH Staff',
   'Viewer',
-  'Sales Rep',
+  'Order Fulfillment Staff',
   'Catalog Manager',
+  'Promotions Manager',
+  // Legacy names (still protected if present in DB)
+  'Manager',
+  'Inventory Clerk',
+  'Sales Rep',
   'Warehouse Staff',
 ])
 
@@ -51,6 +64,8 @@ const RESTAURANT_PERMISSIONS = [
   PERMISSION_KEYS.PAYMENTS_VIEW,
   PERMISSION_KEYS.PAYMENTS_MANAGE,
   PERMISSION_KEYS.CATALOG_VIEW,
+  PERMISSION_KEYS.PROMOTIONS_VIEW,
+  PERMISSION_KEYS.PROMOTIONS_MANAGE,
 ]
 
 const SUPPLIER_PERMISSIONS = [
@@ -89,212 +104,8 @@ const SUPPLIER_PERMISSIONS = [
   PERMISSION_KEYS.PAYMENTS_MANAGE,
   PERMISSION_KEYS.FULFILLMENT_VIEW,
   PERMISSION_KEYS.FULFILLMENT_MANAGE,
-]
-
-export const RESTAURANT_SYSTEM_ROLES = [
-  {
-    name: 'Owner',
-    description: 'Full access to everything',
-    permissions: 'ALL',
-  },
-  {
-    name: 'Manager',
-    description: 'Operational control, can approve orders',
-    permissions: [
-      'ORDERS_VIEW',
-      'ORDERS_CREATE',
-      'ORDERS_EDIT',
-      'ORDERS_MANAGE',
-      'INVOICES_VIEW',
-      'INVOICES_MANAGE',
-      'INVENTORY_VIEW',
-      'INVENTORY_EDIT',
-      'INVENTORY_MANAGE',
-      'RESERVATIONS_VIEW',
-      'RESERVATIONS_CREATE',
-      'RESERVATIONS_EDIT',
-      'RESERVATIONS_MANAGE',
-      'STAFF_VIEW',
-      'STAFF_INVITE',
-      'STAFF_EDIT',
-      'STAFF_MANAGE',
-      'RECEIVING_VIEW',
-      'RECEIVING_MANAGE',
-      'SETTINGS_VIEW',
-      'CHAT_VIEW',
-      'CHAT_SEND',
-      'PAYMENTS_VIEW',
-      'SUBSCRIPTIONS_VIEW',
-      'CATALOG_VIEW',
-    ],
-  },
-  {
-    name: 'Purchaser',
-    description: 'Places and tracks orders only',
-    permissions: [
-      'ORDERS_VIEW',
-      'ORDERS_CREATE',
-      'ORDERS_EDIT',
-      'CATALOG_VIEW',
-      'INVENTORY_VIEW',
-      'RECEIVING_VIEW',
-      'CHAT_VIEW',
-      'CHAT_SEND',
-      'INVOICES_VIEW',
-    ],
-  },
-  {
-    name: 'Accountant',
-    description: 'Finance and invoices, read-only on operations',
-    permissions: [
-      'INVOICES_VIEW',
-      'INVOICES_CREATE',
-      'INVOICES_EDIT',
-      'INVOICES_MANAGE',
-      'PAYMENTS_VIEW',
-      'PAYMENTS_MANAGE',
-      'ORDERS_VIEW',
-      'SUBSCRIPTIONS_VIEW',
-      'SETTINGS_VIEW',
-    ],
-  },
-  {
-    name: 'Inventory Clerk',
-    description: 'Manages stock and receiving',
-    permissions: [
-      'INVENTORY_VIEW',
-      'INVENTORY_EDIT',
-      'INVENTORY_MANAGE',
-      'RECEIVING_VIEW',
-      'RECEIVING_MANAGE',
-      'ORDERS_VIEW',
-    ],
-  },
-  {
-    name: 'FOH Staff',
-    description: 'Front of house — reservations only',
-    permissions: ['RESERVATIONS_VIEW', 'RESERVATIONS_CREATE', 'RESERVATIONS_EDIT'],
-  },
-  {
-    name: 'Viewer',
-    description: 'Read-only across the board',
-    permissions: [
-      'ORDERS_VIEW',
-      'INVOICES_VIEW',
-      'INVENTORY_VIEW',
-      'RESERVATIONS_VIEW',
-      'STAFF_VIEW',
-      'SETTINGS_VIEW',
-      'CHAT_VIEW',
-      'CATALOG_VIEW',
-    ],
-  },
-]
-
-export const SUPPLIER_SYSTEM_ROLES = [
-  {
-    name: 'Owner',
-    description: 'Full access to everything',
-    permissions: 'ALL',
-  },
-  {
-    name: 'Manager',
-    description: 'Operational control',
-    permissions: [
-      'ORDERS_VIEW',
-      'ORDERS_EDIT',
-      'ORDERS_MANAGE',
-      'CATALOG_VIEW',
-      'CATALOG_EDIT',
-      'CATALOG_MANAGE',
-      'INVOICES_VIEW',
-      'INVOICES_MANAGE',
-      'INVENTORY_VIEW',
-      'INVENTORY_EDIT',
-      'INVENTORY_MANAGE',
-      'WAREHOUSES_VIEW',
-      'WAREHOUSES_EDIT',
-      'WAREHOUSES_MANAGE',
-      'PAYMENTS_VIEW',
-      'STAFF_VIEW',
-      'STAFF_MANAGE',
-      'SETTINGS_VIEW',
-      'CHAT_VIEW',
-      'CHAT_SEND',
-      'SUBSCRIPTIONS_VIEW',
-      'FULFILLMENT_VIEW',
-      'FULFILLMENT_MANAGE',
-    ],
-  },
-  {
-    name: 'Sales Rep',
-    description: 'Manages orders and customer relationships',
-    permissions: [
-      'ORDERS_VIEW',
-      'ORDERS_EDIT',
-      'ORDERS_MANAGE',
-      'CATALOG_VIEW',
-      'INVOICES_VIEW',
-      'CHAT_VIEW',
-      'CHAT_SEND',
-      'INVENTORY_VIEW',
-      'FULFILLMENT_VIEW',
-    ],
-  },
-  {
-    name: 'Catalog Manager',
-    description: 'Manages products and pricing only',
-    permissions: [
-      'CATALOG_VIEW',
-      'CATALOG_EDIT',
-      'CATALOG_MANAGE',
-      'INVENTORY_VIEW',
-      'INVENTORY_EDIT',
-    ],
-  },
-  {
-    name: 'Warehouse Staff',
-    description: 'Fulfillment and inventory operations',
-    permissions: [
-      'ORDERS_VIEW',
-      'INVENTORY_VIEW',
-      'INVENTORY_EDIT',
-      'INVENTORY_MANAGE',
-      'WAREHOUSES_VIEW',
-      'WAREHOUSES_EDIT',
-      'RECEIVING_VIEW',
-      'RECEIVING_MANAGE',
-      'FULFILLMENT_VIEW',
-      'FULFILLMENT_MANAGE',
-    ],
-  },
-  {
-    name: 'Accountant',
-    description: 'Finance and billing only',
-    permissions: [
-      'INVOICES_VIEW',
-      'INVOICES_CREATE',
-      'INVOICES_EDIT',
-      'INVOICES_MANAGE',
-      'PAYMENTS_VIEW',
-      'PAYMENTS_MANAGE',
-      'ORDERS_VIEW',
-      'SUBSCRIPTIONS_VIEW',
-    ],
-  },
-  {
-    name: 'Viewer',
-    description: 'Read-only',
-    permissions: [
-      'ORDERS_VIEW',
-      'CATALOG_VIEW',
-      'INVOICES_VIEW',
-      'INVENTORY_VIEW',
-      'SETTINGS_VIEW',
-      'CHAT_VIEW',
-      'FULFILLMENT_VIEW',
-    ],
-  },
+  PERMISSION_KEYS.PROMOTIONS_VIEW,
+  PERMISSION_KEYS.PROMOTIONS_MANAGE,
 ]
 
 export function getAllPermissionsForTenantType(tenantType) {
@@ -323,8 +134,26 @@ async function insertRolePermissions(roleId, permissions, db = query) {
   )
 }
 
+async function replaceRolePermissions(roleId, permissions, db) {
+  await db(`DELETE FROM tenant_role_permissions WHERE role_id = $1`, [roleId])
+  await insertRolePermissions(roleId, permissions, db)
+}
+
+async function findSystemRoleRow(tenantId, tenantType, def, db) {
+  const names = allNamesForRoleDef(def)
+  const { rows } = await db(
+    `SELECT id, name FROM tenant_roles
+     WHERE tenant_id = $1 AND tenant_type = $2 AND is_system = true
+       AND name = ANY($3::text[])
+     ORDER BY CASE name WHEN $4 THEN 0 ELSE 1 END
+     LIMIT 1`,
+    [tenantId, tenantType, names, def.name]
+  )
+  return rows[0] || null
+}
+
 /**
- * Seed system roles for a tenant if missing. Idempotent.
+ * Seed system roles for a tenant if missing. Syncs permissions from role-matrix on every run.
  */
 export async function ensureTenantSystemRoles(tenantId, tenantType, client = null) {
   if (!tenantId || !tenantType) return
@@ -335,14 +164,18 @@ export async function ensureTenantSystemRoles(tenantId, tenantType, client = nul
   try {
     const definitions = getSystemRoleDefinitions(tenantType)
     for (const def of definitions) {
-      const { rows: existing } = await db(
-        `SELECT id FROM tenant_roles
-         WHERE tenant_id = $1 AND tenant_type = $2 AND name = $3 AND is_system = true`,
-        [tenantId, tenantType, def.name]
-      )
+      let roleRow = await findSystemRoleRow(tenantId, tenantType, def, db)
       let roleId
-      if (existing.length > 0) {
-        roleId = existing[0].id
+
+      if (roleRow) {
+        roleId = roleRow.id
+        if (roleRow.name !== def.name) {
+          await db(`UPDATE tenant_roles SET name = $1, description = $2 WHERE id = $3`, [
+            def.name,
+            def.description,
+            roleId,
+          ])
+        }
       } else {
         const { rows: inserted } = await db(
           `INSERT INTO tenant_roles (tenant_type, tenant_id, name, description, is_system)
@@ -352,8 +185,9 @@ export async function ensureTenantSystemRoles(tenantId, tenantType, client = nul
         )
         roleId = inserted[0].id
       }
+
       const perms = resolveRolePermissionList(def, tenantType)
-      await insertRolePermissions(roleId, perms, db)
+      await replaceRolePermissions(roleId, perms, db)
     }
   } catch (err) {
     if (err.code === '42P01') return
@@ -446,9 +280,6 @@ export async function assignOwnerRoleForUser(
   return true
 }
 
-/**
- * Match legacy permission set to closest system role name (for migration).
- */
 export function matchClosestSystemRole(permissionCodes, tenantType) {
   const definitions = getSystemRoleDefinitions(tenantType)
   const userSet = new Set(permissionCodes)
@@ -482,4 +313,18 @@ export async function getRoleIdByName(tenantId, tenantType, roleName) {
     [tenantId, tenantType, roleName]
   )
   return rows[0]?.id || null
+}
+
+/**
+ * Backfill all tenants' system role permissions from role-matrix (safe to run in deploy).
+ */
+export async function syncAllTenantsSystemRoles() {
+  const { rows: restaurants } = await query(`SELECT id FROM restaurant`)
+  for (const r of restaurants) {
+    await ensureTenantSystemRoles(r.id, 'RESTAURANT')
+  }
+  const { rows: suppliers } = await query(`SELECT id FROM supplier`)
+  for (const s of suppliers) {
+    await ensureTenantSystemRoles(s.id, 'SUPPLIER')
+  }
 }

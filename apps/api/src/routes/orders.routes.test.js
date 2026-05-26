@@ -37,6 +37,8 @@ vi.mock('../lib/rbac.js', () => ({
     tenantType: 'RESTAURANT',
     tenantName: 'Test Restaurant',
   }),
+  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
+  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   checkPermission: vi.fn().mockResolvedValue(true),
   upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
   setAuthCookies: vi.fn(),
@@ -290,22 +292,21 @@ describe('Orders Routes', () => {
       const supplierId = '660e8400-e29b-41d4-a716-446655440001'
       const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
 
-      // Mock: restaurant lookup, product query (for each item), checkLimit, then transaction queries
-      db.query
-        .mockResolvedValueOnce({
-          rows: [{ id: restaurantId }], // Restaurant lookup
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: productId,
-              supplier_id: supplierId,
-              sku: 'SKU001',
-              current_price: 10.05,
-              currency: 'USD',
-            },
-          ], // Product query for first item
-        })
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      // Mock: product query (for each item), checkLimit, then transaction queries
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: productId,
+            supplier_id: supplierId,
+            sku: 'SKU001',
+            current_price: 10.05,
+            currency: 'USD',
+          },
+        ], // Product query for first item
+      })
 
       const { checkLimit } = await import('../lib/subscription.js')
       vi.mocked(checkLimit).mockResolvedValueOnce({
@@ -410,9 +411,6 @@ describe('Orders Routes', () => {
         })
         .mockResolvedValueOnce({
           rows: [{ supplier_id: 'supplier-1' }], // First item query for supplier_id
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1' }], // Restaurant lookup for permission check
         })
         .mockResolvedValueOnce({
           rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }], // UPDATE order

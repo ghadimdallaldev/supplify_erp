@@ -42,6 +42,7 @@ describe('permissions resolution', () => {
         rows: [{ permission: 'ORDERS_VIEW' }, { permission: 'ORDERS_CREATE' }],
       })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
 
     const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
     expect(perms).toContain('ORDERS_VIEW')
@@ -49,14 +50,25 @@ describe('permissions resolution', () => {
     expect(setCache).toHaveBeenCalled()
   })
 
-  it('merges legacy permissions when tenant role exists', async () => {
+  it('merges legacy permissions when no tenant_user_roles assignment', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ permission: 'ORDERS_VIEW' }] })
       .mockResolvedValueOnce({ rows: [{ code: 'SETTINGS_VIEW' }] })
+      .mockResolvedValueOnce({ rows: [] })
 
     const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
     expect(perms).toContain('ORDERS_VIEW')
     expect(perms).toContain('SETTINGS_VIEW')
+  })
+
+  it('does not merge legacy permissions when tenant_user_roles assignment exists', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ permission: 'ORDERS_VIEW' }] })
+      .mockResolvedValueOnce({ rows: [{ code: 'SETTINGS_VIEW' }, { code: 'ORDERS_CREATE' }] })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+
+    const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
+    expect(perms).toEqual(['ORDERS_VIEW'])
   })
 
   it('uses cache when present', async () => {
@@ -83,6 +95,7 @@ describe('permissions resolution', () => {
     getOrgRolePermissionsMock.mockResolvedValue(['ORDERS_VIEW', 'CATALOG_VIEW'])
     queryMock
       .mockResolvedValueOnce({ rows: [{ permission: 'INVENTORY_VIEW' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 
     const perms = await getPermissionsForUser('u1', 'supplier-1', 'SUPPLIER')
