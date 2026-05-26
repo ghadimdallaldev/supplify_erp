@@ -11,7 +11,7 @@ import {
   useGetEntitlementsQuery,
 } from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
-import { featureEnabled } from '../../lib/planLimits'
+import { canUseGlobalReports } from '../../lib/planFeatureGates'
 import { downloadCsv, reportRowsToCsv } from '../../utils/csvExport'
 import { Loader2, Download } from 'lucide-react'
 import {
@@ -260,7 +260,7 @@ export function ReportsPage() {
   )
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
+  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const { data: branchesData } = useGetBranchesQuery(undefined, { skip: !isRestaurant })
   const branches = branchesData?.branches || []
   const defs = isRestaurant ? RESTAURANT_REPORTS : SUPPLIER_REPORTS

@@ -63,12 +63,23 @@ export function ordersCreateMutationGuard(req, res, next) {
 export function chatSendGuard(req, res, next) {
   const method = req.method.toUpperCase()
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
+  const path = req.path || ''
+  if (
+    (method === 'PATCH' || method === 'PUT') &&
+    (path.endsWith('/read') || path.includes('/read'))
+  ) {
+    return next()
+  }
   return requireAnyPermission(P.CHAT_SEND, P.CHAT_MANAGE)(req, res, next)
 }
 
 /** Billing/subscription routes. */
 export function billingAccessGuard(req, res, next) {
   const method = req.method.toUpperCase()
+  const path = req.path || ''
+  if ((method === 'GET' || method === 'HEAD' || method === 'OPTIONS') && path === '/status') {
+    return next()
+  }
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
     return requireAnyPermission(P.SUBSCRIPTIONS_VIEW, P.SETTINGS_MANAGE)(req, res, next)
   }
@@ -78,7 +89,7 @@ export function billingAccessGuard(req, res, next) {
 /** Skip billing guard for self-serve entitlement/limit reads (any authenticated tenant). */
 export function subscriptionRouteGuard(req, res, next) {
   const path = req.path || ''
-  if (path === '/entitlements' || path === '/current') return next()
+  if (path === '/entitlements' || path === '/current' || path === '/plans') return next()
   return billingAccessGuard(req, res, next)
 }
 
@@ -94,6 +105,12 @@ export function orgStructureGuard(req, res, next) {
       return requirePermission(P.STAFF_VIEW)(req, res, next)
     }
     return requireAnyPermission(P.STAFF_MANAGE, P.SETTINGS_MANAGE)(req, res, next)
+  }
+  if (
+    (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') &&
+    (path === '/' || path === '/branches' || path.startsWith('/branches/'))
+  ) {
+    return next()
   }
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
     return requirePermission(P.SETTINGS_VIEW)(req, res, next)

@@ -8,7 +8,7 @@ import {
   requireAnyPermission,
 } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
-import { query } from '../lib/db.js'
+import { requireRestaurantId, requireSupplierId } from '../lib/tenant-resolve.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import {
   createDispute,
@@ -33,28 +33,6 @@ const featureGate = requireFeature(
 )
 
 router.use(featureGate)
-
-async function getRestaurantId(req) {
-  if (req.tenantContext?.tenantType === 'RESTAURANT' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Restaurant not found')
-  return rows[0].id
-}
-
-async function getSupplierId(req) {
-  if (req.tenantContext?.tenantType === 'SUPPLIER' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Supplier not found')
-  return rows[0].id
-}
 
 const disputeItemSchema = z.object({
   orderItemId: z.string().uuid().optional(),
@@ -109,7 +87,7 @@ router.get(
   requirePermission('ORDERS_VIEW'),
   async (req, res, next) => {
     try {
-      const supplierId = await getSupplierId(req)
+      const supplierId = await requireSupplierId(req)
       const disputes = await listIncomingDisputesForSupplier(supplierId, {
         status: req.query.status,
       })
@@ -128,7 +106,7 @@ router.post(
   async (req, res, next) => {
     try {
       const body = createDisputeSchema.parse(req.body)
-      const restaurantId = await getRestaurantId(req)
+      const restaurantId = await requireRestaurantId(req)
       const data = await createDispute({
         restaurantId,
         userId: req.userData.id,
@@ -155,7 +133,7 @@ router.get(
   requirePermission('ORDERS_VIEW'),
   async (req, res, next) => {
     try {
-      const restaurantId = await getRestaurantId(req)
+      const restaurantId = await requireRestaurantId(req)
       const disputes = await listDisputesForRestaurant(restaurantId, {
         status: req.query.status,
       })
@@ -175,9 +153,9 @@ router.get(
     try {
       let scope
       if (req.userData.role === 'SUPPLIER' || req.tenantContext?.tenantType === 'SUPPLIER') {
-        scope = { supplierId: await getSupplierId(req) }
+        scope = { supplierId: await requireSupplierId(req) }
       } else {
-        scope = { restaurantId: await getRestaurantId(req) }
+        scope = { restaurantId: await requireRestaurantId(req) }
       }
       const data = await getDispute(req.params.id, scope)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
@@ -194,7 +172,7 @@ router.post(
   async (req, res, next) => {
     try {
       const body = attachmentSchema.parse(req.body)
-      const restaurantId = await getRestaurantId(req)
+      const restaurantId = await requireRestaurantId(req)
       const attachment = await addDisputeAttachment(
         req.params.id,
         restaurantId,
@@ -216,7 +194,7 @@ router.post(
   requirePermission('ORDERS_CREATE'),
   async (req, res, next) => {
     try {
-      const restaurantId = await getRestaurantId(req)
+      const restaurantId = await requireRestaurantId(req)
       const data = await cancelDispute(req.params.id, restaurantId)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
@@ -231,7 +209,7 @@ router.post(
   requirePermission('ORDERS_MANAGE'),
   async (req, res, next) => {
     try {
-      const supplierId = await getSupplierId(req)
+      const supplierId = await requireSupplierId(req)
       const data = await reviewDispute(req.params.id, supplierId)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
@@ -247,7 +225,7 @@ router.post(
   async (req, res, next) => {
     try {
       const body = resolveSchema.parse(req.body)
-      const supplierId = await getSupplierId(req)
+      const supplierId = await requireSupplierId(req)
       const data = await resolveDispute(req.params.id, supplierId, body)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
@@ -263,7 +241,7 @@ router.post(
   async (req, res, next) => {
     try {
       const body = rejectSchema.parse(req.body)
-      const supplierId = await getSupplierId(req)
+      const supplierId = await requireSupplierId(req)
       const data = await rejectDispute(req.params.id, supplierId, body.resolutionNotes)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {

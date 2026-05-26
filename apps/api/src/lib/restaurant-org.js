@@ -7,6 +7,7 @@ import { logger } from './logger.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser, getOwnerRoleId } from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
+import { RESTAURANT_VIEWER } from './role-matrix.js'
 
 export const RESTAURANT_ORG_SYSTEM_ROLES = [
   {
@@ -46,17 +47,9 @@ export const RESTAURANT_ORG_SYSTEM_ROLES = [
   },
   {
     name: 'Org Viewer',
-    description: 'Read-only across all branches',
+    description: 'Read-only across all branches — workspace data visible, no mutations',
     branchScope: 'all',
-    permissions: [
-      'ORDERS_VIEW',
-      'INVOICES_VIEW',
-      'INVENTORY_VIEW',
-      'RESERVATIONS_VIEW',
-      'STAFF_VIEW',
-      'SETTINGS_VIEW',
-      'CHAT_VIEW',
-    ],
+    permissions: [...RESTAURANT_VIEWER],
   },
   {
     name: 'Regional Manager',
@@ -132,6 +125,7 @@ export async function ensureRestaurantOrgSystemRoles(organizationId, client = nu
       roleId = inserted[0].id
     }
     const perms = resolveOrgRolePermissions(def)
+    await db(`DELETE FROM restaurant_org_role_permissions WHERE role_id = $1`, [roleId])
     for (const permission of perms) {
       await db(
         `INSERT INTO restaurant_org_role_permissions (role_id, permission, branch_scope)
@@ -141,6 +135,37 @@ export async function ensureRestaurantOrgSystemRoles(organizationId, client = nu
       )
     }
   }
+}
+
+export async function getRestaurantOrgRolePermissions(userId, organizationId, restaurantId) {
+  const { rows } = await query(
+    `
+    SELECT rorp.permission, rorp.branch_scope, ror.name AS role_name
+    FROM restaurant_org_user_roles rour
+    JOIN restaurant_org_roles ror ON ror.id = rour.role_id
+    JOIN restaurant_org_role_permissions rorp ON rorp.role_id = ror.id
+    WHERE rour.user_id = $1 AND rour.organization_id = $2
+  `,
+    [userId, organizationId]
+  )
+  if (!rows.length) return []
+
+  const roleName = rows[0].role_name
+  const branchScope = rows[0].branch_scope
+  const permissions = [...new Set(rows.map((r) => r.permission))]
+
+  if (branchScope === 'assigned' && restaurantId) {
+    const { rows: access } = await query(
+      `SELECT 1 FROM restaurant_org_user_branch_access
+       WHERE user_id = $1 AND restaurant_id = $2 AND organization_id = $3`,
+      [userId, restaurantId, organizationId]
+    )
+    if (!access.length && roleName === 'Regional Manager') {
+      return []
+    }
+  }
+
+  return permissions
 }
 
 export async function getRestaurantOrgRoleIdByName(organizationId, roleName, client = null) {

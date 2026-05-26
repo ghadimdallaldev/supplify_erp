@@ -8,6 +8,7 @@ import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifyInvoiceIssued } from '../services/notification.service.js'
 import { requireFeature } from '../lib/subscription.js'
+import { requireRestaurantId, requireSupplierId } from '../lib/tenant-resolve.js'
 
 const router = express.Router()
 
@@ -24,6 +25,26 @@ router.use(
   requirePermission('INVOICES_VIEW'),
   invoicesMutationGuard
 )
+
+async function assertInvoiceTenantAccess(req, invoice) {
+  const role = req.userData?.role
+  if (role === 'ADMIN') return
+  if (role === 'SUPPLIER') {
+    const supplierId = await requireSupplierId(req)
+    if (supplierId !== invoice.supplier_id) {
+      throw new NotFoundError('Invoice not found')
+    }
+    return
+  }
+  if (role === 'RESTAURANT') {
+    const restaurantId = await requireRestaurantId(req)
+    if (restaurantId !== invoice.restaurant_id) {
+      throw new NotFoundError('Invoice not found')
+    }
+    return
+  }
+  throw new NotFoundError('Invoice not found')
+}
 
 /** Build PDF buffer for an invoice with line items */
 async function buildInvoicePdf(invoice, lineItems) {
@@ -156,26 +177,7 @@ router.get('/:id/pdf', requireAuth, async (req, res) => {
     }
 
     const invoice = rows[0]
-    const role = req.userData?.role
-
-    if (role === 'SUPPLIER') {
-      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
-      if (suppliers.length === 0 || suppliers[0].id !== invoice.supplier_id) {
-        throw new NotFoundError('Invoice not found')
-      }
-    } else if (role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-      if (restaurants.length === 0 || restaurants[0].id !== invoice.restaurant_id) {
-        throw new NotFoundError('Invoice not found')
-      }
-    } else if (role !== 'ADMIN') {
-      throw new NotFoundError('Invoice not found')
-    }
+    await assertInvoiceTenantAccess(req, invoice)
 
     const { rows: lineItems } = await query(
       'SELECT * FROM invoice_line_item WHERE invoice_id = $1 ORDER BY created_at',
@@ -231,27 +233,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     }
 
     const invoice = rows[0]
-    const role = req.userData?.role
-
-    // Tenant scoping: only the invoice's supplier, restaurant, or admin may read it
-    if (role === 'SUPPLIER') {
-      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
-      if (suppliers.length === 0 || suppliers[0].id !== invoice.supplier_id) {
-        throw new NotFoundError('Invoice not found')
-      }
-    } else if (role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-      if (restaurants.length === 0 || restaurants[0].id !== invoice.restaurant_id) {
-        throw new NotFoundError('Invoice not found')
-      }
-    } else if (role !== 'ADMIN') {
-      throw new NotFoundError('Invoice not found')
-    }
+    await assertInvoiceTenantAccess(req, invoice)
 
     // Get line items
     const { rows: lineItems } = await query(

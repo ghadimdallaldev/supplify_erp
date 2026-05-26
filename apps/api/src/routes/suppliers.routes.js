@@ -6,6 +6,7 @@ import {
   resolveTenantContext,
   requirePermission,
   getSupplierIdForRequest,
+  getRestaurantIdForRequest,
   getRequestTenant,
 } from '../lib/rbac.js'
 import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
@@ -114,14 +115,9 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (req.userData?.role === 'RESTAURANT') {
       try {
-        // Get restaurant ID from database using email
-        const { rows: restaurants } = await query(
-          'SELECT id FROM restaurant WHERE contact_email = $1',
-          [req.userData.email]
-        )
+        restaurantId = await getRestaurantIdForRequest(req)
 
-        if (restaurants.length > 0) {
-          restaurantId = restaurants[0].id
+        if (restaurantId) {
           patchRequestLogTenant(req, restaurantId, 'RESTAURANT')
 
           // Exclude blocklisted suppliers
@@ -448,13 +444,9 @@ router.get(
     try {
       const { id: supplierId } = req.params
 
-      // Get restaurant ID
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
+      const restaurantId = await getRestaurantIdForRequest(req)
 
-      if (restaurants.length === 0) {
+      if (!restaurantId) {
         return res.status(404).json({
           ok: false,
           data: null,
@@ -465,8 +457,6 @@ router.get(
           requestId: req.requestId,
         })
       }
-
-      const restaurantId = restaurants[0].id
 
       // Calculate statistics from orders
       // Count distinct orders that have items from this supplier
@@ -533,13 +523,7 @@ async function handleGetSupplierById(req, res) {
     // Get restaurant ID for follow status if user is a restaurant
     let restaurantId = null
     if (req.userData && req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-      if (restaurants.length > 0) {
-        restaurantId = restaurants[0].id
-      }
+      restaurantId = await getRestaurantIdForRequest(req)
     }
 
     // Build query with product_count and avg_price

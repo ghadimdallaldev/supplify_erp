@@ -7,6 +7,7 @@ import { logger } from './logger.js'
 import { getCache, setCache, deleteCache } from './cache.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
 import { getOrgRolePermissions } from './supplier-org.js'
+import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
 
 export { PERMISSION_KEYS }
 
@@ -141,6 +142,28 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
       }
     }
 
+    if (tenantType === 'RESTAURANT') {
+      try {
+        const { rows: orgRows } = await query(
+          `SELECT organization_id FROM restaurant WHERE id = $1`,
+          [tenantId]
+        )
+        const organizationId = orgRows[0]?.organization_id
+        if (organizationId) {
+          const { rows: orgMembership } = await query(
+            `SELECT 1 FROM restaurant_org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+            [userId, organizationId]
+          )
+          hasOrgRole = orgMembership.length > 0
+          if (hasOrgRole) {
+            orgPerms = await getRestaurantOrgRolePermissions(userId, organizationId, tenantId)
+          }
+        }
+      } catch (err) {
+        if (err.code !== '42P01') throw err
+      }
+    }
+
     if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
       try {
         named = await getTenantNamedPermissionsForUser(userId, tenantId, tenantType)
@@ -168,7 +191,7 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
 
     const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
 
-    if (tenantType === 'SUPPLIER' && hasOrgRole) {
+    if ((tenantType === 'SUPPLIER' || tenantType === 'RESTAURANT') && hasOrgRole) {
       const permissions = hasNamedAssignment
         ? mergeUniquePermissions(orgPerms, named)
         : mergeUniquePermissions(orgPerms, branchPerms)

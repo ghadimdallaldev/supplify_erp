@@ -29,6 +29,7 @@ import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { featureEnabled } from '../lib/planLimits'
+import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
 /** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
 const DASHBOARD_STACK_GAP = 24
 /** Horizontal gap between KPI cards and between the three content cards. */
@@ -287,7 +288,7 @@ export function DashboardPage() {
   const smartReorderEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.smart_reorder
   )
-  const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
+  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
     skip: !isRestaurant || !smartReorderEnabled,
   })
@@ -296,9 +297,10 @@ export function DashboardPage() {
   })
   const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null)
+  const financeInvoicesEnabled = canUseFinanceInvoices(entitlementsData?.entitlements)
   const { data: invoiceAnalytics } = useGetInvoiceAnalyticsQuery(
     { period: 30 },
-    { skip: !isRestaurant || !reportsEnabled }
+    { skip: !isRestaurant || !financeInvoicesEnabled }
   )
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 

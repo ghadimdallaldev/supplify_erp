@@ -562,6 +562,8 @@ export function resolveTenantContext(req, res, next) {
         tenant.tenantType
       )
 
+      await ensureTenantSystemRoles(tenant.tenantId, tenant.tenantType).catch(() => {})
+
       let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
       let permissions = await getPermissionsForUser(
         req.userData.id,

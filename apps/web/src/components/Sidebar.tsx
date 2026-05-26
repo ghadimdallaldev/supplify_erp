@@ -1,9 +1,9 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
+import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import {
   useGetImpersonationStatusQuery,
-  useGetNotificationsQuery,
   useGetDashboardStatsQuery,
   useGetEntitlementsQuery,
 } from '../services/api'
@@ -32,6 +32,7 @@ import {
   Percent,
 } from 'lucide-react'
 import { featureEnabled, getOrderUsageBadge } from '../lib/planLimits'
+import { canUseGlobalReports } from '../lib/planFeatureGates'
 
 type NavItem = {
   name: string
@@ -57,10 +58,7 @@ export function Sidebar() {
   const { data: statsData } = useGetDashboardStatsQuery(undefined, {
     skip: user?.role === 'ADMIN' && !impersonation?.active,
   })
-  const { data: notificationsData } = useGetNotificationsQuery(
-    { limit: 10, offset: 0 },
-    { skip: !user, pollingInterval: 60000 }
-  )
+  const { unreadCount: notificationUnreadCount } = useNotificationBadge()
 
   const isPlatformAdmin =
     user?.role === 'ADMIN' &&
@@ -76,15 +74,13 @@ export function Sidebar() {
     isPlatformAdmin && impersonation?.active && impersonation?.tenantType === 'SUPPLIER'
 
   const pendingOrders = Number(statsData?.pendingOrders) || 0
-  const unreadCount = (notificationsData?.notifications || []).filter(
-    (n: { is_read?: boolean }) => !n.is_read
-  ).length
+  const unreadCount = notificationUnreadCount
   const planLabel = entitlementsData?.entitlements?.plan?.name ?? ''
   const planCode = (entitlementsData?.entitlements?.plan?.code ?? 'free').toLowerCase()
   const approvalsEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.approvals_budgets
   )
-  const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
+  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const supplierDealsEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.supplier_deals
   )

@@ -3,26 +3,11 @@
  * Permission codes match DB tenant_role_permissions.permission (see permission-keys.js).
  */
 import { PERMISSION_KEYS as P } from './permission-keys.js'
+import { getWorkspaceViewPermissions } from './viewer-permissions.js'
 
-/** Read-only bundle for Viewer roles */
-const RESTAURANT_VIEWER = [
-  P.ORDERS_VIEW,
-  P.INVOICES_VIEW,
-  P.INVENTORY_VIEW,
-  P.RESERVATIONS_VIEW,
-  P.CATALOG_VIEW,
-  P.RECEIVING_VIEW,
-  P.CHAT_VIEW,
-]
-
-const SUPPLIER_VIEWER = [
-  P.ORDERS_VIEW,
-  P.CATALOG_VIEW,
-  P.INVOICES_VIEW,
-  P.INVENTORY_VIEW,
-  P.FULFILLMENT_VIEW,
-  P.CHAT_VIEW,
-]
+/** Read-only: every workspace *_VIEW permission for the tenant type; zero writes. */
+export const RESTAURANT_VIEWER = getWorkspaceViewPermissions('RESTAURANT')
+export const SUPPLIER_VIEWER = getWorkspaceViewPermissions('SUPPLIER')
 
 const RESTAURANT_ACCOUNTANT = [
   P.INVOICES_VIEW,
@@ -179,7 +164,8 @@ export const SUPPLIER_SYSTEM_ROLES = [
   {
     name: 'Viewer',
     legacyNames: ['Viewer'],
-    description: 'Read-only — no operational or admin actions',
+    description:
+      'Read-only supplier workspace — orders, catalog, fulfillment, inventory, chat (view), settings (view); no mutations',
     permissions: SUPPLIER_VIEWER,
   },
 ]

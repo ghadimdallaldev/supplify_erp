@@ -97,4 +97,21 @@ export const config = {
   VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || '',
   VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY || '',
   VAPID_EMAIL: process.env.VAPID_EMAIL || 'notifications@supplify.local',
+  /** Log process.memoryUsage() on an interval (also enabled in NODE_ENV=development). */
+  MEMORY_DEBUG: process.env.MEMORY_DEBUG === '1' || process.env.MEMORY_DEBUG === 'true',
+  /** Include memory + db pool on GET /health (default: on in non-production). */
+  MEMORY_HEALTH_EXPOSE:
+    process.env.MEMORY_HEALTH_EXPOSE === '1' || process.env.MEMORY_HEALTH_EXPOSE === 'true',
+  /** RSS (MB) threshold for warn logs when memory monitoring is active. */
+  MEMORY_WARN_RSS_MB: process.env.MEMORY_WARN_RSS_MB
+    ? parseInt(process.env.MEMORY_WARN_RSS_MB, 10)
+    : 512,
+  /** Interval for dev memory debug logs (ms). Default 5 minutes. */
+  MEMORY_LOG_INTERVAL_MS: process.env.MEMORY_LOG_INTERVAL_MS
+    ? parseInt(process.env.MEMORY_LOG_INTERVAL_MS, 10)
+    : 5 * 60 * 1000,
+  /** PostgreSQL pool max connections (default 20; use 10 in constrained dev). */
+  DATABASE_POOL_MAX: process.env.DATABASE_POOL_MAX
+    ? parseInt(process.env.DATABASE_POOL_MAX, 10)
+    : 20,
 }
