@@ -5,7 +5,6 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
   resolveTenantContext,
-  requirePermission,
 } from '../lib/rbac.js'
 import { settingsMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
@@ -26,12 +25,7 @@ import { config } from '../config/env.js'
 
 const router = express.Router()
 
-router.use(
-  requireAuth,
-  resolveTenantContext,
-  requirePermission('SETTINGS_VIEW'),
-  settingsMutationGuard
-)
+router.use(requireAuth, resolveTenantContext, settingsMutationGuard)
 
 async function resolveParentTenant(req) {
   if (req.userData.role === 'ADMIN') {

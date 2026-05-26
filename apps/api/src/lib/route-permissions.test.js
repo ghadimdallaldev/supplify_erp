@@ -77,8 +77,8 @@ describe('staffMutationGuard', () => {
 describe('orgStructureGuard', () => {
   beforeEach(() => next.mockReset())
 
-  it('allows GET / with SETTINGS_VIEW', () => {
-    const req = { ...mockReq('GET', '/'), tenantContext: { permissions: [P.SETTINGS_VIEW] } }
+  it('allows GET /branches for viewer with any tenant context', () => {
+    const req = { ...mockReq('GET', '/branches'), tenantContext: { permissions: [P.ORDERS_VIEW] } }
     orgStructureGuard(req, res, next)
     expect(next).toHaveBeenCalled()
   })
@@ -142,17 +142,58 @@ describe('role matrix write restrictions', () => {
   const writeKeys = [
     P.ORDERS_CREATE,
     P.ORDERS_EDIT,
+    P.ORDERS_MANAGE,
     P.STAFF_INVITE,
+    P.STAFF_MANAGE,
     P.SETTINGS_MANAGE,
+    P.SETTINGS_EDIT,
     P.INVOICES_CREATE,
     P.RECEIVING_MANAGE,
     P.FULFILLMENT_MANAGE,
+    P.CHAT_SEND,
+    P.CHAT_MANAGE,
+    P.RESERVATIONS_CREATE,
+    P.RESERVATIONS_EDIT,
+    P.RESERVATIONS_MANAGE,
   ]
 
   it('restaurant Viewer cannot perform any write action', () => {
     const perms = rolePerms('Viewer', 'RESTAURANT')
     for (const key of writeKeys) {
       expect(hasPermission(perms, key)).toBe(false)
+    }
+    expect(hasPermission(perms, P.SETTINGS_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.RESERVATIONS_VIEW)).toBe(true)
+  })
+
+  it('supplier Viewer cannot perform any write action', () => {
+    const perms = rolePerms('Viewer', 'SUPPLIER')
+    const supplierWriteKeys = [
+      ...writeKeys,
+      P.CATALOG_EDIT,
+      P.CATALOG_MANAGE,
+      P.INVENTORY_EDIT,
+      P.INVENTORY_MANAGE,
+      P.WAREHOUSES_EDIT,
+      P.WAREHOUSES_MANAGE,
+      P.PROMOTIONS_MANAGE,
+      P.RECEIVING_MANAGE,
+      P.PAYMENTS_MANAGE,
+      P.SUBSCRIPTIONS_MANAGE,
+    ]
+    for (const key of supplierWriteKeys) {
+      expect(hasPermission(perms, key)).toBe(false)
+    }
+    expect(hasPermission(perms, P.ORDERS_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.CATALOG_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.FULFILLMENT_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.WAREHOUSES_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.PROMOTIONS_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.SETTINGS_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.STAFF_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.CHAT_VIEW)).toBe(true)
+    for (const code of perms) {
+      expect(code.endsWith('_VIEW') || code.startsWith('ADMIN_')).toBe(true)
     }
   })
 

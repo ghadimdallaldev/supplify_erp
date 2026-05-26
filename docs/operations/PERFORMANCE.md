@@ -2,6 +2,19 @@
 
 Indexes, query patterns, and local dev startup optimizations.
 
+## Memory profiling (local and production)
+
+See **[PERFORMANCE_MEMORY_AUDIT.md](../../PERFORMANCE_MEMORY_AUDIT.md)** for measured usage, root causes, and AWS sizing.
+
+For subscription vs RBAC alignment, see **[ACCESS_CONTROL.md](../architecture/ACCESS_CONTROL.md)**.
+
+| Command                | Purpose                                                                     |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `pnpm memory:measure`  | Docker stats, Node processes, `GET /health` memory (dev)                    |
+| `pnpm memory:prod-api` | Short-lived `NODE_ENV=production` API on port 4001 with memory on `/health` |
+
+API env (optional): `MEMORY_DEBUG=1`, `MEMORY_WARN_RSS_MB=512`, `DATABASE_POOL_MAX=10`, `MEMORY_HEALTH_EXPOSE=1` (production probes only when intentional).
+
 ## Local dev startup (`pnpm dev`)
 
 | Optimization                          | Effect                                                                                                                                                                         |

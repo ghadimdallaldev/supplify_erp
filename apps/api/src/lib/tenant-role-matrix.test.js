@@ -60,13 +60,23 @@ describe('Restaurant default roles', () => {
     expect(can(perms, P.STAFF_VIEW)).toBe(false)
   })
 
-  it('Viewer is read-only', () => {
+  it('Viewer is read-only with broad workspace read access', () => {
     const perms = role('Viewer', 'RESTAURANT')
     expect(can(perms, P.ORDERS_VIEW)).toBe(true)
+    expect(can(perms, P.RESERVATIONS_VIEW)).toBe(true)
+    expect(can(perms, P.SETTINGS_VIEW)).toBe(true)
+    expect(can(perms, P.STAFF_VIEW)).toBe(true)
+    expect(can(perms, P.SUBSCRIPTIONS_VIEW)).toBe(true)
+    expect(can(perms, P.CHAT_VIEW)).toBe(true)
     expect(can(perms, P.ORDERS_CREATE)).toBe(false)
     expect(can(perms, P.ORDERS_EDIT)).toBe(false)
     expect(can(perms, P.ORDERS_MANAGE)).toBe(false)
     expect(can(perms, P.STAFF_INVITE)).toBe(false)
+    expect(can(perms, P.CHAT_SEND)).toBe(false)
+    expect(can(perms, P.SETTINGS_MANAGE)).toBe(false)
+    for (const code of perms) {
+      expect(code.endsWith('_VIEW') || code.startsWith('ADMIN_')).toBe(true)
+    }
   })
 })
 
@@ -115,11 +125,16 @@ describe('Supplier default roles', () => {
     expect(can(perms, P.ORDERS_EDIT)).toBe(false)
   })
 
-  it('Viewer cannot mutate anything', () => {
+  it('Viewer cannot mutate anything but can read workspace data', () => {
     const perms = role('Viewer', 'SUPPLIER')
     expect(can(perms, P.ORDERS_VIEW)).toBe(true)
+    expect(can(perms, P.SETTINGS_VIEW)).toBe(true)
+    expect(can(perms, P.FULFILLMENT_VIEW)).toBe(true)
     expect(can(perms, P.ORDERS_CREATE)).toBe(false)
     expect(can(perms, P.ORDERS_MANAGE)).toBe(false)
-    expect(can(perms, P.SETTINGS_VIEW)).toBe(false)
+    expect(can(perms, P.CHAT_SEND)).toBe(false)
+    for (const code of perms) {
+      expect(code.endsWith('_VIEW') || code.startsWith('ADMIN_')).toBe(true)
+    }
   })
 })

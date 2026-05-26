@@ -7,6 +7,7 @@ import { logger } from './logger.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser, getOwnerRoleId } from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
+import { SUPPLIER_VIEWER } from './role-matrix.js'
 
 export const ORG_SYSTEM_ROLES = [
   {
@@ -40,16 +41,9 @@ export const ORG_SYSTEM_ROLES = [
   },
   {
     name: 'Org Viewer',
-    description: 'Read-only across all branches',
+    description: 'Read-only across all branches — workspace data visible, no mutations',
     branchScope: 'all',
-    permissions: [
-      'ORDERS_VIEW',
-      'CATALOG_VIEW',
-      'INVOICES_VIEW',
-      'INVENTORY_VIEW',
-      'SETTINGS_VIEW',
-      'FULFILLMENT_VIEW',
-    ],
+    permissions: [...SUPPLIER_VIEWER],
   },
   {
     name: 'Regional Manager',
@@ -119,6 +113,7 @@ export async function ensureOrgSystemRoles(organizationId, client = null) {
       roleId = inserted[0].id
     }
     const perms = resolveOrgRolePermissions(def)
+    await db(`DELETE FROM org_role_permissions WHERE role_id = $1`, [roleId])
     for (const permission of perms) {
       await db(
         `INSERT INTO org_role_permissions (role_id, permission, branch_scope)

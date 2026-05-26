@@ -71,6 +71,16 @@ async function main() {
     }
   }
 
+  if (dockerRunning('supplify-api') || dockerRunning('supplify-web')) {
+    console.warn(
+      '\n⚠ Full Docker api/web/nginx are running alongside native dev — this duplicates Node/nginx memory.',
+    )
+    console.warn(
+      '  Stop them: docker stop supplify-api supplify-web supplify-nginx',
+    )
+    console.warn('  Or use only Docker: pnpm dev:docker\n')
+  }
+
   console.log('\nStarting API (watch) + web (Vite HMR)…')
   console.log('  Web:  http://localhost:5173')
   console.log('  API:  http://localhost:4000')

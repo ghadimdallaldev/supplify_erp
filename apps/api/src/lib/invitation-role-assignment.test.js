@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PERMISSION_KEYS as P } from './permission-keys.js'
-import { resolveRolePermissionList, RESTAURANT_SYSTEM_ROLES } from './tenant-roles.js'
+import {
+  resolveRolePermissionList,
+  RESTAURANT_SYSTEM_ROLES,
+  SUPPLIER_SYSTEM_ROLES,
+} from './tenant-roles.js'
 import { hasPermission } from './permissions.js'
 
 const queryMock = vi.fn()
@@ -288,13 +292,29 @@ describe('acceptRestaurantMemberInvitation role assignment', () => {
 })
 
 describe('role permission boundaries after invite', () => {
-  it('Viewer cannot create orders', () => {
+  it('restaurant Viewer cannot create orders but can view workspace data', () => {
     const viewerPerms = resolveRolePermissionList(
       RESTAURANT_SYSTEM_ROLES.find((r) => r.name === 'Viewer'),
       'RESTAURANT'
     )
     expect(hasPermission(viewerPerms, P.ORDERS_CREATE)).toBe(false)
     expect(hasPermission(viewerPerms, P.ORDERS_VIEW)).toBe(true)
+    expect(hasPermission(viewerPerms, P.RESERVATIONS_VIEW)).toBe(true)
+    expect(hasPermission(viewerPerms, P.SETTINGS_VIEW)).toBe(true)
+  })
+
+  it('supplier Viewer cannot mutate catalog or fulfillment but can view', () => {
+    const viewerPerms = resolveRolePermissionList(
+      SUPPLIER_SYSTEM_ROLES.find((r) => r.name === 'Viewer'),
+      'SUPPLIER'
+    )
+    expect(hasPermission(viewerPerms, P.ORDERS_VIEW)).toBe(true)
+    expect(hasPermission(viewerPerms, P.CATALOG_VIEW)).toBe(true)
+    expect(hasPermission(viewerPerms, P.FULFILLMENT_VIEW)).toBe(true)
+    expect(hasPermission(viewerPerms, P.ORDERS_MANAGE)).toBe(false)
+    expect(hasPermission(viewerPerms, P.CATALOG_EDIT)).toBe(false)
+    expect(hasPermission(viewerPerms, P.FULFILLMENT_MANAGE)).toBe(false)
+    expect(hasPermission(viewerPerms, P.CHAT_SEND)).toBe(false)
   })
 
   it('Accountant cannot manage orders or staff', () => {

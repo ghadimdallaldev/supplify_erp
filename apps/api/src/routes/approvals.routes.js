@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
+import { requireRestaurantId } from '../lib/tenant-resolve.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
@@ -21,17 +22,6 @@ const featureGate = requireFeature(
 )
 
 router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN']), featureGate)
-
-async function getRestaurantId(req) {
-  if (req.tenantContext?.tenantType === 'RESTAURANT' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Restaurant not found')
-  return rows[0].id
-}
 
 const budgetCreateSchema = z.object({
   name: z.string().min(1).max(255),
@@ -65,7 +55,7 @@ const ruleSchema = z.object({
 
 router.get('/budgets', requirePermission('ORDERS_VIEW'), async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const { branchId, year } = req.query
     const params = [restaurantId]
     let sql = `
@@ -97,7 +87,7 @@ router.get('/budgets', requirePermission('ORDERS_VIEW'), async (req, res, next) 
 router.post('/budgets', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
   try {
     const body = budgetCreateSchema.parse(req.body)
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
 
     const {
       rows: [period],
@@ -148,7 +138,7 @@ router.post('/budgets', requirePermission('ORDERS_MANAGE'), async (req, res, nex
 router.patch('/budgets/:id', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
   try {
     const body = budgetUpdateSchema.parse(req.body)
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const { id } = req.params
 
     const { rows: existing } = await query(
@@ -203,7 +193,7 @@ router.patch('/budgets/:id', requirePermission('ORDERS_MANAGE'), async (req, res
 
 router.delete('/budgets/:id', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const { rowCount } = await query(
       `UPDATE budget_periods SET is_active = FALSE, updated_at = NOW() WHERE id = $1 AND restaurant_id = $2`,
       [req.params.id, restaurantId]
@@ -217,7 +207,7 @@ router.delete('/budgets/:id', requirePermission('ORDERS_MANAGE'), async (req, re
 
 router.get('/budgets/:id/usage', requirePermission('ORDERS_VIEW'), async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const usage = await getBudgetPeriodUsage(req.params.id, restaurantId)
     res.json({ ok: true, data: usage, error: null, requestId: req.requestId })
   } catch (err) {
@@ -229,7 +219,7 @@ router.get('/budgets/:id/usage', requirePermission('ORDERS_VIEW'), async (req, r
 
 router.get('/rules', requirePermission('ORDERS_VIEW'), async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const { rows } = await query(
       `
       SELECT ar.*,
@@ -251,7 +241,7 @@ router.get('/rules', requirePermission('ORDERS_VIEW'), async (req, res, next) =>
 router.post('/rules', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
   try {
     const body = ruleSchema.parse(req.body)
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
 
     if (!body.approverUserId && !body.requiresRole) {
       throw new ValidationError('Either approverUserId or requiresRole is required')
@@ -291,7 +281,7 @@ router.post('/rules', requirePermission('ORDERS_MANAGE'), async (req, res, next)
 router.patch('/rules/:id', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
   try {
     const body = ruleSchema.partial().parse(req.body)
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
 
     const { rows: existing } = await query(
       `SELECT id FROM approval_rules WHERE id = $1 AND restaurant_id = $2`,
@@ -331,7 +321,7 @@ router.patch('/rules/:id', requirePermission('ORDERS_MANAGE'), async (req, res, 
 
 router.delete('/rules/:id', requirePermission('ORDERS_MANAGE'), async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const { rowCount } = await query(
       `UPDATE approval_rules SET is_active = FALSE, updated_at = NOW() WHERE id = $1 AND restaurant_id = $2`,
       [req.params.id, restaurantId]
@@ -381,7 +371,7 @@ router.post(
   requirePermission('ORDERS_CREATE'),
   async (req, res, next) => {
     try {
-      const restaurantId = await getRestaurantId(req)
+      const restaurantId = await requireRestaurantId(req)
       const { orderId } = req.params
 
       const { rows: orders } = await query(

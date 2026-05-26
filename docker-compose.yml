@@ -108,6 +108,8 @@ services:
     image: quay.io/keycloak/keycloak:24.0
     container_name: supplify-keycloak
     environment:
+      # Cap JVM heap for local dev (default Keycloak dev mode can exceed 1.5 GiB RSS)
+      JAVA_OPTS_APPEND: ${KEYCLOAK_JAVA_OPTS_APPEND:--Xms256m -Xmx768m}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_DB: postgres

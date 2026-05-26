@@ -28,11 +28,14 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn().mockResolvedValue({
     tenantId: 'rest-1',
     tenantType: 'RESTAURANT',
     tenantName: 'Test Restaurant',
   }),
+  getRestaurantIdForRequest: vi.fn().mockResolvedValue('rest-1'),
+  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -99,22 +102,17 @@ describe('Chat Routes', () => {
 
   describe('GET /api/chat/conversations', () => {
     it('should return list of conversations', async () => {
-      // Mock: supplier lookup, then conversations query
-      db.query
-        .mockResolvedValueOnce({
-          rows: [{ id: 'supplier-1' }], // Supplier lookup
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'conv-1',
-              restaurant_id: 'restaurant-1',
-              supplier_id: 'supplier-1',
-              last_message: 'Hello',
-              last_message_at: new Date(),
-            },
-          ],
-        })
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'conv-1',
+            restaurant_id: 'restaurant-1',
+            supplier_id: 'supplier-1',
+            last_message: 'Hello',
+            last_message_at: new Date(),
+          },
+        ],
+      })
 
       const response = await request(app).get('/api/chat/conversations').expect(200)
 
@@ -125,14 +123,12 @@ describe('Chat Routes', () => {
 
   describe('GET /api/chat/conversations/:conversationId/messages', () => {
     it('should return 404 when user is not a participant (tenant scoping)', async () => {
-      // Conversation belongs to restaurant-1; user is supplier-1 but we'll mock supplier as different
-      db.query
-        .mockResolvedValueOnce({
-          rows: [{ id: 'conv-1', supplier_id: 'supplier-1', restaurant_id: 'restaurant-1' }],
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'supplier-other' }], // Different supplier - not the conversation participant
-        })
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getSupplierIdForRequest).mockResolvedValueOnce('supplier-other')
+
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'conv-1', supplier_id: 'supplier-1', restaurant_id: 'restaurant-1' }],
+      })
 
       const response = await request(app).get('/api/chat/conversations/conv-1/messages').expect(404)
 
@@ -144,9 +140,6 @@ describe('Chat Routes', () => {
       db.query
         .mockResolvedValueOnce({
           rows: [{ id: 'conv-1', supplier_id: 'supplier-1', restaurant_id: 'restaurant-1' }],
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'supplier-1' }], // Same as conversation.supplier_id
         })
         .mockResolvedValueOnce({
           rows: [
@@ -195,23 +188,17 @@ describe('Chat Routes', () => {
       const { errorHandler } = await import('../middlewares/errorHandler.js')
       appRestaurant.use(errorHandler)
 
-      // Mock query sequence:
-      // 1. Restaurant lookup for tenantId (for usage check)
-      // 2. Conversation check
-      // 3. Restaurant verification for sender (must match conversation.restaurant_id)
-      // 4. BEGIN transaction
-      // 5. Message insert RETURNING *
-      // 6. COMMIT transaction
-      // 7. Fetch message with attachments (final SELECT WHERE m.id = $1)
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRequestTenant).mockResolvedValue({
+        tenantId: 'restaurant-1',
+        tenantType: 'RESTAURANT',
+        tenantName: 'Test Restaurant',
+      })
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValue('restaurant-1')
+
       db.query
         .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1' }], // Restaurant lookup for tenantId
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'conv-1', restaurant_id: 'restaurant-1', supplier_id: 'supplier-1' }], // Conversation check
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1' }], // Restaurant verification for sender
+          rows: [{ id: 'conv-1', restaurant_id: 'restaurant-1', supplier_id: 'supplier-1' }],
         })
         .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockResolvedValueOnce({

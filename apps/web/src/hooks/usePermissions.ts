@@ -33,6 +33,14 @@ export function usePermissions() {
 
   const canAny = (...permissionKeys: string[]): boolean => permissionKeys.some((key) => can(key))
 
+  /** True for restaurant or supplier Viewer / Org Viewer — read-only by design. */
+  const isWorkspaceViewer =
+    user?.role === 'RESTAURANT' || user?.role === 'SUPPLIER'
+      ? user?.workspace?.roleName === 'Viewer' ||
+        user?.workspace?.roleName === 'Org Viewer' ||
+        user?.tenantRoles?.includes('Viewer') === true
+      : false
+
   /** True when user has view but none of the write/manage keys for the same domain. */
   const isViewOnly = (viewKey: string): boolean => {
     if (!can(viewKey)) return false
@@ -46,5 +54,5 @@ export function usePermissions() {
     )
   }
 
-  return { can, canAny, isViewOnly }
+  return { can, canAny, isViewOnly, isWorkspaceViewer }
 }

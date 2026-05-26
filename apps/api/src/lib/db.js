@@ -6,7 +6,7 @@ import { summarizeQuery } from './log-helpers.js'
 // Create connection pool (production: set DATABASE_SSL=true, optional DATABASE_STATEMENT_TIMEOUT)
 const poolConfig = {
   connectionString: config.DATABASE_URL,
-  max: 20,
+  max: config.DATABASE_POOL_MAX,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
 }
@@ -17,6 +17,10 @@ if (config.DATABASE_STATEMENT_TIMEOUT) {
   poolConfig.statement_timeout = config.DATABASE_STATEMENT_TIMEOUT
 }
 export const pool = new Pool(poolConfig)
+
+export async function closePool() {
+  await pool.end()
+}
 
 pool.on('connect', () => {
   logger.debug('Database client connected')

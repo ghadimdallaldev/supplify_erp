@@ -123,6 +123,12 @@ For ADMIN roles, `tenant_id` is NULL and `tenant_type` is `'ADMIN'`.
 - **usePermissions()** – hook that returns `can(permissionKey)`. Uses `user.tenantPermissions` or `user.adminPermissions`; when admin is impersonating, returns `true` for any key so the UI matches backend access.
 - Sidebar: Settings link requires `SETTINGS_VIEW`; Staff, Reservations, Inventory, Invoices (and supplier Invoices) are gated by their view permission; admin nav requires `ADMIN_ACCESS`.
 
+## Subscription features vs RBAC
+
+Plan entitlements (`requireFeature`) and role permissions (`requirePermission`) are **both** required. They answer different questions: whether the **tenant** bought the module vs whether the **user** may use it.
+
+See **[ACCESS_CONTROL.md](./ACCESS_CONTROL.md)** for the full matrix (module analytics vs global `reports`, tenant resolution, and checklists for new routes).
+
 ## Default assignments (migration 0043)
 
 - Users with `app_user.role = 'RESTAURANT'` and `restaurant.contact_email = app_user.email` get **RESTAURANT_OWNER** for that restaurant.

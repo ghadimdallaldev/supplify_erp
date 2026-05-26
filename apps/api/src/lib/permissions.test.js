@@ -18,6 +18,15 @@ vi.mock('./supplier-org.js', () => ({
   getOrgRolePermissions: (...args) => getOrgRolePermissionsMock(...args),
 }))
 
+vi.mock('./restaurant-org.js', () => ({
+  getRestaurantOrgRolePermissions: vi.fn().mockResolvedValue([]),
+}))
+
+/** No restaurant org on tenant (keeps legacy mock order for branch permission queries). */
+function mockNoRestaurantOrg() {
+  return { rows: [{ organization_id: null }] }
+}
+
 import {
   getPermissionsForUser,
   invalidateUserPermissionCache,
@@ -38,6 +47,7 @@ describe('permissions resolution', () => {
 
   it('resolves permissions from tenant role', async () => {
     queryMock
+      .mockResolvedValueOnce(mockNoRestaurantOrg())
       .mockResolvedValueOnce({
         rows: [{ permission: 'ORDERS_VIEW' }, { permission: 'ORDERS_CREATE' }],
       })
@@ -52,6 +62,7 @@ describe('permissions resolution', () => {
 
   it('merges legacy permissions when no tenant_user_roles assignment', async () => {
     queryMock
+      .mockResolvedValueOnce(mockNoRestaurantOrg())
       .mockResolvedValueOnce({ rows: [{ permission: 'ORDERS_VIEW' }] })
       .mockResolvedValueOnce({ rows: [{ code: 'SETTINGS_VIEW' }] })
       .mockResolvedValueOnce({ rows: [] })
@@ -63,12 +74,32 @@ describe('permissions resolution', () => {
 
   it('does not merge legacy permissions when tenant_user_roles assignment exists', async () => {
     queryMock
+      .mockResolvedValueOnce(mockNoRestaurantOrg())
       .mockResolvedValueOnce({ rows: [{ permission: 'ORDERS_VIEW' }] })
       .mockResolvedValueOnce({ rows: [{ code: 'SETTINGS_VIEW' }, { code: 'ORDERS_CREATE' }] })
       .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
 
     const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
     expect(perms).toEqual(['ORDERS_VIEW'])
+  })
+
+  it('merges restaurant org and branch permissions when user has org role', async () => {
+    const { getRestaurantOrgRolePermissions } = await import('./restaurant-org.js')
+    vi.mocked(getRestaurantOrgRolePermissions).mockResolvedValueOnce([
+      'ORDERS_VIEW',
+      'RESERVATIONS_VIEW',
+    ])
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+      .mockResolvedValueOnce({ rows: [{ permission: 'SETTINGS_VIEW' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+
+    const perms = await getPermissionsForUser('u1', 'rest-1', 'RESTAURANT')
+    expect(perms).toContain('ORDERS_VIEW')
+    expect(perms).toContain('RESERVATIONS_VIEW')
+    expect(perms).toContain('SETTINGS_VIEW')
   })
 
   it('uses cache when present', async () => {

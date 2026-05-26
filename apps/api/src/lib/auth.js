@@ -7,6 +7,8 @@ import axios from 'axios'
 const KEYCLOAK_HTTP_TIMEOUT_MS = 10000
 
 let keycloakConfig = null
+/** @type {Promise<object> | null} */
+let keycloakConfigInflight = null
 
 // Get Keycloak configuration values
 function getKeycloakValues() {
@@ -19,12 +21,7 @@ function getKeycloakValues() {
   }
 }
 
-// Fetch Keycloak configuration
-export async function getKeycloakConfig() {
-  if (keycloakConfig) {
-    return keycloakConfig
-  }
-
+async function loadKeycloakConfig() {
   const { KEYCLOAK_BASE_URL, KEYCLOAK_REALM } = getKeycloakValues()
   const WELL_KNOWN_URL = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration`
 
@@ -38,7 +35,6 @@ export async function getKeycloakConfig() {
   } catch (error) {
     logger.warn('Keycloak well-known failed, using manual config', { error: error.message })
 
-    // Fallback: construct configuration manually
     keycloakConfig = {
       authorization_endpoint: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth`,
       token_endpoint: `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`,
@@ -52,6 +48,19 @@ export async function getKeycloakConfig() {
     logger.debug('Keycloak fallback config used')
     return keycloakConfig
   }
+}
+
+// Fetch Keycloak configuration (dedupes concurrent startup requests)
+export async function getKeycloakConfig() {
+  if (keycloakConfig) {
+    return keycloakConfig
+  }
+  if (!keycloakConfigInflight) {
+    keycloakConfigInflight = loadKeycloakConfig().finally(() => {
+      keycloakConfigInflight = null
+    })
+  }
+  return keycloakConfigInflight
 }
 
 // Exchange authorization code for tokens

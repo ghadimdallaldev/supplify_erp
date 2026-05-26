@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
 import { reviewsAccessGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
-import { query } from '../lib/db.js'
+import { requireRestaurantId } from '../lib/tenant-resolve.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import {
   createSupplierReview,
@@ -40,17 +40,6 @@ const paginationSchema = z.object({
     .optional()
     .transform((v) => (v ? parseInt(v, 10) : 0)),
 })
-
-async function getRestaurantId(req) {
-  if (req.tenantContext?.tenantType === 'RESTAURANT' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Restaurant not found')
-  return rows[0].id
-}
 
 // Public routes (no auth)
 router.get('/suppliers/:supplierId', async (req, res, next) => {
@@ -100,7 +89,7 @@ const reviewsWriteGate = requireFeature(
 
 router.get('/my', async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const { limit, offset } = paginationSchema.parse(req.query)
     const reviews = await listMyReviews(restaurantId, { limit, offset })
     res.json({
@@ -116,7 +105,7 @@ router.get('/my', async (req, res, next) => {
 
 router.post('/suppliers/:supplierId', reviewsWriteGate, async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const body = reviewBodySchema.parse(req.body)
     const review = await createSupplierReview({
       supplierId: req.params.supplierId,
