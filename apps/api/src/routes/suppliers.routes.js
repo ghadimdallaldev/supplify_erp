@@ -10,7 +10,10 @@ import {
 } from '../lib/rbac.js'
 import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
-import { logger } from '../lib/logger.js'
+import { createModuleLogger, logEvent, logQueryDebug, logger } from '../lib/logger.js'
+import { patchRequestLogTenant } from '../lib/request-log-context.js'
+
+const log = createModuleLogger('suppliers.routes')
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
@@ -101,12 +104,12 @@ router.get('/', optionalAuth, async (req, res) => {
     // Handle restaurant-specific filtering
     let restaurantId = null
 
-    logger.info('Supplier list request', {
-      hasUserData: !!req.userData,
-      role: req.userData?.role,
-      email: req.userData?.email,
-      query: req.query,
-    })
+    const listFilters = {
+      q: params.q ?? null,
+      city: params.city ?? null,
+      limit: params.limit,
+      offset: params.offset,
+    }
 
     if (req.userData?.role === 'RESTAURANT') {
       try {
@@ -116,13 +119,9 @@ router.get('/', optionalAuth, async (req, res) => {
           [req.userData.email]
         )
 
-        logger.info('Restaurant lookup result', {
-          found: restaurants.length,
-          restaurantId: restaurants[0]?.id,
-        })
-
         if (restaurants.length > 0) {
           restaurantId = restaurants[0].id
+          patchRequestLogTenant(req, restaurantId, 'RESTAURANT')
 
           // Exclude blocklisted suppliers
           whereConditions.push(`
@@ -135,9 +134,9 @@ router.get('/', optionalAuth, async (req, res) => {
           paramIndex++
         }
       } catch (error) {
-        logger.warn('Failed to get restaurant ID for supplier filtering', {
+        logEvent(log, 'warn', 'supplier.list.restaurant_lookup_failed', {
           error: error.message,
-          email: req.userData?.email,
+          role: req.userData?.role,
         })
         // Continue without restaurant-specific filtering
       }
@@ -185,14 +184,13 @@ router.get('/', optionalAuth, async (req, res) => {
 
     queryParams.push(params.limit, params.offset)
 
-    logger.info('Supplier query built', {
-      whereClause,
-      sql: sql.substring(0, 200) + '...',
-      queryParams: queryParams.slice(0, -2), // Hide limit/offset
+    logQueryDebug(log, 'supplier.list.query', sql, {
+      paramCount: queryParams.length,
+      filterCount: whereConditions.length,
+      hasRestaurantScope: Boolean(restaurantId),
     })
 
     const { rows } = await query(sql, queryParams)
-    logger.debug('Supplier list result', { count: rows.length })
 
     const suppliersWithReviews = await attachReviewFields(rows)
 
@@ -218,6 +216,15 @@ router.get('/', optionalAuth, async (req, res) => {
 
     const countSql = `SELECT COUNT(*) as total FROM supplier s ${whereClause}`
     const { rows: countRows } = await query(countSql, countParams)
+
+    logEvent(log, 'info', 'supplier.list', {
+      ...listFilters,
+      authenticated: Boolean(req.userData),
+      role: req.userData?.role ?? null,
+      restaurantScoped: Boolean(restaurantId),
+      returned: rows.length,
+      total: parseInt(countRows[0].total, 10),
+    })
 
     res.json({
       ok: true,
@@ -246,8 +253,7 @@ router.get('/', optionalAuth, async (req, res) => {
       })
     }
 
-    logger.error({
-      message: 'List suppliers error',
+    logEvent(log, 'error', 'supplier.list.failed', {
       error: error.message,
       stack: error.stack,
     })

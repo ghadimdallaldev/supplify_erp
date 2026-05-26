@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
@@ -17,6 +17,8 @@ import {
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
   useGetOrderQuery,
+  useGetOrdersQuery,
+  useGetSuppliersQuery,
   useCreateDisputeMutation,
   useReviewDisputeMutation,
   useResolveDisputeMutation,
@@ -111,21 +113,69 @@ export function DisputesPage() {
     skip: !orderIdFromUrl || isSupplier,
   })
 
+  const { data: ordersListData, isLoading: loadingOrders } = useGetOrdersQuery(
+    { limit: 100, offset: 0 },
+    { skip: isSupplier || !showCreate }
+  )
+  const { data: suppliersData, isLoading: loadingSuppliers } = useGetSuppliersQuery(
+    { limit: 100, offset: 0 },
+    { skip: isSupplier || !showCreate }
+  )
+
+  const orderOptions = useMemo(() => {
+    const orders = ordersListData?.orders ?? []
+    return orders
+      .filter((o) => o.status !== 'DRAFT' && o.status !== 'CANCELLED')
+      .map((o) => ({
+        id: o.id,
+        label: `${formatOrderRef(o.id)} — ${new Date(o.placed_at || o.created_at).toLocaleDateString()} — $${formatPrice(Number(o.total_amount || 0))}`,
+      }))
+  }, [ordersListData])
+
+  const suppliersForSelectedOrder = useMemo(() => {
+    if (!createForm.orderId) return []
+    const order =
+      orderForDispute?.order?.id === createForm.orderId
+        ? orderForDispute.order
+        : ordersListData?.orders?.find((o) => o.id === createForm.orderId)
+    const items = order?.items ?? []
+    const map = new Map<string, string>()
+    for (const item of items) {
+      const sid = item.supplier_id
+      if (sid) {
+        map.set(sid, item.supplier_name || `Supplier ${sid.slice(0, 8)}`)
+      }
+    }
+    return [...map.entries()].map(([id, name]) => ({ id, name }))
+  }, [createForm.orderId, orderForDispute, ordersListData])
+
+  const supplierOptions = useMemo(() => {
+    if (suppliersForSelectedOrder.length > 0) return suppliersForSelectedOrder
+    const suppliers = suppliersData?.suppliers ?? []
+    return suppliers.map((s) => ({
+      id: s.id,
+      name: s.name || `Supplier ${String(s.id).slice(0, 8)}`,
+    }))
+  }, [suppliersForSelectedOrder, suppliersData])
+
   useEffect(() => {
     if (!orderIdFromUrl || isSupplier) return
     setCreateForm((f) => ({ ...f, orderId: orderIdFromUrl }))
     setShowCreate(true)
   }, [orderIdFromUrl, isSupplier])
 
+  const { data: selectedOrderDetail } = useGetOrderQuery(createForm.orderId, {
+    skip: !createForm.orderId || isSupplier,
+  })
+
   useEffect(() => {
-    const firstItem = orderForDispute?.order?.items?.[0] as
-      | { supplier_id?: string; supplierId?: string }
-      | undefined
-    const supplierId = firstItem?.supplier_id || firstItem?.supplierId
-    if (supplierId) {
-      setCreateForm((f) => ({ ...f, supplierId }))
+    if (!createForm.orderId) return
+    const items = selectedOrderDetail?.order?.items ?? []
+    const ids = [...new Set(items.map((item) => item.supplier_id).filter(Boolean) as string[])]
+    if (ids.length === 1) {
+      setCreateForm((f) => (f.supplierId === ids[0] ? f : { ...f, supplierId: ids[0] }))
     }
-  }, [orderForDispute])
+  }, [createForm.orderId, selectedOrderDetail])
 
   if (!disputesEnabled) {
     return (
@@ -336,18 +386,48 @@ export function DisputesPage() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Order ID</Label>
-              <Input
+              <Label>Order</Label>
+              <select
+                className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
                 value={createForm.orderId}
-                onChange={(e) => setCreateForm((f) => ({ ...f, orderId: e.target.value }))}
-              />
+                onChange={(e) =>
+                  setCreateForm((f) => ({
+                    ...f,
+                    orderId: e.target.value,
+                    supplierId: '',
+                  }))
+                }
+                disabled={loadingOrders}
+              >
+                <option value="">{loadingOrders ? 'Loading orders…' : 'Select an order'}</option>
+                {orderOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
-              <Label>Supplier ID</Label>
-              <Input
+              <Label>Supplier</Label>
+              <select
+                className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
                 value={createForm.supplierId}
                 onChange={(e) => setCreateForm((f) => ({ ...f, supplierId: e.target.value }))}
-              />
+                disabled={!createForm.orderId || loadingSuppliers}
+              >
+                <option value="">
+                  {!createForm.orderId
+                    ? 'Select an order first'
+                    : supplierOptions.length === 0
+                      ? 'No suppliers on this order'
+                      : 'Select supplier'}
+                </option>
+                {supplierOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <Label>Type</Label>

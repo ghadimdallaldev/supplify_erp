@@ -78,7 +78,7 @@ export function OrdersPage() {
   )
 
   const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
-  const { data: productsData } = useGetProductsQuery({ limit: 1000 })
+  const { data: productsData } = useGetProductsQuery({ limit: 1000 }, { skip: !isSupplier })
   const [updateOrder] = useUpdateOrderMutation()
   const [createManualOrder, { isLoading: isCreatingManualOrder }] = useCreateManualOrderMutation()
   const [sendReminder] = useSendOrderReminderMutation()

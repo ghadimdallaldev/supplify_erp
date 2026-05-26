@@ -6,6 +6,12 @@ import {
   generateInviteToken,
   inviteExpiresAt,
 } from '../services/invitationTokens.js'
+import {
+  assertEmailCanJoinWorkspace,
+  assertUserCanJoinWorkspace,
+  bindUserToWorkspace,
+  resolveWorkspaceScope,
+} from './workspace-membership.js'
 
 export function generateBranchInviteToken() {
   return generateInviteToken()
@@ -88,7 +94,8 @@ export async function validateBranchRoleForSupplier(roleId, supplierId) {
   const { rows } = await query(
     `
     SELECT id FROM tenant_roles
-    WHERE id = $1 AND tenant_id = $2 AND tenant_type = 'SUPPLIER' AND is_system = true
+    WHERE id = $1 AND tenant_id = $2 AND tenant_type = 'SUPPLIER' AND is_active = true
+      AND name != 'Owner'
     `,
     [roleId, supplierId]
   )
@@ -103,6 +110,11 @@ export async function createBranchInvitation({
   invitedEmail,
   roleId,
 }) {
+  if (invitedEmail) {
+    const scope = await resolveWorkspaceScope(supplierId, 'SUPPLIER')
+    await assertEmailCanJoinWorkspace(invitedEmail, scope)
+  }
+
   const token = generateInviteToken()
   const expiresAt = inviteExpiresAt()
   const { rows } = await query(
@@ -172,10 +184,10 @@ export async function regenerateBranchInvitation(invitationId, organizationId) {
 }
 
 export async function assertSupplierInOrg(supplierId, organizationId) {
-  const { rows } = await query(
-    `SELECT id FROM supplier WHERE id = $1 AND organization_id = $2`,
-    [supplierId, organizationId]
-  )
+  const { rows } = await query(`SELECT id FROM supplier WHERE id = $1 AND organization_id = $2`, [
+    supplierId,
+    organizationId,
+  ])
   return rows.length > 0
 }
 
@@ -217,6 +229,8 @@ export async function acceptBranchInvitation({
     keycloakSub = kcUserId
   }
 
+  const scope = await resolveWorkspaceScope(invitation.supplier_id, 'SUPPLIER')
+
   return withTransaction(async (client) => {
     const { rows: locked } = await client.query(
       `SELECT * FROM branch_invitations WHERE token = $1 FOR UPDATE`,
@@ -228,6 +242,17 @@ export async function acceptBranchInvitation({
       err.code = 'invalid'
       throw err
     }
+
+    await assertUserCanJoinWorkspace(
+      {
+        userId: existingUserId,
+        email: resolvedEmail,
+        workspaceType: scope.workspaceType,
+        organizationId: scope.organizationId,
+        homeTenantId: scope.homeTenantId,
+      },
+      client
+    )
 
     let userId = existingUserId
     if (!userId) {
@@ -259,6 +284,17 @@ export async function acceptBranchInvitation({
        ON CONFLICT (user_id, tenant_id, tenant_type)
        DO UPDATE SET role_id = EXCLUDED.role_id, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
       [userId, row.role_id, row.supplier_id, row.invited_by]
+    )
+
+    await bindUserToWorkspace(
+      {
+        userId,
+        workspaceType: scope.workspaceType,
+        organizationId: scope.organizationId,
+        homeTenantId: scope.homeTenantId,
+        isMainAdmin: false,
+      },
+      client
     )
 
     await client.query(

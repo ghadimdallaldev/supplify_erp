@@ -5,6 +5,7 @@ import {
   resolveTenantContext,
   resolveAdminContext,
   requirePermission,
+  requireAnyPermission,
   getRequestTenant,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
@@ -24,12 +25,14 @@ import { writeAuditLog } from '../lib/audit.js'
 
 const router = express.Router()
 
-router.use(
-  requireAuth,
-  resolveTenantContext,
-  resolveAdminContext,
-  requirePermission('CATALOG_VIEW')
-)
+const catalogReadAccess = requireAnyPermission('CATALOG_VIEW', 'ORDERS_VIEW', 'INVENTORY_VIEW')
+
+router.use(requireAuth, resolveTenantContext, resolveAdminContext)
+
+router.use((req, res, next) => {
+  if (req.method === 'GET') return catalogReadAccess(req, res, next)
+  return requirePermission('CATALOG_EDIT')(req, res, next)
+})
 
 // Lazy cache: does product table have a tags column? (migration 0026 adds it)
 let _productHasTagsColumn = null

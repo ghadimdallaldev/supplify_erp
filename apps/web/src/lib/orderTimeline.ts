@@ -1,5 +1,7 @@
 export type TimelineEventState = 'completed' | 'current' | 'upcoming' | 'skipped'
 
+export type TimelineViewerRole = 'RESTAURANT' | 'SUPPLIER'
+
 export interface SubstitutionDetail {
   originalName: string
   substituteName: string
@@ -45,9 +47,22 @@ const STATUS_RANK: Record<string, number> = {
   ACKNOWLEDGED: 3,
   PROCESSING: 4,
   SHIPPED: 5,
+  DELIVERED: 6,
   COMPLETED: 6,
+  RECEIVED_PARTIAL: 7,
+  RECEIVED_FULL: 8,
+  INVOICED: 9,
   CANCELLED: -1,
 }
+
+const MILESTONE = {
+  PLACED: 2,
+  ACKNOWLEDGED: 3,
+  PROCESSING: 4,
+  SHIPPED: 5,
+  DELIVERED: 6,
+  RECEIVED: 8,
+} as const
 
 function rank(status: string): number {
   return STATUS_RANK[status] ?? 0
@@ -57,6 +72,33 @@ function formatTs(value?: string | null): string | null {
   if (!value) return null
   const d = new Date(value)
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+function stepState(statusRank: number, milestoneRank: number): TimelineEventState {
+  if (statusRank < milestoneRank) return 'upcoming'
+  if (statusRank > milestoneRank) return 'completed'
+  // At DELIVERED, the delivery milestone is done; receiving is the active step for restaurants.
+  if (milestoneRank === MILESTONE.DELIVERED) return 'completed'
+  return 'current'
+}
+
+function receivingState(statusRank: number, hasReport: boolean): TimelineEventState {
+  if (hasReport || statusRank >= MILESTONE.RECEIVED) return 'completed'
+  if (statusRank >= MILESTONE.DELIVERED) return 'current'
+  return 'upcoming'
+}
+
+/** Timestamp for a milestone: placed uses placed_at; later milestones use updated_at when reached. */
+function milestoneTimestamp(
+  order: OrderLike,
+  milestoneRank: number,
+  statusRank: number
+): string | null {
+  if (statusRank < milestoneRank) return null
+  if (milestoneRank <= MILESTONE.PLACED) {
+    return formatTs(order.placed_at || order.created_at)
+  }
+  return formatTs(order.updated_at)
 }
 
 function productNameById(items: OrderLike['items'], productId?: string | null): string | undefined {
@@ -111,6 +153,7 @@ function amendmentItems(amendment: AmendmentLike): unknown {
 
 export interface BuildOrderTimelineInput {
   order: OrderLike
+  viewerRole?: TimelineViewerRole
   amendments?: AmendmentLike[]
   invoices?: InvoiceLike[]
   disputes?: DisputeLike[]
@@ -119,9 +162,170 @@ export interface BuildOrderTimelineInput {
   approvalStatus?: string | null
 }
 
+function pushCoreFulfillmentSteps(
+  events: TimelineEvent[],
+  input: {
+    order: OrderLike
+    statusRank: number
+    supplierName: string
+    restaurantName?: string
+    viewerRole: TimelineViewerRole
+    approvalPending: boolean
+  }
+) {
+  const { order, statusRank, supplierName, restaurantName, viewerRole, approvalPending } = input
+  const isSupplier = viewerRole === 'SUPPLIER'
+
+  if (approvalPending && statusRank < MILESTONE.PLACED) {
+    events.push({
+      id: 'approval',
+      title: 'Awaiting approval',
+      description: isSupplier
+        ? 'This order is waiting for restaurant approval before fulfillment.'
+        : 'This order needs internal approval before it is sent to the supplier.',
+      timestamp: formatTs(order.created_at),
+      state: 'current',
+      badge: 'Pending approval',
+    })
+  }
+
+  events.push({
+    id: 'placed',
+    title: isSupplier ? 'Order received' : 'Order placed',
+    description: isSupplier
+      ? `New order from ${restaurantName || 'restaurant'}.`
+      : `Order sent to ${supplierName}.`,
+    timestamp: milestoneTimestamp(order, MILESTONE.PLACED, statusRank),
+    state: stepState(statusRank, MILESTONE.PLACED),
+  })
+
+  events.push({
+    id: 'confirmed',
+    title: isSupplier ? 'Order acknowledged' : 'Supplier confirmed',
+    description:
+      statusRank >= MILESTONE.ACKNOWLEDGED
+        ? isSupplier
+          ? 'You acknowledged this order.'
+          : `${supplierName} acknowledged the order.`
+        : isSupplier
+          ? 'Acknowledge the order to start fulfillment.'
+          : 'Waiting for the supplier to acknowledge this order.',
+    timestamp: milestoneTimestamp(order, MILESTONE.ACKNOWLEDGED, statusRank),
+    state: stepState(statusRank, MILESTONE.ACKNOWLEDGED),
+  })
+
+  events.push({
+    id: 'processing',
+    title: isSupplier ? 'Picking & processing' : 'Order processing',
+    description:
+      statusRank >= MILESTONE.PROCESSING
+        ? isSupplier
+          ? 'Items are being picked and prepared for dispatch.'
+          : 'The supplier is preparing and picking items for delivery.'
+        : isSupplier
+          ? 'Pick and prepare items after acknowledgment.'
+          : 'Supplier will start preparing items after confirmation.',
+    timestamp: milestoneTimestamp(order, MILESTONE.PROCESSING, statusRank),
+    state: stepState(statusRank, MILESTONE.PROCESSING),
+  })
+
+  events.push({
+    id: 'shipped',
+    title: 'Order shipped',
+    description:
+      statusRank >= MILESTONE.SHIPPED
+        ? 'Order has left the warehouse and is on its way.'
+        : 'Dispatch will begin once the order is marked as shipped.',
+    timestamp: milestoneTimestamp(order, MILESTONE.SHIPPED, statusRank),
+    state: stepState(statusRank, MILESTONE.SHIPPED),
+  })
+
+  if (isSupplier) {
+    events.push({
+      id: 'delivered',
+      title: 'Marked delivered',
+      description:
+        statusRank >= MILESTONE.DELIVERED
+          ? 'Delivery completed. The restaurant can confirm receipt.'
+          : 'Mark delivered when the handoff or drop-off is complete.',
+      timestamp: milestoneTimestamp(order, MILESTONE.DELIVERED, statusRank),
+      state: stepState(statusRank, MILESTONE.DELIVERED),
+    })
+
+    if (statusRank >= MILESTONE.RECEIVED) {
+      events.push({
+        id: 'restaurant-received',
+        title: 'Restaurant confirmed receipt',
+        description: 'The restaurant recorded receiving this delivery.',
+        timestamp: milestoneTimestamp(order, MILESTONE.RECEIVED, statusRank),
+        state: 'completed',
+      })
+    }
+    return
+  }
+
+  // Restaurant view
+  events.push({
+    id: 'delivered',
+    title: 'Delivered by supplier',
+    description:
+      statusRank >= MILESTONE.DELIVERED
+        ? `${supplierName} marked the order as delivered.`
+        : 'Supplier delivery completion will appear here.',
+    timestamp: milestoneTimestamp(order, MILESTONE.DELIVERED, statusRank),
+    state: stepState(statusRank, MILESTONE.DELIVERED),
+  })
+}
+
+function pushReceivingStep(
+  events: TimelineEvent[],
+  input: {
+    order: OrderLike
+    statusRank: number
+    receiving?: ReceivingLike
+  }
+) {
+  const { order, statusRank, receiving } = input
+
+  const state = receivingState(statusRank, Boolean(receiving))
+
+  if (receiving) {
+    events.push({
+      id: 'received',
+      title: 'Goods received',
+      description: `Receiving report recorded${receiving.status ? ` (${String(receiving.status).toLowerCase()})` : ''}.`,
+      timestamp: formatTs(
+        String(receiving.received_at ?? receiving.receivedAt ?? receiving.created_at ?? '')
+      ),
+      state,
+      link: { label: 'View receiving', href: `/app/receiving?order=${order.id}` },
+    })
+    return
+  }
+
+  events.push({
+    id: 'received',
+    title: statusRank >= MILESTONE.RECEIVED ? 'Goods received' : 'Confirm receipt',
+    description:
+      statusRank >= MILESTONE.RECEIVED
+        ? 'Receiving has been recorded for this order.'
+        : statusRank >= MILESTONE.DELIVERED
+          ? 'Record receiving to confirm quantities and quality.'
+          : 'Receiving will be available after delivery.',
+    timestamp:
+      state === 'completed' ? milestoneTimestamp(order, MILESTONE.RECEIVED, statusRank) : null,
+    state,
+    link:
+      statusRank >= MILESTONE.DELIVERED
+        ? { label: 'Receive order', href: `/app/receiving?order=${order.id}` }
+        : undefined,
+  })
+}
+
 export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEvent[] {
   const {
     order,
+    viewerRole = 'RESTAURANT',
     amendments = [],
     invoices = [],
     disputes = [],
@@ -134,6 +338,8 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
   const status = order.status
   const statusRank = rank(status)
   const supplierName = order.items?.find((i) => i.supplier_name)?.supplier_name || 'Supplier'
+  const restaurantName =
+    (order as OrderLike & { restaurant_name?: string }).restaurant_name || 'Restaurant'
 
   if (status === 'CANCELLED') {
     events.push({
@@ -149,39 +355,13 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
   const approvalPending =
     status === 'PENDING_APPROVAL' || approvalStatus === 'pending' || approvalStatus === 'PENDING'
 
-  if (approvalPending && statusRank < rank('PLACED')) {
-    events.push({
-      id: 'approval',
-      title: 'Awaiting approval',
-      description: 'This order needs internal approval before it is sent to the supplier.',
-      timestamp: formatTs(order.created_at),
-      state: 'current',
-      badge: 'Pending approval',
-    })
-  }
-
-  events.push({
-    id: 'placed',
-    title: 'Order placed',
-    description: `Order sent to ${supplierName}.`,
-    timestamp: formatTs(order.placed_at || order.created_at),
-    state: statusRank >= rank('PLACED') ? 'completed' : approvalPending ? 'upcoming' : 'current',
-  })
-
-  events.push({
-    id: 'confirmed',
-    title: 'Supplier confirmed',
-    description:
-      statusRank >= rank('ACKNOWLEDGED')
-        ? `${supplierName} acknowledged the order.`
-        : 'Waiting for the supplier to acknowledge this order.',
-    timestamp: statusRank >= rank('ACKNOWLEDGED') ? formatTs(order.updated_at) : null,
-    state:
-      statusRank >= rank('ACKNOWLEDGED')
-        ? 'completed'
-        : statusRank >= rank('PLACED')
-          ? 'current'
-          : 'upcoming',
+  pushCoreFulfillmentSteps(events, {
+    order,
+    statusRank,
+    supplierName,
+    restaurantName,
+    viewerRole,
+    approvalPending,
   })
 
   const acceptedSubstitutions = amendments.filter((a) => {
@@ -202,71 +382,9 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     })
   }
 
-  events.push({
-    id: 'processing',
-    title: 'Order processing',
-    description:
-      statusRank >= rank('PROCESSING')
-        ? 'The supplier is preparing and picking items for delivery.'
-        : 'Supplier will start preparing items after confirmation.',
-    timestamp: statusRank >= rank('PROCESSING') ? formatTs(order.updated_at) : null,
-    state:
-      statusRank >= rank('PROCESSING')
-        ? 'completed'
-        : statusRank >= rank('ACKNOWLEDGED')
-          ? 'current'
-          : 'upcoming',
-  })
-
-  events.push({
-    id: 'shipped',
-    title: 'Order shipped',
-    description:
-      statusRank >= rank('SHIPPED')
-        ? 'Order has left the warehouse and is on its way.'
-        : 'Delivery will begin once the order is marked as shipped.',
-    timestamp: statusRank >= rank('SHIPPED') ? formatTs(order.updated_at) : null,
-    state:
-      statusRank >= rank('SHIPPED')
-        ? 'completed'
-        : statusRank >= rank('PROCESSING')
-          ? 'current'
-          : 'upcoming',
-  })
-
-  const receiving = receivingReports.find((r) => String(r.order_id ?? r.orderId) === order.id)
-
-  if (receiving) {
-    events.push({
-      id: 'received',
-      title: 'Goods received',
-      description: `Receiving report recorded${receiving.status ? ` (${String(receiving.status).toLowerCase()})` : ''}.`,
-      timestamp: formatTs(
-        String(receiving.received_at ?? receiving.receivedAt ?? receiving.created_at ?? '')
-      ),
-      state: 'completed',
-      link: { label: 'View receiving', href: `/app/receiving?order=${order.id}` },
-    })
-  } else {
-    events.push({
-      id: 'completed',
-      title: statusRank >= rank('COMPLETED') ? 'Order completed' : 'Goods received',
-      description:
-        statusRank >= rank('COMPLETED')
-          ? 'Supplier marked the order as completed. You can receive and inspect the delivery.'
-          : 'Delivery completion and receiving will appear here.',
-      timestamp: statusRank >= rank('COMPLETED') ? formatTs(order.updated_at) : null,
-      state:
-        statusRank >= rank('COMPLETED')
-          ? 'completed'
-          : statusRank >= rank('SHIPPED')
-            ? 'current'
-            : 'upcoming',
-      link:
-        statusRank >= rank('COMPLETED')
-          ? { label: 'Receive order', href: `/app/receiving?order=${order.id}` }
-          : undefined,
-    })
+  if (viewerRole === 'RESTAURANT') {
+    const receiving = receivingReports.find((r) => String(r.order_id ?? r.orderId) === order.id)
+    pushReceivingStep(events, { order, statusRank, receiving })
   }
 
   const orderDisputes = disputes.filter((d) => disputeOrderId(d) === order.id)
@@ -301,43 +419,57 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     })
   }
 
-  for (const invoice of invoices) {
-    const invoiceStatus = String(invoice.status ?? '').toUpperCase()
-    const isPaid = invoiceStatus === 'PAID'
-    const invoiceNumber = String(invoice.invoice_number ?? invoice.invoiceNumber ?? 'Invoice')
+  if (viewerRole === 'RESTAURANT') {
+    for (const invoice of invoices) {
+      const invoiceStatus = String(invoice.status ?? '').toUpperCase()
+      const isPaid = invoiceStatus === 'PAID'
+      const invoiceNumber = String(invoice.invoice_number ?? invoice.invoiceNumber ?? 'Invoice')
 
-    events.push({
-      id: `invoice-${String(invoice.id)}`,
-      title: isPaid ? 'Invoice closed' : 'Invoice issued',
-      description: isPaid
-        ? `${invoiceNumber} has been paid in full.`
-        : `${invoiceNumber} is ${invoiceStatus.toLowerCase() || 'open'}.`,
-      timestamp: formatTs(
-        String(
-          invoice.payment_date ??
-            invoice.paymentDate ??
-            invoice.invoice_date ??
-            invoice.invoiceDate ??
-            invoice.created_at ??
-            ''
-        )
-      ),
-      state: isPaid ? 'completed' : invoiceStatus === 'ISSUED' ? 'current' : 'upcoming',
-      link: { label: 'View invoice', href: '/app/invoices' },
-    })
+      events.push({
+        id: `invoice-${String(invoice.id)}`,
+        title: isPaid ? 'Invoice closed' : 'Invoice issued',
+        description: isPaid
+          ? `${invoiceNumber} has been paid in full.`
+          : `${invoiceNumber} is ${invoiceStatus.toLowerCase() || 'open'}.`,
+        timestamp: formatTs(
+          String(
+            invoice.payment_date ??
+              invoice.paymentDate ??
+              invoice.invoice_date ??
+              invoice.invoiceDate ??
+              invoice.created_at ??
+              ''
+          )
+        ),
+        state: isPaid ? 'completed' : invoiceStatus === 'ISSUED' ? 'current' : 'upcoming',
+        link: { label: 'View invoice', href: '/app/invoices' },
+      })
+    }
   }
 
   return events
 }
 
-export const ORDER_LIFECYCLE_LABELS = [
+export const RESTAURANT_LIFECYCLE_LABELS = [
   'Order placed',
   'Supplier confirmed',
   'Substitutions',
   'Processing',
   'Shipped',
+  'Delivered',
   'Goods received',
   'Dispute',
   'Credit note',
   'Invoice closed',
+] as const
+
+export const SUPPLIER_LIFECYCLE_LABELS = [
+  'Order received',
+  'Acknowledged',
+  'Substitutions',
+  'Picking',
+  'Shipped',
+  'Delivered',
+  'Restaurant receipt',
+  'Dispute',
 ] as const
