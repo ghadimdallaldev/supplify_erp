@@ -12,7 +12,7 @@ Each environment (`dev`, `staging`, `prod`) has isolated infrastructure:
 - **EcsStack** - ECS Fargate cluster with API service + ALB
 - **S3CloudFrontStack** - Frontend (S3 + CloudFront + WAF + HTTPS)
 - **ObservabilityStack** - CloudWatch Logs + Metrics + Dashboards + X-Ray
-- **IAMStack** - OIDC provider + deployment roles (per environment)
+- **IAMStack** - CDK deploy role + AI read-only role (per environment)
 
 ## 📋 Prerequisites
 
@@ -30,7 +30,6 @@ Set these before deploying:
 ```bash
 export AWS_ACCOUNT_ID=your-account-id
 export AWS_REGION=me-south-1
-export GITHUB_REPO=your-username/repo-name
 ```
 
 Or use CDK context:
@@ -93,62 +92,26 @@ pnpm deploy:prod
 npx cdk deploy --all --context env=prod
 ```
 
-## 🔄 CI/CD Pipeline
+## 🔄 Deployment (AWS CDK)
 
-### GitHub Actions (Automatic Deployment)
+Deploy from your machine or a future CI pipeline using the CDK CLI:
 
-**Branch → Environment Mapping:**
-
-- `dev` branch → dev environment (auto-deploy)
-- `staging` branch → staging environment (auto-deploy)
-- `main` branch → production environment (auto-deploy with approval)
-
-**Workflows:**
-
-- `.github/workflows/deploy-dev.yml` - Deploys on push to `dev` branch
-- `.github/workflows/deploy-staging.yml` - Deploys on push to `staging` branch
-- `.github/workflows/deploy-prod.yml` - Deploys on push to `main` branch (with approval)
-- `.github/workflows/infra-deploy.yml` - Manual infrastructure-only deployment
-
-### ⚠️ Important: Create Branches First
-
-You need to create `dev` and `staging` branches on GitHub:
-
-```bash
-# Create dev branch
-git checkout -b dev
-git push origin dev
-
-# Create staging branch
-git checkout -b staging
-git push origin staging
-```
-
-See `BRANCH_STRATEGY.md` for detailed branch workflow.
-
-### Setup GitHub Actions
-
-1. **Deploy IAM Stack first** (creates roles):
+1. **Bootstrap** (once per account/region): `pnpm cdk:bootstrap`
+2. **Deploy IAM stack** (creates deploy + AI access roles):
 
    ```bash
    npx cdk deploy Supplify-IAMStack-dev --context env=dev
    ```
 
-2. **Get role ARNs from outputs**:
+3. **Deploy all stacks** for an environment:
 
    ```bash
-   aws cloudformation describe-stacks \
-     --stack-name Supplify-IAMStack-dev \
-     --query 'Stacks[0].Outputs' \
-     --output table
+   pnpm deploy:dev
+   # or
+   npx cdk deploy --all --context env=dev
    ```
 
-3. **Add GitHub Secrets**:
-   - `AWS_ROLE_ARN_DEV` = Deploy Role ARN for dev
-   - `AWS_ROLE_ARN_STAGING` = Deploy Role ARN for staging
-   - `AWS_ROLE_ARN_PROD` = Deploy Role ARN for prod
-
-4. **Push to branch** - GitHub Actions will automatically deploy!
+See `docs/BRANCHING.md` for `dev` / `preprod` / `prod` branch promotion. EC2 Docker deploy scripts under `deploy/scripts/` remain available for VM-based hosting.
 
 ## 📦 Available Scripts
 
@@ -231,12 +194,11 @@ aws cloudformation describe-stacks \
 3. Check database connectivity
 4. Verify secrets are accessible
 
-### GitHub Actions Fails
+### CDK Deploy Fails
 
-1. Verify OIDC provider exists in AWS IAM
-2. Check IAM role trust policy matches repository
-3. Verify GitHub secrets are set correctly
-4. Check role has correct permissions
+1. Verify AWS credentials and `cdk bootstrap` for the target account/region
+2. Check IAM deploy role permissions (`SupplifyDeployRole_<env>`)
+3. Review CloudFormation stack events for the failing resource
 
 ## 📚 Resources
 
