@@ -80,9 +80,9 @@ function patchServerJs() {
   const abs = path.join(ROOT, rel)
   if (!fs.existsSync(abs)) return
   let src = fs.readFileSync(abs, 'utf8')
-  src = src.replace(/import \{ e2eRoutes \} from '\.\/routes\/e2e\.routes\.js'\n/, '')
+  src = src.replace(/import \{ e2eRoutes \} from '\.\/routes\/e2e\.routes\.js'\r?\n/, '')
   src = src.replace(
-    /\nif \(config\.E2E_SECRET\) \{\n  app\.use\('\/api\/e2e', e2eRoutes\)\n\}\n/,
+    /\r?\nif \(config\.E2E_SECRET\) \{\r?\n\s*app\.use\('\/api\/e2e', e2eRoutes\)\r?\n\}\r?\n/,
     '\n'
   )
   fs.writeFileSync(abs, src)

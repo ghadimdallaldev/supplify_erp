@@ -56,10 +56,22 @@ console.log(`\nPromoting ${source} → ${branch} (EC2 ${tier} deploy branch)\n`)
 run('git fetch origin')
 run(`git checkout ${branch}`)
 // Prefer dev on conflicts — release branches must not keep outdated prod/preprod copies.
-run(`git merge origin/${source} -m "merge(${source}): promote to ${branch}" -X theirs`)
+try {
+  run(`git merge origin/${source} -m "merge(${source}): promote to ${branch}" -X theirs`)
+} catch {
+  // Release branches delete promote/prune scripts; dev keeps updating them.
+  run('git rm -f scripts/promote-release.mjs scripts/prune-release-tree.mjs')
+  const stillDirty = runCapture('git status --porcelain')
+  if (stillDirty.includes('Unmerged')) {
+    console.error('Merge has unresolved conflicts. Resolve manually, then re-run promote.')
+    process.exit(1)
+  }
+  run('git commit --no-edit')
+}
 
-// Sync all application source from dev before prune (guards against merge omissions).
+// Sync all application source and DB migrations from dev before prune.
 run('git checkout origin/dev -- apps/')
+run('git checkout origin/dev -- apps/api/db/migrations')
 
 // Prune script is dev-only; restore from dev before running on the release branch.
 const pruneSrc = runCapture('git show origin/dev:scripts/prune-release-tree.mjs')
