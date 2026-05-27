@@ -3,15 +3,49 @@ import { Button } from '../ui/button'
 import { useGetBillingStatusQuery } from '../../services/api'
 import { useAppDispatch } from '../../hooks/redux'
 import { openOverduePayment } from '../../lib/openPaymentModal'
+import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
 
 export function BillingOverdueBanner() {
   const dispatch = useAppDispatch()
   const { data: billing } = useGetBillingStatusQuery()
 
   if (!billing?.access) return null
-  const { isLocked, inGracePeriod, isPastDue, daysUntilLock, pendingActivation } = billing.access
+  const {
+    isLocked,
+    inGracePeriod,
+    isPastDue,
+    daysUntilLock,
+    pendingActivation,
+    freeSandboxExpired,
+    lockReason,
+  } = billing.access
 
   if (!isPastDue && !isLocked) return null
+
+  if (isLocked && (freeSandboxExpired || lockReason === 'free_sandbox_expired')) {
+    return (
+      <div className="mx-6 mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-2">
+            <Lock className="h-5 w-5 shrink-0" aria-hidden />
+            <div>
+              <p className="font-semibold">Free testing period ended</p>
+              <p className="mt-0.5 text-amber-900/90">
+                Your free sandbox has expired. Choose a paid plan to continue using Supplify.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            className="shrink-0"
+            onClick={() => openBrowseUpgrade(dispatch, { upgradeUrl: '/app/settings?tab=plan' })}
+          >
+            Choose a plan
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (isLocked && pendingActivation) {
     return (

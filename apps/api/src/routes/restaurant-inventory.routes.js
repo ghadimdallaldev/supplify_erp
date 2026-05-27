@@ -7,6 +7,7 @@ import {
   requirePermission,
 } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
+import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -258,6 +259,28 @@ router.post(
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) {
         throw new ValidationError('Restaurant not found')
+      }
+
+      if (
+        adjustmentData.adjustmentType === 'WASTAGE' ||
+        adjustmentData.adjustmentType === 'SPOILAGE'
+      ) {
+        const wasteEnabled = await isFeatureEnabledForTenant(
+          restaurantId,
+          'RESTAURANT',
+          'waste_tracking'
+        )
+        if (!wasteEnabled) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FEATURE_DISABLED',
+              message: 'Waste tracking is not included in your current plan',
+            },
+            requestId: req.requestId,
+          })
+        }
       }
 
       const result = await withTransaction(async (client) => {
@@ -793,17 +816,20 @@ router.get(
 )
 
 // Get waste analytics for the restaurant
+const wasteTrackingGate = requireFeature(
+  'waste_tracking',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
 router.get(
   '/waste-analytics',
   requireRole(['RESTAURANT', 'ADMIN']),
-  requireFeature(
-    'reports',
-    (req) => req.tenantContext?.tenantId,
-    (req) => req.tenantContext?.tenantType
-  ),
+  wasteTrackingGate,
   async (req, res) => {
     try {
-      const { period = '30' } = req.query // Default to last 30 days
+      const periodRaw = parseInt(String(req.query.period || '30'), 10)
+      const period = Number.isFinite(periodRaw) ? Math.min(Math.max(periodRaw, 7), 90) : 30
 
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) {
@@ -854,13 +880,13 @@ router.get(
         AND ri.product_id = ia.product_id
       WHERE ia.restaurant_id = $1
         AND ia.adjustment_type IN ('WASTAGE', 'SPOILAGE')
-        AND ia.created_at >= NOW() - INTERVAL '${period} days'
+        AND ia.created_at >= NOW() - ($2::int * INTERVAL '1 day')
       GROUP BY p.id, p.name, p.sku, p.unit, s.name, ri.quantity
       HAVING SUM(ia.quantity) > 0
       ORDER BY total_waste_cost DESC NULLS LAST, total_waste_qty DESC
       LIMIT 50
     `,
-        [restaurantId]
+        [restaurantId, period]
       )
 
       // Get summary totals
@@ -876,9 +902,9 @@ router.get(
       FROM inventory_adjustment
       WHERE restaurant_id = $1
         AND adjustment_type IN ('WASTAGE', 'SPOILAGE')
-        AND created_at >= NOW() - INTERVAL '${period} days'
+        AND created_at >= NOW() - ($2::int * INTERVAL '1 day')
     `,
-        [restaurantId]
+        [restaurantId, period]
       )
 
       // Get waste trend (last 7 days daily breakdown)

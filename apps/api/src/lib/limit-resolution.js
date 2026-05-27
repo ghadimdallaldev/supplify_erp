@@ -1,5 +1,8 @@
 import { query } from './db.js'
 
+/** Enforced in API but not shown in subscription/usage UI (Free-tier scheduled-order overflow only). */
+export const HIDDEN_ENTITLEMENT_LIMIT_KEYS = new Set(['scheduled_order_grace_per_day'])
+
 export const RESTAURANT_LIMIT_KEYS = [
   'branches',
   'users',
@@ -16,6 +19,14 @@ export const RESTAURANT_LIMIT_KEYS = [
   'deal_redemptions_per_day',
   'promotions',
 ]
+
+export function stripHiddenEntitlementLimits(limits, usage, overrides = []) {
+  for (const key of HIDDEN_ENTITLEMENT_LIMIT_KEYS) {
+    if (limits) delete limits[key]
+    if (usage) delete usage[key]
+  }
+  return overrides.filter((o) => !HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(o.limitKey))
+}
 
 export const SUPPLIER_LIMIT_KEYS = [
   'branches',

@@ -3,6 +3,7 @@ export const GRACE_PERIOD_DAYS = 7
 
 /** New signups stay locked until paid checkout or admin activation */
 export const LOCK_REASON_PENDING_ACTIVATION = 'pending_activation'
+export const LOCK_REASON_FREE_SANDBOX_EXPIRED = 'free_sandbox_expired'
 
 export const BILLING_PROVIDERS = ['stub', 'manual', 'stripe', 'wish_money', 'bank_transfer']
 

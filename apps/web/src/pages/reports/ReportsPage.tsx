@@ -147,11 +147,11 @@ function ReportPanel({
 }) {
   const restaurantQuery = useGetRestaurantReportQuery(
     { path: def.path, from, to, branchId: branchId || undefined, granularity },
-    { skip: !isRestaurant }
+    { skip: !isRestaurant, refetchOnMountOrArgChange: true }
   )
   const supplierQuery = useGetSupplierReportQuery(
     { path: def.path, from, to, granularity },
-    { skip: isRestaurant }
+    { skip: isRestaurant, refetchOnMountOrArgChange: true }
   )
   const { data, isLoading, isFetching } = isRestaurant ? restaurantQuery : supplierQuery
   const rows = (data?.data as Array<Record<string, unknown>>) || []
@@ -273,7 +273,7 @@ export function ReportsPage() {
         <PageHeader title="Reports" />
         <Card>
           <CardContent className="py-8 text-sm text-[var(--text-muted)]">
-            Reports & analytics are not included on your current plan. Upgrade to unlock insights.
+            Reports are not available on your current plan. Contact support if this looks wrong.
           </CardContent>
         </Card>
       </div>
@@ -341,21 +341,18 @@ export function ReportsPage() {
             </TabsTrigger>
           ))}
         </TabsList>
-        {defs.map((def) => (
-          <TabsContent key={def.key} value={def.key} className="mt-4">
-            <ReportPanel
-              def={def}
-              isRestaurant={isRestaurant}
-              from={from}
-              to={to}
-              branchId={branchId}
-              granularity={granularity}
-            />
-          </TabsContent>
-        ))}
+        <TabsContent value={current.key} className="mt-4">
+          <ReportPanel
+            key={`${current.key}-${from}-${to}-${branchId}-${granularity}`}
+            def={current}
+            isRestaurant={isRestaurant}
+            from={from}
+            to={to}
+            branchId={branchId}
+            granularity={granularity}
+          />
+        </TabsContent>
       </Tabs>
-
-      {!current ? null : null}
     </div>
   )
 }

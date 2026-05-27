@@ -79,7 +79,6 @@ import {
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch } from '../hooks/redux'
-import { ApprovalsSettingsTab } from './approvals/ApprovalsSettingsTab'
 import { ActivityLogTab } from '../components/ActivityLogTab'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { usePermissions } from '../hooks/usePermissions'
@@ -213,7 +212,7 @@ export function RestaurantOnboardingPage() {
     const tab = searchParams.get('tab')
     if (
       tab &&
-      ['profile', 'team', 'branches', 'subscription', 'notifications', 'approvals'].includes(tab)
+      ['profile', 'team', 'branches', 'subscription', 'notifications'].includes(tab)
     ) {
       setActiveTab(tab)
     }
@@ -367,7 +366,6 @@ export function RestaurantOnboardingPage() {
   const refetchBranchesList = useRestaurantOrg ? refetchRestaurantOrgBranches : refetchBranches
   const branchGate = getBranchAddGate(entitlements, branches.length + 1)
   const brandingAllowed = canUseCustomBranding(entitlements)
-  const approvalsFeatureEnabled = featureEnabled(entitlements?.features?.approvals_budgets)
   const tenantAuditEnabled = featureEnabled(entitlements?.features?.tenant_audit_log)
   const pushNotificationsEnabled = featureEnabled(entitlements?.features?.push_notifications)
   const canAddBranch = branchGate.canAdd
@@ -536,13 +534,7 @@ export function RestaurantOnboardingPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList
-          className={`grid w-full ${
-            approvalsFeatureEnabled && isOwner
-              ? 'grid-cols-8'
-              : approvalsFeatureEnabled || isOwner
-                ? 'grid-cols-7'
-                : 'grid-cols-6'
-          }`}
+          className={`grid w-full ${isOwner && tenantAuditEnabled ? 'grid-cols-7' : 'grid-cols-6'}`}
         >
           <TabsTrigger value="profile">
             <Building2 className="h-4 w-4 mr-2" />
@@ -564,12 +556,6 @@ export function RestaurantOnboardingPage() {
             <Settings className="h-4 w-4 mr-2" />
             Notifications
           </TabsTrigger>
-          {approvalsFeatureEnabled && (
-            <TabsTrigger value="approvals">
-              <FileText className="h-4 w-4 mr-2" />
-              Approvals
-            </TabsTrigger>
-          )}
           {isOwner && tenantAuditEnabled && (
             <TabsTrigger value="activity">
               <FileText className="h-4 w-4 mr-2" />
@@ -1109,12 +1095,6 @@ export function RestaurantOnboardingPage() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {approvalsFeatureEnabled && (
-          <TabsContent value="approvals" className="space-y-4">
-            <ApprovalsSettingsTab />
-          </TabsContent>
-        )}
 
         {isOwner && tenantAuditEnabled && (
           <TabsContent value="activity" className="space-y-4">

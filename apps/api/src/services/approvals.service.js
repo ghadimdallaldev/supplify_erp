@@ -123,46 +123,10 @@ export async function getBudgetPeriodUsage(budgetPeriodId, restaurantId) {
 
 /**
  * After order creation: apply approval rule if needed.
+ * Approvals product surface removed — orders always stay on their placement status.
  */
-export async function applyOrderApprovalGate({ client, order, restaurantId, requestedByUserId }) {
-  const { rows: rules } = await client.query(
-    `
-    SELECT * FROM approval_rules
-    WHERE restaurant_id = $1 AND is_active = TRUE
-    ORDER BY threshold_amount DESC NULLS LAST
-    `,
-    [restaurantId]
-  )
-
-  const rule = findMatchingApprovalRule(rules, order.total_amount)
-  if (!rule) return null
-
-  const approverId = await resolveApproverUserId(rule, restaurantId)
-  if (!approverId) {
-    return null
-  }
-
-  if (approverId === requestedByUserId) {
-    return null
-  }
-
-  await client.query(
-    `UPDATE customer_order SET status = 'PENDING_APPROVAL', updated_at = NOW() WHERE id = $1`,
-    [order.id]
-  )
-
-  const {
-    rows: [approval],
-  } = await client.query(
-    `
-    INSERT INTO order_approvals (order_id, rule_id, requested_by, approver_id, status)
-    VALUES ($1, $2, $3, $4, 'pending')
-    RETURNING *
-    `,
-    [order.id, rule.id, requestedByUserId, approverId]
-  )
-
-  return { approval, rule, approverId, status: 'PENDING_APPROVAL' }
+export async function applyOrderApprovalGate() {
+  return null
 }
 
 export async function notifyApproverOfPendingOrder({

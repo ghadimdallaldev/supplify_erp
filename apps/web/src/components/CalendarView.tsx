@@ -136,16 +136,32 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
 
   const calendarEvents = useMemo(() => {
     if (!data?.events) return []
-    return data.events
-      .filter((event) => Boolean(event.start))
-      .map((event) => ({
-        id: event.id,
-        title: event.counterpartName ?? 'Order',
-        start: event.start,
-        end: event.end ?? undefined,
-        extendedProps: event,
-      }))
-  }, [data?.events])
+    let source = data.events.filter((event) => Boolean(event.start))
+
+    const useCompactOrderEvents =
+      activeRole === 'SUPPLIER' &&
+      (currentView === 'dayGridMonth' || currentView === 'listWeek')
+
+    if (useCompactOrderEvents) {
+      const byOrder = new Map<string, OrdersCalendarEvent>()
+      for (const ev of source) {
+        const key = ev.orderId || ev.id
+        const prev = byOrder.get(key)
+        if (!prev || ev.type === 'PURCHASE_ORDER') {
+          byOrder.set(key, ev)
+        }
+      }
+      source = Array.from(byOrder.values())
+    }
+
+    return source.map((event) => ({
+      id: event.id,
+      title: event.counterpartName ?? 'Order',
+      start: event.start,
+      end: event.end ?? undefined,
+      extendedProps: event,
+    }))
+  }, [data?.events, activeRole, currentView])
 
   const supplierLabel = activeRole === 'SUPPLIER' ? 'Restaurant' : 'Supplier'
   const totalPages = useMemo(() => {
@@ -237,6 +253,33 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       }
 
       const statusTheme = statusThemeMap[statusKey] || statusThemeMap.pending
+      const isCompactGrid =
+        content.view.type === 'dayGridMonth' || content.view.type === 'listWeek'
+      const orderRef = `#${(event.orderId ?? content.event.id ?? '').slice(0, 8).toUpperCase()}`
+      const statusLabel = event.status?.replace(/_/g, ' ') ?? ''
+
+      if (isCompactGrid) {
+        return (
+          <div
+            className={`supplify-calendar-event-compact group relative border-l-[3px] px-1.5 py-1 rounded-md ${statusTheme}`}
+            title={`${orderRef} ${event.counterpartName ?? ''} ${formattedAmount}`}
+          >
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="font-mono text-[10px] font-semibold text-[var(--text)] shrink-0">
+                {orderRef}
+              </span>
+              {statusLabel ? (
+                <span className="text-[9px] uppercase truncate text-[var(--text-muted)]">
+                  {statusLabel}
+                </span>
+              ) : null}
+            </div>
+            <p className="text-[10px] text-[var(--text-mid)] truncate leading-tight">
+              {event.counterpartName}
+            </p>
+          </div>
+        )
+      }
 
       return (
         <div
@@ -248,21 +291,15 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             </span>
             {event.status && (
               <span className="text-[10px] rounded-full bg-white/70 px-2 py-0.5 font-medium text-[var(--text-mid)] shadow-sm">
-                {event.status.replace(/_/g, ' ')}
+                {statusLabel}
               </span>
             )}
           </div>
           <div className="mt-1 text-sm font-semibold leading-tight text-[var(--text)] truncate">
-            {`#${event.orderId?.slice(0, 8) ?? content.event.id}`}
+            {orderRef}
           </div>
           <div className="text-xs text-[var(--text-mid)] truncate">{event.counterpartName}</div>
           <div className="mt-2 text-xs font-semibold text-[var(--text)]">{formattedAmount}</div>
-          <div className="pointer-events-none absolute -left-2 top-full z-10 w-48 origin-top-left rounded-lg border border-[var(--app-border)] bg-[var(--surface)] p-3 text-xs text-[var(--text-mid)] opacity-0 shadow-lg transition-all duration-150 group-hover:translate-y-1 group-hover:opacity-100">
-            <p className="font-semibold text-[var(--text)]">{event.type?.replace(/_/g, ' ')}</p>
-            <p className="mt-1">Status: {event.status}</p>
-            {event.branchName && <p>Branch: {event.branchName}</p>}
-            {event.categories?.length ? <p>Categories: {event.categories.join(', ')}</p> : null}
-          </div>
         </div>
       )
     },
@@ -497,7 +534,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             navLinks
             nowIndicator
             selectable={false}
-            dayMaxEvents={3}
+            dayMaxEvents={activeRole === 'SUPPLIER' ? 5 : 3}
+            eventMaxStack={activeRole === 'SUPPLIER' ? 4 : 2}
             slotEventOverlap={false}
             expandRows
             slotDuration="02:00:00"

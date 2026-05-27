@@ -321,7 +321,7 @@ export function RestaurantsPage() {
 
       {/* Statistics Cards */}
       {isSupplier && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -460,9 +460,13 @@ export function RestaurantsPage() {
           </CardContent>
         </Card>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedRestaurants.map((restaurant: any) => (
-            <Card key={restaurant.id} className="hover:shadow-lg transition-all duration-200 relative group">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+          {filteredAndSortedRestaurants.map((restaurant: any) => {
+            const city = restaurant.address_json?.city
+            const country = restaurant.address_json?.country
+            const locationLine = [city, country].filter(Boolean).join(', ')
+            return (
+            <Card key={restaurant.id} className="hover:shadow-lg transition-all duration-200 relative group min-w-0">
               {/* Active/New Badge */}
               {(() => {
                 const thirtyDaysAgo = new Date()
@@ -534,42 +538,35 @@ export function RestaurantsPage() {
                       </a>
                     </div>
                   )}
-                  {restaurant.address_json && (
-                    <div className="flex items-center gap-2">
+                  {locationLine ? (
+                    <div className="flex items-center gap-2 min-w-0">
                       <MapPin className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
-                      <span className="text-[var(--text-mid)]">
-                        {restaurant.address_json.city}, {restaurant.address_json.country}
-                      </span>
+                      <span className="text-[var(--text-mid)] truncate">{locationLine}</span>
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Statistics */}
-                <div className="grid grid-cols-3 gap-3 pt-3 border-t">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
-                      <ShoppingCart className="h-4 w-4" />
-                      <p className="text-xl font-bold">{restaurant.totalOrders || 0}</p>
-                    </div>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Orders</p>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-3 border-t">
+                  <div className="text-center min-w-0">
+                    <p className="text-lg sm:text-xl font-bold tabular-nums">{restaurant.totalOrders || 0}</p>
+                    <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">Orders</p>
                   </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
-                      <DollarSign className="h-4 w-4" />
-                      <p className="text-xl font-bold">{formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}</p>
-                    </div>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Revenue</p>
+                  <div className="text-center min-w-0">
+                    <p className="text-lg sm:text-xl font-bold tabular-nums truncate">
+                      {formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">Revenue</p>
                   </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
-                      <TrendingUp className="h-4 w-4" />
-                      <p className="text-lg font-semibold">
-                        {restaurant.latestOrder 
-                          ? new Date(restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                          : 'N/A'}
-                      </p>
-                    </div>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Last Order</p>
+                  <div className="text-center min-w-0">
+                    <p className="text-sm sm:text-base font-semibold tabular-nums">
+                      {restaurant.latestOrder
+                        ? new Date(
+                            restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at
+                          ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        : 'N/A'}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">Last order</p>
                   </div>
                 </div>
 
@@ -592,28 +589,28 @@ export function RestaurantsPage() {
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-3 border-t">
+                <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 min-w-0"
                     onClick={() => navigate(`/app/orders?restaurant=${restaurant.id}`)}
                   >
-                    <ShoppingCart className="h-4 w-4 mr-1" />
-                    View Orders
+                    <ShoppingCart className="h-4 w-4 mr-1 shrink-0" />
+                    <span className="truncate">Orders</span>
                   </Button>
                   <Button
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 min-w-0"
                     onClick={() => navigate(`/app/restaurants/${restaurant.id}`)}
                   >
-                    <BarChart3 className="h-4 w-4 mr-1" />
+                    <BarChart3 className="h-4 w-4 mr-1 shrink-0" />
                     Details
                   </Button>
                 </div>
               </CardContent>
             </Card>
-          ))}
+          )})}
         </div>
       ) : (
         <div className="space-y-4">

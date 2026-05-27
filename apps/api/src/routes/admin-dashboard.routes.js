@@ -3020,4 +3020,62 @@ router.get('/activity', async (req, res) => {
   }
 })
 
+// ========================================
+// PLATFORM SETTINGS
+// ========================================
+
+router.get('/platform-settings', requirePermission('ADMIN_ACCESS'), async (req, res) => {
+  try {
+    const { getPlatformSetting } = await import('../lib/platform-settings.js')
+    const freeSandboxDays = await getPlatformSetting('free_sandbox_days', 7)
+    res.json({
+      ok: true,
+      data: { freeSandboxDays: Number(freeSandboxDays) || 7 },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('GET platform-settings error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to load platform settings' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.patch('/platform-settings', requirePermission('ADMIN_ACCESS'), async (req, res) => {
+  try {
+    const days = Number(req.body?.freeSandboxDays ?? req.body?.free_sandbox_days)
+    if (!Number.isFinite(days) || days < 1 || days > 30) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'freeSandboxDays must be between 1 and 30',
+        },
+        requestId: req.requestId,
+      })
+    }
+    const { setPlatformSetting } = await import('../lib/platform-settings.js')
+    await setPlatformSetting('free_sandbox_days', Math.round(days))
+    res.json({
+      ok: true,
+      data: { freeSandboxDays: Math.round(days) },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('PATCH platform-settings error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to update platform settings' },
+      requestId: req.requestId,
+    })
+  }
+})
+
 export default router

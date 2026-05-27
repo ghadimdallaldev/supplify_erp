@@ -526,14 +526,14 @@ export function FulfillmentPage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <h4 className="font-semibold">
-                              {ex.orderLabel} â€” {ex.exceptionType.replace(/_/g, ' ')}
+                              {ex.orderLabel} - {ex.exceptionType.replace(/_/g, ' ')}
                             </h4>
                             <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
                               {ex.productName && <p>Product: {ex.productName}</p>}
                               {(ex.quantityExpected != null || ex.quantityActual != null) && (
                                 <p>
-                                  Expected: {ex.quantityExpected ?? 'â€”'}, Actual:{' '}
-                                  {ex.quantityActual ?? 'â€”'}
+                                  Expected: {ex.quantityExpected ?? '-'}, Actual:{' '}
+                                  {ex.quantityActual ?? '-'}
                                 </p>
                               )}
                               {ex.damageDescription && <p>{ex.damageDescription}</p>}
@@ -782,7 +782,7 @@ function DispatchColumn({
             <div>
               <p className="font-medium text-[var(--text)]">{route.route_number}</p>
               <p>
-                <span className="font-semibold text-[var(--text)]">{route.status}</span> â€¢
+                <span className="font-semibold text-[var(--text)]">{route.status}</span> ·
                 Scheduled {new Date(route.scheduled_date).toLocaleDateString()}
               </p>
             </div>

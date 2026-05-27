@@ -51,11 +51,6 @@ export const SUPPLIER_TEAM_MEMBERS = [
  * Applied per tenant_type via applyPlanFeaturePatches().
  */
 export const RESTAURANT_PLAN_FEATURE_PATCHES = {
-  free: {
-    order_calendar: false,
-    disputes_returns: false,
-    advanced_roles: false,
-  },
   bronze: {
     order_calendar: true,
     disputes_returns: true,
@@ -74,15 +69,6 @@ export const RESTAURANT_PLAN_FEATURE_PATCHES = {
 }
 
 export const SUPPLIER_PLAN_FEATURE_PATCHES = {
-  free: {
-    order_calendar: false,
-    disputes_returns: true,
-    advanced_roles: false,
-    warehouses: false,
-    multi_warehouse: false,
-    fulfillment: false,
-    driver_management: false,
-  },
   bronze: {
     order_calendar: true,
     disputes_returns: true,

@@ -1,5 +1,19 @@
 import type { Entitlements } from '../types'
 
+/** Internal meter for Free-tier scheduled quick-list overflow; not a user-facing plan quota. */
+export const HIDDEN_ENTITLEMENT_LIMIT_KEYS = new Set(['scheduled_order_grace_per_day'])
+
+export function shouldShowEntitlementLimit(limitKey: string): boolean {
+  return !HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(limitKey)
+}
+
+/** True when usage has hit a real plan cap (excludes hidden meters and N/A limits). */
+export function isAtEntitlementLimit(current: number, limit: number | null | undefined): boolean {
+  if (limit == null || limit === -1) return false
+  if (limit <= 0) return false
+  return current >= limit
+}
+
 function limitNumber(value: unknown): number | null {
   if (value == null) return null
   const n = Number(value)

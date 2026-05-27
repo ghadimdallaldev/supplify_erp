@@ -1168,6 +1168,85 @@ export async function notifyDisputeOpened(dispute) {
   }
 }
 
+/**
+ * Notify restaurants when a supplier deal is approved and live (or pending payment).
+ */
+export async function notifyDealApproved(deal, { supplierName } = {}) {
+  const supplierId = deal.supplier_id || deal.supplierId
+  const dealId = deal.id
+  const dealName = String(deal.name || 'New deal')
+  const supplierLabel = supplierName || deal.supplier_name || 'A supplier'
+  const link = `/app/deals?highlight=${encodeURIComponent(String(dealId))}`
+
+  if (!supplierId || !dealId) return { followers: 0, nonFollowers: 0 }
+
+  try {
+    const { rows: followers } = await query(
+      `SELECT restaurant_id FROM supplier_follow WHERE supplier_id = $1`,
+      [supplierId]
+    )
+    const followerIds = new Set(followers.map((r) => r.restaurant_id))
+
+    const { rows: nonFollowers } = await query(
+      `
+      SELECT id AS restaurant_id
+      FROM restaurant r
+      WHERE r.id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM supplier_follow sf
+          WHERE sf.supplier_id = $1 AND sf.restaurant_id = r.id
+        )
+      `,
+      [supplierId]
+    )
+
+    let followerCount = 0
+    let nonFollowerCount = 0
+
+    for (const { restaurant_id: restaurantId } of followers) {
+      await notifyTenantUsers({
+        tenantId: restaurantId,
+        tenantType: 'RESTAURANT',
+        notificationType: 'PROMOTION',
+        notificationCategory: 'promotions',
+        title: `New deal from ${supplierLabel}`,
+        message: `${dealName} is now available. Open Deals to view and redeem.`,
+        referenceId: dealId,
+        referenceType: 'DEAL',
+        metadata: { link, dealId, supplierId, audience: 'follower' },
+      })
+      followerCount += 1
+    }
+
+    for (const { restaurant_id: restaurantId } of nonFollowers) {
+      if (followerIds.has(restaurantId)) continue
+      await notifyTenantUsers({
+        tenantId: restaurantId,
+        tenantType: 'RESTAURANT',
+        notificationType: 'PROMOTION',
+        notificationCategory: 'promotions',
+        title: `New deal on Supplify`,
+        message: `${supplierLabel} published "${dealName}". Open Deals to explore.`,
+        referenceId: dealId,
+        referenceType: 'DEAL',
+        metadata: { link, dealId, supplierId, audience: 'non_follower' },
+      })
+      nonFollowerCount += 1
+    }
+
+    logger.info('notifyDealApproved completed', {
+      dealId,
+      supplierId,
+      followerCount,
+      nonFollowerCount,
+    })
+    return { followers: followerCount, nonFollowers: nonFollowerCount }
+  } catch (err) {
+    logger.error('notifyDealApproved failed', { err: err.message, dealId })
+    return { followers: 0, nonFollowers: 0, error: err.message }
+  }
+}
+
 export async function notifyDisputeResolved(dispute, outcome, { replacementOrderId = null } = {}) {
   const restaurantId = dispute.restaurantId || dispute.restaurant_id
   if (!restaurantId) return null

@@ -3,7 +3,12 @@ import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import { useGetProductsQuery, useGetProductCategoriesQuery } from '../../services/api'
+import {
+  useGetProductsQuery,
+  useGetProductCategoriesQuery,
+  useGetSupplierMeQuery,
+} from '../../services/api'
+import { useAppSelector } from '../../hooks/redux'
 import { Loader2, Search, X } from 'lucide-react'
 
 export type AppliesTo = 'all' | 'specific_products' | 'specific_categories'
@@ -21,11 +26,21 @@ type Props = {
 
 export function DealTargetingPickers({ value, onChange }: Props) {
   const [productSearch, setProductSearch] = useState('')
+  const { user } = useAppSelector((state) => state.auth)
+  const isSupplier = user?.role === 'SUPPLIER'
+  const { data: supplierMe } = useGetSupplierMeQuery(undefined, { skip: !isSupplier })
+  const supplierId = supplierMe?.supplier?.id as string | undefined
 
   const { data: categoriesData, isLoading: categoriesLoading } = useGetProductCategoriesQuery()
+  const productsEnabled =
+    value.appliesTo === 'specific_products' && (!isSupplier || Boolean(supplierId))
   const { data: productsData, isLoading: productsLoading } = useGetProductsQuery(
-    { q: productSearch || undefined, limit: 200 },
-    { skip: value.appliesTo !== 'specific_products' }
+    {
+      q: productSearch || undefined,
+      limit: 200,
+      supplier: supplierId,
+    },
+    { skip: !productsEnabled }
   )
 
   const categories = categoriesData?.categories || []
@@ -107,7 +122,9 @@ export function DealTargetingPickers({ value, onChange }: Props) {
               onChange={(e) => setProductSearch(e.target.value)}
             />
           </div>
-          {productsLoading ? (
+          {isSupplier && !supplierId ? (
+            <p className="text-xs text-[var(--text-muted)]">Loading your catalog…</p>
+          ) : productsLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <div className="max-h-40 overflow-y-auto border rounded-md divide-y">

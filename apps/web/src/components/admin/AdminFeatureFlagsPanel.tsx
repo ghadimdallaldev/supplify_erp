@@ -12,6 +12,7 @@ import {
   useUpdateAdminFeatureFlagMutation,
 } from '../../services/api'
 import type { EffectiveFeature } from '../../types'
+import { isRemovedFeatureKey } from '../../lib/removedFeatures'
 
 type TenantType = 'RESTAURANT' | 'SUPPLIER'
 
@@ -60,8 +61,14 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
   const [clearTenantOverride, { isLoading: clearingOverride }] =
     useClearTenantFeatureOverrideMutation()
 
+  const globalFlags = useMemo(
+    () => (flagsData?.flags ?? []).filter((f) => !isRemovedFeatureKey(f.featureKey)),
+    [flagsData?.flags]
+  )
+
   const effectiveFeatures = useMemo(
-    () => tenantData?.effectiveFeatures ?? [],
+    () =>
+      (tenantData?.effectiveFeatures ?? []).filter((f) => !isRemovedFeatureKey(f.featureKey)),
     [tenantData?.effectiveFeatures]
   )
 
@@ -127,7 +134,7 @@ export function AdminFeatureFlagsPanel({ restaurants, suppliers }: AdminFeatureF
                   </tr>
                 </thead>
                 <tbody>
-                  {(flagsData?.flags ?? []).map((flag) => (
+                  {globalFlags.map((flag) => (
                     <tr key={flag.featureKey} className="border-b last:border-0">
                       <td className="py-3 pr-4">
                         <div className="font-medium text-[var(--text)]">{flag.featureName}</div>

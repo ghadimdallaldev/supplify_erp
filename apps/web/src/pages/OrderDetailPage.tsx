@@ -5,7 +5,6 @@ import {
   useUpdateOrderMutation,
   useGetOrderInvoicesQuery,
   useSendOrderReminderMutation,
-  useGetOrderApprovalStatusQuery,
   useGetEntitlementsQuery,
   useGetOrderAmendmentsQuery,
   useCreateOrderAmendmentMutation,
@@ -110,16 +109,10 @@ export function OrderDetailPage() {
 
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const approvalsEnabled = featureEnabled(
-    entitlementsData?.entitlements?.features?.approvals_budgets
-  )
   const amendmentsEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.order_amendments
   )
   const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
-  const { data: approvalStatusData } = useGetOrderApprovalStatusQuery(id!, {
-    skip: !id || !approvalsEnabled,
-  })
   const {
     data: invoicesData,
     isLoading: isLoadingInvoices,
@@ -316,16 +309,6 @@ export function OrderDetailPage() {
   const addressLines = formatAddressLines(deliveryAddress)
   const operatingHoursLabel = formatOperatingHours((order as any).restaurant_operating_hours)
 
-  const approval = approvalStatusData?.approval as { status?: string; notes?: string } | null
-  const approvalBanner =
-    approval?.status === 'pending' || order.status === 'PENDING_APPROVAL'
-      ? { label: 'Awaiting Approval', tone: 'amber' as const }
-      : approval?.status === 'approved'
-        ? { label: 'Approved', tone: 'green' as const }
-        : approval?.status === 'rejected'
-          ? { label: 'Rejected', tone: 'red' as const }
-          : null
-
   const cancellationBanner = getOrderCancellationBanner(
     order,
     isSupplier ? 'SUPPLIER' : 'RESTAURANT'
@@ -363,27 +346,10 @@ export function OrderDetailPage() {
     receivingReports: orderReceivingReports,
     creditNotes: creditNotesData?.creditNotes ?? [],
     replacementOrders: replacementOrders ?? [],
-    approvalStatus: approval?.status ?? null,
   })
 
   return (
     <div className="space-y-6 p-6">
-      {approvalBanner && (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm ${
-            approvalBanner.tone === 'red'
-              ? 'border-red-200 bg-red-50 text-red-900'
-              : approvalBanner.tone === 'amber'
-                ? 'border-amber-200 bg-amber-50 text-amber-900'
-                : 'border-green-200 bg-green-50 text-green-900'
-          }`}
-        >
-          <strong>{approvalBanner.label}</strong>
-          {approval?.notes && approval.status === 'rejected' && (
-            <span className="block mt-1 text-xs">{approval.notes}</span>
-          )}
-        </div>
-      )}
       {cancellationBanner && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
           <strong>{cancellationBanner.title}</strong>

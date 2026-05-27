@@ -2,7 +2,12 @@ import crypto from 'node:crypto'
 import { query, withTransaction } from '../db.js'
 import { logger } from '../logger.js'
 import { getBillingGateway } from './gateway-registry.js'
-import { GRACE_PERIOD_DAYS, LOCK_REASON_PENDING_ACTIVATION } from './constants.js'
+import {
+  GRACE_PERIOD_DAYS,
+  LOCK_REASON_PENDING_ACTIVATION,
+  LOCK_REASON_FREE_SANDBOX_EXPIRED,
+} from './constants.js'
+import { getFreeSandboxDays } from '../platform-settings.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -77,6 +82,17 @@ export function computeBillingAccessState(subscription) {
 
   const lockReason = subscription.lock_reason || null
   const pendingActivation = lockReason === LOCK_REASON_PENDING_ACTIVATION
+  const freeSandboxExpired = lockReason === LOCK_REASON_FREE_SANDBOX_EXPIRED
+  const freeSandboxExpiresAt = subscription.free_sandbox_expires_at
+    ? new Date(subscription.free_sandbox_expires_at)
+    : null
+  let freeSandboxDaysRemaining = null
+  if (isFree && freeSandboxExpiresAt && !freeSandboxExpired) {
+    freeSandboxDaysRemaining = Math.max(
+      0,
+      Math.ceil((freeSandboxExpiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+    )
+  }
 
   return {
     requiresPayment: !isFree,
@@ -84,6 +100,9 @@ export function computeBillingAccessState(subscription) {
     inGracePeriod: pendingActivation ? false : inGracePeriod,
     isLocked,
     pendingActivation,
+    freeSandboxExpired,
+    freeSandboxExpiresAt: freeSandboxExpiresAt ? freeSandboxExpiresAt.toISOString() : null,
+    freeSandboxDaysRemaining,
     daysUntilLock,
     gracePeriodEndsAt: graceEnd ? graceEnd.toISOString() : null,
     pastDueSince: subscription.past_due_since
@@ -357,16 +376,18 @@ async function applyFreePlan(tenantId, tenantType, plan) {
   const subscription = await getSubscriptionForBilling(tenantId, tenantType)
   if (!subscription) return null
   const wasPendingActivation = subscription.lock_reason === LOCK_REASON_PENDING_ACTIVATION
+  const sandboxDays = await getFreeSandboxDays()
   await query(
     `UPDATE subscription SET
       plan_id = $1, plan_name = $2, status = 'ACTIVE', billing_cycle = 'MONTHLY',
       past_due_since = NULL, grace_period_ends_at = NULL,
       account_locked_at = NULL,
       lock_reason = NULL,
+      free_sandbox_expires_at = now() + ($4::int * INTERVAL '1 day'),
       current_period_start = now(), current_period_end = now() + INTERVAL '1 month',
       next_billing_date = NULL, updated_at = now()
      WHERE id = $3`,
-    [plan.id, plan.name, subscription.id]
+    [plan.id, plan.name, subscription.id, sandboxDays]
   )
   if (wasPendingActivation) {
     await query(
@@ -385,6 +406,7 @@ async function applyFreePlan(tenantId, tenantType, plan) {
     plan: plan.code,
     pendingActivation: false,
     activated: wasPendingActivation,
+    freeSandboxDays: sandboxDays,
   }
 }
 

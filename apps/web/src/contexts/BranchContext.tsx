@@ -58,16 +58,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   } = useGetRestaurantOrgBranchesQuery(undefined, { skip: !isRestaurant })
 
   const useSupplierOrgBranches =
-    isSupplier &&
-    !supplierOrgError &&
-    Boolean(supplierOrgData?.organizationId) &&
-    (supplierOrgData?.branches?.length ?? 0) > 0
+    isSupplier && !supplierOrgError && Boolean(supplierOrgData?.organizationId)
 
   const useRestaurantOrgBranches =
-    isRestaurant &&
-    !restaurantOrgError &&
-    Boolean(restaurantOrgData?.organizationId) &&
-    (restaurantOrgData?.branches?.length ?? 0) > 0
+    isRestaurant && !restaurantOrgError && Boolean(restaurantOrgData?.organizationId)
 
   const useOrgBranches = useSupplierOrgBranches || useRestaurantOrgBranches
 

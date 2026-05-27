@@ -35,7 +35,6 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/admin': 'Admin Dashboard',
   '/app/admin/suppliers': 'Supplier Admin',
   '/app/admin/restaurants': 'Restaurant Admin',
-  '/app/approvals': 'Approvals',
   '/app/reports': 'Reports',
   '/app/disputes': 'Disputes',
   '/app/deals': 'Deals',
@@ -355,8 +354,28 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                         background: !notification.is_read ? 'var(--brand-ultra)' : 'transparent',
                       }}
                       onClick={() => {
+                        const meta =
+                          typeof notification.metadata === 'string'
+                            ? (() => {
+                                try {
+                                  return JSON.parse(notification.metadata || '{}')
+                                } catch {
+                                  return {}
+                                }
+                              })()
+                            : notification.metadata || {}
+                        const link = typeof meta.link === 'string' ? meta.link : null
+                        if (link) {
+                          navigate(link)
+                          setShowNotifications(false)
+                          return
+                        }
                         if (notification.reference_type === 'ORDER' && notification.reference_id) {
                           navigate(`/app/orders/${notification.reference_id}`)
+                          setShowNotifications(false)
+                        }
+                        if (notification.reference_type === 'DEAL' && notification.reference_id) {
+                          navigate(`/app/deals?highlight=${notification.reference_id}`)
                           setShowNotifications(false)
                         }
                       }}

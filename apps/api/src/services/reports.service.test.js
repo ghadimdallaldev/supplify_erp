@@ -53,6 +53,13 @@ describe('reports.service', () => {
       expect(params.branchId).toBe('branch-uuid')
     })
 
+    it('includes the full end day for to', () => {
+      const params = parseReportQuery({ from: '2026-01-01', to: '2026-01-31' })
+      expect(params.to.getHours()).toBe(23)
+      expect(params.to.getMinutes()).toBe(59)
+      expect(params.to.getDate()).toBe(31)
+    })
+
     it('rejects invalid granularity', () => {
       expect(() => parseReportQuery({ granularity: 'year' })).toThrow('granularity')
     })
