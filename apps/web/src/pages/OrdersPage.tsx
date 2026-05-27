@@ -11,6 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
+import { StatusBadge } from '../components/ui/status-badge'
 import { Input } from '../components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
@@ -191,33 +194,6 @@ export function OrdersPage() {
       product.sku?.toLowerCase().includes(productSearch.toLowerCase())
   )
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PLACED':
-        return 'default'
-      case 'ACKNOWLEDGED':
-        return 'secondary'
-      case 'PROCESSING':
-        return 'default'
-      case 'SHIPPED':
-        return 'default'
-      case 'DELIVERED':
-        return 'secondary'
-      case 'RECEIVED_PARTIAL':
-        return 'secondary'
-      case 'RECEIVED_FULL':
-        return 'default'
-      case 'INVOICED':
-        return 'default'
-      case 'COMPLETED':
-        return 'default'
-      case 'CANCELLED':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'ACKNOWLEDGED':
@@ -332,44 +308,47 @@ export function OrdersPage() {
   if (error) {
     const errorMessage = (error as any)?.data?.error?.message || 'Failed to load orders'
     return (
-      <div className="text-center py-12">
-        <p className="text-[var(--red)] text-lg font-semibold mb-2">Failed to load orders</p>
-        <p className="text-[var(--text-muted)] text-sm">{errorMessage}</p>
-        <Button onClick={() => refetch()} className="mt-4">
-          Try Again
-        </Button>
-      </div>
+      <EmptyState
+        title="Failed to load orders"
+        description={errorMessage}
+        icon={<AlertCircle className="h-10 w-10" aria-hidden />}
+        action={
+          <Button onClick={() => refetch()} variant="outline">
+            Try again
+          </Button>
+        }
+      />
     )
   }
 
   return (
-    <div className="space-y-6 p-6" data-testid="orders-page">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Orders Inbox</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            {isSupplier
-              ? 'Manage inbound orders from restaurants'
-              : 'Track your orders and their status'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {isSupplier && canCreateOrders && (
-            <Button onClick={() => setShowManualOrderDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Order
-            </Button>
-          )}
-          {!isSupplier && canCreateOrders && (
-            <Button asChild>
-              <Link to="/app/cart" data-testid="orders-create-new-order">
+    <div className="space-y-6" data-testid="orders-page">
+      <PageHeader
+        title="Orders Inbox"
+        description={
+          isSupplier
+            ? 'Manage inbound orders from restaurants'
+            : 'Track your orders and their status'
+        }
+        actions={
+          <>
+            {isSupplier && canCreateOrders && (
+              <Button onClick={() => setShowManualOrderDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Create New Order
-              </Link>
-            </Button>
-          )}
-        </div>
-      </div>
+                Create Order
+              </Button>
+            )}
+            {!isSupplier && canCreateOrders && (
+              <Button asChild>
+                <Link to="/app/cart" data-testid="orders-create-new-order">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Order
+                </Link>
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Filters and Search */}
       <Card>
@@ -436,13 +415,12 @@ export function OrdersPage() {
                         <CardTitle className="text-lg">
                           Order #{order.id.slice(-8).toUpperCase()}
                         </CardTitle>
-                        <Badge
-                          variant={getStatusColor(order.status)}
-                          className="flex items-center gap-1"
-                        >
-                          {getStatusIcon(order.status)}
-                          {order.status}
-                        </Badge>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="text-[var(--text-muted)]" aria-hidden>
+                            {getStatusIcon(order.status)}
+                          </span>
+                          <StatusBadge status={order.status} />
+                        </span>
                         {order.status === 'PLACED' && isSupplier && (
                           <Badge variant="destructive">Action Required</Badge>
                         )}
@@ -604,23 +582,31 @@ export function OrdersPage() {
           </div>
 
           {(!filteredOrders || filteredOrders.length === 0) && (
-            <div className="text-center py-12 rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90">
-              <ShoppingCart className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
-              <p className="text-[var(--text-muted)] font-medium">No orders yet</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
-                {!isSupplier
-                  ? 'Create your first order to get started.'
-                  : 'Orders from restaurants will appear here.'}
-              </p>
-              {!isSupplier && (
-                <Button asChild className="mt-4">
-                  <Link to="/app/cart">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create first order
-                  </Link>
-                </Button>
-              )}
-            </div>
+            <EmptyState
+              title={
+                search || status || activeTab !== 'all'
+                  ? 'No orders match your filters'
+                  : 'No orders yet'
+              }
+              description={
+                search || status || activeTab !== 'all'
+                  ? 'Try adjusting search or status filters.'
+                  : !isSupplier
+                    ? 'Create your first order to get started.'
+                    : 'Orders from restaurants will appear here.'
+              }
+              icon={<ShoppingCart className="h-10 w-10" aria-hidden />}
+              action={
+                !isSupplier && canCreateOrders && !search && !status && activeTab === 'all' ? (
+                  <Button asChild>
+                    <Link to="/app/cart">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create first order
+                    </Link>
+                  </Button>
+                ) : undefined
+              }
+            />
           )}
         </TabsContent>
       </Tabs>

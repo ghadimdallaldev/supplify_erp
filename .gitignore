@@ -13,6 +13,8 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+docker/.env
+apps/api/.env.docker-sync
 
 # Logs
 npm-debug.log*

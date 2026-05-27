@@ -21,6 +21,7 @@ import {
   isQuickListAutomationEnabled,
 } from '../lib/subscription.js'
 import { z } from 'zod'
+import { mapQuickListRow } from '../lib/quick-list-schedule.js'
 
 const router = express.Router()
 
@@ -185,7 +186,7 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         )
 
         return {
-          ...list,
+          ...mapQuickListRow(list),
           items: items || [],
         }
       })
@@ -238,7 +239,7 @@ router.get('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
       throw new NotFoundError('Quick list not found')
     }
 
-    const quickList = lists[0]
+    const quickList = mapQuickListRow(lists[0])
 
     // Get items
     const { rows: items } = await query(

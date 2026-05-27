@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { normalizeDaysOfWeek } from '../lib/quick-list-schedule.js'
 import { evaluateScheduledOrderLimit, incrementUsage } from '../lib/subscription.js'
 import { notifyScheduledOrderEvent } from './notification.service.js'
 
@@ -315,7 +316,7 @@ async function updateNextExecutionDate(quickList) {
         'SATURDAY',
       ]
       const currentDay = today.getDay()
-      const scheduledDays = quickList.days_of_week || []
+      const scheduledDays = normalizeDaysOfWeek(quickList.days_of_week) || []
 
       // Find the next scheduled day within the next 7 days
       for (let i = 1; i <= 7; i++) {

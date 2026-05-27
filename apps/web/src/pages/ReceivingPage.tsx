@@ -20,6 +20,9 @@ import {
   CheckCircle,
 } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
+import { Skeleton } from '../components/ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -233,12 +236,10 @@ export function ReceivingPage() {
       <div className="space-y-6">
         <Card className="shadow-sm">
           <CardContent className="space-y-4 p-4 md:p-5">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h1 className="flex items-center gap-2 text-[21px] font-black text-[var(--text)]">
-                <PackageCheck className="h-7 w-7 shrink-0 text-[var(--brand-mid)]" />
-                Receiving & Quality Control
-              </h1>
-            </div>
+            <PageHeader
+              title="Receiving & Quality Control"
+              description="Confirm deliveries, record quality issues, and open disputes when needed."
+            />
 
             <Tabs defaultValue="pending" className="space-y-4">
               <TabsList className="h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
@@ -257,17 +258,16 @@ export function ReceivingPage() {
 
               <TabsContent value="pending" className="space-y-4">
                 {pendingLoading ? (
-                  <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
+                  <div className="space-y-2 py-4">
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                  </div>
                 ) : pendingOrders.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <PackageCheck className="h-16 w-16 text-[var(--text-muted)] mb-4" />
-                      <p className="text-lg font-semibold mb-2">No Pending Orders</p>
-                      <p className="text-sm text-[var(--text-muted)]">
-                        All delivered orders have been received
-                      </p>
-                    </CardContent>
-                  </Card>
+                  <EmptyState
+                    title="No orders awaiting receiving"
+                    description="Delivered orders ready to receive will show up here."
+                    icon={<PackageCheck className="h-10 w-10" aria-hidden />}
+                  />
                 ) : (
                   <div className="grid gap-4">
                     {pendingOrders.map((order: any) => {

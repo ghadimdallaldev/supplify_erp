@@ -39,6 +39,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
+import { PageHeader } from '../components/ui/page-header'
 import { formatCurrency, formatPrice } from '../utils/format'
 import {
   useGetRestaurantInvoicesQuery,
@@ -276,21 +277,17 @@ export function InvoicesPage() {
 
   return (
     <RequirePermission permission="INVOICES_VIEW" title="invoices">
-      <div className="space-y-6 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">Invoice Dashboard</h1>
-            <p className="text-[var(--text-muted)] mt-2">
-              Manage billing, payments, and financial analytics
-            </p>
-          </div>
-          <div className="flex gap-2">
+      <div className="space-y-6">
+        <PageHeader
+          title="Invoice Dashboard"
+          description="Manage billing, payments, and financial analytics"
+          actions={
             <Button variant="outline" onClick={() => refetch()}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {disputesEnabled && tenantCreditNotes.length > 0 && (
           <Card>

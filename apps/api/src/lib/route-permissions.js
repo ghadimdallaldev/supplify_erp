@@ -89,7 +89,15 @@ export function billingAccessGuard(req, res, next) {
 /** Skip billing guard for self-serve entitlement/limit reads (any authenticated tenant). */
 export function subscriptionRouteGuard(req, res, next) {
   const path = req.path || ''
-  if (path === '/entitlements' || path === '/current' || path === '/plans') return next()
+  if (
+    path === '/entitlements' ||
+    path === '/current' ||
+    path === '/plans' ||
+    path === '/recommendation' ||
+    path === '/conversion-event'
+  ) {
+    return next()
+  }
   return billingAccessGuard(req, res, next)
 }
 
