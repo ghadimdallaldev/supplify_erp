@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { ROUTER_FUTURE } from './lib/routerFuture'
 import { AuthGuard } from './components/AuthGuard'
+import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
@@ -186,6 +187,14 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: '/staff/login',
+    element: (
+      <LazyPage>
+        <StaffSelfServiceLogin />
+      </LazyPage>
+    ),
+  },
+  {
     path: '/register/complete',
     element: (
       <LazyPage>
@@ -213,7 +222,9 @@ const router = createBrowserRouter([
     path: '/staff/dashboard',
     element: (
       <LazyPage>
-        <StaffSelfServiceDashboard />
+        <StaffPortalGuard>
+          <StaffSelfServiceDashboard />
+        </StaffPortalGuard>
       </LazyPage>
     ),
   },
