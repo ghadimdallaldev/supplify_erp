@@ -12,8 +12,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button'
 import { ReservationBoard } from '../components/reservations/ReservationBoard'
 import { ReservationTableBuilder } from '../components/reservations/ReservationTableBuilder'
+import { PublicBookingSettingsCard } from '../components/reservations/PublicBookingSettingsCard'
 import { ReservationAnalyticsPanel } from '../components/reservations/ReservationAnalyticsPanel'
 import { ReservationCreateDrawer } from '../components/reservations/ReservationCreateDrawer'
+import { ReservationAssignmentsSummary } from '../components/reservations/ReservationAssignmentsSummary'
 import { CalendarDays, Loader2, Link2, Copy, Star, Users, Sparkles } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
@@ -99,14 +101,23 @@ export function ReservationsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm">
-            <CalendarDays className="mr-2 h-4 w-4 text-[var(--brand-mid)]" />
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm">
+            <CalendarDays className="h-4 w-4 text-[var(--brand-mid)]" />
             <Input
               type="date"
               value={selectedDate}
               onChange={(event) => setSelectedDate(event.target.value)}
               className="border-none p-0 text-sm focus-visible:ring-0"
             />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 text-xs"
+              onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
+            >
+              Today
+            </Button>
           </div>
           <ReservationCreateDrawer
             tables={tables}
@@ -259,18 +270,33 @@ export function ReservationsPage() {
         </CardContent>
       </Card>
 
+      {!boardLoading ? (
+        <ReservationAssignmentsSummary
+          reservations={reservations}
+          tables={tables}
+          boardDate={selectedDate}
+        />
+      ) : null}
+
       {boardLoading ? (
         <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-[var(--app-border)]">
           <Loader2 className="mr-2 h-5 w-5 animate-spin text-[var(--brand-mid)]" />
           <p className="text-sm text-[var(--text-muted)]">Loading reservations…</p>
         </div>
       ) : (
-        <ReservationBoard reservations={reservations} tables={tables} waitlist={waitlist} />
+        <ReservationBoard
+          reservations={reservations}
+          tables={tables}
+          waitlist={waitlist}
+          boardDate={selectedDate}
+        />
       )}
 
       <div className="space-y-6">
+        <PublicBookingSettingsCard />
+
         <div className="-mx-4 lg:-mx-6">
-          <ReservationTableBuilder tables={tables} />
+          <ReservationTableBuilder tables={tables} reservations={reservations} defaultLiveView />
         </div>
 
         <ReservationAnalyticsPanel

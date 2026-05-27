@@ -3,6 +3,8 @@ import {
   sendNotification,
   notifyGuestReservationConfirmation,
   sendWhatsAppMessage,
+  listTenantUserIds,
+  notifyTenantUsers,
 } from './notification.service.js'
 
 const queryMock = vi.fn()
@@ -254,6 +256,44 @@ describe('Notification Service', () => {
 
       expect(result.whatsapp).toBe(true)
       expect(result.whatsappUrl).toContain('https://wa.me/96176911906')
+    })
+  })
+
+  describe('listTenantUserIds', () => {
+    it('returns distinct user ids for tenant roles and contact email', async () => {
+      queryMock.mockResolvedValueOnce({
+        rows: [{ id: 'user-1' }, { id: 'user-2' }],
+      })
+
+      const ids = await listTenantUserIds('rest-1', 'RESTAURANT')
+      expect(ids).toEqual(['user-1', 'user-2'])
+      expect(String(queryMock.mock.calls[0][0])).toContain('tenant_user_roles')
+    })
+  })
+
+  describe('notifyTenantUsers', () => {
+    it('fans out to every tenant user', async () => {
+      const { getEntitlements } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
+
+      queryMock
+        .mockResolvedValueOnce({ rows: [{ id: 'user-a' }, { id: 'user-b' }] })
+        .mockResolvedValue({
+          rows: [{ ...basePrefs, in_app_enabled: true, notify_order_new: true }],
+        })
+
+      const sent = await notifyTenantUsers({
+        tenantId: 'rest-1',
+        tenantType: 'RESTAURANT',
+        notificationType: 'ORDER',
+        notificationCategory: 'PLACED',
+        title: 'New order',
+        message: 'Order placed',
+        referenceId: 'order-1',
+        referenceType: 'ORDER',
+      })
+
+      expect(sent.length).toBeGreaterThan(0)
     })
   })
 

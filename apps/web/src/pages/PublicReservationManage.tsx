@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -36,9 +36,23 @@ export function PublicReservationManage() {
   const [rescheduleSlot, setRescheduleSlot] = useState('')
   const [notes, setNotes] = useState(reservation?.notes ?? '')
 
+  useEffect(() => {
+    if (reservation?.scheduled_at) {
+      setRescheduleDate(new Date(reservation.scheduled_at).toISOString().slice(0, 10))
+    }
+    if (reservation?.notes != null) {
+      setNotes(reservation.notes)
+    }
+  }, [reservation?.scheduled_at, reservation?.notes])
+
   const partySize = reservation?.party_size ?? 2
   const { data: availability } = useGetPublicReservationAvailabilityQuery(
-    { restaurantId: reservation?.restaurant_id ?? '', partySize, date: rescheduleDate },
+    {
+      restaurantId: reservation?.restaurant_id ?? '',
+      partySize,
+      date: rescheduleDate,
+      manageToken: token,
+    },
     { skip: !reservation }
   )
 
@@ -98,11 +112,16 @@ export function PublicReservationManage() {
       setNotes('')
       setRescheduleSlot('')
       refetch()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error?.data?.message || error?.data?.error?.message || 'Unable to reschedule reservation'
+        extractApiError(error, 'Unable to reschedule — try another time or contact the restaurant')
       )
     }
+  }
+
+  function extractApiError(error: unknown, fallback: string) {
+    const err = error as { data?: { message?: string; error?: { message?: string } } }
+    return err?.data?.message || err?.data?.error?.message || fallback
   }
 
   const handleCancel = async () => {
@@ -230,7 +249,8 @@ export function PublicReservationManage() {
           <CardHeader>
             <CardTitle>Reschedule reservation</CardTitle>
             <CardDescription>
-              Pick a new date and time. Availability updates in real-time.
+              Pick a new date and time. Your current booking is excluded from capacity so you can
+              move to another slot on the same day.
             </CardDescription>
           </CardHeader>
           <CardContent>

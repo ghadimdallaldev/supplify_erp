@@ -1,6 +1,6 @@
 import { query } from '../lib/db.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
-import { sendNotification } from './notification.service.js'
+import { notifyTenantUsers } from './notification.service.js'
 
 export const DELIVERED_ORDER_STATUSES = [
   'COMPLETED',
@@ -268,32 +268,24 @@ export async function notifyLeaveReviewIfEligible({ orderId, supplierId, restaur
   ])
   if (existing.length) return null
 
-  const { rows: users } = await query(
-    `
-    SELECT u.id AS user_id
-    FROM app_user u
-    WHERE u.email = (SELECT contact_email FROM restaurant WHERE id = $1)
-    LIMIT 1
-    `,
-    [restaurantId]
-  )
-  if (!users.length) return null
-
   const { rows: suppliers } = await query(`SELECT name FROM supplier WHERE id = $1`, [supplierId])
   const supplierName = suppliers[0]?.name || 'your supplier'
 
-  return sendNotification({
-    userId: users[0].user_id,
-    userType: 'RESTAURANT',
+  const sent = await notifyTenantUsers({
+    tenantId: restaurantId,
+    tenantType: 'RESTAURANT',
     notificationType: 'SYSTEM',
     notificationCategory: 'system_updates',
     title: 'How was your delivery?',
     message: `Leave a review for ${supplierName} on your recent order.`,
+    referenceId: orderId,
+    referenceType: 'ORDER',
     metadata: {
       orderId,
       supplierId,
       action: 'leave_review',
+      link: `/app/orders/${orderId}?review=1`,
     },
-    link: `/app/orders/${orderId}?review=1`,
   })
+  return sent[0] || null
 }

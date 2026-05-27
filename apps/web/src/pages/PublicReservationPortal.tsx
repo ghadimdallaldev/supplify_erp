@@ -11,10 +11,21 @@ import {
   useGetPublicRestaurantQuery,
   useLazyGetPublicReservationAvailabilityQuery,
   useCreatePublicReservationMutation,
+  useJoinPublicWaitlistMutation,
 } from '../services/api'
+import type { PublicAvailabilitySlot } from '../types'
 
 function formatTime(isoString: string) {
   return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatSlotLabel(slot: PublicAvailabilitySlot, totalCapacity?: number) {
+  if (slot.status === 'past') return 'Past'
+  if (!slot.isAvailable) return 'Full'
+  const left = slot.seatsLeft ?? slot.capacityAvailable
+  if (totalCapacity != null && left >= totalCapacity) return 'Available'
+  if (slot.status === 'limited') return `${left} left — limited`
+  return `${left} seat${left === 1 ? '' : 's'} left`
 }
 
 export function PublicReservationPortal() {
@@ -30,6 +41,8 @@ export function PublicReservationPortal() {
     useLazyGetPublicReservationAvailabilityQuery()
   const [createReservation, { isLoading: creatingReservation }] =
     useCreatePublicReservationMutation()
+  const [joinWaitlist, { isLoading: joiningWaitlist }] = useJoinPublicWaitlistMutation()
+  const [showWaitlistForm, setShowWaitlistForm] = useState(false)
 
   const [form, setForm] = useState({
     partySize: 2,
@@ -40,8 +53,12 @@ export function PublicReservationPortal() {
     customerPhone: '',
     notes: '',
   })
+  const [availabilityChecked, setAvailabilityChecked] = useState(false)
 
   const slots = availabilityData?.slots ?? []
+  const totalCapacity = availabilityData?.totalCapacity
+  const bookingWindow = availabilityData?.bookingWindow
+  const hasBookableSlot = slots.some((slot) => slot.isAvailable)
   const selectedSlotDetails = useMemo(
     () => slots.find((slot) => slot.startTime === form.selectedSlot),
     [slots, form.selectedSlot]
@@ -55,23 +72,47 @@ export function PublicReservationPortal() {
     }
 
     try {
-      await fetchAvailability({
+      const result = await fetchAvailability({
         restaurantId: restaurant.id,
         partySize: form.partySize,
         date: form.date,
       }).unwrap()
+      setAvailabilityChecked(true)
+      if (result.totalCapacity != null && form.partySize > result.totalCapacity) {
+        toast.error(
+          `Maximum capacity is ${result.totalCapacity} guests. Join the waitlist or reduce party size.`
+        )
+        setShowWaitlistForm(true)
+        return
+      }
+      setShowWaitlistForm(false)
       toast.success('Availability refreshed')
     } catch (error: any) {
+      setAvailabilityChecked(false)
       toast.error(
         error?.data?.message || error?.data?.error?.message || 'Unable to check availability'
       )
     }
   }
 
+  const guestContactComplete =
+    form.customerName.trim().length > 0 &&
+    form.customerEmail.trim().length > 0 &&
+    form.customerPhone.trim().length > 0
+  const canConfirm = Boolean(form.selectedSlot && guestContactComplete)
+
   const handleCreateReservation = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!restaurant?.id || !form.selectedSlot) {
       toast.error('Please select a time slot')
+      return
+    }
+    if (!form.customerEmail.trim()) {
+      toast.error('Email is required')
+      return
+    }
+    if (!form.customerPhone.trim()) {
+      toast.error('Phone is required')
       return
     }
 
@@ -80,9 +121,9 @@ export function PublicReservationPortal() {
         restaurantId: restaurant.id,
         partySize: form.partySize,
         scheduledAt: form.selectedSlot,
-        customerName: form.customerName,
-        customerEmail: form.customerEmail || undefined,
-        customerPhone: form.customerPhone || undefined,
+        customerName: form.customerName.trim(),
+        customerEmail: form.customerEmail.trim(),
+        customerPhone: form.customerPhone.trim(),
         notes: form.notes || undefined,
       }).unwrap()
 
@@ -90,9 +131,37 @@ export function PublicReservationPortal() {
       const reservation = response.reservation
       navigate(`/reserve/confirmation?token=${reservation.manageToken}`)
     } catch (error: any) {
-      toast.error(
-        error?.data?.message || error?.data?.error?.message || 'Unable to create reservation'
-      )
+      const message =
+        error?.data?.error?.message || error?.data?.message || 'Unable to create reservation'
+      toast.error(message)
+      if (
+        message.toLowerCase().includes('just booked') ||
+        message.toLowerCase().includes('unavailable')
+      ) {
+        setForm((prev) => ({ ...prev, selectedSlot: '' }))
+        void handleCheckAvailability()
+      }
+    }
+  }
+
+  const handleJoinWaitlist = async () => {
+    if (!restaurant?.id || !form.customerName.trim()) {
+      toast.error('Enter your name to join the waitlist')
+      return
+    }
+    try {
+      await joinWaitlist({
+        restaurantId: restaurant.id,
+        partySize: form.partySize,
+        customerName: form.customerName.trim(),
+        customerPhone: form.customerPhone.trim() || 'n/a',
+        desiredAt: form.selectedSlot || undefined,
+        notes: form.notes || undefined,
+      }).unwrap()
+      toast.success('You are on the waitlist. We will contact you when a table opens.')
+      setShowWaitlistForm(false)
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || error?.data?.message || 'Could not join waitlist')
     }
   }
 
@@ -159,12 +228,14 @@ export function PublicReservationPortal() {
                   min={1}
                   max={50}
                   value={form.partySize}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    setAvailabilityChecked(false)
                     setForm((prev) => ({
                       ...prev,
                       partySize: Number(event.target.value) || prev.partySize,
+                      selectedSlot: '',
                     }))
-                  }
+                  }}
                 />
               </div>
               <div>
@@ -172,9 +243,10 @@ export function PublicReservationPortal() {
                 <Input
                   type="date"
                   value={form.date}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    setAvailabilityChecked(false)
                     setForm((prev) => ({ ...prev, date: event.target.value, selectedSlot: '' }))
-                  }
+                  }}
                 />
               </div>
             </div>
@@ -189,11 +261,25 @@ export function PublicReservationPortal() {
 
             <div className="space-y-2">
               <Label>Available times</Label>
+              {bookingWindow?.openTime && bookingWindow?.closeTime && !bookingWindow.closed ? (
+                <p className="text-[10px] text-[var(--text-muted)]">
+                  Booking window: {bookingWindow.openTime} – {bookingWindow.closeTime}
+                  {totalCapacity != null ? ` · ${totalCapacity} seats in your dining room` : ''}
+                </p>
+              ) : null}
               {slots.length === 0 ? (
                 <p className="text-xs text-[var(--text-muted)]">
-                  Choose a date, then click “Check availability” to view open time slots.
+                  {!availabilityChecked
+                    ? 'Choose a date, then click “Check availability” to view open time slots.'
+                    : 'No time slots for this date. The restaurant may need tables configured in Reservations, or try a smaller party size or another date.'}
                 </p>
-              ) : (
+              ) : !hasBookableSlot ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  All listed times are full for your party size. Try another date or join the
+                  waitlist below.
+                </p>
+              ) : null}
+              {slots.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2">
                   {slots.map((slot) => (
                     <button
@@ -210,15 +296,51 @@ export function PublicReservationPortal() {
                       onClick={() => setForm((prev) => ({ ...prev, selectedSlot: slot.startTime }))}
                     >
                       <span className="font-medium">{formatTime(slot.startTime)}</span>
-                      <span>Up to {slot.capacityAvailable} seats</span>
-                      {!slot.isAvailable ? (
-                        <span className="text-[10px] uppercase text-[var(--red)]">Waitlist</span>
-                      ) : null}
+                      <span
+                        className={
+                          slot.status === 'past'
+                            ? 'text-[var(--text-muted)]'
+                            : !slot.isAvailable
+                              ? 'text-[var(--red)] font-medium'
+                              : ''
+                        }
+                      >
+                        {formatSlotLabel(slot, totalCapacity)}
+                      </span>
                     </button>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
+
+            {(showWaitlistForm || (availabilityChecked && !hasBookableSlot)) &&
+            totalCapacity != null &&
+            form.partySize <= totalCapacity ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                <p className="text-xs font-medium text-amber-900">Join the waitlist</p>
+                <p className="text-[10px] text-amber-800">
+                  No tables for your party right now. Leave your details and the restaurant will
+                  reach out when space opens.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-amber-300"
+                  disabled={joiningWaitlist || !form.customerName.trim()}
+                  onClick={handleJoinWaitlist}
+                >
+                  {joiningWaitlist ? 'Joining…' : 'Join waitlist'}
+                </Button>
+              </div>
+            ) : null}
+
+            {totalCapacity != null && form.partySize > totalCapacity ? (
+              <p className="text-xs text-[var(--red)]">
+                Party size ({form.partySize}) exceeds dining room capacity ({totalCapacity}). Use
+                the waitlist or choose fewer guests.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -243,24 +365,31 @@ export function PublicReservationPortal() {
                   />
                 </div>
                 <div>
-                  <Label>Email</Label>
+                  <Label>
+                    Email <span className="text-[var(--red)]">*</span>
+                  </Label>
                   <Input
                     type="email"
                     value={form.customerEmail}
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, customerEmail: event.target.value }))
                     }
-                    placeholder="Optional"
+                    required
+                    autoComplete="email"
                   />
                 </div>
                 <div>
-                  <Label>Phone</Label>
+                  <Label>
+                    Phone <span className="text-[var(--red)]">*</span>
+                  </Label>
                   <Input
+                    type="tel"
                     value={form.customerPhone}
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, customerPhone: event.target.value }))
                     }
-                    placeholder="Optional"
+                    required
+                    autoComplete="tel"
                   />
                 </div>
                 <div>
@@ -290,11 +419,19 @@ export function PublicReservationPortal() {
 
               <Button
                 type="submit"
-                disabled={creatingReservation || !form.selectedSlot}
+                disabled={creatingReservation || !canConfirm}
                 className="w-full"
               >
                 {creatingReservation ? 'Reserving…' : 'Confirm reservation'}
               </Button>
+
+              {!canConfirm && !creatingReservation ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  {!form.selectedSlot
+                    ? 'Select an available time on the left after checking availability.'
+                    : 'Enter your name, email, and phone to confirm.'}
+                </p>
+              ) : null}
 
               <p className="text-xs text-[var(--text-muted)]">
                 By completing this booking you agree to receive reservation updates for this visit.

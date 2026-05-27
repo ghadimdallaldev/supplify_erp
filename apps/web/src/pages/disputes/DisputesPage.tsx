@@ -192,8 +192,21 @@ export function DisputesPage() {
   }
 
   const handleCreate = async () => {
-    if (!createForm.orderId || !createForm.supplierId || !createForm.description.trim()) {
-      toast.error('Order, supplier, and description are required')
+    const fieldLabels = {
+      order: 'Order',
+      supplier: 'Supplier',
+      description: 'Description',
+    } as const
+    const missing: (keyof typeof fieldLabels)[] = []
+    if (!createForm.orderId) missing.push('order')
+    if (!createForm.supplierId) missing.push('supplier')
+    if (!createForm.description.trim()) missing.push('description')
+    if (missing.length > 0) {
+      toast.error(
+        missing.length === 1
+          ? `${fieldLabels[missing[0]]} is required`
+          : `Please complete: ${missing.map((k) => fieldLabels[k]).join(', ')}`
+      )
       return
     }
     try {
@@ -382,7 +395,21 @@ export function DisputesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog
+        open={showCreate}
+        onOpenChange={(open) => {
+          setShowCreate(open)
+          if (!open) {
+            setCreateForm({
+              orderId: '',
+              supplierId: '',
+              type: 'short_delivery',
+              description: '',
+              disputedAmount: '',
+            })
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Open dispute</DialogTitle>
@@ -460,10 +487,14 @@ export function DisputesPage() {
               />
             </div>
             <div>
-              <Label>Description</Label>
+              <Label>
+                Description <span className="text-[var(--text-muted)]">(required)</span>
+              </Label>
               <Textarea
+                required
                 value={createForm.description}
                 onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="What went wrong with this delivery or invoice?"
               />
             </div>
           </div>

@@ -176,11 +176,11 @@ export async function notifyApproverOfPendingOrder({
       userId: approverId,
       userType: 'RESTAURANT',
       notificationType: 'order_approval',
-      notificationCategory: 'orders',
+      notificationCategory: 'order_approval',
       title: 'Order awaiting your approval',
       message: `Order requires approval (${Number(orderTotal).toFixed(2)}). Review and approve or reject.`,
       referenceId: orderId,
-      referenceType: 'order',
+      referenceType: 'ORDER',
       metadata: { restaurantName, action: 'approve_order' },
     })
   } catch {
