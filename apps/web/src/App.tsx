@@ -103,6 +103,9 @@ const ReportsPage = lazy(() =>
 const DisputesPage = lazy(() =>
   import('./pages/disputes/DisputesPage').then((m) => ({ default: m.DisputesPage }))
 )
+const DisputeDetailPage = lazy(() =>
+  import('./pages/disputes/DisputeDetailPage').then((m) => ({ default: m.DisputeDetailPage }))
+)
 const PromotionsPage = lazy(() =>
   import('./pages/promotions/PromotionsPage').then((m) => ({ default: m.PromotionsPage }))
 )
@@ -318,6 +321,14 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <DisputesPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/disputes/:id',
+        element: (
+          <LazyPage>
+            <DisputeDetailPage />
           </LazyPage>
         ),
       },

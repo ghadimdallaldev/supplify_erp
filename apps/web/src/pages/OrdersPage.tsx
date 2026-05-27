@@ -6,6 +6,9 @@ import {
   useGetRestaurantsQuery,
   useGetProductsQuery,
   useSendOrderReminderMutation,
+  useGetDisputesQuery,
+  useGetIncomingDisputesQuery,
+  useGetEntitlementsQuery,
 } from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
@@ -36,12 +39,18 @@ import {
   Filter,
   Plus,
   AlertCircle,
+  Scale,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
+import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
+import { getOrderStatusLabel } from '../lib/orderStatusDisplay'
+import { featureEnabled } from '../lib/planLimits'
+import { getActiveDisputeForOrder } from '../lib/disputeHelpers'
+import { isDisputeReplacementOrder } from '../lib/orderPlacement'
 
 export function OrdersPage() {
   const [status, setStatus] = useState('')
@@ -52,6 +61,8 @@ export function OrdersPage() {
   const [selectedRestaurant, setSelectedRestaurant] = useState('')
   const [orderNotes, setOrderNotes] = useState('')
   const [productSearch, setProductSearch] = useState('')
+  const [declineOrderId, setDeclineOrderId] = useState<string | null>(null)
+  const [declineOrderLabel, setDeclineOrderLabel] = useState<string | undefined>()
   const [manualOrderItems, setManualOrderItems] = useState<
     Array<{
       productId: string
@@ -85,6 +96,19 @@ export function OrdersPage() {
       pollingInterval: 20000,
     }
   )
+
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
+    skip: isSupplier || !disputesEnabled,
+    pollingInterval: 30_000,
+  })
+  const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
+    skip: !isSupplier || !disputesEnabled,
+    pollingInterval: 30_000,
+  })
+  const allDisputes =
+    (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []
 
   const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
   const { data: productsData } = useGetProductsQuery({ limit: 1000 }, { skip: !isSupplier })
@@ -206,6 +230,7 @@ export function OrdersPage() {
         return <Truck className="h-4 w-4" />
       case 'RECEIVED_PARTIAL':
       case 'RECEIVED_FULL':
+      case 'RECEIVED_WITH_DISPUTE':
         return <CheckCircle className="h-4 w-4" />
       case 'INVOICED':
         return <FileText className="h-4 w-4" />
@@ -218,13 +243,21 @@ export function OrdersPage() {
 
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
-  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+  const handleStatusUpdate = async (
+    orderId: string,
+    newStatus: string,
+    extra?: { decline_reason?: string }
+  ) => {
     if (updatingOrderId === orderId) return // Prevent multiple clicks
 
     try {
       setUpdatingOrderId(orderId) // Set immediately - button will be replaced by disabled button
-      await updateOrder({ id: orderId, data: { status: newStatus } }).unwrap()
-      toast.success(`Order status updated to ${newStatus}`)
+      await updateOrder({ id: orderId, data: { status: newStatus, ...extra } }).unwrap()
+      const successLabel =
+        newStatus === 'CANCELLED' && isSupplier
+          ? 'Order declined'
+          : `Order status updated to ${newStatus}`
+      toast.success(successLabel)
 
       // Refetch to get updated data
       const refetchResult = await refetch()
@@ -274,7 +307,7 @@ export function OrdersPage() {
         ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)) ||
       (activeTab === 'shipped' && order.status === 'SHIPPED') ||
       (activeTab === 'completed' &&
-        ['RECEIVED_FULL', 'INVOICED', 'COMPLETED'].includes(order.status))
+        ['RECEIVED_FULL', 'RECEIVED_WITH_DISPUTE', 'INVOICED', 'COMPLETED'].includes(order.status))
 
     return matchesSearch && matchesStatus
   })
@@ -419,7 +452,33 @@ export function OrdersPage() {
                           <span className="text-[var(--text-muted)]" aria-hidden>
                             {getStatusIcon(order.status)}
                           </span>
-                          <StatusBadge status={order.status} />
+                          <StatusBadge
+                            status={order.status}
+                            label={getOrderStatusLabel(
+                              order,
+                              isSupplier ? 'SUPPLIER' : 'RESTAURANT'
+                            )}
+                          />
+                          {isDisputeReplacementOrder(order) && (
+                            <Badge variant="secondary">Replacement</Badge>
+                          )}
+                          {disputesEnabled && getActiveDisputeForOrder(allDisputes, order.id) && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-400 text-amber-800 bg-amber-50"
+                            >
+                              <Scale className="h-3 w-3 mr-1" aria-hidden />
+                              Dispute open
+                            </Badge>
+                          )}
+                          {!isSupplier &&
+                            order.status === 'CANCELLED' &&
+                            order.cancelled_by === 'SUPPLIER' &&
+                            order.cancel_reason && (
+                              <p className="text-xs text-red-700 mt-1 max-w-md">
+                                {order.cancel_reason}
+                              </p>
+                            )}
                         </span>
                         {order.status === 'PLACED' && isSupplier && (
                           <Badge variant="destructive">Action Required</Badge>
@@ -491,7 +550,10 @@ export function OrdersPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
+                              onClick={() => {
+                                setDeclineOrderId(order.id)
+                                setDeclineOrderLabel(order.restaurant_name)
+                              }}
                               data-testid={`order-${order.id}-decline`}
                             >
                               Decline
@@ -787,6 +849,24 @@ export function OrdersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeclineOrderDialog
+        open={Boolean(declineOrderId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeclineOrderId(null)
+            setDeclineOrderLabel(undefined)
+          }
+        }}
+        orderLabel={declineOrderLabel}
+        isSubmitting={Boolean(declineOrderId && updatingOrderId === declineOrderId)}
+        onConfirm={async (reason) => {
+          if (!declineOrderId) return
+          await handleStatusUpdate(declineOrderId, 'CANCELLED', { decline_reason: reason })
+          setDeclineOrderId(null)
+          setDeclineOrderLabel(undefined)
+        }}
+      />
     </div>
   )
 }

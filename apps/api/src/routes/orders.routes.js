@@ -162,6 +162,8 @@ const orderUpdateSchema = z.object({
     ])
     .optional(),
   notes: z.string().optional(),
+  cancel_reason: z.string().trim().min(1).max(2000).optional(),
+  decline_reason: z.string().trim().min(1).max(2000).optional(),
   delivery_status: deliveryStatusSchema.optional(),
   failure_reason: z.string().optional(),
 })
@@ -1061,6 +1063,25 @@ router.get('/:id', requireAuth, async (req, res, next) => {
         }
       : null
 
+    const { rows: replacementOrders } = await query(
+      `
+      SELECT id, status, placement_source, source_order_id, source_dispute_id, created_at, total_amount
+      FROM customer_order
+      WHERE source_order_id = $1
+      ORDER BY created_at ASC
+      `,
+      [id]
+    )
+
+    let sourceDispute = null
+    if (order.source_dispute_id) {
+      const { rows: disputeRows } = await query(
+        `SELECT id, status, resolution_type, order_id FROM disputes WHERE id = $1`,
+        [order.source_dispute_id]
+      )
+      sourceDispute = disputeRows[0] || null
+    }
+
     res.json({
       ok: true,
       data: {
@@ -1071,6 +1092,8 @@ router.get('/:id', requireAuth, async (req, res, next) => {
           multiLocationFulfillment: warehouseAssignments.some((a) => a.order_item_id != null),
           appliedPromotion,
           promotion: appliedPromotion,
+          replacementOrders,
+          sourceDispute,
         },
       },
       error: null,
@@ -1796,6 +1819,19 @@ router.patch('/:id', async (req, res) => {
             requestId: req.requestId,
           })
         }
+        const declineReason = (updateData.decline_reason || updateData.cancel_reason || '').trim()
+        if (declineReason.length < 3) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'DECLINE_REASON_REQUIRED',
+              message: 'A reason is required when declining an order (at least 3 characters).',
+            },
+            requestId: req.requestId,
+          })
+        }
+        updateData.cancel_reason = declineReason
       } else if (!hasPermission(supplierPerms, 'ORDERS_EDIT')) {
         return res.status(403).json({
           ok: false,
@@ -1838,6 +1874,23 @@ router.patch('/:id', async (req, res) => {
       updateFields.push(`status = $${paramIndex}`)
       updateValues.push(updateData.status)
       paramIndex++
+    }
+
+    if (updateData.status === 'CANCELLED' && updateData.status !== order.status) {
+      const cancelledBy = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
+      const cancelReason =
+        (updateData.cancel_reason || updateData.decline_reason || updateData.notes || '').trim() ||
+        null
+
+      updateFields.push(`cancelled_by = $${paramIndex}`)
+      updateValues.push(cancelledBy)
+      paramIndex++
+
+      if (cancelReason) {
+        updateFields.push(`cancel_reason = $${paramIndex}`)
+        updateValues.push(cancelReason)
+        paramIndex++
+      }
     }
 
     if (updateFields.length === 0) {
@@ -1920,7 +1973,6 @@ router.patch('/:id', async (req, res) => {
             updateData.status
           )
         } else if (updateData.status === 'CANCELLED') {
-          // Cancelled - notify supplier
           await notifyOrderStatusChange(
             {
               id: rows[0].id,
@@ -1929,6 +1981,8 @@ router.patch('/:id', async (req, res) => {
               restaurant_name: restaurantInfo[0]?.name || 'Restaurant',
               supplier_id: supplierIdForNotification,
               supplier_name: supplierInfo[0]?.name || 'Supplier',
+              cancelled_by: rows[0].cancelled_by,
+              cancel_reason: rows[0].cancel_reason,
             },
             updateData.status
           )

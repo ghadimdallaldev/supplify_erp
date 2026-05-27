@@ -1,4 +1,5 @@
 import express from 'express'
+import { assertValidQuantityForUnit } from '../lib/quantity-unit.js'
 import {
   requireAuth,
   requireRole,
@@ -292,6 +293,45 @@ router.post(
       }
 
       const supplierId = items[0].supplier_id
+
+      for (const line of lineItems) {
+        const unit = line.unit || 'unit'
+        const ordered = parseFloat(line.ordered_quantity || 0)
+        const receivedRaw = parseFloat(line.received_quantity ?? line.ordered_quantity ?? 0)
+        try {
+          line.received_quantity = assertValidQuantityForUnit(receivedRaw, unit, {
+            fieldName: 'Received quantity',
+          })
+          if (line.ordered_quantity != null) {
+            line.ordered_quantity = assertValidQuantityForUnit(
+              parseFloat(line.ordered_quantity),
+              unit,
+              { fieldName: 'Ordered quantity' }
+            )
+          }
+        } catch (qtyErr) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: qtyErr.message,
+            },
+            requestId: req.requestId,
+          })
+        }
+        if (line.received_quantity > ordered) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: `Received quantity cannot exceed ordered quantity (${ordered} ${unit})`,
+            },
+            requestId: req.requestId,
+          })
+        }
+      }
 
       // Calculate totals
       const totalItemsOrdered = lineItems.reduce(

@@ -36,10 +36,24 @@ import {
   useGetPendingOrdersForReceivingQuery,
   useCreateReceivingReportMutation,
   useGetReceivingHistoryQuery,
+  useGetEntitlementsQuery,
 } from '../services/api'
+import { featureEnabled } from '../lib/planLimits'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 import { isOrderReadyForReceiving } from '../lib/orderReceiving'
+import {
+  getQuantityUnitRules,
+  normalizeReceivedQuantity,
+  snapQuantityToUnit,
+} from '../lib/quantityUnit'
+import {
+  disputeLineItemsFromReceiving,
+  receivingFormToDisputeDrafts,
+  supplierIdFromOrder,
+  type DisputeLineItemDraft,
+} from '../lib/disputeHelpers'
+import { OpenDisputeDialog } from '../components/disputes/OpenDisputeDialog'
 
 export function ReceivingPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -50,6 +64,37 @@ export function ReceivingPage() {
   const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [showDialog, setShowDialog] = useState(false)
+  const [openDisputeContext, setOpenDisputeContext] = useState<{
+    orderId: string
+    supplierId: string
+    lineItems: DisputeLineItemDraft[]
+    receivingReportId?: string
+  } | null>(null)
+
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const canShowDispute = disputesEnabled && canOpenDispute
+
+  const beginDisputeFromReceiving = (
+    order: { id: string; items?: unknown[]; supplier_id?: string },
+    formData: Record<string, unknown>,
+    receivingReportId?: string
+  ) => {
+    const supplierId = supplierIdFromOrder(order as Parameters<typeof supplierIdFromOrder>[0])
+    if (!supplierId) {
+      toast.error('Could not determine supplier for this order')
+      return
+    }
+    setOpenDisputeContext({
+      orderId: order.id,
+      supplierId,
+      lineItems: receivingFormToDisputeDrafts(
+        (order.items ?? []) as Array<Record<string, unknown>>,
+        formData
+      ),
+      receivingReportId,
+    })
+  }
 
   // Load received order IDs from localStorage on mount
   const [receivingOrderIds, setReceivingOrderIds] = useState<Set<string>>(() => {
@@ -92,28 +137,51 @@ export function ReceivingPage() {
 
       const result = await createReport({
         orderId: selectedOrder.id,
-        lineItems: selectedOrder.items.map((item: any) => ({
-          productId: item.product_id,
-          orderItemId: item.id,
-          product_name: item.product_name,
-          sku: item.sku,
-          ordered_quantity: item.ordered_quantity,
-          received_quantity: formData[`received_${item.id}`] || item.ordered_quantity,
-          unit: item.unit,
-          expected_unit_price: item.unit_price,
-          actual_unit_price: formData[`price_${item.id}`] || item.unit_price,
-          quality_status: formData[`quality_${item.id}`] || 'ACCEPTED',
-          notes: formData[`notes_${item.id}`] || '',
-        })),
+        lineItems: selectedOrder.items.map((item: any) => {
+          const ordered = Number(item.ordered_quantity ?? 0)
+          const rawReceived = Number(formData[`received_${item.id}`] ?? item.ordered_quantity ?? 0)
+          const received = normalizeReceivedQuantity(rawReceived, ordered, item.unit)
+          return {
+            productId: item.product_id,
+            orderItemId: item.id,
+            product_name: item.product_name,
+            sku: item.sku,
+            ordered_quantity: ordered,
+            received_quantity: received,
+            unit: item.unit,
+            expected_unit_price: item.unit_price,
+            actual_unit_price: formData[`price_${item.id}`] || item.unit_price,
+            quality_status: formData[`quality_${item.id}`] || 'ACCEPTED',
+            notes: formData[`notes_${item.id}`] || '',
+          }
+        }),
         deliveryNotes: formData.deliveryNotes,
         qualityScore: formData.qualityScore,
         qualityNotes: formData.qualityNotes,
         receivedBy: user?.id,
       }).unwrap()
 
-      toast.success('Receiving report created successfully')
       setShowDialog(false)
       setSelectedOrder(null)
+
+      const discrepancyItems = disputeLineItemsFromReceiving(selectedOrder.items ?? [], formData)
+      const supplierId = supplierIdFromOrder(selectedOrder)
+      const reportId = (result as { report?: { id?: string } })?.report?.id
+
+      if (canShowDispute && discrepancyItems.length > 0 && supplierId) {
+        toast(
+          `Receiving saved. ${discrepancyItems.length} item(s) had issues — submit one dispute for the supplier.`,
+          { icon: '⚠️', duration: 7000 }
+        )
+        setOpenDisputeContext({
+          orderId,
+          supplierId,
+          lineItems: discrepancyItems,
+          receivingReportId: reportId,
+        })
+      } else {
+        toast.success('Receiving completed successfully')
+      }
 
       // Wait a moment for database transaction to commit
       await new Promise((resolve) => setTimeout(resolve, 500))
@@ -503,8 +571,27 @@ export function ReceivingPage() {
             onOpenChange={setShowDialog}
             onSubmit={handleSubmitReceiving}
             isLoading={isCreating}
-            canOpenDispute={canOpenDispute}
             canReceive={canReceive}
+            canOpenDispute={canShowDispute}
+            onOpenDispute={(formData) => beginDisputeFromReceiving(selectedOrder, formData)}
+          />
+        )}
+
+        {openDisputeContext && (
+          <OpenDisputeDialog
+            open={Boolean(openDisputeContext)}
+            onOpenChange={(open) => {
+              if (!open) setOpenDisputeContext(null)
+            }}
+            orderId={openDisputeContext.orderId}
+            defaultSupplierId={openDisputeContext.supplierId}
+            receivingReportId={openDisputeContext.receivingReportId}
+            initialLineItems={openDisputeContext.lineItems}
+            onCreated={() => {
+              setOpenDisputeContext(null)
+              void refetchPending()
+              void refetchHistory()
+            }}
           />
         )}
       </div>
@@ -518,85 +605,127 @@ function ReceivingDialog({
   onOpenChange,
   onSubmit,
   isLoading,
-  canOpenDispute,
   canReceive,
-}: any) {
-  const [formData, setFormData] = useState<any>({
+  canOpenDispute,
+  onOpenDispute,
+}: {
+  order: { id: string; items: Array<Record<string, unknown>> }
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (formData: Record<string, unknown>) => void
+  isLoading: boolean
+  canReceive: boolean
+  canOpenDispute: boolean
+  onOpenDispute: (formData: Record<string, unknown>) => void
+}) {
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     deliveryNotes: '',
     qualityScore: 5,
     qualityNotes: '',
   })
+
+  useEffect(() => {
+    if (!open) return
+    setFormData({
+      deliveryNotes: '',
+      qualityScore: 5,
+      qualityNotes: '',
+    })
+  }, [open, order.id])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Receive Order #{order.id.slice(0, 8)}</DialogTitle>
-          <DialogDescription>Review received items and enter receiving details</DialogDescription>
+          <DialogDescription>
+            Enter quantities and quality for each line. When you complete receiving, if any items
+            had issues, one dispute form opens for the whole order (not per item).
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           <div>
             <Label>Items Received</Label>
             <div className="space-y-3 mt-2">
-              {order.items.map((item: any) => (
-                <Card key={item.id} className="p-4">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="font-medium">{item.product_name}</p>
-                      <p className="text-sm text-[var(--text-muted)]">SKU: {item.sku}</p>
-                      <p className="text-sm text-[var(--text-muted)]">
-                        Ordered: {item.ordered_quantity} {item.unit}
-                      </p>
-                    </div>
-                    <div className="border-t pt-3 mt-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label htmlFor={`received_${item.id}`}>Received Qty</Label>
-                          <Input
-                            id={`received_${item.id}`}
-                            type="number"
-                            defaultValue={item.ordered_quantity}
-                            step="0.01"
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                [`received_${item.id}`]: parseFloat(e.target.value),
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`quality_${item.id}`}>Quality Status</Label>
-                          <select
-                            id={`quality_${item.id}`}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            defaultValue="ACCEPTED"
-                            onChange={(e) =>
-                              setFormData({ ...formData, [`quality_${item.id}`]: e.target.value })
-                            }
-                          >
-                            <option value="ACCEPTED">Accepted</option>
-                            <option value="DAMAGED">Damaged</option>
-                            <option value="EXPIRED">Expired</option>
-                            <option value="WRONG_ITEM">Wrong Item</option>
-                            <option value="SHORT">Short</option>
-                          </select>
-                        </div>
-                        <div>
-                          <Label htmlFor={`notes_${item.id}`}>Notes (Optional)</Label>
-                          <Input
-                            id={`notes_${item.id}`}
-                            onChange={(e) =>
-                              setFormData({ ...formData, [`notes_${item.id}`]: e.target.value })
-                            }
-                          />
+              {order.items.map((item: any) => {
+                const unit = item.unit
+                const ordered = Number(item.ordered_quantity ?? 0)
+                const qtyRules = getQuantityUnitRules(unit)
+                const receivedKey = `received_${item.id}`
+                const receivedValue =
+                  formData[receivedKey] !== undefined
+                    ? Number(formData[receivedKey])
+                    : snapQuantityToUnit(ordered, unit)
+
+                return (
+                  <Card key={item.id} className="p-4">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="font-medium">{item.product_name}</p>
+                        <p className="text-sm text-[var(--text-muted)]">SKU: {item.sku}</p>
+                        <p className="text-sm text-[var(--text-muted)]">
+                          Ordered: {ordered} {unit}
+                          {qtyRules.allowDecimals ? ` (step ${qtyRules.step})` : ' (whole units)'}
+                        </p>
+                      </div>
+                      <div className="border-t pt-3 mt-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor={`received_${item.id}`}>Received Qty</Label>
+                            <Input
+                              id={`received_${item.id}`}
+                              type="number"
+                              step={qtyRules.step}
+                              min={qtyRules.min}
+                              max={ordered}
+                              inputMode={qtyRules.allowDecimals ? 'decimal' : 'numeric'}
+                              value={receivedValue}
+                              onChange={(e) => {
+                                const parsed = parseFloat(e.target.value)
+                                if (Number.isNaN(parsed)) return
+                                setFormData({
+                                  ...formData,
+                                  [receivedKey]: normalizeReceivedQuantity(parsed, ordered, unit),
+                                })
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`quality_${item.id}`}>Quality Status</Label>
+                            <select
+                              id={`quality_${item.id}`}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              value={String(formData[`quality_${item.id}`] ?? 'ACCEPTED')}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  [`quality_${item.id}`]: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="ACCEPTED">Accepted</option>
+                              <option value="DAMAGED">Damaged</option>
+                              <option value="EXPIRED">Expired</option>
+                              <option value="WRONG_ITEM">Wrong Item</option>
+                              <option value="SHORT">Short</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label htmlFor={`notes_${item.id}`}>Notes (Optional)</Label>
+                            <Input
+                              id={`notes_${item.id}`}
+                              onChange={(e) =>
+                                setFormData({ ...formData, [`notes_${item.id}`]: e.target.value })
+                              }
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                )
+              })}
             </div>
           </div>
 
@@ -641,13 +770,13 @@ function ReceivingDialog({
         <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
           <div>
             {canOpenDispute && (
-              <Button variant="outline" asChild>
-                <Link
-                  to={`/app/disputes?orderId=${order.id}&supplierId=${order.supplier_id || ''}`}
-                  data-testid="receiving-open-dispute"
-                >
-                  Open dispute
-                </Link>
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="receiving-open-dispute"
+                onClick={() => onOpenDispute(formData)}
+              >
+                Open dispute
               </Button>
             )}
           </div>
