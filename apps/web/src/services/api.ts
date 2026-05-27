@@ -1742,11 +1742,16 @@ export const api = createApi({
     }),
     getPublicReservationAvailability: builder.query<
       PublicAvailabilityResponse,
-      { restaurantId: string; partySize: number; date: string }
+      { restaurantId: string; partySize: number; date: string; manageToken?: string }
     >({
-      query: ({ restaurantId, partySize, date }) => ({
+      query: ({ restaurantId, partySize, date, manageToken }) => ({
         url: '/api/public/reservations/availability',
-        params: { restaurantId, partySize, date },
+        params: {
+          restaurantId,
+          partySize,
+          date,
+          ...(manageToken ? { manageToken } : {}),
+        },
         credentials: 'omit',
       }),
     }),
@@ -1776,8 +1781,8 @@ export const api = createApi({
         scheduledAt: string
         durationMinutes?: number
         customerName: string
-        customerEmail?: string
-        customerPhone?: string
+        customerEmail: string
+        customerPhone: string
         notes?: string
       }
     >({
@@ -1787,6 +1792,7 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
+      invalidatesTags: [{ type: 'Reservation', id: 'BOARD' }],
     }),
     getPublicReservationDetails: builder.query<{ reservation: PublicReservationDetails }, string>({
       query: (token) => ({
@@ -1806,7 +1812,10 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
-      invalidatesTags: (_result, _error, { token }) => [{ type: 'Reservation', id: token }],
+      invalidatesTags: (_result, _error, { token }) => [
+        { type: 'Reservation', id: token },
+        { type: 'Reservation', id: 'BOARD' },
+      ],
     }),
     reschedulePublicReservation: builder.mutation<
       { reservation: PublicReservationDetails },
@@ -1818,7 +1827,10 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
-      invalidatesTags: (_result, _error, { token }) => [{ type: 'Reservation', id: token }],
+      invalidatesTags: (_result, _error, { token }) => [
+        { type: 'Reservation', id: token },
+        { type: 'Reservation', id: 'BOARD' },
+      ],
     }),
 
     // Staff self-service portal

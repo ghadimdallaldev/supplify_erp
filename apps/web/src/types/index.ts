@@ -614,6 +614,7 @@ export interface Reservation {
   status: ReservationStatus
   customer_name: string
   customer_phone?: string | null
+  customer_email?: string | null
   party_size: number
   scheduled_at: string
   duration_minutes: number
@@ -1091,11 +1092,21 @@ export interface PublicAvailabilitySlot {
   startTime: string
   endTime: string
   capacityAvailable: number
+  seatsLeft?: number
   isAvailable: boolean
+  status?: 'available' | 'limited' | 'full' | 'past'
 }
 
 export interface PublicAvailabilityResponse {
   slots: PublicAvailabilitySlot[]
+  totalCapacity?: number
+  tableCount?: number
+  bookingWindow?: {
+    closed?: boolean
+    source?: string
+    openTime?: string
+    closeTime?: string
+  } | null
 }
 
 export interface PublicReservationSummary {

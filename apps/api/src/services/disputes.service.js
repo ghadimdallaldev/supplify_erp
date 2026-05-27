@@ -2,7 +2,7 @@ import { query, withTransaction } from '../lib/db.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
-import { sendNotification } from './notification.service.js'
+import { notifyDisputeOpened, notifyDisputeResolved } from './notification.service.js'
 
 const ACTIVE_STATUSES = ['open', 'under_review', 'escalated']
 const DELIVERED_ORDER_STATUSES = ['COMPLETED']
@@ -78,59 +78,6 @@ async function loadDisputeDetail(disputeId, { restaurantId, supplierId } = {}) {
     attachments,
     creditNotes,
   }
-}
-
-async function getSupplierUserId(supplierId) {
-  const { rows } = await query(
-    `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-    [supplierId]
-  )
-  return rows[0]?.id || null
-}
-
-async function getRestaurantUserId(restaurantId) {
-  const { rows } = await query(
-    `SELECT u.id FROM app_user u JOIN restaurant r ON r.contact_email = u.email WHERE r.id = $1`,
-    [restaurantId]
-  )
-  return rows[0]?.id || null
-}
-
-async function notifyDisputeOpened(dispute) {
-  const userId = await getSupplierUserId(dispute.supplierId)
-  if (!userId) return
-  await sendNotification({
-    userId,
-    userType: 'SUPPLIER',
-    notificationType: 'DISPUTE',
-    notificationCategory: 'dispute_opened',
-    title: 'New dispute opened',
-    message: `A restaurant opened a dispute on order #${dispute.orderId.slice(0, 8)}`,
-    referenceId: dispute.id,
-    referenceType: 'DISPUTE',
-    metadata: { disputeId: dispute.id, orderId: dispute.orderId, type: dispute.type },
-  }).catch((err) => logger.error('notifyDisputeOpened failed', { err: err.message }))
-}
-
-async function notifyDisputeResolved(dispute, outcome) {
-  const userId = await getRestaurantUserId(dispute.restaurantId)
-  if (!userId) return
-  const title = outcome === 'rejected' ? 'Dispute rejected' : 'Dispute resolved'
-  const message =
-    outcome === 'rejected'
-      ? `Your dispute was rejected. ${dispute.resolutionNotes || ''}`.trim()
-      : `Your dispute was resolved (${dispute.resolutionType || 'closed'}).`
-  await sendNotification({
-    userId,
-    userType: 'RESTAURANT',
-    notificationType: 'DISPUTE',
-    notificationCategory: outcome === 'rejected' ? 'dispute_rejected' : 'dispute_resolved',
-    title,
-    message,
-    referenceId: dispute.id,
-    referenceType: 'DISPUTE',
-    metadata: { disputeId: dispute.id, resolutionType: dispute.resolutionType },
-  }).catch((err) => logger.error('notifyDisputeResolved failed', { err: err.message }))
 }
 
 async function generateCreditNoteNumber(client) {

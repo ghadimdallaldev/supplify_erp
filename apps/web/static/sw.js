@@ -9,12 +9,34 @@ self.addEventListener('push', (event) => {
     payload.body = event.data?.text() || payload.body
   }
 
+  const title = payload.title || 'Supplify'
+  const body = payload.body || ''
+  const url = payload.url || '/app/notifications'
+
   event.waitUntil(
-    self.registration.showNotification(payload.title || 'Supplify', {
-      body: payload.body || '',
-      icon: '/favicon.ico',
-      data: { url: payload.url || '/' },
-    })
+    (async () => {
+      await self.registration.showNotification(title, {
+        body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: payload.referenceId
+          ? `supplify-${payload.referenceType}-${payload.referenceId}`
+          : undefined,
+        data: { url },
+        vibrate: [120, 60, 120],
+        silent: false,
+      })
+      // Best-effort auto-dismiss (~10s) for background push banners.
+      await new Promise((resolve) => setTimeout(resolve, 10_000))
+      const notifications = await self.registration.getNotifications({
+        tag: payload.referenceId
+          ? `supplify-${payload.referenceType}-${payload.referenceId}`
+          : undefined,
+      })
+      for (const n of notifications) {
+        if (n.title === title) n.close()
+      }
+    })()
   )
 })
 

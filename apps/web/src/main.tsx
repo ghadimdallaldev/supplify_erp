@@ -17,7 +17,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <ErrorBoundary>
           <App />
         </ErrorBoundary>
-        <Toaster position="top-right" />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              maxWidth: 420,
+            },
+          }}
+        />
       </Provider>
     </QueryClientProvider>
   </React.StrictMode>

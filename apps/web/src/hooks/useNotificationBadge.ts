@@ -1,7 +1,7 @@
 import { useGetNotificationsQuery } from '../services/api'
 import { useAppSelector } from './redux'
 
-const NOTIFICATION_POLL_MS = 60_000
+const NOTIFICATION_POLL_MS = 12_000
 
 /** Single RTK Query subscription for notification badge (Header + Sidebar). */
 export function useNotificationBadge() {
@@ -11,6 +11,8 @@ export function useNotificationBadge() {
     {
       skip: !user,
       pollingInterval: NOTIFICATION_POLL_MS,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
       refetchOnMountOrArgChange: false,
     }
   )

@@ -2082,7 +2082,7 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
     }
 
     // Import notification service
-    const { sendNotification } = await import('../services/notification.service.js')
+    const { notifyTenantUsers } = await import('../services/notification.service.js')
 
     // Send reminder notification
     const reminderMessage =
@@ -2091,9 +2091,9 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
         : `Reminder: You have an unacknowledged order #${order.id.slice(0, 8)} from ${order.restaurant_name} for $${order.total_amount || 0}. Please acknowledge when ready.`
 
     try {
-      await sendNotification({
-        userId: supplier.user_id,
-        userType: 'SUPPLIER',
+      await notifyTenantUsers({
+        tenantId: order.supplier_id,
+        tenantType: 'SUPPLIER',
         notificationType: 'ORDER',
         notificationCategory: 'PLACED',
         title: 'Order Reminder',
