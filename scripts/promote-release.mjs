@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Promote dev → preprod or prod: merge, prune dev-only files, commit.
+ * Promote release branches: dev → preprod, then preprod → prod (never dev → prod).
  * Run from repo root on a clean dev branch:
- *   node scripts/promote-release.mjs --tier preprod|prod
+ *   node scripts/promote-release.mjs --tier preprod
+ *   node scripts/promote-release.mjs --tier prod   # after UAT on preprod
  */
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -43,8 +44,8 @@ const tier = (() => {
 })()
 
 const branch = tier
-// Always promote from dev so release branches get the full runtime tree (not a stale preprod snapshot).
-const source = 'dev'
+// preprod ← dev (full tree + prune). prod ← preprod only (UAT-signed runtime; never merge dev directly into prod).
+const source = tier === 'prod' ? 'preprod' : 'dev'
 
 const dirty = runCapture('git status --porcelain')
 if (dirty) {
@@ -58,6 +59,9 @@ if (current !== 'dev') {
   process.exit(1)
 }
 
+if (tier === 'prod') {
+  console.log('\n⚠ prod promotes from preprod only (pruned UAT tree). Run preprod promote first.\n')
+}
 console.log(`\nPromoting ${source} → ${branch} (EC2 ${tier} deploy branch)\n`)
 
 run('git fetch origin')
@@ -83,9 +87,10 @@ try {
   run('git commit --no-edit')
 }
 
-// Sync all application source and DB migrations from dev before prune.
-run('git checkout origin/dev -- apps/')
-run('git checkout origin/dev -- apps/api/db/migrations')
+// Sync runtime tree from source branch before prune (preprod←dev, prod←preprod).
+const syncRef = tier === 'prod' ? 'origin/preprod' : 'origin/dev'
+run(`git checkout ${syncRef} -- apps/`)
+run(`git checkout ${syncRef} -- apps/api/db/migrations`)
 
 // Prune script is dev-only; restore from dev before running on the release branch.
 const pruneSrc = runCapture('git show origin/dev:scripts/prune-release-tree.mjs')

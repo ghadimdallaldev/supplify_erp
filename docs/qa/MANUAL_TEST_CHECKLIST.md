@@ -204,7 +204,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | GATE-R08 | `advanced_roles`       | Settings → Team: no role management UI                                | Available           | Available                 |       |
 | GATE-R09 | `reports`              | `GET /api/reports` → 403                                              | 403 (Gold+)         | 200                       |       |
 | GATE-R10 | `smart_reorder`        | Reorder suggestions API → 403                                         | 403 (Gold+)         | 200 or available          |       |
-| GATE-R11 | `approvals_budgets`    | Approval workflow API → 403                                           | 403 (Gold+)         | 200                       |       |
+| GATE-R11 | `waste_tracking`       | Inventory → Waste tab; `GET /api/restaurant-inventory/waste-analytics` | Available (Free+)   | Available                 |       |
 | GATE-R12 | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                               | Blocked (Gold+)     | Visible and loads         |       |
 | GATE-R13 | `order_amendments`     | Order amendment API → 403                                             | 403 (Gold+)         | 200                       |       |
 | GATE-R14 | `push_notifications`   | Push endpoint → 403                                                   | 403 (Gold+)         | 200                       |       |

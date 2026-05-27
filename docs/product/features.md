@@ -37,8 +37,8 @@ The sidebar (`apps/web/src/components/Sidebar.tsx`) adapts by role and admin imp
 
 | Role                  | Primary nav                                                                                                                    |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Restaurant**        | Dashboard, Products, Orders, Chat, Quick Lists, Cart, Suppliers, Reservations, Staff, Inventory, Receiving, Invoices, Settings |
-| **Supplier**          | Dashboard, Products, Orders, Chat, Restaurants, Fulfillment, Invoices, Settings                                                |
+| **Restaurant**        | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Suppliers, Deals, Reports, Disputes, Staff, Inventory (+ waste), Invoices, Chat, Settings, Org |
+| **Supplier**          | Dashboard, Orders, Products, Fulfillment, Restaurants, Promotions, Reports, Disputes, Invoices, Chat, Settings, Org |
 | **Platform admin**    | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                    |
 | **Public (no login)** | Reservation portal, staff self-service                                                                                         |
 
@@ -93,8 +93,9 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 | Restaurant deals     | `/app/deals`         | `/api/promotions`         | Discovery feed with CTAs; sponsored deals from non-followers                            |
 | Admin deal approvals | `/app/admin` → Deals | `/api/promotions/admin/*` | Approve/reject deals; configure boost pricing                                           |
 | Supplier reviews     | Supplier detail      | `/api/reviews`            | Ratings and summaries per supplier                                                      |
-| Approvals & budgets  | `/app/approvals`     | `/api/approvals`          | Plan `approvals_budgets` — see [approvals-budgets.md](../features/approvals-budgets.md) |
-| Tenant audit log     | —                    | `/api/audit`              | Tenant-scoped audit entries                                                             |
+| Waste & spoilage     | `/app/restaurant-inventory` → Waste tab | `/api/restaurant-inventory/waste-analytics` | Plan `waste_tracking` — [waste-tracking.md](../features/waste-tracking.md) |
+| Order amendments     | Order detail         | `/api/orders/:id/amendments` | Plan `order_amendments` |
+| Tenant audit log     | Settings → Activity  | `/api/audit`              | Plan `tenant_audit_log` |
 
 **Verify:** Gold+ restaurant → Reports loads spend charts; supplier → Promotions CRUD. Tests: `reports.routes.test.js`, `disputes.routes.test.js`, `approvals.routes.test.js`.
 
@@ -112,8 +113,9 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 | Feature              | Web route                   | API prefix                   | Notes                        |
 | -------------------- | --------------------------- | ---------------------------- | ---------------------------- |
-| Restaurant inventory | `/app/restaurant-inventory` | `/api/restaurant-inventory`  | On-hand, par levels          |
+| Restaurant inventory | `/app/restaurant-inventory` | `/api/restaurant-inventory`  | On-hand; waste tab when `waste_tracking` |
 | Receiving            | `/app/receiving`            | `/api/receiving`             | Goods-in, quality checks     |
+| Disputes             | `/app/disputes`, `/app/disputes/:id` | `/api/disputes`     | Replacement orders, credit notes |
 | Onboarding           | `/app/onboarding`           | `/api/restaurant-onboarding` | Restaurant setup wizard      |
 | Restaurant pricing   | —                           | `/api/restaurant-pricing`    | Internal menu / cost pricing |
 | Restaurant finance   | —                           | `/api/restaurant-finance`    | COGS / finance hooks         |
@@ -199,6 +201,9 @@ Tests: `notification.service.test.js`, `push.service.test.js`, `orderStatusDispl
 | Supplier admin      | `/app/admin/suppliers`   | same                                 | Supplier tenant management     |
 | Restaurant admin    | `/app/admin/restaurants` | same                                 | Restaurant tenant management   |
 | Feature toggles     | Admin → **Features** tab | `/api/admin-dashboard/feature-flags` | Global + per-tenant overrides  |
+| Limit overrides     | Admin → Usage / limits   | `/api/admin-dashboard/limit-overrides` | Per-tenant meter caps          |
+| Deal review         | Admin → **Deals** tab    | `/api/promotions/admin/*`            | Approve, reject, insights     |
+| Free sandbox days   | Admin → Overview         | `/api/admin-dashboard/platform-settings` | Free tier auto-expiry        |
 | Impersonation       | Banner when active       | cookie + middleware                  | View app as tenant             |
 | Legacy admin routes | —                        | `/api/admin`                         | Internal maintenance endpoints |
 
@@ -218,9 +223,11 @@ Tests: `auth.routes.test.js`, `rbac.test.js`. Web: `apps/web/src/lib/authRedirec
 
 Canonical keys in `apps/api/src/lib/feature-keys.js`:
 
-**Restaurant:** `chat`, `reports`, `smart_reorder`, `multi_branch`, `receiving_quality`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `approvals_budgets`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
+**Restaurant:** `chat`, `order_calendar`, `reports`, `smart_reorder`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `supplier_deals`, `order_amendments`, `supplier_reviews`, `push_notifications`, `tenant_audit_log`, `waitlist_auto_promo`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
 
-**Supplier:** `chat`, `reports`, `fulfillment_tools`, `quick_lists`, `inventory_management`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
+**Supplier:** `chat`, `order_calendar`, `reports`, `multi_branch`, `warehouses`, `multi_warehouse`, `fulfillment`, `fulfillment_tools`, `driver_management`, `disputes_returns`, `quick_lists`, `inventory_management`, `promotions`, `order_amendments`, `push_notifications`, `tenant_audit_log`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`
+
+**Removed:** `approvals_budgets` (see [approvals-budgets.md](../features/approvals-budgets.md))
 
 ## Automated verification
 

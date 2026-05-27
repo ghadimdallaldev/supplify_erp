@@ -10,8 +10,9 @@ Deep-dive docs per product area. The route map lives in [product/features.md](..
 | [reservations-foh.md](./reservations-foh.md)                             | Board, availability, table assign, staff alerts            |
 | [waitlist-auto-promotion.md](./waitlist-auto-promotion.md)               | Waitlist offers on cancel                                  |
 | [order-amendments.md](./order-amendments.md)                             | Post-place order changes                                   |
-| [approvals-budgets.md](./approvals-budgets.md)                           | Order approval thresholds                                  |
-| [disputes-returns.md](./disputes-returns.md)                             | Disputes and credit notes                                  |
+| [waste-tracking.md](./waste-tracking.md)                               | Restaurant waste & spoilage (inventory tab)                |
+| [approvals-budgets.md](./approvals-budgets.md)                           | **Removed** — was order approval thresholds                |
+| [disputes-returns.md](./disputes-returns.md)                             | Disputes, credit notes, replacement orders                   |
 | [receiving-delivered-flow.md](./receiving-delivered-flow.md)             | Restaurant receiving                                       |
 | [supplier-reviews.md](./supplier-reviews.md)                             | Post-delivery reviews                                      |
 | [fulfillment-logistics.md](./fulfillment-logistics.md)                   | Pick/pack/ship                                             |

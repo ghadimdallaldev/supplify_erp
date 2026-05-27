@@ -76,7 +76,7 @@ All management routes require `requireAuth`, `resolveTenantContext`, and `requir
 
 ## Approvals integration
 
-Approval rules can target roles by name (e.g. Manager, Owner). Users with **Manager** or **Owner** tenant roles receive `ORDERS_MANAGE` and are typical approvers when `approvals_budgets` is enabled.
+Order approvals (`approvals_budgets`) were removed from the product in 2026-05. Tenant roles still gate permissions such as `ORDERS_MANAGE` for order operations.
 
 ## Frontend
 

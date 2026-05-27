@@ -2,6 +2,7 @@
 
 | Doc | Purpose |
 |-----|---------|
+| **[ALL_FEATURES.md](./ALL_FEATURES.md)** | **Master catalog** — every route, API, job, plan flag (MVP source of truth) |
 | [features.md](./features.md) | Routes, roles, smoke verification |
 | [FEATURE_CATALOG.md](./FEATURE_CATALOG.md) | Technical feature keys & enforcement map |
 | [FEATURE_COMPARISON.md](./FEATURE_COMPARISON.md) | Supplier vs restaurant surface comparison |

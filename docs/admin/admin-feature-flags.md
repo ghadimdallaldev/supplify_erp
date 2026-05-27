@@ -72,7 +72,9 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 ## Canonical feature keys
 
-**RESTAURANT** (23 keys): chat, order_calendar, reports, smart_reorder, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, approvals_budgets, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo
+**RESTAURANT** (22 keys): chat, order_calendar, reports, smart_reorder, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals
+
+**Removed:** `approvals_budgets` (not shown in admin UI)
 
 **SUPPLIER** (22 keys): chat, order_calendar, reports, multi_branch, warehouses, multi_warehouse, fulfillment_tools, fulfillment, driver_management, disputes_returns, quick_lists, inventory_management, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, promotions, push_notifications, order_amendments, tenant_audit_log
 

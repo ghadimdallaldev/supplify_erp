@@ -199,11 +199,17 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ---
 
-## Approvals & Budgets
+## Waste tracking
 
-| feature_key       | display_name              | applies_to | permissions_required | limit_key | backend_enforcement                                       | frontend_surfaces | plan_availability                       |
-| ----------------- | ------------------------- | ---------- | -------------------- | --------- | --------------------------------------------------------- | ----------------- | --------------------------------------- |
-| approvals_budgets | Order approvals & budgets | MULTI      | —                    | —         | approvals.routes.js `requireFeature('approvals_budgets')` | ApprovalsPage.tsx | Bronze+ single-level, Gold+ multi-level |
+| feature_key      | display_name   | applies_to | permissions_required | limit_key | backend_enforcement                                                                 | frontend_surfaces                                      | plan_availability        |
+| ---------------- | -------------- | ---------- | -------------------- | --------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------ |
+| waste_tracking   | Waste tracking | RESTAURANT | INVENTORY_EDIT       | —         | restaurant-inventory.routes.js adjust + waste-analytics; reports `/restaurant/waste` | RestaurantInventoryPage → Waste tab, RestaurantWastePanel | Free+ (`0115` migration) |
+
+---
+
+## Approvals & budgets — removed
+
+`approvals_budgets` removed 2026-05. See [approvals-budgets.md](../features/approvals-budgets.md).
 
 ---
 
@@ -312,7 +318,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 - **Plans (from migration 0022 / UI):** Free, Bronze, Gold, Platinum
 
-**RESTAURANT** (23 keys): `chat`, `order_calendar`, `reports`, `smart_reorder`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `approvals_budgets`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `supplier_reviews`, `push_notifications`, `order_amendments`, `tenant_audit_log`, `waitlist_auto_promo`
+**RESTAURANT** (22 keys): `chat`, `order_calendar`, `reports`, `smart_reorder`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `supplier_reviews`, `push_notifications`, `order_amendments`, `tenant_audit_log`, `waitlist_auto_promo`, `supplier_deals`
 
 **SUPPLIER** (22 keys): `chat`, `order_calendar`, `reports`, `multi_branch`, `warehouses`, `multi_warehouse`, `fulfillment_tools`, `fulfillment`, `driver_management`, `disputes_returns`, `quick_lists`, `inventory_management`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `promotions`, `push_notifications`, `order_amendments`, `tenant_audit_log`
 

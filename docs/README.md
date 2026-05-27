@@ -20,8 +20,10 @@ Supplify docs are grouped by purpose. Start with **[Developer handbook](./guides
 ## Quick links
 
 - [Developer handbook](./guides/developer-handbook.md) — quick start, Docker, CI/CD, contributing
-- [Feature overview & routes](./product/features.md) — what exists where
+- **[Complete feature catalog](./product/ALL_FEATURES.md)** — master list for MVP (routes, API, jobs, flags)
+- [Feature overview & routes](./product/features.md) — verification commands & smoke tests
 - [Feature catalog (technical)](./product/FEATURE_CATALOG.md) — keys, enforcement, surfaces
+- [Release branching](./BRANCHING.md) — `dev` → `preprod` → `prod` (prod never merges dev)
 - [Manual testing checklist](./guides/manual-testing.md) · [Full QA regression](./qa/MANUAL_TEST_CHECKLIST.md)
 - [Feature specs index](./features/README.md) · [Order decline](./features/order-decline.md) · [Notifications delivery](./features/notifications-delivery.md)
 - [Production readiness](./operations/production-readiness.md) — status + findings + fix plan
