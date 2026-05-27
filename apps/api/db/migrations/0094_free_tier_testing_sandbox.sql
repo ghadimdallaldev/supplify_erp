@@ -55,7 +55,7 @@ SET
     "promotions": false,
     "reports": false,
     "fulfillment_tools": "basic_orders",
-    "disputes_returns": false,
+    "disputes_returns": true,
     "notifications": "in_app_only",
     "api_integrations": false,
     "support_sla": "community",

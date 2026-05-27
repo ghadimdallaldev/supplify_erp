@@ -35,10 +35,26 @@ export function resolveNotificationUrl(notification: NotificationLike): string {
 }
 
 let audioContext: AudioContext | null = null
+let audioUnlocked = false
+
+/** Call once after a user gesture so notification sounds are allowed by the browser. */
+export function unlockNotificationAudio() {
+  if (typeof window === 'undefined' || audioUnlocked) return
+  audioUnlocked = true
+  try {
+    const ctx = audioContext ?? new AudioContext()
+    audioContext = ctx
+    if (ctx.state === 'suspended') {
+      void ctx.resume()
+    }
+  } catch {
+    // Web Audio unavailable
+  }
+}
 
 /** Short two-tone chime — no external asset required. */
 export function playNotificationSound() {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || !audioUnlocked) return
   try {
     const ctx = audioContext ?? new AudioContext()
     audioContext = ctx

@@ -114,6 +114,8 @@ export interface Order {
   updated_at: string
   restaurant_name?: string
   restaurant_slug?: string
+  cancel_reason?: string | null
+  cancelled_by?: 'RESTAURANT' | 'SUPPLIER' | null
   items?: OrderItem[]
 }
 
@@ -164,6 +166,8 @@ export interface UpdateOrderRequest {
     | 'COMPLETED'
     | 'CANCELLED'
   notes?: string
+  cancel_reason?: string
+  decline_reason?: string
   delivery_status?: 'assigned' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed'
   failure_reason?: string
 }

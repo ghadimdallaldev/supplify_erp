@@ -9,6 +9,7 @@ import {
   playNotificationSound,
   resolveNotificationUrl,
   showBrowserNotificationAlways,
+  unlockNotificationAudio,
   type NotificationLike,
 } from '../lib/notificationAlerts'
 
@@ -87,6 +88,17 @@ export function useNotificationAlerts() {
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
     navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const unlock = () => unlockNotificationAudio()
+    document.addEventListener('pointerdown', unlock, { once: true })
+    document.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      document.removeEventListener('pointerdown', unlock)
+      document.removeEventListener('keydown', unlock)
+    }
   }, [])
 
   useEffect(() => {

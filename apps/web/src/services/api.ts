@@ -2120,7 +2120,7 @@ export const api = createApi({
     }),
     createDispute: builder.mutation<Record<string, unknown>, Record<string, unknown>>({
       query: (body) => ({ url: '/api/disputes', method: 'POST', body }),
-      invalidatesTags: ['Disputes', 'Order'],
+      invalidatesTags: ['Disputes', 'Order', 'Receiving'],
     }),
     cancelDispute: builder.mutation<Record<string, unknown>, string>({
       query: (id) => ({ url: `/api/disputes/${id}/cancel`, method: 'POST' }),

@@ -10,6 +10,7 @@ import { Textarea } from '../../components/ui/textarea'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -20,7 +21,6 @@ import {
   useGetOrderQuery,
   useGetOrdersQuery,
   useGetSuppliersQuery,
-  useCreateDisputeMutation,
   useReviewDisputeMutation,
   useResolveDisputeMutation,
   useRejectDisputeMutation,
@@ -28,18 +28,14 @@ import {
 } from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
 import { featureEnabled } from '../../lib/planLimits'
+import {
+  disputeEligibilityMessage,
+  isOrderEligibleForDispute,
+} from '../../lib/orderDisputeEligibility'
+import { OpenDisputeDialog } from '../../components/disputes/OpenDisputeDialog'
 import { formatPrice } from '../../utils/format'
 import toast from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
-
-const DISPUTE_TYPES = [
-  'short_delivery',
-  'damaged_goods',
-  'wrong_items',
-  'quality_issue',
-  'billing_error',
-  'other',
-] as const
 
 function statusBadge(status: string) {
   const s = status?.toLowerCase()
@@ -64,13 +60,16 @@ type DisputeRow = {
   disputedAmount?: number | null
   disputed_amount?: number | null
   restaurantName?: string
+  restaurant_name?: string
 }
 
 export function DisputesPage() {
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const orderIdFromUrl = searchParams.get('orderId') || ''
+  const supplierIdFromUrl = searchParams.get('supplierId') || ''
+  const [disputeDialogOrderId, setDisputeDialogOrderId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [resolveId, setResolveId] = useState<string | null>(null)
@@ -82,7 +81,7 @@ export function DisputesPage() {
   const [createForm, setCreateForm] = useState({
     orderId: '',
     supplierId: '',
-    type: 'short_delivery' as (typeof DISPUTE_TYPES)[number],
+    type: 'short_delivery',
     description: '',
     disputedAmount: '',
   })
@@ -101,7 +100,6 @@ export function DisputesPage() {
     refetch: refetchSupplier,
   } = useGetIncomingDisputesQuery({ status: statusFilter || undefined }, { skip: !isSupplier })
 
-  const [createDispute, { isLoading: creating }] = useCreateDisputeMutation()
   const [reviewDispute] = useReviewDisputeMutation()
   const [resolveDispute, { isLoading: resolving }] = useResolveDisputeMutation()
   const [rejectDispute, { isLoading: rejecting }] = useRejectDisputeMutation()
@@ -123,15 +121,35 @@ export function DisputesPage() {
     { skip: isSupplier || !showCreate }
   )
 
+  const { data: selectedOrderDetail } = useGetOrderQuery(createForm.orderId, {
+    skip: !createForm.orderId || isSupplier,
+  })
+
   const orderOptions = useMemo(() => {
     const orders = ordersListData?.orders ?? []
     return orders
-      .filter((o) => o.status !== 'DRAFT' && o.status !== 'CANCELLED')
+      .filter((o) => isOrderEligibleForDispute(o.status))
       .map((o) => ({
         id: o.id,
-        label: `${formatOrderRef(o.id)} — ${new Date(o.placed_at || o.created_at).toLocaleDateString()} — $${formatPrice(Number(o.total_amount || 0))}`,
+        label: `${formatOrderRef(o.id)} — ${String(o.status).replace(/_/g, ' ')} — ${new Date(o.placed_at || o.created_at).toLocaleDateString()} — $${formatPrice(Number(o.total_amount || 0))}`,
       }))
   }, [ordersListData])
+
+  const selectedOrderStatus = useMemo(() => {
+    if (!createForm.orderId) return null
+    if (orderForDispute?.order?.id === createForm.orderId) return orderForDispute.order.status
+    if (selectedOrderDetail?.order?.id === createForm.orderId)
+      return selectedOrderDetail.order.status
+    return ordersListData?.orders?.find((o) => o.id === createForm.orderId)?.status ?? null
+  }, [createForm.orderId, orderForDispute, selectedOrderDetail, ordersListData])
+
+  const selectedOrderIneligible =
+    Boolean(createForm.orderId) && !isOrderEligibleForDispute(selectedOrderStatus)
+
+  const orderFromUrlIneligible =
+    Boolean(orderIdFromUrl) &&
+    orderForDispute?.order?.id === orderIdFromUrl &&
+    !isOrderEligibleForDispute(orderForDispute.order.status)
 
   const suppliersForSelectedOrder = useMemo(() => {
     if (!createForm.orderId) return []
@@ -161,13 +179,13 @@ export function DisputesPage() {
 
   useEffect(() => {
     if (!orderIdFromUrl || isSupplier) return
-    setCreateForm((f) => ({ ...f, orderId: orderIdFromUrl }))
-    setShowCreate(true)
-  }, [orderIdFromUrl, isSupplier])
-
-  const { data: selectedOrderDetail } = useGetOrderQuery(createForm.orderId, {
-    skip: !createForm.orderId || isSupplier,
-  })
+    setCreateForm((f) => ({
+      ...f,
+      orderId: orderIdFromUrl,
+      supplierId: supplierIdFromUrl || f.supplierId,
+    }))
+    setDisputeDialogOrderId(orderIdFromUrl)
+  }, [orderIdFromUrl, supplierIdFromUrl, isSupplier])
 
   useEffect(() => {
     if (!createForm.orderId) return
@@ -189,41 +207,6 @@ export function DisputesPage() {
         </Card>
       </div>
     )
-  }
-
-  const handleCreate = async () => {
-    const fieldLabels = {
-      order: 'Order',
-      supplier: 'Supplier',
-      description: 'Description',
-    } as const
-    const missing: (keyof typeof fieldLabels)[] = []
-    if (!createForm.orderId) missing.push('order')
-    if (!createForm.supplierId) missing.push('supplier')
-    if (!createForm.description.trim()) missing.push('description')
-    if (missing.length > 0) {
-      toast.error(
-        missing.length === 1
-          ? `${fieldLabels[missing[0]]} is required`
-          : `Please complete: ${missing.map((k) => fieldLabels[k]).join(', ')}`
-      )
-      return
-    }
-    try {
-      await createDispute({
-        orderId: createForm.orderId,
-        supplierId: createForm.supplierId,
-        type: createForm.type,
-        description: createForm.description,
-        disputedAmount: createForm.disputedAmount ? Number(createForm.disputedAmount) : undefined,
-      }).unwrap()
-      toast.success('Dispute opened')
-      setShowCreate(false)
-      refetch()
-    } catch (e: unknown) {
-      const err = e as { data?: { message?: string; error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || err?.data?.message || 'Failed to create dispute')
-    }
   }
 
   const handleReview = async (id: string) => {
@@ -284,7 +267,20 @@ export function DisputesPage() {
         }
         actions={
           !isSupplier ? (
-            <Button onClick={() => setShowCreate(true)}>Open dispute</Button>
+            <Button
+              onClick={() => {
+                setCreateForm({
+                  orderId: '',
+                  supplierId: '',
+                  type: 'short_delivery',
+                  description: '',
+                  disputedAmount: '',
+                })
+                setShowCreate(true)
+              }}
+            >
+              Open dispute
+            </Button>
           ) : undefined
         }
       />
@@ -323,6 +319,7 @@ export function DisputesPage() {
                 <thead>
                   <tr className="border-b text-left text-[var(--text-muted)]">
                     <th className="py-2">Order</th>
+                    {isSupplier && <th>Restaurant</th>}
                     <th>Type</th>
                     <th>Status</th>
                     <th>Amount</th>
@@ -348,8 +345,18 @@ export function DisputesPage() {
                             <span className="text-[var(--text-muted)]">—</span>
                           )}
                         </td>
+                        {isSupplier && (
+                          <td className="text-sm">
+                            {String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}
+                          </td>
+                        )}
                         <td className="capitalize">
-                          {String(dispute.type || '').replace(/_/g, ' ')}
+                          <Link
+                            to={`/app/disputes/${dispute.id}`}
+                            className="text-[var(--brand-mid)] hover:underline"
+                          >
+                            {String(dispute.type || '').replace(/_/g, ' ')}
+                          </Link>
                         </td>
                         <td>
                           <Badge variant={statusBadge(String(dispute.status))}>
@@ -413,8 +420,19 @@ export function DisputesPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Open dispute</DialogTitle>
+            <DialogDescription>
+              Report delivery, quality, or billing issues for an order that has been delivered or
+              received.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {(orderFromUrlIneligible || selectedOrderIneligible) && (
+              <p className="text-sm text-amber-700 dark:text-amber-400 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
+                {disputeEligibilityMessage(
+                  orderFromUrlIneligible ? orderForDispute?.order?.status : selectedOrderStatus
+                )}
+              </p>
+            )}
             <div>
               <Label>Order</Label>
               <select
@@ -429,7 +447,13 @@ export function DisputesPage() {
                 }
                 disabled={loadingOrders}
               >
-                <option value="">{loadingOrders ? 'Loading orders…' : 'Select an order'}</option>
+                <option value="">
+                  {loadingOrders
+                    ? 'Loading orders…'
+                    : orderOptions.length === 0
+                      ? 'No eligible delivered orders'
+                      : 'Select an order'}
+                </option>
                 {orderOptions.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}
@@ -459,51 +483,35 @@ export function DisputesPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <Label>Type</Label>
-              <select
-                className="w-full h-10 rounded-md border px-3 text-sm"
-                value={createForm.type}
-                onChange={(e) =>
-                  setCreateForm((f) => ({
-                    ...f,
-                    type: e.target.value as (typeof DISPUTE_TYPES)[number],
-                  }))
-                }
-              >
-                {DISPUTE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Disputed amount (optional)</Label>
-              <Input
-                type="number"
-                value={createForm.disputedAmount}
-                onChange={(e) => setCreateForm((f) => ({ ...f, disputedAmount: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>
-                Description <span className="text-[var(--text-muted)]">(required)</span>
-              </Label>
-              <Textarea
-                required
-                value={createForm.description}
-                onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="What went wrong with this delivery or invoice?"
-              />
-            </div>
+            <p className="text-sm text-[var(--text-muted)]">
+              Next you can select specific line items and quantities (e.g. received 1 of 3
+              products).
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={creating}>
-              {creating ? 'Submitting…' : 'Submit'}
+            <Button
+              onClick={() => {
+                if (!createForm.orderId) {
+                  toast.error('Order is required')
+                  return
+                }
+                if (!createForm.supplierId) {
+                  toast.error('Supplier is required')
+                  return
+                }
+                if (selectedOrderIneligible) {
+                  toast.error(disputeEligibilityMessage(selectedOrderStatus))
+                  return
+                }
+                setDisputeDialogOrderId(createForm.orderId)
+                setShowCreate(false)
+              }}
+              disabled={selectedOrderIneligible || !createForm.orderId || !createForm.supplierId}
+            >
+              Continue
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -571,6 +579,24 @@ export function DisputesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {!isSupplier && disputeDialogOrderId && (
+        <OpenDisputeDialog
+          open={Boolean(disputeDialogOrderId)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDisputeDialogOrderId(null)
+              setSearchParams({})
+            }
+          }}
+          orderId={disputeDialogOrderId}
+          defaultSupplierId={createForm.supplierId || supplierIdFromUrl}
+          onCreated={() => {
+            setDisputeDialogOrderId(null)
+            refetch()
+          }}
+        />
+      )}
     </div>
   )
 }

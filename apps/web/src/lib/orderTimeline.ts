@@ -25,6 +25,8 @@ type OrderLike = {
   placed_at?: string | null
   created_at: string
   updated_at?: string
+  cancelled_by?: string | null
+  cancel_reason?: string | null
   items?: Array<{
     id?: string
     product_id?: string
@@ -50,6 +52,7 @@ const STATUS_RANK: Record<string, number> = {
   DELIVERED: 6,
   COMPLETED: 6,
   RECEIVED_PARTIAL: 7,
+  RECEIVED_WITH_DISPUTE: 8,
   RECEIVED_FULL: 8,
   INVOICED: 9,
   CANCELLED: -1,
@@ -151,6 +154,8 @@ function amendmentItems(amendment: AmendmentLike): unknown {
   return amendment.items
 }
 
+type ReplacementOrderLike = Record<string, unknown>
+
 export interface BuildOrderTimelineInput {
   order: OrderLike
   viewerRole?: TimelineViewerRole
@@ -159,6 +164,7 @@ export interface BuildOrderTimelineInput {
   disputes?: DisputeLike[]
   receivingReports?: ReceivingLike[]
   creditNotes?: CreditNoteLike[]
+  replacementOrders?: ReplacementOrderLike[]
   approvalStatus?: string | null
 }
 
@@ -286,18 +292,21 @@ function pushReceivingStep(
   }
 ) {
   const { order, statusRank, receiving } = input
+  const disputeOpen = order.status === 'RECEIVED_WITH_DISPUTE'
 
   const state = receivingState(statusRank, Boolean(receiving))
 
   if (receiving) {
     events.push({
       id: 'received',
-      title: 'Goods received',
-      description: `Receiving report recorded${receiving.status ? ` (${String(receiving.status).toLowerCase()})` : ''}.`,
+      title: disputeOpen ? 'Received — dispute open' : 'Goods received',
+      description: disputeOpen
+        ? 'Receiving was recorded. A dispute is open with the supplier until it is resolved.'
+        : `Receiving report recorded${receiving.status ? ` (${String(receiving.status).toLowerCase()})` : ''}.`,
       timestamp: formatTs(
         String(receiving.received_at ?? receiving.receivedAt ?? receiving.created_at ?? '')
       ),
-      state,
+      state: disputeOpen ? 'completed' : state,
       link: { label: 'View receiving', href: `/app/receiving?order=${order.id}` },
     })
     return
@@ -305,9 +314,15 @@ function pushReceivingStep(
 
   events.push({
     id: 'received',
-    title: statusRank >= MILESTONE.RECEIVED ? 'Goods received' : 'Confirm receipt',
-    description:
-      statusRank >= MILESTONE.RECEIVED
+    title:
+      disputeOpen || statusRank >= MILESTONE.RECEIVED
+        ? disputeOpen
+          ? 'Received — dispute open'
+          : 'Goods received'
+        : 'Confirm receipt',
+    description: disputeOpen
+      ? 'Receiving was recorded. Resolve the open dispute with your supplier.'
+      : statusRank >= MILESTONE.RECEIVED
         ? 'Receiving has been recorded for this order.'
         : statusRank >= MILESTONE.DELIVERED
           ? 'Record receiving to confirm quantities and quality.'
@@ -331,8 +346,14 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     disputes = [],
     receivingReports = [],
     creditNotes = [],
+    replacementOrders = [],
     approvalStatus,
   } = input
+
+  const orderDisputes = disputes.filter((d) => disputeOrderId(d) === order.id)
+  const firstOpenDispute = orderDisputes.find((d) =>
+    ['open', 'under_review'].includes(String(d.status ?? ''))
+  )
 
   const events: TimelineEvent[] = []
   const status = order.status
@@ -342,10 +363,18 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     (order as OrderLike & { restaurant_name?: string }).restaurant_name || 'Restaurant'
 
   if (status === 'CANCELLED') {
+    const supplierDeclined = order.cancelled_by === 'SUPPLIER' && viewerRole === 'RESTAURANT'
+    const reason = order.cancel_reason?.trim()
     events.push({
       id: 'cancelled',
-      title: 'Order cancelled',
-      description: 'This order was cancelled and will not be fulfilled.',
+      title: supplierDeclined ? 'Declined by supplier' : 'Order cancelled',
+      description: supplierDeclined
+        ? reason
+          ? reason
+          : 'The supplier declined this order and it will not be fulfilled.'
+        : reason
+          ? `Cancelled: ${reason}`
+          : 'This order was cancelled and will not be fulfilled.',
       timestamp: formatTs(order.updated_at),
       state: 'completed',
     })
@@ -385,9 +414,30 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
   if (viewerRole === 'RESTAURANT') {
     const receiving = receivingReports.find((r) => String(r.order_id ?? r.orderId) === order.id)
     pushReceivingStep(events, { order, statusRank, receiving })
+  } else if (
+    viewerRole === 'SUPPLIER' &&
+    (order.status === 'RECEIVED_WITH_DISPUTE' || statusRank >= MILESTONE.RECEIVED)
+  ) {
+    const disputeOpen = order.status === 'RECEIVED_WITH_DISPUTE'
+    events.push({
+      id: 'restaurant-received',
+      title: disputeOpen ? 'Received — dispute open' : 'Restaurant confirmed receipt',
+      description: disputeOpen
+        ? `${restaurantName} recorded receiving and opened a dispute that needs your response.`
+        : `${restaurantName} recorded receiving for this order.`,
+      timestamp: formatTs(order.updated_at),
+      state: disputeOpen ? 'current' : 'completed',
+      link: disputeOpen
+        ? {
+            label: 'Manage dispute',
+            href: firstOpenDispute
+              ? `/app/disputes/${String(firstOpenDispute.id)}`
+              : '/app/disputes',
+          }
+        : undefined,
+    })
   }
 
-  const orderDisputes = disputes.filter((d) => disputeOrderId(d) === order.id)
   for (const dispute of orderDisputes) {
     const type = String(dispute.type ?? 'issue').replace(/_/g, ' ')
     events.push({
@@ -399,7 +449,29 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
         ? 'completed'
         : 'current',
       badge: type,
-      link: { label: 'View dispute', href: `/app/disputes?orderId=${order.id}` },
+      link: {
+        label: 'View dispute',
+        href: `/app/disputes/${String(dispute.id)}`,
+      },
+    })
+  }
+
+  for (const replacement of replacementOrders) {
+    const replacementId = String(replacement.id ?? '')
+    const disputeId = String(replacement.source_dispute_id ?? replacement.sourceDisputeId ?? '')
+    events.push({
+      id: `replacement-${replacementId}`,
+      title: 'Replacement order created',
+      description: disputeId
+        ? `Replacement order #${replacementId.slice(0, 8).toUpperCase()} was created from dispute #${disputeId.slice(0, 8).toUpperCase()}.`
+        : `Replacement order #${replacementId.slice(0, 8).toUpperCase()} was created to fulfill disputed quantities.`,
+      timestamp: formatTs(String(replacement.created_at ?? replacement.createdAt ?? '')),
+      state: 'completed',
+      badge: 'Replacement',
+      link: {
+        label: 'View replacement order',
+        href: `/app/orders/${replacementId}`,
+      },
     })
   }
 
