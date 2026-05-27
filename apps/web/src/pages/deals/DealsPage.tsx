@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
 import { DealCard } from '../../components/deals/DealCard'
@@ -16,9 +17,11 @@ const SORT_OPTIONS = [
 ]
 
 export function DealsPage() {
+  const [searchParams] = useSearchParams()
+  const highlightDealId = searchParams.get('highlight') || ''
   const [sort, setSort] = useState('newest')
   const [expiringSoon, setExpiringSoon] = useState(false)
-  const [supplierFilter, setSupplierFilter] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState(searchParams.get('supplierId') || '')
   const { user } = useAppSelector((state) => state.auth)
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !user || user.role !== 'RESTAURANT',
@@ -50,6 +53,17 @@ export function DealsPage() {
   }, [promotions])
 
   const sponsoredCount = promotions.filter((p) => p.is_sponsored).length
+
+  useEffect(() => {
+    const supplierFromUrl = searchParams.get('supplierId')
+    if (supplierFromUrl) setSupplierFilter(supplierFromUrl)
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!highlightDealId || isLoading || promotions.length === 0) return
+    const el = document.getElementById(`deal-card-${highlightDealId}`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightDealId, isLoading, promotions.length])
 
   return (
     <div className="space-y-6">
@@ -125,7 +139,17 @@ export function DealsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {promotions.map((p) => (
-            <DealCard key={String(p.id)} deal={p} canRedeem={canRedeem} />
+            <div
+              key={String(p.id)}
+              id={`deal-card-${String(p.id)}`}
+              className={
+                highlightDealId && String(p.id) === highlightDealId
+                  ? 'ring-2 ring-[var(--brand)] rounded-xl'
+                  : undefined
+              }
+            >
+              <DealCard deal={p} canRedeem={canRedeem} />
+            </div>
           ))}
         </div>
       )}

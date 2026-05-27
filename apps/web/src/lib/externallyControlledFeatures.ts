@@ -1,4 +1,5 @@
 import type { Entitlements } from '../types'
+import { isRemovedFeatureKey } from './removedFeatures'
 
 export function formatFeatureKeyLabel(featureKey: string): string {
   return featureKey
@@ -30,6 +31,7 @@ export function getExternallyDisabledFeatures(
   const out: ExternallyDisabledFeature[] = []
 
   for (const key of keys) {
+    if (isRemovedFeatureKey(key)) continue
     if (features[key] !== false) continue
     const src = sources[key]
     if (src !== 'tenant_override' && src !== 'global') continue
@@ -64,6 +66,7 @@ export function getPlanTierDisabledFeatures(entitlements: Entitlements): PlanTie
   const out: PlanTierDisabledFeature[] = []
 
   for (const key of keys) {
+    if (isRemovedFeatureKey(key)) continue
     if (features[key] !== false) continue
     const src = sources[key]
     if (src !== 'plan' && src !== 'default') continue

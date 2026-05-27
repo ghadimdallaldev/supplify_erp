@@ -27,6 +27,7 @@ import {
   Upload,
   FileText,
   ShoppingCart,
+  Recycle,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
@@ -34,9 +35,12 @@ import {
   useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
   useAdjustRestaurantInventoryMutation,
+  useGetEntitlementsQuery,
 } from '../services/api'
 import toast from 'react-hot-toast'
 import { formatNumber } from '../utils/format'
+import { featureEnabled } from '../lib/planLimits'
+import { RestaurantWastePanel } from '../components/inventory/RestaurantWastePanel'
 
 export function RestaurantInventoryPage() {
   const [search, setSearch] = useState('')
@@ -55,6 +59,12 @@ export function RestaurantInventoryPage() {
   const [selectedProductId, setSelectedProductId] = useState('')
   const [addQuantity, setAddQuantity] = useState('')
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
+  const [wastePreselectProductId, setWastePreselectProductId] = useState<string | null>(null)
+
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const wasteTrackingEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.waste_tracking
+  )
 
   const { data, isLoading, error } = useGetRestaurantInventoryQuery()
   const { data: historyData, isLoading: isLoadingHistory } = useGetRestaurantInventoryHistoryQuery({
@@ -283,6 +293,9 @@ export function RestaurantInventoryPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="inventory">Current Inventory</TabsTrigger>
+          {wasteTrackingEnabled ? (
+            <TabsTrigger value="waste">Waste & spoilage</TabsTrigger>
+          ) : null}
           <TabsTrigger value="history">Movement History</TabsTrigger>
           <TabsTrigger value="totals">Totals & Sources</TabsTrigger>
         </TabsList>
@@ -564,10 +577,24 @@ export function RestaurantInventoryPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleOpenAdjustDialog(item, 'SUBTRACT')}
-                                title="Reduce inventory"
+                                title="Count correction (reduce stock)"
                               >
                                 <Minus className="h-4 w-4" />
                               </Button>
+                              {wasteTrackingEnabled ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-[var(--amber-mid)] border-[var(--amber-mid)]/40"
+                                  onClick={() => {
+                                    setWastePreselectProductId(item.product_id)
+                                    setActiveTab('waste')
+                                  }}
+                                  title="Log waste or spoilage"
+                                >
+                                  <Recycle className="h-4 w-4" />
+                                </Button>
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -649,6 +676,16 @@ export function RestaurantInventoryPage() {
             </DialogContent>
           </Dialog>
         </TabsContent>
+
+        {wasteTrackingEnabled ? (
+          <TabsContent value="waste" className="space-y-6">
+            <RestaurantWastePanel
+              inventory={inventory}
+              preselectedProductId={wastePreselectProductId}
+              onPreselectConsumed={() => setWastePreselectProductId(null)}
+            />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="history" className="space-y-6">
           <Card>
@@ -736,7 +773,8 @@ export function RestaurantInventoryPage() {
                           if (t === 'ADD') return 'ADD'
                           if (t === 'SUBTRACT') return 'SUBTRACT'
                           if (t === 'COUNT_CORRECTION') return 'ADJUST'
-                          if (t === 'WASTAGE' || t === 'SPOILAGE') return 'SUBTRACT'
+                          if (t === 'WASTAGE') return 'WASTE'
+                          if (t === 'SPOILAGE') return 'SPOIL'
                           return t || '—'
                         })()
                         return (
@@ -757,10 +795,16 @@ export function RestaurantInventoryPage() {
                                     ? 'default'
                                     : typeLabel === 'ADJUST'
                                       ? 'secondary'
-                                      : 'destructive'
+                                      : typeLabel === 'WASTE' || typeLabel === 'SPOIL'
+                                        ? 'destructive'
+                                        : 'destructive'
                                 }
                               >
-                                {typeLabel}
+                                {typeLabel === 'WASTE'
+                                  ? 'Wastage'
+                                  : typeLabel === 'SPOIL'
+                                    ? 'Spoilage'
+                                    : typeLabel}
                               </Badge>
                             </td>
                             <td

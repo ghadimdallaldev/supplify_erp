@@ -29,6 +29,7 @@ import {
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useCartActions } from '../hooks/useCartActions'
 import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planComparison'
+import { isAtEntitlementLimit, shouldShowEntitlementLimit } from '../lib/planLimits'
 import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
 import { LimitExceededBanner } from './LimitExceededBanner'
 import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
@@ -168,7 +169,7 @@ export function Layout() {
   const limits = e?.limits ?? {}
   const usage = e?.usage ?? {}
   const nearLimitKeys = Object.entries(limits)
-    .filter(([_, limit]) => limit != null && limit !== -1)
+    .filter(([key, limit]) => shouldShowEntitlementLimit(key) && limit != null && limit !== -1)
     .map(([key]) => {
       const current = usage[key] ?? 0
       const limit = limits[key] as number
@@ -179,13 +180,13 @@ export function Layout() {
     .slice(0, 3)
 
   const atLimitEntries = Object.entries(limits)
-    .filter(([_, limit]) => limit != null && limit !== -1)
+    .filter(([key, limit]) => shouldShowEntitlementLimit(key) && limit != null && limit !== -1)
     .map(([key, limit]) => ({
       key,
       current: usage[key] ?? 0,
       limit: limit as number,
     }))
-    .filter(({ current, limit }) => current >= limit)
+    .filter(({ current, limit }) => isAtEntitlementLimit(current, limit))
     .slice(0, 3)
 
   const recentBlockLimitKeys = recentBlockedSummary.limitKeys.map((x) => x.key)

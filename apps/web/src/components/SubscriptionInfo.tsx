@@ -30,6 +30,7 @@ import {
   getExternallyDisabledFeatures,
   getPlanTierDisabledFeatures,
 } from '../lib/externallyControlledFeatures'
+import { shouldShowEntitlementLimit } from '../lib/planLimits'
 
 const LIMIT_LABELS: Record<string, string> = {
   branches: 'Branch accounts',
@@ -181,10 +182,9 @@ export function SubscriptionInfo() {
   } as const
 
   const limitEntries = (
-    Object.entries(limits).filter(([_, limit]) => limit !== null && limit !== undefined) as [
-      string,
-      number,
-    ][]
+    Object.entries(limits).filter(
+      ([key, limit]) => shouldShowEntitlementLimit(key) && limit !== null && limit !== undefined
+    ) as [string, number][]
   ).sort(([keyA], [keyB]) => {
     const order = LIMIT_DISPLAY_ORDER[e.tenantType] ?? []
     const indexA = order.indexOf(keyA)
@@ -248,9 +248,28 @@ export function SubscriptionInfo() {
           )}
           {(plan.code || '').toLowerCase() === 'free' ? (
             <div className="mt-3 space-y-2">
+              {e.freeSandbox?.expiresAt && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {billing?.access?.freeSandboxExpired || billing?.access?.lockReason === 'free_sandbox_expired' ? (
+                    <p>
+                      Your free testing period has ended. Upgrade to a paid plan to restore access.
+                    </p>
+                  ) : (
+                    <p>
+                      Free testing access ends{' '}
+                      <span className="font-semibold">
+                        {new Date(e.freeSandbox.expiresAt).toLocaleDateString()}
+                      </span>
+                      {billing?.access?.freeSandboxDaysRemaining != null
+                        ? ` (${billing.access.freeSandboxDaysRemaining} day(s) left)`
+                        : ''}
+                      .
+                    </p>
+                  )}
+                </div>
+              )}
               <p className="text-sm text-[var(--text-muted)]">
-                Upgrade to a paid plan, then pay securely from this page (card or saved method via
-                our payment gateway).
+                Free is for evaluation only. Upgrade to a paid plan for ongoing production use.
               </p>
               <Button
                 type="button"

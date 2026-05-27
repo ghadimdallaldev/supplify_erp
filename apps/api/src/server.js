@@ -59,10 +59,10 @@ import { publicRoutes } from './routes/public.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
 import { runFulfillmentExceptionChecks } from './jobs/fulfillment-exceptions.job.js'
-import { approvalsRoutes } from './routes/approvals.routes.js'
 import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
 import { runDeactivateExpiredPromotionsJob } from './jobs/promotions-expiry.job.js'
+import { runFreeSandboxExpiryJob } from './jobs/free-sandbox-expiry.job.js'
 import { disputesRoutes } from './routes/disputes.routes.js'
 import { creditNotesRoutes } from './routes/credit-notes.routes.js'
 import { pushRoutes } from './routes/push.routes.js'
@@ -303,7 +303,6 @@ app.use('/api/restaurants', restaurantsRoutes)
 app.use('/api/orders/calendar', ordersCalendarRoutes)
 app.use('/api/orders', ordersWriteLimiter)
 app.use('/api/orders', ordersRoutes)
-app.use('/api/approvals', approvalsRoutes)
 app.use('/api/promotions', promotionsWriteLimiter)
 app.use('/api/promotions', promotionsRoutes)
 app.use('/api/audit', tenantAuditRoutes)
@@ -512,6 +511,19 @@ server.listen(PORT, () => {
   runInvitationExpiry()
   trackInterval(runInvitationExpiry, 60 * 60 * 1000)
   logger.info('Invitation expiry job started (runs every 1h)')
+
+  runFreeSandboxExpiryJob().catch((err) =>
+    logger.error('Free sandbox expiry job failed on startup:', err)
+  )
+  trackInterval(
+    () => {
+      runFreeSandboxExpiryJob().catch((err) =>
+        logger.error('Free sandbox expiry job failed:', err)
+      )
+    },
+    60 * 60 * 1000
+  )
+  logger.info('Free sandbox expiry job started (runs every 1h)')
 
   runFulfillmentExceptionChecks().catch((err) =>
     logger.error('Fulfillment exceptions job failed on startup:', err)

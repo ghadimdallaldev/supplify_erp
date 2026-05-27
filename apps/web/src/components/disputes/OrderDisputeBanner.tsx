@@ -28,7 +28,7 @@ export function OrderDisputeBanner({ orderId, disputes, isSupplier }: OrderDispu
           <div>
             <strong>Dispute in progress</strong>
             <p className="mt-0.5 text-amber-900/90 dark:text-amber-200/90">
-              {type} — {status}
+              {type} - {status}
               {isSupplier
                 ? '. Review and resolve from Disputes or below.'
                 : '. The supplier has been notified.'}

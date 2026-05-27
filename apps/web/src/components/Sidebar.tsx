@@ -27,7 +27,6 @@ import {
   Shield,
   CalendarDays,
   UserCircle2,
-  ClipboardCheck,
   BarChart3,
   Scale,
   Tag,
@@ -93,9 +92,6 @@ export function Sidebar({
   const unreadCount = notificationUnreadCount
   const planLabel = entitlementsData?.entitlements?.plan?.name ?? ''
   const planCode = (entitlementsData?.entitlements?.plan?.code ?? 'free').toLowerCase()
-  const approvalsEnabled = featureEnabled(
-    entitlementsData?.entitlements?.features?.approvals_budgets
-  )
   const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const supplierDealsEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.supplier_deals
@@ -172,17 +168,6 @@ export function Sidebar({
         permission: 'CATALOG_VIEW',
         testId: 'nav-suppliers',
       },
-      ...(approvalsEnabled
-        ? [
-            {
-              name: 'Approvals',
-              href: '/app/approvals',
-              icon: ClipboardCheck,
-              permission: 'ORDERS_MANAGE',
-              testId: 'nav-approvals',
-            },
-          ]
-        : []),
       ...(reportsEnabled
         ? [
             {

@@ -958,6 +958,7 @@ export interface Entitlements {
   }>
   usage: Record<string, number>
   usageWindowMeta?: Record<string, { date?: string }>
+  freeSandbox?: { expiresAt: string | null } | null
 }
 
 export interface AdminFeatureFlag {

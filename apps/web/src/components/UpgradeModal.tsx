@@ -215,18 +215,18 @@ export function UpgradeModal() {
     if (targetPlan?.id && (targetPlan.code || '').toLowerCase() === 'free') {
       dispatch(closeMonetizationModal())
       schedulePayloadReset()
-      if (pendingActivation) {
-        void activateFreePlanFromPlans(dispatch, plans).then((result) => {
-          if (result.ok) {
-            toast.success('Your free plan is active.')
-            navigate('/app', { replace: true })
-          } else {
-            toast.error(result.message)
-          }
-        })
-        return
-      }
-      openFreePlanCheckout(dispatch, plans)
+      void activateFreePlanFromPlans(dispatch, plans).then((result) => {
+        if (result.ok) {
+          toast.success(
+            pendingActivation
+              ? 'Your free plan is active.'
+              : 'You are now on the Free testing plan. Upgrade anytime for production use.'
+          )
+          if (pendingActivation) navigate('/app', { replace: true })
+        } else {
+          toast.error(result.message)
+        }
+      })
       return
     }
 

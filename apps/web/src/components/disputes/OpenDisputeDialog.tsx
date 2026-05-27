@@ -132,7 +132,7 @@ export function OpenDisputeDialog({
         receivingReportId: receivingReportId || undefined,
         items: items.length ? items : undefined,
       }).unwrap()
-      toast.success('Dispute opened — the supplier has been notified')
+      toast.success('Dispute opened - the supplier has been notified')
       onOpenChange(false)
       setSearchParams({})
       onCreated?.()

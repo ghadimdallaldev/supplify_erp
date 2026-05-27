@@ -10,6 +10,7 @@ import {
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { loadActivePromotionsForSupplier } from '../services/promotions.service.js'
 import {
@@ -450,7 +451,21 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
         activationAmount,
       },
     })
-    res.json({ ok: true, data: { deal: rows[0] }, error: null, requestId: req.requestId })
+
+    const approvedDeal = rows[0]
+    if (next.status === DEAL_STATUSES.ACTIVE || next.status === DEAL_STATUSES.SCHEDULED) {
+      const { rows: supplierRows } = await query(`SELECT name FROM supplier WHERE id = $1`, [
+        approvedDeal.supplier_id,
+      ])
+      const { notifyDealApproved } = await import('../services/notification.service.js')
+      notifyDealApproved(approvedDeal, {
+        supplierName: supplierRows[0]?.name,
+      }).catch((err) => {
+        logger.error('Deal approval notifications failed', { err: err.message, dealId: approvedDeal.id })
+      })
+    }
+
+    res.json({ ok: true, data: { deal: approvedDeal }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
   }

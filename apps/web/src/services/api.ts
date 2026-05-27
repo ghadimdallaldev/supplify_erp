@@ -198,6 +198,7 @@ export const api = createApi({
     'Price',
     'Inventory',
     'RestaurantInventory',
+    'RestaurantWaste',
     'Chat',
     'Receiving',
     'RestaurantFinance',
@@ -1054,6 +1055,14 @@ export const api = createApi({
         adjustmentType: 'WASTAGE' | 'SPOILAGE' | 'COUNT_CORRECTION' | 'OTHER'
         quantity: number
         reason?: string
+        unitCost?: number
+        wasteCategory?:
+          | 'OVER_PRODUCTION'
+          | 'SPOILAGE'
+          | 'BREAKAGE'
+          | 'EXPIRED'
+          | 'OVERPORTIONING'
+          | 'OTHER'
       }
     >({
       query: (body) => ({
@@ -1061,7 +1070,22 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['RestaurantInventory'],
+      invalidatesTags: ['RestaurantInventory', 'RestaurantWaste'],
+    }),
+    getRestaurantWasteAnalytics: builder.query<
+      {
+        analytics: Array<Record<string, unknown>>
+        summary: Record<string, unknown>
+        trend: Array<Record<string, unknown>>
+        period: number
+      },
+      { period?: number }
+    >({
+      query: ({ period = 30 } = {}) => ({
+        url: '/api/restaurant-inventory/waste-analytics',
+        params: { period },
+      }),
+      providesTags: ['RestaurantWaste'],
     }),
     getReorderSuggestions: builder.query<ReorderSuggestionsResponse, void>({
       query: () => '/api/restaurant-inventory/reorder-suggestions',
@@ -1290,6 +1314,13 @@ export const api = createApi({
     }),
     createOrgBranch: builder.mutation<any, Record<string, unknown>>({
       query: (body) => ({ url: '/api/org/branches', method: 'POST', body }),
+      invalidatesTags: ['Branch', 'Org', 'Supplier'],
+    }),
+    deactivateOrgBranch: builder.mutation<{ deactivated: boolean }, string>({
+      query: (supplierId) => ({
+        url: `/api/org/branches/${supplierId}`,
+        method: 'DELETE',
+      }),
       invalidatesTags: ['Branch', 'Org', 'Supplier'],
     }),
     switchOrgBranchContext: builder.mutation<
@@ -2723,6 +2754,21 @@ export const api = createApi({
       query: () => '/api/admin-dashboard/overview',
       providesTags: ['Admin'],
     }),
+    getAdminPlatformSettings: builder.query<{ freeSandboxDays: number }, void>({
+      query: () => '/api/admin-dashboard/platform-settings',
+      providesTags: ['Admin'],
+    }),
+    updateAdminPlatformSettings: builder.mutation<
+      { freeSandboxDays: number },
+      { freeSandboxDays: number }
+    >({
+      query: (body) => ({
+        url: '/api/admin-dashboard/platform-settings',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
     getAdminConversionStats: builder.query<
       {
         days: number
@@ -3073,6 +3119,7 @@ export const {
   useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
   useAdjustRestaurantInventoryMutation,
+  useGetRestaurantWasteAnalyticsQuery,
   useGetReorderSuggestionsQuery,
   useGetPendingOrdersForReceivingQuery,
   useGetReceivingHistoryQuery,
@@ -3098,6 +3145,7 @@ export const {
   useGetOrgQuery,
   useGetOrgBranchesQuery,
   useCreateOrgBranchMutation,
+  useDeactivateOrgBranchMutation,
   useSwitchOrgBranchContextMutation,
   useGetBranchInviteRolesQuery,
   useGetBranchInvitationsQuery,
@@ -3247,6 +3295,8 @@ export const {
   useAcceptWaitlistOfferMutation,
   useDeclineWaitlistOfferMutation,
   useGetAdminOverviewQuery,
+  useGetAdminPlatformSettingsQuery,
+  useUpdateAdminPlatformSettingsMutation,
   useGetAdminConversionStatsQuery,
   useGetAdminPlansQuery,
   useCreateAdminPlanMutation,

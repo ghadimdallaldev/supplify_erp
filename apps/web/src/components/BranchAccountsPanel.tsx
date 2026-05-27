@@ -18,25 +18,51 @@ import {
   useCreateBranchMutation,
   useDeleteBranchMutation,
   useGetEntitlementsQuery,
+  useGetOrgBranchesQuery,
+  useCreateOrgBranchMutation,
+  useDeactivateOrgBranchMutation,
 } from '../services/api'
 import { formatBranchGateMessage, getBranchAddGate } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
-import { useAppDispatch } from '../hooks/redux'
+import { useAppDispatch, useAppSelector } from '../hooks/redux'
 
 export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?: string }) {
   const dispatch = useAppDispatch()
+  const { user } = useAppSelector((state) => state.auth)
+  const isSupplier = user?.role === 'SUPPLIER'
   const [showDialog, setShowDialog] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', address: '' })
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const { data, refetch, isLoading } = useGetBranchesQuery()
-  const [createBranch, { isLoading: isCreating }] = useCreateBranchMutation()
+
+  const { data: orgBranchesData, refetch: refetchOrg, isLoading: orgLoading } =
+    useGetOrgBranchesQuery(undefined, { skip: !isSupplier })
+  const useSupplierOrg = isSupplier && Boolean(orgBranchesData?.organizationId)
+
+  const { data: linkedData, refetch: refetchLinked, isLoading: linkedLoading } = useGetBranchesQuery(
+    undefined,
+    { skip: useSupplierOrg }
+  )
+  const [createBranch, { isLoading: isCreatingLinked }] = useCreateBranchMutation()
   const [deleteBranch] = useDeleteBranchMutation()
+  const [createOrgBranch, { isLoading: isCreatingOrg }] = useCreateOrgBranchMutation()
+  const [deactivateOrgBranch] = useDeactivateOrgBranchMutation()
 
   const entitlements = entitlementsData?.entitlements
-  const linked = (data?.accounts ?? []).filter((account: any) => !account.isPrimary)
-  const totalBranchAccounts = linked.length + 1
+  const branches = useSupplierOrg
+    ? (orgBranchesData?.branches ?? []).filter((b: { is_main_branch?: boolean }) => !b.is_main_branch)
+    : (linkedData?.accounts ?? []).filter((account: { isPrimary?: boolean }) => !account.isPrimary)
+  const totalBranchAccounts = useSupplierOrg
+    ? (orgBranchesData?.branches?.length ?? 1)
+    : (linkedData?.accounts?.length ?? 1)
   const branchGate = getBranchAddGate(entitlements, totalBranchAccounts)
   const canAdd = branchGate.canAdd
+  const isLoading = useSupplierOrg ? orgLoading : linkedLoading
+  const isCreating = isCreatingLinked || isCreatingOrg
+
+  const refetch = () => {
+    if (useSupplierOrg) refetchOrg()
+    else refetchLinked()
+  }
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
@@ -51,17 +77,45 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
       return
     }
     try {
-      await createBranch({
-        name: form.name,
-        contact_phone: form.phone || null,
-        address: form.address ? { street: form.address } : null,
-      }).unwrap()
+      if (useSupplierOrg) {
+        await createOrgBranch({
+          name: form.name,
+          contact_phone: form.phone || null,
+          address: form.address ? { street: form.address } : null,
+        }).unwrap()
+      } else {
+        await createBranch({
+          name: form.name,
+          contact_phone: form.phone || null,
+          address: form.address ? { street: form.address } : null,
+        }).unwrap()
+      }
       setForm({ name: '', phone: '', address: '' })
       setShowDialog(false)
       refetch()
-      toast.success('Branch account created')
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to create branch account')
+      toast.success('Branch created')
+    } catch (error: unknown) {
+      const msg =
+        (error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
+        'Failed to create branch'
+      toast.error(msg)
+    }
+  }
+
+  const handleRemove = async (branchId: string) => {
+    try {
+      if (useSupplierOrg) {
+        await deactivateOrgBranch(branchId).unwrap()
+      } else {
+        await deleteBranch(branchId).unwrap()
+      }
+      refetch()
+      toast.success('Branch removed')
+    } catch (error: unknown) {
+      const msg =
+        (error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
+        'Failed to remove branch'
+      toast.error(msg)
     }
   }
 
@@ -69,17 +123,18 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Branch accounts</CardTitle>
               <CardDescription>
-                Each branch is a separate account with its own catalog, orders, and settings. Switch
-                between them from the header.
+                {useSupplierOrg
+                  ? 'Locations under your supplier organization. Switch between them from the header.'
+                  : `Each branch is a separate account with its own catalog, orders, and settings. Switch between them from the header.`}
               </CardDescription>
             </div>
-            <Button disabled={!canAdd} onClick={() => setShowDialog(true)}>
+            <Button disabled={!canAdd} onClick={() => setShowDialog(true)} className="shrink-0">
               <Plus className="h-4 w-4 mr-2" />
-              Add branch account
+              Add branch
             </Button>
           </div>
         </CardHeader>
@@ -91,59 +146,53 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
           )}
           {isLoading ? (
             <p className="text-sm text-[var(--text-muted)]">Loading branch accounts…</p>
-          ) : linked.length === 0 ? (
+          ) : branches.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
               <FileText className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-              <p className="text-[var(--text-muted)]">No branch accounts yet</p>
+              <p className="text-[var(--text-muted)]">No extra branches yet</p>
               <p className="text-sm text-[var(--text-muted)] mt-2">
-                Create a separate account for each additional {entityLabel}
+                Add another {entityLabel} when you are ready to expand
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {linked.map((branch: any) => (
-                <div
-                  key={branch.id}
-                  className="flex items-center justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
-                >
-                  <div>
-                    <p className="font-medium">{branch.name}</p>
-                    <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] mt-1">
-                      {branch.phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {branch.phone}
-                        </span>
-                      )}
-                      {branch.address && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {typeof branch.address === 'string'
-                            ? branch.address
-                            : branch.address?.street}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        await deleteBranch(branch.id).unwrap()
-                        refetch()
-                        toast.success('Branch account unlinked')
-                      } catch (error: any) {
-                        toast.error(
-                          error?.data?.error?.message || 'Failed to remove branch account'
-                        )
-                      }
-                    }}
+              {branches.map((branch: Record<string, unknown>) => {
+                const id = String(branch.id)
+                const phone = String(branch.phone ?? branch.contact_phone ?? '')
+                const address =
+                  typeof branch.address === 'string'
+                    ? branch.address
+                    : (branch.address as { street?: string })?.street ||
+                      (branch.address_json as { street?: string })?.street ||
+                      ''
+                return (
+                  <div
+                    key={id}
+                    className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="min-w-0">
+                      <p className="font-medium">{String(branch.name)}</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--text-muted)] mt-1">
+                        {phone ? (
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            {phone}
+                          </span>
+                        ) : null}
+                        {address ? (
+                          <span className="flex items-center gap-1 min-w-0">
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{address}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" className="shrink-0" onClick={() => handleRemove(id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>
@@ -152,10 +201,9 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New branch account</DialogTitle>
+            <DialogTitle>New branch</DialogTitle>
             <DialogDescription>
-              This creates a separate account under your organization. You can switch to it from the
-              header.
+              Creates an additional {entityLabel} you can switch to from the header.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -189,7 +237,7 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
               Cancel
             </Button>
             <Button onClick={handleCreate} disabled={isCreating}>
-              {isCreating ? 'Creating…' : 'Create account'}
+              {isCreating ? 'Creating…' : 'Create branch'}
             </Button>
           </DialogFooter>
         </DialogContent>
