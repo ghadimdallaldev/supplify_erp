@@ -602,9 +602,9 @@ export async function applyPromotionByIdToOrder({
   subtotal,
   lineItems,
 }) {
-  const { canApplyDealRedemption } = await import('../lib/subscription.js')
-  const redemption = await canApplyDealRedemption(restaurantId)
-  if (!redemption.allowed) return null
+  const { isFeatureEnabled } = await import('../lib/subscription.js')
+  const dealsEnabled = await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_deals')
+  if (!dealsEnabled) return null
 
   const { rows } = await client.query(
     `

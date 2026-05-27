@@ -1,0 +1,49 @@
+# Deploy to a single EC2 instance using deploy/docker-compose.prod.yml
+# (not CDK/ECS — see deploy-prod.yml for that path).
+#
+# Required GitHub secrets (Settings → Secrets → Actions, or environment "production"):
+#   EC2_HOST          — public IP or DNS of the server
+#   EC2_USER          — e.g. ubuntu (Ubuntu) or ec2-user (Amazon Linux)
+#   EC2_SSH_KEY       — private key PEM (full contents)
+#   EC2_DEPLOY_PATH   — optional, default /opt/supplify
+#
+# One-time on the server (before first workflow run):
+#   sudo mkdir -p /opt/supplify && sudo chown $USER:$USER /opt/supplify
+#   git clone <repo> /opt/supplify && cd /opt/supplify
+#   sudo ./deploy/scripts/deploy-prod.sh   # creates deploy/env/.env.prod
+#
+name: Deploy EC2 Production
+
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ec2-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH deploy to EC2
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 45m
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.EC2_DEPLOY_PATH || '/opt/supplify' }}"
+            BRANCH="${{ secrets.EC2_DEPLOY_BRANCH || 'prod' }}"
+            cd "$DEPLOY_PATH"
+            git fetch origin
+            git checkout "$BRANCH"
+            git pull origin "$BRANCH"
+            sudo ./deploy/scripts/deploy-prod.sh
+            ./deploy/scripts/healthcheck.sh prod || true
