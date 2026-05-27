@@ -1,9 +1,18 @@
 import dotenv from 'dotenv'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
+import { resolveNativeDatabaseUrl } from '../../../../scripts/lib/local-infra-urls.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-dotenv.config({ path: path.resolve(__dirname, '../../.env') })
+const apiEnvDir = path.resolve(__dirname, '../..')
+dotenv.config({ path: path.join(apiEnvDir, '.env') })
+const dockerSyncPath = path.join(apiEnvDir, '.env.docker-sync')
+if (existsSync(dockerSyncPath)) {
+  dotenv.config({ path: dockerSyncPath, override: true })
+}
+const envDatabaseUrl = process.env.DATABASE_URL
+const resolvedDatabaseUrl = resolveNativeDatabaseUrl(envDatabaseUrl)
 
 export const config = {
   PORT: process.env.PORT || 4000,
@@ -17,8 +26,7 @@ export const config = {
     : process.env.NODE_ENV === 'production'
       ? [process.env.WEB_ORIGIN || 'http://localhost:5173']
       : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
-  DATABASE_URL:
-    process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/supplify',
+  DATABASE_URL: resolvedDatabaseUrl,
   /** Enable SSL for DB (e.g. DATABASE_SSL=true in production). */
   DATABASE_SSL: process.env.DATABASE_SSL === 'true',
   /** Statement timeout in ms (optional; e.g. 30000 for 30s in production). */

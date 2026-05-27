@@ -104,42 +104,9 @@ function Test-HttpOk {
 }
 
 function Ensure-Env {
-    if (-not (Test-Path $EnvFile)) {
-        if (-not (Test-Path $EnvExample)) {
-            Write-Error "Missing $EnvExample"
-        }
-        Copy-Item $EnvExample $EnvFile
-        Write-Host "Created $EnvFile from example."
-    }
-
-    $vars = Read-EnvFile
-    $changed = $false
-
-    $pgPort = [int](Get-EnvVal $vars "POSTGRES_PORT" "5432")
-    if ((Test-PortInUse $pgPort) -and -not (Test-OurContainerOnPort $pgPort "supplify-postgres")) {
-        Write-Host "Port $pgPort is busy - using 5433 for Postgres."
-        Set-EnvVal "POSTGRES_PORT" "5433"
-        $changed = $true
-    }
-
-    $appPort = [int](Get-EnvVal $vars "APP_PORT" "80")
-    if ((Test-PortInUse $appPort) -and -not (Test-OurContainerOnPort $appPort "supplify-nginx")) {
-        Write-Host "Port $appPort is busy - using 8080 for the app (nginx)."
-        Set-EnvVal "APP_PORT" "8080"
-        Set-EnvVal "VITE_API_URL" "http://localhost:8080"
-        Set-EnvVal "WEB_ORIGIN" "http://localhost:8080"
-        $changed = $true
-    }
-
-    $kcPort = [int](Get-EnvVal $vars "KEYCLOAK_PORT" "8180")
-    if ((Test-PortInUse $kcPort) -and -not (Test-OurContainerOnPort $kcPort "supplify-keycloak")) {
-        Write-Host "Port $kcPort is busy - using 8181 for Keycloak."
-        Set-EnvVal "KEYCLOAK_PORT" "8181"
-        Set-EnvVal "VITE_KEYCLOAK_URL" "http://localhost:8181"
-        $changed = $true
-    }
-
-    if ($changed) { $script:vars = Read-EnvFile } else { $script:vars = $vars }
+    & node (Join-Path $RepoRoot "scripts\ensure-docker-env.mjs")
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $script:vars = Read-EnvFile
 }
 
 function Get-Urls {
@@ -183,7 +150,7 @@ if ($cmd -eq "up") {
     }
 
     Ensure-Env
-    Write-Host "Syncing apps/api/.env from docker/.env (native migrations + pnpm dev)..."
+    Write-Host "Syncing apps/api/.env.docker-sync from docker/.env (native migrations + pnpm dev)..."
     & node (Join-Path $RepoRoot "scripts\ensure-native-env.mjs")
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     Write-Host "Starting Supplify stack..."

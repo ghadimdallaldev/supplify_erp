@@ -69,49 +69,7 @@ patch_env_var() {
 }
 
 ensure_env() {
-  if [[ ! -f "$ENV_FILE" ]]; then
-    if [[ ! -f "$ENV_EXAMPLE" ]]; then
-      echo "Missing $ENV_EXAMPLE"
-      exit 1
-    fi
-    cp "$ENV_EXAMPLE" "$ENV_FILE"
-    echo "Created $ENV_FILE from example."
-  fi
-
-  # shellcheck disable=SC1090
-  set -a
-  source "$ENV_FILE"
-  set +a
-
-  local changed=0
-
-  if port_in_use "${POSTGRES_PORT:-5432}" && ! our_container_on_port "${POSTGRES_PORT:-5432}" supplify-postgres; then
-    echo "Port ${POSTGRES_PORT:-5432} is busy — using 5433 for Postgres."
-    patch_env_var POSTGRES_PORT 5433
-    changed=1
-  fi
-
-  if port_in_use "${APP_PORT:-80}" && ! our_container_on_port "${APP_PORT:-80}" supplify-nginx; then
-    echo "Port ${APP_PORT:-80} is busy — using 8080 for the app (nginx)."
-    patch_env_var APP_PORT 8080
-    patch_env_var VITE_API_URL "http://localhost:8080"
-    patch_env_var WEB_ORIGIN "http://localhost:8080"
-    changed=1
-  fi
-
-  if port_in_use "${KEYCLOAK_PORT:-8180}" && ! our_container_on_port "${KEYCLOAK_PORT:-8180}" supplify-keycloak; then
-    echo "Port ${KEYCLOAK_PORT:-8180} is busy — using 8181 for Keycloak."
-    patch_env_var KEYCLOAK_PORT 8181
-    patch_env_var VITE_KEYCLOAK_URL "http://localhost:8181"
-    changed=1
-  fi
-
-  if [[ "$changed" -eq 1 ]]; then
-    # shellcheck disable=SC1090
-    set -a
-    source "$ENV_FILE"
-    set +a
-  fi
+  node "$REPO_ROOT/scripts/ensure-docker-env.mjs"
 }
 
 load_urls() {
@@ -146,6 +104,8 @@ cmd_up() {
   done
 
   ensure_env
+  echo "Syncing apps/api/.env.docker-sync from docker/.env..."
+  node "$REPO_ROOT/scripts/ensure-native-env.mjs"
   echo "Starting Supplify stack (Docker full profile)..."
   dc up -d "${build_flag[@]}" --profile full
 

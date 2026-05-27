@@ -45,11 +45,12 @@ pnpm db:migrate   # SQL migrations
 
 ## Environment variables (keys only)
 
-Copy `.env.example` to `apps/api/.env` and set values locally. Common keys:
+Copy `apps/api/.env.example` to `apps/api/.env` for app secrets (Twilio, VAPID, etc.). **Local Postgres/Redis/Keycloak** credentials and ports live in `docker/.env` (created from `docker/.env.example` on first `pnpm local:infra` or `pnpm dev`). Native dev syncs `apps/api/.env.docker-sync` automatically — do not hand-edit that file.
 
 | Key                                  | Purpose                                  |
 | ------------------------------------ | ---------------------------------------- |
-| `DATABASE_URL`                       | PostgreSQL connection                    |
+| `docker/.env` `POSTGRES_*`           | Local PostgreSQL (source of truth)       |
+| `DATABASE_URL` in `apps/api/.env`    | Optional override (remote DB, CI)        |
 | `REDIS_URL`                          | Cache (permissions, feature flags)       |
 | `WEB_ORIGIN` / `WEB_ORIGINS`         | Allowed browser origins (CORS)           |
 | `SESSION_SECRET`                     | Express session signing                  |

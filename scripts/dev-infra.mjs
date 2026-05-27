@@ -4,18 +4,13 @@
  * Use with: pnpm local:infra
  */
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { dockerComposeArgs, getRepoRoot } from './lib/docker-env.mjs'
+import { ensureDockerEnv } from './lib/ensure-docker-env.mjs'
 
 const root = getRepoRoot()
-const envFile = path.join(root, 'docker', '.env')
-const envExample = path.join(root, 'docker', '.env.example')
-
-if (!existsSync(envFile)) {
-  copyFileSync(envExample, envFile)
-  console.log('Created docker/.env from example')
-}
+ensureDockerEnv()
+spawnSync('node', ['scripts/ensure-native-env.mjs'], { cwd: root, stdio: 'inherit', shell: true })
 
 const services = [
   'postgres',

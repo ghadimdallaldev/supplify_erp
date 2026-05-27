@@ -6,12 +6,19 @@ import {
   useRegenerateRestaurantMemberInvitationMutation,
   useRevokeRestaurantMemberInvitationMutation,
 } from '../../services/api'
+import { usePermissions } from '../../hooks/usePermissions'
 
 export function RestaurantPendingInvitations() {
-  const { data, refetch } = useGetRestaurantMemberInvitationsQuery()
+  const { canAny } = usePermissions()
+  const canManageInvites = canAny('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE')
+  const { data, refetch } = useGetRestaurantMemberInvitationsQuery(undefined, {
+    skip: !canManageInvites,
+  })
   const [revoke] = useRevokeRestaurantMemberInvitationMutation()
   const [regenerate] = useRegenerateRestaurantMemberInvitationMutation()
   const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  if (!canManageInvites) return null
 
   const invitations = (data?.invitations ?? []).filter((inv) =>
     ['pending', 'expired', 'revoked'].includes(inv.status)
