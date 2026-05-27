@@ -61,7 +61,12 @@ try {
 } catch {
   // Release branches delete promote/prune scripts; dev keeps updating them.
   run('git rm -f scripts/promote-release.mjs scripts/prune-release-tree.mjs')
-  const stillDirty = runCapture('git status --porcelain')
+  let stillDirty = runCapture('git status --porcelain')
+  if (stillDirty.includes('Unmerged') && fs.existsSync(path.join(ROOT, 'docs'))) {
+    // Release branches must not contain docs/ (pruned tree).
+    run('git rm -rf docs')
+    stillDirty = runCapture('git status --porcelain')
+  }
   if (stillDirty.includes('Unmerged')) {
     console.error('Merge has unresolved conflicts. Resolve manually, then re-run promote.')
     process.exit(1)
