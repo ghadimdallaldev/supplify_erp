@@ -21,6 +21,13 @@ function runCapture(cmd) {
   return execSync(cmd, { cwd: ROOT, encoding: 'utf8' }).trim()
 }
 
+function hasUnmergedPaths(porcelain) {
+  return porcelain.split('\n').some((line) => {
+    if (!line.trim()) return false
+    return line.slice(0, 2).includes('U')
+  })
+}
+
 const tier = (() => {
   const i = process.argv.indexOf('--tier')
   if (i === -1 || !process.argv[i + 1]) {
@@ -62,12 +69,12 @@ try {
   // Release branches delete promote/prune scripts; dev keeps updating them.
   run('git rm -f scripts/promote-release.mjs scripts/prune-release-tree.mjs')
   let stillDirty = runCapture('git status --porcelain')
-  if (stillDirty.includes('Unmerged') && fs.existsSync(path.join(ROOT, 'docs'))) {
+  if (hasUnmergedPaths(stillDirty) && fs.existsSync(path.join(ROOT, 'docs'))) {
     // Release branches must not contain docs/ (pruned tree).
     run('git rm -rf docs')
     stillDirty = runCapture('git status --porcelain')
   }
-  if (stillDirty.includes('Unmerged')) {
+  if (hasUnmergedPaths(stillDirty)) {
     console.error('Merge has unresolved conflicts. Resolve manually, then re-run promote.')
     process.exit(1)
   }
