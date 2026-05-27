@@ -67,7 +67,9 @@ try {
   run(`git merge origin/${source} -m "merge(${source}): promote to ${branch}" -X theirs`)
 } catch {
   // Release branches delete promote/prune scripts; dev keeps updating them.
-  run('git rm -f scripts/promote-release.mjs scripts/prune-release-tree.mjs')
+  for (const rel of ['scripts/promote-release.mjs', 'scripts/prune-release-tree.mjs']) {
+    if (fs.existsSync(path.join(ROOT, rel))) run(`git rm -f ${rel}`)
+  }
   let stillDirty = runCapture('git status --porcelain')
   if (hasUnmergedPaths(stillDirty) && fs.existsSync(path.join(ROOT, 'docs'))) {
     // Release branches must not contain docs/ (pruned tree).
