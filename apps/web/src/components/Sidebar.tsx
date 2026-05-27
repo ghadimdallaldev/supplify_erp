@@ -6,6 +6,8 @@ import {
   useGetImpersonationStatusQuery,
   useGetDashboardStatsQuery,
   useGetEntitlementsQuery,
+  useGetDisputesQuery,
+  useGetIncomingDisputesQuery,
 } from '../services/api'
 import { SupplifyLogo } from './SupplifyLogo'
 import {
@@ -32,6 +34,7 @@ import {
   Percent,
 } from 'lucide-react'
 import { featureEnabled, getOrderUsageBadge } from '../lib/planLimits'
+import { countActiveDisputes } from '../lib/disputeHelpers'
 import { canUseGlobalReports } from '../lib/planFeatureGates'
 
 type NavItem = {
@@ -39,7 +42,7 @@ type NavItem = {
   href: string
   icon: any
   permission?: string
-  badge?: 'pending' | 'unread'
+  badge?: 'pending' | 'unread' | 'disputes'
   testId?: string
 }
 
@@ -98,6 +101,17 @@ export function Sidebar({
     entitlementsData?.entitlements?.features?.supplier_deals
   )
   const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
+    skip: !disputesEnabled || isSupplier || !user,
+    pollingInterval: 30_000,
+  })
+  const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
+    skip: !disputesEnabled || !isSupplier || !user,
+    pollingInterval: 30_000,
+  })
+  const activeDisputeCount = countActiveDisputes(
+    (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []
+  )
   const promotionsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.promotions)
   const orderUsageBadge = getOrderUsageBadge(entitlementsData?.entitlements)
 
@@ -187,6 +201,7 @@ export function Sidebar({
               href: '/app/disputes',
               icon: Scale,
               permission: 'ORDERS_VIEW',
+              badge: 'disputes' as const,
               testId: 'nav-disputes',
             },
           ]
@@ -322,6 +337,18 @@ export function Sidebar({
         permission: 'ORDERS_VIEW',
         testId: 'nav-restaurants',
       },
+      ...(disputesEnabled
+        ? [
+            {
+              name: 'Disputes',
+              href: '/app/disputes',
+              icon: Scale,
+              permission: 'ORDERS_VIEW',
+              badge: 'disputes' as const,
+              testId: 'nav-disputes',
+            },
+          ]
+        : []),
     ].filter((item) => !item.permission || can(item.permission))
     const intel: NavItem[] = [
       ...(reportsEnabled
@@ -332,17 +359,6 @@ export function Sidebar({
               icon: BarChart3,
               permission: 'ORDERS_VIEW',
               testId: 'nav-reports',
-            },
-          ]
-        : []),
-      ...(disputesEnabled
-        ? [
-            {
-              name: 'Disputes',
-              href: '/app/disputes',
-              icon: Scale,
-              permission: 'ORDERS_VIEW',
-              testId: 'nav-disputes',
             },
           ]
         : []),
@@ -444,6 +460,7 @@ export function Sidebar({
               const isActive = isNavItemActive(location.pathname, item.href)
               const showPendingBadge = item.badge === 'pending' && pendingOrders > 0
               const showUnreadBadge = item.badge === 'unread' && unreadCount > 0
+              const showDisputesBadge = item.badge === 'disputes' && activeDisputeCount > 0
               const showOrderUsage =
                 item.name === 'Cart' && (isRestaurant || impersonatingRestaurant) && orderUsageBadge
 
@@ -527,6 +544,23 @@ export function Sidebar({
                       }}
                     >
                       {pendingOrders > 99 ? '99+' : pendingOrders}
+                    </span>
+                  )}
+                  {showDisputesBadge && (
+                    <span
+                      style={{
+                        background: 'var(--amber-mid)',
+                        color: '#000',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        borderRadius: 8,
+                        padding: '1px 5px',
+                        minWidth: 18,
+                        textAlign: 'center',
+                      }}
+                      title="Active disputes"
+                    >
+                      {activeDisputeCount > 99 ? '99+' : activeDisputeCount}
                     </span>
                   )}
                   {showUnreadBadge && (

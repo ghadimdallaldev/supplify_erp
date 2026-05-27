@@ -1,6 +1,8 @@
 # Push Notifications (Web Push / PWA)
 
-Browser-native **Web Push** via VAPID. Complements in-app `notification_log` entries; does not use Twilio or FCM.
+Browser-native **Web Push** via VAPID. Complements in-app `notification_log` entries and foreground **toasts** (`useNotificationAlerts` in `Layout`); does not use Twilio or FCM.
+
+Team members receive the same events as the primary account via `notifyTenantUsers` — see [notifications-delivery.md](./notifications-delivery.md).
 
 ## Configuration
 

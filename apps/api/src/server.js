@@ -49,7 +49,11 @@ import { runSubscriptionBillingJob } from './jobs/subscription-billing.job.js'
 import { checkExpiredWaitlistOffers } from './services/waitlistPromotion.js'
 import { billingAccessMiddleware } from './middlewares/billingAccess.js'
 import { billingRoutes } from './routes/billing.routes.js'
-import { ensureReservationsSchema, ensureStaffAppSchema } from './lib/migrator.js'
+import {
+  ensureReservationsSchema,
+  ensureStaffAppSchema,
+  ensureOrderCancellationColumns,
+} from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { e2eRoutes } from './routes/e2e.routes.js'
@@ -89,6 +93,7 @@ if (config.NODE_ENV !== 'test') {
   try {
     await ensureReservationsSchema()
     await ensureStaffAppSchema()
+    await ensureOrderCancellationColumns()
   } catch (error) {
     logger.error('Aborting server startup due to reservations migration failure', {
       error: error.message,

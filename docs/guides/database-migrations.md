@@ -4,11 +4,11 @@ SQL migrations live in `apps/api/db/migrations/` and run in lexical order. Appli
 
 ## Running migrations
 
-| Environment | Command |
-|-------------|---------|
-| Docker stack (recommended) | `scripts\run-local.cmd seed` or automatic via `supplify-migrate` on `docker compose up` |
-| Host against Docker Postgres | `DATABASE_URL=postgresql://postgres:postgres@localhost:5433/supplify node apps/api/scripts/run-migration.js` (port must match `docker/.env` `POSTGRES_PORT`) |
-| pnpm (uses `migrate.js` wrapper) | `pnpm db:migrate` |
+| Environment                      | Command                                                                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Docker stack (recommended)       | `scripts\run-local.cmd seed` or automatic via `supplify-migrate` on `docker compose up`                                                                      |
+| Host against Docker Postgres     | `DATABASE_URL=postgresql://postgres:postgres@localhost:5433/supplify node apps/api/scripts/run-migration.js` (port must match `docker/.env` `POSTGRES_PORT`) |
+| pnpm (uses `migrate.js` wrapper) | `pnpm db:migrate`                                                                                                                                            |
 
 `apps/api/scripts/migrate.js` runs:
 
@@ -16,11 +16,11 @@ SQL migrations live in `apps/api/db/migrations/` and run in lexical order. Appli
 2. Runtime schema checks (reservations, staff app) from `src/lib/migrator.js` — in parallel
 3. `migrate-users-to-roles.js` when tenant role backfill is not already complete (skipped on subsequent `pnpm dev` runs when DB is up to date)
 
-| Script | Command |
-|--------|---------|
-| SQL + runtime checks + role backfill (if needed) | `pnpm db:migrate` |
-| Role backfill only | `pnpm db:migrate-users-to-roles` |
-| Skip role backfill | `SKIP_TENANT_ROLE_BACKFILL=1 pnpm db:migrate` |
+| Script                                           | Command                                       |
+| ------------------------------------------------ | --------------------------------------------- |
+| SQL + runtime checks + role backfill (if needed) | `pnpm db:migrate`                             |
+| Role backfill only                               | `pnpm db:migrate-users-to-roles`              |
+| Skip role backfill                               | `SKIP_TENANT_ROLE_BACKFILL=1 pnpm db:migrate` |
 
 ## Fresh database checklist
 
@@ -28,7 +28,7 @@ SQL migrations live in `apps/api/db/migrations/` and run in lexical order. Appli
 2. Run migrations (`run-migration.js`).
 3. Seed demo data: `scripts\run-local.cmd seed` (migrations + `seed.sql` + Keycloak users).
 
-All **55** migrations (through `0055_admin_feature_toggles.sql`) must complete without error on an empty database.
+All SQL files in `apps/api/db/migrations/` must complete without error on an empty database. Recent examples: `0103_reservation_availability_indexes.sql`, `0108_order_cancellation_details.sql` (`cancel_reason`, `cancelled_by` on `customer_order`).
 
 ## Common issues
 

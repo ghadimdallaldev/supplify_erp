@@ -19,6 +19,10 @@ import {
 } from '../services/api'
 import { Link as RouterLink } from 'react-router-dom'
 import { featureEnabled } from '../lib/planLimits'
+import { isOrderEligibleForDispute } from '../lib/orderDisputeEligibility'
+import { getActiveDisputeForOrder, getDisputesForOrder } from '../lib/disputeHelpers'
+import { OrderDisputeBanner } from '../components/disputes/OrderDisputeBanner'
+import { OpenDisputeDialog } from '../components/disputes/OpenDisputeDialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -47,6 +51,9 @@ import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 import { buildOrderTimeline } from '../lib/orderTimeline'
 import { OrderOperationsTimeline } from '../components/orders/OrderOperationsTimeline'
+import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
+import { getOrderCancellationBanner, getOrderStatusLabel } from '../lib/orderStatusDisplay'
+import { formatOrderRef, isDisputeReplacementOrder } from '../lib/orderPlacement'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -93,6 +100,7 @@ export function OrderDetailPage() {
   const [activeTab, setActiveTab] = useState<string>('timeline')
   const [showPickingNotes, setShowPickingNotes] = useState(false)
   const [showDeliveryNotes, setShowDeliveryNotes] = useState(false)
+  const [showOpenDispute, setShowOpenDispute] = useState(false)
 
   useEffect(() => {
     if (tabFromUrl && VALID_ORDER_TABS.includes(tabFromUrl as (typeof VALID_ORDER_TABS)[number])) {
@@ -140,6 +148,7 @@ export function OrderDetailPage() {
   const [sendReminder, { isLoading: isSendingReminder }] = useSendOrderReminderMutation()
   const [showAmendmentForm, setShowAmendmentForm] = useState(false)
   const [amendmentDescription, setAmendmentDescription] = useState('')
+  const [showDeclineDialog, setShowDeclineDialog] = useState(false)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -164,13 +173,20 @@ export function OrderDetailPage() {
 
   const [isUpdating, setIsUpdating] = useState(false)
 
-  const handleStatusUpdate = async (newStatus: string) => {
+  const handleStatusUpdate = async (
+    newStatus: string,
+    extra?: { decline_reason?: string; cancel_reason?: string }
+  ) => {
     if (!id || isUpdating) return // Prevent multiple clicks
 
     try {
       setIsUpdating(true) // Set immediately - button will be replaced by disabled button
-      await updateOrder({ id, data: { status: newStatus } }).unwrap()
-      toast.success(`Order status updated to ${newStatus}`)
+      await updateOrder({ id, data: { status: newStatus, ...extra } }).unwrap()
+      const successLabel =
+        newStatus === 'CANCELLED' && isSupplier
+          ? 'Order declined'
+          : `Order status updated to ${newStatus}`
+      toast.success(successLabel)
 
       // Refetch to get updated data
       const refetchResult = await refetch()
@@ -310,12 +326,34 @@ export function OrderDetailPage() {
           ? { label: 'Rejected', tone: 'red' as const }
           : null
 
-  const orderDisputes = isSupplier
+  const cancellationBanner = getOrderCancellationBanner(
+    order,
+    isSupplier ? 'SUPPLIER' : 'RESTAURANT'
+  )
+  const statusLabel = getOrderStatusLabel(order, isSupplier ? 'SUPPLIER' : 'RESTAURANT')
+
+  const allDisputes = isSupplier
     ? (incomingDisputesData?.disputes ?? [])
     : (disputesData?.disputes ?? [])
+  const orderDisputes = getDisputesForOrder(allDisputes, order.id)
+  const activeDispute = getActiveDisputeForOrder(allDisputes, order.id)
   const orderReceivingReports = (receivingHistoryData?.reports ?? []).filter(
     (report: Record<string, unknown>) => String(report.order_id ?? report.orderId) === order.id
   )
+  const replacementOrders = (order as Record<string, unknown>).replacementOrders as
+    | Array<Record<string, unknown>>
+    | undefined
+  const sourceDispute = (order as Record<string, unknown>).sourceDispute as
+    | Record<string, unknown>
+    | null
+    | undefined
+  const isReplacementOrder = isDisputeReplacementOrder(order as Record<string, unknown>)
+  const sourceOrderId = String(
+    (order as Record<string, unknown>).source_order_id ??
+      (order as Record<string, unknown>).sourceOrderId ??
+      ''
+  )
+
   const timelineEvents = buildOrderTimeline({
     order,
     viewerRole: isSupplier ? 'SUPPLIER' : 'RESTAURANT',
@@ -324,6 +362,7 @@ export function OrderDetailPage() {
     disputes: orderDisputes,
     receivingReports: orderReceivingReports,
     creditNotes: creditNotesData?.creditNotes ?? [],
+    replacementOrders: replacementOrders ?? [],
     approvalStatus: approval?.status ?? null,
   })
 
@@ -345,6 +384,43 @@ export function OrderDetailPage() {
           )}
         </div>
       )}
+      {cancellationBanner && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <strong>{cancellationBanner.title}</strong>
+          {cancellationBanner.reason && (
+            <p className="mt-1 text-red-800 whitespace-pre-wrap">{cancellationBanner.reason}</p>
+          )}
+        </div>
+      )}
+      {disputesEnabled && (
+        <OrderDisputeBanner orderId={order.id} disputes={allDisputes} isSupplier={isSupplier} />
+      )}
+      {isReplacementOrder && (
+        <div className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
+          <strong>Replacement for dispute</strong>
+          <p className="mt-1 text-sky-900/90 dark:text-sky-200/90">
+            This order was created to ship missing or corrected goods from a resolved dispute.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {sourceOrderId && (
+              <RouterLink
+                to={`/app/orders/${sourceOrderId}`}
+                className="text-[var(--brand-mid)] hover:underline font-medium"
+              >
+                Original order {formatOrderRef(sourceOrderId)}
+              </RouterLink>
+            )}
+            {sourceDispute?.id && (
+              <RouterLink
+                to={`/app/disputes/${String(sourceDispute.id)}`}
+                className="text-[var(--brand-mid)] hover:underline font-medium"
+              >
+                Dispute {formatOrderRef(sourceDispute.id)}
+              </RouterLink>
+            )}
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -360,8 +436,13 @@ export function OrderDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isReplacementOrder && (
+            <Badge variant="secondary" className="text-sm">
+              Replacement
+            </Badge>
+          )}
           <Badge variant={getStatusColor(order.status)} className="text-lg px-3 py-1">
-            {order.status}
+            {statusLabel}
           </Badge>
           {!isSupplier && order.status === 'PLACED' && (
             <Button
@@ -378,9 +459,18 @@ export function OrderDetailPage() {
                   : 'Send Reminder'}
             </Button>
           )}
-          {!isSupplier && canOpenDispute && !['CANCELLED', 'DRAFT'].includes(order.status) && (
+          {!isSupplier &&
+            canOpenDispute &&
+            disputesEnabled &&
+            isOrderEligibleForDispute(order.status) &&
+            !activeDispute && (
+              <Button size="sm" variant="outline" onClick={() => setShowOpenDispute(true)}>
+                Open dispute
+              </Button>
+            )}
+          {isSupplier && disputesEnabled && activeDispute && (
             <Button size="sm" variant="outline" asChild>
-              <RouterLink to={`/app/disputes?orderId=${order.id}`}>Open dispute</RouterLink>
+              <RouterLink to="/app/disputes">Manage dispute</RouterLink>
             </Button>
           )}
           {isSupplier && (
@@ -394,7 +484,7 @@ export function OrderDetailPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleStatusUpdate('CANCELLED')}
+                      onClick={() => setShowDeclineDialog(true)}
                       data-testid="order-decline"
                     >
                       Decline
@@ -1184,6 +1274,25 @@ export function OrderDetailPage() {
           </TabsContent>
         )}
       </Tabs>
+
+      <DeclineOrderDialog
+        open={showDeclineDialog}
+        onOpenChange={setShowDeclineDialog}
+        orderLabel={order.restaurant_name}
+        isSubmitting={isUpdating}
+        onConfirm={async (reason) => {
+          await handleStatusUpdate('CANCELLED', { decline_reason: reason })
+        }}
+      />
+
+      {!isSupplier && disputesEnabled && (
+        <OpenDisputeDialog
+          open={showOpenDispute}
+          onOpenChange={setShowOpenDispute}
+          orderId={order.id}
+          onCreated={() => refetch()}
+        />
+      )}
     </div>
   )
 }

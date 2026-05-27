@@ -6,7 +6,7 @@
 | ------------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | **Email**    | Twilio SendGrid API (preferred) or [nodemailer](https://nodemailer.com/) SMTP | `SENDGRID_API_KEY` or `SMTP_*` on the API                                                                        |
 | **WhatsApp** | Twilio Programmable Messaging (+ `wa.me` fallback in metadata)                | Outbound when configured; in-app “Open in WhatsApp” when link present                                            |
-| **In-app**   | `notification_log` table                                                      | Bell icon in header                                                                                              |
+| **In-app**   | `notification_log` table                                                      | Bell icon; **toast + sound** via `useNotificationAlerts` (~10s); optional browser banner when permitted          |
 | **Push**     | Web Push (VAPID) via `web-push`                                               | Opt-in (`push_enabled`); requires `VAPID_*` env — see [push-notifications.md](../features/push-notifications.md) |
 
 ### SMTP environment variables
@@ -37,31 +37,50 @@ Guest reservation confirmations:
 
 ---
 
+## Recipients
+
+Most tenant events use **`notifyTenantUsers`**: every user in `tenant_user_roles` plus the primary `contact_email` account. See [notifications-delivery.md](../features/notifications-delivery.md).
+
 ## Notification triggers
 
 ### Orders
 
-| Event                                        | Recipient  | Category key          |
-| -------------------------------------------- | ---------- | --------------------- |
-| Order placed / cancelled                     | Supplier   | `PLACED`, `CANCELLED` |
-| Acknowledged, processing, shipped, delivered | Restaurant | matching status       |
+| Event                                        | Recipient(s)      | Category / notes                                                                                 |
+| -------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------ |
+| Order placed                                 | Supplier team     | `PLACED` / `notify_order_new`                                                                    |
+| Acknowledged, processing, shipped, delivered | Restaurant team   | matching status                                                                                  |
+| Cancelled by **restaurant**                  | Supplier team     | `CANCELLED`                                                                                      |
+| **Declined by supplier** (reason required)   | Restaurant team   | `CANCELLED`; message includes `cancel_reason` — [order-decline.md](../features/order-decline.md) |
+| Order approval pending                       | Assigned approver | `order_approval`                                                                                 |
+| Order amendment created/accepted/rejected    | Counterparty team | `order_amendment`                                                                                |
+| Order reminder (restaurant)                  | Supplier team     | `PLACED`                                                                                         |
 
 ### Reservations
 
-| Event                        | Recipient                   |
+| Event                        | Recipient(s)                |
 | ---------------------------- | --------------------------- |
-| New reservation              | Restaurant owner            |
-| Waitlist                     | Restaurant owner            |
+| New reservation              | Restaurant team             |
+| Waitlist                     | Restaurant team             |
+| Guest cancel / reschedule    | Restaurant team             |
+| Staff status change          | Restaurant team             |
 | Confirmed / waitlist (guest) | Guest email + WhatsApp link |
 
-### Other
+See [reservations-foh.md](../features/reservations-foh.md).
 
-- Invoices issued → restaurant
-- Payments received → supplier
-- Low stock → restaurant / supplier
-- Chat messages → counterparty
-- Staff PTO / shift swap → restaurant manager
-- Scheduled orders → restaurant
+### Other (tenant-wide where noted)
+
+| Event                        | Recipient(s)                |
+| ---------------------------- | --------------------------- |
+| Invoice issued               | Restaurant team             |
+| Invoice overdue              | Restaurant + supplier teams |
+| Payment received             | Supplier team               |
+| Low / out of stock           | Supplier or restaurant team |
+| Chat message                 | Counterparty team           |
+| Dispute opened               | Supplier team               |
+| Dispute resolved             | Restaurant team             |
+| Staff PTO / swap             | Restaurant team             |
+| Scheduled quick list         | Restaurant team             |
+| Post-receiving review prompt | Restaurant team             |
 
 Preference toggles map to `notify_*` keys (e.g. `notify_order_new`, `notify_reservation_created`). Disabled toggles skip delivery.
 
@@ -116,4 +135,4 @@ Update log with delivery results
 ---
 
 **Last updated:** May 2026  
-**Version:** 2.0.0 (nodemailer + wa.me)
+**Version:** 2.1.0 (tenant fan-out, foreground alerts, supplier decline notifications)

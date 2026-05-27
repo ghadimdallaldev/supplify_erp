@@ -30,7 +30,7 @@ Restaurants can rate suppliers after a delivered order. Ratings are aggregated p
 
 ## Notifications
 
-After `POST /api/receiving/receive`, if the order is delivered and has no review yet, the restaurant contact receives an in-app notification prompting them to leave a review.
+After `POST /api/receiving/receive`, if the order is delivered and has no review yet, the **restaurant team** receives an in-app notification prompting them to leave a review (`notifyTenantUsers`).
 
 ## Database
 

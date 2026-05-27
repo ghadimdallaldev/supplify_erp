@@ -697,13 +697,15 @@ Product created with image
   - "Start Processing" → `PROCESSING`
   - "Mark as Shipped" → `SHIPPED`
   - "Complete Order" → `COMPLETED` _(triggers auto-invoice)_
-  - "Decline" → `CANCELLED`
+  - **"Decline"** → `CANCELLED` — opens a dialog; **reason required** (min 3 characters). Sets `cancelled_by = 'SUPPLIER'` and `cancel_reason`. Restaurant users see **Declined by supplier** and the reason.
 
 ### API Endpoints:
 
 - `GET /api/orders` - List orders (supplier-filtered by product ownership)
 - `GET /api/orders/:id` - Get order with items
-- `PATCH /api/orders/:id` - Update order status
+- `PATCH /api/orders/:id` - Update order status; supplier decline: `{ "status": "CANCELLED", "decline_reason": "..." }`
+
+See [order-decline.md](../features/order-decline.md).
 
 ### Order Completion Auto-Trigger
 

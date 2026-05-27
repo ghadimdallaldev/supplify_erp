@@ -62,15 +62,15 @@ RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) furth
 
 ## Ordering
 
-| Feature              | Web route                        | API prefix             | Notes                                           |
-| -------------------- | -------------------------------- | ---------------------- | ----------------------------------------------- |
-| Orders list & detail | `/app/orders`, `/app/orders/:id` | `/api/orders`          | Placement, status workflow, reminders           |
-| Order calendar       | —                                | `/api/orders/calendar` | Delivery / pickup calendar (Redis-backed cache) |
-| Cart                 | `/app/cart`                      | via orders/products    | Checkout flow                                   |
-| Quick lists          | `/app/quick-lists`               | `/api/quick-lists`     | Saved order templates; scheduled re-order       |
-| Scheduled orders     | —                                | cron in `server.js`    | Runs every 5 min in dev                         |
+| Feature              | Web route                        | API prefix             | Notes                                                   |
+| -------------------- | -------------------------------- | ---------------------- | ------------------------------------------------------- |
+| Orders list & detail | `/app/orders`, `/app/orders/:id` | `/api/orders`          | Placement, status workflow, supplier decline, reminders |
+| Order calendar       | —                                | `/api/orders/calendar` | Delivery / pickup calendar (Redis-backed cache)         |
+| Cart                 | `/app/cart`                      | via orders/products    | Checkout flow                                           |
+| Quick lists          | `/app/quick-lists`               | `/api/quick-lists`     | Saved order templates; scheduled re-order               |
+| Scheduled orders     | —                                | cron in `server.js`    | Runs every 5 min in dev                                 |
 
-**Verify:** Restaurant → Cart → place order → Orders list shows new order. Supplier → Fulfillment sees incoming orders. Tests: `orders.routes.test.js`, `orders.calendar.routes.test.js`, `scheduled-orders.service.test.js`.
+**Verify:** Restaurant → Cart → place order → Orders list shows new order. Supplier → Decline with reason → Restaurant sees **Declined by supplier**. Tests: `orders.routes.test.js`, `orderStatusDisplay.test.ts`, `orders.calendar.routes.test.js`, `scheduled-orders.service.test.js`.
 
 ## Chat & realtime
 
@@ -129,23 +129,34 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 Gated by `finance_invoices` where applicable. Tests: `invoices.routes.test.js`, `payments.routes.test.js`.
 
+## Orders — decline & cancellation
+
+| Feature               | Web route         | API prefix              | Notes                                                                  |
+| --------------------- | ----------------- | ----------------------- | ---------------------------------------------------------------------- |
+| Supplier decline      | `/app/orders/:id` | `PATCH /api/orders/:id` | Required `decline_reason`; restaurant sees **Declined by supplier**    |
+| Cancellation metadata | —                 | —                       | `cancel_reason`, `cancelled_by` on `customer_order` (migration `0108`) |
+
+See [order-decline.md](../features/order-decline.md).
+
 ## Reservations (FOH)
 
-| Feature              | Web route                    | API prefix                         | Notes                       |
-| -------------------- | ---------------------------- | ---------------------------------- | --------------------------- |
-| Reservations cockpit | `/app/reservations`          | `/api/reservations`                | Floor plan, board, bookings |
-| Public booking       | `/reserve`, `/reserve/:slug` | `/api/public/reservations*`        | Guest-facing portal         |
-| Manage booking       | `/reserve/manage/:token`     | `/api/public/reservations/manage*` | Cancel / reschedule         |
-| Confirmation         | `/reserve/confirmation`      | —                                  | Post-booking page           |
+| Feature              | Web route                    | API prefix                         | Notes                                |
+| -------------------- | ---------------------------- | ---------------------------------- | ------------------------------------ |
+| Reservations cockpit | `/app/reservations`          | `/api/reservations`                | Floor plan, board, table assign      |
+| Public booking       | `/reserve`, `/reserve/:slug` | `/api/public/reservations*`        | Guest-facing portal                  |
+| Manage booking       | `/reserve/manage/:token`     | `/api/public/reservations/manage*` | Cancel / reschedule → staff notified |
+| Confirmation         | `/reserve/confirmation`      | —                                  | Post-booking page                    |
 
-Runtime schema ensured on API startup (`ensureReservationsSchema`). Tests: `reservations.routes.test.js`, `public.routes.test.js`.
+Runtime schema ensured on API startup (`ensureReservationsSchema`). Tests: `reservations.routes.test.js`, `public.routes.test.js`, `reservation-availability.test.js`.
+
+See [reservations-foh.md](../features/reservations-foh.md).
 
 **Verify:**
 
 1. `GET http://localhost:4000/health` → `ok: true`
 2. `GET http://localhost:4000/api/public/restaurants` → list (may be empty before seed)
-3. Restaurant → Reservations → create booking on board
-4. Open `/reserve` and complete guest flow
+3. Restaurant → Reservations → create booking on board → assign table
+4. Open `/reserve` and complete guest flow; cancel/reschedule from manage link → board + notifications update
 
 ## Staff & labour
 
@@ -171,14 +182,14 @@ Tests: `subscriptions.routes.test.js`, `feature-flags.test.js`, `subscription.te
 
 | Feature              | Web route                        | API prefix           | Notes                                                                       |
 | -------------------- | -------------------------------- | -------------------- | --------------------------------------------------------------------------- |
-| In-app notifications | Header bell                      | `/api/notifications` | Order updates, reminders                                                    |
+| In-app notifications | Header bell + toasts             | `/api/notifications` | Team-wide via `notifyTenantUsers`; `useNotificationAlerts` in Layout        |
 | Email                | Settings → Notifications         | —                    | SendGrid (preferred) or SMTP                                                |
 | WhatsApp             | Settings → Notifications         | —                    | Twilio / `wa.me` link in metadata                                           |
 | Web Push (PWA)       | Settings (restaurant onboarding) | `/api/push`          | VAPID keys on API; `usePushNotifications` + `/sw.js`; opt-in `push_enabled` |
 
-See [NOTIFICATIONS_SUMMARY.md](./NOTIFICATIONS_SUMMARY.md) and [push-notifications.md](../features/push-notifications.md).
+See [NOTIFICATIONS_SUMMARY.md](./NOTIFICATIONS_SUMMARY.md), [notifications-delivery.md](../features/notifications-delivery.md), and [push-notifications.md](../features/push-notifications.md).
 
-Tests: `notification.service.test.js`, `push.service.test.js`.
+Tests: `notification.service.test.js`, `push.service.test.js`, `orderStatusDisplay.test.ts`.
 
 ## Admin platform
 
@@ -236,18 +247,20 @@ node apps/api/scripts/migrate.js
 
 ## Manual smoke checklist
 
-| Check          | Command / action                    | Expected                                     |
-| -------------- | ----------------------------------- | -------------------------------------------- |
-| API up         | `GET /health`                       | `{ "ok": true, "status": "healthy" }`        |
-| DB migrated    | `node apps/api/scripts/migrate.js`  | All migrations skipped or applied; no errors |
-| Public API     | `GET /api/public/restaurants`       | `200` JSON envelope                          |
-| Web dev server | Open Vite URL in browser            | Login page or app shell                      |
-| Auth           | Log in as each demo role            | Correct sidebar for role                     |
-| Chat           | Send message restaurant ↔ supplier | Message appears; socket connected            |
-| Order          | Place order from cart               | Appears in Orders + supplier Fulfillment     |
-| Reservations   | Restaurant board + `/reserve`       | Booking created                              |
-| Staff          | `/app/staff` + `/staff/login`       | Roster + portal controls; staff login works  |
-| Admin flags    | `/app/admin` → Features             | List loads; toggle inherits/on/off           |
+| Check          | Command / action                       | Expected                                                   |
+| -------------- | -------------------------------------- | ---------------------------------------------------------- |
+| API up         | `GET /health`                          | `{ "ok": true, "status": "healthy" }`                      |
+| DB migrated    | `node apps/api/scripts/migrate.js`     | All migrations skipped or applied; no errors               |
+| Public API     | `GET /api/public/restaurants`          | `200` JSON envelope                                        |
+| Web dev server | Open Vite URL in browser               | Login page or app shell                                    |
+| Auth           | Log in as each demo role               | Correct sidebar for role                                   |
+| Chat           | Send message restaurant ↔ supplier    | Message appears; socket connected                          |
+| Order          | Place order from cart                  | Appears in Orders + supplier Fulfillment                   |
+| Order decline  | Supplier declines with reason          | Restaurant: label + reason + notification                  |
+| Notifications  | New order (second team user logged in) | Bell + toast for non-owner team member                     |
+| Reservations   | Restaurant board + `/reserve`          | Booking created; table assign; guest cancel notifies staff |
+| Staff          | `/app/staff` + `/staff/login`          | Roster + portal controls; staff login works                |
+| Admin flags    | `/app/admin` → Features                | List loads; toggle inherits/on/off                         |
 
 ## E2E (optional)
 

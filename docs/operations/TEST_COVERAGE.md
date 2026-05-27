@@ -26,7 +26,8 @@ This document outlines the comprehensive test suite created for the Supplify pla
 
 #### Services Tests
 
-- ✅ `notification.service.test.js` - Email (nodemailer), WhatsApp links, guest confirmation, preference toggles
+- ✅ `notification.service.test.js` - Email (nodemailer), WhatsApp links, guest confirmation, preference toggles, `listTenantUserIds` / `notifyTenantUsers`
+- ✅ `reservation-availability.test.js`, `reservation-board-date.test.js` - Slot/overlap and local board date
 - ✅ `scheduled-orders.service.test.js` - Scheduled orders processing
 
 #### Library Tests
@@ -52,6 +53,8 @@ This document outlines the comprehensive test suite created for the Supplify pla
 - ✅ `components/AuthGuard.test.tsx` - Authentication guard
 - ✅ `components/Header.test.tsx` - Header component
 - ✅ `utils/clipboard.test.ts` - Reservation booking link copy helper
+- ✅ `lib/orderStatusDisplay.test.ts` - Declined-by-supplier labels and cancellation banner
+- ✅ `lib/reservation-tables.test.ts` - Table assignment ID normalization
 - ✅ `components/ui/button.test.tsx` - Button UI component
 
 #### Hook Tests

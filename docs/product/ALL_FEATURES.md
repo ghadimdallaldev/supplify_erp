@@ -136,6 +136,7 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 | Place order                               | Cart                 | `POST /api/orders`                                                  |
 | Orders list & filters                     | `/app/orders`        | `GET /api/orders`                                                   |
 | Order detail & status                     | `/app/orders/:id`    | `GET/PATCH /api/orders/:id`                                         |
+| Supplier decline (reason required)        | Order list/detail    | `PATCH` with `decline_reason`; restaurant sees decline label        |
 | Order reminders to supplier               | Order detail         | `POST /api/orders/:id/remind`                                       |
 | Order calendar view                       | (API-driven widgets) | `/api/orders/calendar`                                              |
 | Approvals & budgets (plan)                | `/app/approvals`     | `/api/approvals/*`, `GET /api/orders/:id/approval-status`           |
@@ -493,18 +494,18 @@ Overrides: admin can set per-tenant limit overrides; API returns `LIMIT_EXCEEDED
 
 | Channel  | Technology                                                                                                           |
 | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| In-app   | `notification_log` table + header bell                                                                               |
+| In-app   | `notification_log` + header bell; toast/sound via `useNotificationAlerts`; **team-wide** `notifyTenantUsers`         |
 | Email    | Twilio SendGrid API (preferred) or SMTP                                                                              |
 | WhatsApp | Twilio Programmable Messaging (+ wa.me link in metadata fallback)                                                    |
 | Push     | Web Push via VAPID (`web-push`); `GET /api/push/vapid-public-key`, subscribe/unsubscribe; service worker at `/sw.js` |
 
 ### Notification categories (preference keys)
 
-Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages, invoices (issued, overdue), payments, inventory (low/out of stock), reservations (created, waitlist), staff (PTO, swap, clock, announcements, documents), scheduled orders, system updates, promotions, test.
+Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), messages, invoices (issued, overdue), payments, inventory (low/out of stock), reservations (created, waitlist, guest cancel/reschedule), staff (PTO, swap), scheduled orders, disputes, amendments, system updates, promotions, test.
 
 ### Triggers (examples)
 
-- Order status changes
+- Order status changes (recipient = full tenant team; supplier decline → restaurant)
 - New chat message
 - Invoice overdue job
 - Reservation created / waitlist

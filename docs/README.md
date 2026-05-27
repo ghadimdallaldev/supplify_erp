@@ -6,6 +6,7 @@ Supplify docs are grouped by purpose. Start with **[Developer handbook](./guides
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **[guides/](./guides/)**             | Setup, usage, DB migrations, prod-like seed, **manual testing**, long-form developer handbook                                                                       |
 | **[product/](./product/)**           | Feature routes & verification, technical feature catalog, tenant capabilities, finance & notifications                                                              |
+| **[features/](./features/)**         | Per-feature specs (orders, reservations, notifications, disputes, …)                                                                                                |
 | **[architecture/](./architecture/)** | Security, hardening, tenancy, RBAC, [audit report](./architecture/RBAC_AUDIT_REPORT.md), [permission matrix](./architecture/RBAC_PERMISSION_MATRIX.md), admin audit |
 | **[qa/](./qa/)**                     | Manual test checklists, [RBAC hardening QA](./qa/RBAC_HARDENING_QA_REPORT.md)                                                                                       |
 | **[admin/](./admin/)**               | Admin UI, dashboard status, feature flags, setup notes                                                                                                              |
@@ -21,7 +22,8 @@ Supplify docs are grouped by purpose. Start with **[Developer handbook](./guides
 - [Developer handbook](./guides/developer-handbook.md) — quick start, Docker, CI/CD, contributing
 - [Feature overview & routes](./product/features.md) — what exists where
 - [Feature catalog (technical)](./product/FEATURE_CATALOG.md) — keys, enforcement, surfaces
-- [Manual testing checklist](./guides/manual-testing.md)
+- [Manual testing checklist](./guides/manual-testing.md) · [Full QA regression](./qa/MANUAL_TEST_CHECKLIST.md)
+- [Feature specs index](./features/README.md) · [Order decline](./features/order-decline.md) · [Notifications delivery](./features/notifications-delivery.md)
 - [Production readiness](./operations/production-readiness.md) — status + findings + fix plan
 - [Database migrations](./guides/database-migrations.md)
 - [RBAC audit report](./architecture/RBAC_AUDIT_REPORT.md) · [RBAC QA checklist](./qa/RBAC_HARDENING_QA_REPORT.md)

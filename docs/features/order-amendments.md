@@ -29,7 +29,7 @@ Mounted at `/api/orders/:orderId/amendments` (requires `ORDERS_VIEW` / `ORDERS_M
 - `item_substitution` — replaces product on line
 - `delivery_date_change` / `other` — status only (no line changes unless items provided)
 
-Notifications are sent to the other party via the notification service.
+Notifications are sent to the **counterparty tenant team** via `notifyTenantUsers` (not only the primary contact email).
 
 ## Database
 

@@ -737,9 +737,19 @@ export async function notifyOrderStatusChange(order, status) {
         ? `Order #${order.id.slice(0, 8)} from ${order.restaurant_name} has been cancelled`
         : `Order #${order.id.slice(0, 8)} has been cancelled`,
     },
+    SUPPLIER_DECLINED: {
+      title: 'Order declined by supplier',
+      message: order.cancel_reason
+        ? `Order #${order.id.slice(0, 8)} was declined: ${order.cancel_reason}`
+        : `Order #${order.id.slice(0, 8)} was declined by ${order.supplier_name || 'your supplier'}`,
+    },
   }
 
-  const msg = messages[status]
+  const isSupplierDecline =
+    status === 'CANCELLED' &&
+    (order.cancelled_by === 'SUPPLIER' || order.cancelledBy === 'SUPPLIER')
+
+  const msg = isSupplierDecline ? messages.SUPPLIER_DECLINED : messages[status]
   if (!msg) return null
 
   const payload = {
@@ -749,10 +759,30 @@ export async function notifyOrderStatusChange(order, status) {
     message: msg.message,
     referenceId: order.id,
     referenceType: 'ORDER',
-    metadata: { order_id: order.id, status },
+    metadata: {
+      order_id: order.id,
+      status,
+      cancelled_by: order.cancelled_by || order.cancelledBy,
+      cancel_reason: order.cancel_reason || order.cancelReason,
+    },
   }
 
-  if (status === 'PLACED' || status === 'CANCELLED') {
+  if (status === 'PLACED') {
+    return notifyTenantUsers({
+      tenantId: order.supplier_id,
+      tenantType: 'SUPPLIER',
+      ...payload,
+    })
+  }
+
+  if (status === 'CANCELLED') {
+    if (isSupplierDecline) {
+      return notifyTenantUsers({
+        tenantId: order.restaurant_id,
+        tenantType: 'RESTAURANT',
+        ...payload,
+      })
+    }
     return notifyTenantUsers({
       tenantId: order.supplier_id,
       tenantType: 'SUPPLIER',
@@ -1138,15 +1168,32 @@ export async function notifyDisputeOpened(dispute) {
   }
 }
 
-export async function notifyDisputeResolved(dispute, outcome) {
+export async function notifyDisputeResolved(dispute, outcome, { replacementOrderId = null } = {}) {
   const restaurantId = dispute.restaurantId || dispute.restaurant_id
   if (!restaurantId) return null
 
+  const resolutionType = dispute.resolutionType || dispute.resolution_type
+  const replacementId =
+    replacementOrderId || dispute.replacementOrderId || dispute.replacement_order_id
+
   const title = outcome === 'rejected' ? 'Dispute rejected' : 'Dispute resolved'
-  const message =
+  let message =
     outcome === 'rejected'
-      ? `Your dispute was rejected. ${dispute.resolutionNotes || ''}`.trim()
-      : `Your dispute was resolved (${dispute.resolutionType || 'closed'}).`
+      ? `Your dispute was rejected. ${dispute.resolutionNotes || dispute.resolution_notes || ''}`.trim()
+      : `Your dispute was resolved (${resolutionType || 'closed'}).`
+
+  if (outcome !== 'rejected' && resolutionType === 'replacement' && replacementId) {
+    message = `Your dispute was resolved with a replacement. Replacement order #${String(replacementId).slice(0, 8)} has been created.`
+  }
+
+  const metadata = {
+    disputeId: dispute.id,
+    resolutionType,
+  }
+  if (replacementId) {
+    metadata.replacementOrderId = replacementId
+    metadata.link = `/app/orders/${replacementId}`
+  }
 
   try {
     const sent = await notifyTenantUsers({
@@ -1158,7 +1205,7 @@ export async function notifyDisputeResolved(dispute, outcome) {
       message,
       referenceId: dispute.id,
       referenceType: 'DISPUTE',
-      metadata: { disputeId: dispute.id, resolutionType: dispute.resolutionType },
+      metadata,
     })
     return sent[0] || null
   } catch (err) {

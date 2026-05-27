@@ -21,6 +21,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 | order_detail    | Order detail view    | MULTI      | ORDERS_VIEW                            | —              | orders.routes.js GET /:id (tenant check)                                                 | apps/web/src/pages/OrderDetailPage.tsx | UNKNOWN           |
 | order_create    | Create / place order | RESTAURANT | ORDERS_CREATE (not enforced per-route) | orders_per_day | orders.routes.js POST / checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')         | OrdersPage, CartPage flow              | UNKNOWN           |
 | order_edit      | Edit / update order  | MULTI      | ORDERS_EDIT (not enforced per-route)   | —              | orders.routes.js PATCH /:id                                                              | OrderDetailPage                        | UNKNOWN           |
+| order_decline   | Supplier decline     | SUPPLIER   | ORDERS_MANAGE                          | —              | PATCH /:id status CANCELLED + decline_reason (min 3 chars)                               | DeclineOrderDialog, OrdersPage         | UNKNOWN           |
 | orders_calendar | Orders calendar view | MULTI      | —                                      | —              | apps/api/src/routes/orders.calendar.routes.js requireAuth, getRequestTenant              | DashboardPage (CalendarView)           | Bronze+           |
 
 **Flags**
@@ -194,7 +195,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 | feature_key      | display_name       | applies_to | permissions_required | limit_key | backend_enforcement                                     | frontend_surfaces | plan_availability |
 | ---------------- | ------------------ | ---------- | -------------------- | --------- | ------------------------------------------------------- | ----------------- | ----------------- |
-| disputes_returns | Disputes & returns | MULTI      | —                    | —         | disputes.routes.js `requireFeature('disputes_returns')` | DisputesPage.tsx  | Bronze+           |
+| disputes_returns | Disputes & returns | MULTI      | —                    | —         | disputes.routes.js `requireFeature('disputes_returns')` | DisputesPage.tsx  | Free+ (all tiers) |
 
 ---
 

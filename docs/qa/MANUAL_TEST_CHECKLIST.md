@@ -223,7 +223,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | GATE-S03 | `driver_management`                 | Driver dispatch tab → 403/hidden                               | Available           | Available        |       |
 | GATE-S04 | `finance_invoices`                  | `/app/invoices` → 403/paywall                                  | Loads               | Loads            |       |
 | GATE-S05 | `order_calendar`                    | Dashboard calendar → paywall; `GET /api/orders/calendar` → 403 | 200                 | 200              |       |
-| GATE-S06 | `disputes_returns`                  | `GET /api/disputes` → 403                                      | 200                 | 200              |       |
+| GATE-S06 | `disputes_returns`                  | `GET /api/disputes/incoming` → 200; Disputes nav visible       | 200                 | 200              |       |
 | GATE-S07 | `warehouses`                        | Settings → Warehouses: single warehouse only                   | Plan limit (e.g. 2) | Higher limit     |       |
 | GATE-S08 | `multi_warehouse`                   | Settings → multi-warehouse toggle hidden/locked                | Locked (Gold+)      | Toggle available |       |
 | GATE-S09 | `inventory_management`              | `/app/inventory` → 403 or locked                               | 403 (Gold+)         | Loads            |       |
@@ -349,11 +349,13 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 4.7 Notifications preferences
 
-| ID    | Steps                                                | Expected                                          | Pass? |
-| ----- | ---------------------------------------------------- | ------------------------------------------------- | ----- |
-| UX-10 | Settings → notifications (restaurant/supplier/admin) | Toggles: email, WhatsApp, in-app, per-event types |       |
-| UX-11 | Save preferences → reload                            | Values persisted                                  |       |
-| UX-12 | Trigger event (e.g. new order) with in-app on        | Notification appears in header                    |       |
+| ID     | Steps                                                   | Expected                                          | Pass? |
+| ------ | ------------------------------------------------------- | ------------------------------------------------- | ----- |
+| UX-10  | Settings → notifications (restaurant/supplier/admin)    | Toggles: email, WhatsApp, in-app, per-event types |       |
+| UX-11  | Save preferences → reload                               | Values persisted                                  |       |
+| UX-12  | Trigger event (e.g. new order) with in-app on           | Notification appears in header                    |       |
+| UX-12a | Same event as UX-12 (foreground tab)                    | Toast ~10s + short sound; optional browser banner |       |
+| UX-12b | Log in as **second team user** (not contact_email only) | Same event visible in bell + toast for that user  |       |
 
 ## 4.8 Realtime & impersonation
 
@@ -383,14 +385,14 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 5.1 Guest reservation portal
 
-| ID     | Steps                                           | Expected                                        | Pass? |
-| ------ | ----------------------------------------------- | ----------------------------------------------- | ----- |
-| PUB-01 | Open `/reserve` or `/reserve/{restaurant-slug}` | Booking UI loads; restaurant name shown         |       |
-| PUB-02 | Complete booking (party size, date, time)       | Confirmation page `/reserve/confirmation`       |       |
-| PUB-03 | Copy manage link from confirmation email/UI     | `/reserve/manage/:token` loads reservation      |       |
-| PUB-04 | Cancel reservation via manage link              | Status cancelled; reflected on restaurant board |       |
-| PUB-05 | Reschedule via manage link                      | New slot saved                                  |       |
-| PUB-06 | Invalid/expired token                           | Friendly error; no crash                        |       |
+| ID     | Steps                                           | Expected                                                                  | Pass? |
+| ------ | ----------------------------------------------- | ------------------------------------------------------------------------- | ----- |
+| PUB-01 | Open `/reserve` or `/reserve/{restaurant-slug}` | Booking UI loads; restaurant name shown                                   |       |
+| PUB-02 | Complete booking (party size, date, time)       | Confirmation page `/reserve/confirmation`                                 |       |
+| PUB-03 | Copy manage link from confirmation email/UI     | `/reserve/manage/:token` loads reservation                                |       |
+| PUB-04 | Cancel reservation via manage link              | Status cancelled; reflected on restaurant board; restaurant team notified |       |
+| PUB-05 | Reschedule via manage link                      | New slot saved; restaurant team notified                                  |       |
+| PUB-06 | Invalid/expired token                           | Friendly error; no crash                                                  |       |
 
 ## 5.2 Staff self-service portal
 
@@ -426,13 +428,15 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.2 Orders (`/app/orders`, `/app/orders/:id`)
 
-| ID     | Steps                                                      | Expected                             | Pass? |
-| ------ | ---------------------------------------------------------- | ------------------------------------ | ----- |
-| RST-07 | Orders list tabs: All, New, Processing, Shipped, Completed | Correct filtering                    |       |
-| RST-08 | Open order detail                                          | Details, Items tabs load             |       |
-| RST-09 | Place order from cart (see 6.4)                            | New order appears in list            |       |
-| RST-10 | Cancel or update order (if permitted)                      | Status updates; supplier sees change |       |
-| RST-11 | Order reminders / notifications                            | Trigger where applicable             |       |
+| ID      | Steps                                                        | Expected                                                                 | Pass? |
+| ------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ | ----- |
+| RST-07  | Orders list tabs: All, New, Processing, Shipped, Completed   | Correct filtering                                                        |       |
+| RST-08  | Open order detail                                            | Details, Items tabs load                                                 |       |
+| RST-09  | Place order from cart (see 6.4)                              | New order appears in list                                                |       |
+| RST-10  | Cancel order (if permitted)                                  | Status cancelled; supplier notified                                      |       |
+| RST-10a | Supplier declines `PLACED` order with reason (other session) | **Declined by supplier** + reason on list/detail; timeline shows decline |       |
+| RST-10b | Supplier decline without reason (API or UI)                  | `400 DECLINE_REASON_REQUIRED` or UI blocks submit                        |       |
+| RST-11  | Order reminders / notifications                              | Trigger where applicable                                                 |       |
 
 ## 6.3 Products & catalog (`/app/products`, `/app/products/:id`)
 
@@ -487,16 +491,18 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.8 Reservations (`/app/reservations`)
 
-| ID     | Steps                               | Expected                                 | Pass? |
-| ------ | ----------------------------------- | ---------------------------------------- | ----- |
-| RST-35 | Reservation board for selected date | Tables + reservations + waitlist         |       |
-| RST-36 | Create reservation (drawer)         | Appears on board                         |       |
-| RST-37 | Seat / confirm / cancel from board  | Status transitions                       |       |
-| RST-38 | **Table builder**                   | Add/edit floor plan tables               |       |
-| RST-39 | Analytics panel (day/week/month)    | Metrics load                             |       |
-| RST-40 | Guest intelligence panel            | Guest stats load                         |       |
-| RST-41 | Copy public **booking link**        | Link works in incognito (`/reserve/...`) |       |
-| RST-42 | User without `RESERVATIONS_VIEW`    | Nav hidden                               |       |
+| ID      | Steps                                | Expected                                                  | Pass? |
+| ------- | ------------------------------------ | --------------------------------------------------------- | ----- |
+| RST-35  | Reservation board for selected date  | Tables + reservations + waitlist                          |       |
+| RST-36  | Create reservation (drawer)          | Appears on board                                          |       |
+| RST-37  | Seat / confirm / cancel from board   | Status transitions                                        |       |
+| RST-37a | **Assign table** from board dropdown | Table shows guest on floor plan until completed/cancelled |       |
+| RST-37b | Guest **reschedule** via manage link | Board date/slot updates; staff notification               |       |
+| RST-38  | **Table builder**                    | Add/edit floor plan tables                                |       |
+| RST-39  | Analytics panel (day/week/month)     | Metrics load                                              |       |
+| RST-40  | Guest intelligence panel             | Guest stats load                                          |       |
+| RST-41  | Copy public **booking link**         | Link works in incognito (`/reserve/...`)                  |       |
+| RST-42  | User without `RESERVATIONS_VIEW`     | Nav hidden                                                |       |
 
 ## 6.9 Staff HR (`/app/staff`)
 
@@ -604,14 +610,15 @@ Hidden without RBAC permission or feature gate.
 
 ## 7.2 Orders (`/app/orders`, `/app/orders/:id`)
 
-| ID     | Steps                                         | Expected                                   | Pass? |
-| ------ | --------------------------------------------- | ------------------------------------------ | ----- |
-| SUP-05 | List tabs                                     | Filter by status                           |       |
-| SUP-06 | Accept/processing workflow                    | Status moves New → Processing              |       |
-| SUP-07 | Mark shipped → **Mark Delivered**             | Restaurant sees `DELIVERED`; can receive   |       |
-| SUP-08 | **Manual order** creation (if UI/API exposed) | Order created for restaurant               |       |
-| SUP-09 | Order detail — supplier tabs                  | Picking notes, Delivery info, Packing slip |       |
-| SUP-10 | Invoice tab on order (if present)             | Linked invoice                             |       |
+| ID      | Steps                                         | Expected                                                                 | Pass? |
+| ------- | --------------------------------------------- | ------------------------------------------------------------------------ | ----- |
+| SUP-05  | List tabs                                     | Filter by status                                                         |       |
+| SUP-06  | Accept/processing workflow                    | Status moves New → Processing                                            |       |
+| SUP-06b | **Decline** `PLACED` order                    | Modal requires reason; restaurant sees **Declined by supplier** + reason |       |
+| SUP-07  | Mark shipped → **Mark Delivered**             | Restaurant sees `DELIVERED`; can receive                                 |       |
+| SUP-08  | **Manual order** creation (if UI/API exposed) | Order created for restaurant                                             |       |
+| SUP-09  | Order detail — supplier tabs                  | Picking notes, Delivery info, Packing slip                               |       |
+| SUP-10  | Invoice tab on order (if present)             | Linked invoice                                                           |       |
 
 ## 7.3 Products & pricing (`/app/products`, `/app/products/:id`)
 
@@ -867,6 +874,7 @@ Hidden without RBAC permission or feature gate.
 | ID      | Steps                                                                                                              | Expected                                            | Pass? |
 | ------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- | ----- |
 | E2E-01  | Restaurant places order → Supplier accepts → Ships → Restaurant receives                                           | Happy path all statuses                             |       |
+| E2E-01b | Restaurant places order → Supplier **declines with reason** → Restaurant sees decline label + notification         | Decline path                                        |       |
 | E2E-02  | Order → Invoice issued → Payment recorded                                                                          | Invoice paid; balances correct                      |       |
 | E2E-03  | Restaurant chats supplier about order (both Bronze+)                                                               | Message thread linked contextually                  |       |
 | E2E-04  | Guest books table → Restaurant board updates → Guest cancels via link                                              | Public + internal sync                              |       |

@@ -76,7 +76,7 @@ export const RESTAURANT_PLAN_FEATURE_PATCHES = {
 export const SUPPLIER_PLAN_FEATURE_PATCHES = {
   free: {
     order_calendar: false,
-    disputes_returns: false,
+    disputes_returns: true,
     advanced_roles: false,
     warehouses: false,
     multi_warehouse: false,

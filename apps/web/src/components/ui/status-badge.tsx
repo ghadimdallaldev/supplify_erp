@@ -27,6 +27,7 @@ const STATUS_TONE_MAP: Record<string, StatusTone> = {
   pending_admin_approval: 'warning',
   approved_pending_payment: 'warning',
   RECEIVED_PARTIAL: 'warning',
+  RECEIVED_WITH_DISPUTE: 'warning',
   PAST_DUE: 'danger',
   past_due: 'danger',
   failed: 'danger',

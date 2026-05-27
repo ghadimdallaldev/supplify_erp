@@ -22,9 +22,10 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 
 - [ ] **Keycloak** running (e.g. port 8080) if using real auth.
 
-**Notes:**  
-- **Numbers:** Currency and numeric values should come from the API and use shared formatters (`formatCurrency` / `formatPrice`).  
-- **Tiers & features:** Enforced via `requireFeature`, `checkLimit`. Admin → Subscriptions changes tenant capabilities.  
+**Notes:**
+
+- **Numbers:** Currency and numeric values should come from the API and use shared formatters (`formatCurrency` / `formatPrice`).
+- **Tiers & features:** Enforced via `requireFeature`, `checkLimit`. Admin → Subscriptions changes tenant capabilities.
 - **Impersonation:** Start from tenant management; stop via the amber banner.
 
 ---
@@ -53,82 +54,84 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 
 ## 4. Restaurant — cart & orders
 
-- [ ] **Cart** — lines, quantity, place order.  
+- [ ] **Cart** — lines, quantity, place order.
 - [ ] **Orders** — list, filters, **order detail** actions.
+- [ ] **Supplier decline** — as supplier, decline a `PLACED` order with a reason; as restaurant, confirm status **Declined by supplier** and reason on list + detail (see [order-decline.md](../features/order-decline.md)).
 
 ---
 
 ## 5. Restaurant — quick lists, suppliers, reservations
 
-- [ ] **Quick lists** — CRUD, add to cart/order.  
-- [ ] **Suppliers** — list, detail, follow/request if present.  
-- [ ] **Reservations** — board, create, status flow, waitlist, analytics, booking link, table builder.
+- [ ] **Quick lists** — CRUD, add to cart/order.
+- [ ] **Suppliers** — list, detail, follow/request if present.
+- [ ] **Reservations** — board, create, status flow, waitlist, analytics, booking link, table builder, **table assignment**, guest cancel/reschedule → staff notification (see [reservations-foh.md](../features/reservations-foh.md)).
 
 ---
 
 ## 6. Restaurant — staff, inventory, receiving, invoices, chat
 
-- [ ] **Staff** — team, schedule/time, PTO, swaps, docs/incidents, payroll tabs as applicable.  
-- [ ] **Restaurant inventory** — levels, adjustments.  
-- [ ] **Receiving** — pending/history, submit report.  
-- [ ] **Invoices** — list, detail, payment recording.  
+- [ ] **Staff** — team, schedule/time, PTO, swaps, docs/incidents, payroll tabs as applicable.
+- [ ] **Restaurant inventory** — levels, adjustments.
+- [ ] **Receiving** — pending/history, submit report.
+- [ ] **Invoices** — list, detail, payment recording.
 - [ ] **Chat** — threads, send, attachments if present.
 
 ---
 
 ## 7. Restaurant — onboarding & settings
 
-- [ ] **Onboarding** — if shown, complete steps.  
+- [ ] **Onboarding** — if shown, complete steps.
 - [ ] **Settings** — profile, notifications, subscription/billing links.
+- [ ] **Notifications** — trigger order/reservation event; bell + toast + sound for team users (not only account owner).
 
 ---
 
 ## 8. Supplier — nav, products, orders, fulfillment, restaurants, invoices, chat, settings
 
-- [ ] Sidebar matches supplier role.  
-- [ ] Products CRUD/inventory as allowed.  
-- [ ] Orders lifecycle (acknowledge → ship → deliver / cancel).  
-- [ ] **Fulfillment** queue if present.  
-- [ ] **Restaurants** list/detail.  
-- [ ] **Invoices** list/create/issue.  
+- [ ] Sidebar matches supplier role.
+- [ ] Products CRUD/inventory as allowed.
+- [ ] Orders lifecycle (acknowledge → ship → deliver / **decline with required reason**).
+- [ ] **Fulfillment** queue if present.
+- [ ] **Restaurants** list/detail.
+- [ ] **Invoices** list/create/issue.
 - [ ] **Chat** and **supplier settings** (warehouses, notifications).
 
 ---
 
 ## 9. Admin — dashboard, tenants, impersonation, settings
 
-- [ ] Admin-only nav.  
-- [ ] Tabs: overview, plans, subscriptions, tenants, health/finance/usage/audit as present.  
-- [ ] Supplier admin / restaurant admin routes.  
-- [ ] **Impersonate** and **stop** banner.  
+- [ ] Admin-only nav.
+- [ ] Tabs: overview, plans, subscriptions, tenants, health/finance/usage/audit as present.
+- [ ] Supplier admin / restaurant admin routes.
+- [ ] **Impersonate** and **stop** banner.
 - [ ] Admin **Settings** if any.
 
 ---
 
 ## 10. Public & staff flows
 
-- [ ] **Public reservation** — book, confirm, manage token link.  
+- [ ] **Public reservation** — book, confirm, manage token link.
 - [ ] **Staff self-service** (`/staff`…) — login, shifts, clock, PTO, swaps if configured.
 
 ---
 
 ## 11. Cross-cutting
 
-- [ ] Permission toggle hides route or returns 403.  
-- [ ] Plan limits → upgrade / block UX.  
-- [ ] Responsive smoke on login, dashboard, products, cart, one order, one reservation.  
-- [ ] 404 / API error handling.  
+- [ ] Permission toggle hides route or returns 403.
+- [ ] Plan limits → upgrade / block UX.
+- [ ] Responsive smoke on login, dashboard, products, cart, one order, one reservation.
+- [ ] 404 / API error handling.
 - [ ] Logout clears UI state.
 
 ---
 
 ## Quick reference — logins
 
-| Role       | Email                   | Password              |
-| ---------- | ----------------------- | --------------------- |
-| Admin      | admin@supplify.com      | SupplifyAdmin1!       |
+| Role       | Email                   | Password             |
+| ---------- | ----------------------- | -------------------- |
+| Admin      | admin@supplify.com      | SupplifyAdmin1!      |
 | Restaurant | restaurant@supplify.com | SupplifyRestaurant1! |
-| Supplier   | supplier@supplify.com   | SupplifySupplier1!    |
+| Supplier   | supplier@supplify.com   | SupplifySupplier1!   |
 
 ---
 
