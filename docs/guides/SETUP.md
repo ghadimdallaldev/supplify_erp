@@ -124,7 +124,7 @@ supplify-v2/
 ├── infra/                  # Infrastructure configuration
 │   ├── db/                 # Database setup
 │   └── keycloak/          # Keycloak realm configuration
-└── .github/workflows/     # CI/CD pipelines
+└── infra/                 # AWS CDK (deploy dev/staging/prod)
 ```
 
 ## 🔐 Authentication

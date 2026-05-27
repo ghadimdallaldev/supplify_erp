@@ -170,20 +170,17 @@ The API follows RESTful conventions with:
 - Input validation with Zod
 - Rate limiting and CSRF protection
 
-## CI/CD Automation
+## CI/CD and deployment
 
-This repository uses GitHub Actions for automated CI/CD workflows.
+Deployments use **AWS CDK** (`infra/`). Run locally before pushing:
 
-### PR Flow
+```bash
+pnpm lint
+pnpm test:ci
+pnpm build
+```
 
-Every pull request automatically triggers:
-
-1. **Type Checking** - Validates TypeScript types in the web app
-2. **Linting** - Runs ESLint on both API and web code
-3. **Testing** - Executes unit tests for both API and web
-4. **Build** - Verifies that both applications build successfully
-
-All checks must pass before a PR can be merged.
+Release branches (`preprod`, `prod`) are promoted from `dev` with `node scripts/promote-release.mjs`. See `docs/BRANCHING.md`.
 
 ### Conventional Commits
 
@@ -223,35 +220,6 @@ Closes #123
 
 Commitlint will automatically validate commit messages on commit using Husky.
 
-### Automatic Release
-
-When code is merged into `main`, semantic-release automatically:
-
-1. Analyzes commits since the last release
-2. Determines the version bump (patch, minor, or major)
-3. Generates release notes from commit messages
-4. Updates `CHANGELOG.md`
-5. Creates a Git tag for the new version
-6. Creates a GitHub release
-
-**No manual version bumping required!** The version is determined automatically based on commit types:
-
-- `feat`: minor version bump
-- `fix`: patch version bump
-- `BREAKING CHANGE`: major version bump
-
-### Deployment Trigger
-
-Tagged releases (e.g., `v1.2.3`) automatically trigger deployment:
-
-- **API**: Deploys to AWS ECS using OIDC authentication (no static secrets)
-- **Web**: Deploys to Vercel (if configured)
-
-Deployment requires:
-
-- AWS OIDC role configured (for API deployment)
-- Vercel tokens configured (for web deployment)
-
 ### Running Tests Locally
 
 To run tests locally before pushing:
@@ -270,12 +238,6 @@ pnpm e2e
 pnpm --filter @supplify/api test:coverage
 pnpm --filter @supplify/web test:coverage
 ```
-
-### Workflow Files
-
-- `.github/workflows/ci.yml` - Runs on every PR and push to main/develop
-- `.github/workflows/release.yml` - Runs semantic-release on main branch
-- `.github/workflows/deploy.yml` - Deploys to production on tagged releases
 
 ## Contributing
 

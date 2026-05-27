@@ -540,7 +540,7 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled), messages,
 | **Socket.IO**               | Realtime chat + layout notifications                                                                                                                                            |
 | **Docker Compose**          | Local full stack (Postgres, Redis, Keycloak, MinIO, nginx)                                                                                                                      |
 | **AWS CDK** (`infra/`)      | Cloud deployment (dev/staging/prod)                                                                                                                                             |
-| **GitHub Actions**          | CI (lint, tests, guards)                                                                                                                                                        |
+| **Local CI**                | `pnpm lint`, `pnpm test:ci`, `pnpm build` before deploy                                                                                                                         |
 | **Playwright**              | E2E tests (`tests/e2e`)                                                                                                                                                         |
 | **Semantic release**        | Versioning (root config)                                                                                                                                                        |
 

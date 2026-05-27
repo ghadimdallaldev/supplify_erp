@@ -78,69 +78,25 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now supplify   # production
 ```
 
-## GitHub Actions → EC2 (Docker deploy)
+## EC2 manual deploy (Docker Compose)
 
-This repo has **two deploy paths**:
-
-| Path                     | Workflows                                         | Target                                       |
-| ------------------------ | ------------------------------------------------- | -------------------------------------------- |
-| **EC2 + Docker Compose** | `deploy-ec2-prod.yml`, `deploy-ec2-dev.yml`       | Your VM running `deploy/scripts/deploy-*.sh` |
-| **AWS CDK / ECS / S3**   | `deploy-prod.yml`, `deploy-dev.yml`, `deploy.yml` | ECR, ECS, CloudFront (legacy CDK infra)      |
-
-For **EC2**, use the new workflows.
-
-### 1) One-time server bootstrap
-
-On the EC2 instance:
+For VM hosting, deploy on the server after pulling the target branch (`dev`, `preprod`, or `prod`):
 
 ```bash
 sudo mkdir -p /opt/supplify && sudo chown $USER:$USER /opt/supplify
 git clone https://github.com/<org>/supplify_erp.git /opt/supplify
 cd /opt/supplify
-sudo ./deploy/scripts/deploy-prod.sh   # or deploy-dev.sh
+git checkout prod   # or dev / preprod
+sudo ./deploy/scripts/deploy-prod.sh   # or deploy-dev.sh / deploy-preprod.sh
 ```
 
-This creates `deploy/env/.env.prod` (secrets stay **on the server**, not in GitHub).
-
-### 2) SSH key for GitHub Actions
-
-On your laptop:
+Secrets live in `deploy/env/.env.*` on the server. Re-deploy after `git pull`:
 
 ```bash
-ssh-keygen -t ed25519 -f supplify-deploy -N ""
+cd /opt/supplify && git pull origin prod && sudo ./deploy/scripts/deploy-prod.sh
 ```
 
-- Add `supplify-deploy.pub` to the EC2 instance: `~/.ssh/authorized_keys`
-- Add **private** key contents to GitHub → **Settings → Secrets and variables → Actions**
-
-| Secret              | Example                         |
-| ------------------- | ------------------------------- |
-| `EC2_HOST`          | `3.28.x.x` or `app.example.com` |
-| `EC2_USER`          | `ubuntu` or `ec2-user`          |
-| `EC2_SSH_KEY`       | full PEM private key            |
-| `EC2_DEPLOY_PATH`   | `/opt/supplify` (optional)      |
-| `EC2_DEPLOY_BRANCH` | `main` or `dev` (optional)      |
-
-Use **GitHub Environments** (`production`, `dev`) so dev and prod can use different hosts/secrets.
-
-### 3) Git pull on the server
-
-The workflow runs `git pull` on EC2. Allow that once:
-
-- **HTTPS:** create a fine-grained PAT and `git remote set-url origin https://<token>@github.com/...` on the server, or
-- **SSH:** add a **deploy key** (read-only) on the repo and use `git@github.com:...` remote on EC2
-
-### 4) What runs automatically
-
-| Event          | Workflow                                           |
-| -------------- | -------------------------------------------------- |
-| Push to `dev`  | `Deploy EC2 Dev` → `deploy-dev.sh`                 |
-| Push to `main` | `Deploy EC2 Production` → tests + `deploy-prod.sh` |
-| Manual         | Actions tab → **Run workflow**                     |
-
-### 5) Security group
-
-EC2 security group: allow **22** from GitHub Actions IPs (or a bastion), **80** (and **443** if TLS) from the internet. GitHub-hosted runners use dynamic IPs; many teams use a **self-hosted runner** on the EC2 box to avoid opening SSH to the world.
+For **AWS CDK** (ECS, RDS, CloudFront), see `infra/README.md`.
 
 ## Files
 

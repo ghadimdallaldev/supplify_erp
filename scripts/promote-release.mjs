@@ -89,4 +89,4 @@ if (!after) {
 run(`git push origin ${branch}`)
 run('git checkout dev')
 
-console.log(`\n✓ ${branch} promoted and pushed. EC2 deploy workflow should run automatically.\n`)
+console.log(`\n✓ ${branch} promoted and pushed. Deploy with CDK or deploy/scripts on the target host.\n`)

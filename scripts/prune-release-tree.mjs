@@ -4,7 +4,6 @@
  * Run from repo root after merging dev:
  *   node scripts/prune-release-tree.mjs --tier preprod|prod
  */
-import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -87,42 +86,6 @@ function patchServerJs() {
   )
   fs.writeFileSync(abs, src)
   console.log('patched apps/api/src/server.js (removed e2e routes)')
-}
-
-function restoreDeployWorkflows() {
-  const wfDir = path.join(ROOT, '.github/workflows')
-  fs.mkdirSync(wfDir, { recursive: true })
-  const files =
-    tier === 'preprod' ? ['deploy-ec2-preprod.yml'] : ['deploy-ec2-prod.yml']
-  for (const file of files) {
-    try {
-      const content = execSync(`git show origin/dev:.github/workflows/${file}`, {
-        cwd: ROOT,
-        encoding: 'utf8',
-      })
-      fs.writeFileSync(path.join(wfDir, file), content)
-      console.log(`restored .github/workflows/${file} from dev`)
-    } catch {
-      console.warn(`warn: could not restore .github/workflows/${file} from dev`)
-    }
-  }
-}
-
-function pruneWorkflows() {
-  restoreDeployWorkflows()
-
-  const keep =
-    tier === 'preprod'
-      ? new Set(['deploy-ec2-preprod.yml', 'release-tree-guard.yml'])
-      : new Set(['deploy-ec2-prod.yml', 'release-tree-guard.yml'])
-
-  const wfDir = path.join(ROOT, '.github/workflows')
-  if (!fs.existsSync(wfDir)) return
-  for (const file of fs.readdirSync(wfDir)) {
-    if (!keep.has(file)) {
-      rmFile(path.join('.github/workflows', file))
-    }
-  }
 }
 
 function pruneDeployArtifacts() {
@@ -247,6 +210,7 @@ Migrations run automatically during deploy. Branching guide: see \`docs/BRANCHIN
 const SHARED_DIRS = [
   'docs',
   'tests',
+  '.github',
   '.claude',
   '.cursor',
   '.husky',
@@ -287,7 +251,6 @@ removeTestFiles()
 pruneApiScripts()
 patchServerJs()
 pruneDeployArtifacts()
-pruneWorkflows()
 slimPackageJson()
 writeReadme()
 
