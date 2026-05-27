@@ -160,10 +160,18 @@ router.get('/tags', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const params = productListSchema.parse(req.query)
+    const tenant = await getRequestTenant(req)
+    const scopedSupplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
 
     const whereConditions = []
     const queryParams = []
     let paramIndex = 1
+
+    if (scopedSupplierId) {
+      whereConditions.push(`p.supplier_id = $${paramIndex}`)
+      queryParams.push(scopedSupplierId)
+      paramIndex++
+    }
 
     // Text search
     if (params.q) {

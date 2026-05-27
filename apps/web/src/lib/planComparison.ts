@@ -35,7 +35,6 @@ export const RESTAURANT_FEATURE_KEYS = [
   'multi_branch',
   'disputes_returns',
   'advanced_roles',
-  'approvals_budgets',
   'supplier_deals',
   'supplier_reviews',
   'tenant_audit_log',
@@ -81,7 +80,6 @@ export const FEATURE_KEY_LABELS: Record<string, string> = {
   multi_branch: 'Multi-branch',
   disputes_returns: 'Disputes & returns',
   advanced_roles: 'Advanced roles',
-  approvals_budgets: 'Approvals & budgets',
   supplier_reviews: 'Supplier reviews',
   tenant_audit_log: 'Activity log',
   custom_branding: 'Custom branding',
@@ -147,7 +145,7 @@ export function getFeatureLabel(featureKey: string): string {
 }
 
 /** Human-readable nudge when the user has been blocked repeatedly (Layout banner). */
-const IGNORED_BLOCK_KEYS = new Set(['upgrade_prompt'])
+const IGNORED_BLOCK_KEYS = new Set(['upgrade_prompt', 'scheduled_order_grace_per_day'])
 
 export function formatPlanBlockNudgeMessage(
   limitKeys: string[],

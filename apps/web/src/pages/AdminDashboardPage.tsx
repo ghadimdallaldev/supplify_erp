@@ -68,6 +68,7 @@ import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPan
 import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
 import { AdminLimitOverridesPanel } from '../components/admin/AdminLimitOverridesPanel'
 import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
+import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -436,6 +437,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 refreshing={overviewFetching}
                 lastUpdated={overviewLastUpdated}
               />
+
+              <AdminPlatformSettingsPanel />
 
               {/* Alerts banner — only visible if there are issues */}
               {((overview?.alerts?.pastDueSubscriptions || 0) > 0 ||

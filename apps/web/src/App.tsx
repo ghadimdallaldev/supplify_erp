@@ -94,9 +94,6 @@ const RegisterCompletePage = lazy(() =>
 const AccountActivationPage = lazy(() =>
   import('./pages/AccountActivationPage').then((m) => ({ default: m.AccountActivationPage }))
 )
-const ApprovalsPage = lazy(() =>
-  import('./pages/approvals/ApprovalsPage').then((m) => ({ default: m.ApprovalsPage }))
-)
 const ReportsPage = lazy(() =>
   import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage }))
 )
@@ -297,14 +294,6 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <OrderDetailPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/approvals',
-        element: (
-          <LazyPage>
-            <ApprovalsPage />
           </LazyPage>
         ),
       },

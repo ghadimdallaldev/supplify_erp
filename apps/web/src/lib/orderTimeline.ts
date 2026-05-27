@@ -299,7 +299,7 @@ function pushReceivingStep(
   if (receiving) {
     events.push({
       id: 'received',
-      title: disputeOpen ? 'Received — dispute open' : 'Goods received',
+      title: disputeOpen ? 'Received - dispute open' : 'Goods received',
       description: disputeOpen
         ? 'Receiving was recorded. A dispute is open with the supplier until it is resolved.'
         : `Receiving report recorded${receiving.status ? ` (${String(receiving.status).toLowerCase()})` : ''}.`,
@@ -317,7 +317,7 @@ function pushReceivingStep(
     title:
       disputeOpen || statusRank >= MILESTONE.RECEIVED
         ? disputeOpen
-          ? 'Received — dispute open'
+          ? 'Received - dispute open'
           : 'Goods received'
         : 'Confirm receipt',
     description: disputeOpen
@@ -421,7 +421,7 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     const disputeOpen = order.status === 'RECEIVED_WITH_DISPUTE'
     events.push({
       id: 'restaurant-received',
-      title: disputeOpen ? 'Received — dispute open' : 'Restaurant confirmed receipt',
+      title: disputeOpen ? 'Received - dispute open' : 'Restaurant confirmed receipt',
       description: disputeOpen
         ? `${restaurantName} recorded receiving and opened a dispute that needs your response.`
         : `${restaurantName} recorded receiving for this order.`,
@@ -484,7 +484,7 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     events.push({
       id: `credit-${String(cn.id)}`,
       title: 'Credit note issued',
-      description: `Credit of ${cn.credit_amount ?? cn.creditAmount ?? cn.remaining_amount ?? '—'} applied from dispute resolution.`,
+      description: `Credit of ${cn.credit_amount ?? cn.creditAmount ?? cn.remaining_amount ?? '-'} applied from dispute resolution.`,
       timestamp: formatTs(String(cn.issue_date ?? cn.created_at ?? '')),
       state: 'completed',
       link: { label: 'View invoices', href: '/app/invoices' },

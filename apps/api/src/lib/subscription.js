@@ -9,7 +9,11 @@ import {
   resolveEffectiveLimit,
   discoverLimitKeys,
   fillMissingFreeTierLimits,
+  stripHiddenEntitlementLimits,
+  HIDDEN_ENTITLEMENT_LIMIT_KEYS,
 } from './limit-resolution.js'
+
+export { HIDDEN_ENTITLEMENT_LIMIT_KEYS }
 
 export { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS, discoverLimitKeys }
 
@@ -754,8 +758,13 @@ export async function getEntitlements(tenantId, tenantType) {
   fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
 
   const usage = await getUsageSnapshot(tenantId, tenantType)
+  stripHiddenEntitlementLimits(limits, usage)
+  stripHiddenEntitlementLimits(baseLimits, null)
+  const visibleOverrides = stripHiddenEntitlementLimits(null, null, overrides)
+
   const usageWindowMeta = {}
   limitKeys.forEach((k) => {
+    if (HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(k)) return
     if (k === 'orders_per_day' || k === 'chats_per_day')
       usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
   })
@@ -779,7 +788,7 @@ export async function getEntitlements(tenantId, tenantType) {
     featureSources,
     limits,
     baseLimits,
-    overrides: overrides.map((o) => ({
+    overrides: visibleOverrides.map((o) => ({
       limitKey: o.limitKey,
       value: o.value,
       reason: o.reason || null,
@@ -788,6 +797,14 @@ export async function getEntitlements(tenantId, tenantType) {
     })),
     usage,
     usageWindowMeta,
+    freeSandbox:
+      (subscription.plan_code || '').toLowerCase() === 'free'
+        ? {
+            expiresAt: subscription.free_sandbox_expires_at
+              ? new Date(subscription.free_sandbox_expires_at).toISOString()
+              : null,
+          }
+        : null,
   }
 }
 
