@@ -7,6 +7,7 @@ This document reviews **every role** (Restaurant, Supplier, Admin, Staff), summa
 ## 1. RESTAURANT (Primary User)
 
 ### What they have today
+
 - **Procurement:** Quick Lists, Cart, Orders, direct Message from Suppliers page, Order reminders
 - **Suppliers:** Browse, follow/block, view products, message
 - **Inventory:** Restaurant inventory, reorder suggestions, waste/spoilage tracking, receiving with quality status
@@ -19,26 +20,27 @@ This document reviews **every role** (Restaurant, Supplier, Admin, Staff), summa
 
 ### Gaps & opportunities (restaurant-centric)
 
-| Priority | Area | Gap / Opportunity | Why it matters |
-|----------|------|-------------------|----------------|
-| **P0** | **Unified “today” view** | No single “command center” for: orders due today, deliveries expected, low-stock alerts, reservations today, staff on shift | Restaurants think in “today”; everything is scattered across Orders, Receiving, Inventory, Reservations, Staff. |
-| **P0** | **Mobile-first receiving** | Receiving is desktop-heavy; staff often receive at the back door on a phone | Quick “Receive” from notification or short link (order + confirm quantities) would dramatically improve adoption. |
-| **P0** | **Invoice PDF** | No download/print for invoices; only view in app | Needed for accounting, disputes, and filing; doc says “planned” but not implemented. |
-| **P1** | **Order → Receiving link** | After “Mark Delivered,” restaurant must remember to go to Receiving; no strong CTA “Receive this order” from order detail or notification | One tap from order or notification to open receiving for that order. |
-| **P1** | **Low-stock → Quick List / Cart** | Reorder suggestions don’t one-click add to a Quick List or Cart | Reduces friction from “I see I’m low” to “I’ve ordered.” |
-| **P1** | **Multi-branch clarity** | Branches exist in schema; UI is not clearly multi-branch (inventory, orders, reporting per branch) | Chains need per-location view and reporting. |
-| **P1** | **Reservations ↔ Staff** | Reservations and Staff are separate; no “who’s on floor today” next to reservation load | Helps with section planning and shift coverage. |
-| **P1** | **Notification preferences** | In-app + email/SMS exist; per-channel and per-event toggles could be clearer (e.g. “Only notify me for deliveries and overdue invoices”) | Reduces noise and increases action on important events. |
-| **P2** | **Spend vs budget** | Expense analytics exist; no simple “monthly budget” or “budget vs actual” per category/supplier | Helps managers control costs. |
-| **P2** | **Supplier performance** | No scorecard: on-time delivery, order accuracy, quality issues from receiving | Restaurants want to choose and keep the best suppliers. |
-| **P2** | **Recurring order visibility** | Quick Lists can be scheduled; no clear “Upcoming recurring orders” or “Next run: Wed 9am” on dashboard | Builds trust in automation. |
-| **P2** | **Guest preferences (reservations)** | Notes exist; no structured allergies, preferences, or visit history per guest (e.g. by phone/email) | Improves service and repeat visits. |
+| Priority | Area                                 | Gap / Opportunity                                                                                                                         | Why it matters                                                                                                    |
+| -------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **P0**   | **Unified “today” view**             | No single “command center” for: orders due today, deliveries expected, low-stock alerts, reservations today, staff on shift               | Restaurants think in “today”; everything is scattered across Orders, Receiving, Inventory, Reservations, Staff.   |
+| **P0**   | **Mobile-first receiving**           | Receiving is desktop-heavy; staff often receive at the back door on a phone                                                               | Quick “Receive” from notification or short link (order + confirm quantities) would dramatically improve adoption. |
+| **P0**   | **Invoice PDF**                      | No download/print for invoices; only view in app                                                                                          | Needed for accounting, disputes, and filing; doc says “planned” but not implemented.                              |
+| **P1**   | **Order → Receiving link**           | After “Mark Delivered,” restaurant must remember to go to Receiving; no strong CTA “Receive this order” from order detail or notification | One tap from order or notification to open receiving for that order.                                              |
+| **P1**   | **Low-stock → Quick List / Cart**    | Reorder suggestions don’t one-click add to a Quick List or Cart                                                                           | Reduces friction from “I see I’m low” to “I’ve ordered.”                                                          |
+| **P1**   | **Multi-branch clarity**             | Branches exist in schema; UI is not clearly multi-branch (inventory, orders, reporting per branch)                                        | Chains need per-location view and reporting.                                                                      |
+| **P1**   | **Reservations ↔ Staff**            | Reservations and Staff are separate; no “who’s on floor today” next to reservation load                                                   | Helps with section planning and shift coverage.                                                                   |
+| **P1**   | **Notification preferences**         | In-app + email/SMS exist; per-channel and per-event toggles could be clearer (e.g. “Only notify me for deliveries and overdue invoices”)  | Reduces noise and increases action on important events.                                                           |
+| **P2**   | **Spend vs budget**                  | Expense analytics exist; no simple “monthly budget” or “budget vs actual” per category/supplier                                           | Helps managers control costs.                                                                                     |
+| **P2**   | **Supplier performance**             | No scorecard: on-time delivery, order accuracy, quality issues from receiving                                                             | Restaurants want to choose and keep the best suppliers.                                                           |
+| **P2**   | **Recurring order visibility**       | Quick Lists can be scheduled; no clear “Upcoming recurring orders” or “Next run: Wed 9am” on dashboard                                    | Builds trust in automation.                                                                                       |
+| **P2**   | **Guest preferences (reservations)** | Notes exist; no structured allergies, preferences, or visit history per guest (e.g. by phone/email)                                       | Improves service and repeat visits.                                                                               |
 
 ---
 
 ## 2. SUPPLIER
 
 ### What they have today
+
 - **Products:** CRUD, bulk upload, images, categories, warehouse assignment
 - **Inventory:** By product and by warehouse, reserved vs available
 - **Orders:** Inbox, status workflow (Acknowledge → Processing → Shipped → Delivered), manual order creation for a restaurant
@@ -50,22 +52,23 @@ This document reviews **every role** (Restaurant, Supplier, Admin, Staff), summa
 
 ### Gaps & opportunities (supplier helps restaurant experience)
 
-| Priority | Area | Gap / Opportunity | Why it matters |
-|----------|------|-------------------|----------------|
-| **P0** | **Low-stock alerts (supplier)** | Suppliers don’t get notified when their warehouse stock is low | Prevents stockouts and failed orders; FEATURE_COMPARISON already flags this. |
-| **P1** | **Restaurant analytics (supplier)** | No “top restaurants by orders/revenue” or “restaurants who stopped ordering” | Suppliers can prioritize and re-engage; restaurants get better attention. |
-| **P1** | **Delivery ETA / tracking** | Order can be “Shipped” but no ETA or link to tracking | Restaurants want to know when to expect delivery; reduces “where’s my order?” chats. |
-| **P1** | **Packing slip PDF** | Packing slip data exists; PDF download not implemented | Standard for warehouse and drivers. |
-| **P1** | **Contract / custom pricing** | Restaurant pricing exists in schema; no supplier UI to set per-restaurant or volume pricing | Restaurants expect custom terms; reduces back-and-forth. |
-| **P2** | **Payment reminders** | No automated “invoice overdue” reminder to restaurant | Improves cash flow for suppliers. |
-| **P2** | **Product performance** | No “best sellers” or “products with most returns/complaints” | Helps suppliers optimize catalog and quality. |
-| **P2** | **Fulfillment backend** | Waves, routes, pick lists need full API and workflow (assign orders to waves, print pick lists) | Makes “Mark Shipped” and delivery flow professional. |
+| Priority | Area                                | Gap / Opportunity                                                                               | Why it matters                                                                       |
+| -------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **P0**   | **Low-stock alerts (supplier)**     | Suppliers don’t get notified when their warehouse stock is low                                  | Prevents stockouts and failed orders; FEATURE_COMPARISON already flags this.         |
+| **P1**   | **Restaurant analytics (supplier)** | No “top restaurants by orders/revenue” or “restaurants who stopped ordering”                    | Suppliers can prioritize and re-engage; restaurants get better attention.            |
+| **P1**   | **Delivery ETA / tracking**         | Order can be “Shipped” but no ETA or link to tracking                                           | Restaurants want to know when to expect delivery; reduces “where’s my order?” chats. |
+| **P1**   | **Packing slip PDF**                | Packing slip data exists; PDF download not implemented                                          | Standard for warehouse and drivers.                                                  |
+| **P1**   | **Contract / custom pricing**       | Restaurant pricing exists in schema; no supplier UI to set per-restaurant or volume pricing     | Restaurants expect custom terms; reduces back-and-forth.                             |
+| **P2**   | **Payment reminders**               | No automated “invoice overdue” reminder to restaurant                                           | Improves cash flow for suppliers.                                                    |
+| **P2**   | **Product performance**             | No “best sellers” or “products with most returns/complaints”                                    | Helps suppliers optimize catalog and quality.                                        |
+| **P2**   | **Fulfillment backend**             | Waves, routes, pick lists need full API and workflow (assign orders to waves, print pick lists) | Makes “Mark Shipped” and delivery flow professional.                                 |
 
 ---
 
 ## 3. ADMIN
 
 ### What they have today
+
 - **Admin dashboard:** Overview, Plans, Subscriptions, Tenants (suppliers/restaurants), Usage, Audit logs, Portals (reservations, staff)
 - **Plans:** Edit limits and features, pricing
 - **Tenants:** Change plan, override limits, view usage
@@ -74,43 +77,45 @@ This document reviews **every role** (Restaurant, Supplier, Admin, Staff), summa
 
 ### Gaps & opportunities
 
-| Priority | Area | Gap / Opportunity | Why it matters |
-|----------|------|-------------------|----------------|
-| **P1** | **Impersonation / support view** | Admin cannot “view as” a restaurant or supplier to debug or guide | Support and onboarding would be much faster. |
-| **P1** | **Alerts for platform health** | No built-in alerts for: high error rate, DB latency, queue lag, failed jobs | Ensures reliability as the best restaurant software. |
-| **P1** | **Billing integration** | Plans and limits exist; no Stripe/Billing provider for self-serve upgrade and usage-based billing | Needed for scale and fewer manual interventions. |
-| **P2** | **Tenant onboarding checklist** | No “Restaurant onboarding: profile ✓, first order ✓, first receiving ✓” | Improves activation and retention. |
-| **P2** | **Feature flags per tenant** | Experimental features (e.g. new reservations UI) can’t be toggled per tenant | Safer rollouts. |
+| Priority | Area                             | Gap / Opportunity                                                                                 | Why it matters                                       |
+| -------- | -------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **P1**   | **Impersonation / support view** | Admin cannot “view as” a restaurant or supplier to debug or guide                                 | Support and onboarding would be much faster.         |
+| **P1**   | **Alerts for platform health**   | No built-in alerts for: high error rate, DB latency, queue lag, failed jobs                       | Ensures reliability as the best restaurant software. |
+| **P1**   | **Billing integration**          | Plans and limits exist; no Stripe/Billing provider for self-serve upgrade and usage-based billing | Needed for scale and fewer manual interventions.     |
+| **P2**   | **Tenant onboarding checklist**  | No “Restaurant onboarding: profile ✓, first order ✓, first receiving ✓”                           | Improves activation and retention.                   |
+| **P2**   | **Feature flags per tenant**     | Experimental features (e.g. new reservations UI) can’t be toggled per tenant                      | Safer rollouts.                                      |
 
 ---
 
 ## 4. STAFF (Front-line, self-service)
 
 ### What they have today
+
 - **Staff self-service:** Magic-link login, dashboard with upcoming shifts, announcements, documents
 - **PTO requests, shift swaps** (submit; manager approves in main Staff UI)
-- **No** direct access to main app (no Orders, Inventory, Reservations in staff portal)
+- **No** direct access to main app (`STAFF_PORTAL` role blocked from `/app` and admin APIs; use `/staff/login` only)
+- Provisioned from `/app/staff` → Team (not Settings → Team); Keycloak realm role `staff_portal` only
 
 ### Gaps & opportunities
 
-| Priority | Area | Gap / Opportunity | Why it matters |
-|----------|------|-------------------|----------------|
-| **P1** | **Shift swap discovery** | Staff can request swaps; no “open shifts” or “who wants to swap?” visibility in portal | Fills gaps and reduces manager load. |
-| **P1** | **Clock in/out in portal** | Time entry may be in main Staff app; ensure staff can clock in/out from self-service on mobile | Single place for frontline. |
-| **P2** | **Read-only reservations or “my section”** | Staff could see today’s reservations (or filtered) in portal | Helps hosts and servers prepare. |
-| **P2** | **Acknowledge documents** | Documents and policies with “acknowledged by” and date | Compliance and training. |
+| Priority | Area                                       | Gap / Opportunity                                                                              | Why it matters                       |
+| -------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- | ------------------------------------ |
+| **P1**   | **Shift swap discovery**                   | Staff can request swaps; no “open shifts” or “who wants to swap?” visibility in portal         | Fills gaps and reduces manager load. |
+| **P1**   | **Clock in/out in portal**                 | Time entry may be in main Staff app; ensure staff can clock in/out from self-service on mobile | Single place for frontline.          |
+| **P2**   | **Read-only reservations or “my section”** | Staff could see today’s reservations (or filtered) in portal                                   | Helps hosts and servers prepare.     |
+| **P2**   | **Acknowledge documents**                  | Documents and policies with “acknowledged by” and date                                         | Compliance and training.             |
 
 ---
 
 ## 5. CROSS-CUTTING (All roles / platform)
 
-| Priority | Area | Recommendation |
-|----------|------|----------------|
-| **P0** | **Real-time chat** | WebSocket is planned; deliver it so order-related questions get instant answers. |
-| **P0** | **Request IDs & observability** | You have request IDs; add structured logging, metrics (p95, p99), and tracing so you can prove and improve “best software” reliability. |
-| **P1** | **Offline / PWA** | Consider PWA for Receiving and Staff check-in so spotty WiFi doesn’t block operations. |
-| **P1** | **Localization** | Names like `name_ar` suggest Arabic; add locale/translations for key flows (reservations, receiving, staff) to serve more markets. |
-| **P1** | **Accessibility** | Reservations and Staff are used under stress; ensure keyboard nav, focus, and screen-reader basics. |
+| Priority | Area                            | Recommendation                                                                                                                          |
+| -------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **P0**   | **Real-time chat**              | WebSocket is planned; deliver it so order-related questions get instant answers.                                                        |
+| **P0**   | **Request IDs & observability** | You have request IDs; add structured logging, metrics (p95, p99), and tracing so you can prove and improve “best software” reliability. |
+| **P1**   | **Offline / PWA**               | Consider PWA for Receiving and Staff check-in so spotty WiFi doesn’t block operations.                                                  |
+| **P1**   | **Localization**                | Names like `name_ar` suggest Arabic; add locale/translations for key flows (reservations, receiving, staff) to serve more markets.      |
+| **P1**   | **Accessibility**               | Reservations and Staff are used under stress; ensure keyboard nav, focus, and screen-reader basics.                                     |
 
 ---
 
@@ -142,12 +147,12 @@ This document reviews **every role** (Restaurant, Supplier, Admin, Staff), summa
 
 ## 7. ROLE SUMMARY TABLE
 
-| Role        | Strong today                          | Top 3 improvements |
-|------------|----------------------------------------|--------------------|
-| **Restaurant** | Procurement, inventory, finance, reservations, staff, chat | Today view, mobile receiving, invoice PDF |
-| **Supplier**   | Products, orders, invoices, manual orders, chat | Low-stock alerts, delivery ETA, restaurant analytics |
-| **Admin**      | Plans, tenants, usage, audit, portals  | View-as-tenant, billing integration, platform alerts |
-| **Staff**      | Self-service, PTO, swaps, docs        | Open shifts / swap discovery, clock in/out in portal |
+| Role           | Strong today                                               | Top 3 improvements                                   |
+| -------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
+| **Restaurant** | Procurement, inventory, finance, reservations, staff, chat | Today view, mobile receiving, invoice PDF            |
+| **Supplier**   | Products, orders, invoices, manual orders, chat            | Low-stock alerts, delivery ETA, restaurant analytics |
+| **Admin**      | Plans, tenants, usage, audit, portals                      | View-as-tenant, billing integration, platform alerts |
+| **Staff**      | Self-service, PTO, swaps, docs                             | Open shifts / swap discovery, clock in/out in portal |
 
 ---
 

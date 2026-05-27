@@ -55,6 +55,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
     dispatch(setUser(data))
     dispatch(setLoading(false))
 
+    if (data.role === 'STAFF_PORTAL' && isAppRoute) {
+      navigate('/staff/dashboard', { replace: true })
+      return
+    }
+
     if (!needsRegister) {
       redirectedToRegister.current = false
       return

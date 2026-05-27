@@ -2,13 +2,19 @@ import { config } from '../config/env.js'
 import { sendMail, isEmailConfigured } from './mailer.service.js'
 import { logger } from '../lib/logger.js'
 
+function staffPortalWebBase() {
+  return (config.STAFF_PORTAL_BASE_URL || config.WEB_ORIGIN || 'http://localhost:5173').replace(
+    /\/$/,
+    ''
+  )
+}
+
+export function buildStaffPortalLoginPageUrl() {
+  return `${staffPortalWebBase()}/staff/login`
+}
+
 export function buildStaffPortalLoginUrl(sessionToken) {
-  const base = (
-    config.STAFF_PORTAL_BASE_URL ||
-    config.WEB_ORIGIN ||
-    'http://localhost:5173'
-  ).replace(/\/$/, '')
-  return `${base}/staff/dashboard?token=${encodeURIComponent(sessionToken)}`
+  return `${staffPortalWebBase()}/staff/dashboard?token=${encodeURIComponent(sessionToken)}`
 }
 
 /** @deprecated Use isEmailConfigured from mailer.service.js */
@@ -58,4 +64,43 @@ This link expires at ${expiresLabel}. If you did not request it, you can ignore 
 
   await sendMail({ to, subject, text, html })
   return { delivered: true, loginUrl }
+}
+
+/**
+ * Invite email for staff with a Keycloak portal account (sign in at /staff/login).
+ */
+export async function sendStaffPortalAccountInvite({ to, displayName, loginUrl }) {
+  const subject = 'Your Supplify staff portal account'
+  const greeting = displayName ? `Hi ${displayName},` : 'Hi,'
+  const url = loginUrl || buildStaffPortalLoginPageUrl()
+  const text = `${greeting}
+
+Your restaurant enabled staff portal access. Sign in with your work email:
+${url}
+
+Use the password provided by your manager, or reset it from the login page if needed.
+
+— Supplify`
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #0f172a;">
+  <p>${greeting}</p>
+  <p>Your restaurant enabled staff portal access. Sign in with your work email:</p>
+  <p style="margin: 24px 0;">
+    <a href="${url}" style="background:#0f172a;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block;">Staff portal sign in</a>
+  </p>
+  <p style="font-size:14px;color:#64748b;"><a href="${url}">${url}</a></p>
+</body>
+</html>`
+
+  if (!isEmailConfigured()) {
+    if (config.NODE_ENV === 'development') {
+      logger.info('Staff portal account invite (email not configured)', { loginUrl: url })
+    }
+    return { delivered: false, loginUrl: url, preview: true }
+  }
+
+  await sendMail({ to, subject, text, html })
+  return { delivered: true, loginUrl: url }
 }

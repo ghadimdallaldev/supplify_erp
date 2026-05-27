@@ -156,6 +156,38 @@ export async function ensureApiClientDirectAccessGrants() {
   return true
 }
 
+export async function setKeycloakUserEnabled(adminToken, userId, enabled) {
+  const url = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users/${userId}`
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Set Keycloak user enabled=${enabled} failed: ${res.status} ${text}`)
+  }
+}
+
+export async function resetKeycloakUserPassword(adminToken, userId, password, temporary = true) {
+  const url = `${base()}/admin/realms/${config.KEYCLOAK_REALM}/users/${userId}/reset-password`
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ type: 'password', value: password, temporary }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Reset Keycloak password failed: ${res.status} ${text}`)
+  }
+}
+
 export async function ensureKeycloakRealmRole(email, roleName) {
   try {
     const token = await getKeycloakAdminToken()

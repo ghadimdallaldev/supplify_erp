@@ -49,6 +49,7 @@ import type { StaffMember, StaffPtoRequest, StaffShiftSwap } from '../types'
 import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
+import { StaffPortalAccessPanel } from '../components/StaffPortalAccessPanel'
 
 interface StaffFormState {
   firstName: string
@@ -948,6 +949,7 @@ export function StaffPage() {
                                 )}
                               </div>
                             </div>
+                            <StaffPortalAccessPanel member={member} canManage={canWriteStaff} />
                           </div>
                         )
                       })}

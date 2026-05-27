@@ -901,18 +901,24 @@ Display History:
 
 ### Highlights
 
-- Dedicated `/staff` login via passwordless magic link
-- Personal dashboard with upcoming shifts, announcements, and documents
-- Submit PTO requests, log shift swaps, and review history
-- Mobile-friendly UI for on-the-go access
-- Secure session tokens (12-hour expiry) with audit-ready trails
+- **Separate from platform users** — operational staff use role `STAFF_PORTAL` (Keycloak `staff_portal`), not Team/RBAC roles
+- Sign in at **`/staff/login`** (Keycloak); managers provision accounts from **`/app/staff` → Team**
+- Personal dashboard: shifts, clock in/out, PTO, swaps, availability, announcements, own documents
+- Optional legacy **magic link** (`/staff` → email → `/staff/dashboard?token=`)
+- API enforcement: staff cannot access `/app` routes or other employees’ data (`/api/staff/self/*` only)
 
-### Staff Flow
+### Manager flow (Team tab)
 
-1. Request a secure link using work email
-2. Open the dashboard to review shifts and key updates
-3. Submit PTO or swap requests that sync with manager tools
-4. Access training docs, policies, and acknowledgment resources
+1. Add staff member with work email
+2. **Create portal account** → Keycloak user + link to `staff_member`
+3. **Send invite** or copy **`/staff/login`** link; reset or disable access as needed
+
+### Staff flow
+
+1. Open `/staff/login` and sign in with work email/password (from manager)
+2. Review shifts and announcements on `/staff/dashboard`
+3. Clock in/out, submit PTO/swap/availability (own record only)
+4. Acknowledge announcements; view assigned documents
 
 ### Operational Impact
 
@@ -989,7 +995,7 @@ Display History:
 18. ✅ **Extended Session Timeout** - 1 hour session (was 5 minutes)
 19. ✅ **Order Reminders** - Send reminders to suppliers for unacknowledged orders
 20. ✅ **Public Reservation Portal** - Guest self-service booking with live availability
-21. ✅ **Staff Self-Service Portal** - Passwordless access for schedules, PTO, swaps, docs, and **clock in/out** with recent time entries
+21. ✅ **Staff Self-Service Portal** - Keycloak staff accounts (`STAFF_PORTAL`), manager provisioning on Team tab, `/staff/login`, API-scoped self-service, optional magic links
 
 ### Partially Implemented 🔄:
 

@@ -24,6 +24,11 @@ describe('staff-portal-mail.service', () => {
     isEmailConfigured.mockReturnValue(false)
   })
 
+  it('buildStaffPortalLoginPageUrl points to staff login', async () => {
+    const { buildStaffPortalLoginPageUrl } = await import('./staff-portal-mail.service.js')
+    expect(buildStaffPortalLoginPageUrl()).toBe('http://localhost:5173/staff/login')
+  })
+
   it('buildStaffPortalLoginUrl encodes token in dashboard URL', async () => {
     const { buildStaffPortalLoginUrl } = await import('./staff-portal-mail.service.js')
     const url = buildStaffPortalLoginUrl('11111111-1111-1111-1111-111111111111')

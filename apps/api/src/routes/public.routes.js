@@ -6,12 +6,19 @@ import {
   notifyReservationCreated,
   notifyReservationWaitlist,
   notifyGuestReservationConfirmation,
-  notifyStaffPtoRequest,
-  notifyStaffSwapRequest,
 } from '../services/notification.service.js'
 import { config } from '../config/env.js'
 import { sendStaffPortalMagicLink } from '../services/staff-portal-mail.service.js'
 import { isEmailConfigured } from '../services/mailer.service.js'
+import {
+  ensureStaffSession,
+  fetchStaffPortalDashboard,
+  fetchStaffPortalTimeEntries,
+  staffPortalCheckIn,
+  staffPortalCheckOut,
+  submitStaffPortalPto,
+  submitStaffPortalSwap,
+} from '../services/staff-portal-self.service.js'
 import {
   acceptWaitlistOffer,
   declineWaitlistOffer,
@@ -194,47 +201,6 @@ async function calculateSlotAvailability(restaurantId, date, partySize, excludeR
       isAvailable: capacityAvailable >= partySize,
     }
   })
-}
-
-async function ensureStaffSession(token) {
-  const { rows } = await query(
-    `
-      SELECT sps.*, sm.display_name, sm.restaurant_id
-      FROM staff_portal_session sps
-      JOIN staff_member sm ON sm.id = sps.staff_id
-      WHERE sps.session_token = $1
-        AND sps.expires_at > now()
-    `,
-    [token]
-  )
-  if (!rows.length) {
-    return null
-  }
-  return rows[0]
-}
-
-function mapTimeEntryRow(row) {
-  return {
-    id: row.id,
-    restaurantId: row.restaurant_id,
-    staffId: row.staff_id,
-    clockInAt: row.clock_in_at,
-    clockOutAt: row.clock_out_at,
-    clockInMethod: row.clock_in_method,
-    clockOutMethod: row.clock_out_method,
-    breakMinutes: row.break_minutes != null ? Number(row.break_minutes) : null,
-    note: row.note,
-    status: row.status,
-    staff: row.staff_id
-      ? {
-          id: row.staff_id,
-          name: row.staff_name,
-          role: row.staff_role,
-        }
-      : null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
 }
 
 function isUuid(str) {
@@ -620,9 +586,11 @@ router.post('/staff/request-link', async (req, res) => {
     const payload = staffLinkRequestSchema.parse(req.body)
     const { rows } = await query(
       `
-        SELECT id, display_name, restaurant_id
+        SELECT id, display_name, restaurant_id, portal_access_enabled
         FROM staff_member
         WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+          AND status = 'ACTIVE'
+          AND portal_access_enabled = true
       `,
       [payload.email]
     )
@@ -740,92 +708,12 @@ router.get('/staff/dashboard', async (req, res) => {
       })
     }
 
-    const staffId = session.staff_id
-    const restaurantId = session.restaurant_id
-
-    const [
-      staffInfoResult,
-      shiftsResult,
-      ptoResult,
-      swapsResult,
-      announcementsResult,
-      documentsResult,
-    ] = await Promise.all([
-      query(
-        `
-          SELECT id, display_name, role, email, phone
-          FROM staff_member
-          WHERE id = $1
-        `,
-        [staffId]
-      ),
-      query(
-        `
-          SELECT id, role, shift_date, starts_at, ends_at, status
-          FROM staff_shift
-          WHERE restaurant_id = $1
-            AND (staff_id = $2 OR staff_id IS NULL)
-            AND shift_date >= CURRENT_DATE
-          ORDER BY shift_date, starts_at
-          LIMIT 10
-        `,
-        [restaurantId, staffId]
-      ),
-      query(
-        `
-          SELECT id, type, status, start_date, end_date, hours_requested, created_at
-          FROM staff_pto_request
-          WHERE staff_id = $1
-          ORDER BY created_at DESC
-          LIMIT 10
-        `,
-        [staffId]
-      ),
-      query(
-        `
-          SELECT id, status, reason, created_at
-          FROM staff_shift_swap
-          WHERE requested_by = $1
-          ORDER BY created_at DESC
-          LIMIT 10
-        `,
-        [staffId]
-      ),
-      query(
-        `
-          SELECT a.id, a.title, a.body, a.require_ack, a.published_at,
-                 EXISTS (
-                   SELECT 1 FROM staff_announcement_ack ack
-                   WHERE ack.announcement_id = a.id AND ack.staff_id = $1
-                 ) AS acknowledged
-          FROM staff_announcement a
-          WHERE a.restaurant_id = $2
-          ORDER BY a.published_at DESC
-          LIMIT 5
-        `,
-        [staffId, restaurantId]
-      ),
-      query(
-        `
-          SELECT id, doc_type, title, file_url, status, uploaded_at, expires_at
-          FROM staff_document
-          WHERE restaurant_id = $1 AND (staff_id = $2 OR staff_id IS NULL)
-          ORDER BY uploaded_at DESC
-          LIMIT 10
-        `,
-        [restaurantId, staffId]
-      ),
-    ])
+    const dashboard = await fetchStaffPortalDashboard(session.staff_id, session.restaurant_id)
 
     res.json({
       ok: true,
       data: {
-        staff: staffInfoResult.rows[0],
-        upcomingShifts: shiftsResult.rows,
-        ptoRequests: ptoResult.rows,
-        swapRequests: swapsResult.rows,
-        announcements: announcementsResult.rows,
-        documents: documentsResult.rows,
+        ...dashboard,
         session: {
           token: session.session_token,
           expiresAt: session.expires_at,
@@ -857,23 +745,10 @@ router.get('/staff/time-entries', async (req, res) => {
         requestId: req.requestId,
       })
     }
-    const start = new Date()
-    start.setDate(start.getDate() - 30)
-    const startStr = start.toISOString()
-    const { rows } = await query(
-      `
-        SELECT te.*, sm.display_name AS staff_name, sm.role AS staff_role
-        FROM staff_time_entry te
-        JOIN staff_member sm ON sm.id = te.staff_id
-        WHERE te.restaurant_id = $1 AND te.staff_id = $2 AND te.clock_in_at >= $3
-        ORDER BY te.clock_in_at DESC
-        LIMIT 50
-      `,
-      [session.restaurant_id, session.staff_id, startStr]
-    )
+    const entries = await fetchStaffPortalTimeEntries(session.staff_id, session.restaurant_id)
     res.json({
       ok: true,
-      data: rows.map(mapTimeEntryRow),
+      data: entries,
       error: null,
       requestId: req.requestId,
     })
@@ -902,57 +777,20 @@ router.post('/staff/check-in', async (req, res) => {
         requestId: req.requestId,
       })
     }
-    const { rows: openRows } = await query(
-      `
-        SELECT id FROM staff_time_entry
-        WHERE restaurant_id = $1 AND staff_id = $2 AND clock_out_at IS NULL
-        LIMIT 1
-      `,
-      [session.restaurant_id, session.staff_id]
-    )
-    if (openRows.length) {
-      return res.status(409).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'TIME_ENTRY_OPEN_EXISTS',
-          message: 'You already have an open time entry. Clock out first.',
-        },
-        requestId: req.requestId,
-      })
-    }
-    const clockInAt = new Date().toISOString()
-    const { rows } = await query(
-      `
-        INSERT INTO staff_time_entry (
-          restaurant_id, staff_id, clock_in_at, clock_in_method, note, created_by, updated_by
-        )
-        VALUES ($1, $2, $3, 'portal', $4, NULL, NULL)
-        RETURNING *
-      `,
-      [session.restaurant_id, session.staff_id, clockInAt, payload.note ?? null]
-    )
-    const entry = rows[0]
-    const { rows: staffRows } = await query(
-      `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
-      [entry.staff_id]
-    )
-    if (staffRows.length) {
-      entry.staff_name = staffRows[0].staff_name
-      entry.staff_role = staffRows[0].staff_role
-    }
+    const data = await staffPortalCheckIn(session.staff_id, session.restaurant_id, payload.note)
     res.status(201).json({
       ok: true,
-      data: mapTimeEntryRow(entry),
+      data,
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
     logger.error('Staff portal check-in failed', { error: error.message })
-    res.status(400).json({
+    const status = error.status || 400
+    res.status(status).json({
       ok: false,
       data: null,
-      error: { name: 'TIME_ENTRY_CREATE_ERROR', message: error.message },
+      error: { name: error.name || 'TIME_ENTRY_CREATE_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }
@@ -970,46 +808,20 @@ router.post('/staff/time-entries/:id/check-out', async (req, res) => {
         requestId: req.requestId,
       })
     }
-    const entryId = req.params.id
-    const clockOutAt = new Date().toISOString()
-    const { rows } = await query(
-      `
-        UPDATE staff_time_entry
-        SET clock_out_at = $3, clock_out_method = 'portal', updated_at = now()
-        WHERE id = $1 AND restaurant_id = $2 AND staff_id = $4 AND clock_out_at IS NULL
-        RETURNING *
-      `,
-      [entryId, session.restaurant_id, clockOutAt, session.staff_id]
-    )
-    if (!rows.length) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'Time entry not found or already closed' },
-        requestId: req.requestId,
-      })
-    }
-    const entry = rows[0]
-    const { rows: staffRows } = await query(
-      `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
-      [entry.staff_id]
-    )
-    if (staffRows.length) {
-      entry.staff_name = staffRows[0].staff_name
-      entry.staff_role = staffRows[0].staff_role
-    }
+    const data = await staffPortalCheckOut(session.staff_id, session.restaurant_id, req.params.id)
     res.json({
       ok: true,
-      data: mapTimeEntryRow(entry),
+      data,
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
     logger.error('Staff portal check-out failed', { error: error.message })
-    res.status(400).json({
+    const status = error.status || 400
+    res.status(status).json({
       ok: false,
       data: null,
-      error: { name: 'TIME_ENTRY_UPDATE_ERROR', message: error.message },
+      error: { name: error.name || 'TIME_ENTRY_UPDATE_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }
@@ -1028,42 +840,11 @@ router.post('/staff/pto', async (req, res) => {
       })
     }
 
-    const { rows } = await query(
-      `
-        INSERT INTO staff_pto_request (
-          restaurant_id,
-          staff_id,
-          type,
-          status,
-          start_date,
-          end_date,
-          hours_requested,
-          reason,
-          created_by
-        )
-        VALUES ($1, $2, $3, 'PENDING', $4, $5, $6, $7, NULL)
-        RETURNING *
-      `,
-      [
-        session.restaurant_id,
-        session.staff_id,
-        payload.type,
-        payload.startDate,
-        payload.endDate,
-        payload.hoursRequested ?? null,
-        payload.reason ?? null,
-      ]
-    )
-
-    try {
-      await notifyStaffPtoRequest(rows[0])
-    } catch (notifyError) {
-      logger.warn('Staff self-service PTO notification failed', { error: notifyError.message })
-    }
+    const data = await submitStaffPortalPto(session.staff_id, session.restaurant_id, payload)
 
     res.status(201).json({
       ok: true,
-      data: rows[0],
+      data,
       error: null,
       requestId: req.requestId,
     })
@@ -1091,37 +872,11 @@ router.post('/staff/swaps', async (req, res) => {
       })
     }
 
-    const { rows } = await query(
-      `
-        INSERT INTO staff_shift_swap (
-          restaurant_id,
-          shift_id,
-          requested_by,
-          proposed_cover_id,
-          reason,
-          status
-        )
-        VALUES ($1, $2, $3, $4, $5, 'REQUESTED')
-        RETURNING *
-      `,
-      [
-        session.restaurant_id,
-        payload.shiftId,
-        session.staff_id,
-        payload.proposedCoverId ?? null,
-        payload.reason ?? null,
-      ]
-    )
-
-    try {
-      await notifyStaffSwapRequest(rows[0])
-    } catch (notifyError) {
-      logger.warn('Staff swap notification failed', { error: notifyError.message })
-    }
+    const data = await submitStaffPortalSwap(session.staff_id, session.restaurant_id, payload)
 
     res.status(201).json({
       ok: true,
-      data: rows[0],
+      data,
       error: null,
       requestId: req.requestId,
     })

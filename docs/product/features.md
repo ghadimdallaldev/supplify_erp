@@ -149,14 +149,14 @@ Runtime schema ensured on API startup (`ensureReservationsSchema`). Tests: `rese
 
 ## Staff & labour
 
-| Feature            | Web route                    | API prefix           | Notes                                      |
-| ------------------ | ---------------------------- | -------------------- | ------------------------------------------ |
-| Staff directory    | `/app/staff`                 | `/api/staff`         | Members, roles, shifts                     |
-| Staff self-service | `/staff`, `/staff/dashboard` | `/api/public/staff*` | Magic-link login, clock in/out, PTO, swaps |
+| Feature            | Web route                          | API prefix                                          | Notes                                                                                |
+| ------------------ | ---------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Staff directory    | `/app/staff`                       | `/api/staff`                                        | Members, roles, shifts                                                               |
+| Staff self-service | `/staff/login`, `/staff/dashboard` | `/api/staff/self/*` (+ legacy `/api/public/staff*`) | Keycloak `STAFF_PORTAL` accounts; manager provisioning on Team tab; no `/app` access |
 
-Runtime schema ensured on API startup (`ensureStaffAppSchema`). Tests: `staff.routes.test.js`, `public.routes.test.js` (staff endpoints).
+Migration `0108_staff_portal_accounts.sql`. Tests: `staff-portal-auth.test.js`, `staff-portal-access.test.js`, `staff.routes.test.js`, `public.routes.test.js`.
 
-**Verify:** Restaurant → Staff → view roster. Visit `/staff` → request link flow (email in dev logs).
+**Verify:** `/app/staff` → Team → create portal account → staff signs in at `/staff/login` → clock in; staff user gets 403 on `/api/staff/members`.
 
 ## Subscriptions & entitlements
 
@@ -246,7 +246,7 @@ node apps/api/scripts/migrate.js
 | Chat           | Send message restaurant ↔ supplier | Message appears; socket connected            |
 | Order          | Place order from cart               | Appears in Orders + supplier Fulfillment     |
 | Reservations   | Restaurant board + `/reserve`       | Booking created                              |
-| Staff          | `/app/staff` + `/staff`             | Roster loads; self-service reachable         |
+| Staff          | `/app/staff` + `/staff/login`       | Roster + portal controls; staff login works  |
 | Admin flags    | `/app/admin` → Features             | List loads; toggle inherits/on/off           |
 
 ## E2E (optional)

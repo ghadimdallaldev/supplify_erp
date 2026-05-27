@@ -6,11 +6,16 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { toast } from 'react-hot-toast'
 import { useRequestStaffPortalLinkMutation } from '../services/api'
+import { redirectToAuth } from '../lib/authRedirect'
 
 export function StaffSelfServiceLogin() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [requestLink, { isLoading }] = useRequestStaffPortalLinkMutation()
+
+  const handleKeycloakLogin = () => {
+    redirectToAuth('login')
+  }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -43,9 +48,8 @@ export function StaffSelfServiceLogin() {
         <div className="w-full space-y-4 lg:w-1/2">
           <h1 className="text-3xl font-bold tracking-tight">Supplify Staff Access</h1>
           <p className="text-sm text-[var(--text-muted)]">
-            View your schedule, request time off, and stay in sync with your restaurant. Enter your
-            work email to receive a magic link. Keep this page open—you&apos;ll be redirected
-            automatically once the link is generated.
+            View your schedule, request time off, and clock in/out. Sign in with the account your
+            manager created, or request a one-time magic link to your work email.
           </p>
           <div className="rounded-2xl border border-white/10 bg-slate-800/60 p-5 text-sm">
             <p className="font-semibold text-[var(--text-muted)]">What you can do</p>
@@ -60,13 +64,28 @@ export function StaffSelfServiceLogin() {
 
         <Card className="w-full bg-white/95 text-[var(--text-muted)] shadow-xl lg:w-1/2">
           <CardHeader>
-            <CardTitle>Request secure login link</CardTitle>
+            <CardTitle>Staff portal sign in</CardTitle>
             <CardDescription>
-              We’ll send a one-time access link to your work email. No passwords, just a simple RSVP
-              back to the team.
+              Use your work email and password from your manager, or request a one-time magic link.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Button type="button" className="w-full" onClick={handleKeycloakLogin}>
+                Sign in with email & password
+              </Button>
+              <p className="text-center text-xs text-[var(--text-muted)]">
+                For accounts created by your restaurant manager
+              </p>
+            </div>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-[var(--app-border)]" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-[var(--text-muted)]">Or magic link</span>
+              </div>
+            </div>
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
                 <Label htmlFor="email">Work email</Label>

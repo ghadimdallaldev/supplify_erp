@@ -226,7 +226,7 @@ describe('public.routes – staff portal time entries', () => {
         .post(`/api/public/staff/time-entries/${TIME_ENTRY_ID}/check-out`)
         .send({ token: VALID_TOKEN })
         .expect(404)
-      expect(res.body.error?.name).toBe('NOT_FOUND')
+      expect(res.body.error?.name).toBe('TIME_ENTRY_NOT_FOUND')
     })
 
     it('closes time entry and returns 200', async () => {

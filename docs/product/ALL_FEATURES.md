@@ -48,14 +48,14 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ## 2. User roles & access model
 
-| Role               | Description                                              | Primary navigation                                                                                                             |
-| ------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **RESTAURANT**     | Buyer: orders, inventory, reservations, staff, suppliers | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Staff, Inventory, Suppliers, Invoices, Chat, Settings |
-| **SUPPLIER**       | Seller: catalog, fulfillment, restaurants, invoices      | Dashboard, Orders, Products, Fulfillment, Restaurants, Invoices, Chat, Settings                                                |
-| **ADMIN**          | Platform operator: tenants, plans, billing, flags        | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                    |
-| **PENDING**        | New signup before tenant setup                           | Redirected to `/register/complete`                                                                                             |
-| **Public guest**   | No account                                               | Reservation booking, manage booking by token                                                                                   |
-| **Staff (portal)** | No Supplify login; magic-link session                    | `/staff`, `/staff/dashboard`                                                                                                   |
+| Role               | Description                                                      | Primary navigation                                                                                                             |
+| ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **RESTAURANT**     | Buyer: orders, inventory, reservations, staff, suppliers         | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Staff, Inventory, Suppliers, Invoices, Chat, Settings |
+| **SUPPLIER**       | Seller: catalog, fulfillment, restaurants, invoices              | Dashboard, Orders, Products, Fulfillment, Restaurants, Invoices, Chat, Settings                                                |
+| **ADMIN**          | Platform operator: tenants, plans, billing, flags                | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                    |
+| **PENDING**        | New signup before tenant setup                                   | Redirected to `/register/complete`                                                                                             |
+| **Public guest**   | No account                                                       | Reservation booking, manage booking by token                                                                                   |
+| **Staff (portal)** | Operational staff only (`STAFF_PORTAL`); separate from Team RBAC | `/staff/login`, `/staff/dashboard` — **no** `/app` access unless also a platform user (dual link)                              |
 
 **Additional controls:**
 
@@ -70,22 +70,22 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ## 3. Public features (no login)
 
-| Feature                              | Web route                                  | API                                                                    |
-| ------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------- |
-| Guest reservation booking            | `/reserve`, `/reserve/:restaurantIdOrSlug` | `GET/POST /api/public/reservations*`                                   |
-| Reservation availability slots       | (portal UI)                                | `GET /api/public/reservations/availability`                            |
-| Waitlist signup                      | (portal UI)                                | `POST /api/public/reservations/waitlist`                               |
-| Booking confirmation page            | `/reserve/confirmation`                    | —                                                                      |
-| Manage booking (cancel / reschedule) | `/reserve/manage/:token`                   | `GET/POST /api/public/reservations/manage*`                            |
-| List restaurants for booking         | (portal)                                   | `GET /api/public/restaurants`, `GET .../restaurants/:idOrSlug`         |
-| Staff self-service login             | `/staff`                                   | `POST /api/public/staff/request-link`                                  |
-| Staff portal session                 | `/staff/dashboard?token=…`                 | `POST /api/public/staff/session`, `GET .../staff/dashboard`            |
-| Staff clock in / out                 | (portal)                                   | `POST .../staff/check-in`, `POST .../staff/time-entries/:id/check-out` |
-| Staff PTO request (self)             | (portal)                                   | `POST /api/public/staff/pto`                                           |
-| Staff shift swap request (self)      | (portal)                                   | `POST /api/public/staff/swaps`                                         |
-| Staff time entries history           | (portal)                                   | `GET /api/public/staff/time-entries`                                   |
+| Feature                              | Web route                                  | API                                                                         |
+| ------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------- |
+| Guest reservation booking            | `/reserve`, `/reserve/:restaurantIdOrSlug` | `GET/POST /api/public/reservations*`                                        |
+| Reservation availability slots       | (portal UI)                                | `GET /api/public/reservations/availability`                                 |
+| Waitlist signup                      | (portal UI)                                | `POST /api/public/reservations/waitlist`                                    |
+| Booking confirmation page            | `/reserve/confirmation`                    | —                                                                           |
+| Manage booking (cancel / reschedule) | `/reserve/manage/:token`                   | `GET/POST /api/public/reservations/manage*`                                 |
+| List restaurants for booking         | (portal)                                   | `GET /api/public/restaurants`, `GET .../restaurants/:idOrSlug`              |
+| Staff portal login (Keycloak)        | `/staff/login`                             | OAuth via `/auth/login`; callback → `/staff/dashboard` for `STAFF_PORTAL`   |
+| Staff self-service (authenticated)   | `/staff/dashboard`                         | `GET/POST /api/staff/self/*` (cookie session; own staff profile only)       |
+| Staff magic-link login (legacy)      | `/staff`, `/staff/dashboard?token=…`       | `POST /api/public/staff/request-link`, `.../session`, public staff routes   |
+| Staff clock in / out                 | (portal)                                   | `POST /api/staff/self/check-in`, `.../self/time-entries/:id/check-out`      |
+| Staff PTO / swap / availability      | (portal)                                   | `POST /api/staff/self/pto`, `.../swaps`, `.../availability`                 |
+| Manager: portal account controls     | `/app/staff` → Team                        | `POST /api/staff/members/:id/portal/create-account`, invite, reset, disable |
 
-**Notes:** Public APIs are rate-limited. Staff magic links are emailed via Twilio SendGrid (or returned in dev when email is not configured).
+**Notes:** Public staff APIs are rate-limited. Magic links require `portal_access_enabled`. Operational staff must not receive `restaurant`/`supplier` Keycloak roles. See `docs/features/staff-portal-access.md`.
 
 ---
 

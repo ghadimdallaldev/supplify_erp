@@ -22,7 +22,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | `/login`                                                                        | Public                                                |
 | `/register/complete`                                                            | Pending / needs setup                                 |
 | `/reserve`, `/reserve/:slug`, `/reserve/confirmation`, `/reserve/manage/:token` | Guest                                                 |
-| `/staff`, `/staff/dashboard`                                                    | Staff portal (not tenant login)                       |
+| `/staff`, `/staff/login`, `/staff/dashboard`                                    | Staff portal (operational staff; not `/app`)          |
 | `/app/dashboard`, `/`                                                           | Restaurant / Supplier / Admin (impersonating)         |
 | `/app/activate`                                                                 | Locked tenant billing activation                      |
 | `/app/orders`, `/app/orders/:id`                                                | Restaurant & Supplier                                 |
@@ -394,12 +394,15 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 5.2 Staff self-service portal
 
-| ID     | Steps                                      | Expected                                            | Pass? |
-| ------ | ------------------------------------------ | --------------------------------------------------- | ----- |
-| PUB-07 | Open `/staff`                              | Staff login / magic-link request UI                 |       |
-| PUB-08 | Request link with staff email              | Email sent (or dev log); no tenant auth required    |       |
-| PUB-09 | Open `/staff/dashboard` with valid session | Clock in/out, schedule, PTO, swaps per portal scope |       |
-| PUB-10 | PIN / session expiry                       | Prompt re-auth                                      |       |
+| ID     | Steps                                                                 | Expected                                                            | Pass? |
+| ------ | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ----- |
+| PUB-07 | Open `/staff/login` (or `/staff`)                                     | Keycloak sign-in + optional magic-link UI                           |       |
+| PUB-08 | Manager: `/app/staff` → Team → **Create portal account** for staff    | Account created; status Active; temp password (dev) or invite flow  |       |
+| PUB-09 | Staff signs in at `/staff/login` with work email                      | Lands on `/staff/dashboard`; **cannot** open `/app` (redirect back) |       |
+| PUB-10 | Staff: clock in/out, view own shifts, submit PTO/swap                 | Only own data; `GET /api/staff/members` returns 403 if forced       |       |
+| PUB-11 | Manager: copy login link, send invite, reset, disable portal access   | Link is `/staff/login`; disable blocks login and magic link         |       |
+| PUB-12 | Magic link: request link (portal enabled) → `/staff/dashboard?token=` | Legacy session works; scoped to one staff profile                   |       |
+| PUB-13 | Session / token expiry                                                | Prompt re-auth at `/staff/login`                                    |       |
 
 ---
 
@@ -497,16 +500,16 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.9 Staff HR (`/app/staff`)
 
-| ID     | Steps                      | Expected                           | Pass? |
-| ------ | -------------------------- | ---------------------------------- | ----- |
-| RST-43 | Tab: Team — list members   | Roles shown                        |       |
-| RST-44 | Invite/add staff member    | Invitation or record created       |       |
-| RST-45 | Tab: Schedule & time       | Shifts; clock events               |       |
-| RST-46 | Tab: PTO & availability    | Request/approve PTO                |       |
-| RST-47 | Tab: Announcements & swaps | Post announcement; shift swap flow |       |
-| RST-48 | Tab: Docs & incidents      | Upload/view document; log incident |       |
-| RST-49 | Tab: Payroll & insights    | Reports load                       |       |
-| RST-50 | User without `STAFF_VIEW`  | Nav hidden                         |       |
+| ID     | Steps                                           | Expected                            | Pass? |
+| ------ | ----------------------------------------------- | ----------------------------------- | ----- |
+| RST-43 | Tab: Team — list members                        | Roles shown; portal access status   |       |
+| RST-44 | Add staff + create portal account / send invite | Staff record + portal controls work |       |
+| RST-45 | Tab: Schedule & time                            | Shifts; clock events                |       |
+| RST-46 | Tab: PTO & availability                         | Request/approve PTO                 |       |
+| RST-47 | Tab: Announcements & swaps                      | Post announcement; shift swap flow  |       |
+| RST-48 | Tab: Docs & incidents                           | Upload/view document; log incident  |       |
+| RST-49 | Tab: Payroll & insights                         | Reports load                        |       |
+| RST-50 | User without `STAFF_VIEW`                       | Nav hidden                          |       |
 
 ## 6.10 Suppliers directory (`/app/suppliers`, `/app/suppliers/:id`)
 
@@ -861,20 +864,21 @@ Hidden without RBAC permission or feature gate.
 
 # Part 9 — End-to-end business flows (multi-persona)
 
-| ID     | Steps                                                                                                              | Expected                                            | Pass? |
-| ------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- | ----- |
-| E2E-01 | Restaurant places order → Supplier accepts → Ships → Restaurant receives                                           | Happy path all statuses                             |       |
-| E2E-02 | Order → Invoice issued → Payment recorded                                                                          | Invoice paid; balances correct                      |       |
-| E2E-03 | Restaurant chats supplier about order (both Bronze+)                                                               | Message thread linked contextually                  |       |
-| E2E-04 | Guest books table → Restaurant board updates → Guest cancels via link                                              | Public + internal sync                              |       |
-| E2E-05 | Staff clocks in on `/staff` → Manager sees on `/app/staff`                                                         | Time event recorded                                 |       |
-| E2E-06 | Restaurant quick list scheduled order → Appears on supplier orders                                                 | Scheduled metadata preserved                        |       |
-| E2E-07 | Supplier low stock → Dashboard alert → Adjust inventory                                                            | Stock corrected                                     |       |
-| E2E-08 | Free restaurant blocked on calendar → Upgrades to Bronze → Calendar works                                          | Feature gate lifted; subscription cache invalidated |       |
-| E2E-09 | Admin impersonates → places test order → stops impersonation                                                       | Audit trail; no data leak across tenants            |       |
-| E2E-10 | Admin disables `chat` globally → Both tenants lose chat → Admin re-enables → Chat restored                         | Feature gate toggles for all tenants consistently   |       |
-| E2E-11 | Supplier creates product → Restaurant browses catalog → Restaurant adds to cart → Places order → Supplier fulfills | Full order lifecycle from catalog to delivery       |       |
-| E2E-12 | Tenant subscription goes PAST_DUE (simulated) → Grace period timer → Account locked → Tenant pays → Unlocked       | Full billing lifecycle                              |       |
+| ID      | Steps                                                                                                              | Expected                                            | Pass? |
+| ------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- | ----- |
+| E2E-01  | Restaurant places order → Supplier accepts → Ships → Restaurant receives                                           | Happy path all statuses                             |       |
+| E2E-02  | Order → Invoice issued → Payment recorded                                                                          | Invoice paid; balances correct                      |       |
+| E2E-03  | Restaurant chats supplier about order (both Bronze+)                                                               | Message thread linked contextually                  |       |
+| E2E-04  | Guest books table → Restaurant board updates → Guest cancels via link                                              | Public + internal sync                              |       |
+| E2E-05  | Staff portal account clocks in on `/staff/dashboard` → Manager sees on `/app/staff`                                | Time event recorded; staff cannot access `/app`     |       |
+| E2E-05b | Staff portal user navigates to `/app` or `GET /api/orders`                                                         | Redirect or 403 `STAFF_PORTAL_FORBIDDEN`            |       |
+| E2E-06  | Restaurant quick list scheduled order → Appears on supplier orders                                                 | Scheduled metadata preserved                        |       |
+| E2E-07  | Supplier low stock → Dashboard alert → Adjust inventory                                                            | Stock corrected                                     |       |
+| E2E-08  | Free restaurant blocked on calendar → Upgrades to Bronze → Calendar works                                          | Feature gate lifted; subscription cache invalidated |       |
+| E2E-09  | Admin impersonates → places test order → stops impersonation                                                       | Audit trail; no data leak across tenants            |       |
+| E2E-10  | Admin disables `chat` globally → Both tenants lose chat → Admin re-enables → Chat restored                         | Feature gate toggles for all tenants consistently   |       |
+| E2E-11  | Supplier creates product → Restaurant browses catalog → Restaurant adds to cart → Places order → Supplier fulfills | Full order lifecycle from catalog to delivery       |       |
+| E2E-12  | Tenant subscription goes PAST_DUE (simulated) → Grace period timer → Account locked → Tenant pays → Unlocked       | Full billing lifecycle                              |       |
 
 ---
 
