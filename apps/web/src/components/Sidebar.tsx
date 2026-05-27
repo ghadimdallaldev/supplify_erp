@@ -45,7 +45,20 @@ type NavItem = {
 
 type NavSection = { label: string; items: NavItem[] }
 
-export function Sidebar() {
+function isNavItemActive(pathname: string, href: string): boolean {
+  if (href === '/app/dashboard') {
+    return pathname === href || pathname === '/app' || pathname === '/' || pathname === '/app/'
+  }
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+export function Sidebar({
+  mobileOpen = false,
+  onMobileClose,
+}: {
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+} = {}) {
   const location = useLocation()
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
@@ -399,21 +412,16 @@ export function Sidebar() {
     .slice(0, 2)
 
   return (
-    <div
+    <aside
       data-testid="sidebar"
-      style={{
-        width: 224,
-        minWidth: 224,
-        background: 'var(--surface)',
-        borderRight: '1px solid var(--app-border)',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        position: 'sticky',
-        top: 0,
-        overflowY: 'auto',
-        fontFamily: "'Inter', system-ui, sans-serif",
-      }}
+      aria-label="Main navigation"
+      className={[
+        'flex flex-col border-r border-[var(--app-border)] bg-[var(--surface)] font-sans',
+        'h-screen overflow-y-auto',
+        'fixed inset-y-0 left-0 z-50 w-56 transition-transform duration-200 lg:sticky lg:translate-x-0',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      ].join(' ')}
+      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {/* Brand block */}
       <div
@@ -423,22 +431,17 @@ export function Sidebar() {
       </div>
 
       {/* Navigation sections */}
-      <nav style={{ flex: 1, padding: '6px 10px', display: 'flex', flexDirection: 'column' }}>
+      <nav
+        style={{ flex: 1, padding: '6px 10px', display: 'flex', flexDirection: 'column' }}
+        aria-label="Application sections"
+      >
         {sections.map((section) => (
           <div key={section.label} style={{ marginBottom: 6 }}>
-            <div
-              style={{
-                fontSize: 9.5,
-                fontWeight: 700,
-                color: '#d4c8f0',
-                letterSpacing: '0.08em',
-                padding: '8px 6px 3px',
-              }}
-            >
+            <div className="px-1.5 pb-0.5 pt-2 text-[9.5px] font-bold uppercase tracking-wider text-[var(--sidebar-section)]">
               {section.label}
             </div>
             {section.items.map((item) => {
-              const isActive = location.pathname === item.href
+              const isActive = isNavItemActive(location.pathname, item.href)
               const showPendingBadge = item.badge === 'pending' && pendingOrders > 0
               const showUnreadBadge = item.badge === 'unread' && unreadCount > 0
               const showOrderUsage =
@@ -448,6 +451,8 @@ export function Sidebar() {
                 <Link
                   key={item.name}
                   to={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => onMobileClose?.()}
                   data-testid={item.testId || `nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
                   style={{
                     display: 'flex',
@@ -635,6 +640,6 @@ export function Sidebar() {
           </span>
         )}
       </div>
-    </div>
+    </aside>
   )
 }

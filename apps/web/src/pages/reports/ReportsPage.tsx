@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { PageHeader } from '../../components/ui/page-header'
 import { Button } from '../../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { Label } from '../../components/ui/label'
@@ -269,7 +270,7 @@ export function ReportsPage() {
   if (!reportsEnabled) {
     return (
       <div className="space-y-4">
-        <h1 className="text-[21px] font-black text-[var(--text)]">Reports</h1>
+        <PageHeader title="Reports" />
         <Card>
           <CardContent className="py-8 text-sm text-[var(--text-muted)]">
             Reports & analytics are not included on your current plan. Upgrade to unlock insights.
@@ -281,14 +282,14 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-[21px] font-black text-[var(--text)]">Reports & Analytics</h1>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          {isRestaurant
+      <PageHeader
+        title="Reports & Analytics"
+        description={
+          isRestaurant
             ? 'Restaurant purchasing and operations insights'
-            : 'Supplier revenue and fulfillment insights'}
-        </p>
-      </div>
+            : 'Supplier revenue and fulfillment insights'
+        }
+      />
 
       <Card>
         <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-4 gap-4">

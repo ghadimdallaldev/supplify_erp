@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
@@ -35,6 +35,11 @@ import { LimitExceededBanner } from './LimitExceededBanner'
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [location.pathname])
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const { rehydrateCart } = useCartActions()
@@ -195,9 +200,17 @@ export function Layout() {
         <UpgradeModal />
         <PaymentModal />
         <div className="flex">
-          <Sidebar />
-          <div className="flex-1 flex flex-col">
-            <Header />
+          {mobileNavOpen && (
+            <button
+              type="button"
+              className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+              aria-label="Close navigation menu"
+              onClick={() => setMobileNavOpen(false)}
+            />
+          )}
+          <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
             {user?.role !== 'ADMIN' && <BillingOverdueBanner />}
             {user?.role !== 'ADMIN' && externallyDisabledFeatures.length > 0 && e && (
               <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -330,8 +343,8 @@ export function Layout() {
                 </button>
               </div>
             )}
-            <main className="flex-1 p-4 md:p-6">
-              <div className="min-h-[calc(100vh-5rem)] rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-4 shadow-sm md:p-6">
+            <main className="flex-1 p-3 sm:p-4 md:p-6">
+              <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
                 <Outlet />
               </div>
             </main>

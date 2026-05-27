@@ -6,6 +6,7 @@ import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
+import { PageLoading } from './components/ui/page-loading'
 
 const DashboardPage = lazy(() =>
   import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
@@ -122,11 +123,7 @@ const InviteAcceptPage = lazy(() =>
 )
 
 function PageLoader() {
-  return (
-    <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-      Loading…
-    </div>
-  )
+  return <PageLoading />
 }
 
 function LazyPage({ children }: { children: ReactNode }) {

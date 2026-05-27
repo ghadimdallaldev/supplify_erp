@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { PageHeader } from '../../components/ui/page-header'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Input } from '../../components/ui/input'
@@ -180,7 +181,7 @@ export function DisputesPage() {
   if (!disputesEnabled) {
     return (
       <div className="space-y-4">
-        <h1 className="text-[21px] font-black text-[var(--text)]">Disputes</h1>
+        <PageHeader title="Disputes" />
         <Card>
           <CardContent className="py-8 text-sm text-[var(--text-muted)]">
             Disputes & returns are not on your plan. Upgrade to manage delivery issues and credits.
@@ -263,15 +264,17 @@ export function DisputesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Disputes</h1>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
-            {isSupplier ? 'Incoming disputes from restaurants' : 'Open and track order disputes'}
-          </p>
-        </div>
-        {!isSupplier && <Button onClick={() => setShowCreate(true)}>Open dispute</Button>}
-      </div>
+      <PageHeader
+        title="Disputes"
+        description={
+          isSupplier ? 'Incoming disputes from restaurants' : 'Open and track order disputes'
+        }
+        actions={
+          !isSupplier ? (
+            <Button onClick={() => setShowCreate(true)}>Open dispute</Button>
+          ) : undefined
+        }
+      />
 
       <Card>
         <CardContent className="pt-6 flex flex-wrap gap-3 items-end">

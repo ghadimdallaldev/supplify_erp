@@ -1,5 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
+@layer components {
+  .sidebar-nav-item {
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .sidebar-nav-item:hover {
+    background: var(--brand-ultra);
+    color: var(--text-mid);
+  }
+  .sidebar-nav-item:focus-visible {
+    outline: 2px solid var(--brand-light);
+    outline-offset: 2px;
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -51,6 +67,8 @@
     --text: #1e0b3a;
     --text-mid: #4a3570;
     --text-muted: #8b7aaa;
+    --app-bg-subtle: #f8fafc;
+    --sidebar-section: #c4b5fd;
   }
 
   .dark {
@@ -122,7 +140,9 @@
   }
 
   .fc .supplify-calendar-event {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
   .fc .supplify-calendar-event:hover {
