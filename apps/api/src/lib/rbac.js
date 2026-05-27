@@ -20,6 +20,7 @@ import {
   assignOwnerRoleForUser,
   userHasOwnerRole,
 } from './tenant-roles.js'
+import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -92,6 +93,8 @@ export async function upsertUser(userInfo, roles = []) {
     let explicitRole = null
     if (hasRole('admin')) {
       explicitRole = 'ADMIN'
+    } else if (hasRole('staff_portal') || hasRole('staff_portal_user')) {
+      explicitRole = STAFF_PORTAL_APP_ROLE
     } else if (hasRole('supplier')) {
       explicitRole = 'SUPPLIER'
     } else if (hasRole('restaurant')) {
@@ -182,6 +185,10 @@ export async function requireAuth(req, res, next) {
 
       req.userData = user
       syncRequestLogContext(req)
+      const staffPortalBlock = assertStaffPortalRouteAccess(req, user)
+      if (staffPortalBlock) {
+        return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
+      }
       next()
     } catch (error) {
       logger.debug('Token verification failed, attempting refresh')
@@ -247,6 +254,10 @@ export async function requireAuth(req, res, next) {
 
       req.userData = user
       syncRequestLogContext(req)
+      const staffPortalBlock = assertStaffPortalRouteAccess(req, user)
+      if (staffPortalBlock) {
+        return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
+      }
       next()
     }
   } catch (error) {

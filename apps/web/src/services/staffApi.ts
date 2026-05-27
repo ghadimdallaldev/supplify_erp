@@ -349,7 +349,10 @@ export const staffApi = api.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.map((announcement) => ({ type: 'StaffAnnouncement' as const, id: announcement.id })),
+              ...result.map((announcement) => ({
+                type: 'StaffAnnouncement' as const,
+                id: announcement.id,
+              })),
               { type: 'StaffAnnouncement' as const, id: 'LIST' },
             ]
           : [{ type: 'StaffAnnouncement' as const, id: 'LIST' }],
@@ -450,6 +453,66 @@ export const staffApi = api.injectEndpoints({
       }),
       invalidatesTags: [{ type: 'StaffPayroll', id: 'LIST' }],
     }),
+    getStaffPortalAccess: build.query<
+      {
+        staffId: string
+        email?: string | null
+        hasAccount: boolean
+        portalAccessEnabled: boolean
+        status: string
+        loginUrl: string
+        invitedAt?: string | null
+        lastLoginAt?: string | null
+        disabledAt?: string | null
+      },
+      string
+    >({
+      query: (staffId) => `/api/staff/members/${staffId}/portal`,
+    }),
+    createStaffPortalAccount: build.mutation<
+      { temporaryPassword?: string; status: string; loginUrl: string },
+      string
+    >({
+      query: (staffId) => ({
+        url: `/api/staff/members/${staffId}/portal/create-account`,
+        method: 'POST',
+        body: {},
+      }),
+      invalidatesTags: (_r, _e, staffId) => [
+        { type: 'StaffMember', id: staffId },
+        { type: 'StaffMember', id: 'LIST' },
+      ],
+    }),
+    sendStaffPortalInvite: build.mutation<{ status: string; loginUrl: string }, string>({
+      query: (staffId) => ({
+        url: `/api/staff/members/${staffId}/portal/send-invite`,
+        method: 'POST',
+        body: {},
+      }),
+      invalidatesTags: (_r, _e, staffId) => [{ type: 'StaffMember', id: staffId }],
+    }),
+    getStaffPortalLoginLink: build.query<{ loginUrl: string; status: string }, string>({
+      query: (staffId) => `/api/staff/members/${staffId}/portal/login-link`,
+    }),
+    resetStaffPortalAccess: build.mutation<{ temporaryPassword?: string; status: string }, string>({
+      query: (staffId) => ({
+        url: `/api/staff/members/${staffId}/portal/reset-access`,
+        method: 'POST',
+        body: {},
+      }),
+      invalidatesTags: (_r, _e, staffId) => [{ type: 'StaffMember', id: staffId }],
+    }),
+    disableStaffPortalAccess: build.mutation<{ status: string }, string>({
+      query: (staffId) => ({
+        url: `/api/staff/members/${staffId}/portal/disable`,
+        method: 'POST',
+        body: {},
+      }),
+      invalidatesTags: (_r, _e, staffId) => [
+        { type: 'StaffMember', id: staffId },
+        { type: 'StaffMember', id: 'LIST' },
+      ],
+    }),
   }),
   overrideExisting: false,
 })
@@ -484,5 +547,10 @@ export const {
   useCreateStaffPerformanceNoteMutation,
   useGetStaffPayrollExportsQuery,
   useCreateStaffPayrollExportMutation,
+  useGetStaffPortalAccessQuery,
+  useCreateStaffPortalAccountMutation,
+  useSendStaffPortalInviteMutation,
+  useLazyGetStaffPortalLoginLinkQuery,
+  useResetStaffPortalAccessMutation,
+  useDisableStaffPortalAccessMutation,
 } = staffApi
-

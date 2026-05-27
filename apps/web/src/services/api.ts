@@ -1918,6 +1918,26 @@ export const api = createApi({
         'StaffDocument',
       ],
     }),
+    getStaffSelfTimeEntries: builder.query<StaffTimeEntry[], void>({
+      query: () => '/api/staff/self/time-entries',
+      providesTags: ['StaffTimeEntry'],
+    }),
+    staffSelfCheckIn: builder.mutation<StaffTimeEntry, { note?: string }>({
+      query: (body) => ({
+        url: '/api/staff/self/check-in',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['StaffTimeEntry'],
+    }),
+    staffSelfCheckOut: builder.mutation<StaffTimeEntry, { id: string }>({
+      query: ({ id }) => ({
+        url: `/api/staff/self/time-entries/${id}/check-out`,
+        method: 'POST',
+        body: {},
+      }),
+      invalidatesTags: ['StaffTimeEntry'],
+    }),
     submitStaffSelfPto: builder.mutation<
       StaffPtoRequest,
       {
@@ -3120,6 +3140,9 @@ export const {
   useSubmitStaffPortalPtoMutation,
   useSubmitStaffPortalSwapMutation,
   useGetStaffSelfDashboardQuery,
+  useGetStaffSelfTimeEntriesQuery,
+  useStaffSelfCheckInMutation,
+  useStaffSelfCheckOutMutation,
   useSubmitStaffSelfPtoMutation,
   useSubmitStaffSelfSwapMutation,
   useGetCurrentSubscriptionQuery,

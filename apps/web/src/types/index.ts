@@ -3,7 +3,14 @@ export interface User {
   id: string
   email: string
   displayName: string
-  role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'PENDING'
+  role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'PENDING' | 'STAFF_PORTAL'
+  /** platform = main app; staff_portal = operational staff only */
+  accessType?: 'platform' | 'staff_portal'
+  staffPortal?: {
+    staffId: string
+    restaurantId: string
+    displayName?: string | null
+  } | null
   createdAt: string
   /** Tenant-scoped role codes (e.g. RESTAURANT_OWNER, SUPPLIER_STAFF) */
   tenantRoles?: string[]
@@ -656,6 +663,15 @@ export interface ReservationAnalyticsResponse {
 export type StaffStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
 export type StaffWageType = 'HOURLY' | 'SALARY' | 'CONTRACT' | 'OTHER'
 
+export interface StaffPortalAccessInfo {
+  hasAccount: boolean
+  enabled: boolean
+  status: 'none' | 'invited' | 'active' | 'disabled'
+  invitedAt?: string | null
+  lastLoginAt?: string | null
+  disabledAt?: string | null
+}
+
 export interface StaffMember {
   id: string
   restaurantId: string
@@ -670,6 +686,7 @@ export interface StaffMember {
   wageRate?: number | null
   hireDate?: string | null
   profileColor?: string | null
+  portalAccess?: StaffPortalAccessInfo
   createdAt: string
   updatedAt: string
 }

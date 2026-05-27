@@ -185,8 +185,13 @@ router.get('/callback', async (req, res) => {
     logger.info('User authenticated', { userId: user.id, role: user.role })
 
     const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
-    const needsSetup = await userNeedsTenantSetup(user)
-    const redirectUrl = needsSetup ? `${webOrigin}/register/complete` : `${webOrigin}/app`
+    let redirectUrl
+    if (user.role === 'STAFF_PORTAL') {
+      redirectUrl = `${webOrigin}/staff/dashboard`
+    } else {
+      const needsSetup = await userNeedsTenantSetup(user)
+      redirectUrl = needsSetup ? `${webOrigin}/register/complete` : `${webOrigin}/app`
+    }
     res.redirect(redirectUrl)
   } catch (error) {
     logger.error('Callback error', { error: error.message })
@@ -281,6 +286,20 @@ router.get('/me', requireAuth, async (req, res) => {
       adminPermissions = await getPermissionsForUser(user.id, null, 'ADMIN')
     }
 
+    const accessType = user.role === 'STAFF_PORTAL' ? 'staff_portal' : 'platform'
+    let staffPortal = null
+    if (user.role === 'STAFF_PORTAL') {
+      const { getStaffMemberForPortalUser } = await import('../lib/staff-portal-auth.js')
+      const staffMember = await getStaffMemberForPortalUser(user.id)
+      if (staffMember) {
+        staffPortal = {
+          staffId: staffMember.id,
+          restaurantId: staffMember.restaurant_id,
+          displayName: staffMember.display_name,
+        }
+      }
+    }
+
     res.json({
       ok: true,
       data: {
@@ -288,6 +307,8 @@ router.get('/me', requireAuth, async (req, res) => {
         email: user.email,
         displayName: user.display_name,
         role: user.role,
+        accessType,
+        staffPortal,
         createdAt: user.created_at,
         tenantRoles,
         tenantPermissions,
