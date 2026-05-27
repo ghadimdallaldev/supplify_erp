@@ -36,7 +36,8 @@ const tier = (() => {
 })()
 
 const branch = tier
-const source = tier === 'prod' ? 'preprod' : 'dev'
+// Always promote from dev so release branches get the full runtime tree (not a stale preprod snapshot).
+const source = 'dev'
 
 const dirty = runCapture('git status --porcelain')
 if (dirty) {
@@ -54,7 +55,11 @@ console.log(`\nPromoting ${source} → ${branch} (EC2 ${tier} deploy branch)\n`)
 
 run('git fetch origin')
 run(`git checkout ${branch}`)
-run(`git merge origin/${source} -m "merge(${source}): promote to ${branch}"`)
+// Prefer dev on conflicts — release branches must not keep outdated prod/preprod copies.
+run(`git merge origin/${source} -m "merge(${source}): promote to ${branch}" -X theirs`)
+
+// Sync all application source from dev before prune (guards against merge omissions).
+run('git checkout origin/dev -- apps/')
 
 // Prune script is dev-only; restore from dev before running on the release branch.
 const pruneSrc = runCapture('git show origin/dev:scripts/prune-release-tree.mjs')
