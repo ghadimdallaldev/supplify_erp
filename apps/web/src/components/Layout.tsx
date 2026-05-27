@@ -31,6 +31,7 @@ import { useCartActions } from '../hooks/useCartActions'
 import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planComparison'
 import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
 import { LimitExceededBanner } from './LimitExceededBanner'
+import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
 
 export function Layout() {
   const location = useLocation()
@@ -43,6 +44,8 @@ export function Layout() {
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const { rehydrateCart } = useCartActions()
+
+  useNotificationAlerts()
 
   useEffect(() => {
     dispatch(refreshBlockedCount())
