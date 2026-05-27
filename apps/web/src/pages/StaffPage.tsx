@@ -49,6 +49,7 @@ import type { StaffMember, StaffPtoRequest, StaffShiftSwap } from '../types'
 import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
+import { PageHeader } from '../components/ui/page-header'
 import { StaffPortalAccessPanel } from '../components/StaffPortalAccessPanel'
 
 interface StaffFormState {
@@ -610,249 +611,254 @@ export function StaffPage() {
   return (
     <RequirePermission permission="STAFF_VIEW" title="staff management">
       <div className="space-y-6">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">Staff operations</h1>
-            <p className="text-sm text-[var(--text-muted)]">
-              Schedule shifts, manage time, and keep your single-location team aligned.
-            </p>
-          </div>
-          {canWriteStaff && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Dialog open={isAddShiftOpen} onOpenChange={setIsAddShiftOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">Create shift</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Schedule shift</DialogTitle>
-                    <DialogDescription>
-                      Drop a shift on the calendar with clear start and end times.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="shiftRole">Role</Label>
-                      <Input
-                        id="shiftRole"
-                        value={shiftForm.role}
-                        onChange={(event) => handleShiftInputChange('role', event.target.value)}
-                        placeholder="Server, kitchen, cashier..."
-                      />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
+        <PageHeader
+          title="Staff operations"
+          description="Schedule shifts, manage time, and keep your team aligned. This is the manager view — staff use their own portal at /staff/dashboard."
+          actions={
+            canWriteStaff ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Dialog open={isAddShiftOpen} onOpenChange={setIsAddShiftOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">Create shift</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Schedule shift</DialogTitle>
+                      <DialogDescription>
+                        Drop a shift on the calendar with clear start and end times.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
                       <div>
-                        <Label htmlFor="shiftDate">Date</Label>
+                        <Label htmlFor="shiftRole">Role</Label>
                         <Input
-                          id="shiftDate"
-                          type="date"
-                          value={shiftForm.shiftDate}
-                          onChange={(event) =>
-                            handleShiftInputChange('shiftDate', event.target.value)
-                          }
+                          id="shiftRole"
+                          value={shiftForm.role}
+                          onChange={(event) => handleShiftInputChange('role', event.target.value)}
+                          placeholder="Server, kitchen, cashier..."
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="shiftStaff">Assign to (optional)</Label>
-                        <select
-                          id="shiftStaff"
-                          value={shiftForm.staffId}
-                          onChange={(event) =>
-                            handleShiftInputChange('staffId', event.target.value)
-                          }
-                          className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
-                        >
-                          <option value="">Unassigned</option>
-                          {staffMembers.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.displayName} · {member.role}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="shiftDate">Date</Label>
+                          <Input
+                            id="shiftDate"
+                            type="date"
+                            value={shiftForm.shiftDate}
+                            onChange={(event) =>
+                              handleShiftInputChange('shiftDate', event.target.value)
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="shiftStaff">Assign to (optional)</Label>
+                          <select
+                            id="shiftStaff"
+                            value={shiftForm.staffId}
+                            onChange={(event) =>
+                              handleShiftInputChange('staffId', event.target.value)
+                            }
+                            className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                          >
+                            <option value="">Unassigned</option>
+                            {staffMembers.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.displayName} · {member.role}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="startTime">Start time</Label>
+                          <Input
+                            id="startTime"
+                            type="time"
+                            value={shiftForm.startTime}
+                            onChange={(event) =>
+                              handleShiftInputChange('startTime', event.target.value)
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="endTime">End time</Label>
+                          <Input
+                            id="endTime"
+                            type="time"
+                            value={shiftForm.endTime}
+                            onChange={(event) =>
+                              handleShiftInputChange('endTime', event.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
                       <div>
-                        <Label htmlFor="startTime">Start time</Label>
+                        <Label htmlFor="shiftNotes">Notes</Label>
                         <Input
-                          id="startTime"
-                          type="time"
-                          value={shiftForm.startTime}
-                          onChange={(event) =>
-                            handleShiftInputChange('startTime', event.target.value)
-                          }
+                          id="shiftNotes"
+                          value={shiftForm.notes}
+                          onChange={(event) => handleShiftInputChange('notes', event.target.value)}
+                          placeholder="Prep, handover, reminders..."
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="endTime">End time</Label>
-                        <Input
-                          id="endTime"
-                          type="time"
-                          value={shiftForm.endTime}
-                          onChange={(event) =>
-                            handleShiftInputChange('endTime', event.target.value)
-                          }
-                        />
-                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor="shiftNotes">Notes</Label>
-                      <Input
-                        id="shiftNotes"
-                        value={shiftForm.notes}
-                        onChange={(event) => handleShiftInputChange('notes', event.target.value)}
-                        placeholder="Prep, handover, reminders..."
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleCreateShift} disabled={creatingShift}>
-                      {creatingShift ? 'Scheduling…' : 'Schedule shift'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    <DialogFooter>
+                      <Button onClick={handleCreateShift} disabled={creatingShift}>
+                        {creatingShift ? 'Scheduling…' : 'Schedule shift'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
-              <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
-                <DialogTrigger asChild>
-                  <Button>Add staff</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add staff member</DialogTitle>
-                    <DialogDescription>
-                      Capture key details so they can clock shifts and receive schedules.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="firstName">First name</Label>
-                        <Input
-                          id="firstName"
-                          value={staffForm.firstName}
-                          onChange={(event) =>
-                            handleStaffInputChange('firstName', event.target.value)
-                          }
-                        />
+                <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
+                  <DialogTrigger asChild>
+                    <Button>Add staff</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add staff member</DialogTitle>
+                      <DialogDescription>
+                        Capture key details so they can clock shifts and receive schedules.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="firstName">First name</Label>
+                          <Input
+                            id="firstName"
+                            value={staffForm.firstName}
+                            onChange={(event) =>
+                              handleStaffInputChange('firstName', event.target.value)
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="lastName">Last name</Label>
+                          <Input
+                            id="lastName"
+                            value={staffForm.lastName}
+                            onChange={(event) =>
+                              handleStaffInputChange('lastName', event.target.value)
+                            }
+                          />
+                        </div>
                       </div>
                       <div>
-                        <Label htmlFor="lastName">Last name</Label>
+                        <Label htmlFor="displayName">Display name</Label>
                         <Input
-                          id="lastName"
-                          value={staffForm.lastName}
+                          id="displayName"
+                          value={staffForm.displayName}
                           onChange={(event) =>
-                            handleStaffInputChange('lastName', event.target.value)
+                            handleStaffInputChange('displayName', event.target.value)
                           }
+                          placeholder="Optional alias used in the app"
                         />
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="email">Email</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={staffForm.email}
+                            onChange={(event) =>
+                              handleStaffInputChange('email', event.target.value)
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="phone">Phone</Label>
+                          <Input
+                            id="phone"
+                            value={staffForm.phone}
+                            onChange={(event) =>
+                              handleStaffInputChange('phone', event.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="role">Role</Label>
+                        <Input
+                          id="role"
+                          value={staffForm.role}
+                          onChange={(event) => handleStaffInputChange('role', event.target.value)}
+                          placeholder="Server, kitchen, barista..."
+                        />
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="wageType">Wage type</Label>
+                          <select
+                            id="wageType"
+                            value={staffForm.wageType}
+                            onChange={(event) =>
+                              handleStaffInputChange('wageType', event.target.value)
+                            }
+                            className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
+                          >
+                            {wageTypeOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option.charAt(0) + option.slice(1).toLowerCase()}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <Label htmlFor="wageRate">Base rate</Label>
+                          <Input
+                            id="wageRate"
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={staffForm.wageRate}
+                            onChange={(event) =>
+                              handleStaffInputChange('wageRate', event.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="hireDate">Hire date</Label>
+                          <Input
+                            id="hireDate"
+                            type="date"
+                            value={staffForm.hireDate}
+                            onChange={(event) =>
+                              handleStaffInputChange('hireDate', event.target.value)
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="profileColor">Accent color</Label>
+                          <Input
+                            id="profileColor"
+                            type="color"
+                            value={staffForm.profileColor || '#2563eb'}
+                            onChange={(event) =>
+                              handleStaffInputChange(
+                                'profileColor',
+                                event.target.value || '#2563eb'
+                              )
+                            }
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <Label htmlFor="displayName">Display name</Label>
-                      <Input
-                        id="displayName"
-                        value={staffForm.displayName}
-                        onChange={(event) =>
-                          handleStaffInputChange('displayName', event.target.value)
-                        }
-                        placeholder="Optional alias used in the app"
-                      />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={staffForm.email}
-                          onChange={(event) => handleStaffInputChange('email', event.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="phone">Phone</Label>
-                        <Input
-                          id="phone"
-                          value={staffForm.phone}
-                          onChange={(event) => handleStaffInputChange('phone', event.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="role">Role</Label>
-                      <Input
-                        id="role"
-                        value={staffForm.role}
-                        onChange={(event) => handleStaffInputChange('role', event.target.value)}
-                        placeholder="Server, kitchen, barista..."
-                      />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="wageType">Wage type</Label>
-                        <select
-                          id="wageType"
-                          value={staffForm.wageType}
-                          onChange={(event) =>
-                            handleStaffInputChange('wageType', event.target.value)
-                          }
-                          className="mt-1 w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 text-sm"
-                        >
-                          {wageTypeOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option.charAt(0) + option.slice(1).toLowerCase()}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <Label htmlFor="wageRate">Base rate</Label>
-                        <Input
-                          id="wageRate"
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          value={staffForm.wageRate}
-                          onChange={(event) =>
-                            handleStaffInputChange('wageRate', event.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="hireDate">Hire date</Label>
-                        <Input
-                          id="hireDate"
-                          type="date"
-                          value={staffForm.hireDate}
-                          onChange={(event) =>
-                            handleStaffInputChange('hireDate', event.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="profileColor">Accent color</Label>
-                        <Input
-                          id="profileColor"
-                          type="color"
-                          value={staffForm.profileColor || '#2563eb'}
-                          onChange={(event) =>
-                            handleStaffInputChange('profileColor', event.target.value || '#2563eb')
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleCreateStaff} disabled={creatingStaff}>
-                      {creatingStaff ? 'Adding…' : 'Add staff member'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          )}
-        </div>
+                    <DialogFooter>
+                      <Button onClick={handleCreateStaff} disabled={creatingStaff}>
+                        {creatingStaff ? 'Adding…' : 'Add staff member'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            ) : undefined
+          }
+        />
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
           <TabsList className="w-full overflow-x-auto">

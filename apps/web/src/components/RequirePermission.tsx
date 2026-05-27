@@ -18,16 +18,16 @@ export function RequirePermission({ permission, anyOf, title, children }: Props)
   if (allowed) return <>{children}</>
 
   return (
-    <div className="flex min-h-[40vh] items-center justify-center p-6">
-      <Card className="max-w-md w-full">
+    <div className="flex min-h-[40vh] items-center justify-center p-6" role="alert">
+      <Card className="w-full max-w-md border-[var(--app-border)]">
         <CardHeader>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <ShieldOff className="h-5 w-5" />
-            <CardTitle>Access denied</CardTitle>
+          <div className="flex items-center gap-2 text-[var(--text-mid)]">
+            <ShieldOff className="h-5 w-5 shrink-0 text-[var(--brand-mid)]" aria-hidden />
+            <CardTitle className="text-[var(--text)]">Access restricted</CardTitle>
           </div>
-          <CardDescription>
-            You do not have permission to view {title ?? 'this page'}. Contact your workspace admin
-            if you need access.
+          <CardDescription className="text-[var(--text-muted)]">
+            You don&apos;t have permission to view {title ?? 'this page'}. Your role is read-only or
+            limited for this area — contact a workspace admin if you need access.
           </CardDescription>
         </CardHeader>
         <CardContent />

@@ -1,66 +1,13 @@
 import React from 'react'
 import { Button } from '../ui/button'
 import { Loader2 } from 'lucide-react'
+import { EmptyState } from '../ui/empty-state'
+import { StatusBadge, formatStatusLabel, getStatusTone, type StatusTone } from '../ui/status-badge'
 
-export type AdminStatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'muted'
+export type AdminStatusTone = StatusTone
 
-const STATUS_TONE_MAP: Record<string, AdminStatusTone> = {
-  ACTIVE: 'success',
-  active: 'success',
-  healthy: 'success',
-  HEALTHY: 'success',
-  PAID: 'success',
-  paid: 'success',
-  approved: 'success',
-  APPROVED: 'success',
-  TRIALING: 'info',
-  trialing: 'info',
-  scheduled: 'info',
-  SCHEDULED: 'info',
-  PENDING: 'warning',
-  pending: 'warning',
-  pending_approval: 'warning',
-  pending_admin_approval: 'warning',
-  approved_pending_payment: 'warning',
-  PAST_DUE: 'danger',
-  past_due: 'danger',
-  failed: 'danger',
-  FAILED: 'danger',
-  rejected: 'danger',
-  REJECTED: 'danger',
-  expired: 'muted',
-  EXPIRED: 'muted',
-  cancelled: 'muted',
-  CANCELLED: 'muted',
-  paused: 'muted',
-  PAUSED: 'muted',
-  inactive: 'muted',
-  INACTIVE: 'muted',
-  draft: 'neutral',
-  DRAFT: 'neutral',
-}
-
-const TONE_CLASSES: Record<AdminStatusTone, string> = {
-  success: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  warning: 'bg-amber-50 text-amber-800 border-amber-200',
-  danger: 'bg-red-50 text-red-800 border-red-200',
-  info: 'bg-sky-50 text-sky-800 border-sky-200',
-  neutral: 'bg-slate-50 text-slate-700 border-slate-200',
-  muted: 'bg-[var(--app-border)]/40 text-[var(--text-muted)] border-[var(--app-border)]',
-}
-
-export function formatAdminStatus(status: string): string {
-  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-export function getStatusTone(status: string): AdminStatusTone {
-  const key = status?.trim() || ''
-  if (STATUS_TONE_MAP[key]) return STATUS_TONE_MAP[key]
-  if (key.includes('pending')) return 'warning'
-  if (key.includes('fail') || key.includes('reject') || key.includes('past')) return 'danger'
-  if (key.includes('active') || key.includes('paid') || key.includes('approve')) return 'success'
-  return 'neutral'
-}
+export const formatAdminStatus = formatStatusLabel
+export { getStatusTone }
 
 export function AdminStatusBadge({
   status,
@@ -69,14 +16,7 @@ export function AdminStatusBadge({
   status: string
   className?: string
 }) {
-  const tone = getStatusTone(status)
-  return (
-    <span
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${TONE_CLASSES[tone]} ${className}`}
-    >
-      {formatAdminStatus(status || 'unknown')}
-    </span>
-  )
+  return <StatusBadge status={status} className={className} />
 }
 
 export function AdminSectionHeader({
@@ -112,16 +52,7 @@ export function AdminEmptyState({
   action?: React.ReactNode
   icon?: React.ReactNode
 }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-[var(--app-border)] bg-[var(--app-bg-subtle)]/50 px-6 py-10 text-center">
-      {icon && <div className="mb-3 text-[var(--text-muted)]">{icon}</div>}
-      <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
-      {description && (
-        <p className="mt-1 max-w-md text-xs text-[var(--text-muted)]">{description}</p>
-      )}
-      {action && <div className="mt-4">{action}</div>}
-    </div>
-  )
+  return <EmptyState title={title} description={description} action={action} icon={icon} />
 }
 
 export function AdminLoadingState({ label = 'Loading…' }: { label?: string }) {

@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
+import { Skeleton } from '../components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -222,8 +223,12 @@ export function StaffSelfServiceDashboard() {
 
   if (isLoading || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-900/90 text-white">
-        <p className="text-sm text-[var(--text-muted)]">Loading your schedule…</p>
+      <div className="min-h-screen bg-slate-900/90 px-4 py-12" role="status" aria-live="polite">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+          <Skeleton className="h-10 w-64 bg-white/10" />
+          <Skeleton className="h-32 w-full rounded-lg bg-white/10" />
+          <Skeleton className="h-48 w-full rounded-lg bg-white/10" />
+        </div>
       </div>
     )
   }
@@ -238,6 +243,10 @@ export function StaffSelfServiceDashboard() {
             <p className="text-sm uppercase tracking-wide text-[var(--text-muted)]">Welcome back</p>
             <h1 className="text-3xl font-bold tracking-tight">{staff.display_name}</h1>
             <p className="text-sm text-[var(--text-muted)]">Role: {staff.role}</p>
+            <p className="mt-1 max-w-xl text-xs text-slate-400">
+              Staff portal — view your schedule, clock in/out, and submit requests. Restaurant
+              managers use the main app under Staff operations.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="bg-[var(--mint-pale)]/10 text-[var(--mint)]">

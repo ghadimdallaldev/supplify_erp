@@ -55,6 +55,7 @@ import {
   getQuickListScheduleGate,
 } from '../lib/planLimits'
 import { LimitExceededBanner } from '../components/LimitExceededBanner'
+import { formatDaysOfWeekLabel, parseDaysOfWeek } from '../utils/parseDaysOfWeek'
 
 export function QuickListsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -238,17 +239,14 @@ export function QuickListsPage() {
     if (list.is_scheduled && list.frequency) {
       setScheduleFrequency(list.frequency)
       if (list.days_of_week) {
-        try {
-          const days =
-            typeof list.days_of_week === 'string'
-              ? JSON.parse(list.days_of_week)
-              : list.days_of_week
-          setScheduleDays(Array.isArray(days) ? days : [])
-        } catch {
-          setScheduleDays(
-            list.frequency === 'WEEKLY' ? ['MONDAY'] : ['MONDAY', 'WEDNESDAY', 'FRIDAY']
-          )
-        }
+        const days = parseDaysOfWeek(list.days_of_week)
+        setScheduleDays(
+          days.length > 0
+            ? days
+            : list.frequency === 'WEEKLY'
+              ? ['MONDAY']
+              : ['MONDAY', 'WEDNESDAY', 'FRIDAY']
+        )
       } else {
         setScheduleDays(
           list.frequency === 'WEEKLY' ? ['MONDAY'] : ['MONDAY', 'WEDNESDAY', 'FRIDAY']
@@ -1184,17 +1182,18 @@ export function QuickListsPage() {
                         )}
                       </span>
                     </div>
-                    {selectedListDetails.days_of_week &&
-                      selectedListDetails.days_of_week.length > 0 && (
+                    {(() => {
+                      const detailDays = parseDaysOfWeek(selectedListDetails.days_of_week)
+                      if (!detailDays.length) return null
+                      return (
                         <div className="flex justify-between">
                           <span className="text-sm text-[var(--text-muted)]">Days:</span>
                           <span className="text-sm font-medium">
-                            {JSON.parse(selectedListDetails.days_of_week)
-                              .map((d: string) => d.charAt(0) + d.slice(1).toLowerCase())
-                              .join(', ')}
+                            {formatDaysOfWeekLabel(detailDays)}
                           </span>
                         </div>
-                      )}
+                      )
+                    })()}
                     {selectedListDetails.preferred_time && (
                       <div className="flex justify-between">
                         <span className="text-sm text-[var(--text-muted)]">Preferred Time:</span>
