@@ -1,6 +1,6 @@
 # Supplify (Production branch)
 
-Deploy-only branch ΓÇö **do not develop here**. Merge from `dev` on the `dev` branch using:
+Deploy-only branch — **do not develop here**. On `dev`: `node scripts/promote-release.mjs --tier preprod`, then after UAT `--tier prod` (prod merges **preprod**, not dev).
 
 ```bash
 node scripts/promote-release.mjs --tier prod
