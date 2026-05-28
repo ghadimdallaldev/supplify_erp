@@ -114,12 +114,23 @@ export function formatPlanFeatureCell(
   return { enabled }
 }
 
-/** Plan value subtitles (pricing psychology). Do not change plan names/codes. */
+/** Plan value subtitles (pricing psychology). Do not change DB plan codes. */
 export const PLAN_SUBTITLES: Record<string, string> = {
-  free: 'Setup & Testing',
+  free: 'Time-limited trial',
   bronze: 'Starter',
   gold: 'Most Popular',
   platinum: 'Unlimited Ops',
+}
+
+/** User-facing plan name; DB code `free` is marketed as Free Trial (not forever-free). */
+export function formatPlanDisplayName(
+  planCode: string | null | undefined,
+  planName?: string | null
+): string {
+  const code = (planCode || '').toLowerCase()
+  if (code === 'free') return 'Free Trial'
+  if (planName?.trim()) return planName.trim()
+  return 'Plan'
 }
 
 export function getPlanSubtitle(planCode: string | null | undefined): string {

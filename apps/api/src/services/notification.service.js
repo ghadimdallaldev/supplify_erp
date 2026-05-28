@@ -2,7 +2,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { sendMail } from './mailer.service.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
-import { getEntitlements } from '../lib/subscription.js'
+import { getEntitlements, isFeatureEnabled } from '../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from './whatsapp.service.js'
 import { sendWebPushToUser, isPushConfigured } from './push.service.js'
 
@@ -385,7 +385,6 @@ export async function sendNotification({
       if (tenantId) {
         const entitlements = await getEntitlements(tenantId, userType)
         allowedChannels = resolveAllowedChannels(entitlements?.features?.notifications)
-        const { isFeatureEnabled } = await import('./subscription.js')
         pushFeatureEnabled = await isFeatureEnabled(tenantId, userType, 'push_notifications')
       }
     } catch (err) {

@@ -2,14 +2,9 @@ import { query } from '../lib/db.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import { notifyTenantUsers } from './notification.service.js'
 
-export const DELIVERED_ORDER_STATUSES = [
-  'COMPLETED',
-  'DELIVERED',
-  'RECEIVED_PARTIAL',
-  'RECEIVED_FULL',
-  'RECEIVED_WITH_DISPUTE',
-  'INVOICED',
-]
+import { DELIVERED_ORDER_STATUSES } from '../lib/order-statuses.js'
+
+export { DELIVERED_ORDER_STATUSES }
 
 const EDIT_WINDOW_DAYS = 7
 

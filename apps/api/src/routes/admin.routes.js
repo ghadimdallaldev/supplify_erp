@@ -2,6 +2,7 @@ import express from 'express'
 import { requireAuth, requireRole, getRequestTenant } from '../lib/rbac.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
 import { query } from '../lib/db.js'
+import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 import { logger } from '../lib/logger.js'
 import { z } from 'zod'
 
@@ -160,7 +161,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
           SELECT COUNT(DISTINCT oi.order_id) as count 
           FROM order_item oi 
           JOIN customer_order o ON o.id = oi.order_id 
-          WHERE oi.supplier_id = $1 AND o.status = 'COMPLETED'
+          WHERE oi.supplier_id = $1 AND ${deliveredOrderStatusInSql('o.status')}
         `,
           [supplierId]
         ),
@@ -169,7 +170,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
           SELECT COALESCE(SUM(oi.line_total), 0) as total 
           FROM order_item oi 
           JOIN customer_order o ON o.id = oi.order_id 
-          WHERE oi.supplier_id = $1 AND o.status = 'COMPLETED'
+          WHERE oi.supplier_id = $1 AND ${deliveredOrderStatusInSql('o.status')}
         `,
           [supplierId]
         ),
@@ -209,11 +210,11 @@ router.get('/dashboard', requireAuth, async (req, res) => {
           [restaurantId]
         ),
         query(
-          "SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND status = 'COMPLETED'",
+          `SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1 AND ${deliveredOrderStatusInSql()}`,
           [restaurantId]
         ),
         query(
-          'SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE restaurant_id = $1',
+          `SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE restaurant_id = $1 AND ${deliveredOrderStatusInSql()}`,
           [restaurantId]
         ),
       ])
@@ -243,9 +244,9 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         query(
           "SELECT COUNT(*) as count FROM customer_order WHERE status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')"
         ),
-        query("SELECT COUNT(*) as count FROM customer_order WHERE status = 'COMPLETED'"),
+        query(`SELECT COUNT(*) as count FROM customer_order WHERE ${deliveredOrderStatusInSql()}`),
         query(
-          "SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE status = 'COMPLETED'"
+          `SELECT COALESCE(SUM(total_amount), 0) as total FROM customer_order WHERE ${deliveredOrderStatusInSql()}`
         ),
       ])
       stats = {

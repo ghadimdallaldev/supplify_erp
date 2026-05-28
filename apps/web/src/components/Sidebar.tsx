@@ -35,6 +35,7 @@ import {
 import { featureEnabled, getOrderUsageBadge } from '../lib/planLimits'
 import { countActiveDisputes } from '../lib/disputeHelpers'
 import { canUseGlobalReports } from '../lib/planFeatureGates'
+import { formatPlanDisplayName } from '../lib/planComparison'
 
 type NavItem = {
   name: string
@@ -641,11 +642,11 @@ export function Sidebar({
             {user?.role?.toLowerCase()}
           </div>
         </div>
-        {planCode !== 'free' && planLabel && (
+        {planLabel && (
           <span
             style={{
-              background: 'var(--amber-pale)',
-              color: 'var(--amber)',
+              background: planCode === 'free' ? 'var(--amber-pale)' : 'var(--brand-pale)',
+              color: planCode === 'free' ? 'var(--amber)' : 'var(--brand-mid)',
               fontSize: 9,
               fontWeight: 700,
               borderRadius: 4,
@@ -655,7 +656,7 @@ export function Sidebar({
               flexShrink: 0,
             }}
           >
-            {planLabel}
+            {formatPlanDisplayName(planCode, planLabel)}
           </span>
         )}
       </div>

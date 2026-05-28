@@ -1,5 +1,6 @@
 import { getRequestTenant } from '../lib/rbac.js'
 import { getBillingStatus, buildAccountLockedError } from '../lib/billing/billing-service.js'
+import { LOCK_REASON_FREE_SANDBOX_EXPIRED } from '../lib/billing/constants.js'
 import { logger } from '../lib/logger.js'
 
 const ALLOW_PREFIXES = ['/api/billing', '/api/register', '/auth', '/health', '/api/public']
@@ -10,9 +11,17 @@ const ALLOW_GET_PATHS = new Set([
   '/api/subscriptions/plans',
 ])
 
+function isFreeTrialExpiredLock(access) {
+  if (!access?.isLocked) return false
+  return (
+    access.freeSandboxExpired === true || access.lockReason === LOCK_REASON_FREE_SANDBOX_EXPIRED
+  )
+}
+
 /**
  * Block tenant API access when subscription account is locked (overdue after grace).
  * Billing and read-only subscription endpoints remain available.
+ * Expired Free Trial: allow GET (read-only); block writes.
  */
 export async function billingAccessMiddleware(req, res, next) {
   if (req.method === 'OPTIONS') return next()
@@ -30,6 +39,8 @@ export async function billingAccessMiddleware(req, res, next) {
 
     const billing = await getBillingStatus(tenant.tenantId, tenant.tenantType)
     if (!billing.access.isLocked) return next()
+
+    if (req.method === 'GET' && isFreeTrialExpiredLock(billing.access)) return next()
 
     return res.status(402).json({
       ok: false,

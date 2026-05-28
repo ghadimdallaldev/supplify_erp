@@ -29,9 +29,9 @@ export function BillingOverdueBanner() {
           <div className="flex gap-2">
             <Lock className="h-5 w-5 shrink-0" aria-hidden />
             <div>
-              <p className="font-semibold">Free testing period ended</p>
+              <p className="font-semibold">Free Trial expired</p>
               <p className="mt-0.5 text-amber-900/90">
-                Your free sandbox has expired. Choose a paid plan to continue using Supplify.
+                Your Free Trial has expired. Upgrade your plan to continue using Supplify.
               </p>
             </div>
           </div>

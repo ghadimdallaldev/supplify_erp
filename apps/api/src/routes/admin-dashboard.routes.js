@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { logger } from '../lib/logger.js'
 import { ZodError } from 'zod'
 import { config } from '../config/env.js'
+import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 import {
   createImpersonationToken,
   verifyImpersonationToken,
@@ -31,7 +32,11 @@ import {
 } from '../lib/feature-flags.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { recordConversionEvent } from '../lib/conversion-events.js'
-import { unlockSubscriptionAccount } from '../lib/billing/billing-service.js'
+import {
+  extendFreeSandboxTrial,
+  unlockSubscriptionAccount,
+} from '../lib/billing/billing-service.js'
+import { clampFreeTrialDays } from '../lib/platform-settings.js'
 
 function getAllowedLimitKeys(tenantType) {
   return tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
@@ -1225,12 +1230,147 @@ router.patch('/subscriptions/:id', async (req, res) => {
 })
 
 /**
+ * POST /subscriptions/:id/extend-free-trial — extend Free Trial expiry and unlock.
+ * Body: { days?: number } — clamped to 3–7 (platform default when omitted).
+ */
+router.post('/subscriptions/:id/extend-free-trial', async (req, res) => {
+  try {
+    const { id } = req.params
+    const rawDays = req.body?.days ?? req.body?.freeTrialDays
+    const days = rawDays !== undefined && rawDays !== null ? Number(rawDays) : undefined
+
+    if (days !== undefined && (!Number.isFinite(days) || days < 3 || days > 7)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'freeTrialDays must be between 3 and 7',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows } = await query('SELECT * FROM subscription WHERE id = $1', [id])
+    if (rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Subscription not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const existing = rows[0]
+    const result = await extendFreeSandboxTrial(id, {
+      days: days !== undefined ? clampFreeTrialDays(days) : undefined,
+      adminUserId: req.userData.id,
+      unlockedBy: 'admin',
+    })
+
+    const updated = result.subscription
+
+    await logAudit(
+      req,
+      'subscription.free_trial_extended',
+      `Extended Free Trial for subscription ${id} by ${result.freeTrialDays} day(s)`,
+      'subscription',
+      id,
+      existing,
+      updated,
+      {
+        target_tenant_id: existing.tenant_id,
+        target_tenant_type: existing.tenant_type,
+        freeTrialDays: result.freeTrialDays,
+      }
+    )
+    await writeAuditLog(req, {
+      action_type: 'billing.free_trial.extended',
+      tenant_type: existing.tenant_type,
+      tenant_id: existing.tenant_id,
+      target_id: id,
+      payload_json: {
+        adminUserId: req.userData.id,
+        freeTrialDays: result.freeTrialDays,
+        freeSandboxExpiresAt: result.freeSandboxExpiresAt,
+      },
+    })
+
+    invalidateTenantSubscriptionCache(existing.tenant_id, existing.tenant_type).catch(() => {})
+    try {
+      const { emitEntitlementsRefreshNotice } = await import('../lib/socket.js')
+      emitEntitlementsRefreshNotice({
+        tenantId: existing.tenant_id,
+        tenantType: existing.tenant_type,
+        reason: 'admin_free_trial_extended',
+      })
+    } catch (emitErr) {
+      logger.warn('emitEntitlementsRefreshNotice failed', { error: emitErr.message })
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        subscription: updated,
+        freeTrialDays: result.freeTrialDays,
+        freeSandboxExpiresAt: result.freeSandboxExpiresAt,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    if (error.code === 'VALIDATION_ERROR') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Extend free trial error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to extend Free Trial' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
  * POST /subscriptions/:id/unlock — clear lock (overdue payment resolved or admin activation).
+ * For expired Free Trial, also extends free_sandbox_expires_at (body: freeTrialDays 3–7).
  */
 router.post('/subscriptions/:id/unlock', async (req, res) => {
   try {
     const { id } = req.params
     const reason = (req.body?.reason || 'admin_unlock').trim()
+    const rawTrialDays = req.body?.freeTrialDays ?? req.body?.days
+    const extendFreeTrialDays =
+      rawTrialDays !== undefined && rawTrialDays !== null ? Number(rawTrialDays) : undefined
+
+    if (
+      extendFreeTrialDays !== undefined &&
+      (!Number.isFinite(extendFreeTrialDays) || extendFreeTrialDays < 3 || extendFreeTrialDays > 7)
+    ) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'freeTrialDays must be between 3 and 7',
+        },
+        requestId: req.requestId,
+      })
+    }
 
     const { rows } = await query('SELECT * FROM subscription WHERE id = $1', [id])
     if (rows.length === 0) {
@@ -1246,6 +1386,7 @@ router.post('/subscriptions/:id/unlock', async (req, res) => {
     await unlockSubscriptionAccount(id, {
       unlockedBy: 'admin',
       adminUserId: req.userData.id,
+      extendFreeTrialDays,
     })
 
     await query(
@@ -1650,7 +1791,7 @@ router.get('/tenants/suppliers', async (req, res) => {
         (SELECT COALESCE(SUM(oi.line_total), 0)
          FROM order_item oi
          JOIN customer_order o ON o.id = oi.order_id
-         WHERE oi.supplier_id = s.id AND o.status = 'COMPLETED'
+         WHERE oi.supplier_id = s.id AND ${deliveredOrderStatusInSql('o.status')}
         )::numeric(12,2) as total_revenue
       FROM supplier s
       LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
@@ -1684,7 +1825,7 @@ router.get('/tenants/restaurants', async (req, res) => {
         sub.plan_name,
         sub.id as subscription_id,
         (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as order_count,
-        (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND status = 'COMPLETED') as total_spent,
+        (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND ${deliveredOrderStatusInSql()}) as total_spent,
         (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id AND placed_at >= NOW() - INTERVAL '30 days') as orders_last_30d
       FROM restaurant r
       LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
@@ -3048,13 +3189,13 @@ router.get('/platform-settings', requirePermission('ADMIN_ACCESS'), async (req, 
 router.patch('/platform-settings', requirePermission('ADMIN_ACCESS'), async (req, res) => {
   try {
     const days = Number(req.body?.freeSandboxDays ?? req.body?.free_sandbox_days)
-    if (!Number.isFinite(days) || days < 1 || days > 30) {
+    if (!Number.isFinite(days) || days < 3 || days > 7) {
       return res.status(400).json({
         ok: false,
         data: null,
         error: {
           name: 'VALIDATION_ERROR',
-          message: 'freeSandboxDays must be between 1 and 30',
+          message: 'freeSandboxDays must be between 3 and 7',
         },
         requestId: req.requestId,
       })
