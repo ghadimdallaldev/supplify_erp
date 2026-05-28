@@ -383,14 +383,14 @@ export function OrderDetailPage() {
                   Original order {formatOrderRef(sourceOrderId)}
                 </RouterLink>
               )}
-              {sourceDispute?.id && (
+              {sourceDispute?.id != null && String(sourceDispute.id) !== '' ? (
                 <RouterLink
                   to={`/app/disputes/${String(sourceDispute.id)}`}
                   className="text-[var(--brand-mid)] hover:underline font-medium"
                 >
-                  Dispute {formatOrderRef(sourceDispute.id)}
+                  Dispute {formatOrderRef(String(sourceDispute.id))}
                 </RouterLink>
-              )}
+              ) : null}
             </div>
           </div>
         )}
@@ -1038,7 +1038,7 @@ export function OrderDetailPage() {
                   <div className="space-y-4">
                     {order.items?.map((item: any, idx: number) => (
                       <div key={item.id || idx} className="border rounded-lg p-4">
-                        <div className="grid grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
                           <div>
                             <p className="text-sm font-medium text-[var(--text-muted)]">Product</p>
                             <p className="font-semibold">{item.product_name}</p>

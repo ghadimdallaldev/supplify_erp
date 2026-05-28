@@ -475,7 +475,7 @@ export function Sidebar({
       className={[
         'flex flex-col border-r border-[var(--app-border)] bg-[var(--surface)] font-sans',
         'h-screen overflow-y-auto',
-        'fixed inset-y-0 left-0 z-50 w-56 transition-transform duration-200 lg:sticky lg:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 w-[min(100vw-3rem,14rem)] transition-transform duration-200 lg:sticky lg:w-56 lg:translate-x-0',
         mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       ].join(' ')}
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
