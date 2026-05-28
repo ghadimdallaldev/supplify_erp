@@ -157,6 +157,13 @@ export function Sidebar({
         testId: 'nav-products',
       },
       {
+        name: 'My Prices',
+        href: '/app/my-prices',
+        icon: Percent,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-my-prices',
+      },
+      {
         name: 'Quick Lists',
         href: '/app/quick-lists',
         icon: List,
@@ -349,6 +356,13 @@ export function Sidebar({
           icon: Package,
           permission: 'CATALOG_VIEW',
           testId: 'nav-products',
+        },
+        {
+          name: 'Contract Pricing',
+          href: '/app/contract-pricing',
+          icon: Percent,
+          permission: 'CATALOG_VIEW',
+          testId: 'nav-contract-pricing',
         },
         {
           name: 'Fulfillment',

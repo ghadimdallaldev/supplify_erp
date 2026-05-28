@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { SupplifyLogo } from '../components/SupplifyLogo'
 import { redirectToAuth, redirectToLogout, isEmbeddedFrame } from '../lib/authRedirect'
+import { LegalFooterLinks } from '../components/legal/LegalFooterLinks'
 
 export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -263,9 +264,7 @@ export function LoginPage() {
             </CardContent>
           </Card>
 
-          <p className="text-center text-xs text-[var(--text-muted)]">
-            By signing in, you agree to our Terms of Service and Privacy Policy
-          </p>
+          <LegalFooterLinks />
         </div>
       </div>
     </div>

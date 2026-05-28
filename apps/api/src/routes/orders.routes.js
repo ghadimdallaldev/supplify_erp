@@ -38,6 +38,7 @@ import {
   getSupplierIdForOrder,
   orderHasProofOfDelivery,
 } from '../lib/driver-delivery.js'
+import { resolveProductPricesBatch } from '../services/resolve-product-price.service.js'
 import {
   assertAndDeductSupplierStock,
   restoreSupplierStockForOrder,
@@ -1119,6 +1120,20 @@ router.post(
 
       const productMap = new Map(products.map((p) => [p.id, p]))
 
+      const resolveItems = orderData.items.map((item) => {
+        const product = productMap.get(item.productId)
+        return {
+          productId: item.productId,
+          supplierId: product.supplier_id,
+          quantity: item.quantity,
+        }
+      })
+      const resolvedPrices = await resolveProductPricesBatch({
+        restaurantId,
+        items: resolveItems,
+      })
+      const resolvedMap = new Map(resolvedPrices.map((r) => [r.productId, r]))
+
       // Validate and group items by supplier
       const supplierGroups = new Map()
       for (const item of orderData.items) {
@@ -1126,7 +1141,8 @@ router.post(
         if (!product) {
           throw new ValidationError(`Product ${item.productId} not found`)
         }
-        if (!product.current_price) {
+        const resolved = resolvedMap.get(item.productId)
+        if (resolved?.unitPrice == null) {
           throw new ValidationError(`No valid price found for product ${product.sku}`)
         }
         if (!supplierGroups.has(product.supplier_id)) {
@@ -1135,7 +1151,10 @@ router.post(
         supplierGroups.get(product.supplier_id).push({
           ...item,
           product,
-          unitPrice: Number(product.current_price),
+          unitPrice: Number(resolved.unitPrice),
+          pricingSource: resolved.source,
+          contractPriceId: resolved.contractPriceId,
+          defaultCatalogPrice: resolved.defaultPrice,
         })
       }
 
@@ -1206,8 +1225,9 @@ router.post(
             } = await client.query(
               `
             INSERT INTO order_item (
-              order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+              order_id, product_id, supplier_id, quantity, unit_price, line_total, notes,
+              pricing_source, contract_price_id, default_catalog_price
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
           `,
               [
@@ -1218,6 +1238,9 @@ router.post(
                 item.unitPrice,
                 lineTotal,
                 item.notes,
+                item.pricingSource || 'DEFAULT_PRICE',
+                item.contractPriceId || null,
+                item.defaultCatalogPrice ?? null,
               ]
             )
 
@@ -1475,9 +1498,19 @@ router.post(
         let totalAmount = 0
         const orderItems = []
 
+        const manualResolveItems = orderData.items.map((item) => ({
+          productId: item.productId,
+          supplierId,
+          quantity: item.quantity,
+        }))
+        const manualResolved = await resolveProductPricesBatch({
+          restaurantId: orderData.restaurant_id,
+          items: manualResolveItems,
+        })
+        const manualResolvedMap = new Map(manualResolved.map((r) => [r.productId, r]))
+
         // Process each item
         for (const item of orderData.items) {
-          // Get product and current price
           const { rows: products } = await client.query(
             `
           SELECT p.*, pr.amount as current_price, pr.currency
@@ -1496,8 +1529,9 @@ router.post(
           }
 
           const product = products[0]
+          const resolved = manualResolvedMap.get(item.productId)
 
-          if (!product.current_price) {
+          if (resolved?.unitPrice == null) {
             throw new ValidationError(`No valid price found for product ${product.sku}`)
           }
 
@@ -1506,22 +1540,32 @@ router.post(
             reserve: true,
           })
 
-          // Calculate line total
-          const unitPrice = Number(product.current_price)
+          const unitPrice = Number(resolved.unitPrice)
           const lineTotal = unitPrice * item.quantity
           totalAmount += lineTotal
 
-          // Create order item
           const {
             rows: [orderItem],
           } = await client.query(
             `
           INSERT INTO order_item (
-            order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            order_id, product_id, supplier_id, quantity, unit_price, line_total, notes,
+            pricing_source, contract_price_id, default_catalog_price
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *
         `,
-            [order.id, item.productId, supplierId, item.quantity, unitPrice, lineTotal, item.notes]
+            [
+              order.id,
+              item.productId,
+              supplierId,
+              item.quantity,
+              unitPrice,
+              lineTotal,
+              item.notes,
+              resolved.source || 'DEFAULT_PRICE',
+              resolved.contractPriceId || null,
+              resolved.defaultPrice ?? null,
+            ]
           )
 
           orderItems.push(orderItem)

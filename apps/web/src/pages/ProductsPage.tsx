@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { formatPrice, formatNumber } from '../utils/format'
+import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { featureEnabled } from '../lib/planLimits'
 import { PermissionGate } from '../components/PermissionGate'
 import { RequirePermission } from '../components/RequirePermission'
@@ -720,12 +721,14 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                     </td>
                     <td className="px-4 py-4">
                       {product.current_price ? (
-                        <>
-                          <p className="font-semibold">{formatPrice(product.current_price)}</p>
-                          {product.unit && (
-                            <p className="text-xs text-[var(--text-muted)]">per {product.unit}</p>
-                          )}
-                        </>
+                        <ContractPriceDisplay
+                          compact
+                          currentPrice={product.current_price}
+                          catalogPrice={product.catalog_price}
+                          pricingSource={product.pricing_source}
+                          currency={product.currency}
+                          unit={product.unit}
+                        />
                       ) : (
                         <p className="text-sm text-[var(--text-muted)]">N/A</p>
                       )}

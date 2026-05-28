@@ -18,6 +18,11 @@ import {
 } from '../lib/invite-session'
 import { InviteEmailMismatchCard } from '../components/invite/InviteEmailMismatchCard'
 import { InviteSignupEmailField } from '../components/invite/InviteSignupEmailField'
+import {
+  LegalAcceptancePanel,
+  isLegalAcceptanceComplete,
+} from '../components/legal/LegalAcceptancePanel'
+import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
 
 export function InviteAcceptPage() {
   const [searchParams] = useSearchParams()
@@ -37,7 +42,12 @@ export function InviteAcceptPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [acceptedLegal, setAcceptedLegal] = useState<Set<LegalDocumentSlug>>(new Set())
+  const [electronicSigned, setElectronicSigned] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const legalComplete = isLegalAcceptanceComplete('invite', null, acceptedLegal, electronicSigned)
+  const legalPayload = legalComplete ? buildLegalAcceptancePayload(acceptedLegal) : undefined
 
   const invite = data
   const branchLabel = invite?.restaurant_name || invite?.branch_name || 'this branch'
@@ -110,8 +120,12 @@ export function InviteAcceptPage() {
 
   const handleAcceptLoggedIn = async () => {
     setError(null)
+    if (!legalPayload) {
+      setError('Please accept all required legal agreements before continuing.')
+      return
+    }
     try {
-      const result = await accept({ token, type }).unwrap()
+      const result = await accept({ token, type, legalAcceptance: legalPayload }).unwrap()
       dispatch(api.util.resetApiState())
       finishInviteAcceptNavigation(result, navigate, searchParams)
     } catch (err) {
@@ -140,6 +154,10 @@ export function InviteAcceptPage() {
       setError(inviteFormEmailMismatchMessage(requiredInviteEmail))
       return
     }
+    if (!legalPayload) {
+      setError('Please accept all required legal agreements before continuing.')
+      return
+    }
     try {
       const result = await accept({
         token,
@@ -147,6 +165,7 @@ export function InviteAcceptPage() {
         full_name: fullName.trim(),
         email: signupEmail,
         password,
+        legalAcceptance: legalPayload,
       }).unwrap()
       dispatch(api.util.resetApiState())
       finishInviteAcceptNavigation(result, navigate, searchParams)
@@ -179,11 +198,19 @@ export function InviteAcceptPage() {
               <p className="text-sm text-[var(--text-muted)]">
                 You&apos;re logged in as {sessionUser.displayName || sessionUser.email}. {headline}.
               </p>
+              <LegalAcceptancePanel
+                variant="invite"
+                value={acceptedLegal}
+                onChange={setAcceptedLegal}
+                electronicSigned={electronicSigned}
+                onElectronicSignedChange={setElectronicSigned}
+                disabled={accepting}
+              />
               {error && <p className="text-sm text-red-600">{error}</p>}
               <Button
                 type="button"
                 className="w-full"
-                disabled={accepting}
+                disabled={accepting || !legalComplete}
                 onClick={() => handleAcceptLoggedIn()}
               >
                 Accept & Join
@@ -243,8 +270,16 @@ export function InviteAcceptPage() {
               minLength={8}
             />
           </label>
+          <LegalAcceptancePanel
+            variant="invite"
+            value={acceptedLegal}
+            onChange={setAcceptedLegal}
+            electronicSigned={electronicSigned}
+            onElectronicSignedChange={setElectronicSigned}
+            disabled={accepting}
+          />
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" className="w-full" disabled={accepting}>
+          <Button type="submit" className="w-full" disabled={accepting || !legalComplete}>
             Create Account & Join
           </Button>
         </form>
@@ -269,7 +304,7 @@ function PageShell({ children, className = '' }: { children: ReactNode; classNam
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <div className="max-w-md w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
+    <div className="max-w-xl w-full space-y-4 border border-[var(--app-border)] rounded-lg p-6">
       {children}
     </div>
   )

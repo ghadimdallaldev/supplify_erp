@@ -3,6 +3,7 @@ import {
   normalizeAdminPlanUpdateResult,
   type AdminPlanUpdateResult,
 } from '../lib/adminPlanSaveFeedback'
+import type { LegalAcceptancePayload } from '../lib/legalDocuments'
 import type {
   User,
   Product,
@@ -230,6 +231,7 @@ export const api = createApi({
     'Reports',
     'Disputes',
     'Promotions',
+    'ContractPricing',
     'Audit',
     'TenantRoles',
     'Amendments',
@@ -276,7 +278,12 @@ export const api = createApi({
     }),
     completeRegistration: builder.mutation<
       { tenantType: string; tenant: unknown },
-      { accountType: 'RESTAURANT' | 'SUPPLIER'; businessName: string; phone?: string }
+      {
+        accountType: 'RESTAURANT' | 'SUPPLIER'
+        businessName: string
+        phone?: string
+        legalAcceptance: LegalAcceptancePayload
+      }
     >({
       query: (body) => ({
         url: '/api/register/complete',
@@ -1612,7 +1619,13 @@ export const api = createApi({
     }),
     acceptBranchInvite: builder.mutation<
       { user?: { email?: string; displayName?: string }; activeSupplierId: string },
-      { token: string; full_name?: string; email?: string; password?: string }
+      {
+        token: string
+        full_name?: string
+        email?: string
+        password?: string
+        legalAcceptance?: LegalAcceptancePayload
+      }
     >({
       query: (body) => ({
         url: '/api/public/invitations/branch/accept',
@@ -1651,6 +1664,7 @@ export const api = createApi({
         full_name?: string
         email?: string
         password?: string
+        legalAcceptance?: LegalAcceptancePayload
       }
     >({
       query: (body) => ({
@@ -2388,6 +2402,128 @@ export const api = createApi({
       string
     >({
       query: (id) => ({ url: `/api/promotions/${id}/use-coupon`, method: 'POST' }),
+    }),
+
+    // Contract pricing
+    getContractPricing: builder.query<
+      { pricing: Array<Record<string, unknown>> },
+      { restaurantId?: string; productId?: string; q?: string; status?: string }
+    >({
+      query: (params) => ({
+        url: '/api/restaurant-pricing',
+        params,
+      }),
+      providesTags: ['ContractPricing'],
+      transformResponse: (response: { data?: { pricing?: Array<Record<string, unknown>> } }) => ({
+        pricing: response?.data?.pricing ?? [],
+      }),
+    }),
+    getMyContractPricing: builder.query<
+      {
+        pricing: Array<Record<string, unknown>>
+        summary: Array<Record<string, unknown>>
+      },
+      { supplierId?: string; productId?: string; q?: string }
+    >({
+      query: (params) => ({
+        url: '/api/restaurant-pricing/my-pricing',
+        params,
+      }),
+      providesTags: ['ContractPricing'],
+      transformResponse: (response: {
+        data?: {
+          pricing?: Array<Record<string, unknown>>
+          summary?: Array<Record<string, unknown>>
+        }
+      }) => ({
+        pricing: response?.data?.pricing ?? [],
+        summary: response?.data?.summary ?? [],
+      }),
+    }),
+    createContractPricing: builder.mutation<
+      { pricing: Record<string, unknown> },
+      {
+        restaurantId: string
+        productId: string
+        price: number
+        currency?: string
+        contractDiscountPercentage?: number
+        contractStartDate?: string
+        contractEndDate?: string
+        agreementType?: string
+        minOrderQuantity?: number
+        notes?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-pricing',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['ContractPricing', 'Product'],
+    }),
+    updateContractPricing: builder.mutation<
+      { pricing: Record<string, unknown> },
+      {
+        id: string
+        price?: number
+        contractDiscountPercentage?: number
+        contractStartDate?: string | null
+        contractEndDate?: string | null
+        agreementType?: string
+        minOrderQuantity?: number | null
+        isActive?: boolean
+        notes?: string | null
+        restaurantId?: string
+        productId?: string
+      }
+    >({
+      query: ({ id, restaurantId: _r, productId: _p, ...body }) => ({
+        url: `/api/restaurant-pricing/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['ContractPricing', 'Product'],
+    }),
+    deactivateContractPricing: builder.mutation<{ pricing: Record<string, unknown> }, string>({
+      query: (id) => ({
+        url: `/api/restaurant-pricing/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['ContractPricing', 'Product'],
+    }),
+    resolveContractPrices: builder.mutation<
+      {
+        items: Array<{
+          productId: string
+          supplierId: string
+          quantity: number
+          unitPrice: number
+          source: string
+          defaultPrice: number | null
+          contractPriceId: string | null
+        }>
+      },
+      {
+        items: Array<{ productId: string; supplierId: string; quantity: number }>
+      }
+    >({
+      query: (body) => ({
+        url: '/api/restaurant-pricing/resolve',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (response: { data?: { items?: Array<Record<string, unknown>> } }) => ({
+        items: (response?.data?.items ?? []) as Array<{
+          productId: string
+          supplierId: string
+          quantity: number
+          unitPrice: number
+          source: string
+          defaultPrice: number | null
+          contractPriceId: string | null
+        }>,
+      }),
     }),
     messageFromDeal: builder.mutation<
       {
@@ -3495,6 +3631,12 @@ export const {
   useApplyCreditNoteMutation,
   useGetPromotionsQuery,
   useGetActivePromotionsQuery,
+  useGetContractPricingQuery,
+  useGetMyContractPricingQuery,
+  useCreateContractPricingMutation,
+  useUpdateContractPricingMutation,
+  useDeactivateContractPricingMutation,
+  useResolveContractPricesMutation,
   useCreatePromotionMutation,
   useUpdatePromotionMutation,
   useActivatePromotionMutation,

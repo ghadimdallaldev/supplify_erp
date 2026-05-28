@@ -4,9 +4,12 @@ describe('registerServiceWorker', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
   })
 
-  it('registers sw.js once on window load without throwing', async () => {
+  it('registers sw.js once on window load in production', async () => {
+    vi.stubEnv('MODE', 'production')
+
     const register = vi.fn().mockResolvedValue(undefined)
     const addEventListener = vi.fn()
 
@@ -30,7 +33,38 @@ describe('registerServiceWorker', () => {
     expect(register).toHaveBeenCalledTimes(1)
   })
 
+  it('clears service workers and skips registration in dev', async () => {
+    vi.stubEnv('MODE', 'development')
+
+    const unregister = vi.fn().mockResolvedValue(true)
+    const getRegistrations = vi.fn().mockResolvedValue([{ unregister }])
+    const addEventListener = vi.fn()
+    const cacheDelete = vi.fn().mockResolvedValue(true)
+    const cacheKeys = vi.fn().mockResolvedValue(['supplify-static-v1'])
+
+    vi.stubGlobal('window', {
+      addEventListener,
+      caches: { keys: cacheKeys, delete: cacheDelete },
+    })
+    vi.stubGlobal('navigator', {
+      serviceWorker: { register: vi.fn(), getRegistrations },
+    })
+
+    const { registerServiceWorker } = await import('./registerServiceWorker')
+    registerServiceWorker()
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(getRegistrations).toHaveBeenCalled()
+    expect(unregister).toHaveBeenCalled()
+    expect(cacheKeys).toHaveBeenCalled()
+    expect(cacheDelete).toHaveBeenCalledWith('supplify-static-v1')
+    expect(addEventListener).not.toHaveBeenCalled()
+  })
+
   it('no-ops when service workers are unavailable', async () => {
+    vi.stubEnv('MODE', 'production')
     vi.stubGlobal('window', { addEventListener: vi.fn() })
     vi.stubGlobal('navigator', {})
 

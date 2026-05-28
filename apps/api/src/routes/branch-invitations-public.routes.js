@@ -19,6 +19,7 @@ import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { WorkspaceMembershipError } from '../lib/workspace-membership.js'
 import { resolveInvitationAcceptIdentity } from '../lib/invitation-accept.js'
+import { recordInviteLegalAcceptances } from '../lib/legal-acceptance.js'
 
 const router = express.Router()
 
@@ -130,7 +131,7 @@ function invitationAcceptErrorName(error) {
 
 router.post('/accept', optionalAuth, async (req, res) => {
   try {
-    const { token, type: rawType, full_name: fullName, password, email } = req.body
+    const { token, type: rawType, full_name: fullName, password, email, legalAcceptance } = req.body
     const type = normalizeInviteType(rawType)
     if (!token || !type) {
       return res.status(400).json({
@@ -153,6 +154,23 @@ router.post('/accept', optionalAuth, async (req, res) => {
         requestId: req.requestId,
       })
     }
+    if (!legalAcceptance?.electronicSignatureAttestation) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'You must accept the legal agreements to continue',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const acceptMeta = {
+      legalAcceptance,
+      ipAddress: req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
+      userAgent: req.headers['user-agent'],
+    }
 
     const acceptEmail = existingUserId ? existingUserEmail : email
 
@@ -164,6 +182,7 @@ router.post('/accept', optionalAuth, async (req, res) => {
         password,
         existingUserId,
         existingUserEmail,
+        ...acceptMeta,
       })
     }
 
@@ -222,6 +241,18 @@ router.post('/accept', optionalAuth, async (req, res) => {
     })
 
     const login = await completeInviteAcceptSession(res, { result, fullName, req })
+    try {
+      await recordInviteLegalAcceptances({
+        userId: result.userId,
+        acceptedDocuments: legalAcceptance.acceptedDocuments,
+        electronicSignatureAttestation: legalAcceptance.electronicSignatureAttestation,
+        packVersion: legalAcceptance.packVersion,
+        ipAddress: acceptMeta.ipAddress,
+        userAgent: acceptMeta.userAgent,
+      })
+    } catch (legalErr) {
+      logger.warn('Invite legal acceptance not recorded', { error: legalErr.message })
+    }
     return res.json({
       ok: true,
       data: {
@@ -247,7 +278,17 @@ router.post('/accept', optionalAuth, async (req, res) => {
 async function handleSupplierBranchAccept(
   req,
   res,
-  { token, fullName, email, password, existingUserId, existingUserEmail }
+  {
+    token,
+    fullName,
+    email,
+    password,
+    existingUserId,
+    existingUserEmail,
+    legalAcceptance,
+    ipAddress,
+    userAgent,
+  }
 ) {
   let result
   try {
@@ -293,6 +334,18 @@ async function handleSupplierBranchAccept(
   })
 
   const login = await completeInviteAcceptSession(res, { result, fullName, req })
+  try {
+    await recordInviteLegalAcceptances({
+      userId: result.userId,
+      acceptedDocuments: legalAcceptance.acceptedDocuments,
+      electronicSignatureAttestation: legalAcceptance.electronicSignatureAttestation,
+      packVersion: legalAcceptance.packVersion,
+      ipAddress,
+      userAgent,
+    })
+  } catch (legalErr) {
+    logger.warn('Supplier invite legal acceptance not recorded', { error: legalErr.message })
+  }
   return res.json({
     ok: true,
     data: {
@@ -339,7 +392,7 @@ router.get('/branch', async (req, res) => {
 
 router.post('/branch/accept', optionalAuth, async (req, res) => {
   try {
-    const { token, full_name: fullName, password, email } = req.body
+    const { token, full_name: fullName, password, email, legalAcceptance } = req.body
     if (!token) {
       return res.status(400).json({
         ok: false,
@@ -361,6 +414,20 @@ router.post('/branch/accept', optionalAuth, async (req, res) => {
         requestId: req.requestId,
       })
     }
+    if (!legalAcceptance?.electronicSignatureAttestation) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'You must accept the legal agreements to continue',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const ipAddress = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    const userAgent = req.headers['user-agent']
 
     let result
     try {
@@ -406,6 +473,18 @@ router.post('/branch/accept', optionalAuth, async (req, res) => {
     })
 
     const login = await completeInviteAcceptSession(res, { result, fullName, req })
+    try {
+      await recordInviteLegalAcceptances({
+        userId: result.userId,
+        acceptedDocuments: legalAcceptance.acceptedDocuments,
+        electronicSignatureAttestation: legalAcceptance.electronicSignatureAttestation,
+        packVersion: legalAcceptance.packVersion,
+        ipAddress,
+        userAgent,
+      })
+    } catch (legalErr) {
+      logger.warn('Branch invite legal acceptance not recorded', { error: legalErr.message })
+    }
     res.json({
       ok: true,
       data: {
