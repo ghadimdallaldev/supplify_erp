@@ -1,0 +1,18 @@
+%% Tenant overrides and plan limit overrides
+%% Status: current | Related: apps/api/src/lib/limit-resolution.js, feature-flags.js
+flowchart LR
+  subgraph Limits
+    PlanDef[plan.limits default] --> PlanOv[plan_limit_override\nincrease-only]
+    PlanOv --> TenantOv[tenant_limit_override\nincrease-only + expiry]
+    TenantOv --> Addon[subscription add-ons\nbranches / warehouses qty]
+    Addon --> EffectiveLimit[effective limit for enforcement]
+  end
+
+  subgraph Features
+    PlanFeat[plan.features] --> GlobOv[feature_flag global override]
+    GlobOv --> TenFeat[feature_flag_override per tenant]
+    TenFeat --> Eval[evaluatePlanFeatureValue]
+  end
+
+  Admin[Admin override-limit POST] --> TenantOv
+  AdminPlan[Admin plan-overrides PATCH] --> PlanOv

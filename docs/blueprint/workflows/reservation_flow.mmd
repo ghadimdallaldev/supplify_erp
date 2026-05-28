@@ -1,9 +1,12 @@
+%% Public reservations — see docs/diagrams/reservations/ for availability + waitlist detail
 flowchart LR
-  Public[Public /reserve] --> Book[Book slot]
-  Book --> Confirm[Confirmation]
+  Public[Public /reserve] --> Slots[GET availability\ncapacity minus overlapping reservations]
+  Slots --> Book[Book slot or waitlist if full]
+  Book --> Confirm[Confirmation + manage token]
   Staff[Staff board] --> Manage[Manage reservations]
   Guest[Guest manage link] --> CancelReschedule[Cancel / reschedule]
   CancelReschedule --> NotifyStaff[Notify restaurant team]
   Manage --> Book
   Public --> ManageLink["/reserve/manage/:token"]
   Staff --> Analytics[GET /api/reservations/analytics\nslots, waitlist by range]
+  Staff --> Promote[Manual waitlist promote]

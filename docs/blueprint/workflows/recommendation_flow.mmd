@@ -8,7 +8,7 @@ flowchart TB
   Logic -->|yes| Resolve[resolvesLimits\nrecommend next tier]
   Logic -->|no| Features{missing\nreports/smart_reorder/multi_branch?}
   Features -->|yes| Upgrades[upgrades\nlowest plan that unlocks]
-  Features -->|no| Default[Free → recommend Gold\ndefault serious plan]
+  Features -->|no| Default[Free trial → recommend Gold\npaid default: silver → gold ladder]
   Resolve --> Response[recommendedPlanCode, reason\ncomparedToCurrent]
   Upgrades --> Response
   Default --> Response

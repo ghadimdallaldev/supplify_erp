@@ -31,7 +31,7 @@ flowchart TB
   CheckSusp -->|ok or ack| Cookie
   Cookie --> AuditStart
   Start --> Redirect["redirectTo /app/dashboard"]
-  Redirect --> TenantNav
+  Redirect --> TenantNav[Full tenant UI nav\nSidebar uses effectiveRole]
   Ctx --> Eff
   TenantNav --> Eff
   Eff --> Guard

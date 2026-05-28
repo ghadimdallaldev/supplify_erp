@@ -1,0 +1,16 @@
+%% Branch monetization: included limits + paid add-ons
+%% Status: current | Related: docs/BRANCHES_WAREHOUSES_AUDIT.md
+flowchart TD
+  Org[Organization subscription\nmain branch billing tenant] --> Included[included branches from plan\nFree/Silver: 1 | Gold: 2 | Platinum: 3]
+  Create[POST restaurant-org/branches\nor org/branches supplier] --> Guard[multi_branch feature + checkLocationLimit]
+  Guard --> Count[countActiveBranchLocations\norg sub-tenants + legacy links]
+  Count --> Eff[effectiveLimit = included + addon qty]
+  Eff --> Allow{current < effective?}
+  Allow -->|yes| NewBranch[Create org sub-tenant\npending Free sub row for activation]
+  Allow -->|no| Block[403 LIMIT_EXCEEDED\nupgrade or purchase addon]
+  Block --> AddonCheck{plan Gold/Platinum?}
+  AddonCheck -->|yes| Purchase[tenant_subscription_addon\nrestaurant_extra_branch / supplier_extra_branch]
+  AddonCheck -->|no Silver/Free| Upgrade[Upgrade to Gold+]
+  Count --> Cap{total branches >= 6?}
+  Cap -->|yes| Enterprise[Contact sales — Enterprise\nhard cap even with addons]
+  Legacy[Legacy tenant_account_link\n/api/branches] -.->|unmigrated tenants| Count

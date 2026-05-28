@@ -20,6 +20,8 @@ flowchart LR
   A --> AdminCtx
   A --> Impersonation[Impersonation\nview as Restaurant/Supplier]
 
-  TenantCtx --> Subscription[Subscription / Entitlements]
-  Subscription --> Limits[Limits + Overrides]
+  TenantCtx --> Billing[resolveOrgBillingTenantId for branches]
+  Billing --> Subscription[Subscription / Entitlements]
+  Subscription --> Limits[Limits + Overrides + add-ons]
   Subscription --> Features[Feature Flags]
+  Removed[approvals_budgets removed] -.x Features

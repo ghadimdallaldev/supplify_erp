@@ -1,0 +1,13 @@
+%% Cart and checkout flow
+%% Status: current | Related: apps/api/src/routes/orders.routes.js
+flowchart LR
+  Browse[Catalog / supplier products] --> Cart[Cart lines]
+  Cart --> QL[Optional: quick list\nscheduled or manual]
+  QL --> Checkout[Checkout — pricing, deals redeem]
+  Checkout --> Limit{orders_per_day meter}
+  Limit -->|allowed| Place[POST place order\ncustomer_order PLACED]
+  Limit -->|blocked| Modal[403 LIMIT_EXCEEDED\nUpgradeModal]
+  Place --> Notify[Notify supplier team]
+  Place --> WH{Supplier multi-warehouse?}
+  WH -->|yes| Assign[assignWarehousesToOrder]
+  WH -->|no| DefaultWH[default warehouse path]

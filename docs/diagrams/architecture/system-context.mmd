@@ -1,0 +1,35 @@
+%% High-level system context
+%% Status: current | Related: docs/blueprint/system_context.mmd
+flowchart TB
+  subgraph Users
+    Restaurant[Restaurant Users]
+    Supplier[Supplier Users]
+    Admin[Admin Users]
+  end
+
+  subgraph Public["Public unauthenticated"]
+    Guest[Reservation guests /reserve]
+    StaffPortal[Staff self-service links]
+  end
+
+  subgraph Supplify
+    Web[Web App Vite/React]
+    API[API Server Express]
+  end
+
+  subgraph External
+    Keycloak[Keycloak Auth]
+    DB[(PostgreSQL)]
+    Storage[Object storage files]
+  end
+
+  Restaurant --> Web
+  Supplier --> Web
+  Admin --> Web
+  Guest --> Web
+  StaffPortal --> Web
+  Web --> API
+  Web --> Keycloak
+  API --> Keycloak
+  API --> DB
+  API --> Storage

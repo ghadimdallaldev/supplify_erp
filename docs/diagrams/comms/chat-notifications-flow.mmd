@@ -1,0 +1,20 @@
+%% Chat and notifications
+%% Status: current | Related: docs/blueprint/workflows/chat_flow.mmd
+flowchart TB
+  subgraph Chat
+    List[GET /api/chat conversations] --> Open[Open conversation]
+    Open --> Send[POST message]
+    Send --> Meter[checkAndIncrementUsage chats_per_day]
+    Meter --> Store[Persist message]
+    Store --> Push[Notify other party]
+  end
+
+  subgraph Notifications
+    Prefs[notification_preferences] --> Channels{Plan notifications feature}
+    Channels --> Email[email]
+    Channels --> WhatsApp[whatsapp tiers]
+    Channels --> Webhook[Platinum catalog: webhook — catalog-only]
+    InApp[/api/notifications in-app feed]
+  end
+
+  Push --> InApp

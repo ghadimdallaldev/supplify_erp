@@ -1,0 +1,17 @@
+%% Admin impersonation flow
+%% Status: current | Related: docs/blueprint/workflows/admin_impersonation_flow.mmd
+flowchart TB
+  Admin[Admin Tenants tab] --> Start[POST /api/admin-dashboard/impersonate]
+  Start --> DenyAdmin{Target is ADMIN user?}
+  DenyAdmin -->|yes| E403[403 FORBIDDEN]
+  DenyAdmin --> CheckSusp{Suspended / inactive?}
+  CheckSusp -->|yes, no ack| E403b[403 TENANT_SUSPENDED]
+  CheckSusp --> Cookie[Set impersonation_token JWT cookie]
+  Cookie --> Audit[admin_audit_log IMPERSONATION_START]
+  Cookie --> Redirect[/app/dashboard]
+  Redirect --> UI[Full tenant sidebar nav\nuseImpersonation effectiveRole]
+  UI --> API[API: impersonationContext\ngetEffectiveTenant on reads/writes]
+  API --> BillingBlock[rejectImpersonationMutation\nbilling POST blocked]
+  BillingBlock --> AuditBlock[audit_logs impersonation.blocked_action]
+  Exit[Exit impersonation] --> Stop[POST .../impersonate/stop]
+  Stop --> Clear[Clear cookie + IMPERSONATION_END]

@@ -1,0 +1,15 @@
+%% Free Trial lifecycle (plan code: free)
+%% Status: current | Related: docs/features/free-trial-expiry.md
+stateDiagram-v2
+  [*] --> Trialing: applyFreePlan / registration
+  Trialing: Broad sandbox features (0112 parity)
+  Trialing: Low plan limits still enforced
+  Trialing --> Active: status ACTIVE + free_sandbox_expires_at set
+  Active --> Expired: free-sandbox-expiry.job\nexpires_at < now
+  Expired: lock_reason = free_sandbox_expired
+  Expired --> ReadOnly: GET tenant APIs OK
+  ReadOnly --> WriteBlocked: POST/PUT/PATCH/DELETE → 402
+  ReadOnly --> BillingOK: /api/billing/* still allowed
+  Expired --> Active: upgrade OR admin extend-free-trial
+  Active --> Paid: checkout / admin plan change\n(silver, gold, platinum)
+  Paid --> [*]

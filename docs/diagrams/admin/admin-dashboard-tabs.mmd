@@ -1,0 +1,16 @@
+%% Admin dashboard panel tabs and data sources
+%% Status: current | Related: apps/web/src/pages/AdminDashboardPage.tsx
+flowchart TB
+  Admin[Admin user /app/admin] --> Tabs{Tab}
+  Tabs --> Overview[Overview\nGET /admin-dashboard/overview\npending deals, health, GMV hints]
+  Tabs --> Plans[Plans\nCRUD /admin-dashboard/plans]
+  Tabs --> Subs[Subscriptions\nlist, PATCH, preview-change\nextend-free-trial]
+  Tabs --> Tenants[Tenants\nsuppliers + restaurants lists]
+  Tabs --> Deals[Deals\n/api/promotions/admin/* approve/reject]
+  Tabs --> Overrides[Limit overrides\nPOST override-limit, plan-overrides]
+  Tabs --> Health[Health\nrecent errors, DB pool]
+  Tabs --> Finance[Finance\nGMV, MRR, overdue, top tenants]
+  Tabs --> Usage[Usage meters snapshot]
+  Tabs --> Audit[Audit logs\nadmin_audit_log + audit_logs]
+  Tabs --> Settings[Platform settings\nfreeSandboxDays 3-7]
+  Tenants --> Impersonate[Impersonate → impersonation_token]

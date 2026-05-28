@@ -1,0 +1,14 @@
+%% Waitlist and auto-promotion
+%% Status: current | Related: apps/api/src/services/waitlistPromotion.js
+flowchart TD
+  Book[Public or staff book] --> Full{slot full for party?}
+  Full -->|no| Res[Create reservation CONFIRMED/PENDING]
+  Full -->|yes| WL[Insert reservation_waitlist\nreservation.waitlist = true]
+  WL --> Notify[Notification stub / log]
+  Cancel[Cancel or reduce party on reservation] --> Promo[waitlistPromotion service]
+  Promo --> Offer[Offer next waitlist entry slot]
+  Staff[Staff board] --> Manual[POST waitlist/:id/manually-promote]
+  Manual --> Offer
+  Offer --> Accept{guest accepts?}
+  Accept -->|yes| Res
+  Tier[waitlist_auto_promo feature\nFree/Platinum on, Silver off] -.-> Promo

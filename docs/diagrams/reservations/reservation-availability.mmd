@@ -1,0 +1,14 @@
+%% Reservation availability calculation
+%% Status: current | Related: apps/api/src/lib/reservation-availability.js
+flowchart TD
+  Tables[Active reservation_table rows\ncapacity per table] --> Total[totalCapacity = sum capacities]
+  Res[Reservations for date] --> Filter[status in PENDING, CONFIRMED, SEATED\nexcludes CANCELLED, COMPLETED, WAITLIST]
+  Filter --> Slots[buildTimeSlots from operating hours]
+  Slots --> Overlap[For each slot: overlapping reservations\ninterval overlap with duration_minutes]
+  Overlap --> Booked[bookedCovers = sum party_size]
+  Booked --> Left[seatsLeft = totalCapacity - bookedCovers]
+  Left --> State{seatsLeft >= partySize?}
+  State -->|yes| Avail[available or limited label]
+  State -->|no| Full[full — may offer waitlist on book]
+  Past[slot.start < now] --> Disabled[past — not bookable]
+  Legacy[Optional branch_id on reservation\nlegacy branch table] -.-> Res

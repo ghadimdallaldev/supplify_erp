@@ -24,6 +24,7 @@ import {
 } from '../../services/api'
 import { DealAnalyticsDialog } from '../../components/deals/DealAnalyticsDialog'
 import { PromoteDealDialog } from '../../components/deals/PromoteDealDialog'
+import { DealBoostStatus, type BoostStatus } from '../../components/deals/DealBoostStatus'
 import {
   DealTargetingPickers,
   type DealTargetingValue,
@@ -196,92 +197,106 @@ export function PromotionsPage() {
             <p className="text-sm text-[var(--text-muted)]">No promotions yet.</p>
           ) : (
             <div className="space-y-3">
-              {promotions.map((p) => (
-                <div
-                  key={String(p.id)}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--app-border)] p-4"
-                >
-                  <div>
-                    <p className="font-semibold">{String(p.name)}</p>
-                    <p className="text-xs text-[var(--text-muted)] capitalize">
-                      {String(p.type || '').replace(/_/g, ' ')}
-                      {p.discount_value != null
-                        ? ` · ${p.discount_value}${p.type === 'percentage_discount' ? '%' : ''}`
-                        : ''}
-                    </p>
+              {promotions.map((p) => {
+                const boostStatus = (p.boost_status as BoostStatus | undefined) || null
+                return (
+                  <div
+                    key={String(p.id)}
+                    className="flex flex-col gap-3 rounded-lg border border-[var(--app-border)] p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">{String(p.name)}</p>
+                        <p className="text-xs text-[var(--text-muted)] capitalize">
+                          {String(p.type || '').replace(/_/g, ' ')}
+                          {p.discount_value != null
+                            ? ` · ${p.discount_value}${p.type === 'percentage_discount' ? '%' : ''}`
+                            : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline">{String(p.status)}</Badge>
+                        {p.is_promoted ? <Badge variant="secondary">Boosted</Badge> : null}
+                        {p.status === 'draft' && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                await activatePromotion(String(p.id)).unwrap()
+                                toast.success('Submitted for admin approval')
+                                refetch()
+                              }}
+                            >
+                              Submit for approval
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                await deletePromotion(String(p.id)).unwrap()
+                                toast.success('Deleted')
+                                refetch()
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                        {p.status === 'active' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                await pausePromotion(String(p.id)).unwrap()
+                                toast.success('Paused')
+                                refetch()
+                              }}
+                            >
+                              Pause
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPromoteId(String(p.id))}
+                            >
+                              <Megaphone className="h-3 w-3 mr-1" /> Boost
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setAnalyticsId(String(p.id))}
+                            >
+                              <BarChart3 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                        {p.status === 'paused' && (
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              await resumePromotion(String(p.id)).unwrap()
+                              toast.success('Resumed')
+                              refetch()
+                            }}
+                          >
+                            Resume
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <DealBoostStatus boost={boostStatus} />
+                    {p.status === 'active' &&
+                    boostStatus?.state !== 'active' &&
+                    boostStatus?.state !== 'scheduled' ? (
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Increase visibility with a boost package — reach restaurants beyond your
+                        followers.
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{String(p.status)}</Badge>
-                    {p.is_promoted ? <Badge variant="secondary">Boosted</Badge> : null}
-                    {p.status === 'draft' && (
-                      <>
-                        <Button
-                          size="sm"
-                          onClick={async () => {
-                            await activatePromotion(String(p.id)).unwrap()
-                            toast.success('Submitted for admin approval')
-                            refetch()
-                          }}
-                        >
-                          Submit for approval
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            await deletePromotion(String(p.id)).unwrap()
-                            toast.success('Deleted')
-                            refetch()
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
-                    {p.status === 'active' && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            await pausePromotion(String(p.id)).unwrap()
-                            toast.success('Paused')
-                            refetch()
-                          }}
-                        >
-                          Pause
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setPromoteId(String(p.id))}
-                        >
-                          <Megaphone className="h-3 w-3 mr-1" /> Boost
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setAnalyticsId(String(p.id))}
-                        >
-                          <BarChart3 className="h-3 w-3" />
-                        </Button>
-                      </>
-                    )}
-                    {p.status === 'paused' && (
-                      <Button
-                        size="sm"
-                        onClick={async () => {
-                          await resumePromotion(String(p.id)).unwrap()
-                          toast.success('Resumed')
-                          refetch()
-                        }}
-                      >
-                        Resume
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

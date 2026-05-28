@@ -1,0 +1,20 @@
+%% Subscription tiers and entitlements resolution
+%% Status: current | Related: docs/monetization/FINAL_TIER_MATRIX.md
+flowchart TD
+  Request[API request for tenant] --> ResolveBilling[resolveOrgBillingTenantId\nbranch uses parent org subscription]
+  ResolveBilling --> Sub[getTenantSubscription]
+  Sub --> PlanRow[subscription_plan\nfree | silver | gold | platinum | enterprise]
+  PlanRow --> Limits[plan.limits JSON]
+  PlanRow --> Features[plan.features JSON]
+  Limits --> TenantOv{tenant_limit_override?}
+  TenantOv -->|increase only| EffLimit[effective limit]
+  Limits --> PlanOv{plan_limit_override?}
+  PlanOv --> EffLimit
+  Limits --> Addon[tenant_subscription_addon\nbranches / warehouses]
+  Addon --> EffLimit
+  EffLimit --> Usage[usage_meter + live counts]
+  Features --> FeatOv[feature_flag_override\ntenant → global → plan]
+  FeatOv --> Gate[requireFeature / requireWithinLimit]
+  BronzeLegacy[API input bronze] --> Normalize[normalizePlanCode → silver]
+  Normalize --> PlanRow
+  Enterprise[enterprise plan] --> AdminOnly[requires_admin_assignment\nno self-serve]

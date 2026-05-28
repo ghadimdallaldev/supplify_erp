@@ -1,0 +1,12 @@
+%% Credit note flow from dispute resolution
+%% Status: current | Related: apps/api/src/services/disputes.service.js
+sequenceDiagram
+  participant Rest as Restaurant
+  participant API as disputes.service
+  participant DB as credit_note
+
+  Rest->>API: Resolve dispute resolutionType=credit_note
+  API->>DB: INSERT credit_note\nnumber, amounts, dispute_id, invoice_id
+  API-->>Rest: credit note details
+  Note over API,DB: Applies to supplier/restaurant finance views
+  Rest->>API: Apply / update credit note status as supported

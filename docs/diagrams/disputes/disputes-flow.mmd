@@ -1,0 +1,12 @@
+%% Disputes and returns flow
+%% Status: current | Related: apps/api/src/services/disputes.service.js
+flowchart TD
+  Recv[Receiving identifies issue] --> Open[POST /api/disputes\nlinked to customer_order]
+  Open --> Review[Supplier / restaurant review states]
+  Review --> Resolve{resolution type}
+  Resolve -->|credit_note| CN[Create credit_note\nlinked to invoice if present]
+  Resolve -->|replacement| Rep[createReplacementOrderFromDispute\nPLACED new order]
+  Resolve -->|other| Close[Close dispute status]
+  Orig[Original order] --> Stays[Stays received/partial — not re-opened]
+  Rep --> NewCycle[New fulfillment cycle for replacement order]
+  Feature[disputes_returns plan feature] -.-> Open

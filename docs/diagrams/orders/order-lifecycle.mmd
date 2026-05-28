@@ -1,0 +1,14 @@
+%% Order lifecycle (customer_order)
+%% Status: current | Related: docs/blueprint/workflows/order_flow.mmd
+stateDiagram-v2
+  [*] --> Cart: Cart / quick list
+  Cart --> Checkout: Checkout validation
+  Checkout --> Placed: PLACED\ncheckAndIncrementUsage orders_per_day
+  Placed --> Ack: Supplier acknowledges
+  Ack --> Fulfilling: Pick / pack / ship waves
+  Fulfilling --> Delivered: Delivered / POD
+  Delivered --> Receiving: Restaurant receiving report
+  Placed --> Cancelled: Supplier decline\nCANCELLED cancelled_by SUPPLIER
+  Placed --> Amend: order_amendments if enabled
+  Receiving --> Dispute: disputes_returns feature
+  Dispute --> [*]

@@ -128,10 +128,28 @@
 
 ## 10. Limits
 
-- **Component:** `AdminLimitOverridesPanel`
-- **API:** `GET .../limit-keys`, `limit-overrides`, CRUD overrides
-- **DB:** Plan/tenant limit override tables; keys from `subscription.js` limit keys
-- **Status:** OK — restaurant vs supplier keys via `tenantType` selector.
+- **Component:** `AdminLimitsTab` (unified limits tab: tenant picker, add-ons, overrides)
+- **API:**
+  - `GET /api/admin-dashboard/tenants/suppliers` & `.../restaurants` — tenant directory for search
+  - `GET /api/admin-dashboard/tenants/search?q=&type=&orgMainOnly=` — optional server-side filter
+  - `GET .../tenants/:type/:id/subscription-addons` — usage, add-ons, billing tenant resolution
+  - `PUT .../subscription-addons/:addonKey` — grant/update/remove add-on (qty `0` = remove)
+  - `GET .../limit-keys`, `GET .../limit-overrides`, `GET .../plans`
+  - `POST .../plans/:planId/override-limit` — plan-tier override
+  - `POST .../tenants/:type/:id/override-limit` — tenant override
+  - `GET .../effective-limit/:limitKey` — preview base/effective before save
+  - `PATCH .../tenant-overrides/:id` & `.../plan-overrides/:id` — disable (`is_active: false`)
+- **DB:** `tenant_subscription_addon`, `plan_limit_override`, `tenant_limit_override`, `subscription_plan`
+- **UX (2026-05-28):**
+  - Searchable tenant picker (name, slug, email, plan, type) — no primary UUID field
+  - Summary cards: included / add-ons / effective / current usage for branches (& warehouses for suppliers)
+  - Plan dropdown (Free Trial, Silver, Gold, Platinum, Enterprise) instead of plan UUID
+  - Limit key dropdown filtered by tenant type; hidden internal keys excluded
+  - Override preview: plan default → new value; effective limit → tenant override
+  - Reason required for add-ons and overrides
+  - Tables for active add-ons and overrides with disable + confirm
+  - Org billing banner when selected branch ≠ main branch (add-ons apply to main)
+- **Manual / limitations:** Custom `unit_price_monthly` not exposed in UI (uses plan-tier default). No hard-delete of overrides (disable only). Large tenant lists (>50 matches) require refining search in the picker dropdown.
 
 ---
 

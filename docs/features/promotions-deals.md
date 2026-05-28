@@ -67,7 +67,7 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 | DELETE | `/api/promotions/:id`           | Delete draft only                                                |
 | GET    | `/api/promotions/:id/analytics` | Views, clicks, orders, messages, coupon uses, conversion         |
 | GET    | `/api/promotions/:id/preview`   | Supplier preview with targets                                    |
-| GET    | `/api/promotions/pricing`       | Boost pricing tiers                                              |
+| GET    | `/api/promotions/pricing`       | Active boost packages (supplier boost picker)                    |
 
 ## API — Restaurant (feature `supplier_deals`)
 
@@ -82,14 +82,33 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 
 ## API — Admin
 
-| Method | Path                                 | Description               |
-| ------ | ------------------------------------ | ------------------------- |
-| GET    | `/api/promotions/admin/pending`      | Deals awaiting approval   |
-| POST   | `/api/promotions/admin/:id/approve`  | Approve → active          |
-| POST   | `/api/promotions/admin/:id/reject`   | Reject → draft            |
-| PATCH  | `/api/promotions/admin/pricing/:key` | Update boost pricing tier |
+| Method | Path                                 | Description                                          |
+| ------ | ------------------------------------ | ---------------------------------------------------- |
+| GET    | `/api/promotions/admin/pending`      | Deals awaiting approval                              |
+| POST   | `/api/promotions/admin/:id/approve`  | Approve → active                                     |
+| POST   | `/api/promotions/admin/:id/reject`   | Reject → draft                                       |
+| GET    | `/api/promotions/admin/pricing`      | All boost + activation pricing rows (incl. inactive) |
+| PATCH  | `/api/promotions/admin/pricing/:key` | Update boost package fields                          |
 
 Admin UI: **Admin → Deals** tab (`AdminDealsPanel`).
+
+## Boost packages (Facebook-style visibility)
+
+Suppliers pick a **boost package** when promoting an active deal. Packages are rows in `promotion_pricing_config` with `package_type = 'boost'`. Default tiers (migration `0123_deal_boost_packages.sql`):
+
+| `pricing_key`  | Display name  | Price | Duration | Badge / reach (qualitative)        |
+| -------------- | ------------- | ----- | -------- | ---------------------------------- |
+| `boost_flat`   | Starter Boost | $9    | 1 day    | Test visibility · Basic visibility |
+| `boost_7_day`  | Weekly Boost  | $39   | 7 days   | Most popular · Higher placement    |
+| `boost_30_day` | Monthly Boost | $99   | 30 days  | Best value · Maximum visibility    |
+
+**Activation** (`deal_activation`, `package_type = 'activation'`) remains **$0** — labeled “Free after admin approval” in admin UI; not shown as a paid boost option.
+
+On purchase (`POST /api/promotions/:id/promote`), `deal_promotions` stores snapshots: `pricing_package_id`, `pricing_key`, `price_paid`, `duration_days`, `package_display_name`. Admin price edits affect **new** purchases only.
+
+Supplier list responses include `boost_status`: `active` (days remaining, ends at), `expired`, `scheduled`, or `none`.
+
+**UX copy:** “Boost visibility” / “Boost deal” — not “promotion fee”. Reach labels describe feed placement priority; no fake impression numbers until real analytics exist.
 
 ## Order integration
 
@@ -99,7 +118,8 @@ Admin UI: **Admin → Deals** tab (`AdminDealsPanel`).
 
 ## Monetization
 
-- `promotion_pricing_config` — admin-configurable boost tiers (flat fee, per-day)
+- `promotion_pricing_config` — admin-configurable boost packages (`amount`, `duration_days`, `badge_label`, `estimated_reach_label`, `is_recommended`, `is_active`, `sort_order`)
+- `deal_promotions` — campaign row + purchase snapshots (`price_paid`, etc.)
 - `deal_promotions.billing_status` — `pending`, `paid`, `waived`, etc. (payment stub: boosts activate with `waivePayment` until billing wired)
 - Feature gates: supplier `promotions`, restaurant `supplier_deals` (Silver+ on paid tiers)
 
@@ -113,6 +133,7 @@ Admin UI: **Admin → Deals** tab (`AdminDealsPanel`).
 | --------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `0074_promotions.sql`             | `promotions`, `promotion_targets`, `promotion_restaurant_targets`, `promotion_usages`          |
 | `0095_deal_promotions_system.sql` | Extended promotion columns, `deal_promotions`, `deal_interactions`, `promotion_pricing_config` |
+| `0123_deal_boost_packages.sql`    | Boost package fields, purchase snapshots, default Starter/Weekly/Monthly pricing               |
 
 ## Frontend
 
@@ -133,6 +154,8 @@ Automated coverage maps to `docs/qa/MANUAL_TEST_CHECKLIST.md` IDs below.
 | `apps/api/src/services/promotions.service.test.js`         | Discount math, eligibility (RST-77, RST-78 order flows)                                                        |
 | `apps/api/src/services/deal-lifecycle.service.test.js`     | Approval, visibility, ineligibility messages                                                                   |
 | `apps/api/src/services/deal-promotions.service.test.js`    | Restaurant/audience targeting for sponsored deals (RST-76)                                                     |
+| `apps/api/src/services/deal-boost.helpers.test.js`         | Boost status builder (active / expired / days remaining)                                                       |
+| `apps/api/src/services/deal-promotions.boost.test.js`      | Package purchase snapshots, inactive package rejection                                                         |
 | `apps/api/src/routes/promotions.routes.test.js`            | Admin pending/approve/reject/pricing (ADM Deals tab, API-22)                                                   |
 | `apps/api/src/routes/promotions.supplier-security.test.js` | Supplier cannot access other tenants' deals                                                                    |
 | `apps/api/src/routes/feature-gates.routes.test.js`         | `promotions` / `supplier_deals` — Free 403; Silver supplier 200 (GATE-S13); Silver restaurant deals (GATE-R19) |

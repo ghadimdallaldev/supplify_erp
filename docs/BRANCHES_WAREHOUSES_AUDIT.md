@@ -4,6 +4,8 @@
 **Scope:** Restaurant branches, supplier branches (org model), linked branch accounts, supplier warehouses, plan limits, features, RBAC, and operational integration (orders, inventory, fulfillment).  
 **Out of scope (per request):** Tier limit/pricing changes, deals/promotions logic, UI redesign.
 
+**Admin limits tab (2026-05-28):** See [ADMIN_PANEL_TABS_AUDIT.md](./admin/ADMIN_PANEL_TABS_AUDIT.md) §10 — searchable tenant picker, add-on grant UI, plan/tenant override forms with previews. Backend still resolves org billing tenant via `resolveOrgBillingTenantId`.
+
 ---
 
 ## Executive summary

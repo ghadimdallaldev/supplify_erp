@@ -1,0 +1,20 @@
+%% Subscription conversion funnel events
+%% Status: current | Related: docs/blueprint/workflows/conversion_funnel_flow.mmd
+flowchart TB
+  subgraph Events
+    VIEW[VIEW_PLANS]
+    BLOCK_F[BLOCKED_FEATURE]
+    BLOCK_L[BLOCKED_LIMIT]
+    OPEN[OPEN_UPGRADE]
+    SUCCESS[UPGRADE_SUCCESS]
+  end
+  VIEW --> API[POST /subscriptions/conversion-event]
+  OPEN --> API
+  API --> Table[(conversion_event)]
+  Middleware[requireFeature / requireWithinLimit] --> BLOCK_F
+  Middleware --> BLOCK_L
+  BLOCK_F --> Table
+  BLOCK_L --> Table
+  Admin[Admin PATCH subscription] --> SUCCESS
+  SUCCESS --> Table
+  Table --> Stats[GET /admin-dashboard/conversion-stats]

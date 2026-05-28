@@ -19,6 +19,7 @@ import { openCheckoutPayment } from '../lib/openPaymentModal'
 import { Check, Lock, Minus, TrendingUp } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useEffect, useRef } from 'react'
+import { useImpersonation } from '../hooks/useImpersonation'
 import {
   getLimitKeys,
   getFeatureKeys,
@@ -97,6 +98,7 @@ export function UpgradeModal() {
   const { open, openRevision, type, payload } = useAppSelector((state) => state.monetization)
   const user = useAppSelector((state) => state.auth.user)
   const canUpgrade = user?.tenantPermissions?.includes('SUBSCRIPTIONS_MANAGE') ?? true
+  const { shouldLoadTenantEntitlements } = useImpersonation()
 
   const blocked =
     type === 'limit' && payload && 'limitKey' in payload
@@ -106,12 +108,16 @@ export function UpgradeModal() {
         : undefined
 
   const { data: recommendation } = useGetRecommendationQuery({ blocked }, { skip: !open })
-  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !shouldLoadTenantEntitlements,
+  })
   const {
     data: plansData,
     isLoading: plansLoading,
     isError: plansError,
-  } = useGetSubscriptionPlansQuery()
+  } = useGetSubscriptionPlansQuery(undefined, {
+    skip: !shouldLoadTenantEntitlements,
+  })
   const { data: billingStatus } = useGetBillingStatusQuery(undefined, { skip: !open })
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const pendingActivation = Boolean(
