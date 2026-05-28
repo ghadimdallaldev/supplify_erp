@@ -3,6 +3,8 @@ import {
   resolveEffectiveLimit,
   discoverLimitKeys,
   fillMissingFreeTierLimits,
+  formatPlanLimitDisplay,
+  isLimitKeyApplicable,
   RESTAURANT_LIMIT_KEYS,
   SUPPLIER_LIMIT_KEYS,
 } from './limit-resolution.js'
@@ -153,5 +155,19 @@ describe('limit-resolution', () => {
     const limits = { deal_redemptions_per_day: 2 }
     fillMissingFreeTierLimits(limits, 'RESTAURANT', 'free')
     expect(limits.deal_redemptions_per_day).toBe(2)
+  })
+
+  it('does not include supplier promotions meter on restaurant catalog', () => {
+    expect(RESTAURANT_LIMIT_KEYS).not.toContain('promotions')
+    expect(SUPPLIER_LIMIT_KEYS).toContain('promotions')
+    expect(isLimitKeyApplicable('RESTAURANT', 'promotions')).toBe(false)
+    expect(isLimitKeyApplicable('SUPPLIER', 'promotions')).toBe(true)
+  })
+
+  it('formatPlanLimitDisplay treats missing keys as n/a not unlimited', () => {
+    expect(formatPlanLimitDisplay(undefined, { defined: false })).toBe('n/a')
+    expect(formatPlanLimitDisplay(undefined, { defined: true })).toBe('unlimited')
+    expect(formatPlanLimitDisplay(-1, { defined: true })).toBe('unlimited')
+    expect(formatPlanLimitDisplay(10, { defined: true })).toBe('10')
   })
 })

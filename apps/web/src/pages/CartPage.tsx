@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { LimitExceededBanner } from '../components/LimitExceededBanner'
+import { pageHeaderRowClass, splitRowClass } from '../components/ui/card-layout'
 import { ShoppingCart, Trash2, Plus, Minus, Save, Calendar, FileText } from 'lucide-react'
 import { useCartActions } from '../hooks/useCartActions'
 import {
@@ -240,12 +241,12 @@ export function CartPage() {
 
   return (
     <div className="space-y-6" data-testid="cart-page">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className={pageHeaderRowClass}>
+        <div className="min-w-0">
           <h1 className="text-[21px] font-black text-[var(--text)]">Shopping Cart</h1>
           <p className="text-[var(--text-muted)] mt-2">Review your order before placing it</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           {drafts.length > 0 && (
             <Button variant="outline" onClick={() => setShowLoadDraft(true)}>
               Load Draft
@@ -289,9 +290,11 @@ export function CartPage() {
           {groups.map((group) => (
             <Card key={group.supplierId}>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{group.supplierName}</span>
-                  <Badge variant="secondary">${formatPrice(group.subtotal)}</Badge>
+                <CardTitle className={splitRowClass}>
+                  <span className="min-w-0 truncate">{group.supplierName}</span>
+                  <Badge variant="secondary" className="shrink-0">
+                    ${formatPrice(group.subtotal)}
+                  </Badge>
                 </CardTitle>
                 <CardDescription>
                   {group.items.length} item{group.items.length !== 1 ? 's' : ''}
@@ -301,10 +304,10 @@ export function CartPage() {
                 {group.items.map((item) => (
                   <div
                     key={item.productId}
-                    className="flex items-center space-x-4 p-4 border rounded-lg"
+                    className="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:gap-4"
                     data-testid={`cart-item-row-${item.productId}`}
                   >
-                    <div className="w-16 h-16 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
+                    <div className="w-16 h-16 shrink-0 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
                       {item.product.image_url ? (
                         <img
                           src={item.product.image_url}
@@ -316,8 +319,8 @@ export function CartPage() {
                       )}
                     </div>
 
-                    <div className="flex-1">
-                      <h4 className="font-medium">{item.product.name}</h4>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium truncate">{item.product.name}</h4>
                       <p className="text-sm text-[var(--text-muted)]">SKU: {item.product.sku}</p>
                       <p className="text-sm text-[var(--text-muted)]">
                         $
@@ -328,44 +331,45 @@ export function CartPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
-                        disabled={item.quantity <= 1}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center">{item.quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
+                          disabled={item.quantity <= 1}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center tabular-nums">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
 
-                    <div className="text-right">
-                      <p className="font-medium">
+                      <p className="font-medium tabular-nums sm:text-right">
                         $
                         {(typeof item.product.current_price === 'number'
                           ? item.product.current_price
                           : parseFloat(String(item.product.current_price ?? '')) || 0) *
                           item.quantity}
                       </p>
-                    </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (item.productId) handleRemoveItem(item.productId)
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (item.productId) handleRemoveItem(item.productId)
+                        }}
+                        aria-label="Remove item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </CardContent>

@@ -63,7 +63,7 @@ Quick checks to verify the “Launch Polish Micro” tweaks (Recommended badge, 
 **Mapping** (single source: `apps/web/src/lib/planComparison.ts` → `PLAN_SUBTITLES` / `getPlanSubtitle()`)
 
 - Free: “Setup & Testing”
-- Bronze: “Starter”
+- Silver: “Starter”
 - Gold: “Most Popular”
 - Platinum: “Unlimited Ops”
 - Enterprise: “Custom Contract” (e.g. admin only)

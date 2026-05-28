@@ -14,6 +14,16 @@ Suppliers create **deals** (stored in `promotions`) — percentage/fixed discoun
 | **Promotion / Boost** | Paid visibility campaign (`deal_promotions` row)            |
 | **Sponsored**         | Deal with an active boost campaign visible to non-followers |
 
+## Plan limits (not boost pricing)
+
+| Tenant         | Meter                      | Silver (0117)                  | Notes                                                                           |
+| -------------- | -------------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
+| **Supplier**   | `promotions`               | 3 active deals                 | `requireFeature('promotions')` on supplier routes                               |
+| **Restaurant** | `deal_redemptions_per_day` | 10/day (Silver), 50/day (Gold) | `supplier_deals` feature; **`promotions` limit key is n/a** on restaurant plans |
+| **Free Trial** | (varies)                   | Low caps in free seeds         | See [SUBSCRIPTIONS.md](../monetization/SUBSCRIPTIONS.md)                        |
+
+Deal **boost** checkout uses separate `promotion_pricing_config` — not counted against the plan `promotions` cap unless product rules say otherwise.
+
 ## Promotion / deal types
 
 | Type                  | Order discount                                         |
@@ -91,7 +101,7 @@ Admin UI: **Admin → Deals** tab (`AdminDealsPanel`).
 
 - `promotion_pricing_config` — admin-configurable boost tiers (flat fee, per-day)
 - `deal_promotions.billing_status` — `pending`, `paid`, `waived`, etc. (payment stub: boosts activate with `waivePayment` until billing wired)
-- Feature gates: supplier `promotions`, restaurant `supplier_deals` (Bronze+ on paid tiers)
+- Feature gates: supplier `promotions`, restaurant `supplier_deals` (Silver+ on paid tiers)
 
 ## Background job
 
@@ -118,16 +128,16 @@ Automated coverage maps to `docs/qa/MANUAL_TEST_CHECKLIST.md` IDs below.
 
 ### API unit (Vitest)
 
-| File                                                       | Covers                                                           |
-| ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| `apps/api/src/services/promotions.service.test.js`         | Discount math, eligibility (RST-77, RST-78 order flows)          |
-| `apps/api/src/services/deal-lifecycle.service.test.js`     | Approval, visibility, ineligibility messages                     |
-| `apps/api/src/services/deal-promotions.service.test.js`    | Restaurant/audience targeting for sponsored deals (RST-76)       |
-| `apps/api/src/routes/promotions.routes.test.js`            | Admin pending/approve/reject/pricing (ADM Deals tab, API-22)     |
-| `apps/api/src/routes/promotions.supplier-security.test.js` | Supplier cannot access other tenants' deals                      |
-| `apps/api/src/routes/feature-gates.routes.test.js`         | `promotions` / `supplier_deals` 403 (GATE-S13, GATE-R19, API-21) |
-| `apps/api/src/routes/orders.routes.test.js`                | `appliedPromotion` on order detail (RST-81, API-23)              |
-| `apps/api/src/lib/limit-resolution.test.js`                | Free-tier `promotions` limit default for suppliers               |
+| File                                                       | Covers                                                                                                         |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/services/promotions.service.test.js`         | Discount math, eligibility (RST-77, RST-78 order flows)                                                        |
+| `apps/api/src/services/deal-lifecycle.service.test.js`     | Approval, visibility, ineligibility messages                                                                   |
+| `apps/api/src/services/deal-promotions.service.test.js`    | Restaurant/audience targeting for sponsored deals (RST-76)                                                     |
+| `apps/api/src/routes/promotions.routes.test.js`            | Admin pending/approve/reject/pricing (ADM Deals tab, API-22)                                                   |
+| `apps/api/src/routes/promotions.supplier-security.test.js` | Supplier cannot access other tenants' deals                                                                    |
+| `apps/api/src/routes/feature-gates.routes.test.js`         | `promotions` / `supplier_deals` — Free 403; Silver supplier 200 (GATE-S13); Silver restaurant deals (GATE-R19) |
+| `apps/api/src/routes/orders.routes.test.js`                | `appliedPromotion` on order detail (RST-81, API-23)                                                            |
+| `apps/api/src/lib/limit-resolution.test.js`                | Free-tier `promotions` limit default for suppliers                                                             |
 
 ### Web unit (Vitest)
 

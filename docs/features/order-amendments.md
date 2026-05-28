@@ -4,6 +4,8 @@
 
 After an order is placed, restaurants and suppliers can request structured changes (quantity, substitution, removal, delivery date, other). The counter-party accepts, rejects, or the requester cancels a pending request.
 
+**Plan gate:** `order_amendments` — **Silver+** (on in migration `0117` for Silver restaurant and supplier).
+
 ## Mutable order statuses
 
 Amendments are allowed while status is one of: `PLACED`, `PENDING_APPROVAL`, `ACKNOWLEDGED`, `PROCESSING`. Not allowed after `SHIPPED`, `DELIVERED`, etc.

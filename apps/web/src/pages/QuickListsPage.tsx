@@ -10,6 +10,13 @@ import {
   useGetQuickListQuery,
 } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import {
+  CardActionGrid,
+  CardStatusBadges,
+  cardActionBtnClass,
+  cardShellClass,
+  pageHeaderRowClass,
+} from '../components/ui/card-layout'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
@@ -300,7 +307,7 @@ export function QuickListsPage() {
         (apiError?.name === 'LIMIT_EXCEEDED'
           ? `Plan limit reached (${apiError?.details?.limitKey ?? 'limit'}). Upgrade for more.`
           : apiError?.name === 'FEATURE_NOT_AVAILABLE'
-            ? 'Scheduled quick lists require Bronze or higher on your current plan.'
+            ? 'Scheduled quick lists require Silver or higher on your current plan.'
             : 'Failed to schedule order')
       toast.error(message)
     }
@@ -504,7 +511,7 @@ export function QuickListsPage() {
         scheduledQuickListGate.limit === 1 &&
         scheduledQuickListGate.canUse && (
           <p className="text-sm text-[var(--text-muted)] rounded-lg border border-[var(--app-border)] px-4 py-3">
-            Free plan includes 1 scheduled quick list. Upgrade to Bronze for more scheduled lists
+            Free plan includes 1 scheduled quick list. Upgrade to Silver for more scheduled lists
             and full automation.
           </p>
         )}
@@ -519,14 +526,15 @@ export function QuickListsPage() {
             upgradeUrl="/app/settings?tab=subscription"
           />
         )}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className={pageHeaderRowClass}>
+        <div className="min-w-0">
           <h1 className="text-[21px] font-black text-[var(--text)]">Quick Lists</h1>
           <p className="text-[var(--text-muted)] mt-2">
             Create lists for recurring orders and save time
           </p>
         </div>
         <Button
+          className="shrink-0 whitespace-normal"
           onClick={() => setShowCreateDialog(true)}
           disabled={!quickListCreateGate.canUse}
           title={quickListCreateGate.message || undefined}
@@ -671,36 +679,35 @@ export function QuickListsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredLists.map((list: any) => (
-            <Card key={list.id} className="hover:shadow-lg transition-shadow relative">
-              {/* Scheduled Badge */}
-              {list.is_scheduled && list.status === 'ACTIVE' && (
-                <div className="absolute top-4 right-4">
-                  <Badge className="bg-[var(--mint)] text-white flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Scheduled
-                  </Badge>
-                </div>
-              )}
-              {list.is_scheduled && list.status === 'PAUSED' && (
-                <div className="absolute top-4 right-4">
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <Pause className="h-3 w-3" />
-                    Paused
-                  </Badge>
-                </div>
-              )}
-
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 pr-8">
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5 text-[var(--brand-mid)]" />
-                      {list.name}
+            <Card key={list.id} className={`${cardShellClass} hover:shadow-lg transition-shadow`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2 min-w-0">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="flex items-center gap-2 min-w-0 text-lg">
+                      <Package className="h-5 w-5 shrink-0 text-[var(--brand-mid)]" />
+                      <span className="truncate">{list.name}</span>
                     </CardTitle>
-                    <CardDescription className="mt-2">
+                    <CardDescription className="mt-1 truncate">
                       {list.description || 'No description'}
                     </CardDescription>
                   </div>
+                  <CardStatusBadges className="shrink-0 max-w-[45%] justify-end">
+                    {list.is_scheduled && list.status === 'ACTIVE' && (
+                      <Badge className="bg-[var(--mint)] text-white flex items-center gap-1 text-[10px] px-1.5 py-0">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        Scheduled
+                      </Badge>
+                    )}
+                    {list.is_scheduled && list.status === 'PAUSED' && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1 text-[10px] px-1.5 py-0"
+                      >
+                        <Pause className="h-3 w-3 shrink-0" />
+                        Paused
+                      </Badge>
+                    )}
+                  </CardStatusBadges>
                 </div>
               </CardHeader>
               <CardContent>
@@ -778,33 +785,43 @@ export function QuickListsPage() {
                     </div>
                   )}
 
-                  {/* Actions */}
-                  <div className="flex gap-2 flex-wrap">
+                  <CardActionGrid>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleViewDetails(list)}
-                      className="flex-1 min-w-[80px]"
+                      className={cardActionBtnClass()}
                     >
-                      <Eye className="h-4 w-4 mr-1" />
+                      <Eye className="h-4 w-4 mr-1 shrink-0" />
                       View
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleAddProducts(list.id)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAddProducts(list.id)}
+                      className={cardActionBtnClass({ iconOnly: true })}
+                      aria-label="Add products"
+                    >
                       <Plus className="h-4 w-4" />
                     </Button>
                     <Button
-                      className="flex-1"
                       size="sm"
                       onClick={() => handleOrderFromList(list.id)}
                       disabled={!list || !list.items || list.items.length === 0}
+                      className={cardActionBtnClass()}
                     >
-                      <ShoppingCart className="h-4 w-4 mr-1" />
+                      <ShoppingCart className="h-4 w-4 mr-1 shrink-0" />
                       Order
                     </Button>
-                  </div>
-
-                  {/* Schedule/Unschedule */}
-                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteList(list.id, list.name)}
+                      className={`${cardActionBtnClass({ iconOnly: true })} text-[var(--red)] hover:text-[var(--red)]`}
+                      aria-label="Delete list"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                     {(quickListSchedulingEnabled || list.is_scheduled) &&
                       (list.is_scheduled ? (
                         <>
@@ -812,16 +829,17 @@ export function QuickListsPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleScheduleOrder(list)}
-                            className="flex-1"
+                            className={cardActionBtnClass({ span: 'full' })}
                           >
-                            <Edit className="h-4 w-4 mr-1" />
+                            <Edit className="h-4 w-4 mr-1 shrink-0" />
                             Edit Schedule
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleUnschedule(list.id, list.name)}
-                            className="text-[var(--amber)] hover:text-[var(--amber-mid)]"
+                            className={`${cardActionBtnClass({ iconOnly: true })} text-[var(--amber)] hover:text-[var(--amber-mid)]`}
+                            aria-label="Pause schedule"
                           >
                             <Pause className="h-4 w-4" />
                           </Button>
@@ -831,7 +849,7 @@ export function QuickListsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleScheduleOrder(list)}
-                          className="flex-1"
+                          className={cardActionBtnClass({ span: 'full' })}
                           disabled={
                             !getQuickListScheduleGate(entitlementsData?.entitlements, false)
                               .canSchedule
@@ -841,19 +859,11 @@ export function QuickListsPage() {
                               .message || undefined
                           }
                         >
-                          <Clock className="h-4 w-4 mr-1" />
+                          <Clock className="h-4 w-4 mr-1 shrink-0" />
                           Schedule Order
                         </Button>
                       ))}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteList(list.id, list.name)}
-                      className="text-[var(--red)] hover:text-[var(--red)]"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  </CardActionGrid>
 
                   {list.created_at && (
                     <p className="text-xs text-[var(--text-muted)]">

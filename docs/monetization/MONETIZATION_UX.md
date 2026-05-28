@@ -49,6 +49,6 @@ The global **UpgradeModal** is opened via Redux: when `baseQueryWithUnwrap` in `
 
 - **Recommended badge:** `RecommendedBadge` component shows “Recommended” on the plan that matches GET /api/subscriptions/recommendation. Used in SubscriptionInfo (current plan) and UpgradeModal (comparison table header). Subtle style when reasonCode is CURRENT_BEST.
 - **Nav Upgrade CTA:** Single “Upgrade” button in Header; visible when plan is Free, or any usage ≥ 80%, or blocked events in last 7 days. Click opens UpgradeModal and records OPEN_UPGRADE with `metadata: { source: "nav_upgrade_cta", trigger: "free"|"near_limit"|"blocked" }`. Dot indicator when near-limit or blocked.
-- **Plan value copy:** `PLAN_SUBTITLES` in `lib/planComparison.ts` (Free: “Time-limited trial”, Bronze: “Starter”, …). Display name for code `free`: **Free Trial** via `formatPlanDisplayName()`. Shown in UpgradeModal, SubscriptionInfo, sidebar.
+- **Plan value copy:** `PLAN_SUBTITLES` in `lib/planComparison.ts` (Free: “Time-limited trial”, Silver: “Starter”, …). Display name for code `free`: **Free Trial** via `formatPlanDisplayName()`. Shown in UpgradeModal, SubscriptionInfo, sidebar.
 - **Free Trial expiry:** See [free-trial-expiry.md](../features/free-trial-expiry.md); manual QA **BIL-FT-\*** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md).
 - **Manual test notes:** [LAUNCH_POLISH.md](../operations/LAUNCH_POLISH.md).

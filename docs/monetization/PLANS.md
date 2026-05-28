@@ -4,7 +4,7 @@
 
 Supplify offers tiered subscription plans designed for **restaurants and suppliers** at various stages of growth. Plans are structured to provide value at every level, with clear upgrade paths and feature alignment.
 
-- **Same tiers for both:** Free, Bronze, Gold, and Platinum apply to restaurants and suppliers (plan type: `restaurant_and_supplier`).
+- **Same tiers for both:** Free, Silver, Gold, and Platinum apply to restaurants and suppliers (plan type: `restaurant_and_supplier`).
 - **Supplier limits:** Each tier defines limits for suppliers (e.g. products, warehouses, **chats_per_day**). Suppliers without an active subscription are auto-assigned the Free plan so chat and other features work (no "0/0" chat limit).
 - **API:** Both roles can use `GET /api/subscriptions/current` and `GET /api/subscriptions/usage/:meterType` (e.g. `chats_per_day`). See [SUPPLIER_FEATURES.md](SUPPLIER_FEATURES.md#-subscription--plan-suppliers).
 
@@ -47,44 +47,49 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 ---
 
-### 🥉 Bronze Plan
+### 🥉 Silver Plan
 
-**Best for:** Growing single-location restaurants
+**Best for:** Single-location restaurants and small suppliers (first paid tier after Free Trial)
 
 **Pricing:** $49/month or $490/year (save 2 months)
 
-**Limits:**
+**Restaurant limits:**
 
-- 3 restaurants
-- Up to 10 suppliers per restaurant
-- 1,000 products
-- 1 warehouse
+- 1 branch account (main location)
+- Up to 5 suppliers per restaurant
+- 250 inventory SKUs
 - 3 users
-- 1 GB storage
-- 2 branch accounts (main + 1 linked location)
+- 500 MB storage
 - 20 orders per day
-- 50 chats per day
+- 30 chats per day, 5 open conversations
+- 10 quick lists, 100 items per list, 3 scheduled quick lists
+- 10 deal redemptions per day (restaurant deal meter; not the supplier `promotions` limit)
 
-**Features:**
+**Supplier limits:**
 
-- Automated quick lists (weekly scheduling)
-- Smart reorder with 7-day history
+- 1 branch, 1 warehouse
+- 250 product SKUs
+- 3 users, 500 MB storage
+- 30 chats per day, 5 open conversations
+- Up to 3 active promotions
+
+**Features (restaurant & supplier):**
+
+- Automated quick lists (weekly scheduling, capped)
 - Real-time inventory management
-- Manual waste tracking
-- Photos-enabled receiving quality
-- Invoice payment recording
-- Multi-supplier chat
-- Basic KPI reports
-- Single-level approval/budgets
-- No multi-branch
-- Manual orders & invoices
-- Default plan features only
+- Manual waste entry (restaurant; no analytics dashboard)
+- Photos-enabled receiving quality (restaurant)
+- Invoice payment recording (restaurant)
+- Multi-supplier chat, order calendar
+- Basic KPI reports (route gating unchanged)
+- Supplier deals & reviews (restaurant)
+- Basic fulfillment (supplier; no driver management)
 - In-app + email notifications
-- Exports-only API integrations
 - 72-hour support SLA
-- No custom branding
+- No smart reorder, waitlist auto-promotion, advanced roles, activity log, API integrations, or custom branding
+- No multi-branch (restaurant) or multi-warehouse (supplier)
 
-**Use Case:** Single location with 1-3 suppliers, basic inventory needs
+**Use Case:** One location, small team, daily ordering without Gold-scale automation or analytics
 
 ---
 
@@ -94,17 +99,25 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 **Pricing:** $149/month or $1,490/year (save 2 months)
 
-**Limits:**
+**Restaurant limits:**
 
-- 10 restaurants
-- Unlimited suppliers
-- 1,000 inventory SKUs
-- 3 warehouses
-- 10 users
-- 5 GB storage
 - 3 branch accounts (main + 2 linked locations)
-- 50 orders per day
-- 200 chats per day
+- 15 users
+- 100 orders per day
+- Up to 30 suppliers
+- 3,000 inventory SKUs
+- 500 chats per day, 30 open conversations
+- 10 GB storage
+- 50 quick lists, 500 items per list, 15 scheduled quick lists
+- 50 deal redemptions per day
+
+**Supplier limits:**
+
+- 3 branch accounts, 3 warehouses
+- 15 users, 3,000 product SKUs
+- 500 chats per day, 30 open conversations
+- 10 GB storage
+- 25 active promotions
 
 **Features:**
 
@@ -116,7 +129,6 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 - Expense analytics
 - Group chat with file sharing
 - Usage & cost dashboards
-- Approval & budget caps
 - **Multi-branch support**
 - Warehouse pick & pack
 - Add-on toggles
@@ -135,20 +147,21 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 **Pricing:** $349/month or $3,490/year (save 2 months)
 
-**Limits:**
+**Restaurant limits:**
 
-- **Unlimited** restaurants
-- Unlimited suppliers
-- Unlimited products
-- Unlimited warehouses
-- Unlimited users
-- 20 GB storage
-- Unlimited orders/day
-- Unlimited chats/day
+- Unlimited branch accounts, users, orders/day, suppliers, inventory SKUs
+- Unlimited chats/day, open conversations, quick lists, deal redemptions
+- **30 GB** storage
 
-**Features:**
+**Supplier limits:**
 
-- **Everything in Gold PLUS:**
+- Unlimited branches, warehouses, users, product SKUs, chats, open conversations
+- Unlimited active promotions
+- **30 GB** storage
+
+**Features (catalog; some require future implementation — see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):**
+
+- **Everything in Gold PLUS (marketing):**
 - AI smart automation for quick lists
 - AI forecast with seasonality
 - Lot expiry tracking
@@ -158,7 +171,6 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 - All experimental features
 - Real-time media, read receipts in chat
 - Advanced forecasting & custom reports
-- Multi-level approvals
 - Central purchasing
 - Full fulfillment routing suite
 - Email + SMS + webhook notifications
@@ -172,13 +184,13 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 ## Upgrade Paths
 
-### Free → Bronze
+### Free → Silver
 
 **When:** You need more suppliers, products, or basic automation
 **Cost Impact:** +$49/month
-**Benefits:** Real-time inventory, smart reorder, basic reports
+**Benefits:** Higher limits, real-time inventory, quick list automation, basic reports
 
-### Bronze → Gold
+### Silver → Gold
 
 **When:** You open a second location or need multi-branch capabilities
 **Cost Impact:** +$100/month
@@ -197,7 +209,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 ### Branches (Restaurants Only)
 
 - **Free:** 1 location (main account only — no linked branch accounts)
-- **Bronze:** 2 locations (main + 1 linked branch account)
+- **Silver:** 1 location (main account only)
 - **Gold:** Up to 3 locations (main + 2 linked branch accounts)
 - **Platinum:** Unlimited locations
 
@@ -206,7 +218,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 ### Warehouses (Suppliers Only)
 
 - **Free:** 0 warehouses
-- **Bronze:** 1 warehouse
+- **Silver:** 1 warehouse
 - **Gold:** Up to 3 warehouses
 - **Platinum:** Unlimited warehouses
 
@@ -230,32 +242,39 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 ### Limits
 
-| Limit                           | Free  | Bronze | Gold      | Platinum  |
-| ------------------------------- | ----- | ------ | --------- | --------- |
-| **Branches** (restaurants)      | 1     | 2      | 3         | Unlimited |
-| **Warehouses** (suppliers)      | 0     | 1      | 3         | Unlimited |
-| **Users**                       | 1     | 3      | 10        | Unlimited |
-| **Orders / day**                | 3     | 20     | 50        | Unlimited |
-| **Suppliers per restaurant**    | 1     | 10     | Unlimited | Unlimited |
-| **Inventory SKUs** (restaurant) | 15    | 1,000  | 1,000     | Unlimited |
-| **Products / SKUs** (supplier)  | 15    | 1,000  | 1,000     | Unlimited |
-| **Chats / day**                 | 3     | 50     | 200       | Unlimited |
-| **Storage**                     | 50 MB | 1 GB   | 5 GB      | 20 GB     |
+| Limit                            | Free  | Silver | Gold  | Platinum  |
+| -------------------------------- | ----- | ------ | ----- | --------- |
+| **Branches** (restaurants)       | 1     | 1      | 3     | Unlimited |
+| **Warehouses** (suppliers)       | 0     | 1      | 3     | Unlimited |
+| **Users**                        | 1     | 3      | 15    | Unlimited |
+| **Orders / day**                 | 3     | 20     | 100   | Unlimited |
+| **Suppliers per restaurant**     | 1     | 5      | 30    | Unlimited |
+| **Inventory SKUs** (restaurant)  | 10    | 250    | 3,000 | Unlimited |
+| **Products / SKUs** (supplier)   | 10    | 250    | 3,000 | Unlimited |
+| **Chats / day**                  | 3     | 30     | 500   | Unlimited |
+| **Open conversations**           | 1     | 5      | 30    | Unlimited |
+| **Storage**                      | 50 MB | 500 MB | 10 GB | 30 GB     |
+| **Quick lists** (restaurant)     | 1     | 10     | 50    | Unlimited |
+| **Deal redemptions / day**       | 1     | 10     | 50    | Unlimited |
+| **Active promotions** (supplier) | 1     | 3      | 25    | Unlimited |
 
 ### Features
 
-| Feature                             | Free               | Bronze                 | Gold                           | Platinum                              |
+| Feature                             | Free               | Silver                 | Gold                           | Platinum                              |
 | ----------------------------------- | ------------------ | ---------------------- | ------------------------------ | ------------------------------------- |
 | **Chat**                            | Basic (1 supplier) | Multi-supplier         | Groups + files                 | Real-time + media + read receipts     |
 | **Reports**                         | ❌                 | Basic KPIs             | Usage & cost dashboards        | Advanced forecasting + custom reports |
-| **Smart Reorder**                   | ❌                 | ❌                     | Full (90-day trends)           | AI forecast + seasonality             |
+| **Smart Reorder**                   | ❌                 | ❌ (off on Silver)     | Full (90-day trends)           | AI forecast + seasonality             |
+| **Waitlist auto-promotion**         | ❌                 | ❌ (off on Silver)     | ✅                             | ✅                                    |
+| **Advanced roles**                  | ❌                 | ❌ (off on Silver)     | ✅                             | ✅                                    |
+| **Activity log**                    | ❌                 | ❌ (off on Silver)     | ✅                             | ✅                                    |
+| **Driver management** _(supplier)_  | ❌                 | ❌ (off on Silver)     | ✅                             | ✅                                    |
 | **Reservations** _(restaurant)_     | ❌                 | Basic (board + create) | Floor plan builder + analytics | Guest intelligence + VIP tracking     |
 | **Multi-Branch** _(restaurant)_     | ❌                 | ❌                     | ✅                             | Central purchasing                    |
 | **Inventory Management**            | Basic              | Real-time              | Multi-branch tracking          | Lot + expiry tracking                 |
 | **Waste Tracking**                  | ❌                 | Manual entry           | Analytics dashboard            | Cost vs. sales analytics              |
 | **Receiving Quality**               | Manual only        | Photos enabled         | Quality scoring                | Supplier performance reports          |
 | **Finance & Invoices**              | View only          | Record payments        | Expense analytics              | Advanced finance dashboard            |
-| **Approvals & Budgets**             | ❌                 | Single-level           | Approval + budget caps         | Multi-level approvals                 |
 | **Quick Lists**                     | Manual only        | Automated weekly       | Full schedule                  | AI smart automation                   |
 | **Fulfillment Tools** _(supplier)_  | Basic orders       | Manual + invoices      | Warehouse pick & pack          | Full routing suite                    |
 | **Disputes & Returns**              | ❌                 | ✅                     | ✅                             | ✅                                    |
@@ -265,7 +284,8 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 | **Order Calendar**                  | ❌                 | ✅                     | ✅                             | ✅                                    |
 | **Advanced Roles**                  | ❌                 | ❌                     | ✅                             | ✅                                    |
 | **Activity Log**                    | ❌                 | ❌                     | ✅                             | ✅                                    |
-| **Promotions & Deals** _(supplier)_ | ❌                 | ✅                     | ✅                             | ✅                                    |
+| **Promotions & Deals** _(supplier)_ | ❌                 | ✅ (max 3 active)      | ✅ (max 25 active)             | ✅ (unlimited active)                 |
+| **Deal redemptions** _(restaurant)_ | 1/day (Free)       | 10/day                 | 50/day                         | Unlimited                             |
 | **Notifications**                   | In-app only        | + Email                | + SMS                          | + Webhooks                            |
 | **API Integrations**                | ❌                 | ❌                     | API key access                 | Full API + webhooks                   |
 | **Support SLA**                     | Community          | 72h standard           | 24h priority                   | Same-day dedicated                    |
@@ -283,7 +303,7 @@ When downgrading to a plan with fewer resources:
 4. Clear dashboard showing what to resolve
 5. Upgrade prompt shown on locked features
 
-**Example:** Downgrading from Gold (3 branches) to Bronze (1 branch):
+**Example:** Downgrading from Gold (3 branches) to Silver (1 branch):
 
 - All 3 branches remain visible
 - Cannot create 4th branch
@@ -304,7 +324,7 @@ A: Orders are blocked with an upgrade prompt. Existing orders remain untouched.
 A: Contact admin for custom enterprise plans with tailored limits and features.
 
 **Q: Are there trials?**
-A: **Free Trial** (`free` plan) is time-limited (**3–7 days**, default 7). After expiry you can still log in and view data, but must upgrade to create or change operational records. Bronze may offer promotional trials separately. Gold/Platinum available on request.
+A: **Free Trial** (`free` plan) is time-limited (**3–7 days**, default 7). After expiry you can still log in and view data, but must upgrade to create or change operational records. Silver may offer promotional trials separately. Gold/Platinum available on request.
 
 **Q: How do I upgrade?**
 A: In your restaurant settings → Subscription, click Upgrade and follow the flow.

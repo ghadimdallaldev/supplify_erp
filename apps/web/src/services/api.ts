@@ -1,4 +1,8 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import {
+  normalizeAdminPlanUpdateResult,
+  type AdminPlanUpdateResult,
+} from '../lib/adminPlanSaveFeedback'
 import type {
   User,
   Product,
@@ -219,7 +223,6 @@ export const api = createApi({
     'QuickList',
     'Fulfillment',
     'Driver',
-    'Approvals',
     'Reviews',
     'Reports',
     'Disputes',
@@ -2012,102 +2015,6 @@ export const api = createApi({
       }),
     }),
 
-    // Approvals & budgets
-    getApprovalBudgets: builder.query<
-      { periods: Array<Record<string, unknown>> },
-      { branchId?: string; year?: string } | void
-    >({
-      query: (params) => ({
-        url: '/api/approvals/budgets',
-        params: params || {},
-      }),
-      providesTags: ['Approvals'],
-    }),
-    getApprovalBudgetUsage: builder.query<Record<string, unknown>, string>({
-      query: (id) => `/api/approvals/budgets/${id}/usage`,
-      providesTags: ['Approvals'],
-    }),
-    createApprovalBudget: builder.mutation<
-      { period: Record<string, unknown> },
-      Record<string, unknown>
-    >({
-      query: (body) => ({ url: '/api/approvals/budgets', method: 'POST', body }),
-      invalidatesTags: ['Approvals'],
-    }),
-    updateApprovalBudget: builder.mutation<
-      { period: Record<string, unknown> },
-      { id: string; body: Record<string, unknown> }
-    >({
-      query: ({ id, body }) => ({ url: `/api/approvals/budgets/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['Approvals'],
-    }),
-    deleteApprovalBudget: builder.mutation<{ deleted: boolean }, string>({
-      query: (id) => ({ url: `/api/approvals/budgets/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Approvals'],
-    }),
-    getApprovalRules: builder.query<{ rules: Array<Record<string, unknown>> }, void>({
-      query: () => '/api/approvals/rules',
-      providesTags: ['Approvals'],
-    }),
-    createApprovalRule: builder.mutation<
-      { rule: Record<string, unknown> },
-      Record<string, unknown>
-    >({
-      query: (body) => ({ url: '/api/approvals/rules', method: 'POST', body }),
-      invalidatesTags: ['Approvals'],
-    }),
-    updateApprovalRule: builder.mutation<
-      { rule: Record<string, unknown> },
-      { id: string; body: Record<string, unknown> }
-    >({
-      query: ({ id, body }) => ({ url: `/api/approvals/rules/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['Approvals'],
-    }),
-    deleteApprovalRule: builder.mutation<{ deactivated: boolean }, string>({
-      query: (id) => ({ url: `/api/approvals/rules/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Approvals'],
-    }),
-    getPendingApprovals: builder.query<{ approvals: Array<Record<string, unknown>> }, void>({
-      query: () => '/api/approvals/pending',
-      providesTags: ['Approvals', 'Order'],
-    }),
-    approveOrderRequest: builder.mutation<
-      { orderId: string; status: string },
-      { id: string; notes?: string }
-    >({
-      query: ({ id, notes }) => ({
-        url: `/api/approvals/requests/${id}/approve`,
-        method: 'POST',
-        body: { notes },
-      }),
-      invalidatesTags: ['Approvals', 'Order'],
-    }),
-    rejectOrderRequest: builder.mutation<
-      { orderId: string; status: string },
-      { id: string; notes: string }
-    >({
-      query: ({ id, notes }) => ({
-        url: `/api/approvals/requests/${id}/reject`,
-        method: 'POST',
-        body: { notes },
-      }),
-      invalidatesTags: ['Approvals', 'Order'],
-    }),
-    getOrderApprovalStatus: builder.query<
-      {
-        approval: Record<string, unknown> | null
-        orderStatus?: string
-        hasPendingApproval?: boolean
-      },
-      string
-    >({
-      query: (orderId) => `/api/orders/${orderId}/approval-status`,
-      providesTags: (_r, _e, id) => [
-        { type: 'Approvals', id },
-        { type: 'Order', id },
-      ],
-    }),
-
     // Reports
     getRestaurantReport: builder.query<
       { data: Array<Record<string, unknown>>; meta?: Record<string, unknown> },
@@ -2766,7 +2673,7 @@ export const api = createApi({
     }),
 
     // Admin Dashboard endpoints
-    getAdminOverview: builder.query<any, void>({
+    getAdminOverview: builder.query<import('../lib/adminOverview').AdminOverview, void>({
       query: () => '/api/admin-dashboard/overview',
       providesTags: ['Admin'],
     }),
@@ -2841,12 +2748,19 @@ export const api = createApi({
       }),
       invalidatesTags: ['Admin'],
     }),
-    updateAdminPlan: builder.mutation<SubscriptionPlan, { id: string; data: any }>({
+    updateAdminPlan: builder.mutation<
+      AdminPlanUpdateResult,
+      { id: string; data: Record<string, unknown> }
+    >({
       query: ({ id, data }) => ({
         url: `/api/admin-dashboard/plans/${id}`,
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (raw) =>
+        normalizeAdminPlanUpdateResult(
+          raw as AdminPlanUpdateResult | import('../types').SubscriptionPlan
+        ),
       invalidatesTags: ['Admin'],
     }),
     getAdminSubscriptions: builder.query<{ subscriptions: Subscription[] }, any>({
@@ -3237,19 +3151,6 @@ export const {
   useExtendAdminFreeTrialMutation,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,
-  useGetApprovalBudgetsQuery,
-  useGetApprovalBudgetUsageQuery,
-  useCreateApprovalBudgetMutation,
-  useUpdateApprovalBudgetMutation,
-  useDeleteApprovalBudgetMutation,
-  useGetApprovalRulesQuery,
-  useCreateApprovalRuleMutation,
-  useUpdateApprovalRuleMutation,
-  useDeleteApprovalRuleMutation,
-  useGetPendingApprovalsQuery,
-  useApproveOrderRequestMutation,
-  useRejectOrderRequestMutation,
-  useGetOrderApprovalStatusQuery,
   useGetRestaurantReportQuery,
   useGetSupplierReportQuery,
   useGetDisputesQuery,

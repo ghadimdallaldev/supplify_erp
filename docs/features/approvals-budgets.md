@@ -1,10 +1,18 @@
 # Approvals & budgets — removed
 
-**Status:** Removed from the product (2026-05). Not part of the MVP.
+**Removed:** 2026-05 (product direction). See [APPROVALS_BUDGETING_REMOVAL_AUDIT.md](../../APPROVALS_BUDGETING_REMOVAL_AUDIT.md) for full audit.
 
-- UI route `/app/approvals` removed
-- API `/api/approvals` unmounted from `server.js`
-- Plan key `approvals_budgets` stripped from subscription plans (migration `0114`)
-- Order approval gate in `approvals.service.js` is a no-op
+## What was removed
 
-Restaurants place orders without internal approval workflows or budget caps. Do not re-enable without an explicit product decision.
+- UI route `/app/approvals` and settings tab (pages deleted)
+- API `/api/approvals` (route module deleted; was unmounted from `server.js`)
+- `GET /api/orders/:id/approval-status`
+- Plan key `approvals_budgets` (migration `0114`)
+- Order approval gate on placement (no `PENDING_APPROVAL` for new orders)
+- Migration `0118` releases legacy stuck `PENDING_APPROVAL` orders
+
+## What remains (compatibility only)
+
+- DB tables: `approval_rules`, `budget_periods`, `budget_allocations`, `order_approvals` (not dropped)
+- Deal/promotion **admin** approval flows (unrelated feature)
+- Promotion **boost budget** fields on deals (unrelated)

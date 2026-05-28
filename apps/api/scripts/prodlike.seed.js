@@ -53,7 +53,7 @@ const rng = createSeededRng(SEED)
 // Plan IDs from migration 0022
 const PLAN_IDS = {
   free: '00000000-0000-0000-0000-000000000001',
-  bronze: '00000000-0000-0000-0000-000000000002',
+  silver: '00000000-0000-0000-0000-000000000002',
   gold: '00000000-0000-0000-0000-000000000003',
   platinum: '00000000-0000-0000-0000-000000000004',
 }
@@ -508,7 +508,7 @@ async function main() {
     console.log('   Team (settings): ' + teamCount)
 
     // --- Subscriptions (restaurants + suppliers) ---
-    const planCodes = ['free', 'bronze', 'gold', 'platinum']
+    const planCodes = ['free', 'silver', 'gold', 'platinum']
     const now = new Date()
     for (const r of restaurants) {
       const code = pick(rng, planCodes)

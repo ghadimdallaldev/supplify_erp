@@ -4,6 +4,9 @@
  *
  *   pnpm run log:tier-limits
  *   node apps/api/scripts/log-tier-limits.mjs
+ *
+ * Limit display: explicit -1 = unlimited; missing canonical key = n/a (not unlimited).
+ * Restaurant catalog excludes supplier-only `promotions` (use deal_redemptions_per_day).
  */
 import 'dotenv/config'
 import path from 'node:path'
@@ -14,6 +17,7 @@ import {
   RESTAURANT_LIMIT_KEYS,
   SUPPLIER_LIMIT_KEYS,
   HIDDEN_ENTITLEMENT_LIMIT_KEYS,
+  formatPlanLimitDisplay,
 } from '../src/lib/limit-resolution.js'
 import {
   RESTAURANT_FEATURE_KEYS,
@@ -28,11 +32,6 @@ const repoRoot = path.resolve(apiRoot, '../..')
 
 dotenv.config({ path: path.join(apiRoot, '.env') })
 dotenv.config({ path: path.join(repoRoot, 'docker', '.env') })
-
-function formatLimit(value) {
-  if (value === -1 || value === null || value === undefined) return 'unlimited'
-  return String(value)
-}
 
 function formatFeature(value) {
   if (value === true) return 'on'
@@ -90,9 +89,6 @@ async function main() {
 
   const tiers = [...new Set(plans.map((p) => p.code))].sort()
   printSection(`Tiers found (${tiers.join(', ')})`)
-  console.log(
-    'Marketing note: DB code "bronze" = Silver tier in seed/UI (see apps/api/scripts/seed/tierDefinitions.js)'
-  )
 
   for (const tenantType of ['RESTAURANT', 'SUPPLIER']) {
     const subset = plans.filter((p) => p.tenant_type === tenantType)
@@ -113,9 +109,10 @@ async function main() {
       console.log('Limits:')
       for (const key of sortKeys(limits, limitCanon)) {
         if (HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(key)) continue
+        const defined = Object.prototype.hasOwnProperty.call(limits, key)
         const v = limits[key]
         const marker = limitCanon.includes(key) ? '' : ' [extra]'
-        console.log(`  ${key}${marker}: ${formatLimit(v)}`)
+        console.log(`  ${key}${marker}: ${formatPlanLimitDisplay(v, { defined })}`)
       }
       console.log('Features:')
       for (const key of sortKeys(features, featureCanon)) {

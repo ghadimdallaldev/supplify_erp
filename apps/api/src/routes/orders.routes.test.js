@@ -59,12 +59,6 @@ vi.mock('../lib/subscription.js', () => ({
   buildLimitExceededPayload: vi.fn(),
 }))
 
-vi.mock('../services/approvals.service.js', () => ({
-  applyOrderApprovalGate: vi.fn().mockResolvedValue(null),
-  notifyApproverOfPendingOrder: vi.fn(),
-  getOrderApprovalStatus: vi.fn().mockResolvedValue(null),
-}))
-
 vi.mock('../services/promotions.service.js', () => ({
   applyBestPromotionToOrder: vi.fn().mockResolvedValue(null),
 }))

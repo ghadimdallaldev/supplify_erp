@@ -47,6 +47,6 @@ flowchart TB
 - **Invoices & payments** — Invoices tied to orders; restaurants pay and see analytics; suppliers track revenue and overdue.
 - **Reservations** — Restaurant reservation board and public booking portal.
 - **Chat** — Conversations between restaurants and suppliers, with daily message limits by plan.
-- **Subscriptions** — Each tenant has a plan (Free, Bronze, Gold, Platinum) with limits and features; admins can change plans and override limits.
+- **Subscriptions** — Each tenant has a plan (Free, Silver, Gold, Platinum) with limits and features; admins can change plans and override limits.
 
 This overview shows why one platform reduces friction: ordering, receiving, finance, and communication are connected, so both restaurants and suppliers get a single source of truth.

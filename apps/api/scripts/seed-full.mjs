@@ -62,7 +62,7 @@ runStep('Prod-like dataset (10 restaurants, 50 suppliers, orders, reservations, 
 
 runStep('Demo tenants (restaurant@supplify.com / supplier@supplify.com)', 'seed-demo-tenants.js')
 
-runStep('Plan-tier demos (Free / Silver·Bronze / Gold restaurants & suppliers)', 'seed-plan-tier-demos.js')
+runStep('Plan-tier demos (Free / Silver / Gold restaurants & suppliers)', 'seed-plan-tier-demos.js')
 
 runStep('Subscription billing (payment methods, grace & lock demos)', 'seed-billing.js')
 

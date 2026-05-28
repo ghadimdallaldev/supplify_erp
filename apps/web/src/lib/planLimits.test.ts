@@ -9,6 +9,10 @@ import {
   getSupplierPromotionGate,
   canBrowseSupplierDeals,
   getPlanLimitGate,
+  multiBranchEnabled,
+  getBranchAddGate,
+  canAddWarehouses,
+  warehousesFeatureEnabled,
 } from './planLimits'
 import type { Entitlements } from '../types'
 
@@ -156,5 +160,61 @@ describe('deal and promotion limits', () => {
     const gate = getPlanLimitGate(ent, 'deal_redemptions_per_day', 1)
     expect(gate.canUse).toBe(false)
     expect(gate.message).toContain('deal redemption')
+  })
+})
+
+describe('multi_branch feature gates', () => {
+  const entWithFeature = (multi_branch: unknown) =>
+    ({
+      plan: { name: 'Test', code: 'test' },
+      limits: { branches: 3 },
+      usage: { branches: 1 },
+      features: { multi_branch },
+    }) as Entitlements
+
+  it('enables for Gold (boolean true)', () => {
+    expect(multiBranchEnabled(entWithFeature(true))).toBe(true)
+    expect(getBranchAddGate(entWithFeature(true), 1).canAdd).toBe(true)
+  })
+
+  it('enables for Platinum (central_purchasing string)', () => {
+    expect(multiBranchEnabled(entWithFeature('central_purchasing'))).toBe(true)
+    expect(getBranchAddGate(entWithFeature('central_purchasing'), 1).canAdd).toBe(true)
+  })
+
+  it('blocks for Silver (false) at single-branch limit', () => {
+    const silver = {
+      plan: { name: 'Silver', code: 'silver' },
+      limits: { branches: 1 },
+      usage: { branches: 1 },
+      features: { multi_branch: false },
+    } as Entitlements
+    expect(multiBranchEnabled(silver)).toBe(false)
+    expect(getBranchAddGate(silver, 1).canAdd).toBe(false)
+    expect(getBranchAddGate(silver, 1).reason).toBe('at_limit')
+  })
+})
+
+describe('supplier warehouse free tier', () => {
+  it('warehouses feature off on Free', () => {
+    const ent = {
+      plan: { name: 'Free', code: 'free' },
+      limits: { warehouses: 0 },
+      usage: { warehouses: 0 },
+      features: { warehouses: false },
+    } as Entitlements
+    expect(warehousesFeatureEnabled(ent)).toBe(false)
+    expect(canAddWarehouses(ent, 0)).toBe(false)
+  })
+
+  it('allows first warehouse on Silver', () => {
+    const ent = {
+      plan: { name: 'Silver', code: 'silver' },
+      limits: { warehouses: 1 },
+      usage: { warehouses: 0 },
+      features: { warehouses: true },
+    } as Entitlements
+    expect(canAddWarehouses(ent, 0)).toBe(true)
+    expect(canAddWarehouses(ent, 1)).toBe(false)
   })
 })

@@ -3,7 +3,6 @@ import { assignDefaultRoleForTenant } from './rbac.js'
 import { ensureOrgSystemRoles, assignOrgUserRole } from './supplier-org.js'
 import { ensureRestaurantOrgSystemRoles, assignRestaurantOrgUserRole } from './restaurant-org.js'
 import { ensureTenantSystemRoles, assignOwnerRoleForUser } from './tenant-roles.js'
-import { createDefaultWarehouseForSupplier } from './warehouse-helpers.js'
 import { ensureKeycloakRealmRole } from './keycloak-admin.js'
 import { ConflictError, ValidationError } from '../middlewares/errorHandler.js'
 import {
@@ -82,8 +81,6 @@ async function completeSupplierRegistration(
      WHERE id = $2`,
     [organization.id, tenant.id]
   )
-
-  await createDefaultWarehouseForSupplier(client, tenant)
 
   await ensureOrgSystemRoles(organization.id, client)
   await ensureTenantSystemRoles(tenant.id, 'SUPPLIER', client)

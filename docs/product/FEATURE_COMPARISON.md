@@ -81,7 +81,7 @@
 
 | Feature                         | Supplier                                     | Restaurant                                 | Notes                                                             |
 | ------------------------------- | -------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
-| Subscription tiers              | ✅ Same plans (Free, Bronze, Gold, Platinum) | ✅ Same plans                              | Limits (chats_per_day, products, warehouses, etc.) apply to both. |
+| Subscription tiers              | ✅ Same plans (Free, Silver, Gold, Platinum) | ✅ Same plans                              | Limits (chats_per_day, products, warehouses, etc.) apply to both. |
 | View current plan               | ✅ GET /api/subscriptions/current            | ✅ GET /api/subscriptions/current          | Suppliers and restaurants both supported.                         |
 | View usage (e.g. chats_per_day) | ✅ GET /api/subscriptions/usage/:meterType   | ✅ GET /api/subscriptions/usage/:meterType | Daily chat limit enforced for both.                               |
 | Plan & usage in Settings        | ✅ Settings → Plan & usage tab               | ✅ Onboarding / subscription UI            | Suppliers see plan, limits, and upgrade prompt.                   |

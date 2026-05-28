@@ -1008,7 +1008,7 @@ router.post(
             details: {
               current: currentFollowCount,
               limit: limitCheck.limit,
-              requiredPlan: limitCheck.limit === 2 ? 'Bronze' : 'Gold',
+              requiredPlan: limitCheck.limit === 2 ? 'Silver' : 'Gold',
             },
           },
           requestId: req.requestId,

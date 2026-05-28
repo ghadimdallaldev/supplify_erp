@@ -37,7 +37,7 @@ describe('activateFreePlan', () => {
   describe('activateFreePlanFromPlans', () => {
     it('returns error when no free plan exists', async () => {
       const result = await activateFreePlanFromPlans(dispatch, [
-        { id: 'p1', code: 'bronze', name: 'Bronze' },
+        { id: 'p1', code: 'silver', name: 'Silver' },
       ])
       expect(result).toEqual({
         ok: false,

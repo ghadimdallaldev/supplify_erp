@@ -1,6 +1,6 @@
 # Tenant role system
 
-Plan feature key: `advanced_roles` (Bronze/Silver, Gold, and Platinum — not on Free).
+Plan feature key: `advanced_roles` (**Gold** and **Platinum** only — off on Free Trial and **Silver**).
 
 Named roles let restaurant and supplier tenants assign **Owner**, **Manager**, and other predefined system roles, or create **custom roles** with a permission checklist. Permission checks in the API still use the existing `permissions.js` keys; this feature adds per-tenant storage and management UI.
 
@@ -8,15 +8,15 @@ Named roles let restaurant and supplier tenants assign **Owner**, **Manager**, a
 
 ### Restaurant
 
-| Role            | Description            | Highlights                                                            |
-| --------------- | ---------------------- | --------------------------------------------------------------------- |
-| Owner           | Full access            | All restaurant permissions                                            |
-| Manager         | Operations & approvals | Orders, inventory, staff, receiving, chat                             |
-| Purchaser       | Ordering               | Orders, inventory view, receiving view, chat                          |
-| Accountant      | Finance                | Invoices, payments, orders view                                       |
-| Inventory Clerk | Stock & receiving      | Inventory + receiving manage                                          |
-| FOH Staff       | Reservations           | Reservations create/edit                                              |
-| Viewer          | Read-only              | View orders, invoices, inventory, reservations, staff, settings, chat |
+| Role            | Description       | Highlights                                                            |
+| --------------- | ----------------- | --------------------------------------------------------------------- |
+| Owner           | Full access       | All restaurant permissions                                            |
+| Manager         | Operations        | Orders, inventory, staff, receiving, chat                             |
+| Purchaser       | Ordering          | Orders, inventory view, receiving view, chat                          |
+| Accountant      | Finance           | Invoices, payments, orders view                                       |
+| Inventory Clerk | Stock & receiving | Inventory + receiving manage                                          |
+| FOH Staff       | Reservations      | Reservations create/edit                                              |
+| Viewer          | Read-only         | View orders, invoices, inventory, reservations, staff, settings, chat |
 
 ### Supplier (branch-level)
 

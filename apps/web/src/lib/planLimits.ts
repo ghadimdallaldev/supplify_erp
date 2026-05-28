@@ -27,6 +27,11 @@ export function featureEnabled(value: unknown): boolean {
   return Boolean(value)
 }
 
+/** Plan allows multi-branch (Gold boolean, Platinum tier string, Silver off). */
+export function multiBranchEnabled(entitlements: Entitlements | null | undefined): boolean {
+  return featureEnabled(entitlements?.features?.multi_branch)
+}
+
 export type BranchAddGate = {
   canAdd: boolean
   reason: 'ok' | 'at_limit' | 'feature_unavailable'
@@ -52,7 +57,7 @@ export function getBranchAddGate(
   }
 
   const limit = limitNumber(entitlements.limits?.branches)
-  const multiBranch = featureEnabled(entitlements.features?.multi_branch)
+  const multiBranch = multiBranchEnabled(entitlements)
 
   if (limit === 0) {
     if (currentCount > 0) {
@@ -136,7 +141,7 @@ export function canAddBranches(
   return getBranchAddGate(entitlements, currentCount).canAdd
 }
 
-/** Warehouse management feature (Bronze+). */
+/** Warehouse management feature (Silver+). */
 export function warehousesFeatureEnabled(entitlements: Entitlements | null | undefined): boolean {
   return featureEnabled(entitlements?.features?.warehouses)
 }
@@ -348,7 +353,7 @@ export function getQuickListScheduleGate(
       canSchedule: false,
       current: 0,
       limit: null,
-      message: 'Scheduled quick lists require Bronze or higher. Upgrade in Settings.',
+      message: 'Scheduled quick lists require Silver or higher. Upgrade in Settings.',
     }
   }
 

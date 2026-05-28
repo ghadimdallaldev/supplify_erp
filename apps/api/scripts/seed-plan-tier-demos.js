@@ -1,5 +1,5 @@
 /**
- * Demo restaurants & suppliers on Free, Bronze (Silver tier), Gold, and Platinum plans.
+ * Demo restaurants & suppliers on Free, Silver, Gold, and Platinum plans.
  * Does not remove prod-like or golden-fork demo tenants.
  *
  * Run: pnpm run seed:plan-tiers
@@ -11,20 +11,12 @@ import { dirname } from 'path'
 import { pool } from '../src/lib/db.js'
 import { isMainModule } from './lib/is-main.mjs'
 import { getScopedInsertShape, insertScopedLocation } from './seed/scopedLocation.js'
-import { applyPlanFeaturePatches } from './seed/tierDefinitions.js'
+import { applyPlanFeaturePatches, TIERS } from './seed/tierDefinitions.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SLUG_PREFIX = 'plan-demo-'
 const SEED_PASSWORD = process.env.SEED_ACCOUNTS_PASSWORD || 'Supplify1!'
-
-/** Bronze plan = "Silver" tier in product marketing. */
-const TIERS = [
-  { tier: 'free', planCode: 'free', label: 'Free' },
-  { tier: 'silver', planCode: 'bronze', label: 'Silver' },
-  { tier: 'gold', planCode: 'gold', label: 'Gold' },
-  { tier: 'platinum', planCode: 'platinum', label: 'Platinum' },
-]
 
 const RESTAURANTS = TIERS.map(({ tier, label }) => ({
   slug: `${SLUG_PREFIX}restaurant-${tier}`,
@@ -202,12 +194,12 @@ export async function seedPlanTierDemos() {
 
     await applyPlanFeaturePatches(client)
 
-    console.log('   Restaurants (Free / Silver·Bronze / Gold / Platinum):')
+    console.log('   Restaurants (Free / Silver / Gold / Platinum):')
     for (const def of RESTAURANTS) {
       const r = await seedRestaurant(client, def, branchShape)
       console.log(`     • ${r.email} → ${r.plan} plan`)
     }
-    console.log('   Suppliers (Free / Silver·Bronze / Gold / Platinum):')
+    console.log('   Suppliers (Free / Silver / Gold / Platinum):')
     for (const def of SUPPLIERS) {
       const s = await seedSupplier(client, def, warehouseShape)
       console.log(`     • ${s.email} → ${s.plan} plan`)
@@ -291,13 +283,12 @@ async function ensureKeycloakUsers() {
 }
 
 async function main() {
-  console.log('📊 Seeding plan-tier demo tenants (Free / Silver·Bronze / Gold / Platinum)...\n')
+  console.log('📊 Seeding plan-tier demo tenants (Free / Silver / Gold / Platinum)...\n')
   await seedPlanTierDemos()
   if (process.env.SKIP_KEYCLOAK !== 'true') {
     await ensureKeycloakUsers()
   }
   console.log('\n✅ Plan-tier demos ready. Log in with any email above and password Supplify1!')
-  console.log('   (Silver tier uses the Bronze plan in the database.)')
 }
 
 if (isMainModule(import.meta.url)) {

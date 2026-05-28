@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Enterprise** plan is for large chains, distributors, and organizations that need custom terms, SLAs, and scale beyond the standard Platinum tier. It is **not** available for self-serve signup or in the public plan selector. Only an **admin** can assign the Enterprise plan to a tenant.
+The **Enterprise** plan is for large chains, distributors, and organizations that need custom terms, SLAs, and scale beyond the standard Platinum tier (self-serve Platinum: unlimited operational meters, **30 GB** storage per migration `0120`). It is **not** available for self-serve signup or in the public plan selector. Only an **admin** can assign the Enterprise plan to a tenant.
 
 ## What Enterprise Gets
 

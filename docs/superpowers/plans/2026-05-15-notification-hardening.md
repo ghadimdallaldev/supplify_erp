@@ -12,25 +12,26 @@
 
 ## File Map
 
-| File | Action | Responsibility |
-|---|---|---|
-| `apps/api/src/services/whatsapp.service.js` | **Create** | No-op WhatsApp send skeleton |
-| `apps/api/src/services/whatsapp.service.test.js` | **Create** | Tests for skeleton |
+| File                                                                    | Action     | Responsibility                                     |
+| ----------------------------------------------------------------------- | ---------- | -------------------------------------------------- |
+| `apps/api/src/services/whatsapp.service.js`                             | **Create** | No-op WhatsApp send skeleton                       |
+| `apps/api/src/services/whatsapp.service.test.js`                        | **Create** | Tests for skeleton                                 |
 | `apps/api/db/migrations/0060_fix_notification_plan_feature_strings.sql` | **Create** | Rename sms→whatsapp in Gold/Platinum plan features |
-| `apps/api/db/migrations/0061_invoice_overdue_notified_at.sql` | **Create** | Add `overdue_notified_at` column to invoice table |
-| `apps/api/src/services/notification.service.js` | **Modify** | Tier enforcement + 3 new notify functions |
-| `apps/api/src/services/notification.service.test.js` | **Modify** | Tests for tier enforcement + new functions |
-| `apps/api/src/jobs/invoice-overdue.job.js` | **Create** | Daily job: mark + notify overdue invoices |
-| `apps/api/src/jobs/invoice-overdue.job.test.js` | **Create** | Tests for overdue job |
-| `apps/api/src/server.js` | **Modify** | Register invoice-overdue job on 24h interval |
-| `apps/api/src/routes/inventory.routes.js` | **Modify** | Fire `notifyOutOfStock` when qty drops to 0 |
-| `apps/api/src/routes/chat.routes.js` | **Modify** | Fire `notifyMessageReceived` after message insert |
+| `apps/api/db/migrations/0061_invoice_overdue_notified_at.sql`           | **Create** | Add `overdue_notified_at` column to invoice table  |
+| `apps/api/src/services/notification.service.js`                         | **Modify** | Tier enforcement + 3 new notify functions          |
+| `apps/api/src/services/notification.service.test.js`                    | **Modify** | Tests for tier enforcement + new functions         |
+| `apps/api/src/jobs/invoice-overdue.job.js`                              | **Create** | Daily job: mark + notify overdue invoices          |
+| `apps/api/src/jobs/invoice-overdue.job.test.js`                         | **Create** | Tests for overdue job                              |
+| `apps/api/src/server.js`                                                | **Modify** | Register invoice-overdue job on 24h interval       |
+| `apps/api/src/routes/inventory.routes.js`                               | **Modify** | Fire `notifyOutOfStock` when qty drops to 0        |
+| `apps/api/src/routes/chat.routes.js`                                    | **Modify** | Fire `notifyMessageReceived` after message insert  |
 
 ---
 
 ## Task 1: WhatsApp service skeleton
 
 **Files:**
+
 - Create: `apps/api/src/services/whatsapp.service.js`
 - Create: `apps/api/src/services/whatsapp.service.test.js`
 
@@ -110,6 +111,7 @@ git commit -m "feat(notifications): add WhatsApp service skeleton"
 ## Task 2: DB migration — fix Gold/Platinum notification plan strings
 
 **Files:**
+
 - Create: `apps/api/db/migrations/0060_fix_notification_plan_feature_strings.sql`
 
 - [ ] **Step 1: Create the migration**
@@ -160,11 +162,12 @@ import('./src/lib/db.js').then(async ({ query }) => {
 ```
 
 Expected output:
+
 ```
 code       | notif
 -----------|---------------------------
 free       | in_app_only
-bronze     | in_app_and_email
+Silver     | in_app_and_email
 gold       | email_and_whatsapp
 platinum   | email_whatsapp_webhook
 enterprise | email_and_whatsapp
@@ -182,6 +185,7 @@ git commit -m "feat(notifications): rename sms to whatsapp in Gold/Platinum plan
 ## Task 3: DB migration — invoice overdue_notified_at column
 
 **Files:**
+
 - Create: `apps/api/db/migrations/0061_invoice_overdue_notified_at.sql`
 
 - [ ] **Step 1: Create the migration**
@@ -227,6 +231,7 @@ git commit -m "feat(notifications): add overdue_notified_at column to invoice"
 ## Task 4: Tier enforcement in `sendNotification()`
 
 **Files:**
+
 - Modify: `apps/api/src/services/notification.service.js`
 - Modify: `apps/api/src/services/notification.service.test.js`
 
@@ -251,8 +256,12 @@ it('does NOT send email when tenant is on Free plan', async () => {
   getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
 
   queryMock
-    .mockResolvedValueOnce({ rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }] }) // prefs
-    .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }] }) // getUserContactInfo tenant
+    .mockResolvedValueOnce({
+      rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }],
+    }) // prefs
+    .mockResolvedValueOnce({
+      rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }],
+    }) // getUserContactInfo tenant
     .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com' }] }) // contact_info table
     .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] }) // getTenantIdForUser
     .mockResolvedValueOnce({ rows: [{ id: 'notif-1', title: 'Test' }] }) // INSERT notification_log
@@ -270,7 +279,7 @@ it('does NOT send email when tenant is on Free plan', async () => {
   expect(sendMail).not.toHaveBeenCalled()
 })
 
-it('sends email when tenant is on Bronze plan', async () => {
+it('sends email when tenant is on Silver plan', async () => {
   const { sendMail } = await import('./mailer.service.js')
   const { getEntitlements } = await import('../lib/subscription.js')
 
@@ -278,8 +287,12 @@ it('sends email when tenant is on Bronze plan', async () => {
   getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_and_email' } })
 
   queryMock
-    .mockResolvedValueOnce({ rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }] })
-    .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }] })
+    .mockResolvedValueOnce({
+      rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }],
+    })
+    .mockResolvedValueOnce({
+      rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }],
+    })
     .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com' }] })
     .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] })
     .mockResolvedValueOnce({ rows: [{ id: 'notif-1', title: 'New Order' }] })
@@ -304,8 +317,12 @@ it('defaults to in_app_only when entitlements fetch fails', async () => {
   getEntitlements.mockRejectedValue(new Error('DB error'))
 
   queryMock
-    .mockResolvedValueOnce({ rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }] })
-    .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }] })
+    .mockResolvedValueOnce({
+      rows: [{ email_enabled: true, in_app_enabled: true, notify_order_new: true }],
+    })
+    .mockResolvedValueOnce({
+      rows: [{ tenant_id: 'tenant-1', email: 'owner@test.com', phone: null }],
+    })
     .mockResolvedValueOnce({ rows: [{ email: 'owner@test.com' }] })
     .mockResolvedValueOnce({ rows: [{ tenant_id: 'tenant-1' }] })
     .mockResolvedValueOnce({ rows: [{ id: 'notif-1', title: 'New Order' }] })
@@ -375,7 +392,7 @@ async function getTenantIdForUser(userId, userType) {
      FROM ${table} s
      JOIN app_user u ON u.email = s.contact_email
      WHERE u.id = $1`,
-    [userId],
+    [userId]
   )
   return rows[0]?.tenant_id || null
 }
@@ -423,13 +440,13 @@ export async function sendNotification({
 Then replace the WhatsApp send block (the `if (channels.whatsapp && contact?.phone)` section) with:
 
 ```js
-    if (channels.whatsapp && contact?.phone) {
-      const waResult = await sendWhatsAppMessageService({ to: contact.phone, message })
-      results.sms = waResult.sent
-      // Store deep link in metadata for in-app display
-      const whatsappUrl = buildWhatsAppUrl(contact.phone, message)
-      if (whatsappUrl) metadataPayload.whatsappUrl = whatsappUrl
-    }
+if (channels.whatsapp && contact?.phone) {
+  const waResult = await sendWhatsAppMessageService({ to: contact.phone, message })
+  results.sms = waResult.sent
+  // Store deep link in metadata for in-app display
+  const whatsappUrl = buildWhatsAppUrl(contact.phone, message)
+  if (whatsappUrl) metadataPayload.whatsappUrl = whatsappUrl
+}
 ```
 
 - [ ] **Step 4: Run tests to confirm they pass**
@@ -452,6 +469,7 @@ git commit -m "feat(notifications): enforce subscription tier on email/WhatsApp 
 ## Task 5: Add three missing notify functions
 
 **Files:**
+
 - Modify: `apps/api/src/services/notification.service.js`
 - Modify: `apps/api/src/services/notification.service.test.js`
 
@@ -475,16 +493,24 @@ describe('notifyInvoiceOverdue', () => {
     queryMock.mockResolvedValueOnce({ rows: [{ id: 'supplier-user-1' }] })
     // For each sendNotification call (restaurant): prefs, contact tenant, contact table, tenantId, INSERT log, UPDATE log
     queryMock
-      .mockResolvedValueOnce({ rows: [{ email_enabled: true, in_app_enabled: true, notify_invoice_overdue: true }] })
-      .mockResolvedValueOnce({ rows: [{ tenant_id: 'r-tenant', email: 'rest@test.com', phone: null }] })
+      .mockResolvedValueOnce({
+        rows: [{ email_enabled: true, in_app_enabled: true, notify_invoice_overdue: true }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ tenant_id: 'r-tenant', email: 'rest@test.com', phone: null }],
+      })
       .mockResolvedValueOnce({ rows: [{ email: 'rest@test.com' }] })
       .mockResolvedValueOnce({ rows: [{ tenant_id: 'r-tenant' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'notif-r' }] })
       .mockResolvedValueOnce({ rowCount: 1 })
     // For supplier sendNotification: same pattern
     queryMock
-      .mockResolvedValueOnce({ rows: [{ email_enabled: true, in_app_enabled: true, notify_invoice_overdue: true }] })
-      .mockResolvedValueOnce({ rows: [{ tenant_id: 's-tenant', email: 'supp@test.com', phone: null }] })
+      .mockResolvedValueOnce({
+        rows: [{ email_enabled: true, in_app_enabled: true, notify_invoice_overdue: true }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ tenant_id: 's-tenant', email: 'supp@test.com', phone: null }],
+      })
       .mockResolvedValueOnce({ rows: [{ email: 'supp@test.com' }] })
       .mockResolvedValueOnce({ rows: [{ tenant_id: 's-tenant' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'notif-s' }] })
@@ -515,8 +541,12 @@ describe('notifyOutOfStock', () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ name: 'Tomatoes', supplier_id: 'supp-1' }] }) // product lookup
       .mockResolvedValueOnce({ rows: [{ id: 'supp-user-1' }] }) // user lookup
-      .mockResolvedValueOnce({ rows: [{ email_enabled: true, in_app_enabled: true, notify_out_of_stock: true }] })
-      .mockResolvedValueOnce({ rows: [{ tenant_id: 's-tenant', email: 'supp@test.com', phone: null }] })
+      .mockResolvedValueOnce({
+        rows: [{ email_enabled: true, in_app_enabled: true, notify_out_of_stock: true }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ tenant_id: 's-tenant', email: 'supp@test.com', phone: null }],
+      })
       .mockResolvedValueOnce({ rows: [{ email: 'supp@test.com' }] })
       .mockResolvedValueOnce({ rows: [{ tenant_id: 's-tenant' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'notif-1' }] })
@@ -540,8 +570,12 @@ describe('notifyMessageReceived', () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ supplier_id: 'supp-1', restaurant_id: 'rest-1' }] }) // conversation
       .mockResolvedValueOnce({ rows: [{ id: 'supp-user-1' }] }) // supplier user
-      .mockResolvedValueOnce({ rows: [{ email_enabled: true, in_app_enabled: true, notify_message_received: true }] })
-      .mockResolvedValueOnce({ rows: [{ tenant_id: 's-tenant', email: 'supp@test.com', phone: null }] })
+      .mockResolvedValueOnce({
+        rows: [{ email_enabled: true, in_app_enabled: true, notify_message_received: true }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ tenant_id: 's-tenant', email: 'supp@test.com', phone: null }],
+      })
       .mockResolvedValueOnce({ rows: [{ email: 'supp@test.com' }] })
       .mockResolvedValueOnce({ rows: [{ tenant_id: 's-tenant' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'notif-1' }] })
@@ -580,7 +614,7 @@ export async function notifyInvoiceOverdue(invoice) {
 
   const { rows: restaurantRows } = await query(
     `SELECT u.id FROM app_user u JOIN restaurant r ON r.contact_email = u.email WHERE r.id = $1`,
-    [invoice.restaurant_id],
+    [invoice.restaurant_id]
   )
   if (restaurantRows.length > 0) {
     promises.push(
@@ -594,13 +628,15 @@ export async function notifyInvoiceOverdue(invoice) {
         referenceId: invoice.id,
         referenceType: 'INVOICE',
         metadata: { invoice_number: invoice.invoice_number, due_date: invoice.due_date },
-      }).catch((err) => logger.error('notifyInvoiceOverdue restaurant failed', { err: err.message })),
+      }).catch((err) =>
+        logger.error('notifyInvoiceOverdue restaurant failed', { err: err.message })
+      )
     )
   }
 
   const { rows: supplierRows } = await query(
     `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-    [invoice.supplier_id],
+    [invoice.supplier_id]
   )
   if (supplierRows.length > 0) {
     promises.push(
@@ -614,7 +650,7 @@ export async function notifyInvoiceOverdue(invoice) {
         referenceId: invoice.id,
         referenceType: 'INVOICE',
         metadata: { invoice_number: invoice.invoice_number, due_date: invoice.due_date },
-      }).catch((err) => logger.error('notifyInvoiceOverdue supplier failed', { err: err.message })),
+      }).catch((err) => logger.error('notifyInvoiceOverdue supplier failed', { err: err.message }))
     )
   }
 
@@ -628,7 +664,7 @@ export async function notifyInvoiceOverdue(invoice) {
 export async function notifyOutOfStock({ productId, warehouseId, productName }) {
   const { rows: productRows } = await query(
     `SELECT p.name, p.supplier_id FROM product p WHERE p.id = $1`,
-    [productId],
+    [productId]
   )
   if (!productRows.length) return null
 
@@ -637,7 +673,7 @@ export async function notifyOutOfStock({ productId, warehouseId, productName }) 
 
   const { rows: userRows } = await query(
     `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-    [supplierId],
+    [supplierId]
   )
   if (!userRows.length) {
     logger.warn('No app_user found for supplier in notifyOutOfStock', { supplierId })
@@ -667,7 +703,7 @@ export async function notifyOutOfStock({ productId, warehouseId, productName }) 
 export async function notifyMessageReceived({ conversationId, senderType, messagePreview }) {
   const { rows: convRows } = await query(
     `SELECT supplier_id, restaurant_id FROM conversation WHERE id = $1`,
-    [conversationId],
+    [conversationId]
   )
   if (!convRows.length) return null
 
@@ -678,7 +714,7 @@ export async function notifyMessageReceived({ conversationId, senderType, messag
     // Notify supplier
     const { rows } = await query(
       `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-      [conv.supplier_id],
+      [conv.supplier_id]
     )
     if (!rows.length) return null
     recipientUserId = rows[0].id
@@ -688,7 +724,7 @@ export async function notifyMessageReceived({ conversationId, senderType, messag
     // Notify restaurant
     const { rows } = await query(
       `SELECT u.id FROM app_user u JOIN restaurant r ON r.contact_email = u.email WHERE r.id = $1`,
-      [conv.restaurant_id],
+      [conv.restaurant_id]
     )
     if (!rows.length) return null
     recipientUserId = rows[0].id
@@ -735,6 +771,7 @@ git commit -m "feat(notifications): add notifyInvoiceOverdue, notifyOutOfStock, 
 ## Task 6: Invoice overdue cron job
 
 **Files:**
+
 - Create: `apps/api/src/jobs/invoice-overdue.job.js`
 - Create: `apps/api/src/jobs/invoice-overdue.job.test.js`
 
@@ -763,14 +800,16 @@ describe('checkOverdueInvoices', () => {
 
     queryMock
       .mockResolvedValueOnce({
-        rows: [{
-          id: 'inv-1',
-          invoice_number: 'INV-001',
-          total_amount: 300,
-          due_date: '2026-04-01',
-          restaurant_id: 'rest-1',
-          supplier_id: 'supp-1',
-        }],
+        rows: [
+          {
+            id: 'inv-1',
+            invoice_number: 'INV-001',
+            total_amount: 300,
+            due_date: '2026-04-01',
+            restaurant_id: 'rest-1',
+            supplier_id: 'supp-1',
+          },
+        ],
       }) // SELECT overdue invoices
       .mockResolvedValueOnce({ rowCount: 1 }) // UPDATE status + notified_at
 
@@ -778,7 +817,7 @@ describe('checkOverdueInvoices', () => {
 
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('overdue_notified_at IS NULL'),
-      expect.any(Array),
+      expect.any(Array)
     )
     expect(notifyInvoiceOverdue).toHaveBeenCalledWith(expect.objectContaining({ id: 'inv-1' }))
     expect(result).toEqual({ processed: 1, notified: 1 })
@@ -821,7 +860,7 @@ export async function checkOverdueInvoices() {
      WHERE status IN ('ISSUED', 'PARTIALLY_PAID')
        AND due_date < CURRENT_DATE
        AND overdue_notified_at IS NULL`,
-    [],
+    []
   )
 
   logger.info('Invoice overdue job running', { count: overdueInvoices.length })
@@ -834,12 +873,15 @@ export async function checkOverdueInvoices() {
     try {
       await query(
         `UPDATE invoice SET status = 'OVERDUE', overdue_notified_at = NOW() WHERE id = $1`,
-        [invoice.id],
+        [invoice.id]
       )
       await notifyInvoiceOverdue(invoice)
       notified++
     } catch (err) {
-      logger.error('Failed to process overdue invoice', { invoiceId: invoice.id, error: err.message })
+      logger.error('Failed to process overdue invoice', {
+        invoiceId: invoice.id,
+        error: err.message,
+      })
     }
   }
 
@@ -867,6 +909,7 @@ git commit -m "feat(notifications): add invoice overdue daily job"
 ## Task 7: Register invoice-overdue job in server.js
 
 **Files:**
+
 - Modify: `apps/api/src/server.js`
 
 - [ ] **Step 1: Add import**
@@ -882,20 +925,20 @@ import { checkOverdueInvoices } from './jobs/invoice-overdue.job.js'
 In `server.js`, inside the `server.listen(PORT, () => { ... })` callback, add after the existing scheduled-orders block (after line 266):
 
 ```js
-  // Invoice overdue job — runs once daily (24h interval)
-  const INVOICE_OVERDUE_INTERVAL = 24 * 60 * 60 * 1000
+// Invoice overdue job — runs once daily (24h interval)
+const INVOICE_OVERDUE_INTERVAL = 24 * 60 * 60 * 1000
 
+checkOverdueInvoices().catch((err) => {
+  logger.error('Error in initial invoice overdue check:', err)
+})
+
+setInterval(() => {
   checkOverdueInvoices().catch((err) => {
-    logger.error('Error in initial invoice overdue check:', err)
+    logger.error('Error in invoice overdue check:', err)
   })
+}, INVOICE_OVERDUE_INTERVAL)
 
-  setInterval(() => {
-    checkOverdueInvoices().catch((err) => {
-      logger.error('Error in invoice overdue check:', err)
-    })
-  }, INVOICE_OVERDUE_INTERVAL)
-
-  logger.info('Invoice overdue job started (runs every 24h)')
+logger.info('Invoice overdue job started (runs every 24h)')
 ```
 
 - [ ] **Step 3: Verify server starts without errors**
@@ -921,6 +964,7 @@ git commit -m "feat(notifications): register invoice overdue job on 24h interval
 ## Task 8: Out-of-stock trigger in inventory.routes.js
 
 **Files:**
+
 - Modify: `apps/api/src/routes/inventory.routes.js`
 
 - [ ] **Step 1: Add the import**
@@ -928,10 +972,7 @@ git commit -m "feat(notifications): register invoice overdue job on 24h interval
 At the top of `inventory.routes.js`, add `notifyOutOfStock` to the existing notification service import:
 
 ```js
-import {
-  notifySupplierLowStock,
-  notifyOutOfStock,
-} from '../services/notification.service.js'
+import { notifySupplierLowStock, notifyOutOfStock } from '../services/notification.service.js'
 ```
 
 (If the file currently only imports `notifySupplierLowStock`, just add `notifyOutOfStock` to the destructure.)
@@ -941,15 +982,17 @@ import {
 In the inventory adjustment route handler, immediately after the existing low-stock check block (after the closing `}` of the `if (settings.length > 0 && newQty < settings[0].low_stock_threshold)` block, around line 376), add:
 
 ```js
-        // Out-of-stock trigger: fires once when qty transitions from >0 to 0
-        if (newQty <= 0 && currentQty > 0) {
-          const { rows: productNameRow } = await query('SELECT name FROM product WHERE id = $1', [productId])
-          notifyOutOfStock({
-            productId,
-            warehouseId: adjustmentData.warehouseId || null,
-            productName: productNameRow[0]?.name || null,
-          }).catch((err) => logger.warn('Out-of-stock notification failed', { err: err.message }))
-        }
+// Out-of-stock trigger: fires once when qty transitions from >0 to 0
+if (newQty <= 0 && currentQty > 0) {
+  const { rows: productNameRow } = await query('SELECT name FROM product WHERE id = $1', [
+    productId,
+  ])
+  notifyOutOfStock({
+    productId,
+    warehouseId: adjustmentData.warehouseId || null,
+    productName: productNameRow[0]?.name || null,
+  }).catch((err) => logger.warn('Out-of-stock notification failed', { err: err.message }))
+}
 ```
 
 - [ ] **Step 3: Run the inventory route tests to ensure nothing is broken**
@@ -972,6 +1015,7 @@ git commit -m "feat(notifications): fire notifyOutOfStock when stock reaches zer
 ## Task 9: Message-received trigger in chat.routes.js
 
 **Files:**
+
 - Modify: `apps/api/src/routes/chat.routes.js`
 
 - [ ] **Step 1: Add the import**
@@ -987,12 +1031,12 @@ import { notifyMessageReceived } from '../services/notification.service.js'
 In the message-send route handler, after `await query('COMMIT')` (around line 752) and before the socket emit block, add:
 
 ```js
-        // Notify the other party of the new message (fire-and-forget)
-        notifyMessageReceived({
-          conversationId,
-          senderType: req.userData.role,
-          messagePreview: messageData.content?.slice(0, 100) || '',
-        }).catch((err) => logger.warn('Message received notification failed', { err: err.message }))
+// Notify the other party of the new message (fire-and-forget)
+notifyMessageReceived({
+  conversationId,
+  senderType: req.userData.role,
+  messagePreview: messageData.content?.slice(0, 100) || '',
+}).catch((err) => logger.warn('Message received notification failed', { err: err.message }))
 ```
 
 - [ ] **Step 3: Run the chat route tests to ensure nothing is broken**

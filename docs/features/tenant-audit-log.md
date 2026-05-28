@@ -4,6 +4,8 @@
 
 Restaurant and supplier owners can review activity in their tenant via the unified `audit_logs` table (migration `0046`). Entries are scoped by `tenant_type` and `tenant_id`.
 
+**Plan gate:** `tenant_audit_log` — **Gold+** only (off on Free Trial and **Silver**). Settings → **Activity** tab hidden when disabled.
+
 ## API
 
 Requires auth and tenant context (`RESTAURANT` or `SUPPLIER`).

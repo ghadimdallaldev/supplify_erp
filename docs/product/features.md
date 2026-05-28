@@ -97,7 +97,7 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 | Order amendments     | Order detail                            | `/api/orders/:id/amendments`                | Plan `order_amendments`                                                    |
 | Tenant audit log     | Settings → Activity                     | `/api/audit`                                | Plan `tenant_audit_log`                                                    |
 
-**Verify:** Gold+ restaurant → Reports loads spend charts; supplier → Promotions CRUD. Tests: `reports.routes.test.js`, `disputes.routes.test.js`, `approvals.routes.test.js`.
+**Verify:** Gold+ restaurant → Reports loads spend charts; supplier → Promotions CRUD. Tests: `reports.routes.test.js`, `disputes.routes.test.js`.
 
 ## Fulfillment & supplier inventory
 

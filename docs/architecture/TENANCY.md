@@ -11,25 +11,29 @@ Supplify uses a multi-tenant architecture where each restaurant and supplier is 
 ### Restaurants
 
 Restaurants are the primary buyers in the Supplify marketplace. They:
+
 - Browse and order from suppliers
 - Track inventory across multiple branches
 - Receive goods and manage receiving
 - Generate reports and analytics
 
 **Subscription Model:**
-- Choose a plan (Free, Bronze, Gold, Platinum)
+
+- Choose a plan (Free, Silver, Gold, Platinum)
 - Plans differ in limits (branches, orders, products)
 - Features vary by tier
 
 ### Suppliers
 
 Suppliers are the sellers providing products to restaurants. They:
+
 - List products with pricing
 - Receive orders from restaurants
 - Manage warehouses and fulfillment
 - Track sales and inventory
 
 **Subscription Model:**
+
 - Same 4-tier plan structure
 - Plans differ in warehouses, products, and fulfillment features
 - Higher tiers unlock warehouse management and advanced fulfillment
@@ -54,12 +58,12 @@ The same owner signs in once and **switches accounts** from the header dropdown.
 
 Linked branch accounts count against the **parent** plan `branches` limit:
 
-| Plan | Linked branch accounts |
-|------|------------------------|
-| Free | 0 (primary account only) |
-| Bronze | 0–1 (single account) |
-| Gold | 2–3 (see plan catalog) |
-| Platinum | Unlimited |
+| Plan     | Linked branch accounts   |
+| -------- | ------------------------ |
+| Free     | 0 (primary account only) |
+| Silver   | 0–1 (single account)     |
+| Gold     | 2–3 (see plan catalog)   |
+| Platinum | Unlimited                |
 
 Free tier **cannot** create branch accounts. Paid tiers with `multi_branch` can.
 
@@ -80,12 +84,12 @@ Free tier **cannot** create branch accounts. Paid tiers with `multi_branch` can.
 
 ### API
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/branches` | List primary + linked accounts |
-| POST | `/api/branches` | Create linked branch account (paid + `multi_branch`) |
-| POST | `/api/branches/switch` | Set active account |
-| DELETE | `/api/branches/:childTenantId` | Unlink branch account |
+| Method | Path                           | Purpose                                              |
+| ------ | ------------------------------ | ---------------------------------------------------- |
+| GET    | `/api/branches`                | List primary + linked accounts                       |
+| POST   | `/api/branches`                | Create linked branch account (paid + `multi_branch`) |
+| POST   | `/api/branches/switch`         | Set active account                                   |
+| DELETE | `/api/branches/:childTenantId` | Unlink branch account                                |
 
 ### Legacy `branch` table
 
@@ -96,6 +100,7 @@ The older `branch` table (sub-locations within one tenant) remains in the schema
 ## Branches (legacy sub-location model — deprecated in UI)
 
 **Examples:**
+
 - "Joe's Pizza Downtown" (main branch)
 - "Joe's Pizza Uptown" (second branch)
 - "Joe's Pizza Express Airport" (third branch)
@@ -104,12 +109,12 @@ The older `branch` table (sub-locations within one tenant) remains in the schema
 
 Branch limits are enforced by subscription plan:
 
-| Plan | Branches Allowed |
-|------|-----------------|
-| Free | 1 (single location only) |
-| Bronze | 1 (single location only) |
-| Gold | 3 branches |
-| Platinum | Unlimited branches |
+| Plan     | Branches Allowed         |
+| -------- | ------------------------ |
+| Free     | 1 (single location only) |
+| Silver   | 1 (single location only) |
+| Gold     | 3 branches               |
+| Platinum | Unlimited branches       |
 
 ### Creating a Branch
 
@@ -129,6 +134,7 @@ Restaurants on Gold+ plans can create branches:
 ### Branch Functionality
 
 Each branch maintains:
+
 - **Separate inventory** - products tracked per branch
 - **Separate receiving** - deliveries logged per branch
 - **Separate analytics** - reports filtered by branch
@@ -136,11 +142,13 @@ Each branch maintains:
 - **Shared settings** - basic restaurant settings
 
 **Orders:**
+
 - Each order is placed for a specific branch
 - Branch ID is required on Gold/Platinum orders
 - Can filter orders by branch
 
 **Inventory:**
+
 - Branches track their own stock levels
 - Central view available (Gold+)
 - Cross-branch transfers (Platinum only)
@@ -148,12 +156,14 @@ Each branch maintains:
 ### Branch Scoping
 
 When a restaurant has multiple branches:
+
 - **Orders** must specify `branch_id`
 - **Inventory** movements track by branch
 - **Receiving** logs require branch
 - **Analytics** can filter by branch or show consolidated
 
-When a restaurant has only 1 branch (Free/Bronze):
+When a restaurant has only 1 branch (Free/Silver):
+
 - Branch ID is optional (auto-assigned to main branch)
 - No branch selector in UI
 - All data scoped to default branch
@@ -167,6 +177,7 @@ When a restaurant has only 1 branch (Free/Bronze):
 A **warehouse** is a fulfillment location for suppliers.
 
 **Examples:**
+
 - "Main Distribution Center" (primary warehouse)
 - "West Coast Warehouse" (regional)
 - "Fresh Produce Cold Storage" (specialized)
@@ -175,16 +186,16 @@ A **warehouse** is a fulfillment location for suppliers.
 
 Warehouse limits are enforced by subscription plan:
 
-| Plan | Warehouses Allowed |
-|------|-------------------|
-| Free | 0 (no warehouses) |
-| Bronze | 1 warehouse |
-| Gold | 3 warehouses |
+| Plan     | Warehouses Allowed   |
+| -------- | -------------------- |
+| Free     | 0 (no warehouses)    |
+| Silver   | 1 warehouse          |
+| Gold     | 3 warehouses         |
 | Platinum | Unlimited warehouses |
 
 ### Creating a Warehouse
 
-Suppliers on Bronze+ plans can create warehouses:
+Suppliers on Silver+ plans can create warehouses:
 
 1. Navigate to **Settings → Warehouses**
 2. Click "Add Warehouse"
@@ -201,17 +212,20 @@ Suppliers on Bronze+ plans can create warehouses:
 ### Warehouse Functionality
 
 Each warehouse maintains:
+
 - **Separate inventory** - stock levels per warehouse
 - **Separate fulfillment** - orders picked/packed per warehouse
 - **Capacity tracking** - available space (JSONB)
 - **Routing** - order fulfillment routes (Platinum)
 
 **Fulfillment:**
+
 - Orders assigned to nearest warehouse
 - Picking lists generated per warehouse
 - Packing optimized by warehouse
 
 **Inventory:**
+
 - Stock tracked per warehouse
 - Central view shows aggregated stock
 - Transfers between warehouses (Gold+)
@@ -219,12 +233,14 @@ Each warehouse maintains:
 ### Warehouse Scoping
 
 When a supplier has multiple warehouses:
+
 - **Fulfillment** routes to specific warehouse
 - **Inventory** movements require `warehouse_id`
 - **Picklists** scoped to warehouse
 - **Analytics** filter by warehouse
 
 When a supplier has no warehouses (Free plan):
+
 - Default "Unassigned" warehouse
 - No warehouse selector in UI
 - Inventory tracked without warehouse granularity
@@ -236,6 +252,7 @@ When a supplier has no warehouses (Free plan):
 ### Tenant Isolation
 
 Each tenant's data is completely isolated:
+
 - Cannot see other tenants' data
 - Cannot access other restaurants or suppliers
 - API calls scoped to authenticated tenant
@@ -245,11 +262,13 @@ Each tenant's data is completely isolated:
 ### Cross-Tenant Operations
 
 Allowed operations:
+
 - Restaurant ordering from Supplier (public catalog)
 - Chat messages between restaurant and supplier
 - Public reviews/ratings (future)
 
 Blocked operations:
+
 - Viewing supplier's internal inventory data (not in catalog)
 - Accessing other restaurant's orders
 - Seeing administrative settings
@@ -261,6 +280,7 @@ Blocked operations:
 ### How Plans Affect Tenancy
 
 Plans determine:
+
 - **Limits** - How many branches/warehouses/products you can have
 - **Features** - Which capabilities are enabled
 - **Scoping** - Whether multi-branch/warehouse functionality is available
@@ -268,12 +288,14 @@ Plans determine:
 **Example:** Free vs Gold Restaurant
 
 **Free Plan (1 branch):**
+
 - UI hides branch selector
 - All data scoped to "Main" branch
 - No branch-specific analytics
 - Orders don't require branch_id
 
 **Gold Plan (3 branches):**
+
 - UI shows branch selector
 - Inventory/orders/receiving all require branch_id
 - Branch-specific analytics tabs
@@ -320,12 +342,14 @@ GET /api/inventory?warehouse_id=xyz-789
 
 ### For Restaurants
 
-**Single Location (Free/Bronze):**
+**Single Location (Free/Silver):**
+
 - Sign up and start ordering
 - No branch management needed
 - All data automatically scoped to your location
 
 **Multiple Locations (Gold/Platinum):**
+
 - Create branches after upgrading
 - Each branch manages its own inventory and receiving
 - View consolidated or branch-specific reports
@@ -336,16 +360,19 @@ GET /api/inventory?warehouse_id=xyz-789
 ### For Suppliers
 
 **No Warehouses (Free):**
+
 - List products and fulfill from single location
 - No warehouse management
 - Streamlined for small suppliers
 
-**Single Warehouse (Bronze):**
+**Single Warehouse (Silver):**
+
 - Create warehouse
 - Assign products to warehouse
 - Orders fulfilled from warehouse
 
 **Multiple Warehouses (Gold/Platinum):**
+
 - Create multiple warehouses
 - Products assigned to warehouses
 - Fulfillment routes automatically
@@ -356,15 +383,18 @@ GET /api/inventory?warehouse_id=xyz-789
 ## Troubleshooting
 
 **Issue:** Can't create branch/warehouse
+
 - **Check:** Current plan allows additional units?
 - **Check:** Usage counter says you're at limit?
 - **Fix:** Upgrade plan or contact admin for override
 
 **Issue:** Orders don't have branch_id on multi-branch tenant
+
 - **Fix:** Always specify branch_id in order API calls
 - **Note:** UI enforces this automatically
 
 **Issue:** Warehouse inventory shows 0 but products are assigned
+
 - **Check:** Products are assigned to correct warehouse?
 - **Check:** Capacity limits not exceeded?
 - **Fix:** Verify product-to-warehouse assignments
@@ -381,4 +411,3 @@ GET /api/inventory?warehouse_id=xyz-789
 ---
 
 Last Updated: [Current Date]
-

@@ -2,6 +2,8 @@
 
 Deep-dive docs per product area. The route map lives in [product/features.md](../product/features.md); enforcement keys in [FEATURE_CATALOG.md](../product/FEATURE_CATALOG.md).
 
+**Plan tiers & limits:** [SUBSCRIPTIONS.md](../monetization/SUBSCRIPTIONS.md) (canonical Silver catalog: migration `0117`) · [PLANS.md](../monetization/PLANS.md)
+
 | Doc                                                                      | Topic                                                      |
 | ------------------------------------------------------------------------ | ---------------------------------------------------------- |
 | [order-decline.md](./order-decline.md)                                   | Supplier decline with required reason; restaurant display  |

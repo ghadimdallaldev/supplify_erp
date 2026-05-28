@@ -24,10 +24,11 @@ Supplify provides comprehensive supplier management features for F&B suppliers t
 
 ## 📦 Subscription & plan (suppliers)
 
-Suppliers use the **same subscription tiers** as restaurants (Free, Bronze, Gold, Platinum). Each tier defines limits and features that apply to suppliers:
+Suppliers use the **same subscription tiers** as restaurants (Free, Silver, Gold, Platinum). Each tier defines limits and features that apply to suppliers:
 
-- **Chat:** Daily message limit per plan (e.g. Free: 10 chats/day). If a supplier has no subscription, the system auto-assigns the Free plan so chat and other features work.
-- **Products / warehouses:** Plan limits apply (e.g. Free: 50 products, 0 warehouses; higher tiers allow more).
+- **Chat:** Daily message limit per plan (e.g. Free Trial: 3/day; Silver: 30/day). If a supplier has no subscription, the system auto-assigns the Free plan so chat and other features work.
+- **Products / warehouses:** Plan limits apply (e.g. Free: 10 SKUs, 0 warehouses; Silver: 250 SKUs, 1 warehouse, up to 3 active promotions). See [SUBSCRIPTIONS.md](../monetization/SUBSCRIPTIONS.md).
+- **Restaurant `promotions` meter:** Not applicable — suppliers use the `promotions` limit for active deal count; restaurants use `deal_redemptions_per_day`.
 - **API:** Suppliers can call `GET /api/subscriptions/current`, `GET /api/subscriptions/usage/:meterType` (e.g. `chats_per_day`), and `GET /api/subscriptions/features/:featureKey` to see their plan and usage.
 - **Settings:** In **Settings → Plan & usage**, suppliers see their current plan, limits, and usage (e.g. chats used today).
 

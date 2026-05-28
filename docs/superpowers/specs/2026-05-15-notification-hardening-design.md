@@ -8,7 +8,7 @@
 
 ## Problem
 
-1. **Tier enforcement is absent.** `sendNotification()` sends email to every user regardless of plan. Free users should receive in-app notifications only; email is a Bronze+ feature; WhatsApp is a Gold+ feature.
+1. **Tier enforcement is absent.** `sendNotification()` sends email to every user regardless of plan. Free users should receive in-app notifications only; email is a Silver+ feature; WhatsApp is a Gold+ feature.
 2. **Three notification events have no trigger.** Invoice overdue, out-of-stock, and chat message received all have preference columns in the DB and are expected by users, but no code ever fires them.
 3. **WhatsApp has no service shape.** `lib/whatsapp.js` builds wa.me deep links. There is no `whatsapp.service.js` with a standard send interface, making future API integration unnecessarily invasive.
 4. **Plan feature strings are misleading.** Gold says `"email_and_sms"`, Platinum says `"email_sms_webhook"` — SMS is deprecated and WhatsApp is the intended channel.
@@ -55,13 +55,13 @@ getEntitlements(tenantId, tenantType)
 
 Channel resolution table:
 
-| `notifications` feature value | Allowed channels |
-|---|---|
-| `in_app_only` | `['in_app']` |
-| `in_app_and_email` | `['in_app', 'email']` |
-| `email_and_whatsapp` (Gold) | `['in_app', 'email', 'whatsapp']` |
+| `notifications` feature value       | Allowed channels                  |
+| ----------------------------------- | --------------------------------- |
+| `in_app_only`                       | `['in_app']`                      |
+| `in_app_and_email`                  | `['in_app', 'email']`             |
+| `email_and_whatsapp` (Gold)         | `['in_app', 'email', 'whatsapp']` |
 | `email_whatsapp_webhook` (Platinum) | `['in_app', 'email', 'whatsapp']` |
-| *(missing / unknown)* | `['in_app']` — safe default |
+| _(missing / unknown)_               | `['in_app']` — safe default       |
 
 User preferences are applied as an **additional opt-out layer**: a channel must be both in `allowedChannels` AND enabled in the user's preferences to fire.
 
@@ -148,15 +148,15 @@ Route / Job fires event
 
 ## Files Changed
 
-| File | Change |
-|---|---|
-| `apps/api/src/services/whatsapp.service.js` | **New** — skeleton send function |
-| `apps/api/src/services/notification.service.js` | Add tier enforcement + 3 new notify functions |
-| `apps/api/src/jobs/invoice-overdue.job.js` | **New** — daily cron job |
-| `apps/api/src/db/migrations/0059_fix_notification_plan_feature_strings.sql` | **New** — fix Gold/Platinum plan strings |
-| `apps/api/src/db/migrations/0060_invoice_overdue_notified_at.sql` | **New** — add column to invoice table |
-| `apps/api/src/routes/inventory.routes.js` | Add out-of-stock trigger after stock writes |
-| Chat routes / service | Add message-received trigger after insert |
+| File                                                                        | Change                                        |
+| --------------------------------------------------------------------------- | --------------------------------------------- |
+| `apps/api/src/services/whatsapp.service.js`                                 | **New** — skeleton send function              |
+| `apps/api/src/services/notification.service.js`                             | Add tier enforcement + 3 new notify functions |
+| `apps/api/src/jobs/invoice-overdue.job.js`                                  | **New** — daily cron job                      |
+| `apps/api/src/db/migrations/0059_fix_notification_plan_feature_strings.sql` | **New** — fix Gold/Platinum plan strings      |
+| `apps/api/src/db/migrations/0060_invoice_overdue_notified_at.sql`           | **New** — add column to invoice table         |
+| `apps/api/src/routes/inventory.routes.js`                                   | Add out-of-stock trigger after stock writes   |
+| Chat routes / service                                                       | Add message-received trigger after insert     |
 
 ---
 

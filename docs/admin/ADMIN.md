@@ -53,7 +53,7 @@ Navigate to `/app/admin` (visible only to users with ADMIN role).
 Shows all 4 Supplify plans:
 
 - Free Trial (`free` — time-limited, not forever-free)
-- Bronze ($49/mo)
+- Silver ($49/mo)
 - Gold ($149/mo)
 - Platinum ($349/mo)
 
@@ -70,17 +70,17 @@ To change what a plan includes:
 
 1. Navigate to **Plans** tab
 2. Click "Edit" on any plan
-3. Modify limits (e.g., change Bronze branch limit from 1 to 2)
-4. Modify features (e.g., enable multi-branch on Bronze)
+3. Modify limits (e.g., change Silver `orders_per_day` from 20 to 30)
+4. Modify features (e.g., enable `driver_management` on Silver for a pilot)
 5. Click "Save"
 
 **Impact:** All existing tenants on that plan inherit changes immediately.
 
-**Example:** Changing Bronze to include 2 branches
+**Example:** Raising Silver restaurant `deal_redemptions_per_day`
 
-- Before: Bronze tenants limited to 1 branch
-- After: Bronze tenants can create 2 branches
-- Existing tenants get access instantly
+- Before: 10 redemptions/day (migration `0117` default)
+- After: 15 redemptions/day
+- Existing Silver tenants pick up the new cap on next entitlement refresh (~30s)
 
 ### Editing Plan Pricing
 
@@ -276,7 +276,7 @@ Features are controlled directly through subscription plans. Each plan has a `fe
 **To Enable/Disable Features:**
 
 1. Admin → Plans
-2. Select plan (Free, Bronze, Gold, Platinum)
+2. Select plan (Free, Silver, Gold, Platinum)
 3. Edit plan features
 4. Update the features JSONB field
 5. Save changes
@@ -397,7 +397,7 @@ Shows:
 ### Audit Log Examples
 
 ```
-[2025-01-15 14:23] Admin upgraded Restaurant "Joe's Diner" from Bronze to Gold
+[2025-01-15 14:23] Admin upgraded Restaurant "Joe's Diner" from Silver to Gold
 - Changed by: admin@supplify.com
 - Impact: Limits increased (branches: 1→3, orders/day: 100→500)
 - Reason: Customer requested multi-location support

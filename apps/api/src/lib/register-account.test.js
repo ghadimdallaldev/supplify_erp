@@ -42,6 +42,18 @@ vi.mock('./supplier-org.js', () => ({
   invalidateOrgPermissionCaches: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('./workspace-membership.js', () => ({
+  getUserWorkspaceMembership: vi.fn().mockResolvedValue(null),
+  bindUserToWorkspace: vi.fn().mockResolvedValue(undefined),
+  resolveWorkspaceScope: vi.fn().mockImplementation((_type, { organizationId, tenantId }) =>
+    Promise.resolve({
+      workspaceType: _type,
+      organizationId,
+      homeTenantId: tenantId,
+    })
+  ),
+}))
+
 describe('register-account', () => {
   beforeEach(() => {
     mockQuery.mockReset()
@@ -82,7 +94,7 @@ describe('register-account', () => {
 
       mockQuery
         .mockResolvedValueOnce({ rows: [{ id: 'u1', role: 'PENDING' }] })
-        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] }) // existing tenant by email
 
       mockClientQuery.mockImplementation(async (sql) => {
         const text = typeof sql === 'string' ? sql : ''
@@ -120,7 +132,7 @@ describe('register-account', () => {
 
       mockQuery
         .mockResolvedValueOnce({ rows: [{ id: 'u2', role: 'PENDING' }] })
-        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] }) // existing tenant by email
 
       mockClientQuery.mockImplementation(async (sql) => {
         const text = typeof sql === 'string' ? sql : ''
@@ -152,6 +164,9 @@ describe('register-account', () => {
         'SUPPLIER',
         'free'
       )
+
+      const { createDefaultWarehouseForSupplier } = await import('./warehouse-helpers.js')
+      expect(createDefaultWarehouseForSupplier).not.toHaveBeenCalled()
     })
   })
 })

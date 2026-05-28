@@ -42,4 +42,13 @@ describe('buildOrderTimeline', () => {
     expect(placed?.state).not.toBe('current')
     expect(placed?.state).not.toBe('upcoming')
   })
+
+  it('does not show a separate approval step for legacy PENDING_APPROVAL', () => {
+    const events = buildOrderTimeline({
+      order: { ...baseOrder, status: 'PENDING_APPROVAL' },
+      viewerRole: 'RESTAURANT',
+    })
+    expect(events.find((e) => e.id === 'approval')).toBeUndefined()
+    expect(events.find((e) => e.id === 'placed')?.state).toBe('current')
+  })
 })

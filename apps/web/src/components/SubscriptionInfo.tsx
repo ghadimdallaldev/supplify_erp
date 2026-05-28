@@ -31,25 +31,7 @@ import {
   getPlanTierDisabledFeatures,
 } from '../lib/externallyControlledFeatures'
 import { shouldShowEntitlementLimit } from '../lib/planLimits'
-
-const LIMIT_LABELS: Record<string, string> = {
-  branches: 'Branch accounts',
-  users: 'Users',
-  orders_per_day: 'Orders (today)',
-  suppliers_per_restaurant: 'Suppliers',
-  restaurant_inventory_skus: 'Inventory SKUs',
-  warehouses: 'Warehouses',
-  supplier_products_skus: 'Products',
-  chats_per_day: 'Messages (today)',
-  storage_mb: 'Storage (MB)',
-  promotions: 'Deals & promotions',
-  open_conversations: 'Open chats',
-}
-
-const SUPPLIER_LIMIT_LABELS: Record<string, string> = {
-  ...LIMIT_LABELS,
-  open_conversations: 'Chats',
-}
+import { getLimitLabel as getPlanLimitLabel } from '../lib/planComparison'
 
 /** Usage rows shown first in settings (supplier vs restaurant). */
 const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
@@ -76,8 +58,10 @@ const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
 }
 
 function getLimitLabel(tenantType: string, limitKey: string): string {
-  const labels = tenantType === 'SUPPLIER' ? SUPPLIER_LIMIT_LABELS : LIMIT_LABELS
-  return labels[limitKey] ?? limitKey.replace(/_/g, ' ')
+  if (tenantType === 'SUPPLIER' && limitKey === 'open_conversations') {
+    return 'Chats'
+  }
+  return getPlanLimitLabel(limitKey)
 }
 
 export function SubscriptionInfo() {

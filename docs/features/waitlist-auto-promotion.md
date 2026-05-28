@@ -1,6 +1,8 @@
 # Waitlist Auto-Promotion
 
-When a reservation is **cancelled**, the system automatically offers the next matching waitlist guest a table. Guests receive email/WhatsApp links to accept or decline within **2 hours**. Expired offers roll to the next person in queue.
+When a reservation is **cancelled**, the system automatically offers the next matching waitlist guest a table.
+
+**Plan gate:** `waitlist_auto_promo` — **Gold+** on restaurant plans. **Silver** and **Free** do not auto-offer on cancel (manual promote may still be available where implemented). See migration `0117_silver_tier_limits_features.sql`. Guests receive email/WhatsApp links to accept or decline within **2 hours**. Expired offers roll to the next person in queue.
 
 ## Flow
 

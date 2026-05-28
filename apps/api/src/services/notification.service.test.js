@@ -161,7 +161,7 @@ describe('Notification Service', () => {
       expect(sendMail).not.toHaveBeenCalled()
     })
 
-    it('sends email when tenant is on Bronze plan', async () => {
+    it('sends email when tenant is on Silver plan', async () => {
       const { sendMail } = await import('./mailer.service.js')
       const { getEntitlements } = await import('../lib/subscription.js')
 

@@ -55,8 +55,8 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | SETUP-01 | Stop all running services (`Ctrl+C` in each terminal or `pnpm run dev` teardown)                                                                               | No API or web process running on ports 3001/5173                                                                                                                                                 | pass  |
 | SETUP-02 | Drop and recreate the database: run your project's DB reset script (e.g. `pnpm run db:reset` or `psql -c "DROP DATABASE supplify; CREATE DATABASE supplify;"`) | Clean empty database; no tables                                                                                                                                                                  | pass  |
 | SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All migrations apply (incl. `0104_user_workspace_membership`); no errors                                                                                                                         | pass  |
-| SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Bronze, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;` | pass  |
-| SETUP-05 | Verify plan feature patches applied: `SELECT code, tenant_type, features FROM subscription_plan WHERE tenant_type = 'RESTAURANT';`                             | All plans have `order_calendar`, `disputes_returns`, `advanced_roles` present in features JSON                                                                                                   | pass  |
+| SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Silver, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;` | pass  |
+| SETUP-05 | Verify plan catalog (post `0117`): `pnpm run log:tier-limits` or query `subscription_plan` for `code = 'silver'`                                               | Silver restaurant: 1 branch, 20 orders/day, 5 suppliers, 250 SKUs, no `promotions` limit key; Silver supplier: 1 warehouse, `promotions` 3; `advanced_roles` false on Silver                     | pass  |
 | SETUP-06 | Start the API: `pnpm --filter @supplify/api dev`                                                                                                               | API listening; migrations logged; no crash on startup                                                                                                                                            | pass  |
 | SETUP-07 | Start the web: `pnpm --filter @supplify/web dev`                                                                                                               | Dev server running at `http://localhost:5173` (or configured port)                                                                                                                               | pass  |
 | SETUP-08 | Health check: `GET /api/health`                                                                                                                                | `{ status: "ok" }`                                                                                                                                                                               | pass  |
@@ -94,7 +94,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | CRST-06 | On `/app/activate`: inspect page                                                                                                              | Activation banner; **Activate free plan** and **Compare plans & pay** visible; no other app sections accessible | Pass  |
 | CRST-07 | Click **Activate free plan** (or **Compare plans & pay** → Free → confirm)                                                                    | Subscription Free ACTIVE; `pending_activation` cleared; redirected to dashboard                                 | Pass  |
 | CRST-08 | (Alt) Use upgrade modal: **Compare plans & pay** → Free tier **Activate free plan** → confirm (no card)                                       | Same as CRST-07                                                                                                 | pass  |
-| CRST-09 | (New session) Repeat CRST-01–CRST-04 with a second account; select **Bronze plan**; enter stub card `4242424242424242`, any future expiry/CVC | Subscription ACTIVE Bronze; redirected to dashboard                                                             | pass  |
+| CRST-09 | (New session) Repeat CRST-01–CRST-04 with a second account; select **Silver plan**; enter stub card `4242424242424242`, any future expiry/CVC | Subscription ACTIVE Silver; redirected to dashboard                                                             | pass  |
 | CRST-10 | (New session) Repeat with **Gold plan**                                                                                                       | Subscription ACTIVE Gold; redirected to dashboard                                                               | pass  |
 | CRST-11 | Verify `GET /api/subscriptions/entitlements/current` for each account                                                                         | `plan.code` matches the selected plan; `features` object reflects plan tier                                     | pass  |
 
@@ -111,11 +111,11 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | CRST-18 | Navigate to `/app/invoices`                   | **403 or paywall** — `finance_invoices` gated                   |       |
 | CRST-19 | Navigate to `/app/restaurant-inventory`       | **403 or paywall** — `inventory_management` gated               |       |
 
-## 1.4 Post-activation state (Bronze restaurant)
+## 1.4 Post-activation state (Silver restaurant)
 
 | ID      | Steps                                                | Expected                            | Pass? |
 | ------- | ---------------------------------------------------- | ----------------------------------- | ----- |
-| CRST-20 | Log in as Bronze restaurant; navigate to `/app/chat` | Chat UI loads; can send a message   |       |
+| CRST-20 | Log in as Silver restaurant; navigate to `/app/chat` | Chat UI loads; can send a message   |       |
 | CRST-21 | Navigate to `/app/quick-lists`                       | Quick lists load; can create a list |       |
 | CRST-22 | Navigate to `/app/receiving`                         | Receiving page loads                |       |
 | CRST-23 | Navigate to `/app/invoices`                          | Invoice list loads                  |       |
@@ -152,7 +152,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | CSUP-05  | On `/app/activate`: inspect page                              | **Activate free plan** and **Compare plans & pay** visible                      |       |
 | CSUP-06  | Click **Activate free plan** (no card required)               | Subscription Free ACTIVE; `pending_activation` cleared; redirected to dashboard |       |
 | CSUP-06b | (Alt) **Compare plans & pay** → Free → **Activate free plan** | Same as CSUP-06                                                                 |       |
-| CSUP-07  | (New session) Repeat with **Bronze plan** + stub card         | Bronze ACTIVE                                                                   |       |
+| CSUP-07  | (New session) Repeat with **Silver plan** + stub card         | Silver ACTIVE                                                                   |       |
 | CSUP-08  | (New session) Repeat with **Gold plan** + stub card           | Gold ACTIVE                                                                     |       |
 | CSUP-09  | `GET /api/subscriptions/entitlements/current` for each        | `plan.code` and `features` correct per plan                                     |       |
 
@@ -165,14 +165,14 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | CSUP-12 | Navigate to Settings → Warehouses tab            | Single warehouse allowed; adding a second warehouse blocked by plan |       |
 | CSUP-13 | Navigate to `/app/invoices`                      | **403 or paywall** — `finance_invoices` gated                       |       |
 
-## 2.4 Post-activation state (Bronze supplier)
+## 2.4 Post-activation state (Silver supplier)
 
-| ID      | Steps                                              | Expected                                                                 | Pass? |
-| ------- | -------------------------------------------------- | ------------------------------------------------------------------------ | ----- |
-| CSUP-14 | Log in as Bronze supplier; navigate to `/app/chat` | Chat UI loads                                                            |       |
-| CSUP-15 | Navigate to `/app/fulfillment`                     | Fulfillment page loads; driver dispatch, pick lists, routes tabs visible |       |
-| CSUP-16 | Navigate to `/app/invoices`                        | Invoice list loads                                                       |       |
-| CSUP-17 | Settings → Warehouses: add a second warehouse      | Blocked or allowed per Bronze plan limit; verify against plan definition |       |
+| ID      | Steps                                              | Expected                                                                                                               | Pass? |
+| ------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----- |
+| CSUP-14 | Log in as Silver supplier; navigate to `/app/chat` | Chat UI loads                                                                                                          |       |
+| CSUP-15 | Navigate to `/app/fulfillment`                     | Fulfillment page loads (manual fulfillment); **Driver dispatch** tab hidden or 403 (`driver_management` off on Silver) |       |
+| CSUP-16 | Navigate to `/app/invoices`                        | Invoice list loads                                                                                                     |       |
+| CSUP-17 | Settings → Warehouses: add a second warehouse      | **Blocked** — Silver allows 1 warehouse (`warehouses` limit); upgrade CTA                                              |       |
 
 ## 2.5 Post-activation state (Gold supplier)
 
@@ -188,55 +188,58 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 > These tests verify that each feature-gated route correctly blocks Free accounts, unblocks on the appropriate paid tier, and that admin overrides work correctly.
 >
-> **Required accounts:** Free restaurant, Bronze restaurant, Gold restaurant, Free supplier, Bronze supplier, Gold supplier, Admin.
+> **Required accounts:** Free restaurant, Silver restaurant, Gold restaurant, Free supplier, Silver supplier, Gold supplier, Admin.
+>
+> **Silver catalog reference:** migration `0117_silver_tier_limits_features.sql` · [SUBSCRIPTIONS.md](../monetization/SUBSCRIPTIONS.md)
 
 ## 3.1 Restaurant feature gates
 
-| ID       | Feature key            | Free account                                                           | Bronze account      | Gold account              | Pass? |
-| -------- | ---------------------- | ---------------------------------------------------------------------- | ------------------- | ------------------------- | ----- |
-| GATE-R01 | `chat`                 | `/app/chat` → 403/paywall                                              | Loads               | Loads                     |       |
-| GATE-R02 | `quick_lists`          | `/app/quick-lists` → 403/paywall                                       | Loads               | Loads                     |       |
-| GATE-R03 | `receiving_quality`    | `/app/receiving` → 403/paywall                                         | Loads               | Loads                     |       |
-| GATE-R04 | `finance_invoices`     | `/app/invoices` → 403/paywall                                          | Loads               | Loads                     |       |
-| GATE-R05 | `inventory_management` | `/app/restaurant-inventory` → 403/paywall                              | Loads               | Loads                     |       |
-| GATE-R06 | `order_calendar`       | Dashboard calendar widget → paywall; `GET /api/orders/calendar` → 403  | 200 + calendar data | 200 + calendar data       |       |
-| GATE-R07 | `disputes_returns`     | `GET /api/disputes` → 403                                              | 200                 | 200                       |       |
-| GATE-R08 | `advanced_roles`       | Settings → Team: no role management UI                                 | Available           | Available                 |       |
-| GATE-R09 | `reports`              | `GET /api/reports` → 403                                               | 403 (Gold+)         | 200                       |       |
-| GATE-R10 | `smart_reorder`        | Reorder suggestions API → 403                                          | 403 (Gold+)         | 200 or available          |       |
-| GATE-R11 | `waste_tracking`       | Inventory → Waste tab; `GET /api/restaurant-inventory/waste-analytics` | Available (Free+)   | Available                 |       |
-| GATE-R12 | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                                | Blocked (Gold+)     | Visible and loads         |       |
-| GATE-R13 | `order_amendments`     | Order amendment API → 403                                              | 403 (Gold+)         | 200                       |       |
-| GATE-R14 | `push_notifications`   | Push endpoint → 403                                                    | 403 (Gold+)         | 200                       |       |
-| GATE-R15 | `supplier_reviews`     | Reviews API → 403                                                      | 403 (Gold+)         | 200                       |       |
-| GATE-R16 | `custom_branding`      | Settings branding section → hidden or locked                           | Locked (Gold+)      | Branding upload available |       |
-| GATE-R17 | `multi_branch`         | Settings → Branches: cannot add 2nd branch                             | Limited by plan     | Higher branch limit       |       |
-| GATE-R18 | `feature_flags_access` | Tenant flag override API → 403                                         | 403 (Gold+)         | 200 (if UI exposed)       |       |
-| GATE-R19 | `supplier_deals`       | `/app/deals` → 403/paywall; `GET /api/promotions/active` → 403         | Loads               | Loads                     |       |
+| ID       | Feature key            | Free account                                                          | Silver account                     | Gold account                | Pass? |
+| -------- | ---------------------- | --------------------------------------------------------------------- | ---------------------------------- | --------------------------- | ----- |
+| GATE-R01 | `chat`                 | `/app/chat` → 403/paywall                                             | Loads                              | Loads                       |       |
+| GATE-R02 | `quick_lists`          | `/app/quick-lists` → 403/paywall                                      | Loads                              | Loads                       |       |
+| GATE-R03 | `receiving_quality`    | `/app/receiving` → 403/paywall                                        | Loads                              | Loads                       |       |
+| GATE-R04 | `finance_invoices`     | `/app/invoices` → 403/paywall                                         | Loads                              | Loads                       |       |
+| GATE-R05 | `inventory_management` | `/app/restaurant-inventory` → 403/paywall                             | Loads                              | Loads                       |       |
+| GATE-R06 | `order_calendar`       | Dashboard calendar widget → paywall; `GET /api/orders/calendar` → 403 | 200 + calendar data                | 200 + calendar data         |       |
+| GATE-R07 | `disputes_returns`     | `GET /api/disputes` → 403                                             | 200                                | 200                         |       |
+| GATE-R08 | `advanced_roles`       | Settings → Team: no role management UI                                | Hidden/locked (Gold+)              | Available                   |       |
+| GATE-R09 | `reports`              | `GET /api/reports` → 403                                              | 200 (`basic_kpis`)                 | 200                         |       |
+| GATE-R10 | `smart_reorder`        | Reorder suggestions API → 403                                         | 403 (Gold+)                        | 200 or available            |       |
+| GATE-R11 | `waste_tracking`       | Inventory → Waste tab; waste analytics                                | Manual entry only (`manual_entry`) | Analytics dashboard (Gold+) |       |
+| GATE-R12 | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                               | Hidden/locked (Gold+)              | Visible and loads           |       |
+| GATE-R13 | `order_amendments`     | Order amendment API → 403                                             | 200                                | 200                         |       |
+| GATE-R14 | `push_notifications`   | Push endpoint → 403                                                   | 200 (if VAPID configured)          | 200                         |       |
+| GATE-R15 | `supplier_reviews`     | Reviews API → 403                                                     | 200                                | 200                         |       |
+| GATE-R16 | `custom_branding`      | Settings branding section → hidden or locked                          | Locked (Gold+)                     | Branding upload available   |       |
+| GATE-R17 | `multi_branch`         | Settings → Branches: cannot add 2nd branch                            | 1 branch max (cannot add 2nd)      | Up to 3 branches            |       |
+| GATE-R18 | `feature_flags_access` | Tenant flag override API → 403                                        | 403 (Gold+)                        | 200 (if UI exposed)         |       |
+| GATE-R19 | `supplier_deals`       | `/app/deals` → 403/paywall; `GET /api/promotions/active` → 403        | Loads                              | Loads                       |       |
+| GATE-R20 | `waitlist_auto_promo`  | Cancel reservation → no auto-offer to waitlist                        | No auto-offer (Gold+)              | Auto-offer on cancel        |       |
 
 ## 3.2 Supplier feature gates
 
-| ID       | Feature key                         | Free account                                                   | Bronze account      | Gold account     | Pass? |
-| -------- | ----------------------------------- | -------------------------------------------------------------- | ------------------- | ---------------- | ----- |
-| GATE-S01 | `chat`                              | `/app/chat` → 403/paywall                                      | Loads               | Loads            |       |
-| GATE-S02 | `fulfillment_tools` / `fulfillment` | `/app/fulfillment` → 403/paywall                               | Loads               | Loads            |       |
-| GATE-S03 | `driver_management`                 | Driver dispatch tab → 403/hidden                               | Available           | Available        |       |
-| GATE-S04 | `finance_invoices`                  | `/app/invoices` → 403/paywall                                  | Loads               | Loads            |       |
-| GATE-S05 | `order_calendar`                    | Dashboard calendar → paywall; `GET /api/orders/calendar` → 403 | 200                 | 200              |       |
-| GATE-S06 | `disputes_returns`                  | `GET /api/disputes/incoming` → 200; Disputes nav visible       | 200                 | 200              |       |
-| GATE-S07 | `warehouses`                        | Settings → Warehouses: single warehouse only                   | Plan limit (e.g. 2) | Higher limit     |       |
-| GATE-S08 | `multi_warehouse`                   | Settings → multi-warehouse toggle hidden/locked                | Locked (Gold+)      | Toggle available |       |
-| GATE-S09 | `inventory_management`              | `/app/inventory` → 403 or locked                               | 403 (Gold+)         | Loads            |       |
-| GATE-S10 | `quick_lists`                       | `/app/quick-lists` → 403                                       | Loads               | Loads            |       |
-| GATE-S11 | `advanced_roles`                    | Settings → Team: no role management                            | Locked (Gold+)      | Available        |       |
-| GATE-S12 | `reports`                           | Reports API → 403                                              | 403 (Gold+)         | 200              |       |
-| GATE-S13 | `promotions`                        | Promotions API → 403                                           | 403 (Gold+)         | 200              |       |
-| GATE-S14 | `tenant_audit_log`                  | Settings → Activity tab → hidden                               | Locked (Gold+)      | Visible          |       |
-| GATE-S15 | `order_amendments`                  | Order amendment API → 403                                      | 403 (Gold+)         | 200              |       |
-| GATE-S16 | `push_notifications`                | Push endpoint → 403                                            | 403 (Gold+)         | 200              |       |
-| GATE-S17 | `multi_branch`                      | Settings → Branches: 1 branch only                             | Limited             | Higher limit     |       |
-| GATE-S18 | `feature_flags_access`              | Tenant flag override API → 403                                 | 403 (Gold+)         | 200              |       |
-| GATE-S19 | `custom_branding`                   | Branding section locked                                        | Locked (Gold+)      | Available        |       |
+| ID       | Feature key                         | Free account                                                   | Silver account           | Gold account     | Pass? |
+| -------- | ----------------------------------- | -------------------------------------------------------------- | ------------------------ | ---------------- | ----- |
+| GATE-S01 | `chat`                              | `/app/chat` → 403/paywall                                      | Loads                    | Loads            |       |
+| GATE-S02 | `fulfillment_tools` / `fulfillment` | `/app/fulfillment` → 403/paywall                               | Loads (no drivers)       | Loads            |       |
+| GATE-S03 | `driver_management`                 | Driver dispatch tab → 403/hidden                               | Hidden/403 (Gold+)       | Available        |       |
+| GATE-S04 | `finance_invoices`                  | `/app/invoices` → 403/paywall                                  | Loads                    | Loads            |       |
+| GATE-S05 | `order_calendar`                    | Dashboard calendar → paywall; `GET /api/orders/calendar` → 403 | 200                      | 200              |       |
+| GATE-S06 | `disputes_returns`                  | `GET /api/disputes/incoming` → 403                             | 200                      | 200              |       |
+| GATE-S07 | `warehouses`                        | Settings → Warehouses: 0 warehouses (Free)                     | 1 warehouse max          | Up to 3          |       |
+| GATE-S08 | `multi_warehouse`                   | Settings → multi-warehouse toggle hidden/locked                | Locked (Gold+)           | Toggle available |       |
+| GATE-S09 | `inventory_management`              | `/app/inventory` → 403 or locked                               | Loads                    | Loads            |       |
+| GATE-S10 | `quick_lists`                       | N/A (restaurant-only feature)                                  | N/A                      | N/A              |       |
+| GATE-S11 | `advanced_roles`                    | Settings → Team: no role management                            | Hidden/locked (Gold+)    | Available        |       |
+| GATE-S12 | `reports`                           | Reports API → 403                                              | 200 (`basic_kpis`)       | 200              |       |
+| GATE-S13 | `promotions`                        | Promotions API → 403                                           | 200 (max 3 active deals) | 200              |       |
+| GATE-S14 | `tenant_audit_log`                  | Settings → Activity tab → hidden                               | Hidden/locked (Gold+)    | Visible          |       |
+| GATE-S15 | `order_amendments`                  | Order amendment API → 403                                      | 200                      | 200              |       |
+| GATE-S16 | `push_notifications`                | Push endpoint → 403                                            | 200 (if configured)      | 200              |       |
+| GATE-S17 | `multi_branch`                      | Settings → Branches: 1 branch only                             | 1 branch max             | Higher limit     |       |
+| GATE-S18 | `feature_flags_access`              | Tenant flag override API → 403                                 | 403 (Gold+)              | 200              |       |
+| GATE-S19 | `custom_branding`                   | Branding section locked                                        | Locked (Gold+)           | Available        |       |
 
 ## 3.3 Admin feature flag overrides (for gated features)
 
@@ -260,7 +263,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 | ID       | Steps                                                         | Expected                                                              | Pass? |
 | -------- | ------------------------------------------------------------- | --------------------------------------------------------------------- | ----- |
-| GATE-U01 | Free restaurant → Settings → Subscription → upgrade to Bronze | Billing modal opens; stub card accepted; subscription becomes Bronze  |       |
+| GATE-U01 | Free restaurant → Settings → Subscription → upgrade to Silver | Billing modal opens; stub card accepted; subscription becomes Silver  |       |
 | GATE-U02 | After upgrade: navigate to `/app/chat`                        | Chat now loads (feature unlocked by plan upgrade)                     |       |
 | GATE-U03 | Admin → Subscriptions → downgrade that tenant back to Free    | Subscription becomes Free; `invalidateTenantSubscriptionCache` called |       |
 | GATE-U04 | Log in as that restaurant; navigate to `/app/chat`            | 403/paywall returns (feature re-locked)                               |       |
@@ -297,7 +300,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | BIL-01 | New restaurant after register — no payment            | `/app/activate`; pending activation banner                                |       |
 | BIL-02 | On activate page → **Compare plans & pay**            | Upgrade/payment modal; `/api/billing/`\* works (no 402)                   |       |
 | BIL-03 | Navigate to Orders/Dashboard while locked             | Redirect to `/app/activate` or 402 `ACCOUNT_LOCKED` + `pendingActivation` |       |
-| BIL-04 | Paid checkout (stub card) for Bronze/Gold             | Unlock; full app access                                                   |       |
+| BIL-04 | Paid checkout (stub card) for Silver/Gold             | Unlock; full app access                                                   |       |
 | BIL-05 | Admin → Subscriptions → **Activate** on locked tenant | Unlocked without payment                                                  |       |
 
 ## 4.4 Billing, subscriptions & overdue
@@ -314,19 +317,19 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 4.5 Plan limits & upgrade UX
 
-| ID      | Steps                                               | Expected                                               | Pass? |
-| ------- | --------------------------------------------------- | ------------------------------------------------------ | ----- |
-| PLN-01  | Free restaurant → Dashboard **Order calendar**      | Paywall + upgrade CTA; no broken URL / "Try again"     |       |
-| PLN-02  | Gold restaurant → Order calendar                    | Calendar loads; filters work                           |       |
-| PLN-03  | Hit daily order limit (or seed at limit)            | Block message; upgrade modal with limit label          |       |
-| PLN-04  | Hit chat limit                                      | Send blocked; upgrade nudge                            |       |
-| PLN-05  | Add branch over plan limit                          | Gate message references `multi_branch` / branch limit  |       |
-| PLN-06  | Supplier add warehouse over limit                   | Warehouse gate from plan                               |       |
-| PLN-06a | Bronze supplier → add 2nd warehouse (if limit is 1) | Blocked or upgrade CTA (`warehouses` limit)            |       |
-| PLN-06b | Gold supplier → enable multi-warehouse              | Settings toggle; routing rules API; split order badges |       |
-| PLN-06c | Supplier org → add branch over plan limit           | `multi_branch` / branch limit message                  |       |
-| PLN-07  | Gold/Platinum → custom branding in settings         | Logo/colors upload (Gold); white-label if Platinum     |       |
-| PLN-08  | Header **Plans** button                             | Upgrade/browse modal; plan comparison table            |       |
+| ID      | Steps                                          | Expected                                                  | Pass? |
+| ------- | ---------------------------------------------- | --------------------------------------------------------- | ----- |
+| PLN-01  | Free restaurant → Dashboard **Order calendar** | Paywall + upgrade CTA; no broken URL / "Try again"        |       |
+| PLN-02  | Gold restaurant → Order calendar               | Calendar loads; filters work                              |       |
+| PLN-03  | Hit daily order limit (or seed at limit)       | Block message; upgrade modal with limit label             |       |
+| PLN-04  | Hit chat limit                                 | Send blocked; upgrade nudge                               |       |
+| PLN-05  | Add branch over plan limit                     | Gate message references `multi_branch` / branch limit     |       |
+| PLN-06  | Supplier add warehouse over limit              | Warehouse gate from plan                                  |       |
+| PLN-06a | Silver supplier → add 2nd warehouse            | **Blocked** — Silver `warehouses` limit is 1; upgrade CTA |       |
+| PLN-06b | Gold supplier → enable multi-warehouse         | Settings toggle; routing rules API; split order badges    |       |
+| PLN-06c | Supplier org → add branch over plan limit      | `multi_branch` / branch limit message                     |       |
+| PLN-07  | Gold/Platinum → custom branding in settings    | Logo/colors upload (Gold); white-label if Platinum        |       |
+| PLN-08  | Header **Plans** button                        | Upgrade/browse modal; plan comparison table               |       |
 
 ## 4.6 Free Trial expiry (read-only lock)
 
@@ -349,7 +352,7 @@ WHERE id = '<subscription_id>';
 | BIL-FT-03 | Open `/app/products` or supplier catalog                                  | List/detail **GET** works                                                                        |       |
 | BIL-FT-04 | Try place order / POST cart checkout / create product                     | **402**; message: _Your Free Trial has expired. Upgrade your plan to continue using Supplify._   |       |
 | BIL-FT-05 | `GET /api/billing/status` while locked                                    | **200**; `access.isLocked` true; `freeSandboxExpired` or `lockReason === 'free_sandbox_expired'` |       |
-| BIL-FT-06 | `POST /api/billing/checkout` (upgrade to Bronze)                          | Allowed (billing exempt from lock)                                                               |       |
+| BIL-FT-06 | `POST /api/billing/checkout` (upgrade to Silver)                          | Allowed (billing exempt from lock)                                                               |       |
 | BIL-FT-07 | Settings → Subscription tab                                               | Shows **Free Trial** label; expired copy; upgrade path                                           |       |
 | BIL-FT-08 | Admin → Platform settings → set trial length **2** or **10**              | Validation error; only **3–7** accepted                                                          |       |
 | BIL-FT-09 | Admin → Platform settings → save **7** days                               | Persists; new Free activations use clamped value                                                 |       |
@@ -452,7 +455,7 @@ Hidden without RBAC permission or feature gate.
 | RST-02 | **Recent orders** list       | Links to order detail                                   |       |
 | RST-03 | **Spend trend** (30 days)    | Chart matches invoice/order data or empty-state message |       |
 | RST-04 | **Reorder alerts**           | Suggestions; add to quick list works                    |       |
-| RST-05 | **Order calendar** (Bronze+) | Calendar events; filters                                |       |
+| RST-05 | **Order calendar** (Silver+) | Calendar events; filters                                |       |
 | RST-06 | **Order calendar** (Free)    | Upgrade paywall only                                    |       |
 
 ## 6.2 Orders (`/app/orders`, `/app/orders/:id`)
@@ -489,7 +492,7 @@ Hidden without RBAC permission or feature gate.
 | ID     | Steps                                         | Expected                       | Pass? |
 | ------ | --------------------------------------------- | ------------------------------ | ----- |
 | RST-19 | Free account → navigate to `/app/quick-lists` | 403 or paywall; not accessible |       |
-| RST-20 | Bronze+ account → create quick list           | Saved with name                |       |
+| RST-20 | Silver+ account → create quick list           | Saved with name                |       |
 | RST-21 | Add/remove SKUs                               | Persists                       |       |
 | RST-22 | Order from quick list                         | Creates order with lines       |       |
 | RST-23 | Scheduled quick list (if UI filter)           | Scheduled vs unscheduled views |       |
@@ -499,7 +502,7 @@ Hidden without RBAC permission or feature gate.
 | ID     | Steps                                                  | Expected                              | Pass? |
 | ------ | ------------------------------------------------------ | ------------------------------------- | ----- |
 | RST-24 | Free account → navigate to `/app/restaurant-inventory` | 403 or paywall                        |       |
-| RST-25 | Bronze+ → Tab: Current inventory                       | SKU levels, par levels                |       |
+| RST-25 | Silver+ → Tab: Current inventory                       | SKU levels, par levels                |       |
 | RST-26 | Tab: Movement history                                  | Events listed                         |       |
 | RST-27 | Tab: Totals & sources                                  | Aggregates correct                    |       |
 | RST-28 | Adjust stock (if UI)                                   | Quantity updates; audit in history    |       |
@@ -510,7 +513,7 @@ Hidden without RBAC permission or feature gate.
 | ID      | Steps                                                                           | Expected                                                                              | Pass? |
 | ------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----- |
 | RST-30  | Free account → navigate to `/app/receiving`                                     | 403 or paywall                                                                        |       |
-| RST-31  | Bronze+ — supplier marks order **Mark Delivered** (`DELIVERED`)                 | Restaurant pending list shows order; green “Supplier marked as delivered” message     |       |
+| RST-31  | Silver+ — supplier marks order **Mark Delivered** (`DELIVERED`)                 | Restaurant pending list shows order; green “Supplier marked as delivered” message     |       |
 | RST-32  | **Receive Now** on pending order — full quantities                              | Order leaves pending; appears in **History** tab; order status `RECEIVED_FULL`        |       |
 | RST-33  | Partial receive / discrepancies                                                 | `RECEIVED_PARTIAL` or report status `PARTIAL`; inventory reflects received qty only   |       |
 | RST-34  | Tab: History                                                                    | Past `receiving_report` rows listed (orders not received do not appear here)          |       |
@@ -552,14 +555,14 @@ Hidden without RBAC permission or feature gate.
 | ------ | -------------------------------------------------- | ------------------------------------------ | ----- |
 | RST-51 | List suppliers                                     | Search/filter                              |       |
 | RST-52 | Supplier detail                                    | Catalog preview, follow/block if available |       |
-| RST-53 | Start chat from supplier (requires `chat` feature) | Opens conversation if Bronze+              |       |
+| RST-53 | Start chat from supplier (requires `chat` feature) | Opens conversation if Silver+              |       |
 
 ## 6.11 Invoices (`/app/invoices`) — requires `finance_invoices` feature
 
 | ID     | Steps                                      | Expected              | Pass? |
 | ------ | ------------------------------------------ | --------------------- | ----- |
 | RST-54 | Free account → navigate to `/app/invoices` | 403 or paywall        |       |
-| RST-55 | Bronze+ → Invoice list                     | Filter by status/date |       |
+| RST-55 | Silver+ → Invoice list                     | Filter by status/date |       |
 | RST-56 | Open invoice → Details tab                 | Line items, totals    |       |
 | RST-57 | Payments tab                               | Payment history       |       |
 | RST-58 | Related order tab                          | Links to order        |       |
@@ -571,7 +574,7 @@ Hidden without RBAC permission or feature gate.
 | ID     | Steps                                  | Expected                                | Pass? |
 | ------ | -------------------------------------- | --------------------------------------- | ----- |
 | RST-61 | Free account → navigate to `/app/chat` | 403 or paywall                          |       |
-| RST-62 | Bronze+ → Conversation list            | Suppliers/restaurants shown             |       |
+| RST-62 | Silver+ → Conversation list            | Suppliers/restaurants shown             |       |
 | RST-63 | Send message                           | Delivered; appears in thread            |       |
 | RST-64 | Receive message (second browser/user)  | Real-time or refresh shows message      |       |
 | RST-65 | Unread state / read receipts           | Updates correctly                       |       |
@@ -582,7 +585,7 @@ Hidden without RBAC permission or feature gate.
 | ID     | Steps                             | Expected                                                        | Pass? |
 | ------ | --------------------------------- | --------------------------------------------------------------- | ----- |
 | RST-74 | Free account → `/app/deals`       | 403 or paywall                                                  |       |
-| RST-75 | Bronze+ → Deals feed loads        | Cards from followed suppliers; sort/filter works                |       |
+| RST-75 | Silver+ → Deals feed loads        | Cards from followed suppliers; sort/filter works                |       |
 | RST-76 | Sponsored deal visible            | Badge "Sponsored" on boosted deal from non-followed supplier    |       |
 | RST-77 | **Order now** CTA                 | Navigates to products; place order; discount on order detail    |       |
 | RST-78 | **Use coupon** CTA                | Coupon copied; apply at cart checkout; discount applied         |       |
@@ -635,7 +638,7 @@ Hidden without RBAC permission or feature gate.
 | SUP-01 | Load dashboard                              | Supplier KPIs                                 |       |
 | SUP-02 | **Low stock** column (not "Reorder alerts") | Lists SKUs below threshold; link to inventory |       |
 | SUP-03 | Recent orders                               | Links work                                    |       |
-| SUP-04 | Order calendar (Bronze+, `order_calendar`)  | Same gating as restaurant; paywall on Free    |       |
+| SUP-04 | Order calendar (Silver+, `order_calendar`)  | Same gating as restaurant; paywall on Free    |       |
 
 ## 7.2 Orders (`/app/orders`, `/app/orders/:id`)
 
@@ -662,24 +665,25 @@ Hidden without RBAC permission or feature gate.
 
 ## 7.4 Fulfillment (`/app/fulfillment`) — requires `fulfillment_tools` feature
 
-| ID     | Steps                                         | Expected                       | Pass? |
-| ------ | --------------------------------------------- | ------------------------------ | ----- |
-| SUP-17 | Free account → navigate to `/app/fulfillment` | 403 or paywall                 |       |
-| SUP-18 | Bronze+ → Tab: Driver dispatch                | Assign driver / dispatch list  |       |
-| SUP-19 | Tab: Pick lists                               | Generate pick list from orders |       |
-| SUP-20 | Tab: Routes                                   | Route planning UI              |       |
-| SUP-21 | Tab: Delivery tracking                        | Status updates                 |       |
-| SUP-22 | Tab: Exceptions                               | Log/resolve exception          |       |
-| SUP-23 | Proof of delivery capture                     | Notes/signature fields save    |       |
+| ID      | Steps                                              | Expected                       | Pass? |
+| ------- | -------------------------------------------------- | ------------------------------ | ----- |
+| SUP-17  | Free account → navigate to `/app/fulfillment`      | 403 or paywall                 |       |
+| SUP-18  | Gold+ → Tab: Driver dispatch (`driver_management`) | Assign driver / dispatch list  |       |
+| SUP-18a | Silver → Fulfillment → Driver dispatch             | Tab hidden or 403              |       |
+| SUP-19  | Tab: Pick lists                                    | Generate pick list from orders |       |
+| SUP-20  | Tab: Routes                                        | Route planning UI              |       |
+| SUP-21  | Tab: Delivery tracking                             | Status updates                 |       |
+| SUP-22  | Tab: Exceptions                                    | Log/resolve exception          |       |
+| SUP-23  | Proof of delivery capture                          | Notes/signature fields save    |       |
 
 ## 7.5 Supplier inventory (`/app/inventory`) — requires `inventory_management` feature
 
-| ID     | Steps                                       | Expected              | Pass? |
-| ------ | ------------------------------------------- | --------------------- | ----- |
-| SUP-24 | Free/Bronze → `GET /api/supplier/inventory` | 403 (Gold+ feature)   |       |
-| SUP-25 | Gold+ → Open `/app/inventory` (deep link)   | Stock by warehouse    |       |
-| SUP-26 | Low-stock alerts                            | Aligns with dashboard |       |
-| SUP-27 | Stock adjustment                            | Quantity changes      |       |
+| ID     | Steps                                       | Expected                                    | Pass? |
+| ------ | ------------------------------------------- | ------------------------------------------- | ----- |
+| SUP-24 | Free → `/app/inventory` or inventory API    | 403 or paywall (`inventory_management` off) |       |
+| SUP-25 | Silver+ → Open `/app/inventory` (deep link) | Stock by warehouse loads                    |       |
+| SUP-26 | Low-stock alerts                            | Aligns with dashboard                       |       |
+| SUP-27 | Stock adjustment                            | Quantity changes                            |       |
 
 ## 7.6 Restaurants (customers) (`/app/restaurants`, `/app/restaurants/:id`)
 
@@ -694,7 +698,7 @@ Hidden without RBAC permission or feature gate.
 | ID     | Steps                                            | Expected                  | Pass? |
 | ------ | ------------------------------------------------ | ------------------------- | ----- |
 | SUP-31 | Free account → navigate to `/app/invoices`       | 403 or paywall            |       |
-| SUP-32 | Bronze+ → Issue invoice from order (if workflow) | Invoice created           |       |
+| SUP-32 | Silver+ → Issue invoice from order (if workflow) | Invoice created           |       |
 | SUP-33 | Record **full payment**                          | Balance zero              |       |
 | SUP-34 | Record **partial payment**                       | Remaining balance correct |       |
 | SUP-35 | Apply **credit**                                 | Balance adjusted          |       |
@@ -705,7 +709,7 @@ Hidden without RBAC permission or feature gate.
 | ID     | Steps                                         | Expected          | Pass? |
 | ------ | --------------------------------------------- | ----------------- | ----- |
 | SUP-37 | Free account → navigate to `/app/chat`        | 403 or paywall    |       |
-| SUP-38 | Bronze+ → List conversations with restaurants | Loads             |       |
+| SUP-38 | Silver+ → List conversations with restaurants | Loads             |       |
 | SUP-39 | **Quick replies** (if enabled)                | Insert template   |       |
 | SUP-40 | Send/receive messages                         | Same as RST-63–66 |       |
 
@@ -717,7 +721,7 @@ Hidden without RBAC permission or feature gate.
 | SUP-42  | Tab: Contacts                             | Contact persons CRUD                                     |       |
 | SUP-43  | Tab: Business                             | Tax, terms, policies                                     |       |
 | SUP-44  | Tab: Warehouses                           | Add/edit warehouse; plan limit gate                      |       |
-| SUP-44a | Bronze+ → add warehouse within plan limit | Warehouse created                                        |       |
+| SUP-44a | Silver+ → add warehouse within plan limit | Warehouse created                                        |       |
 | SUP-44b | Exceed warehouse plan limit               | Block with upgrade CTA                                   |       |
 | SUP-44c | Gold+ → multi-warehouse routing toggle    | Toggle available; routing rules configurable             |       |
 | SUP-45  | Tab: Delivery                             | Zones, lead times, fees                                  |       |
@@ -736,8 +740,8 @@ Hidden without RBAC permission or feature gate.
 | RBAC-S2 | `SUPPLIER_MANAGER`                                                   | Catalog + orders                         |       |
 | RBAC-S3 | `SUPPLIER_OWNER`                                                     | Full supplier access                     |       |
 | RBAC-S4 | Gold supplier — Settings → Team → role assignment (`advanced_roles`) | Can assign/modify roles                  |       |
-| RBAC-S5 | Free/Bronze supplier — no role management                            | Section hidden or locked                 |       |
-| RBAC-S6 | Settings → **Team & roles** tab (Bronze+, `advanced_roles`)          | `TeamRolesPanel` + branch invite panel   |       |
+| RBAC-S5 | Free/Silver supplier — no role management                            | Section hidden or locked                 |       |
+| RBAC-S6 | Settings → **Team & roles** tab (Gold+, `advanced_roles`)            | `TeamRolesPanel` + branch invite panel   |       |
 | RBAC-S7 | Invite email already on another supplier account                     | Blocked at invite or accept              |       |
 
 ## 7.11 Deals & promotions (`/app/promotions`) — requires `promotions` feature
@@ -801,7 +805,7 @@ Hidden without RBAC permission or feature gate.
 
 | ID     | Steps                                                         | Expected                                                                            | Pass? |
 | ------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----- |
-| ADM-16 | List plans by tenant type                                     | Free, Bronze, Gold, Platinum for RESTAURANT and SUPPLIER                            |       |
+| ADM-16 | List plans by tenant type                                     | Free, Silver, Gold, Platinum for RESTAURANT and SUPPLIER                            |       |
 | ADM-17 | Edit plan limits (e.g. daily order limit, SKU limit)          | Saves; tenants reflect on next entitlements fetch                                   |       |
 | ADM-18 | Edit plan features (enable/disable a feature for a plan tier) | Saves; affects all tenants on that plan                                             |       |
 | ADM-19 | Create plan version (if supported)                            | Appears in catalog                                                                  |       |
@@ -905,13 +909,13 @@ Hidden without RBAC permission or feature gate.
 | E2E-01  | Restaurant places order → Supplier accepts → Ships → Restaurant receives                                           | Happy path all statuses                             |       |
 | E2E-01b | Restaurant places order → Supplier **declines with reason** → Restaurant sees decline label + notification         | Decline path                                        |       |
 | E2E-02  | Order → Invoice issued → Payment recorded                                                                          | Invoice paid; balances correct                      |       |
-| E2E-03  | Restaurant chats supplier about order (both Bronze+)                                                               | Message thread linked contextually                  |       |
+| E2E-03  | Restaurant chats supplier about order (both Silver+)                                                               | Message thread linked contextually                  |       |
 | E2E-04  | Guest books table → Restaurant board updates → Guest cancels via link                                              | Public + internal sync                              |       |
 | E2E-05  | Staff portal account clocks in on `/staff/dashboard` → Manager sees on `/app/staff`                                | Time event recorded; staff cannot access `/app`     |       |
 | E2E-05b | Staff portal user navigates to `/app` or `GET /api/orders`                                                         | Redirect or 403 `STAFF_PORTAL_FORBIDDEN`            |       |
 | E2E-06  | Restaurant quick list scheduled order → Appears on supplier orders                                                 | Scheduled metadata preserved                        |       |
 | E2E-07  | Supplier low stock → Dashboard alert → Adjust inventory                                                            | Stock corrected                                     |       |
-| E2E-08  | Free restaurant blocked on calendar → Upgrades to Bronze → Calendar works                                          | Feature gate lifted; subscription cache invalidated |       |
+| E2E-08  | Free restaurant blocked on calendar → Upgrades to Silver → Calendar works                                          | Feature gate lifted; subscription cache invalidated |       |
 | E2E-09  | Admin impersonates → places test order → stops impersonation                                                       | Audit trail; no data leak across tenants            |       |
 | E2E-10  | Admin disables `chat` globally → Both tenants lose chat → Admin re-enables → Chat restored                         | Feature gate toggles for all tenants consistently   |       |
 | E2E-11  | Supplier creates product → Restaurant browses catalog → Restaurant adds to cart → Places order → Supplier fulfills | Full order lifecycle from catalog to delivery       |       |
@@ -925,9 +929,9 @@ Hidden without RBAC permission or feature gate.
 | ------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----- |
 | API-01 | `GET /api/auth/me` with session                                             | User + tenant + permissions                                            |       |
 | API-02 | `GET /api/subscriptions/entitlements/current`                               | Plan, limits, usage, features object                                   |       |
-| API-03 | `GET /api/orders/calendar` (Bronze+ restaurant)                             | 200 + events                                                           |       |
+| API-03 | `GET /api/orders/calendar` (Silver+ restaurant)                             | 200 + events                                                           |       |
 | API-04 | `GET /api/orders/calendar` (Free restaurant)                                | 403 feature error                                                      |       |
-| API-05 | `POST /api/billing/checkout` (stub card, Bronze plan)                       | 200 + active subscription                                              |       |
+| API-05 | `POST /api/billing/checkout` (stub card, Silver plan)                       | 200 + active subscription                                              |       |
 | API-06 | `GET /api/billing/status`                                                   | Plan, status, next billing date                                        |       |
 | API-07 | `PATCH /api/billing/auto-renew` `{ autoRenew: false }`                      | 200; auto_renew updated                                                |       |
 | API-08 | `GET /api/public/reservations/...`                                          | No auth required; 200                                                  |       |
@@ -942,7 +946,7 @@ Hidden without RBAC permission or feature gate.
 | API-17 | `GET /api/feature-flags/global` (admin)                                     | 200 + list of all global flags                                         |       |
 | API-18 | `POST /api/feature-flags/global` (non-admin)                                | 403                                                                    |       |
 | API-19 | `GET /api/subscriptions/entitlements/current` — call 3× in quick succession | All return same data (cache hit); response time < 100ms on 2nd and 3rd |       |
-| API-20 | `GET /api/promotions/active` (Bronze+ restaurant)                           | 200 + deals array                                                      |       |
+| API-20 | `GET /api/promotions/active` (Silver+ restaurant)                           | 200 + deals array                                                      |       |
 | API-21 | `GET /api/promotions/active` (Free restaurant)                              | 403 `FEATURE_DISABLED`                                                 |       |
 | API-22 | `GET /api/promotions/admin/pending` (admin)                                 | 200 + pending deals                                                    |       |
 | API-23 | `GET /api/orders/:id` after deal-applied order                              | 200 + `appliedPromotion` on order object                               |       |
@@ -987,7 +991,7 @@ Hidden without RBAC permission or feature gate.
 | `restaurant@supplify.com`                                         | `SupplifyRestaurant1!` | Golden Fork (demo restaurant)                   |
 | `supplier@supplify.com`                                           | `SupplifySupplier1!`   | Fresh Foods Co. (demo supplier)                 |
 | `restaurant-free@supplify.com`                                    | `Supplify1!`           | Free plan — calendar and chat gated             |
-| `restaurant-bronze@supplify.com`                                  | `Supplify1!`           | Bronze tier                                     |
+| `restaurant-Silver@supplify.com`                                  | `Supplify1!`           | Silver tier                                     |
 | `restaurant-gold@supplify.com`                                    | `Supplify1!`           | Gold — full features                            |
 | `restaurant-platinum@supplify.com`                                | `Supplify1!`           | Platinum tier                                   |
 | `supplier-free@supplify.com`                                      | `Supplify1!`           | Supplier free tier                              |

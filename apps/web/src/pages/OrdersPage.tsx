@@ -442,9 +442,9 @@ export function OrdersPage() {
                 data-testid={`order-row-${order.id}`}
               >
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                         <CardTitle className="text-lg">
                           Order #{order.id.slice(-8).toUpperCase()}
                         </CardTitle>
@@ -506,8 +506,8 @@ export function OrdersPage() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-[var(--brand-mid)]">
+                    <div className="text-left sm:text-right shrink-0">
+                      <div className="text-xl sm:text-2xl font-bold text-[var(--brand-mid)]">
                         {`$${formatPrice(order.total_amount)}`}
                       </div>
                       <div className="text-sm text-[var(--text-muted)]">
@@ -517,9 +517,9 @@ export function OrdersPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     {/* Order Items Preview */}
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="text-sm text-[var(--text-muted)] mb-2">Items:</div>
                       <div className="flex flex-wrap gap-2">
                         {order.items?.slice(0, 3).map((item: any, idx: number) => (
@@ -536,7 +536,7 @@ export function OrdersPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
                       {isSupplier && canEditOrders && order.status === 'PLACED' && (
                         <>
                           <Button

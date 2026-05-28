@@ -1,6 +1,10 @@
 # Reports & Analytics
 
-Plan feature key: `reports` (Silver+). Waste report additionally requires `waste_tracking`.
+Plan feature key: `reports`
+
+- **Silver:** `basic_kpis` — report routes return data (same boolean gate as Gold; tier-specific report depth not split in API yet).
+- **Gold+:** full report set / analytics strings per plan seeds.
+- **Waste report** (`/api/reports/restaurant/waste`): requires `waste_tracking` + `reports` (Gold+ analytics on waste for full dashboard).
 
 ## Query parameters
 

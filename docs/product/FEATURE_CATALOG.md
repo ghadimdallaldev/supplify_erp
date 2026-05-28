@@ -22,7 +22,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 | order_create    | Create / place order | RESTAURANT | ORDERS_CREATE (not enforced per-route) | orders_per_day | orders.routes.js POST / checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')         | OrdersPage, CartPage flow              | UNKNOWN           |
 | order_edit      | Edit / update order  | MULTI      | ORDERS_EDIT (not enforced per-route)   | —              | orders.routes.js PATCH /:id                                                              | OrderDetailPage                        | UNKNOWN           |
 | order_decline   | Supplier decline     | SUPPLIER   | ORDERS_MANAGE                          | —              | PATCH /:id status CANCELLED + decline_reason (min 3 chars)                               | DeclineOrderDialog, OrdersPage         | UNKNOWN           |
-| orders_calendar | Orders calendar view | MULTI      | —                                      | —              | apps/api/src/routes/orders.calendar.routes.js requireAuth, getRequestTenant              | DashboardPage (CalendarView)           | Bronze+           |
+| orders_calendar | Orders calendar view | MULTI      | —                                      | —              | apps/api/src/routes/orders.calendar.routes.js requireAuth, getRequestTenant              | DashboardPage (CalendarView)           | Silver+           |
 
 **Flags**
 
@@ -49,8 +49,8 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 | feature_key        | display_name                                           | applies_to | permissions_required | limit_key | backend_enforcement                                                                                                        | frontend_surfaces                                                        | plan_availability                                                    |
 | ------------------ | ------------------------------------------------------ | ---------- | -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| invoices_list      | Invoice list                                           | MULTI      | INVOICES_VIEW        | —         | apps/api/src/routes/invoices.routes.js router.use(requirePermission('INVOICES_VIEW'))                                      | apps/web/src/pages/InvoicesPage.tsx                                      | finance_invoices feature — all plans (view on Free, more on Bronze+) |
-| invoice_detail     | Invoice detail & PDF                                   | MULTI      | INVOICES_VIEW        | —         | invoices.routes.js GET /:id                                                                                                | InvoicesPage                                                             | finance_invoices feature — all plans (view on Free, more on Bronze+) |
+| invoices_list      | Invoice list                                           | MULTI      | INVOICES_VIEW        | —         | apps/api/src/routes/invoices.routes.js router.use(requirePermission('INVOICES_VIEW'))                                      | apps/web/src/pages/InvoicesPage.tsx                                      | finance_invoices feature — all plans (view on Free, more on Silver+) |
+| invoice_detail     | Invoice detail & PDF                                   | MULTI      | INVOICES_VIEW        | —         | invoices.routes.js GET /:id                                                                                                | InvoicesPage                                                             | finance_invoices feature — all plans (view on Free, more on Silver+) |
 | restaurant_finance | Restaurant finance (invoices, pay, analytics, overdue) | RESTAURANT | —                    | —         | apps/api/src/routes/restaurant-finance.routes.js `requireFeature('finance_invoices')`, requireRole(['RESTAURANT','ADMIN']) | InvoicesPage.tsx (invoices, pay, analytics); DashboardPage (Spend Trend) | finance_invoices feature gate applied                                |
 
 **Flags**
@@ -86,8 +86,8 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 | feature_key      | display_name           | applies_to | permissions_required | limit_key | backend_enforcement                                                                                                | frontend_surfaces   | plan_availability                                                         |
 | ---------------- | ---------------------- | ---------- | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------- |
-| fulfillment_page | Fulfillment (supplier) | SUPPLIER   | —                    | —         | fulfillment.routes.js `requireFeature('fulfillment')`; supplier's dedicated route enforces feature gate            | FulfillmentPage.tsx | Bronze+                                                                   |
-| receiving        | Receiving (restaurant) | RESTAURANT | —                    | —         | apps/api/src/routes/receiving.routes.js `requireFeature('receiving_quality')`, requireRole(['RESTAURANT','ADMIN']) | ReceivingPage.tsx   | receiving_quality feature — Bronze+ for photos, Gold+ for quality scoring |
+| fulfillment_page | Fulfillment (supplier) | SUPPLIER   | —                    | —         | fulfillment.routes.js `requireFeature('fulfillment')`; supplier's dedicated route enforces feature gate            | FulfillmentPage.tsx | Silver+                                                                   |
+| receiving        | Receiving (restaurant) | RESTAURANT | —                    | —         | apps/api/src/routes/receiving.routes.js `requireFeature('receiving_quality')`, requireRole(['RESTAURANT','ADMIN']) | ReceivingPage.tsx   | receiving_quality feature — Silver+ for photos, Gold+ for quality scoring |
 
 **Flags**
 
@@ -112,7 +112,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 | feature_key     | display_name                   | applies_to | permissions_required | limit_key  | backend_enforcement                                                                                                                                                                                         | frontend_surfaces                                                                                 | plan_availability                               |
 | --------------- | ------------------------------ | ---------- | -------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| warehouses      | Warehouses (supplier)          | SUPPLIER   | WAREHOUSES_VIEW      | warehouses | warehouses.routes.js `requireFeature('warehouses')`, `requirePermission('WAREHOUSES_VIEW')`; `checkWarehouseLimit` on create                                                                                | SupplierSettingsPage (Warehouses tab), InventoryPage, ProductsPage                                | Bronze+ (`warehouses` plan flag)                |
+| warehouses      | Warehouses (supplier)          | SUPPLIER   | WAREHOUSES_VIEW      | warehouses | warehouses.routes.js `requireFeature('warehouses')`, `requirePermission('WAREHOUSES_VIEW')`; `checkWarehouseLimit` on create                                                                                | SupplierSettingsPage (Warehouses tab), InventoryPage, ProductsPage                                | Silver+ (`warehouses` plan flag)                |
 | multi_warehouse | Multi-warehouse fulfillment    | SUPPLIER   | WAREHOUSES_VIEW      | —          | `requireFeature('multi_warehouse')` on routing rules, simulate, per-warehouse inventory; suppliers.routes.js PATCH `/me/fulfillment`; `warehouseRouting.js` on order create when `fulfillment_mode = multi` | SupplierSettingsPage (fulfillment toggle), OrderDetailPage (split badges / multi-location banner) | Gold+; also `supplier.multi_warehouse_enabled`  |
 | supplier_org    | Supplier org & branch accounts | SUPPLIER   | — (org roles)        | branches   | org.routes.js `requireSupplierOrgContext`; POST `/api/org/branches` requires `requireFeature('multi_branch')`; branch limit via plan `limits.branches`                                                      | OrgOverviewPage (`/app/org`), BranchSwitcher, migrate-suppliers-to-orgs.js                        | Gold+ (`multi_branch` on supplier plans)        |
 | branch_invites  | Branch manager invite links    | SUPPLIER   | Org Owner            | —          | `branch-invitations.routes.js` + public accept; `requireFeature('multi_branch')`; 7-day tokens; hourly expiry job                                                                                           | AddBranchModal, BranchInvitationsPanel, `/invite/branch`                                          | Gold+ (`multi_branch`); no email delivery yet   |
@@ -217,8 +217,8 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 | feature_key    | display_name     | applies_to | permissions_required | limit_key | backend_enforcement                                     | frontend_surfaces                         | plan_availability       |
 | -------------- | ---------------- | ---------- | -------------------- | --------- | ------------------------------------------------------- | ----------------------------------------- | ----------------------- |
-| promotions     | Supplier deals   | SUPPLIER   | —                    | —         | promotions.routes.js `requireFeature('promotions')`     | PromotionsPage.tsx, DealTargetingPickers  | Bronze+ (SUPPLIER only) |
-| supplier_deals | Restaurant deals | RESTAURANT | —                    | —         | promotions.routes.js `requireFeature('supplier_deals')` | DealsPage.tsx, DealCard.tsx, CartPage.tsx | Bronze+ (RESTAURANT)    |
+| promotions     | Supplier deals   | SUPPLIER   | —                    | —         | promotions.routes.js `requireFeature('promotions')`     | PromotionsPage.tsx, DealTargetingPickers  | Silver+ (SUPPLIER only) |
+| supplier_deals | Restaurant deals | RESTAURANT | —                    | —         | promotions.routes.js `requireFeature('supplier_deals')` | DealsPage.tsx, DealCard.tsx, CartPage.tsx | Silver+ (RESTAURANT)    |
 
 ---
 
@@ -242,7 +242,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 | feature_key      | display_name     | applies_to | permissions_required | limit_key | backend_enforcement                                    | frontend_surfaces            | plan_availability         |
 | ---------------- | ---------------- | ---------- | -------------------- | --------- | ------------------------------------------------------ | ---------------------------- | ------------------------- |
-| supplier_reviews | Supplier reviews | RESTAURANT | —                    | —         | reviews.routes.js `requireFeature('supplier_reviews')` | SupplierDetailPage (reviews) | Bronze+ (RESTAURANT only) |
+| supplier_reviews | Supplier reviews | RESTAURANT | —                    | —         | reviews.routes.js `requireFeature('supplier_reviews')` | SupplierDetailPage (reviews) | Silver+ (RESTAURANT only) |
 
 ---
 
@@ -316,7 +316,7 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ## Plan / Feature Keys (UI and API)
 
-- **Plans (from migration 0022 / UI):** Free, Bronze, Gold, Platinum
+- **Plans (from migration 0022 / UI):** Free, Silver, Gold, Platinum
 
 **RESTAURANT** (22 keys): `chat`, `order_calendar`, `reports`, `smart_reorder`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `supplier_reviews`, `push_notifications`, `order_amendments`, `tenant_audit_log`, `waitlist_auto_promo`, `supplier_deals`
 
@@ -357,7 +357,7 @@ Canonical source: `apps/api/src/lib/feature-keys.js`
 | downgrade_blocked_event    | Downgrade attempt blocked (server)  | ADMIN      | —                    | —         | admin-dashboard.routes.js PATCH /subscriptions/:id returns 400 when usage exceeds target; recordConversionEvent DOWNGRADE_ATTEMPT_BLOCKED                    | — (backend only)                                                                      | —                                    |
 | recommended_badge          | Recommended badge on plan           | MULTI      | —                    | —         | — (frontend; uses GET /api/subscriptions/recommendation cache)                                                                                               | RecommendedBadge.tsx; SubscriptionInfo, UpgradeModal comparison header                | CURRENT_BEST → subtle style          |
 | nav_upgrade_cta            | Top-nav Upgrade button (contextual) | MULTI      | —                    | —         | — (frontend; OPEN_UPGRADE metadata source: nav_upgrade_cta, trigger: free\|near_limit\|blocked)                                                              | Header.tsx (visibility: Free or ≥80% usage or blockedCountLast7d ≥ 1)                 | Dot when urgency                     |
-| plan_subtitles             | Plan value copy (subtitles)         | MULTI      | —                    | —         | — (frontend constants PLAN_SUBTITLES in planComparison.ts)                                                                                                   | UpgradeModal headers, SubscriptionInfo, AdminDashboardPage plan cards                 | Free/Bronze/Gold/Platinum/Enterprise |
+| plan_subtitles             | Plan value copy (subtitles)         | MULTI      | —                    | —         | — (frontend constants PLAN_SUBTITLES in planComparison.ts)                                                                                                   | UpgradeModal headers, SubscriptionInfo, AdminDashboardPage plan cards                 | Free/Silver/Gold/Platinum/Enterprise |
 | free_trial_expiry_lock     | Free Trial expiry (read-only)       | MULTI      | —                    | —         | `billingAccessMiddleware`; `free-sandbox-expiry.job`; `buildAccountLockedError`; admin `extend-free-trial` / unlock extends `free_sandbox_expires_at`        | BillingOverdueBanner, SubscriptionInfo, AdminPlatformSettingsPanel, Extend trial      | Plan `free` only; days 3–7           |
 
 **Flags**

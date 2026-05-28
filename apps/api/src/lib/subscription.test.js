@@ -169,7 +169,7 @@ describe('Subscription lib', () => {
       }
       const planRows = [
         { code: 'free', name: 'Free', limits: {}, features: {} },
-        { code: 'bronze', name: 'Bronze', limits: {}, features: {} },
+        { code: 'silver', name: 'Silver', limits: {}, features: {} },
         { code: 'gold', name: 'Gold', limits: {}, features: {} },
         {
           code: 'platinum',
@@ -237,7 +237,7 @@ describe('Subscription lib', () => {
           return Promise.resolve({
             rows: [
               { code: 'free', name: 'Free', limits: { orders_per_day: 3 }, features: {} },
-              { code: 'bronze', name: 'Bronze', limits: { orders_per_day: 20 }, features: {} },
+              { code: 'silver', name: 'Silver', limits: { orders_per_day: 20 }, features: {} },
               { code: 'gold', name: 'Gold', limits: { orders_per_day: 50 }, features: {} },
               { code: 'platinum', name: 'Platinum', limits: { orders_per_day: -1 }, features: {} },
             ],

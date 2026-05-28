@@ -2,6 +2,8 @@
 
 Restaurants can rate suppliers after a delivered order. Ratings are aggregated per supplier and exposed on supplier list/detail and public review endpoints.
 
+**Plan gate:** `supplier_reviews` — **Silver+** restaurant plans (off on Free Trial).
+
 ## Rules
 
 - One review per `customer_order` (enforced by unique `order_id`).

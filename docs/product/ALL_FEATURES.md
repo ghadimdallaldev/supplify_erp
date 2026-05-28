@@ -388,7 +388,7 @@ Also available via API (not always separate pages):
 | Subscription billing job | Locks accounts, grace period (hourly cron) |
 | Account activation page  | `/app/activate`                            |
 
-**Plan tiers (examples in DB):** Free, Bronze, Silver, Gold, Platinum (restaurant & supplier catalogs); features and limits vary by plan code.
+**Plan tiers (examples in DB):** Free, Silver, Gold, Platinum (restaurant & supplier catalogs); features and limits vary by plan code.
 
 ---
 

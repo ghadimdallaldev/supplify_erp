@@ -32,6 +32,16 @@ vi.mock('../lib/billing/billing-service.js', () => ({
 vi.mock('../lib/conversion-events.js', () => ({
   recordConversionEvent: vi.fn().mockResolvedValue(undefined),
 }))
+const mockBuildAdminOverviewMetrics = vi.fn()
+vi.mock('../lib/admin-overview-metrics.js', () => ({
+  buildAdminOverviewMetrics: (...args) => mockBuildAdminOverviewMetrics(...args),
+}))
+const mockBuildAdminActivityFeed = vi.fn()
+vi.mock('../lib/admin-activity-feed.js', () => ({
+  buildAdminActivityFeed: (...args) => mockBuildAdminActivityFeed(...args),
+  normalizeActivityEvent: (row) => row,
+}))
+
 vi.mock('../lib/subscription.js', () => ({
   getEntitlements: (...args) => mockGetEntitlements(...args),
   invalidateTenantSubscriptionCache: vi.fn().mockResolvedValue(undefined),
@@ -89,9 +99,9 @@ describe('Admin Dashboard Routes', () => {
         .mockResolvedValueOnce({
           rows: [
             {
-              id: 'plan-bronze',
-              name: 'Bronze',
-              code: 'bronze',
+              id: 'plan-silver',
+              name: 'Silver',
+              code: 'silver',
               tenant_type: 'RESTAURANT',
               limits: { orders_per_day: 50 },
               features: {},
@@ -111,7 +121,7 @@ describe('Admin Dashboard Routes', () => {
 
       const res = await request(app)
         .post('/api/admin-dashboard/subscriptions/sub-1/preview-change')
-        .send({ targetPlanId: 'plan-bronze' })
+        .send({ targetPlanId: 'plan-silver' })
         .expect(200)
 
       expect(res.body.ok).toBe(true)
@@ -131,7 +141,7 @@ describe('Admin Dashboard Routes', () => {
         })
         .mockResolvedValueOnce({
           rows: [
-            { id: 'plan-sup', name: 'Bronze', tenant_type: 'SUPPLIER', limits: {}, features: {} },
+            { id: 'plan-sup', name: 'Silver', tenant_type: 'SUPPLIER', limits: {}, features: {} },
           ],
         })
 
@@ -229,6 +239,38 @@ describe('Admin Dashboard Routes', () => {
     })
   })
 
+  describe('GET /overview', () => {
+    it('returns overview metrics payload shape', async () => {
+      mockBuildAdminOverviewMetrics.mockResolvedValueOnce({
+        orders: { today: 1, week: 2, month: 3, total: 9 },
+        activeCarts: 1,
+        chatsLast24h: 2,
+        totalActiveStaff: 3,
+        reservations: { today: 0, week: 1, confirmed: 1 },
+        tenants: {
+          totalSuppliers: 1,
+          totalRestaurants: 2,
+          newSuppliers7d: 0,
+          newRestaurants7d: 0,
+        },
+        totalActiveProducts: 10,
+        totalQuickLists: 1,
+        revenue: { mrr: 49, arr: 588, paidActiveSubscriptions: 1, activeSubscriptions: 1 },
+        subscriptionStats: { ACTIVE: 1, TRIALING: 1 },
+        alerts: {},
+        tenantCounts: {},
+        activity: { ordersLast24h: 1, chatsLast24h: 2 },
+      })
+
+      const res = await request(app).get('/api/admin-dashboard/overview').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.orders.total).toBe(9)
+      expect(res.body.data.revenue.paidActiveSubscriptions).toBe(1)
+      expect(res.body.data.tenants.totalRestaurants).toBe(2)
+    })
+  })
+
   describe('GET /plans', () => {
     it('returns plans when subscription_plan has tenant_type', async () => {
       query.mockResolvedValueOnce({
@@ -257,8 +299,8 @@ describe('Admin Dashboard Routes', () => {
         rows: [
           {
             id: 'p1',
-            code: 'bronze',
-            name: 'Bronze',
+            code: 'silver',
+            name: 'Silver',
             tenant_type: 'SUPPLIER',
             limits: {},
             features: {},
@@ -323,6 +365,132 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.ok).toBe(false)
       expect(res.body.error.message).toMatch(/Unknown keys not allowed/)
     })
+
+    it('rejects promotions limit on restaurant plans', async () => {
+      const res = await request(app)
+        .post('/api/admin-dashboard/plans')
+        .send({
+          code: 'bad_rest',
+          name: 'Bad',
+          tenantType: 'RESTAURANT',
+          pricePerMonth: 0,
+          limits: { promotions: 5 },
+          features: {},
+        })
+        .expect(400)
+
+      expect(res.body.error.message).toMatch(/promotions|Unknown/)
+    })
+
+    it('rejects activating enterprise without confirm flag', async () => {
+      const res = await request(app)
+        .post('/api/admin-dashboard/plans')
+        .send({
+          code: 'enterprise',
+          name: 'Enterprise',
+          tenantType: 'RESTAURANT',
+          pricePerMonth: 0,
+          limits: {},
+          features: {},
+          isActive: true,
+        })
+        .expect(400)
+
+      expect(res.body.error.message).toMatch(/confirmEnterpriseActivation/)
+    })
+
+    it('rejects free trial_days outside 3–7', async () => {
+      const res = await request(app)
+        .post('/api/admin-dashboard/plans')
+        .send({
+          code: 'free',
+          name: 'Free',
+          tenantType: 'RESTAURANT',
+          pricePerMonth: 0,
+          limits: {},
+          features: {},
+          trialDays: 30,
+        })
+        .expect(400)
+
+      expect(res.body.error.message).toMatch(/trial_days/)
+    })
+  })
+
+  describe('PATCH /plans/:id', () => {
+    const planId = 'plan-gold-1'
+    const goldPlan = {
+      id: planId,
+      code: 'gold',
+      name: 'Gold',
+      tenant_type: 'RESTAURANT',
+      limits: { orders_per_day: 100, storage_mb: 10240, users: 15, branches: 3 },
+      features: { reports: true },
+      trial_days: 0,
+    }
+
+    it('rejects invalid limits JSON shape', async () => {
+      query.mockResolvedValueOnce({ rows: [goldPlan] })
+
+      const res = await request(app)
+        .patch(`/api/admin-dashboard/plans/${planId}`)
+        .send({ limits: [] })
+        .expect(400)
+
+      expect(res.body.error.message).toMatch(/JSON object|Invalid plan data|must be a JSON object/)
+    })
+
+    it('rejects removed approvals_budgets feature', async () => {
+      query.mockResolvedValueOnce({ rows: [goldPlan] })
+
+      const res = await request(app)
+        .patch(`/api/admin-dashboard/plans/${planId}`)
+        .send({ features: { approvals_budgets: true } })
+        .expect(400)
+
+      expect(res.body.error.message).toMatch(/approvals_budgets/)
+    })
+
+    it('returns tier ladder warnings without blocking save', async () => {
+      const updatedLimits = { orders_per_day: 5, storage_mb: 10240, users: 15, branches: 3 }
+      query.mockImplementation(async (sql) => {
+        if (
+          typeof sql === 'string' &&
+          sql.includes('WHERE id = $1') &&
+          sql.includes('subscription_plan')
+        ) {
+          return { rows: [goldPlan] }
+        }
+        if (typeof sql === 'string' && sql.includes('id != $2')) {
+          return { rows: [{ code: 'silver', limits: { orders_per_day: 20 } }] }
+        }
+        if (typeof sql === 'string' && sql.includes('UPDATE subscription_plan')) {
+          return { rows: [{ ...goldPlan, limits: updatedLimits }] }
+        }
+        return { rows: [] }
+      })
+
+      const res = await request(app)
+        .patch(`/api/admin-dashboard/plans/${planId}`)
+        .send({ limits: updatedLimits })
+        .expect(200)
+
+      expect(res.body.data.validationWarnings?.length).toBeGreaterThan(0)
+      expect(res.body.data.validationWarnings[0]).toMatch(/silver/)
+    })
+
+    it('blocks activating enterprise without confirm flag', async () => {
+      query.mockResolvedValueOnce({
+        rows: [{ ...goldPlan, code: 'enterprise', is_active: false }],
+      })
+
+      const res = await request(app)
+        .patch(`/api/admin-dashboard/plans/${planId}`)
+        .send({ isActive: true })
+        .expect(400)
+
+      expect(res.body.error.message).toMatch(/confirmEnterpriseActivation/)
+    })
   })
 
   describe('PATCH /subscriptions/:id', () => {
@@ -334,7 +502,7 @@ describe('Admin Dashboard Routes', () => {
         })
         .mockResolvedValueOnce({ rows: [{ code: 'free' }] })
         .mockResolvedValueOnce({
-          rows: [{ id: planIdSupplier, name: 'Bronze', tenant_type: 'SUPPLIER' }],
+          rows: [{ id: planIdSupplier, name: 'Silver', tenant_type: 'SUPPLIER' }],
         })
 
       const res = await request(app)
@@ -347,7 +515,7 @@ describe('Admin Dashboard Routes', () => {
     })
 
     it('rejects downgrade when usage exceeds target plan unless force=true with reason', async () => {
-      const planIdBronze = 'a0000002-0001-4000-8000-000000000002'
+      const planIdSilver = 'a0000002-0001-4000-8000-000000000002'
       query
         .mockResolvedValueOnce({
           rows: [{ id: 'sub-1', tenant_id: 't1', tenant_type: 'RESTAURANT', plan_id: 'p-gold' }],
@@ -356,8 +524,8 @@ describe('Admin Dashboard Routes', () => {
         .mockResolvedValueOnce({
           rows: [
             {
-              id: planIdBronze,
-              name: 'Bronze',
+              id: planIdSilver,
+              name: 'Silver',
               tenant_type: 'RESTAURANT',
               limits: { orders_per_day: 10 },
             },
@@ -371,7 +539,7 @@ describe('Admin Dashboard Routes', () => {
 
       const res = await request(app)
         .patch('/api/admin-dashboard/subscriptions/sub-1')
-        .send({ planId: planIdBronze })
+        .send({ planId: planIdSilver })
         .expect(400)
 
       expect(res.body.ok).toBe(false)
@@ -379,21 +547,21 @@ describe('Admin Dashboard Routes', () => {
     })
 
     it('allows downgrade when force=true and reason provided', async () => {
-      const planIdBronze = 'a0000002-0001-4000-8000-000000000002'
+      const planIdSilver = 'a0000002-0001-4000-8000-000000000002'
       query
         .mockResolvedValueOnce({
           rows: [{ id: 'sub-1', tenant_id: 't1', tenant_type: 'RESTAURANT', plan_id: 'p-gold' }],
         })
         .mockResolvedValueOnce({ rows: [{ code: 'gold' }] })
         .mockResolvedValueOnce({
-          rows: [{ id: planIdBronze, name: 'Bronze', tenant_type: 'RESTAURANT', limits: {} }],
+          rows: [{ id: planIdSilver, name: 'Silver', tenant_type: 'RESTAURANT', limits: {} }],
         })
         .mockResolvedValueOnce({
           rows: [
             {
               id: 'sub-1',
-              plan_id: planIdBronze,
-              plan_name: 'Bronze',
+              plan_id: planIdSilver,
+              plan_name: 'Silver',
               tenant_id: 't1',
               tenant_type: 'RESTAURANT',
             },
@@ -405,7 +573,7 @@ describe('Admin Dashboard Routes', () => {
 
       const res = await request(app)
         .patch('/api/admin-dashboard/subscriptions/sub-1')
-        .send({ planId: planIdBronze, force: true, reason: 'Customer requested downgrade' })
+        .send({ planId: planIdSilver, force: true, reason: 'Customer requested downgrade' })
         .expect(200)
 
       expect(res.body.ok).toBe(true)
@@ -477,6 +645,43 @@ describe('Admin Dashboard Routes', () => {
       const reports = res.body.data.flags.find((f) => f.featureKey === 'reports')
       expect(reports.featureName).toBe('Reports')
       expect(reports.globalOverride).toBe(null)
+    })
+  })
+
+  describe('GET /activity', () => {
+    it('returns composed activity feed with expected shape', async () => {
+      mockBuildAdminActivityFeed.mockResolvedValueOnce({
+        events: [
+          {
+            id: '1',
+            event_type: 'order_placed',
+            type: 'order_placed',
+            title: 'Order placed — Cafe',
+            description: 'Cafe → Supplier',
+            occurred_at: '2026-05-28T12:00:00.000Z',
+            createdAt: '2026-05-28T12:00:00.000Z',
+            actorName: 'Cafe',
+            tenantName: 'Cafe',
+            tenantType: 'RESTAURANT',
+          },
+        ],
+        total: 1,
+        limit: 30,
+        offset: 0,
+        sources: ['order_placed', 'new_tenant'],
+        failedSources: [],
+        partial: false,
+      })
+
+      const res = await request(app).get('/api/admin-dashboard/activity?limit=30').expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.events).toHaveLength(1)
+      expect(res.body.data.events[0].event_type).toBe('order_placed')
+      expect(res.body.data.total).toBe(1)
+      expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: '30', offset: 0 })
+      )
     })
   })
 

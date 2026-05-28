@@ -747,7 +747,7 @@ router.post(
           error: buildFeatureNotAvailablePayload(
             'quick_lists',
             subscription?.plan_name || subscription?.plan_display_name,
-            'Bronze',
+            'Silver',
             recommendedPlans
           ),
           requestId: req.requestId,

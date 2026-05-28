@@ -53,6 +53,7 @@ import { OrderOperationsTimeline } from '../components/orders/OrderOperationsTim
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
 import { getOrderCancellationBanner, getOrderStatusLabel } from '../lib/orderStatusDisplay'
 import { formatOrderRef, isDisputeReplacementOrder } from '../lib/orderPlacement'
+import { pageHeaderRowClass } from '../components/ui/card-layout'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -388,20 +389,22 @@ export function OrderDetailPage() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" asChild>
+      <div className={pageHeaderRowClass}>
+        <div className="flex flex-col gap-3 min-w-0 sm:flex-row sm:items-center sm:gap-4">
+          <Button variant="outline" size="sm" className="self-start shrink-0" asChild>
             <Link to="/app/orders">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Orders
             </Link>
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Order #{order.id.slice(-8).toUpperCase()}</h1>
-            <p className="text-[var(--text-muted)]">{order.restaurant_name}</p>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">
+              Order #{order.id.slice(-8).toUpperCase()}
+            </h1>
+            <p className="text-[var(--text-muted)] truncate">{order.restaurant_name}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {isReplacementOrder && (
             <Badge variant="secondary" className="text-sm">
               Replacement

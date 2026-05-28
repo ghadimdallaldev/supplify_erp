@@ -7,7 +7,13 @@
 | `fulfillment`       | Dispatch board, routes, exceptions (aliases `fulfillment_tools` on plans) |
 | `driver_management` | Driver CRUD and order assignment                                          |
 
-Bronze, Gold, and Platinum supplier plans include both flags. Free tier does not.
+| Plan   | `fulfillment` / `fulfillment_tools` | `driver_management` |
+| ------ | ----------------------------------- | ------------------- |
+| Free   | off                                 | off                 |
+| Silver | on (manual pick/pack/ship)          | **off**             |
+| Gold+  | on                                  | on                  |
+
+Free tier has neither flag. Restaurant plans do not include supplier fulfillment flags.
 
 ## Driver management
 

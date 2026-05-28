@@ -1,12 +1,16 @@
 # Subscriptions and plan catalogs
 
-Plans are split by **tenant type**: each of Free, Bronze, Gold, and Platinum exists as separate rows for **RESTAURANT** and **SUPPLIER**. Limit keys are normalized per tenant type (no mixing of product/SKU keys).
+Plans are split by **tenant type**: each of Free, Silver, Gold, and Platinum exists as separate rows for **RESTAURANT** and **SUPPLIER** (`subscription_plan.code`). Limit keys are normalized per tenant type.
+
+**Canonical source (live DB):** migrations `0116_rename_bronze_to_silver.sql`, `0117_silver_tier_limits_features.sql`, `0119_gold_tier_limits_features.sql`, `0120_platinum_tier_limits_features.sql`. Verify anytime with `pnpm run log:tier-limits`.
+
+**Platinum catalog-only strings:** Several Platinum feature values are marketing/catalog until implemented — see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md).
 
 ## Free Trial (plan code `free`)
 
 - **User-facing name:** Free Trial (not “forever free”).
 - **Duration:** `subscription.free_sandbox_expires_at`; default length from `platform_setting.free_sandbox_days` (**7**, admin-configurable **3–7**).
-- **During trial:** Broad sandbox features (`0112` parity) with plan limits still enforced.
+- **During trial:** Broad sandbox features (`0112` parity with Gold feature JSON) with **low plan limits** still enforced.
 - **After expiry:** `lock_reason = 'free_sandbox_expired'` — **GET** APIs read-only; **writes 402**; billing/upgrade still available.
 - **Admin:** `POST …/extend-free-trial`, unlock extends expiry for expired trials.
 
@@ -14,76 +18,184 @@ Details: [free-trial-expiry.md](../features/free-trial-expiry.md).
 
 ## Limit keys (normalized)
 
-- **RESTAURANT:** `branches`, `users`, `orders_per_day`, `suppliers_per_restaurant`, `restaurant_inventory_skus`, `chats_per_day`, `storage_mb`
-- **SUPPLIER:** `branches`, `warehouses`, `users`, `supplier_products_skus`, `chats_per_day`, `storage_mb`
+### Restaurant (`RESTAURANT`)
 
-Legacy key `products` is no longer used; it was replaced by `restaurant_inventory_skus` (restaurant) and `supplier_products_skus` (supplier).
+`branches`, `users`, `orders_per_day`, `suppliers_per_restaurant`, `restaurant_inventory_skus`, `chats_per_day`, `open_conversations`, `storage_mb`, `quick_lists`, `quick_list_items`, `scheduled_quick_lists`, `deal_redemptions_per_day`, `scheduled_order_grace_per_day` (hidden from entitlements UI).
 
-## Restaurant plan matrix
+**Not applicable on restaurants:** `promotions` (supplier-only meter for active deal count). Restaurants use **`deal_redemptions_per_day`** for marketplace deal caps.
 
-| Plan     | branches  | users     | orders_per_day | suppliers_per_restaurant | restaurant_inventory_skus | chats_per_day | reservations | receiving | finance   |
-| -------- | --------- | --------- | -------------- | ------------------------ | ------------------------- | ------------- | ------------ | --------- | --------- |
-| Free     | 1         | 1         | 3              | 1                        | 15                        | 3             | basic        | manual    | view      |
-| Bronze   | 2         | 3         | 20             | 10                       | 1,000                     | 50            | ✓            | photos    | record    |
-| Gold     | 3         | 10        | 50             | unlimited                | 1,000                     | 200           | ✓            | quality   | analytics |
-| Platinum | unlimited | unlimited | unlimited      | unlimited                | unlimited                 | unlimited     | ✓            | full      | advanced  |
+### Supplier (`SUPPLIER`)
 
-**Branches** counts total location accounts: your **primary restaurant + linked branch accounts** (not legacy `branch` rows).
+`branches`, `warehouses`, `users`, `supplier_products_skus`, `chats_per_day`, `open_conversations`, `storage_mb`, `promotions`.
 
-**chats_per_day** counts **chat messages sent** per day (enforced on `POST .../messages` via `usage_meter`).
+Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_products_skus`.
 
-**Free Trial:** Time-limited sandbox (see above). Catalog limits below apply during the trial; after expiry, read-only until upgrade.
+## Silver tier ($49/mo, $490/yr) — current catalog
 
-- **reservations:** Plan feature / reservation capabilities (from plan `features`).
-- **receiving:** Plan feature (e.g. `receiving_quality`: manual_only, photos_enabled, quality_scoring).
-- **finance:** Plan feature (e.g. `finance_invoices`: view_only, record_payments, expense_analytics).
+### Restaurant Silver
 
-## Supplier plan matrix
+| Limit                     | Value |
+| ------------------------- | ----: |
+| branches                  |     1 |
+| users                     |     3 |
+| orders_per_day            |    20 |
+| suppliers_per_restaurant  |     5 |
+| restaurant_inventory_skus |   250 |
+| chats_per_day             |    30 |
+| open_conversations        |     5 |
+| storage_mb                |   500 |
+| quick_lists               |    10 |
+| quick_list_items          |   100 |
+| scheduled_quick_lists     |     3 |
+| deal_redemptions_per_day  |    10 |
 
-| Plan     | branches  | warehouses | users     | supplier_products_skus | chats_per_day | storage_mb | fulfillment |
-| -------- | --------- | ---------- | --------- | ---------------------- | ------------- | ---------- | ----------- |
-| Free     | 1         | 0          | 1         | 15                     | 3             | 50         | basic       |
-| Bronze   | 1         | 1          | 3         | 1,000                  | 50            | 1,000      | manual      |
-| Gold     | 3         | 3          | 10        | 1,000                  | 200           | 5,000      | warehouse   |
-| Platinum | unlimited | unlimited  | unlimited | unlimited              | unlimited     | 20,000     | full        |
+**Features on:** `chat`, `order_calendar`, `quick_lists` (automated_weekly), `receiving_quality` (photos), `disputes_returns`, `finance_invoices` (record_payments), `inventory_management`, `supplier_deals`, `supplier_reviews`, `order_amendments`, `notifications`, `push_notifications`, `reports` (`basic_kpis` — route gate is boolean; tier strings not differentiated in API yet).
 
-**Free Trial:** Time-limited sandbox; low limits during trial (15 products, 3 chats/day, etc.). See [free-trial-expiry.md](../features/free-trial-expiry.md).
+**Features off:** `smart_reorder`, `waitlist_auto_promo`, `advanced_roles`, `tenant_audit_log`, `custom_branding`, `multi_branch`, `api_integrations`, `feature_flags_access`, `fulfillment_tools`.
 
-- **fulfillment:** Plan feature (e.g. `fulfillment_tools`: basic_orders, manual_orders_invoices, warehouse_pick_pack, routing_full_suite). Can be gated by plan.
+### Supplier Silver
+
+| Limit                  |            Value |
+| ---------------------- | ---------------: |
+| branches               |                1 |
+| users                  |                3 |
+| supplier_products_skus |              250 |
+| warehouses             |                1 |
+| chats_per_day          |               30 |
+| open_conversations     |                5 |
+| storage_mb             |              500 |
+| promotions             | 3 (active deals) |
+
+**Features on:** `chat`, `order_calendar`, `fulfillment`, `fulfillment_tools` (manual), `warehouses`, `promotions`, `disputes_returns`, `inventory_management`, `order_amendments`, `notifications`, `push_notifications`, `reports` (`basic_kpis`).
+
+**Features off:** `driver_management`, `multi_warehouse`, `advanced_roles`, `tenant_audit_log`, `custom_branding`, `api_integrations`, `feature_flags_access`.
+
+## Gold tier ($149/mo, $1490/yr) — current catalog
+
+### Restaurant Gold
+
+| Limit                     |          Value |
+| ------------------------- | -------------: |
+| branches                  |              3 |
+| users                     |             15 |
+| orders_per_day            |            100 |
+| suppliers_per_restaurant  |             30 |
+| restaurant_inventory_skus |          3,000 |
+| chats_per_day             |            500 |
+| open_conversations        |             30 |
+| storage_mb                | 10,240 (10 GB) |
+| quick_lists               |             50 |
+| quick_list_items          |            500 |
+| scheduled_quick_lists     |             15 |
+| deal_redemptions_per_day  |             50 |
+
+**Features on:** `smart_reorder` (`full_90day_trends`), `waitlist_auto_promo`, `advanced_roles`, `tenant_audit_log`, `multi_branch`, `reports` (`usage_cost_dashboards`), `api_integrations` (`api_key_access`), `waste_tracking` (`analytics_dashboard`), `custom_branding` (`logo_colors`), `notifications` (`email_and_whatsapp`), plus Silver-equivalent deals/calendar/disputes.
+
+**Features off:** `fulfillment_tools` (restaurant), `feature_flags_access` beyond addon toggles (Platinum: experimental).
+
+### Supplier Gold
+
+| Limit                  |             Value |
+| ---------------------- | ----------------: |
+| branches               |                 3 |
+| warehouses             |                 3 |
+| users                  |                15 |
+| supplier_products_skus |             3,000 |
+| chats_per_day          |               500 |
+| open_conversations     |                30 |
+| storage_mb             |            10,240 |
+| promotions             | 25 (active deals) |
+
+**Features on:** `multi_warehouse`, `driver_management`, `fulfillment_tools` (`warehouse_pick_pack`), `advanced_roles`, `tenant_audit_log`, `multi_branch`, `reports` (`usage_cost_dashboards`), `api_integrations` (`api_key_access`), `custom_branding` (`logo_colors`).
+
+## Platinum tier ($349/mo, $3490/yr) — current catalog
+
+Top self-serve tier: **unlimited** operational meters (`-1`), **30 GB** storage (`30720` MB). Pricing unchanged.
+
+### Restaurant Platinum
+
+| Limit                           |          Value |
+| ------------------------------- | -------------: |
+| All canonical restaurant meters | unlimited (-1) |
+| storage_mb                      | 30,720 (30 GB) |
+| scheduled_order_grace_per_day   |              0 |
+
+**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** `ai_smart_automation`, `ai_forecast_seasonality`, `advanced_forecasting_custom_reports`, `full_api_webhooks`, `white_label_domain`, `central_purchasing`, `cost_percentage_vs_sales`, etc. — many are **not tier-differentiated in route code yet**.
+
+### Supplier Platinum
+
+| Limit                                                                    |          Value |
+| ------------------------------------------------------------------------ | -------------: |
+| branches, warehouses, users, SKUs, chats, open conversations, promotions | unlimited (-1) |
+| storage_mb                                                               |         30,720 |
+
+**Same catalog-only note** for AI, webhooks, advanced reports, white-label.
+
+## Restaurant plan matrix (summary)
+
+| Plan     | branches | users | orders/day | suppliers |  SKUs | chats/day | open chats | storage |
+| -------- | -------: | ----: | ---------: | --------: | ----: | --------: | ---------: | ------: |
+| Free     |        1 |     1 |          3 |         1 |    10 |         3 |          1 |   50 MB |
+| Silver   |        1 |     3 |         20 |         5 |   250 |        30 |          5 |  500 MB |
+| Gold     |        3 |    15 |        100 |        30 | 3,000 |       500 |         30 |   10 GB |
+| Platinum |        ∞ |     ∞ |          ∞ |         ∞ |     ∞ |         ∞ |          ∞ |   30 GB |
+
+**Also (restaurant):** quick_lists **50**, quick_list_items **500**, scheduled_quick_lists **15**, deal_redemptions_per_day **50** on Gold — see Gold table above and [PLANS.md](./PLANS.md).
+
+**Branches** = primary account + linked branch accounts (not raw `branch` row count alone).
+
+**chats_per_day** = messages **sent** per day (`POST …/messages`).
+
+## Supplier plan matrix (summary)
+
+| Plan     | branches | warehouses | users |  SKUs | chats/day | promotions (active deals) | storage |
+| -------- | -------: | ---------: | ----: | ----: | --------: | ------------------------: | ------: |
+| Free     |        1 |          0 |     1 |    10 |         3 |                         1 |   50 MB |
+| Silver   |        1 |          1 |     3 |   250 |        30 |                         3 |  500 MB |
+| Gold     |        3 |          3 |    15 | 3,000 |       500 |                        25 |   10 GB |
+| Platinum |        ∞ |          ∞ |     ∞ |     ∞ |         ∞ |                         ∞ |   30 GB |
+
+## Tier logger / admin display
+
+- **Explicit `-1`** in plan JSON → unlimited.
+- **Missing key** on a plan row → tier logger shows **`n/a`** (not unlimited). Restaurant plans do not include `promotions` in limits JSON.
+- **Admin plan cards** show only keys present in `subscription_plan.limits` JSON.
 
 ## Enforcement
 
-- **Feature entitlements:** `requireFeature(featureKey)` middleware returns **403** with error name **FEATURE_NOT_AVAILABLE** when the plan does not include the feature. The following feature keys are currently gated on routes:
-  `chat`, `quick_lists`, `receiving_quality`, `finance_invoices`, `inventory_management`, `reports`, `disputes_returns`, `approvals_budgets`, `promotions`, `supplier_deals`, `tenant_audit_log`, `push_notifications`, `supplier_reviews`, `order_amendments`, `fulfillment`, `driver_management`, `warehouses`, `multi_warehouse`, `order_calendar`, `advanced_roles`
-- **Limits:** `requireWithinLimit(limitKey, usage)` and `checkLimit()` return **403** with error name **LIMIT_EXCEEDED** when usage exceeds the plan (or override) limit.
-- **Permissions:** Routes also enforce RBAC (e.g. ORDERS_CREATE, CHAT_SEND, INVENTORY_EDIT, RECEIVING_VIEW, RECEIVING_MANAGE, PAYMENTS_MANAGE, INVOICES_VIEW). See FEATURE_CATALOG.md.
-- **Subscription cache:** Subscription rows are cached with a 30-second TTL (Redis when available, in-memory fallback). Cache is invalidated automatically on plan changes, checkouts, account unlocks, and admin updates.
+- **Feature entitlements:** `requireFeature(featureKey)` → **403** `FEATURE_NOT_AVAILABLE` when disabled on plan (and not overridden).
+- **Limits:** `checkLimit()` / `requireWithinLimit()` → **403** `LIMIT_EXCEEDED`. Non-applicable meters (e.g. `promotions` on restaurants) return `notApplicable` without treating as unlimited.
+- **Permissions:** RBAC on routes (see [FEATURE_CATALOG.md](../product/FEATURE_CATALOG.md)).
+- **Subscription cache:** 30s TTL; invalidated on plan/checkout/admin changes.
+
+Gated feature keys include: `chat`, `quick_lists`, `receiving_quality`, `finance_invoices`, `inventory_management`, `reports`, `disputes_returns`, `promotions` (supplier), `supplier_deals` (restaurant), `tenant_audit_log`, `push_notifications`, `supplier_reviews`, `order_amendments`, `fulfillment`, `driver_management`, `warehouses`, `multi_warehouse`, `order_calendar`, `advanced_roles`, `waitlist_auto_promo`, `smart_reorder`, `waste_tracking`, etc.
 
 ## Enterprise plan
 
-- **Enterprise** is a separate plan (`code = 'enterprise'`) for both RESTAURANT and SUPPLIER with unlimited or very high limits and full features. It has `requires_admin_assignment = true`: only an admin can assign it (no self-serve). See **[ENTERPRISE.md](./ENTERPRISE.md)** for what enterprise gets, SLA options, custom contracts, and manual onboarding.
+Separate `enterprise` plan; `requires_admin_assignment = true`. See [ENTERPRISE.md](./ENTERPRISE.md).
 
 ## Admin
 
-- **Plans tab:** Filter by tenant type (Restaurant / Supplier). Create plan requires **code** and **tenant_type**; only limits/features relevant to that type are shown when editing. Enterprise plan is visible and assignable when changing a tenant’s subscription.
-- **Subscriptions:** When changing a tenant’s plan, the new plan’s `tenant_type` must match the subscription’s tenant (Restaurant vs Supplier). Enterprise can only be assigned by admin.
+- **Plans tab:** Filter RESTAURANT vs SUPPLIER. Plan **code** for paid entry tier is **`silver`** (legacy API alias `bronze` → `silver` in `plan-codes.js`).
+- **Subscriptions:** Target plan `tenant_type` must match subscription.
 
 ## Deal boost monetization (add-on)
 
-Beyond plan entitlements, suppliers can purchase **deal promotion boosts** (paid visibility to non-follower restaurants). Pricing tiers live in `promotion_pricing_config` and are editable from **Admin → Deals**. Boost checkout is currently stubbed (`waivePayment: true`) pending billing integration; campaigns still activate for testing.
+Supplier **deal promotion boosts** (paid visibility) use `promotion_pricing_config` / `deal_promotions` — separate from plan `promotions` limit (active deal count). Boost checkout may be stubbed (`waivePayment: true`) for testing.
 
 ## Entitlements endpoint
 
-**GET /api/subscriptions/entitlements** (auth + SUBSCRIPTIONS_VIEW): returns canonical object with tenantType, tenantId, plan, features, limits (with overrides), baseLimits, overrides (non-expired only), usage, usageWindowMeta.
+**GET /api/subscriptions/entitlements/current** — plan, features, limits (with overrides), usage, `usageWindowMeta`.
 
 ## Plan change preview
 
-**POST /api/admin-dashboard/subscriptions/:id/preview-change** body `{ targetPlanId }` returns willExceed, featureDiff, recommendedActions. **PATCH .../subscriptions/:id** with `planId` (and optional `allowExceedance`) applies change; tenant_type must match; 400 LIMIT_EXCEEDED if usage exceeds target unless allowExceedance.
+**POST /api/admin-dashboard/subscriptions/:id/preview-change** — `willExceed`, `featureDiff`. **PATCH** with `planId` applies change; `allowExceedance` optional.
 
 ## Migration notes
 
-- Migration **0044** adds `subscription_plan.tenant_type`, normalizes limit keys, duplicates plans into RESTAURANT and SUPPLIER catalogs, and points existing subscriptions to the correct plan by tenant type.
-- Migration **0063** rebalances restaurant Free/Bronze/Gold limits (branches include primary account; Bronze 20 orders/day; Gold 50 orders/day).
-- Migration **0064** sets full Bronze/Gold limit objects (inventory SKUs 1,000 on Gold, not 10,000).
-- **usage_meter:** Rows with `meter_type = 'products'` and `tenant_type = 'SUPPLIER'` were updated to `meter_type = 'supplier_products_skus'`.
-- **tenant_limit_override:** `limit_type = 'products'` was updated to `supplier_products_skus` or `restaurant_inventory_skus` by tenant type.
+- **0044** — `tenant_type`, per-type catalogs.
+- **0116** — plan code `bronze` renamed to **`silver`** (display Silver).
+- **0117** — Silver limits/features tightened (first paid tier positioning).
+- **0119** — Gold limits/features rebalanced (finite caps; feature bundle unchanged vs pre-0119 marketing).
+- **0120** — Platinum limits/features normalized (30 GB storage, unlimited meters, waste_tracking fix, legacy keys removed).
+- **0063 / 0064** — historical Gold/Silver limit rebalances (superseded for Silver by 0117, Gold by 0119).

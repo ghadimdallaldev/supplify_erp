@@ -68,7 +68,7 @@ Restaurant linked accounts remain on `/api/branches`.
 
 `multi_branch` on subscription plans:
 
-- **Free / Bronze:** single branch; no switcher dropdown; org overview shows upgrade copy.
+- **Free / Silver:** single branch; no switcher dropdown; org overview shows upgrade copy.
 - **Silver+:** multiple branches; switcher and **Org overview** (`/app/org`) for Org Owner / Org Manager.
 
 ## Migrations

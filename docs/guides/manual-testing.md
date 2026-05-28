@@ -25,7 +25,7 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 **Notes:**
 
 - **Numbers:** Currency and numeric values should come from the API and use shared formatters (`formatCurrency` / `formatPrice`).
-- **Tiers & features:** Enforced via `requireFeature`, `checkLimit`. Admin → Subscriptions changes tenant capabilities.
+- **Tiers & features:** Enforced via `requireFeature`, `checkLimit`. Silver limits/features: migration `0117` · `pnpm run log:tier-limits`. Full gate matrix: [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) Part 3.
 - **Free Trial expiry:** [free-trial-expiry.md](../features/free-trial-expiry.md); full regression cases **BIL-FT-01 … BIL-FT-12** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) §4.6.
 - **Impersonation:** Start from tenant management; stop via the amber banner.
 

@@ -14,7 +14,6 @@ Base URL: `http://localhost:4000` (dev). All `/api/*` routes return JSON with sh
 | `/api/restaurants`             | `restaurants.routes.js`               | Restaurant profiles and admin CRUD                                                                                               |
 | `/api/orders/calendar`         | `orders.calendar.routes.js`           | Order calendar view (plan feature)                                                                                               |
 | `/api/orders`                  | `orders.routes.js`                    | Orders lifecycle, manual orders, supplier **decline** (`PATCH /:id` + `decline_reason`), amendments under `/:orderId/amendments` |
-| `/api/approvals`               | `approvals.routes.js`                 | Order approval rules and requests                                                                                                |
 | `/api/promotions`              | `promotions.routes.js`                | Supplier deals CRUD, restaurant discovery, boosts, admin approvals/pricing; order promotion join on GET                          |
 | `/api/audit`                   | `tenant-audit.routes.js`              | Tenant-scoped audit log                                                                                                          |
 | `/api/disputes`                | `disputes.routes.js`                  | Disputes and returns                                                                                                             |

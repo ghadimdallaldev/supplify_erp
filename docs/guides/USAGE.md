@@ -74,7 +74,7 @@ When usage reaches **80% of limit**:
 - **No functionality is blocked**
 - Clear upgrade CTA shown
 
-**Example:** Restaurant on Bronze plan (100 orders/day limit)
+**Example:** Restaurant on Silver plan (20 orders/day limit per migration `0117`)
 
 - 80+ orders today → Warning badge appears
 - Orders still work normally
@@ -201,10 +201,10 @@ After downgrade:
 - Existing items remain accessible
 - Upgrade prompt shown prominently
 
-### Example: Gold → Bronze (Restaurant)
+### Example: Gold → Silver (Restaurant)
 
 **Before:** 3 branches (Gold allows 3)
-**After:** Downgrade to Bronze (allows 1 branch)
+**After:** Downgrade to Silver (allows 1 branch)
 
 **Result:**
 
@@ -212,7 +212,7 @@ After downgrade:
 - Branch 1 active (within limit)
 - Branches 2-3 **locked** (exceed limit)
 - Cannot create 4th branch
-- Dashboard shows: "2 branches exceed Bronze limit. Upgrade to Gold to unlock."
+- Dashboard shows: "2 branches exceed Silver limit. Upgrade to Gold to unlock."
 
 ---
 

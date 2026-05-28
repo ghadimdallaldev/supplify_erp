@@ -15,6 +15,7 @@ import { Badge } from '../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Input } from '../components/ui/input'
 import { formatPrice } from '../utils/format'
+import { pageHeaderRowClass, splitRowClass } from '../components/ui/card-layout'
 import {
   MapPin,
   CheckCircle,
@@ -331,15 +332,15 @@ export function FulfillmentPage() {
           <TabsContent value="picklists" className="space-y-4">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className={splitRowClass}>
+                  <div className="min-w-0">
                     <CardTitle className="flex items-center gap-2">
-                      <ClipboardList className="h-5 w-5" />
+                      <ClipboardList className="h-5 w-5 shrink-0" />
                       Pick Lists
                     </CardTitle>
                     <CardDescription>Mobile-friendly picking interface</CardDescription>
                   </div>
-                  <Input placeholder="Search pick list..." className="w-64" />
+                  <Input placeholder="Search pick list..." className="w-full sm:w-64 shrink-0" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -355,11 +356,11 @@ export function FulfillmentPage() {
                         key={order.id}
                         className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Link to={`/app/orders/${order.id}`}>
-                                <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer">
+                        <div className={splitRowClass}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <Link to={`/app/orders/${order.id}`} className="min-w-0">
+                                <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer truncate">
                                   #{order.orderNumber}
                                 </h4>
                               </Link>
@@ -383,11 +384,16 @@ export function FulfillmentPage() {
                               <p>Placed: {new Date(order.placedAt).toLocaleDateString()}</p>
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
+                          <div className="flex flex-wrap gap-2 shrink-0">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="whitespace-normal"
+                              asChild
+                            >
                               <Link to={`/app/orders/${order.id}`}>View Details</Link>
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" className="whitespace-normal">
                               View Mobile
                             </Button>
                           </div>
@@ -403,7 +409,7 @@ export function FulfillmentPage() {
           <TabsContent value="routes" className="space-y-4">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className={splitRowClass}>
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5" />
@@ -423,9 +429,9 @@ export function FulfillmentPage() {
                   ) : (
                     routeSummaries.map((route) => (
                       <div key={route.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
+                        <div className={splitRowClass}>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
                               <h4 className="font-semibold">{route.routeNumber}</h4>
                               <Badge
                                 variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}
@@ -440,11 +446,11 @@ export function FulfillmentPage() {
                               </p>
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm">
+                          <div className="flex flex-wrap gap-2 shrink-0">
+                            <Button variant="outline" size="sm" className="whitespace-normal">
                               View Map
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" className="whitespace-normal">
                               Manifest
                             </Button>
                           </div>
@@ -477,10 +483,10 @@ export function FulfillmentPage() {
                       .filter((o) => o.status === 'SHIPPED')
                       .map((order) => (
                         <div key={order.id} className="border rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
+                          <div className={splitRowClass}>
+                            <div className="flex-1 min-w-0">
                               <Link to={`/app/orders/${order.id}`}>
-                                <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer">
+                                <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer truncate">
                                   Order #{order.orderNumber}
                                 </h4>
                               </Link>
@@ -523,9 +529,9 @@ export function FulfillmentPage() {
                   ) : (
                     exceptions.map((ex) => (
                       <div key={ex.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-semibold">
+                        <div className={splitRowClass}>
+                          <div className="min-w-0">
+                            <h4 className="font-semibold break-words">
                               {ex.orderLabel} - {ex.exceptionType.replace(/_/g, ' ')}
                             </h4>
                             <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
@@ -782,8 +788,8 @@ function DispatchColumn({
             <div>
               <p className="font-medium text-[var(--text)]">{route.route_number}</p>
               <p>
-                <span className="font-semibold text-[var(--text)]">{route.status}</span> ·
-                Scheduled {new Date(route.scheduled_date).toLocaleDateString()}
+                <span className="font-semibold text-[var(--text)]">{route.status}</span> · Scheduled{' '}
+                {new Date(route.scheduled_date).toLocaleDateString()}
               </p>
             </div>
           </div>

@@ -79,7 +79,7 @@ After running the seed:
 - **Reservations** – Upcoming and past reservations per branch (40–150 per restaurant), mixed statuses (Pending, Confirmed, Seated, Completed, Cancelled, Waitlist), party sizes and time slots.
 - **Orders** – 60–180 orders per restaurant over the last 90 days, 6–25 lines per order, 2–7 suppliers per order; each restaurant’s history includes items from all 50 suppliers.
 - **Staff & shifts** – Restaurant staff (6–14 per restaurant), roles (manager, cashier, chef, receiver, accountant, waiter), and shifts for the last 14 days (morning/evening).
-- **Subscriptions** – Mixed tiers (Free, Bronze, Gold, Platinum), billing cycles (monthly/yearly), and states (Active, Trialing, Past due, Cancelled).
+- **Subscriptions** – Mixed tiers (Free, Silver, Gold, Platinum), billing cycles (monthly/yearly), and states (Active, Trialing, Past due, Cancelled).
 - **Chat** – After `seed:chats`: one conversation per restaurant–supplier pair that has orders, with 2–6 sample messages each. Log in as any restaurant or supplier to see and test chats.
 
 ## Volumes (minimum)

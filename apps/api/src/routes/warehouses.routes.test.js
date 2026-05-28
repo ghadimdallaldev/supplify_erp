@@ -39,6 +39,14 @@ vi.mock('../lib/plan-enforcement.js', () => ({
   createAuditLog: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../lib/warehouse-helpers.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    ensureDefaultWarehouseForPaidSupplier: vi.fn().mockResolvedValue(null),
+  }
+})
+
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
@@ -69,11 +77,18 @@ describe('Warehouses Routes', () => {
 
   describe('GET /api/warehouses', () => {
     it('should return warehouses for supplier (supplier_id column)', async () => {
-      db.query
-        .mockResolvedValueOnce({ rows: [{ column_name: 'supplier_id' }] })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'wh-1', name: 'Main Warehouse', supplier_id: 'supplier-1' }],
-        })
+      db.query.mockImplementation(async (sql) => {
+        const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('information_schema.columns')) {
+          return { rows: [{ column_name: 'supplier_id' }] }
+        }
+        if (text.includes('FROM warehouse w')) {
+          return {
+            rows: [{ id: 'wh-1', name: 'Main Warehouse', supplier_id: 'supplier-1' }],
+          }
+        }
+        return { rows: [] }
+      })
 
       const response = await request(app).get('/api/warehouses').expect(200)
 

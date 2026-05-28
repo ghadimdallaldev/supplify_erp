@@ -49,7 +49,7 @@ flowchart TB
 
 ### Why this matters to buyers
 
-- **Growing restaurants** — Start on Free/Bronze to try the product; move to Gold for multi-branch and daily volume; consider Platinum or Enterprise when scale and guarantees matter.
+- **Growing restaurants** — Start on Free/Silver to try the product; move to Gold for multi-branch and daily volume; consider Platinum or Enterprise when scale and guarantees matter.
 - **Suppliers** — Scale from one warehouse to many, and from dozens to thousands of products, with plans and overrides that match your growth.
 - **Investors and partners** — The same codebase serves SMB and enterprise; revenue and conversion tooling (limits, recommendations, funnel stats) support monetization and positioning.
 

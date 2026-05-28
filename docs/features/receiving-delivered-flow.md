@@ -1,6 +1,6 @@
 # Receiving after supplier delivery
 
-Plan feature key: `receiving_quality` (Bronze+ for restaurants).
+Plan feature key: `receiving_quality` (Silver+ for restaurants).
 
 ## Flow
 

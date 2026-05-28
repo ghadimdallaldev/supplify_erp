@@ -4,10 +4,10 @@ Warehouses are a **fulfillment** concept inside a supplier branch (not a separat
 
 ## Feature flags
 
-| Key               | Plans (supplier) | When off                                     | When on                              |
-| ----------------- | ---------------- | -------------------------------------------- | ------------------------------------ |
-| `warehouses`      | Bronze+          | No warehouse UI/API                          | CRUD, inventory per warehouse, zones |
-| `multi_warehouse` | Gold+            | Single default warehouse fulfills all orders | Per-item routing, split fulfillment  |
+| Key               | Plans (supplier)                  | When off                                     | When on                              |
+| ----------------- | --------------------------------- | -------------------------------------------- | ------------------------------------ |
+| `warehouses`      | Silver+ (Silver: **1** warehouse) | No warehouse UI/API (Free: 0)                | CRUD, inventory per warehouse, zones |
+| `multi_warehouse` | Gold+                             | Single default warehouse fulfills all orders | Per-item routing, split fulfillment  |
 
 Both flags appear in **Admin → Features** (global + per-tenant override).
 
