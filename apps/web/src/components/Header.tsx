@@ -40,6 +40,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/disputes': 'Disputes',
   '/app/deals': 'Deals',
   '/app/promotions': 'Promotions',
+  '/app/driver-deliveries': 'My Deliveries',
   '/app/onboarding': 'Onboarding',
   '/app/org': 'Organization',
   '/app/inventory': 'Inventory',
@@ -136,17 +137,12 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   return (
     <header
       data-testid="header"
+      className="flex shrink-0 items-center gap-2 border-b border-[var(--app-border)] bg-[var(--surface)] px-3 py-0 sm:gap-3 sm:px-5 lg:px-6"
       style={{
-        height: 56,
         minHeight: 56,
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--app-border)',
-        padding: '0 22px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
+        height: 56,
         fontFamily: "'Inter', system-ui, sans-serif",
-        flexShrink: 0,
+        paddingTop: 'env(safe-area-inset-top)',
       }}
     >
       {onOpenMobileNav && (
@@ -161,15 +157,17 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
       )}
 
       {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400 }}>Supplify</span>
-        <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
-        <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{pageName}</span>
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+        <span className="hidden text-[13px] font-normal text-[var(--text-muted)] xs:inline">
+          Supplify
+        </span>
+        <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)] xs:block" />
+        <span className="truncate text-[13px] font-semibold text-[var(--text)]">{pageName}</span>
         {workspaceLabel && (
           <>
-            <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
+            <ChevronRight size={13} className="hidden shrink-0 text-[var(--text-muted)] sm:block" />
             <span
-              style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}
+              className="hidden truncate text-xs font-medium text-[var(--text-muted)] sm:inline max-w-[8rem] md:max-w-[14rem]"
               data-testid="workspace-context"
             >
               {workspaceLabel}
@@ -179,7 +177,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
       </div>
 
       {/* Right side controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
         <BranchSwitcher />
 
         {showUpgrade && (
@@ -187,7 +185,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             variant={hasUrgency ? 'default' : 'outline'}
             size="sm"
             onClick={handleNavUpgrade}
-            className="relative"
+            className="relative hidden min-h-9 sm:inline-flex"
             style={
               hasUrgency
                 ? { background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }
@@ -273,19 +271,8 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
 
           {showNotifications && (
             <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 44,
-                width: 320,
-                background: 'var(--surface)',
-                borderRadius: 12,
-                border: '1px solid var(--app-border)',
-                boxShadow: '0 8px 32px rgba(91,33,182,0.12)',
-                zIndex: 50,
-                maxHeight: 400,
-                overflowY: 'auto',
-              }}
+              data-testid="notifications-dropdown"
+              className="fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--surface)] shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 sm:w-[min(100vw-1.5rem,20rem)]"
             >
               <div
                 style={{

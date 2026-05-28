@@ -33,8 +33,8 @@ ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
 ENV VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM
 
-# Build the application
-RUN pnpm build
+# Build the application (skip tsc in container — typecheck runs in CI)
+RUN pnpm build:docker
 
 # Production image with nginx
 FROM nginx:alpine AS runner
