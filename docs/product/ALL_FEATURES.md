@@ -64,7 +64,7 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 **Additional controls:**
 
 - **Tenant-scoped RBAC** — fine-grained permissions per restaurant/supplier (e.g. `INVOICES_VIEW`, `STAFF_MANAGE`).
-- **Admin impersonation** — platform admin views the app as a chosen restaurant or supplier (signed cookie).
+- **Admin impersonation** — platform admin navigates the full restaurant or supplier workspace (signed cookie, branch-aware, billing mutations blocked); see [features/admin-impersonation.md](../features/admin-impersonation.md).
 - **Multi-branch** — restaurants and suppliers use org branch accounts (`/api/restaurant-org`, `/api/org`, `/app/org`) with Regional Manager scoping and link-based team invites (`/invite?type=rm|rb|sb`).
 - **Multi-warehouse fulfillment** — Gold+ suppliers route order lines to warehouses (single default vs per-item routing).
 - **Subscription entitlements** — plan features and usage limits enforced on API.
@@ -332,7 +332,7 @@ Also available via API (not always separate pages):
 - Usage per tenant
 - Financial overview
 - Audit logs
-- Impersonate start/stop/status
+- Impersonate start/stop/status (`sessionId`, `acknowledgeSuspended`, `redirectTo`)
 - Tenant list (suppliers, restaurants)
 - Per-tenant entitlements & usage
 - Limit overrides (create/delete)
@@ -364,7 +364,7 @@ Also available via API (not always separate pages):
 | **Plan enforcement**          | `requireFeature()`, `checkLimit()`, usage meters                                             |
 | **Billing access middleware** | Locked tenants → billing/subscription routes only                                            |
 | **Monetization UI**           | Upgrade modals, limit banners, pay-overdue modal                                             |
-| **Impersonation banner**      | Visual indicator when admin is viewing as tenant                                             |
+| **Impersonation banner**      | Sticky “Impersonating …” + exit; `useImpersonation` drives tenant UI                         |
 | **Branch context**            | Active branch cookie/header for multi-site ops                                               |
 | **i18n-ready product data**   | Product `name_ar`, `description_ar` fields                                                   |
 | **Demo data & seeds**         | Extensive seed scripts for dev/demo                                                          |

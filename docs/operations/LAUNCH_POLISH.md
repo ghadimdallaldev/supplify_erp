@@ -54,7 +54,7 @@ Quick checks to verify the “Launch Polish Micro” tweaks (Recommended badge, 
 2. **Near-limit**: Use an account with at least one limit ≥ 80%. Header shows “Upgrade” (and dot if implemented). Click → modal opens with that limit context; event has `trigger: "near_limit"`.
 3. **Blocked in last 7d**: Trigger a block (e.g. hit a limit or feature block), then go to app. Header shows “Upgrade”. Click → modal opens; event has `trigger: "blocked"`.
 4. **Paid, under limits, no recent blocks**: Header should **not** show “Upgrade”.
-5. **Admin**: Log in as Admin (no impersonation). Header should not show “Upgrade” (skip entitlements).
+5. **Admin**: Log in as Admin (no impersonation). Header should not show “Upgrade” (skip entitlements). When impersonating, tenant entitlements/banners apply — see [admin-impersonation.md](../features/admin-impersonation.md).
 
 ---
 

@@ -33,7 +33,7 @@ Fresh Keycloak users complete organization setup at `/register/complete`, then u
 
 ## Roles & navigation
 
-The sidebar (`apps/web/src/components/Sidebar.tsx`) adapts by role and admin impersonation:
+The sidebar (`apps/web/src/components/Sidebar.tsx`) adapts by **effective tenant role** (`useImpersonation()` when an admin is impersonating):
 
 | Role                  | Primary nav                                                                                                                                                             |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -195,18 +195,18 @@ Tests: `notification.service.test.js`, `push.service.test.js`, `orderStatusDispl
 
 ## Admin platform
 
-| Feature             | Web route                 | API prefix                                         | Notes                                      |
-| ------------------- | ------------------------- | -------------------------------------------------- | ------------------------------------------ |
-| Admin dashboard     | `/app/admin`              | `/api/admin-dashboard`                             | Metrics, tenants, plans                    |
-| Supplier admin      | `/app/admin/suppliers`    | same                                               | Supplier tenant management                 |
-| Restaurant admin    | `/app/admin/restaurants`  | same                                               | Restaurant tenant management               |
-| Feature toggles     | Admin → **Features** tab  | `/api/admin-dashboard/feature-flags`               | Global + per-tenant overrides              |
-| Limit overrides     | Admin → Usage / limits    | `/api/admin-dashboard/limit-overrides`             | Per-tenant meter caps                      |
-| Deal review         | Admin → **Deals** tab     | `/api/promotions/admin/*`                          | Approve, reject, insights                  |
-| Free Trial length   | Admin → Platform settings | `GET/PATCH /api/admin-dashboard/platform-settings` | Default **7** days; admin range **3–7**    |
-| Extend Free Trial   | Admin → Subscriptions     | `POST …/subscriptions/:id/extend-free-trial`       | Extends `free_sandbox_expires_at`, unlocks |
-| Impersonation       | Banner when active        | cookie + middleware                                | View app as tenant                         |
-| Legacy admin routes | —                         | `/api/admin`                                       | Internal maintenance endpoints             |
+| Feature             | Web route                 | API prefix                                                  | Notes                                                                                   |
+| ------------------- | ------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Admin dashboard     | `/app/admin`              | `/api/admin-dashboard`                                      | Metrics, tenants, plans                                                                 |
+| Supplier admin      | `/app/admin/suppliers`    | same                                                        | Supplier tenant management                                                              |
+| Restaurant admin    | `/app/admin/restaurants`  | same                                                        | Restaurant tenant management                                                            |
+| Feature toggles     | Admin → **Features** tab  | `/api/admin-dashboard/feature-flags`                        | Global + per-tenant overrides                                                           |
+| Limit overrides     | Admin → Usage / limits    | `/api/admin-dashboard/limit-overrides`                      | Per-tenant meter caps                                                                   |
+| Deal review         | Admin → **Deals** tab     | `/api/promotions/admin/*`                                   | Approve, reject, insights                                                               |
+| Free Trial length   | Admin → Platform settings | `GET/PATCH /api/admin-dashboard/platform-settings`          | Default **7** days; admin range **3–7**                                                 |
+| Extend Free Trial   | Admin → Subscriptions     | `POST …/subscriptions/:id/extend-free-trial`                | Extends `free_sandbox_expires_at`, unlocks                                              |
+| Impersonation       | Banner + tenant nav       | `/api/admin-dashboard/impersonate*` + `impersonation_token` | Full tenant workspace; see [admin-impersonation.md](../features/admin-impersonation.md) |
+| Legacy admin routes | —                         | `/api/admin`                                                | Internal maintenance endpoints                                                          |
 
 See [admin-feature-flags.md](../admin/admin-feature-flags.md) for toggle API details. Tests: `admin-dashboard.routes.test.js`.
 

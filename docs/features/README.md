@@ -29,5 +29,6 @@ Deep-dive docs per product area. The route map lives in [product/features.md](..
 | [restaurant-branches.md](./restaurant-branches.md)                       | Restaurant org branches                                    |
 | [supplier-branches.md](./supplier-branches.md)                           | Supplier org branches                                      |
 | [reports-analytics.md](./reports-analytics.md)                           | Reports module                                             |
+| [admin-impersonation.md](./admin-impersonation.md)                       | Platform admin view-as-tenant (support/debug)              |
 
 **QA:** [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) · [manual-testing.md](../guides/manual-testing.md)

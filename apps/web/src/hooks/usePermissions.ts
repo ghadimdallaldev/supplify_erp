@@ -4,7 +4,7 @@
  * When admin is impersonating, allows all tenant permissions so the UI matches backend access.
  */
 import { useAppSelector } from './redux'
-import { useGetImpersonationStatusQuery } from '../services/api'
+import { useImpersonation } from './useImpersonation'
 
 function hasPermission(permissions: string[] | undefined, required: string): boolean {
   if (!Array.isArray(permissions)) return false
@@ -16,11 +16,7 @@ function hasPermission(permissions: string[] | undefined, required: string): boo
 
 export function usePermissions() {
   const { user } = useAppSelector((state) => state.auth)
-  const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
-    skip: user?.role !== 'ADMIN',
-  })
-
-  const isImpersonating = user?.role === 'ADMIN' && impersonation?.active
+  const { isImpersonating } = useImpersonation()
 
   const can = (permissionKey: string): boolean => {
     if (!user) return false

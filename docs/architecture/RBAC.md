@@ -109,6 +109,7 @@ For ADMIN roles, `tenant_id` is NULL and `tenant_type` is `'ADMIN'`.
 
 - Uses `req.tenantContext.permissions` or `req.adminContext.permissions` and `hasPermission(perms, key)` (exact or `*_MANAGE` for same domain).
 - Bypass: if `req.userData.role === 'ADMIN'` and (impersonating **or** no tenant context but has admin context), access is allowed.
+- **requireRole:** ADMIN may call restaurant-only or supplier-only routes when impersonating that `tenantType` (`getEffectiveTenant`).
 
 ## API
 
@@ -120,8 +121,11 @@ For ADMIN roles, `tenant_id` is NULL and `tenant_type` is `'ADMIN'`.
 
 ## Frontend
 
-- **usePermissions()** – hook that returns `can(permissionKey)`. Uses `user.tenantPermissions` or `user.adminPermissions`; when admin is impersonating, returns `true` for any key so the UI matches backend access.
-- Sidebar: Settings link requires `SETTINGS_VIEW`; Staff, Reservations, Inventory, Invoices (and supplier Invoices) are gated by their view permission; admin nav requires `ADMIN_ACCESS`.
+- **useImpersonation()** – `effectiveRole`, `isEffectiveRestaurant` / `isEffectiveSupplier`, `shouldLoadTenantEntitlements` for impersonating admins.
+- **usePermissions()** – `can(permissionKey)`; when impersonating, returns `true` for tenant keys so UI matches backend `requirePermission` bypass.
+- Sidebar: tenant nav when `useImpersonation()` reports restaurant/supplier; admin nav when platform admin and not impersonating; Settings/Staff/etc. gated by permissions.
+
+**Impersonation:** [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md)
 
 ## Subscription features vs RBAC
 

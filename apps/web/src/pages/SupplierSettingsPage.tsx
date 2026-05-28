@@ -49,6 +49,8 @@ import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
 import {
   canAddWarehouses,
+  getWarehouseAddGate,
+  formatWarehouseGateMessage,
   canUseCustomBranding,
   customBrandingUpgradeMessage,
   warehousesFeatureEnabled,
@@ -186,7 +188,8 @@ export function SupplierSettingsPage() {
   const fulfillment = fulfillmentData?.fulfillment
   const multiWarehouseActive = isMultiWarehouseActive(entitlements, fulfillment ?? supplier)
   const warehouseCount = warehousesData?.warehouses?.length ?? 0
-  const canAddWarehouse = canAddWarehouses(entitlements, warehouseCount)
+  const warehouseGate = getWarehouseAddGate(entitlements, warehouseCount)
+  const canAddWarehouse = warehouseGate.canAdd
   const brandingAllowed = canUseCustomBranding(entitlements)
 
   // Profile form state
@@ -1091,8 +1094,7 @@ export function SupplierSettingsPage() {
                 <CardContent>
                   {!canAddWarehouse && (
                     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      Your plan does not allow additional warehouses. Upgrade to Silver or higher to
-                      add locations. (Free tier: 0 warehouses; legacy default rows are not counted.)
+                      {formatWarehouseGateMessage(warehouseGate)}
                     </div>
                   )}
                   <div className="space-y-3">

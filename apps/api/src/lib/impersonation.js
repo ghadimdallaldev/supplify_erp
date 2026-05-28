@@ -2,29 +2,34 @@
  * Admin impersonation: signed short-lived token and effective-tenant helper.
  * Used so admins can "view as" a Restaurant or Supplier without logging in as that tenant.
  */
+import { randomUUID } from 'crypto'
 import * as jose from 'jose'
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
+import { query } from './db.js'
 
 const COOKIE_NAME = 'impersonation_token'
 const ALG = 'HS256'
 
 /**
  * Create a signed impersonation token (JWT).
- * @param {{ adminUserId: string, tenantId: string, tenantType: string, tenantName: string }} payload
+ * @param {{ adminUserId: string, tenantId: string, tenantType: string, tenantName: string, sessionId?: string }} payload
  * @returns {Promise<string>} JWT
  */
 export async function createImpersonationToken(payload) {
   const secret = new TextEncoder().encode(config.IMPERSONATION_SECRET)
   const maxMin = config.IMPERSONATION_MAX_DURATION_MINUTES || 60
   const exp = Math.floor(Date.now() / 1000) + maxMin * 60
+  const sessionId = payload.sessionId || randomUUID()
   const token = await new jose.SignJWT({
     adminUserId: payload.adminUserId,
     tenantId: payload.tenantId,
     tenantType: payload.tenantType,
     tenantName: payload.tenantName || '',
+    sessionId,
   })
     .setProtectedHeader({ alg: ALG })
+    .setJti(sessionId)
     .setIssuedAt()
     .setExpirationTime(exp)
     .sign(secret)
@@ -46,6 +51,7 @@ export async function verifyImpersonationToken(token) {
       tenantId: payload.tenantId,
       tenantType: payload.tenantType,
       tenantName: payload.tenantName || '',
+      sessionId: payload.sessionId || payload.jti || null,
       exp: payload.exp,
     }
   } catch (err) {
@@ -90,5 +96,47 @@ export function getEffectiveTenant(req) {
     tenantId: ctx.tenantId,
     tenantType: ctx.tenantType,
     tenantName: ctx.tenantName || '',
+    sessionId: ctx.sessionId || null,
   }
+}
+
+/** True when the authenticated admin is actively impersonating a tenant. */
+export function isImpersonating(req) {
+  return Boolean(getEffectiveTenant(req))
+}
+
+/**
+ * During impersonation, verify a branch/linked account belongs to the impersonated tenant's org.
+ */
+export async function impersonationCanAccessBranch(
+  impersonatedTenantId,
+  impersonatedTenantType,
+  targetTenantId,
+  targetTenantType
+) {
+  if (!impersonatedTenantId || !targetTenantId) return false
+  if (impersonatedTenantType !== targetTenantType) return false
+  if (impersonatedTenantId === targetTenantId) return true
+
+  const table = targetTenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+  const { rows: baseRows } = await query(`SELECT organization_id FROM ${table} WHERE id = $1`, [
+    impersonatedTenantId,
+  ])
+  const { rows: targetRows } = await query(`SELECT organization_id FROM ${table} WHERE id = $1`, [
+    targetTenantId,
+  ])
+  const baseOrg = baseRows[0]?.organization_id
+  const targetOrg = targetRows[0]?.organization_id
+  if (baseOrg && targetOrg && baseOrg === targetOrg) return true
+
+  const { rows: linkRows } = await query(
+    `
+    SELECT 1 FROM tenant_account_link
+    WHERE parent_tenant_id = $1 AND parent_tenant_type = $2
+      AND child_tenant_id = $3 AND child_tenant_type = $2
+    LIMIT 1
+    `,
+    [impersonatedTenantId, targetTenantType, targetTenantId]
+  )
+  return linkRows.length > 0
 }

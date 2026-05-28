@@ -26,7 +26,7 @@ Use on **routes and UI actions** (view vs manage).
 - **Use:** `requireRestaurantId(req)` / `requireSupplierId(req)` from `apps/api/src/lib/tenant-resolve.js`
 - **Do not** resolve only via `restaurant.contact_email = user.email` — team members and multi-tenant users will fail.
 
-`getRestaurantIdForRequest` uses active tenant, workspace membership, impersonation, then primary contact fallback.
+`getRestaurantIdForRequest` / `getRequestTenant` use impersonation (`getEffectiveTenant`), active branch cookie, workspace membership, then primary contact fallback. See [features/admin-impersonation.md](../features/admin-impersonation.md).
 
 ## Module analytics vs global reports
 

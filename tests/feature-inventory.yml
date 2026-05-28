@@ -34,6 +34,12 @@ features:
       - e2e/suites/critical_e2e/rbac.spec.ts
       - api/admin-rbac.spec.ts
 
+  - id: admin_impersonation
+    name: Admin impersonation
+    description: Platform admin view-as-tenant; cookie session, tenant scoping, billing guard, audit
+    test_files:
+      - api/admin-impersonation.spec.ts
+
   - id: receiving
     name: Receiving (goods-in)
     description: Restaurant receives DELIVERED orders; pending list and history

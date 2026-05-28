@@ -20,24 +20,67 @@ function limitNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/** Aligns with API `evaluatePlanFeatureValue` — tier strings count as enabled. */
+export function evaluatePlanFeatureValue(featureValue: unknown): boolean {
+  if (featureValue === undefined) return false
+  if (typeof featureValue === 'boolean') return featureValue
+  if (typeof featureValue === 'string') {
+    return featureValue !== 'false' && featureValue !== 'disabled' && featureValue !== ''
+  }
+  return Boolean(featureValue)
+}
+
 export function featureEnabled(value: unknown): boolean {
-  if (value === true) return true
-  if (value === false || value == null) return false
-  if (typeof value === 'string') return value !== 'false' && value.length > 0
-  return Boolean(value)
+  return evaluatePlanFeatureValue(value)
+}
+
+/** Resolved feature value: entitlements.features, then raw planFeatures from catalog JSON. */
+export function resolveEntitlementFeature(
+  entitlements: Entitlements | null | undefined,
+  key: string
+): unknown {
+  if (!entitlements) return undefined
+  const resolved = entitlements.features?.[key]
+  if (resolved !== undefined && resolved !== null) return resolved
+  return entitlements.planFeatures?.[key]
+}
+
+export function isEntitlementFeatureEnabled(
+  entitlements: Entitlements | null | undefined,
+  key: string
+): boolean {
+  if (featureEnabled(entitlements?.features?.[key])) return true
+  return featureEnabled(entitlements?.planFeatures?.[key])
 }
 
 /** Plan allows multi-branch (Gold boolean, Platinum tier string, Silver off). */
 export function multiBranchEnabled(entitlements: Entitlements | null | undefined): boolean {
-  return featureEnabled(entitlements?.features?.multi_branch)
+  return isEntitlementFeatureEnabled(entitlements, 'multi_branch')
 }
 
 export type BranchAddGate = {
   canAdd: boolean
-  reason: 'ok' | 'at_limit' | 'feature_unavailable'
+  reason:
+    | 'ok'
+    | 'at_limit'
+    | 'feature_unavailable'
+    | 'addon_or_upgrade'
+    | 'upgrade_to_gold'
+    | 'contact_enterprise'
   current: number
   limit: number | null
+  includedLimit?: number | null
   planName: string | null
+  planCode?: string | null
+}
+
+function planCodeLower(entitlements: Entitlements | null | undefined): string {
+  return (entitlements?.plan?.code ?? entitlements?.plan?.name ?? '').toLowerCase()
+}
+
+function canBuyBranchAddons(entitlements: Entitlements | null | undefined): boolean {
+  const code = planCodeLower(entitlements)
+  return code === 'gold' || code === 'platinum'
 }
 
 /** Whether the tenant may create another restaurant/supplier branch under the current plan. */
@@ -46,6 +89,9 @@ export function getBranchAddGate(
   currentCount = 0
 ): BranchAddGate {
   const planName = entitlements?.plan?.name ?? null
+  const planCode = entitlements?.plan?.code ?? null
+  const loc = entitlements?.locationLimits?.branches
+
   if (!entitlements) {
     return {
       canAdd: false,
@@ -53,10 +99,24 @@ export function getBranchAddGate(
       current: currentCount,
       limit: null,
       planName,
+      planCode,
     }
   }
 
-  const limit = limitNumber(entitlements.limits?.branches)
+  if (loc?.atEnterpriseThreshold || currentCount >= (loc?.enterpriseThreshold ?? 6)) {
+    return {
+      canAdd: false,
+      reason: 'contact_enterprise',
+      current: currentCount,
+      limit: loc?.effective ?? limitNumber(entitlements.limits?.branches),
+      includedLimit: loc?.included ?? null,
+      planName,
+      planCode,
+    }
+  }
+
+  const limit = loc?.effective ?? limitNumber(entitlements.limits?.branches)
+  const includedLimit = loc?.included ?? entitlements.limitsBeforeAddons?.branches ?? limit
   const multiBranch = multiBranchEnabled(entitlements)
 
   if (limit === 0) {
@@ -66,7 +126,9 @@ export function getBranchAddGate(
         reason: 'at_limit',
         current: currentCount,
         limit: 0,
+        includedLimit: 0,
         planName,
+        planCode,
       }
     }
     return {
@@ -75,15 +137,33 @@ export function getBranchAddGate(
       current: currentCount,
       limit: 0,
       planName,
+      planCode,
     }
   }
 
   if (limit != null && limit !== -1) {
     if (currentCount >= limit) {
-      return { canAdd: false, reason: 'at_limit', current: currentCount, limit, planName }
+      const reason = canBuyBranchAddons(entitlements) ? 'addon_or_upgrade' : 'upgrade_to_gold'
+      return {
+        canAdd: false,
+        reason,
+        current: currentCount,
+        limit,
+        includedLimit,
+        planName,
+        planCode,
+      }
     }
     if (limit > 0 || multiBranch) {
-      return { canAdd: true, reason: 'ok', current: currentCount, limit, planName }
+      return {
+        canAdd: true,
+        reason: 'ok',
+        current: currentCount,
+        limit,
+        includedLimit,
+        planName,
+        planCode,
+      }
     }
     return {
       canAdd: false,
@@ -91,6 +171,7 @@ export function getBranchAddGate(
       current: currentCount,
       limit,
       planName,
+      planCode,
     }
   }
 
@@ -101,14 +182,32 @@ export function getBranchAddGate(
       current: currentCount,
       limit,
       planName,
+      planCode,
     }
   }
 
-  return { canAdd: true, reason: 'ok', current: currentCount, limit, planName }
+  return {
+    canAdd: true,
+    reason: 'ok',
+    current: currentCount,
+    limit,
+    includedLimit,
+    planName,
+    planCode,
+  }
 }
 
 export function formatBranchGateMessage(gate: BranchAddGate): string {
   const plan = gate.planName ?? 'your current plan'
+
+  if (gate.reason === 'contact_enterprise') {
+    return `You have ${gate.current} branch locations. For more than 6 branches, contact sales for Enterprise.`
+  }
+
+  if (gate.reason === 'addon_or_upgrade') {
+    const included = gate.includedLimit ?? gate.limit
+    return `You've reached your included branch limit (${gate.current}/${included} locations on ${plan}). Add an extra branch add-on or upgrade your plan, or contact your administrator.`
+  }
 
   if (gate.reason === 'at_limit') {
     if (gate.limit != null && gate.limit > 0) {
@@ -122,14 +221,17 @@ export function formatBranchGateMessage(gate: BranchAddGate): string {
 
   const planLower = plan.toLowerCase()
   if (
-    planLower.includes('gold') ||
-    planLower.includes('platinum') ||
-    planLower.includes('enterprise')
+    gate.reason === 'upgrade_to_gold' ||
+    planLower.includes('silver') ||
+    planLower.includes('bronze')
   ) {
-    return `Branch accounts are not enabled for this ${plan} subscription. Contact support if you believe this is an error.`
+    return `Additional branch accounts require Gold or higher. Your plan is ${plan}. Upgrade to add more locations.`
   }
-  if (planLower.includes('silver') || planLower.includes('bronze')) {
-    return `Additional branch accounts require Gold or higher. Your plan is ${plan}.`
+  if (planLower.includes('free') || planLower.includes('trial')) {
+    return `Extra branches aren't available on Free Trial. Upgrade to Gold to add separate locations.`
+  }
+  if (planLower.includes('enterprise')) {
+    return `Branch limits on Enterprise are set by your account team. Contact sales for changes.`
   }
   return `Additional branch accounts aren't included on ${plan}. Upgrade to Gold or higher to add separate locations.`
 }
@@ -143,12 +245,12 @@ export function canAddBranches(
 
 /** Warehouse management feature (Silver+). */
 export function warehousesFeatureEnabled(entitlements: Entitlements | null | undefined): boolean {
-  return featureEnabled(entitlements?.features?.warehouses)
+  return isEntitlementFeatureEnabled(entitlements, 'warehouses')
 }
 
 /** Plan allows multi-warehouse routing (Gold+); supplier toggle is separate. */
 export function multiWarehousePlanEnabled(entitlements: Entitlements | null | undefined): boolean {
-  return featureEnabled(entitlements?.features?.multi_warehouse)
+  return isEntitlementFeatureEnabled(entitlements, 'multi_warehouse')
 }
 
 export function isMultiWarehouseActive(
@@ -162,22 +264,79 @@ export function isMultiWarehouseActive(
   )
 }
 
+export type WarehouseAddGate = {
+  canAdd: boolean
+  reason: 'ok' | 'at_limit' | 'feature_unavailable' | 'addon_or_upgrade' | 'upgrade_plan'
+  current: number
+  limit: number | null
+  planName: string | null
+}
+
+export function getWarehouseAddGate(
+  entitlements: Entitlements | null | undefined,
+  currentCount = 0
+): WarehouseAddGate {
+  const planName = entitlements?.plan?.name ?? null
+  if (!entitlements) {
+    return {
+      canAdd: false,
+      reason: 'feature_unavailable',
+      current: currentCount,
+      limit: null,
+      planName,
+    }
+  }
+  if (!warehousesFeatureEnabled(entitlements)) {
+    return {
+      canAdd: false,
+      reason: 'feature_unavailable',
+      current: currentCount,
+      limit: 0,
+      planName,
+    }
+  }
+
+  const loc = entitlements.locationLimits?.warehouses
+  const limit = loc?.effective ?? limitNumber(entitlements.limits?.warehouses)
+  if (limit === 0) {
+    return { canAdd: false, reason: 'upgrade_plan', current: currentCount, limit: 0, planName }
+  }
+  if (limit == null || limit === -1) {
+    return { canAdd: true, reason: 'ok', current: currentCount, limit: null, planName }
+  }
+  if (currentCount >= limit) {
+    const code = planCodeLower(entitlements)
+    const reason = code === 'gold' || code === 'platinum' ? 'addon_or_upgrade' : 'upgrade_plan'
+    return { canAdd: false, reason, current: currentCount, limit, planName }
+  }
+  return { canAdd: true, reason: 'ok', current: currentCount, limit, planName }
+}
+
+export function formatWarehouseGateMessage(gate: WarehouseAddGate): string {
+  const plan = gate.planName ?? 'your current plan'
+  if (gate.reason === 'addon_or_upgrade') {
+    return `You've reached your included warehouse limit (${gate.current}/${gate.limit} on ${plan}). Add an extra warehouse add-on, upgrade your plan, or contact your administrator.`
+  }
+  if (gate.reason === 'upgrade_plan' && gate.limit === 0) {
+    return `Warehouses aren't available on Free Trial. Upgrade to Silver for your first warehouse.`
+  }
+  if (gate.reason === 'feature_unavailable') {
+    return `Warehouse management isn't included on ${plan}. Upgrade to Silver or higher.`
+  }
+  return `You've reached your warehouse limit (${gate.current}/${gate.limit}) on ${plan}. Upgrade for more warehouses.`
+}
+
 /** Whether the tenant may create another supplier warehouse under the current plan. */
 export function canAddWarehouses(
   entitlements: Entitlements | null | undefined,
   currentCount = 0
 ): boolean {
-  if (!entitlements) return false
-  if (!warehousesFeatureEnabled(entitlements)) return false
-  const limit = limitNumber(entitlements.limits?.warehouses)
-  if (limit === 0) return false
-  if (limit == null || limit === -1) return true
-  return currentCount < limit
+  return getWarehouseAddGate(entitlements, currentCount).canAdd
 }
 
 /** Logo upload and brand theming (Gold: logo + colors; Platinum: white-label). */
 export function canUseCustomBranding(entitlements: Entitlements | null | undefined): boolean {
-  return featureEnabled(entitlements?.features?.custom_branding)
+  return isEntitlementFeatureEnabled(entitlements, 'custom_branding')
 }
 
 export function customBrandingUpgradeMessage(planName?: string | null): string {

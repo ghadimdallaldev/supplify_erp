@@ -10,8 +10,10 @@ import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import {
   getUserOrgMembership,
+  listOrgBranches,
   listOrgBranchesForUser,
   createOrgBranch,
   deactivateOrgBranch,
@@ -52,6 +54,7 @@ async function requireSupplierOrgContext(req, res, next) {
   }
 
   let organizationId = membership?.organization_id
+  let organizationName = membership?.organization_name || ''
   let primarySupplierId = null
 
   if (req.userData.role === 'ADMIN' && req.query.organization_id) {
@@ -71,7 +74,7 @@ async function requireSupplierOrgContext(req, res, next) {
       )
       primarySupplierId = anyBranch[0]?.id || null
     }
-  } else if (req.userData.role === 'SUPPLIER') {
+  } else if (req.userData.role === 'SUPPLIER' || req.userData.role === 'ADMIN') {
     const supplierId = await getSupplierIdForRequest(req)
     if (supplierId) {
       const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [
@@ -82,9 +85,16 @@ async function requireSupplierOrgContext(req, res, next) {
     }
   }
 
+  if (organizationId && !organizationName) {
+    const { rows: orgRows } = await query(`SELECT name FROM organization WHERE id = $1`, [
+      organizationId,
+    ])
+    organizationName = orgRows[0]?.name || ''
+  }
+
   req.orgContext = {
     organizationId,
-    organizationName: membership?.organization_name || '',
+    organizationName,
     roleName: membership?.role_name || null,
     primarySupplierId,
     isOrgOwner: membership?.role_name === 'Org Owner',
@@ -108,6 +118,15 @@ function requireOrgOwner(req, res, next) {
     })
   }
   next()
+}
+
+async function listBranchesForRequest(req) {
+  const orgId = req.orgContext?.organizationId
+  if (!orgId) return []
+  if (req.userData.role === 'ADMIN' && getEffectiveTenant(req)) {
+    return listOrgBranches(orgId)
+  }
+  return listOrgBranchesForUser(req.userData.id, orgId)
 }
 
 async function assertBranchAccess(req, supplierId) {
@@ -138,7 +157,7 @@ router.get('/', async (req, res) => {
       })
     }
 
-    const branches = await listOrgBranchesForUser(req.userData.id, req.orgContext.organizationId)
+    const branches = await listBranchesForRequest(req)
 
     res.json({
       ok: true,
@@ -179,7 +198,7 @@ router.get('/branches', async (req, res) => {
       })
     }
 
-    const branches = await listOrgBranchesForUser(req.userData.id, req.orgContext.organizationId)
+    const branches = await listBranchesForRequest(req)
 
     const activeSupplierId =
       req.activeTenantContext?.tenantId ||
@@ -232,6 +251,11 @@ router.post('/branches', requireOrgOwner, multiBranchFeature, async (req, res) =
           message: limitCheck.reason,
           details: {
             limitKey: 'branches',
+            action: limitCheck.action,
+            includedLimit: limitCheck.includedLimit,
+            addonQuantity: limitCheck.addonQuantity,
+            effectiveLimit: limitCheck.effectiveLimit,
+            current: limitCheck.current,
             upgradeUrl: '/app/settings?tab=subscription',
           },
         },

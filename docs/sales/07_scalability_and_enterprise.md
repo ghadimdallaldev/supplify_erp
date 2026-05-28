@@ -44,7 +44,7 @@ flowchart TB
 ### Enterprise readiness
 
 - **High or unlimited limits** — Platinum (and optional Enterprise) plans remove or greatly raise caps so large chains and suppliers don’t hit artificial walls.
-- **Central management** — Admins manage all tenants, plans, and overrides; impersonation and audit logs support compliance and support.
+- **Central management** — Admins manage all tenants, plans, and overrides; [impersonation](../features/admin-impersonation.md) and audit logs support compliance and support.
 - **Custom needs** — Enterprise plans can be defined with custom limits and features and assigned only by admin (e.g. manual onboarding, SLAs, custom contracts). See **docs/monetization/ENTERPRISE.md** for what enterprise gets and how it’s positioned.
 
 ### Why this matters to buyers

@@ -20,7 +20,7 @@ import {
   createActiveTenantToken,
   getActiveTenantCookieName,
   getPrimaryTenantForUser,
-  userCanAccessTenant,
+  canSwitchActiveTenant,
 } from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
 
@@ -208,12 +208,7 @@ router.post('/switch', requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res)
     }
 
     const resolvedType = tenantType || roleType
-    const allowed = await userCanAccessTenant(
-      req.userData.id,
-      req.userData.email,
-      tenantId,
-      resolvedType
-    )
+    const allowed = await canSwitchActiveTenant(req, tenantId, resolvedType)
     if (!allowed) {
       return res.status(403).json({
         ok: false,

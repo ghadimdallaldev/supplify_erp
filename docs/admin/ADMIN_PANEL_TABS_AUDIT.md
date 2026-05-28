@@ -149,7 +149,7 @@
 
 - **Component:** Audit tab
 - **API:** `GET /api/admin-dashboard/audit-logs`
-- **DB:** `admin_audit_log` only (platform admin actions: plans, subscriptions, impersonation, overrides)
+- **DB:** `admin_audit_log` only (platform admin actions: plans, subscriptions, impersonation start/end, overrides). Impersonation: [admin-impersonation.md](../features/admin-impersonation.md).
 - **Scope:** Not tenant-scoped `audit_logs` — empty state message when no admin actions match filters.
 - **Status:** OK
 

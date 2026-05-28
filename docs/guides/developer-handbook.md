@@ -96,13 +96,13 @@ scripts\run-local.cmd seed
 
 Full catalog, routes, roles, and verification steps: **[features.md](../product/features.md)**.
 
-| Area           | API prefix             | Notes                                             |
-| -------------- | ---------------------- | ------------------------------------------------- |
-| Orders         | `/api/orders`          | Placement, status, reminders, calendar            |
-| Chat           | `/api/chat`            | Conversations, messages, Socket.IO                |
-| Reservations   | `/api/reservations`    | Tables, board, bookings                           |
-| Staff / shifts | `/api/staff`           | Members, shifts, time entries                     |
-| Admin          | `/api/admin-dashboard` | Plans, limits, impersonation, **feature toggles** |
+| Area           | API prefix             | Notes                                                                                   |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------- |
+| Orders         | `/api/orders`          | Placement, status, reminders, calendar                                                  |
+| Chat           | `/api/chat`            | Conversations, messages, Socket.IO                                                      |
+| Reservations   | `/api/reservations`    | Tables, board, bookings                                                                 |
+| Staff / shifts | `/api/staff`           | Members, shifts, time entries                                                           |
+| Admin          | `/api/admin-dashboard` | Plans, limits, [impersonation](../features/admin-impersonation.md), **feature toggles** |
 
 Subscription **plans** define default features; admins can override globally or per tenant — see [admin-feature-flags.md](../admin/admin-feature-flags.md).
 
