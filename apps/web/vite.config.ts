@@ -12,7 +12,20 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(rootDir, 'src'),
+      react: path.resolve(rootDir, 'node_modules/react'),
+      'react-dom': path.resolve(rootDir, 'node_modules/react-dom'),
     },
+    dedupe: ['react', 'react-dom', 'react-redux', 'react-router-dom'],
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-redux',
+      'react-router-dom',
+      '@reduxjs/toolkit/query/react',
+      '@tanstack/react-query',
+    ],
   },
   server: {
     port: 5173,

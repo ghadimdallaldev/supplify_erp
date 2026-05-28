@@ -7,10 +7,17 @@ import { ValidationError } from '../middlewares/errorHandler.js'
 
 const router = express.Router()
 
+const legalAcceptanceSchema = z.object({
+  packVersion: z.string().min(1).max(32),
+  acceptedDocuments: z.array(z.string().min(1).max(80)).min(1),
+  electronicSignatureAttestation: z.literal(true),
+})
+
 const completeSchema = z.object({
   accountType: z.enum(['RESTAURANT', 'SUPPLIER']),
   businessName: z.string().min(2).max(200),
   phone: z.string().max(30).optional(),
+  legalAcceptance: legalAcceptanceSchema,
 })
 
 router.get('/status', requireAuth, async (req, res) => {
@@ -55,6 +62,9 @@ router.post('/complete', requireAuth, async (req, res) => {
       accountType: body.accountType,
       businessName: body.businessName,
       phone: body.phone,
+      legalAcceptance: body.legalAcceptance,
+      ipAddress: req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
+      userAgent: req.headers['user-agent'],
     })
 
     logger.info('Tenant registration completed', {

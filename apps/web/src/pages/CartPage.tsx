@@ -3,7 +3,9 @@ import {
   useCreateOrderMutation,
   useGetActivePromotionsQuery,
   useGetEntitlementsQuery,
+  useResolveContractPricesMutation,
 } from '../services/api'
+import { updateItemResolvedPrice } from '../features/cart/cartSlice'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -77,6 +79,8 @@ export function CartPage() {
   } = useCartActions()
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [createOrder] = useCreateOrderMutation()
+  const [resolveContractPrices] = useResolveContractPricesMutation()
+  const ownerEmail = user?.email ?? null
 
   // Draft management
   const [showSaveDraft, setShowSaveDraft] = useState(false)
@@ -101,8 +105,36 @@ export function CartPage() {
     rehydrateCart()
   }, [rehydrateCart])
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  const handleUpdateQuantity = async (productId: string, quantity: number) => {
     updateQuantity(productId, quantity)
+    if (quantity <= 0) return
+    const item = groups.flatMap((g) => g.items).find((i) => i.productId === productId)
+    if (!item?.product.supplier_id) return
+    try {
+      const result = await resolveContractPrices({
+        items: [
+          {
+            productId,
+            supplierId: item.product.supplier_id,
+            quantity,
+          },
+        ],
+      }).unwrap()
+      const resolved = result.items[0]
+      if (resolved?.unitPrice != null) {
+        dispatch(
+          updateItemResolvedPrice({
+            productId,
+            currentPrice: resolved.unitPrice,
+            pricingSource: resolved.source,
+            catalogPrice: resolved.defaultPrice ?? undefined,
+            ownerEmail,
+          })
+        )
+      }
+    } catch {
+      // Order creation re-resolves server-side; cart preview is best-effort
+    }
   }
 
   const handleRemoveItem = (productId: string) => {
@@ -327,11 +359,13 @@ export function CartPage() {
                         <h4 className="font-medium truncate">{item.product.name}</h4>
                         <p className="text-sm text-[var(--text-muted)]">SKU: {item.product.sku}</p>
                         <p className="text-sm text-[var(--text-muted)]">
-                          $
-                          {typeof item.product.current_price === 'number'
-                            ? formatPrice(item.product.current_price)
-                            : item.product.current_price || 'N/A'}{' '}
-                          per {item.product.unit || 'unit'}
+                          {formatPrice(item.product.current_price)} per{' '}
+                          {item.product.unit || 'unit'}
+                          {item.product.pricing_source === 'CONTRACT_PRICE' && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              Your price
+                            </Badge>
+                          )}
                         </p>
                       </div>
 
@@ -356,11 +390,12 @@ export function CartPage() {
                         </div>
 
                         <p className="font-medium tabular-nums sm:text-right">
-                          $
-                          {(typeof item.product.current_price === 'number'
-                            ? item.product.current_price
-                            : parseFloat(String(item.product.current_price ?? '')) || 0) *
-                            item.quantity}
+                          {formatPrice(
+                            (typeof item.product.current_price === 'number'
+                              ? item.product.current_price
+                              : parseFloat(String(item.product.current_price ?? '')) || 0) *
+                              item.quantity
+                          )}
                         </p>
 
                         <Button
