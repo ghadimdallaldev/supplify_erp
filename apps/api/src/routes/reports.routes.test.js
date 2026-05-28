@@ -15,20 +15,10 @@ vi.mock('../lib/db.js', () => {
 
 const isFeatureEnabled = vi.fn().mockResolvedValue(true)
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || { ...mockUser, id: 'user-1', role: 'RESTAURANT' }
-    next()
-  }),
-  requireRole: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || {
-      tenantId: 'restaurant-1',
-      tenantType: 'RESTAURANT',
-    }
-    next()
-  },
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal)
+})
 
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res, next) => next(),

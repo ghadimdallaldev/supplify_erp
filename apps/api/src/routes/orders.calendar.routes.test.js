@@ -9,27 +9,10 @@ const mockUser = {
   role: 'RESTAURANT',
 }
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: (req, res, next) => {
-    req.userData = { ...mockUser }
-    next()
-  },
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = {
-      tenantId: 'restaurant-1',
-      tenantType: 'RESTAURANT',
-      tenantName: 'Golden Fork Restaurant',
-      roles: [],
-      permissions: [],
-    }
-    next()
-  },
-  getRequestTenant: vi.fn().mockResolvedValue({
-    tenantId: 'restaurant-1',
-    tenantType: 'RESTAURANT',
-    tenantName: 'Golden Fork Restaurant',
-  }),
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal)
+})
 
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res, next) => next(),

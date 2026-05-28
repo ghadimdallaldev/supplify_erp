@@ -9,16 +9,14 @@ const mockUser = {
   role: 'RESTAURANT',
 }
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: (req, res, next) => {
-    req.userData = { ...mockUser }
-    next()
-  },
-  requireRole: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => next(),
-  requirePermission: () => (req, res, next) => next(),
-  getRequestTenant: vi.fn().mockResolvedValue(null),
+vi.mock('../lib/tenant-resolve.js', () => ({
+  requireRestaurantId: vi.fn().mockResolvedValue('restaurant-1'),
 }))
+
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal)
+})
 
 const queryMock = vi.fn()
 const withTransactionMock = vi.fn((handler) =>
@@ -58,7 +56,6 @@ describe('reservations.routes', () => {
 
   it('returns reservation board data', async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] }) // resolveRestaurantId
       .mockResolvedValueOnce({ rows: [] }) // fetchTables
       .mockResolvedValueOnce({ rows: [] }) // fetchReservations
       .mockResolvedValueOnce({ rows: [] }) // waitlist
@@ -71,7 +68,6 @@ describe('reservations.routes', () => {
   it('creates reservation with auto-confirm when utilisation low', async () => {
     mockUser.role = 'RESTAURANT'
     queryMock
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', capacity: 4, is_active: true }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
@@ -101,21 +97,19 @@ describe('reservations.routes', () => {
   })
 
   it('returns guest intelligence summary', async () => {
-    queryMock
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            customer_name: 'Repeat Guest',
-            customer_phone: '+96170000000',
-            customer_email: null,
-            visit_count: '3',
-            last_visit: '2026-05-10T12:00:00.000Z',
-            total_covers: '8',
-            upcoming_count: '1',
-          },
-        ],
-      })
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          customer_name: 'Repeat Guest',
+          customer_phone: '+96170000000',
+          customer_email: null,
+          visit_count: '3',
+          last_visit: '2026-05-10T12:00:00.000Z',
+          total_covers: '8',
+          upcoming_count: '1',
+        },
+      ],
+    })
 
     const response = await request(app).get('/api/reservations/guest-intelligence').expect(200)
 

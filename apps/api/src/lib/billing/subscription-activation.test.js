@@ -31,6 +31,23 @@ describe('createPendingActivationSubscription', () => {
     )
   })
 
+  it('links subscription to active free plan row with locked status', async () => {
+    const { createPendingActivationSubscription } = await import('./subscription-activation.js')
+    const client = { query: vi.fn().mockResolvedValue({ rowCount: 1 }) }
+
+    await createPendingActivationSubscription(client, 'tenant-3', 'RESTAURANT', 'free')
+
+    const sql = client.query.mock.calls[0][0]
+    expect(sql).toContain('FROM subscription_plan sp')
+    expect(sql).toContain("'ACTIVE'")
+    expect(client.query).toHaveBeenCalledWith(expect.any(String), [
+      'tenant-3',
+      'RESTAURANT',
+      LOCK_REASON_PENDING_ACTIVATION,
+      'free',
+    ])
+  })
+
   it('uses default query when no client executor is passed', async () => {
     const { createPendingActivationSubscription } = await import('./subscription-activation.js')
 

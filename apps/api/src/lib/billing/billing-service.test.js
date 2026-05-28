@@ -8,6 +8,15 @@ vi.mock('../db.js', () => ({
   withTransaction: async (fn) => fn({ query: (...args) => mockQuery(...args) }),
 }))
 
+vi.mock('../platform-settings.js', () => ({
+  getFreeSandboxDays: vi.fn().mockResolvedValue(7),
+  clampFreeTrialDays: (days, fallback = 7) => {
+    const n = Number(days)
+    const base = Number.isFinite(n) ? Math.round(n) : fallback
+    return Math.min(7, Math.max(3, base))
+  },
+}))
+
 describe('computeBillingAccessState', () => {
   it('free plan does not require payment', () => {
     const state = computeBillingAccessState({
@@ -54,6 +63,55 @@ describe('computeBillingAccessState', () => {
     expect(state.isLocked).toBe(true)
     expect(state.isPastDue).toBe(false)
     expect(state.inGracePeriod).toBe(false)
+  })
+
+  it('active paid plan is not locked', () => {
+    const state = computeBillingAccessState({
+      plan_id: 'plan-gold',
+      plan_code: 'gold',
+      status: 'ACTIVE',
+      account_locked_at: null,
+      lock_reason: null,
+    })
+    expect(state.isLocked).toBe(false)
+    expect(state.requiresPayment).toBe(true)
+    expect(state.pendingActivation).toBe(false)
+  })
+
+  it('active Free Trial with future expiry is not locked', () => {
+    const expires = new Date()
+    expires.setDate(expires.getDate() + 5)
+    const state = computeBillingAccessState({
+      plan_code: 'free',
+      status: 'ACTIVE',
+      account_locked_at: null,
+      lock_reason: null,
+      free_sandbox_expires_at: expires.toISOString(),
+    })
+    expect(state.isLocked).toBe(false)
+    expect(state.freeSandboxDaysRemaining).toBeGreaterThan(0)
+    expect(state.freeSandboxExpired).toBe(false)
+  })
+
+  it('expired Free Trial lock reason is flagged', () => {
+    const state = computeBillingAccessState({
+      plan_code: 'free',
+      status: 'ACTIVE',
+      account_locked_at: new Date().toISOString(),
+      lock_reason: 'free_sandbox_expired',
+    })
+    expect(state.isLocked).toBe(true)
+    expect(state.freeSandboxExpired).toBe(true)
+    expect(state.pendingActivation).toBe(false)
+  })
+
+  it('SUSPENDED status is locked', () => {
+    const state = computeBillingAccessState({
+      plan_code: 'silver',
+      status: 'SUSPENDED',
+      account_locked_at: null,
+    })
+    expect(state.isLocked).toBe(true)
   })
 })
 
@@ -154,5 +212,84 @@ describe('checkoutSubscription free plan', () => {
     )
     expect(updateCall?.[0]).toMatch(/account_locked_at = NULL/)
     expect(updateCall?.[0]).toMatch(/lock_reason = NULL/)
+    expect(updateCall?.[0]).toMatch(/free_sandbox_expires_at/)
+  })
+})
+
+describe('extendFreeSandboxTrial', () => {
+  beforeEach(() => {
+    mockQuery.mockReset()
+  })
+
+  it('extends expiry and clears lock for free plan', async () => {
+    const { extendFreeSandboxTrial } = await import('./billing-service.js')
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-free',
+            tenant_id: 'r1',
+            tenant_type: 'RESTAURANT',
+            plan_code: 'free',
+            lock_reason: 'free_sandbox_expired',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'sub-free', free_sandbox_expires_at: new Date().toISOString() }],
+      })
+
+    const result = await extendFreeSandboxTrial('sub-free', { days: 5, adminUserId: 'admin-1' })
+
+    expect(result.freeTrialDays).toBe(5)
+    const updateCall = mockQuery.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('free_sandbox_expires_at')
+    )
+    expect(updateCall?.[0]).toMatch(/account_locked_at = NULL/)
+    expect(updateCall?.[0]).toMatch(/lock_reason = NULL/)
+  })
+
+  it('rejects extension for non-free plans', async () => {
+    const { extendFreeSandboxTrial } = await import('./billing-service.js')
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'sub-gold', plan_code: 'gold', tenant_id: 'r1', tenant_type: 'RESTAURANT' }],
+    })
+
+    await expect(extendFreeSandboxTrial('sub-gold', { days: 5 })).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+    })
+  })
+})
+
+describe('unlockSubscriptionAccount', () => {
+  beforeEach(() => {
+    mockQuery.mockReset()
+  })
+
+  it('extends Free Trial when lock_reason is free_sandbox_expired', async () => {
+    const { unlockSubscriptionAccount } = await import('./billing-service.js')
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'sub-free',
+            tenant_id: 'r1',
+            tenant_type: 'RESTAURANT',
+            plan_code: 'free',
+            lock_reason: 'free_sandbox_expired',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await unlockSubscriptionAccount('sub-free', { unlockedBy: 'admin', adminUserId: 'a1' })
+
+    const updateCall = mockQuery.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('free_sandbox_expires_at')
+    )
+    expect(updateCall).toBeTruthy()
   })
 })

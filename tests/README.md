@@ -34,12 +34,15 @@
 
 ## Run in CI
 
-- Set `CI=1`, `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_API_URL` (and optionally `E2E_*` credentials).
-- Run:
-  ```bash
-  pnpm e2e:playwright
-  ```
-- Artifacts: `playwright-report/` (HTML), `test-results/` (traces/screenshots on failure).
+**Unit tests (Vitest):** GitHub Actions workflow `.github/workflows/ci.yml` runs `pnpm test:api` and `pnpm test:web` on push/PR. See [docs/qa/QA_AUTOMATION_GUIDE.md](../docs/qa/QA_AUTOMATION_GUIDE.md).
+
+**E2E (Playwright):** separate from unit CI. Set `CI=1`, `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_API_URL` (and optionally `E2E_*` credentials), then:
+
+```bash
+pnpm e2e:playwright
+```
+
+Artifacts: `playwright-report/` (HTML), `test-results/` (traces/screenshots on failure).
 
 ## Free Trial expiry
 

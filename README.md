@@ -39,9 +39,14 @@ Full guide: **[docs/README.md](docs/README.md)**
 pnpm install
 pnpm dev          # native API + web (infra via Docker)
 pnpm build        # production build (web TypeScript + Vite)
-pnpm test:ci      # unit tests
+pnpm test:api     # API unit tests (vitest run, non-watch — use before PR)
+pnpm test:web     # web unit tests (vitest run)
+pnpm test:all     # API + web unit tests (same as test:ci)
+pnpm test:ci      # alias for test:all
 pnpm db:migrate   # SQL migrations
 ```
+
+**Testing:** Full guide in [docs/qa/QA_AUTOMATION_GUIDE.md](docs/qa/QA_AUTOMATION_GUIDE.md). API mock patterns: [docs/API_TEST_SUITE_STABILIZATION.md](docs/API_TEST_SUITE_STABILIZATION.md). Use `pnpm test:api:watch` only while developing; use `pnpm test:api` for final verification (not `pnpm test`, which watches).
 
 ## Environment variables (keys only)
 

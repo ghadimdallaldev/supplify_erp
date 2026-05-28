@@ -21,9 +21,6 @@ export const reservationsApi = api.injectEndpoints({
         },
       }),
       providesTags: (_result) => [{ type: 'Reservation' as const, id: 'BOARD' }],
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
-      pollingInterval: 30_000,
     }),
     saveReservationTables: build.mutation<
       { tables: ReservationTable[] },

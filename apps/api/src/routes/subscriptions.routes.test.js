@@ -117,6 +117,7 @@ describe('Subscriptions Routes', () => {
       mockGetTenantSubscription.mockResolvedValueOnce({
         id: 'sub-1',
         plan_id: 'plan-free',
+        plan_code: 'free',
         plan_name: 'Free',
         plan_display_name: 'Free',
         status: 'ACTIVE',
@@ -128,7 +129,7 @@ describe('Subscriptions Routes', () => {
 
       expect(res.body.ok).toBe(true)
       expect(res.body.data.subscription).toBeDefined()
-      expect(res.body.data.subscription.plan_name).toBe('Free')
+      expect(res.body.data.subscription.plan_name).toBe('Free Trial')
       expect(res.body.data.subscription.limits.chats_per_day).toBe(10)
     })
 
@@ -163,6 +164,7 @@ describe('Subscriptions Routes', () => {
       })
       mockGetTenantSubscription.mockResolvedValueOnce({
         id: 'sub-2',
+        plan_code: 'free',
         plan_name: 'Free',
         plan_display_name: 'Free',
         status: 'ACTIVE',
@@ -173,7 +175,7 @@ describe('Subscriptions Routes', () => {
       const res = await request(appSupplier).get('/api/subscriptions/current').expect(200)
 
       expect(res.body.ok).toBe(true)
-      expect(res.body.data.subscription.plan_name).toBe('Free')
+      expect(res.body.data.subscription.plan_name).toBe('Free Trial')
       expect(res.body.data.subscription.limits.chats_per_day).toBe(10)
     })
 
@@ -256,9 +258,37 @@ describe('Subscriptions Routes', () => {
       expect(res.body.ok).toBe(true)
       expect(res.body.data.entitlements).toBeDefined()
       expect(res.body.data.entitlements.plan.name).toBe('Free')
+      expect(res.body.data.entitlements.plan.code).toBe('free')
       expect(res.body.data.entitlements.overrides).toHaveLength(1)
       expect(res.body.data.entitlements.overrides[0].limitKey).toBe('orders_per_day')
       expect(res.body.data.entitlements.usage.orders_per_day).toBe(5)
+    })
+
+    it('returns Gold entitlements with tier limits', async () => {
+      mockGetEntitlements.mockResolvedValueOnce({
+        tenantType: 'RESTAURANT',
+        tenantId: 'rest-1',
+        plan: {
+          id: 'plan-gold',
+          name: 'Gold',
+          code: 'gold',
+          tenant_type: 'RESTAURANT',
+          price_monthly: 149,
+          price_yearly: null,
+        },
+        features: { multi_branch: true, reports: true },
+        limits: { orders_per_day: 50, branches: 3 },
+        baseLimits: { orders_per_day: 50, branches: 3 },
+        overrides: [],
+        usage: { orders_per_day: 2 },
+        usageWindowMeta: {},
+      })
+
+      const res = await request(app).get('/api/subscriptions/entitlements').expect(200)
+
+      expect(res.body.data.entitlements.plan.code).toBe('gold')
+      expect(res.body.data.entitlements.limits.branches).toBe(3)
+      expect(res.body.data.entitlements.features.multi_branch).toBe(true)
     })
 
     it('returns synthetic Free entitlements when getEntitlements returns null', async () => {
@@ -272,8 +302,33 @@ describe('Subscriptions Routes', () => {
 
       expect(res.body.ok).toBe(true)
       expect(res.body.data.entitlements).toBeDefined()
-      expect(res.body.data.entitlements.plan.name).toBe('Free')
+      expect(res.body.data.entitlements.plan.name).toBe('Free Trial')
       expect(res.body.data.entitlements.plan.code).toBe('free')
+    })
+
+    it('returns Free Trial display name when entitlements plan code is free', async () => {
+      mockGetEntitlements.mockResolvedValueOnce({
+        tenantType: 'RESTAURANT',
+        tenantId: 'rest-1',
+        plan: {
+          id: 'plan-free',
+          name: 'Free Trial',
+          code: 'free',
+          tenant_type: 'RESTAURANT',
+          price_monthly: 0,
+          price_yearly: null,
+        },
+        features: {},
+        limits: { orders_per_day: 3 },
+        baseLimits: { orders_per_day: 3 },
+        overrides: [],
+        usage: { orders_per_day: 0 },
+        usageWindowMeta: {},
+      })
+
+      const res = await request(app).get('/api/subscriptions/entitlements').expect(200)
+
+      expect(res.body.data.entitlements.plan.name).toBe('Free Trial')
     })
   })
 

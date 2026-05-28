@@ -336,6 +336,9 @@ export async function getDispute(disputeId, scope) {
 }
 
 export async function addDisputeAttachment(disputeId, restaurantId, userId, { fileKey, fileName }) {
+  const { assertUploadKeyOwnedByUser } = await import('../lib/sanitize-upload.js')
+  assertUploadKeyOwnedByUser(fileKey, userId)
+
   const { rows } = await query(
     `SELECT id, status FROM disputes WHERE id = $1 AND restaurant_id = $2`,
     [disputeId, restaurantId]

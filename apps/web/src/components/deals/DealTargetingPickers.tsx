@@ -9,6 +9,7 @@ import {
   useGetSupplierMeQuery,
 } from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
+import type { Product } from '../../types'
 import { Loader2, Search, X } from 'lucide-react'
 
 export type AppliesTo = 'all' | 'specific_products' | 'specific_categories'
@@ -44,7 +45,7 @@ export function DealTargetingPickers({ value, onChange }: Props) {
   )
 
   const categories = categoriesData?.categories || []
-  const products = productsData?.products || []
+  const products: Product[] = productsData?.products ?? []
 
   const selectedProducts = useMemo(() => {
     const map = new Map(products.map((p) => [String(p.id), p]))

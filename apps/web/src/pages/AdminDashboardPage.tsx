@@ -78,12 +78,31 @@ import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
 import { AdminLimitsTab } from '../components/admin/AdminLimitsTab'
 import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
+import { usePermissions } from '../hooks/usePermissions'
+import { useAppSelector } from '../hooks/redux'
 
 interface AdminDashboardPageProps {
   initialTab?: string
 }
 
 export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPageProps) {
+  const { can } = usePermissions()
+  const { user } = useAppSelector((state) => state.auth)
+  const canAdminTab = {
+    overview: can('ADMIN_ACCESS'),
+    activity: can('ADMIN_ACCESS'),
+    tenants: can('ADMIN_TENANTS'),
+    subscriptions: can('ADMIN_PLANS'),
+    plans: can('ADMIN_PLANS'),
+    finance: can('ADMIN_FINANCE'),
+    usage: can('ADMIN_PLANS'),
+    features: can('ADMIN_GROWTH'),
+    deals: can('ADMIN_GROWTH'),
+    limits: can('ADMIN_PLANS'),
+    health: can('ADMIN_ACCESS'),
+    audit: can('ADMIN_ACCESS'),
+  }
+
   // Default to 'tenants' tab for supplier/restaurant admin views, otherwise use initialTab
   const defaultTab =
     initialTab === 'suppliers' || initialTab === 'restaurants'
@@ -95,6 +114,17 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   useEffect(() => {
     setSelectedTab(defaultTab)
   }, [defaultTab])
+
+  useEffect(() => {
+    const allowed = canAdminTab[selectedTab as keyof typeof canAdminTab]
+    if (allowed === false) {
+      const fallback =
+        (['overview', 'finance', 'tenants', 'plans', 'subscriptions', 'activity'] as const).find(
+          (tab) => canAdminTab[tab]
+        ) ?? 'overview'
+      setSelectedTab(fallback)
+    }
+  }, [selectedTab, user?.adminPermissions])
   const [plansTenantFilter, setPlansTenantFilter] = useState<'RESTAURANT' | 'SUPPLIER' | undefined>(
     undefined
   )
@@ -478,18 +508,20 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           >
             {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
               <>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="activity">Activity</TabsTrigger>
-                <TabsTrigger value="tenants">Tenants</TabsTrigger>
-                <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-                <TabsTrigger value="plans">Plans</TabsTrigger>
-                <TabsTrigger value="finance">Finance</TabsTrigger>
-                <TabsTrigger value="usage">Usage</TabsTrigger>
-                <TabsTrigger value="features">Features</TabsTrigger>
-                <TabsTrigger value="deals">Deals</TabsTrigger>
-                <TabsTrigger value="limits">Limits</TabsTrigger>
-                <TabsTrigger value="health">Health</TabsTrigger>
-                <TabsTrigger value="audit">Audit</TabsTrigger>
+                {canAdminTab.overview && <TabsTrigger value="overview">Overview</TabsTrigger>}
+                {canAdminTab.activity && <TabsTrigger value="activity">Activity</TabsTrigger>}
+                {canAdminTab.tenants && <TabsTrigger value="tenants">Tenants</TabsTrigger>}
+                {canAdminTab.subscriptions && (
+                  <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+                )}
+                {canAdminTab.plans && <TabsTrigger value="plans">Plans</TabsTrigger>}
+                {canAdminTab.finance && <TabsTrigger value="finance">Finance</TabsTrigger>}
+                {canAdminTab.usage && <TabsTrigger value="usage">Usage</TabsTrigger>}
+                {canAdminTab.features && <TabsTrigger value="features">Features</TabsTrigger>}
+                {canAdminTab.deals && <TabsTrigger value="deals">Deals</TabsTrigger>}
+                {canAdminTab.limits && <TabsTrigger value="limits">Limits</TabsTrigger>}
+                {canAdminTab.health && <TabsTrigger value="health">Health</TabsTrigger>}
+                {canAdminTab.audit && <TabsTrigger value="audit">Audit</TabsTrigger>}
               </>
             )}
 

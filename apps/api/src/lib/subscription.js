@@ -859,7 +859,10 @@ export async function getEntitlements(tenantId, tenantType) {
     usesOrgBilling: billingTenantId !== tenantId,
     plan: {
       id: subscription.plan_id,
-      name: subscription.plan_name || subscription.plan_display_name,
+      name: formatPlanDisplayName(
+        subscription.plan_code,
+        subscription.plan_name || subscription.plan_display_name
+      ),
       code: subscription.plan_code,
       tenant_type: subscription.plan_tenant_type || subscription.tenant_type || tenantType,
       price_monthly:

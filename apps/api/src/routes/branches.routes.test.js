@@ -9,21 +9,10 @@ vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
 }))
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: (req, res, next) => next(),
-  requireRole: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || {
-      tenantId: 'restaurant-1',
-      tenantType: 'RESTAURANT',
-      permissions: ['SETTINGS_VIEW'],
-    }
-    next()
-  },
-  requirePermission: () => (req, res, next) => next(),
-  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
-  getSupplierIdForRequest: vi.fn().mockResolvedValue(null),
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal)
+})
 
 vi.mock('../lib/plan-enforcement.js', () => ({
   checkLinkedAccountLimit: vi.fn().mockResolvedValue({ allowed: true, current: 0, limit: 3 }),
@@ -48,9 +37,14 @@ vi.mock('../lib/linked-accounts.js', () => ({
 }))
 
 vi.mock('../lib/tenant-switch.js', () => ({
+  canSwitchActiveTenant: vi.fn().mockResolvedValue(true),
   createActiveTenantToken: vi.fn().mockResolvedValue('signed-token'),
   getActiveTenantCookieName: () => 'active_tenant_token',
-  getPrimaryTenantForUser: vi.fn().mockResolvedValue({ id: 'restaurant-1', name: 'Main Restaurant' }),
+  getPrimaryTenantForUser: vi.fn().mockResolvedValue({
+    tenantId: 'restaurant-1',
+    tenantType: 'RESTAURANT',
+    tenantName: 'Main Restaurant',
+  }),
   userCanAccessTenant: vi.fn().mockResolvedValue(true),
 }))
 

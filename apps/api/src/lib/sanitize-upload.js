@@ -34,3 +34,21 @@ export function assertUploadKeyOwnedByUser(fileKey, userId) {
   }
   return normalized
 }
+
+/**
+ * Chat attachments must reference the caller's upload prefix on configured object storage.
+ */
+export function assertChatAttachmentUrl(fileUrl, userId) {
+  if (!fileUrl || typeof fileUrl !== 'string') {
+    throw new Error('Invalid attachment URL')
+  }
+  let pathname
+  try {
+    pathname = new URL(fileUrl).pathname.replace(/^\/+/, '')
+  } catch {
+    throw new Error('Invalid attachment URL')
+  }
+  const bucketPrefix = process.env.S3_BUCKET ? `${process.env.S3_BUCKET}/` : ''
+  const key = pathname.startsWith(bucketPrefix) ? pathname.slice(bucketPrefix.length) : pathname
+  return assertUploadKeyOwnedByUser(key, userId)
+}

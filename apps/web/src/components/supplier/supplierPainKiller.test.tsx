@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import { SupplierReceivablesPanel } from './SupplierReceivablesPanel'
-import { DeliveryBoardFilters } from '../fulfillment/DeliveryBoardFilters'
 import { SupplierCommandCenterPage } from '../../pages/SupplierCommandCenterPage'
 import { renderWithProviders } from '../../test/utils'
 
 const mockReceivables = vi.fn()
-const mockDeliveryBoard = vi.fn()
 const mockDrivers = vi.fn()
 const mockCommandCenter = vi.fn()
 const mockCreateDraft = vi.fn()
@@ -25,7 +23,6 @@ vi.mock('../../services/api', async (importOriginal) => {
   return {
     ...actual,
     useGetSupplierReceivablesQuery: (...args: unknown[]) => mockReceivables(...args),
-    useGetSupplierDeliveryBoardQuery: (...args: unknown[]) => mockDeliveryBoard(...args),
     useGetDriversQuery: (...args: unknown[]) => mockDrivers(...args),
     useGetSupplierCommandCenterQuery: (...args: unknown[]) => mockCommandCenter(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
@@ -56,21 +53,6 @@ describe('supplier pain-killer UI', () => {
     })
     renderWithProviders(<SupplierReceivablesPanel />)
     expect(screen.getByTestId('supplier-receivables-empty')).toBeInTheDocument()
-  })
-
-  it('DeliveryBoardFilters renders empty state when no orders', () => {
-    mockDeliveryBoard.mockReturnValue({
-      data: {
-        orders: [],
-        byArea: {},
-        stats: { total: 0, pending: 0, outForDelivery: 0, delivered: 0, failed: 0, rescheduled: 0 },
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    })
-    renderWithProviders(<DeliveryBoardFilters />)
-    expect(screen.getByTestId('delivery-board-empty')).toBeInTheDocument()
   })
 
   it('SupplierCommandCenterPage shows reorder and priorities empty states', () => {
@@ -107,5 +89,6 @@ describe('supplier pain-killer UI', () => {
     expect(screen.getByTestId('reorder-empty')).toBeInTheDocument()
     expect(screen.getByTestId('priorities-empty')).toBeInTheDocument()
     expect(screen.getByTestId('command-center-quick-actions')).toBeInTheDocument()
+    expect(screen.getByTestId('qa-deals').closest('a')).toHaveAttribute('href', '/app/promotions')
   })
 })

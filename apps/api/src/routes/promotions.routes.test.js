@@ -13,28 +13,29 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || { ...mockUser, role: 'ADMIN' }
-    next()
-  }),
-  requireRole: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || {
-      tenantId: 'supplier-1',
-      tenantType: 'SUPPLIER',
-      permissions: ['CATALOG_MANAGE'],
-    }
-    next()
-  },
-  resolveAdminContext: (req, res, next) => {
-    req.adminContext = { permissions: ['ADMIN_ACCESS'] }
-    next()
-  },
-  requirePermission: () => (req, res, next) => next(),
-  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
-  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal, {
+    requireAuth: vi.fn(async (req, res, next) => {
+      req.userData = req.userData || { ...mockUser, role: 'ADMIN' }
+      next()
+    }),
+    resolveTenantContext: (req, res, next) => {
+      req.tenantContext = req.tenantContext || {
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: ['CATALOG_MANAGE'],
+      }
+      next()
+    },
+    resolveAdminContext: (req, res, next) => {
+      req.adminContext = { permissions: ['ADMIN_ACCESS'] }
+      next()
+    },
+    getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
+    getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
+  })
+})
 
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res, next) => next(),

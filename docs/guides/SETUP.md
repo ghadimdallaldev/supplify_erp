@@ -236,19 +236,30 @@ VITE_API_URL=http://localhost:4000
 
 ## 🧪 Testing
 
+**Before PR / CI:** use non-watch commands (see [QA automation guide](../qa/QA_AUTOMATION_GUIDE.md)).
+
 ```bash
-# Run all tests
-pnpm test
+# Full API unit suite (683 tests, no DB required)
+pnpm test:api
 
-# Run API tests only
-pnpm --filter @supplify/api test
+# Full web unit suite
+pnpm test:web
 
-# Run web tests only
-pnpm --filter @supplify/web test
+# API + web (CI / pnpm qa)
+pnpm test:all
 
-# Run tests in watch mode
-pnpm --filter @supplify/api test:watch
+# Subsets
+pnpm test:billing
+pnpm test:rbac
+
+# While developing (watch mode)
+pnpm test:api:watch
+pnpm test:web:watch
 ```
+
+Single API file: `pnpm --filter @supplify/api test:api src/lib/subscription.test.js`
+
+Do **not** use `pnpm test` or `pnpm --filter @supplify/api test` for final verification — those start Vitest in watch mode.
 
 ## 🚀 Deployment
 

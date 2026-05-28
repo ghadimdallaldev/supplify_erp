@@ -16,6 +16,7 @@ import {
   getEntitlements,
   recommendPlan,
 } from '../lib/subscription.js'
+import { formatPlanDisplayName } from '../lib/plan-codes.js'
 import {
   recordConversionEvent,
   ALLOWED_TYPES as CONVERSION_ALLOWED_TYPES,
@@ -102,7 +103,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
         tenantType: tenant.tenantType,
         plan: {
           id: null,
-          name: 'Free',
+          name: formatPlanDisplayName('free', 'Free'),
           code: 'free',
           tenant_type: tenant.tenantType,
           price_monthly: 0,
@@ -180,7 +181,10 @@ router.get('/current', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (
     // Normalize for frontend: plan_display_name -> plan_name, ensure limits/features are objects
     const subscriptionPayload = {
       ...subscription,
-      plan_name: subscription.plan_display_name || subscription.plan_name,
+      plan_name: formatPlanDisplayName(
+        subscription.plan_code,
+        subscription.plan_display_name || subscription.plan_name
+      ),
       limits:
         subscription.limits && typeof subscription.limits === 'object' ? subscription.limits : {},
       features:

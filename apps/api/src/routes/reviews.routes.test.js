@@ -16,23 +16,15 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || { ...mockUser, id: 'user-1', role: 'RESTAURANT' }
-    next()
-  }),
-  requireRole: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || {
-      tenantId: 'restaurant-1',
-      tenantType: 'RESTAURANT',
-      permissions: ['ORDERS_VIEW', 'ORDERS_CREATE'],
-    }
-    next()
-  },
-  requirePermission: () => (req, res, next) => next(),
-  requireAnyPermission: () => (req, res, next) => next(),
+vi.mock('../lib/tenant-resolve.js', () => ({
+  requireRestaurantId: vi.fn().mockResolvedValue('restaurant-1'),
+  requireSupplierId: vi.fn().mockResolvedValue('supplier-1'),
 }))
+
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal)
+})
 
 vi.mock('../services/reviews.service.js', () => ({
   listSupplierReviews: vi.fn().mockResolvedValue({ reviews: [{ id: 'r1' }], total: 1 }),

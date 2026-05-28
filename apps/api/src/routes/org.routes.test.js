@@ -9,11 +9,12 @@ vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
 }))
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: (req, res, next) => next(),
-  requireRole: () => (req, res, next) => next(),
-  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-main'),
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal, {
+    getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-main'),
+  })
+})
 
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res, next) => next(),

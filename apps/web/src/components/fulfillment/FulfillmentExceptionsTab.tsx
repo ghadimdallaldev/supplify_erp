@@ -1,16 +1,29 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
-import { useGetFulfillmentExceptionsQuery } from '../../services/api'
+import { Textarea } from '../ui/textarea'
+import { Label } from '../ui/label'
+import {
+  useGetFulfillmentExceptionsQuery,
+  useResolveFulfillmentExceptionMutation,
+  useIgnoreFulfillmentExceptionMutation,
+} from '../../services/api'
+import { usePermissions } from '../../hooks/usePermissions'
+import toast from 'react-hot-toast'
 
 type Props = {
   warehouseId?: string
 }
 
 export function FulfillmentExceptionsTab({ warehouseId }: Props) {
+  const { can } = usePermissions()
+  const canManage = can('FULFILLMENT_MANAGE')
+  const [notesById, setNotesById] = useState<Record<string, string>>({})
+
   const {
     data: exceptionsResponse,
     isLoading,
@@ -18,8 +31,40 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
     refetch,
   } = useGetFulfillmentExceptionsQuery(warehouseId ? { warehouseId } : undefined)
 
+  const [resolveException, { isLoading: isResolving }] = useResolveFulfillmentExceptionMutation()
+  const [ignoreException, { isLoading: isIgnoring }] = useIgnoreFulfillmentExceptionMutation()
+
   const exceptions = exceptionsResponse?.exceptions ?? []
   const openCount = exceptionsResponse?.openCount ?? 0
+
+  const handleResolve = async (id: string) => {
+    try {
+      await resolveException({
+        id,
+        resolution_notes: notesById[id]?.trim() || undefined,
+      }).unwrap()
+      toast.success('Exception marked resolved')
+      refetch()
+    } catch (err: unknown) {
+      const message =
+        (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
+        'Failed to resolve exception'
+      toast.error(message)
+    }
+  }
+
+  const handleIgnore = async (id: string) => {
+    try {
+      await ignoreException(id).unwrap()
+      toast.success('Exception ignored')
+      refetch()
+    } catch (err: unknown) {
+      const message =
+        (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
+        'Failed to ignore exception'
+      toast.error(message)
+    }
+  }
 
   return (
     <Card data-testid="fulfillment-exceptions-tab">
@@ -90,6 +135,22 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
                           {ex.description}
                         </p>
                       )}
+                      {canManage && ex.status === 'open' && (
+                        <div className="mt-2 max-w-xs">
+                          <Label htmlFor={`notes-${ex.id}`} className="text-xs">
+                            Resolution notes (optional)
+                          </Label>
+                          <Textarea
+                            id={`notes-${ex.id}`}
+                            rows={2}
+                            className="mt-1 text-xs"
+                            value={notesById[ex.id] ?? ''}
+                            onChange={(e) =>
+                              setNotesById((prev) => ({ ...prev, [ex.id]: e.target.value }))
+                            }
+                          />
+                        </div>
+                      )}
                     </td>
                     <td className="p-2 font-mono text-xs">{ex.orderLabel}</td>
                     <td className="p-2">{ex.restaurantName || '—'}</td>
@@ -109,13 +170,37 @@ export function FulfillmentExceptionsTab({ warehouseId }: Props) {
                         : '—'}
                     </td>
                     <td className="p-2 text-right">
-                      {ex.orderId ? (
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/app/orders/${ex.orderId}`}>View order</Link>
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-[var(--text-muted)]">—</span>
-                      )}
+                      <div className="flex flex-col items-end gap-2">
+                        {ex.orderId && (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link to={`/app/orders/${ex.orderId}`}>View order</Link>
+                          </Button>
+                        )}
+                        {canManage && ex.status === 'open' && (
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="default"
+                              disabled={isResolving || isIgnoring}
+                              data-testid={`exception-resolve-${ex.id}`}
+                              onClick={() => handleResolve(ex.id)}
+                            >
+                              Resolve
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isResolving || isIgnoring}
+                              data-testid={`exception-ignore-${ex.id}`}
+                              onClick={() => handleIgnore(ex.id)}
+                            >
+                              Ignore
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

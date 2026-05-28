@@ -17,6 +17,9 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     conditions.push(`COALESCE(o.placed_at, o.created_at)::date = $${paramIdx}::date`)
     params.push(date)
     paramIdx += 1
+  } else {
+    // Default window when no date filter — avoids loading full order history.
+    conditions.push(`COALESCE(o.placed_at, o.created_at) >= NOW() - interval '14 days'`)
   }
 
   if (driverId) {
@@ -73,6 +76,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     LEFT JOIN delivery_zone dz ON dz.warehouse_id = owa.warehouse_id AND dz.supplier_id = $1
     WHERE ${conditions.join(' AND ')}
     ORDER BY o.id, scheduled_at DESC
+    LIMIT 500
   `,
     params
   )

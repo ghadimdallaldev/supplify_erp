@@ -124,6 +124,7 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), a
       WHERE s.contact_email = $1
       GROUP BY i.id, r.name, o.id, o.status
       ORDER BY i.issue_date DESC, i.invoice_number DESC
+      LIMIT 500
     `
 
     const { rows } = await query(invoicesQuery, [req.userData.email])

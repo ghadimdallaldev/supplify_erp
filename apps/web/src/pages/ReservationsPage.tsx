@@ -31,7 +31,10 @@ export function ReservationsPage() {
     data: boardData,
     isLoading: boardLoading,
     refetch,
-  } = useGetReservationBoardQuery({ date: selectedDate })
+  } = useGetReservationBoardQuery(
+    { date: selectedDate },
+    { pollingInterval: 30_000, refetchOnFocus: true, refetchOnReconnect: true }
+  )
   const { data: analytics, refetch: refetchAnalytics } = useGetReservationAnalyticsQuery({ range })
   const { data: guestIntel, isLoading: guestIntelLoading } = useGetGuestIntelligenceQuery({})
   const { data: waitlistData, refetch: refetchWaitlist } = useGetReservationWaitlistQuery()

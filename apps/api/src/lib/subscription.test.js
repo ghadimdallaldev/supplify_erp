@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createSubscriptionQueryRouter,
+  subscriptionIdRow,
+  subscriptionRow,
+} from '../test/factories/subscription.js'
 
 const mockQuery = vi.fn()
 const mockCreatePendingActivation = vi.fn().mockResolvedValue(undefined)
@@ -17,40 +22,38 @@ vi.mock('./cache.js', () => ({
 vi.mock('./feature-flags.js', () => ({
   resolveAllFeaturesForTenant: vi.fn().mockResolvedValue({ features: {}, featureSources: {} }),
 }))
+vi.mock('./org-billing-tenant.js', () => ({
+  resolveOrgBillingTenantId: vi.fn(async (tenantId) => tenantId),
+}))
+vi.mock('./plan-enforcement.js', () => ({
+  countActiveBranchLocations: vi.fn().mockResolvedValue(0),
+  countActiveWarehouses: vi.fn().mockResolvedValue(0),
+}))
 
 describe('Subscription lib', () => {
   beforeEach(() => {
     mockQuery.mockReset()
     mockCreatePendingActivation.mockClear()
+    mockQuery.mockImplementation(createSubscriptionQueryRouter())
   })
 
   describe('getTenantSubscription', () => {
     it('returns subscription when one exists', async () => {
       const { getTenantSubscription } = await import('./subscription.js')
-      mockQuery
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'sub-1',
-              plan_id: 'plan-free',
-              pending_plan_id: null,
-              pending_effective_at: null,
-            },
-          ],
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [subscriptionIdRow()] },
+          fullSub: {
+            rows: [
+              subscriptionRow({
+                tenant_id: 'rest-1',
+                limits: { chats_per_day: 10 },
+                features: { chat: 'enabled' },
+              }),
+            ],
+          },
         })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'sub-1',
-              tenant_id: 'rest-1',
-              tenant_type: 'RESTAURANT',
-              plan_id: 'plan-free',
-              plan_name: 'Free',
-              limits: { chats_per_day: 10 },
-              features: { chat: 'enabled' },
-            },
-          ],
-        })
+      )
 
       const result = await getTenantSubscription('rest-1', 'RESTAURANT')
 
@@ -61,22 +64,30 @@ describe('Subscription lib', () => {
 
     it('creates free subscription when none exists and returns it', async () => {
       const { getTenantSubscription } = await import('./subscription.js')
-      mockQuery
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ id: 'plan-free', name: 'Free', code: 'free' }] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'sub-new',
-              plan_name: 'Free',
-              plan_display_name: 'Free',
-              limits: { chats_per_day: 10 },
-              features: {},
-            },
-          ],
+      let fullSubCalls = 0
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [] },
+          plan: { rows: [{ id: 'plan-free', name: 'Free', code: 'free' }] },
+          fullSub: () => {
+            fullSubCalls += 1
+            if (fullSubCalls === 1) return { rows: [] }
+            return {
+              rows: [
+                subscriptionRow({
+                  id: 'sub-new',
+                  tenant_id: 'supp-1',
+                  tenant_type: 'SUPPLIER',
+                  plan_name: 'Free',
+                  plan_display_name: 'Free',
+                  limits: { chats_per_day: 10 },
+                  features: {},
+                }),
+              ],
+            }
+          },
         })
+      )
 
       const result = await getTenantSubscription('supp-1', 'SUPPLIER')
 
@@ -105,20 +116,22 @@ describe('Subscription lib', () => {
 
     it('returns limit info from subscription and usage_meter', async () => {
       const { checkLimit } = await import('./subscription.js')
-      mockQuery
-        .mockResolvedValueOnce({
-          rows: [{ id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [subscriptionIdRow({ plan_id: 'p1' })] },
+          fullSub: {
+            rows: [
+              subscriptionRow({
+                tenant_id: 'tenant-1',
+                tenant_type: 'SUPPLIER',
+                plan_id: 'p1',
+                limits: { chats_per_day: 10 },
+              }),
+            ],
+          },
+          usage: { rows: [{ current_value: 3 }] },
         })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'sub-1',
-              limits: { chats_per_day: 10 },
-            },
-          ],
-        })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ current_value: 3 }] })
+      )
 
       const result = await checkLimit('tenant-1', 'SUPPLIER', 'chats_per_day')
 
@@ -326,41 +339,37 @@ describe('Subscription lib', () => {
 
   describe('evaluateScheduledOrderLimit', () => {
     beforeEach(async () => {
-      mockQuery.mockReset()
       const { invalidateTenantSubscriptionCache } = await import('./subscription.js')
       await invalidateTenantSubscriptionCache('rest-1', 'RESTAURANT')
     })
 
-    function mockRestaurantSubscription(limits) {
-      return {
-        id: 'sub-1',
+    function mockCheckLimitQueries(limits, orderCount, graceUsed = 0) {
+      const row = subscriptionRow({
+        tenant_id: 'rest-1',
+        tenant_type: 'RESTAURANT',
+        plan_id: 'p1',
         limits,
         plan_code: 'free',
-        plan_name: 'Free',
-      }
-    }
-
-    function mockCheckLimitQueries(limits, orderCount, ordersToCreate = 1, graceUsed = 0) {
-      mockQuery
-        .mockResolvedValueOnce({
-          rows: [{ id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null }],
-        })
-        .mockResolvedValueOnce({ rows: [mockRestaurantSubscription(limits)] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ count: orderCount }] })
-
-      if (orderCount + ordersToCreate > limits.orders_per_day) {
-        mockQuery
-          .mockResolvedValueOnce({
-            rows: [
-              { id: 'sub-1', plan_id: 'p1', pending_plan_id: null, pending_effective_at: null },
-            ],
-          })
-          .mockResolvedValueOnce({ rows: [mockRestaurantSubscription(limits)] })
-          .mockResolvedValueOnce({
-            rows: graceUsed > 0 ? [{ current_value: graceUsed }] : [],
-          })
-      }
+      })
+      mockQuery.mockImplementation(async (sql) => {
+        const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('pending_plan_id') && text.includes('FROM subscription')) {
+          return { rows: [subscriptionIdRow({ plan_id: 'p1' })] }
+        }
+        if (text.includes('JOIN subscription_plan')) {
+          return { rows: [row] }
+        }
+        if (text.includes('customer_order') && text.includes('COUNT')) {
+          return { rows: [{ count: orderCount }] }
+        }
+        if (text.includes('scheduled_order_grace_per_day')) {
+          return { rows: graceUsed > 0 ? [{ current_value: graceUsed }] : [] }
+        }
+        if (text.includes('usage_meter')) {
+          return { rows: graceUsed > 0 ? [{ current_value: graceUsed }] : [] }
+        }
+        return { rows: [] }
+      })
     }
 
     it('allows scheduled orders when under the daily cap', async () => {
@@ -375,7 +384,7 @@ describe('Subscription lib', () => {
 
     it('allows one grace order on Free when daily cap is reached', async () => {
       const { evaluateScheduledOrderLimit } = await import('./subscription.js')
-      mockCheckLimitQueries({ orders_per_day: 3, scheduled_order_grace_per_day: 1 }, 3, 1)
+      mockCheckLimitQueries({ orders_per_day: 3, scheduled_order_grace_per_day: 1 }, 3, 0)
 
       const result = await evaluateScheduledOrderLimit('rest-1', 1)
 
@@ -386,7 +395,7 @@ describe('Subscription lib', () => {
 
     it('blocks when grace is already used for the day', async () => {
       const { evaluateScheduledOrderLimit } = await import('./subscription.js')
-      mockCheckLimitQueries({ orders_per_day: 3, scheduled_order_grace_per_day: 1 }, 3, 1, 1)
+      mockCheckLimitQueries({ orders_per_day: 3, scheduled_order_grace_per_day: 1 }, 3, 1)
 
       const result = await evaluateScheduledOrderLimit('rest-1', 1)
 

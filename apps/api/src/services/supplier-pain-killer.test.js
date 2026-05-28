@@ -43,7 +43,14 @@ Valid Product,SKU2,abc`
       })
       db.query.mockResolvedValueOnce({
         rows: [
-          { product_id: 'p1', product_name: 'Milk', sku: 'M1', total_qty: '10', order_count: 3 },
+          {
+            restaurant_id: 'r1',
+            product_id: 'p1',
+            product_name: 'Milk',
+            sku: 'M1',
+            total_qty: '10',
+            order_count: 3,
+          },
         ],
       })
 

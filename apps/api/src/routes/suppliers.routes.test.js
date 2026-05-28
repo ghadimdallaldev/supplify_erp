@@ -13,44 +13,45 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || { ...mockUser }
-    next()
-  }),
-  requireRole: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || {
-      permissions: ['SETTINGS_MANAGE', 'WAREHOUSES_MANAGE'],
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal, {
+    resolveTenantContext: (req, res, next) => {
+      req.tenantContext = req.tenantContext || {
+        permissions: ['SETTINGS_MANAGE', 'WAREHOUSES_MANAGE'],
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+      }
+      next()
+    },
+    getRequestTenant: vi.fn().mockResolvedValue({
       tenantId: 'supplier-1',
       tenantType: 'SUPPLIER',
-    }
-    next()
-  },
-  requirePermission: () => (req, res, next) => next(),
-  getRequestTenant: vi.fn().mockResolvedValue({
-    tenantId: 'supplier-1',
-    tenantType: 'SUPPLIER',
-    tenantName: 'Test Supplier',
-  }),
-  optionalAuth: vi.fn(async (req, res, next) => {
-    // optionalAuth should set req.userData if available, but not fail if missing
-    // In tests, we set it in the middleware, so optionalAuth just passes through
-    if (!req.userData) {
-      req.userData = { ...mockUser }
-    }
-    next()
-  }),
-}))
+      tenantName: 'Test Supplier',
+    }),
+    optionalAuth: vi.fn(async (req, res, next) => {
+      if (!req.userData) {
+        req.userData = { ...mockUser }
+      }
+      next()
+    }),
+  })
+})
 
-vi.mock('../lib/logger.js', () => ({
-  logger: {
+vi.mock('../lib/logger.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  const silentLogger = {
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
     debug: vi.fn(),
-  },
-}))
+  }
+  return {
+    ...actual,
+    logger: silentLogger,
+    createModuleLogger: () => silentLogger,
+  }
+})
 
 vi.mock('../services/reviews.service.js', () => ({
   getSupplierRatingSummary: vi.fn().mockResolvedValue({ avg_overall: 0, review_count: 0 }),
@@ -92,9 +93,6 @@ describe('Suppliers Routes', () => {
       // Then queries suppliers, then queries count for pagination
       db.query
         .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1' }], // Restaurant lookup when role is RESTAURANT
-        })
-        .mockResolvedValueOnce({
           rows: [
             {
               id: 'supplier-1',
@@ -122,23 +120,19 @@ describe('Suppliers Routes', () => {
   describe('GET /api/suppliers/:id', () => {
     it('should return supplier details', async () => {
       // Mock: restaurant lookup (for RESTAURANT role), then supplier query
-      db.query
-        .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1' }], // Restaurant lookup
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'supplier-1',
-              name: 'Test Supplier',
-              contact_email: 'supplier@example.com',
-              phone: '1234567890',
-              address: '123 Main St',
-              product_count: 5,
-              avg_price: 10.5,
-            },
-          ],
-        })
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'supplier-1',
+            name: 'Test Supplier',
+            contact_email: 'supplier@example.com',
+            phone: '1234567890',
+            address: '123 Main St',
+            product_count: 5,
+            avg_price: 10.5,
+          },
+        ],
+      })
 
       const response = await request(app).get('/api/suppliers/supplier-1').expect(200)
 

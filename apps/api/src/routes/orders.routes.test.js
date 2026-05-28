@@ -16,35 +16,10 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: vi.fn(async (req, res, next) => {
-    req.userData = req.userData || { ...mockUser }
-    next()
-  }),
-  requireRole: () => (req, res, next) => next(),
-  requireOwnership: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = req.tenantContext || {
-      permissions: ['ORDERS_VIEW'],
-      tenantId: 'restaurant-1',
-      tenantType: 'RESTAURANT',
-    }
-    next()
-  },
-  requirePermission: () => (req, res, next) => next(),
-  getRequestTenant: vi.fn().mockResolvedValue({
-    tenantId: 'restaurant-1',
-    tenantType: 'RESTAURANT',
-    tenantName: 'Test Restaurant',
-  }),
-  getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
-  getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
-  checkPermission: vi.fn().mockResolvedValue(true),
-  upsertUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
-  setAuthCookies: vi.fn(),
-  clearAuthCookies: vi.fn(),
-  getUserBySub: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal)
+})
 
 vi.mock('../lib/subscription.js', () => ({
   checkLimit: vi
@@ -208,6 +183,7 @@ describe('Orders Routes', () => {
         })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
 
       const response = await request(app).get('/api/orders/order-1').expect(200)
 
@@ -254,6 +230,7 @@ describe('Orders Routes', () => {
             },
           ],
         })
+        .mockResolvedValueOnce({ rows: [] })
 
       const response = await request(app).get('/api/orders/order-1').expect(200)
 

@@ -100,7 +100,10 @@ function formatAddress(addr) {
   return parts.length ? parts.join(' · ') : null
 }
 
-async function loadRouteStops(routeId, client = null) {
+async function loadRouteStopsForRoutes(routeIds, client = null) {
+  const map = new Map()
+  if (!routeIds.length) return map
+
   const db = client ? (sql, p) => client.query(sql, p) : query
   const { rows } = await db(
     `
@@ -122,12 +125,23 @@ async function loadRouteStops(routeId, client = null) {
     ) da ON true
     LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id
     LEFT JOIN delivery_zone dz ON dz.warehouse_id = owa.warehouse_id
-    WHERE rs.route_id = $1
-    ORDER BY rs.sequence_number ASC
+    WHERE rs.route_id = ANY($1::uuid[])
+    ORDER BY rs.route_id, rs.sequence_number ASC
     `,
-    [routeId]
+    [routeIds]
   )
-  return rows.map(mapStopRow)
+
+  for (const row of rows) {
+    const list = map.get(row.route_id) ?? []
+    list.push(mapStopRow(row))
+    map.set(row.route_id, list)
+  }
+  return map
+}
+
+async function loadRouteStops(routeId, client = null) {
+  const batch = await loadRouteStopsForRoutes([routeId], client)
+  return batch.get(routeId) ?? []
 }
 
 function mapRouteSummary(row, stops = []) {
@@ -182,16 +196,18 @@ export async function listDeliveryRoutes(
     LEFT JOIN drivers d ON d.id = dr.driver_id
     WHERE dr.supplier_id = $1${extra}
     ORDER BY dr.scheduled_date DESC, dr.route_number DESC
+    LIMIT 200
   `,
     params
   )
 
-  const routes = []
-  for (const row of rows) {
-    const stops = await loadRouteStops(row.id)
-    routes.push({ ...mapRouteSummary(row, stops), stops })
-  }
-  return routes
+  const routeIds = rows.map((row) => row.id)
+  const stopsByRoute = await loadRouteStopsForRoutes(routeIds)
+
+  return rows.map((row) => {
+    const stops = stopsByRoute.get(row.id) ?? []
+    return { ...mapRouteSummary(row, stops), stops }
+  })
 }
 
 export async function getDeliveryRoute(supplierId, routeId, { driverIdScope = null } = {}) {

@@ -46,6 +46,7 @@ import {
   useGetRestaurantInvoicesQuery,
   useGetRestaurantInvoiceQuery,
   useMarkInvoicePaidMutation,
+  useRecordSupplierPaymentMutation,
   useGetInvoiceCreditsQuery,
   useGetInvoiceAnalyticsQuery,
   useGetOverdueInvoicesQuery,
@@ -116,6 +117,9 @@ export function InvoicesPage() {
   )
   const { data: overdueData } = useGetOverdueInvoicesQuery(undefined, { skip: !isRestaurant })
   const [markPaid, { isLoading: isProcessingPayment }] = useMarkInvoicePaidMutation()
+  const [recordSupplierPayment, { isLoading: isRecordingSupplierPayment }] =
+    useRecordSupplierPaymentMutation()
+  const isProcessingAnyPayment = isProcessingPayment || isRecordingSupplierPayment
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
     'disputes_returns'
@@ -244,21 +248,37 @@ export function InvoicesPage() {
     }
 
     try {
-      await markPaid({
-        invoiceId: selectedInvoice.id,
-        data: {
-          paymentAmount: finalPaymentAmount > 0 ? finalPaymentAmount : undefined, // undefined = full payment
-          paymentDate: new Date().toISOString().split('T')[0],
-          paymentMethod: paymentMethod as any,
-          paymentReference: paymentReference || undefined,
-          bankName: bankName || undefined,
+      if (!isRestaurant) {
+        if (paymentMode === 'credit') {
+          toast.error('Credit notes can only be applied by the restaurant')
+          return
+        }
+        await recordSupplierPayment({
+          invoice_id: selectedInvoice.id,
+          payment_amount: finalPaymentAmount,
+          payment_date: new Date().toISOString().split('T')[0],
+          payment_method: paymentMethod,
+          payment_reference: paymentReference || undefined,
+          bank_name: bankName || undefined,
           notes: paymentNotes || undefined,
-          creditAmount: creditAmount > 0 ? creditAmount : undefined,
-          creditNoteId: selectedCreditNoteId || undefined,
-          paidByHQ: paidByHQ,
-          hqNotes: hqNotes || undefined,
-        },
-      }).unwrap()
+        }).unwrap()
+      } else {
+        await markPaid({
+          invoiceId: selectedInvoice.id,
+          data: {
+            paymentAmount: finalPaymentAmount > 0 ? finalPaymentAmount : undefined,
+            paymentDate: new Date().toISOString().split('T')[0],
+            paymentMethod: paymentMethod as any,
+            paymentReference: paymentReference || undefined,
+            bankName: bankName || undefined,
+            notes: paymentNotes || undefined,
+            creditAmount: creditAmount > 0 ? creditAmount : undefined,
+            creditNoteId: selectedCreditNoteId || undefined,
+            paidByHQ: paidByHQ,
+            hqNotes: hqNotes || undefined,
+          },
+        }).unwrap()
+      }
 
       toast.success('Payment recorded successfully!')
       setShowPaymentDialog(false)
@@ -586,7 +606,7 @@ export function InvoicesPage() {
                             Paid: {formatPrice(invoice.total_paid)}
                           </p>
                         )}
-                        {isRestaurant && canRecordPayments && remaining > 0 && (
+                        {canRecordPayments && remaining > 0 && (
                           <Button
                             size="sm"
                             variant="default"
@@ -905,7 +925,7 @@ export function InvoicesPage() {
                           </CardContent>
                         </Card>
                       ))}
-                      {isRestaurant && remainingBalance > 0 && (
+                      {canRecordPayments && remainingBalance > 0 && (
                         <div className="border-2 border-[var(--amber-mid)]/40 rounded-lg p-4 bg-[var(--amber-pale)]">
                           <div className="flex justify-between items-center">
                             <div>
@@ -927,7 +947,7 @@ export function InvoicesPage() {
                     <div className="border rounded-lg p-8 text-center bg-[var(--brand-ultra)]">
                       <CreditCard className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
                       <p className="text-[var(--text-muted)]">No payments recorded yet</p>
-                      {isRestaurant && remainingBalance > 0 && (
+                      {canRecordPayments && remainingBalance > 0 && (
                         <Button
                           className="mt-4"
                           onClick={() => {
@@ -999,13 +1019,14 @@ export function InvoicesPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Enhanced Payment Dialog (Restaurant only) */}
-        <Dialog open={isRestaurant && showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Record Payment</DialogTitle>
               <DialogDescription>
-                Record full payment, partial payment, or apply credit notes
+                {isRestaurant
+                  ? 'Record full payment, partial payment, or apply credit notes'
+                  : 'Record payment received from the restaurant against this invoice'}
               </DialogDescription>
             </DialogHeader>
 
@@ -1037,10 +1058,12 @@ export function InvoicesPage() {
                 <div>
                   <Label className="mb-2 block">Payment Type</Label>
                   <Tabs value={paymentMode} onValueChange={(v) => setPaymentMode(v as any)}>
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList
+                      className={`grid w-full ${isRestaurant ? 'grid-cols-3' : 'grid-cols-2'}`}
+                    >
                       <TabsTrigger value="full">Full Payment</TabsTrigger>
                       <TabsTrigger value="partial">Partial Payment</TabsTrigger>
-                      <TabsTrigger value="credit">Apply Credit</TabsTrigger>
+                      {isRestaurant && <TabsTrigger value="credit">Apply Credit</TabsTrigger>}
                     </TabsList>
                   </Tabs>
                 </div>
@@ -1421,12 +1444,12 @@ export function InvoicesPage() {
               <Button
                 onClick={handleRecordPayment}
                 disabled={
-                  isProcessingPayment ||
+                  isProcessingAnyPayment ||
                   (paymentMode === 'credit' && creditAmount <= 0) ||
                   (paymentMode === 'partial' && paymentAmount <= 0)
                 }
               >
-                {isProcessingPayment ? (
+                {isProcessingAnyPayment ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Processing...

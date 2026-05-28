@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { activeRestaurantDeal } from '../test/factories/deal-promotion.js'
 import {
   calculatePromotionDiscount,
   filterEligibleLineItems,
@@ -7,16 +8,7 @@ import {
 } from './promotions.service.js'
 
 describe('promotions.service', () => {
-  const basePromo = {
-    status: 'active',
-    starts_at: '2020-01-01T00:00:00Z',
-    ends_at: '2099-01-01T00:00:00Z',
-    usage_limit: 10,
-    usage_count: 0,
-    min_order_amount: null,
-    max_discount_cap: null,
-    restaurant_ids: [],
-  }
+  const basePromo = activeRestaurantDeal()
 
   describe('isPromotionEligible', () => {
     it('rejects inactive or expired promotions', () => {

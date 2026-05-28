@@ -3,20 +3,15 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ordersCalendarRoutes } from './orders.calendar.routes.js'
 
-vi.mock('../lib/rbac.js', () => ({
-  requireAuth: (req, res, next) => {
-    req.userData = { id: 'user-1', email: 'r@test.com', role: 'RESTAURANT' }
-    next()
-  },
-  resolveTenantContext: (req, res, next) => {
-    req.tenantContext = { tenantId: 'rest-1', tenantType: 'RESTAURANT' }
-    next()
-  },
-  getRequestTenant: vi.fn().mockResolvedValue({
-    tenantId: 'rest-1',
-    tenantType: 'RESTAURANT',
-  }),
-}))
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal, {
+    getRequestTenant: vi.fn().mockResolvedValue({
+      tenantId: 'rest-1',
+      tenantType: 'RESTAURANT',
+    }),
+  })
+})
 
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res) =>
