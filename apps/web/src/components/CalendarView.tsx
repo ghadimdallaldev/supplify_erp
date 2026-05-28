@@ -139,8 +139,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
     let source = data.events.filter((event) => Boolean(event.start))
 
     const useCompactOrderEvents =
-      activeRole === 'SUPPLIER' &&
-      (currentView === 'dayGridMonth' || currentView === 'listWeek')
+      activeRole === 'SUPPLIER' && (currentView === 'dayGridMonth' || currentView === 'listWeek')
 
     if (useCompactOrderEvents) {
       const byOrder = new Map<string, OrdersCalendarEvent>()
@@ -253,8 +252,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       }
 
       const statusTheme = statusThemeMap[statusKey] || statusThemeMap.pending
-      const isCompactGrid =
-        content.view.type === 'dayGridMonth' || content.view.type === 'listWeek'
+      const isCompactGrid = content.view.type === 'dayGridMonth' || content.view.type === 'listWeek'
       const orderRef = `#${(event.orderId ?? content.event.id ?? '').slice(0, 8).toUpperCase()}`
       const statusLabel = event.status?.replace(/_/g, ' ') ?? ''
 
@@ -492,7 +490,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                 {FEATURE_KEY_LABELS.order_calendar} is not on {planName}
               </p>
               <p className="text-sm text-[var(--text-muted)]">
-                Visualize orders, deliveries, and payment due dates in one place. Upgrade to Bronze
+                Visualize orders, deliveries, and payment due dates in one place. Upgrade to Silver
                 or Gold to unlock the calendar — Free is for setup and light testing only.
               </p>
             </div>

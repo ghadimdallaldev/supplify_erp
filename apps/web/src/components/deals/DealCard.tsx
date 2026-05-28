@@ -24,6 +24,8 @@ import { useAppDispatch, useAppSelector } from '../../hooks/redux'
 import { getDealRedeemGate } from '../../lib/planLimits'
 import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
+import { cn } from '../../lib/utils'
+import { cardActionBtnClass, cardShellClass } from '../ui/card-layout'
 
 export type DealRecord = Record<string, unknown>
 
@@ -74,7 +76,7 @@ function CtaIcon({ cta }: { cta: string }) {
 
 function DealBadges({ deal, isSponsored }: { deal: DealRecord; isSponsored: boolean }) {
   return (
-    <div className="flex flex-col items-end gap-1 shrink-0">
+    <div className="flex flex-row flex-wrap items-center justify-end gap-1 shrink-0 max-w-full">
       {isSponsored ? (
         <Badge variant="secondary" className="gap-1 text-[10px]">
           <Megaphone className="h-3 w-3" />
@@ -172,7 +174,7 @@ export function DealCard({
 
   return (
     <Card
-      className={`overflow-hidden ${isSponsored ? 'border-[var(--brand)] ring-1 ring-[var(--brand)]/20' : ''}`}
+      className={`${cardShellClass} ${isSponsored ? 'border-[var(--brand)] ring-1 ring-[var(--brand)]/20' : ''}`}
     >
       {deal.image_url ? (
         <img
@@ -184,18 +186,20 @@ export function DealCard({
         <DealBannerPlaceholderInner />
       )}
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Tag className="h-4 w-4 shrink-0 text-[var(--brand)]" />
-              <span className="truncate">{String(deal.name)}</span>
+        <div className="flex flex-col gap-2 min-w-0">
+          <div className="flex items-start justify-between gap-2 min-w-0">
+            <CardTitle className="text-base min-w-0 flex-1">
+              <span className="flex items-center gap-2 min-w-0">
+                <Tag className="h-4 w-4 shrink-0 text-[var(--brand)]" />
+                <span className="truncate">{String(deal.name)}</span>
+              </span>
             </CardTitle>
-            <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 mt-1">
-              <Building2 className="h-3 w-3 shrink-0" />
-              {String(deal.supplier_name || 'Supplier')}
-            </p>
+            <DealBadges deal={deal} isSponsored={isSponsored} />
           </div>
-          <DealBadges deal={deal} isSponsored={isSponsored} />
+          <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 min-w-0">
+            <Building2 className="h-3 w-3 shrink-0" />
+            <span className="truncate">{String(deal.supplier_name || 'Supplier')}</span>
+          </p>
         </div>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -218,7 +222,12 @@ export function DealCard({
           <p className="text-[var(--text-muted)] line-clamp-2">{String(deal.description)}</p>
         ) : null}
         <p className="text-xs text-[var(--text-muted)]">Valid until {formatValidUntil(deal)}</p>
-        <Button size="sm" className="w-full" onClick={handleCta} disabled={messaging}>
+        <Button
+          size="sm"
+          className={cn('w-full', cardActionBtnClass())}
+          onClick={handleCta}
+          disabled={messaging}
+        >
           {!canRedeem && ctaNeedsRedeem(deal) ? (
             <Lock className="h-4 w-4 mr-2" />
           ) : (

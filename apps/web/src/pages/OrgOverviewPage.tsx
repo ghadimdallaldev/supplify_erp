@@ -7,6 +7,7 @@ import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { multiBranchEnabled } from '../lib/planLimits'
 import { AddBranchModal } from '../components/org/AddBranchModal'
 
 export function OrgOverviewPage() {
@@ -14,7 +15,7 @@ export function OrgOverviewPage() {
   const { can } = usePermissions()
   const navigate = useNavigate()
   const { entitlements } = useEntitlements()
-  const multiBranch = entitlements?.features?.multi_branch === true
+  const multiBranch = multiBranchEnabled(entitlements)
   const { data, isLoading } = useGetOrgQuery(undefined, {
     skip: user?.role !== 'SUPPLIER',
   })

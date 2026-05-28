@@ -165,7 +165,6 @@ export interface BuildOrderTimelineInput {
   receivingReports?: ReceivingLike[]
   creditNotes?: CreditNoteLike[]
   replacementOrders?: ReplacementOrderLike[]
-  approvalStatus?: string | null
 }
 
 function pushCoreFulfillmentSteps(
@@ -176,24 +175,10 @@ function pushCoreFulfillmentSteps(
     supplierName: string
     restaurantName?: string
     viewerRole: TimelineViewerRole
-    approvalPending: boolean
   }
 ) {
-  const { order, statusRank, supplierName, restaurantName, viewerRole, approvalPending } = input
+  const { order, statusRank, supplierName, restaurantName, viewerRole } = input
   const isSupplier = viewerRole === 'SUPPLIER'
-
-  if (approvalPending && statusRank < MILESTONE.PLACED) {
-    events.push({
-      id: 'approval',
-      title: 'Awaiting approval',
-      description: isSupplier
-        ? 'This order is waiting for restaurant approval before fulfillment.'
-        : 'This order needs internal approval before it is sent to the supplier.',
-      timestamp: formatTs(order.created_at),
-      state: 'current',
-      badge: 'Pending approval',
-    })
-  }
 
   events.push({
     id: 'placed',
@@ -347,7 +332,6 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     receivingReports = [],
     creditNotes = [],
     replacementOrders = [],
-    approvalStatus,
   } = input
 
   const orderDisputes = disputes.filter((d) => disputeOrderId(d) === order.id)
@@ -357,7 +341,6 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
 
   const events: TimelineEvent[] = []
   const status = order.status
-  const statusRank = rank(status)
   const supplierName = order.items?.find((i) => i.supplier_name)?.supplier_name || 'Supplier'
   const restaurantName =
     (order as OrderLike & { restaurant_name?: string }).restaurant_name || 'Restaurant'
@@ -381,16 +364,16 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     return events
   }
 
-  const approvalPending =
-    status === 'PENDING_APPROVAL' || approvalStatus === 'pending' || approvalStatus === 'PENDING'
+  // Legacy PENDING_APPROVAL orders are treated as placed in the timeline (product no longer gates orders).
+  const effectiveStatus = status === 'PENDING_APPROVAL' ? 'PLACED' : status
+  const effectiveRank = rank(effectiveStatus)
 
   pushCoreFulfillmentSteps(events, {
-    order,
-    statusRank,
+    order: { ...order, status: effectiveStatus },
+    statusRank: effectiveRank,
     supplierName,
     restaurantName,
     viewerRole,
-    approvalPending,
   })
 
   const acceptedSubstitutions = amendments.filter((a) => {
@@ -413,10 +396,10 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
 
   if (viewerRole === 'RESTAURANT') {
     const receiving = receivingReports.find((r) => String(r.order_id ?? r.orderId) === order.id)
-    pushReceivingStep(events, { order, statusRank, receiving })
+    pushReceivingStep(events, { order, statusRank: effectiveRank, receiving })
   } else if (
     viewerRole === 'SUPPLIER' &&
-    (order.status === 'RECEIVED_WITH_DISPUTE' || statusRank >= MILESTONE.RECEIVED)
+    (order.status === 'RECEIVED_WITH_DISPUTE' || effectiveRank >= MILESTONE.RECEIVED)
   ) {
     const disputeOpen = order.status === 'RECEIVED_WITH_DISPUTE'
     events.push({

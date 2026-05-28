@@ -3,13 +3,21 @@ import { Link } from 'react-router-dom'
 import { useBranchContext } from '../contexts/BranchContext'
 import { useAppSelector } from '../hooks/redux'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { multiBranchEnabled } from '../lib/planLimits'
 
 export function BranchSwitcher() {
   const { user } = useAppSelector((state) => state.auth)
   const { entitlements } = useEntitlements()
-  const multiBranch = entitlements?.features?.multi_branch === true
-  const { accounts, activeAccountId, activeAccount, isLoading, isSwitching, switchAccount, isOrgScope } =
-    useBranchContext()
+  const multiBranch = multiBranchEnabled(entitlements)
+  const {
+    accounts,
+    activeAccountId,
+    activeAccount,
+    isLoading,
+    isSwitching,
+    switchAccount,
+    isOrgScope,
+  } = useBranchContext()
 
   if (user?.role !== 'RESTAURANT' && user?.role !== 'SUPPLIER') {
     return null
@@ -44,9 +52,7 @@ export function BranchSwitcher() {
         disabled={isLoading || isSwitching}
         aria-label="Active account"
       >
-        {isOrgScope && multiBranch && (
-          <option value="">All branches</option>
-        )}
+        {isOrgScope && multiBranch && <option value="">All branches</option>}
         {accounts.map((account) => (
           <option key={account.id} value={account.id}>
             {account.isPrimary ? `${account.name} (main)` : account.name}
@@ -57,14 +63,14 @@ export function BranchSwitcher() {
         multiBranch &&
         isOrgScope &&
         accounts.length > 1 && (
-        <Link
-          to="/app/org"
-          className="text-xs text-[var(--brand)] whitespace-nowrap hover:underline"
-          title="Organization overview"
-        >
-          Manage
-        </Link>
-      )}
+          <Link
+            to="/app/org"
+            className="text-xs text-[var(--brand)] whitespace-nowrap hover:underline"
+            title="Organization overview"
+          >
+            Manage
+          </Link>
+        )}
       <span className="sr-only">{activeAccount?.name ?? 'Main account'}</span>
     </div>
   )

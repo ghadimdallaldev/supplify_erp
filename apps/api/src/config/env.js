@@ -107,6 +107,8 @@ export const config = {
   VAPID_EMAIL: process.env.VAPID_EMAIL || 'notifications@supplify.local',
   /** Log process.memoryUsage() on an interval (also enabled in NODE_ENV=development). */
   MEMORY_DEBUG: process.env.MEMORY_DEBUG === '1' || process.env.MEMORY_DEBUG === 'true',
+  ADMIN_OVERVIEW_DEBUG:
+    process.env.ADMIN_OVERVIEW_DEBUG === '1' || process.env.ADMIN_OVERVIEW_DEBUG === 'true',
   /** Include memory + db pool on GET /health (default: on in non-production). */
   MEMORY_HEALTH_EXPOSE:
     process.env.MEMORY_HEALTH_EXPOSE === '1' || process.env.MEMORY_HEALTH_EXPOSE === 'true',

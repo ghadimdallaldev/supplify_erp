@@ -76,6 +76,7 @@ import {
   customBrandingUpgradeMessage,
   formatBranchGateMessage,
   getBranchAddGate,
+  multiBranchEnabled as isMultiBranchPlan,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch } from '../hooks/redux'
@@ -210,10 +211,7 @@ export function RestaurantOnboardingPage() {
 
   useEffect(() => {
     const tab = searchParams.get('tab')
-    if (
-      tab &&
-      ['profile', 'team', 'branches', 'subscription', 'notifications'].includes(tab)
-    ) {
+    if (tab && ['profile', 'team', 'branches', 'subscription', 'notifications'].includes(tab)) {
       setActiveTab(tab)
     }
   }, [searchParams])
@@ -347,10 +345,10 @@ export function RestaurantOnboardingPage() {
 
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
-  const multiBranchEnabled = entitlements?.features?.multi_branch === true
+  const multiBranchPlan = isMultiBranchPlan(entitlements)
   const { data: restaurantOrgBranches, refetch: refetchRestaurantOrgBranches } =
     useGetRestaurantOrgBranchesQuery(undefined, {
-      skip: !user?.id || !multiBranchEnabled,
+      skip: !user?.id || !multiBranchPlan,
     })
   const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(undefined, {
     skip: !user?.id || Boolean(restaurantOrgBranches?.organizationId),

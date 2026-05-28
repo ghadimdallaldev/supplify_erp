@@ -89,9 +89,7 @@ export async function createDefaultWarehouseForSupplier(client, supplier, db = q
       ? async () => getWarehouseSupplierColumn(db)
       : async () => getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
 
-  const owner = await getWarehouseOwnerInsertSpec(
-    (sql, params) => client.query(sql, params)
-  )
+  const owner = await getWarehouseOwnerInsertSpec((sql, params) => client.query(sql, params))
   const address = formatAddressForWarehouse(supplier.address_json)
   const warehouseName = `${supplier.name} Warehouse`
 
@@ -115,4 +113,31 @@ export async function createDefaultWarehouseForSupplier(client, supplier, db = q
   )
 
   return warehouseId
+}
+
+/**
+ * Create a default warehouse when the supplier's plan allows warehouses (Silver+).
+ * Skipped on Free registration; call when opening warehouse management after upgrade.
+ */
+export async function ensureDefaultWarehouseForPaidSupplier(supplierId) {
+  const { getTenantSubscription } = await import('./subscription.js')
+  const subscription = await getTenantSubscription(supplierId, 'SUPPLIER')
+  if (!subscription) return null
+
+  const rawLimit = subscription.limits?.warehouses
+  const limit =
+    rawLimit === -1 || rawLimit === null || rawLimit === undefined ? null : parseInt(rawLimit, 10)
+  if (limit === 0) return null
+
+  const supplierCol = await getWarehouseSupplierColumn()
+  const { rows: existing } = await query(
+    `SELECT id FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE LIMIT 1`,
+    [supplierId]
+  )
+  if (existing.length) return existing[0].id
+
+  const { rows: supplierRows } = await query(`SELECT * FROM supplier WHERE id = $1`, [supplierId])
+  if (!supplierRows.length) return null
+
+  return createDefaultWarehouseForSupplier(query, supplierRows[0])
 }

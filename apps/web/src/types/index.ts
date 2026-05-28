@@ -894,7 +894,7 @@ export interface StaffPayrollExport {
 // Admin Dashboard types
 export interface SubscriptionPlan {
   id: string
-  code: string // free, bronze, gold, platinum
+  code: string // free, silver, gold, platinum
   name: string
   description?: string
   price_per_month: number

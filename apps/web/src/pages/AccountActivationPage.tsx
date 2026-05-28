@@ -57,7 +57,7 @@ export function AccountActivationPage() {
           <div className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)]/50 p-4 text-sm text-[var(--text-mid)]">
             <p className="flex items-start gap-2">
               <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
-              Pay for Bronze, Gold, or Platinum to unlock orders, inventory, and the full app
+              Pay for Silver, Gold, or Platinum to unlock orders, inventory, and the full app
               immediately.
             </p>
             <p className="mt-3 flex items-start gap-2">

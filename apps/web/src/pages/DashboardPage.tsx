@@ -335,13 +335,7 @@ export function DashboardPage() {
           </div>
           <Skeleton className="h-8 w-36" style={{ background: 'var(--brand-ultra)' }} />
         </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: DASHBOARD_GRID_GAP,
-          }}
-        >
+        <div className="dashboard-kpi-grid">
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
@@ -361,9 +355,7 @@ export function DashboardPage() {
             </div>
           ))}
         </div>
-        <div
-          style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: DASHBOARD_GRID_GAP }}
-        >
+        <div className="dashboard-content-grid">
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
@@ -527,13 +519,11 @@ export function DashboardPage() {
             border: '1px solid var(--brand-light)',
             borderRadius: 12,
             padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             gap: 12,
           }}
+          className="dashboard-split-row"
         >
-          <div>
+          <div className="min-w-0">
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
               You&apos;re all set
             </div>
@@ -564,13 +554,11 @@ export function DashboardPage() {
             border: '1px solid var(--brand-light)',
             borderRadius: 12,
             padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             gap: 12,
           }}
+          className="dashboard-split-row"
         >
-          <div>
+          <div className="min-w-0">
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
               You&apos;re all set
             </div>
@@ -596,8 +584,8 @@ export function DashboardPage() {
       )}
 
       {/* Page heading */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
+      <div className="dashboard-page-header">
+        <div className="min-w-0">
           <h1 style={{ fontSize: 21, fontWeight: 900, color: 'var(--text)', margin: 0 }}>
             {greeting}, {firstName} ☀️
           </h1>
@@ -640,16 +628,14 @@ export function DashboardPage() {
       </div>
 
       {/* KPI grid — 4 columns */}
-      <div
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: DASHBOARD_GRID_GAP }}
-      >
+      <div className="dashboard-kpi-grid">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
       </div>
 
       {/* 3-col content row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: DASHBOARD_GRID_GAP }}>
+      <div className="dashboard-content-grid">
         {/* Col 1 — Recent Orders */}
         <SectionCard
           title="Recent Orders"
@@ -685,14 +671,11 @@ export function DashboardPage() {
                 <Link
                   key={o.id}
                   to={`/app/orders/${o.id}`}
+                  className="dashboard-split-row"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
                     padding: '8px 4px',
                     borderBottom: '1px solid var(--app-border)',
                     textDecoration: 'none',
-                    gap: 8,
                   }}
                 >
                   <div style={{ minWidth: 0 }}>

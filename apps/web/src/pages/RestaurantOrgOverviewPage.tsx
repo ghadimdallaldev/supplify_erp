@@ -7,6 +7,7 @@ import {
 } from '../services/api'
 import { useAppSelector } from '../hooks/redux'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { multiBranchEnabled } from '../lib/planLimits'
 import { usePermissions } from '../hooks/usePermissions'
 import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
 
@@ -16,7 +17,7 @@ export function RestaurantOrgOverviewPage() {
   const { can } = usePermissions()
   const canManageOrg = can('SETTINGS_MANAGE')
   const { entitlements } = useEntitlements()
-  const multiBranch = entitlements?.features?.multi_branch === true
+  const multiBranch = multiBranchEnabled(entitlements)
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
     skip: user?.role !== 'RESTAURANT',
   })
