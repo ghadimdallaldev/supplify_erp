@@ -22,7 +22,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { RecommendedBadge } from './RecommendedBadge'
-import { getPlanSubtitle } from '../lib/planComparison'
+import { formatPlanDisplayName, getPlanSubtitle } from '../lib/planComparison'
 import { useGetBillingStatusQuery } from '../services/api'
 import { openCheckoutPayment, openOverduePayment } from '../lib/openPaymentModal'
 import { getUsageMeterDisplay } from '../lib/usageDisplay'
@@ -206,7 +206,9 @@ export function SubscriptionInfo() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-lg">{plan.name || 'Free'}</h3>
+                <h3 className="font-semibold text-lg">
+                  {formatPlanDisplayName(plan.code, plan.name)}
+                </h3>
                 <RecommendedBadge
                   planCode={plan.code ?? 'free'}
                   recommendedPlanCode={recommendation?.recommendedPlanCode}
@@ -250,7 +252,8 @@ export function SubscriptionInfo() {
             <div className="mt-3 space-y-2">
               {e.freeSandbox?.expiresAt && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  {billing?.access?.freeSandboxExpired || billing?.access?.lockReason === 'free_sandbox_expired' ? (
+                  {billing?.access?.freeSandboxExpired ||
+                  billing?.access?.lockReason === 'free_sandbox_expired' ? (
                     <p>
                       Your free testing period has ended. Upgrade to a paid plan to restore access.
                     </p>
@@ -269,7 +272,8 @@ export function SubscriptionInfo() {
                 </div>
               )}
               <p className="text-sm text-[var(--text-muted)]">
-                Free is for evaluation only. Upgrade to a paid plan for ongoing production use.
+                Free Trial is time-limited and for evaluation only. Upgrade to a paid plan for
+                ongoing production use.
               </p>
               <Button
                 type="button"

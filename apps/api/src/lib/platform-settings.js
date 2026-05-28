@@ -4,11 +4,21 @@ const DEFAULTS = {
   free_sandbox_days: 7,
 }
 
+/** Admin-configurable Free Trial length for new activations and extensions. */
+export const FREE_TRIAL_MIN_DAYS = 3
+export const FREE_TRIAL_MAX_DAYS = 7
+
+export function clampFreeTrialDays(days, fallback = DEFAULTS.free_sandbox_days) {
+  const n = Number(days)
+  const base = Number.isFinite(n) ? Math.round(n) : fallback
+  return Math.min(FREE_TRIAL_MAX_DAYS, Math.max(FREE_TRIAL_MIN_DAYS, base))
+}
+
 export async function getPlatformSetting(key, fallback = null) {
   try {
     const { rows } = await query(`SELECT value FROM platform_setting WHERE key = $1`, [key])
     if (!rows.length) {
-      return fallback !== null ? fallback : DEFAULTS[key] ?? null
+      return fallback !== null ? fallback : (DEFAULTS[key] ?? null)
     }
     const raw = rows[0].value
     if (typeof raw === 'number') return raw
@@ -18,7 +28,7 @@ export async function getPlatformSetting(key, fallback = null) {
     }
     return raw
   } catch (e) {
-    if (e.code === '42P01') return fallback !== null ? fallback : DEFAULTS[key] ?? null
+    if (e.code === '42P01') return fallback !== null ? fallback : (DEFAULTS[key] ?? null)
     throw e
   }
 }
@@ -35,5 +45,5 @@ export async function setPlatformSetting(key, value) {
 export async function getFreeSandboxDays() {
   const days = Number(await getPlatformSetting('free_sandbox_days', DEFAULTS.free_sandbox_days))
   if (!Number.isFinite(days)) return DEFAULTS.free_sandbox_days
-  return Math.min(30, Math.max(1, Math.round(days)))
+  return clampFreeTrialDays(days, DEFAULTS.free_sandbox_days)
 }

@@ -8,6 +8,7 @@ import { createPendingActivationSubscription } from '../lib/billing/subscription
 import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
+import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 
 const router = express.Router()
 
@@ -124,7 +125,7 @@ router.get('/', requireAuth, async (req, res) => {
       SELECT 
         r.*,
         (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as total_orders,
-        (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND status = 'COMPLETED') as total_spent,
+        (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND ${deliveredOrderStatusInSql()}) as total_spent,
         (
           SELECT json_build_object(
             'id', o.id,

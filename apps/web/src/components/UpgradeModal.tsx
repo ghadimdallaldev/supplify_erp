@@ -25,17 +25,18 @@ import {
   FEATURE_KEY_LABELS,
   formatPlanFeatureCell,
   getPlanSubtitle,
+  formatPlanDisplayName,
 } from '../lib/planComparison'
 
 const PLAN_LABELS: Record<string, string> = {
-  free: 'Free',
+  free: 'Free Trial',
   bronze: 'Bronze',
   gold: 'Gold',
   platinum: 'Platinum',
 }
 
 const PLAN_PRICE_FALLBACK: Record<string, string> = {
-  free: 'Free',
+  free: '$0 trial',
   bronze: '$49/mo',
   gold: '$149/mo',
   platinum: '$349/mo',
@@ -43,7 +44,9 @@ const PLAN_PRICE_FALLBACK: Record<string, string> = {
 
 function getPlanPrice(plan: any): string {
   if (plan.price_monthly != null) {
-    return plan.price_monthly === 0 ? 'Free' : `$${plan.price_monthly}/mo`
+    return plan.price_monthly === 0
+      ? formatPlanDisplayName(plan.code, plan.name)
+      : `$${plan.price_monthly}/mo`
   }
   return PLAN_PRICE_FALLBACK[(plan.code || '').toLowerCase()] ?? '—'
 }

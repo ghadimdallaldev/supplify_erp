@@ -602,9 +602,14 @@ export async function applyPromotionByIdToOrder({
   subtotal,
   lineItems,
 }) {
-  const { isFeatureEnabled } = await import('../lib/subscription.js')
+  const { isFeatureEnabled, checkLimit, incrementUsage } = await import('../lib/subscription.js')
   const dealsEnabled = await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_deals')
   if (!dealsEnabled) return null
+
+  const redemptionLimit = await checkLimit(restaurantId, 'RESTAURANT', 'deal_redemptions_per_day')
+  if (redemptionLimit.isOverLimit && !redemptionLimit.isUnlimited) {
+    return null
+  }
 
   const { rows } = await client.query(
     `
@@ -655,6 +660,7 @@ export async function applyPromotionByIdToOrder({
   )
 
   const activePromo = await getActiveDealPromotion(client, promotion.id)
+  await incrementUsage(restaurantId, 'RESTAURANT', 'deal_redemptions_per_day', 1)
   await recordDealInteraction({
     dealId: promotion.id,
     restaurantId,
