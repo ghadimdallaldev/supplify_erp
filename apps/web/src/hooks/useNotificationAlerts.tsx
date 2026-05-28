@@ -12,6 +12,7 @@ import {
   unlockNotificationAudio,
   type NotificationLike,
 } from '../lib/notificationAlerts'
+import { registerServiceWorker } from '../lib/registerServiceWorker'
 
 const POLL_MS = 12_000
 const PERMISSION_PROMPT_KEY = 'supplify_notif_permission_asked'
@@ -86,8 +87,7 @@ export function useNotificationAlerts() {
   )
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+    registerServiceWorker()
   }, [])
 
   useEffect(() => {

@@ -7,6 +7,9 @@ import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { store } from './store/index.ts'
 import './index.css'
+import { registerServiceWorker } from './lib/registerServiceWorker'
+
+registerServiceWorker()
 
 const queryClient = new QueryClient()
 

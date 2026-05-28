@@ -4,6 +4,7 @@ import {
   useSubscribePushMutation,
   useUnsubscribePushMutation,
 } from '../services/api'
+import { registerServiceWorker } from '../lib/registerServiceWorker'
 
 const PUSH_ENABLED_KEY = 'supplify_push_enabled'
 const PUSH_DISMISSED_KEY = 'supplify_push_banner_dismissed'
@@ -35,8 +36,7 @@ export function usePushNotifications() {
   const [unsubscribePush, { isLoading: unsubscribing }] = useUnsubscribePushMutation()
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+    registerServiceWorker()
   }, [])
 
   useEffect(() => {

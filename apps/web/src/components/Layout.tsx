@@ -31,7 +31,9 @@ import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planCompariso
 import { isAtEntitlementLimit, shouldShowEntitlementLimit } from '../lib/planLimits'
 import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { shouldLoadBillingStatus, shouldRedirectToActivate } from '../lib/billingActivationRedirect'
 import { LimitExceededBanner } from './LimitExceededBanner'
+import { OfflineBanner } from './OfflineBanner'
 import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
 
 export function Layout() {
@@ -62,18 +64,23 @@ export function Layout() {
     skip: !shouldLoadTenantEntitlements,
   })
   const { data: billingStatus } = useGetBillingStatusQuery(undefined, {
-    skip: isPlatformAdmin && !isImpersonating,
+    skip: !shouldLoadBillingStatus(isPlatformAdmin, isImpersonating),
   })
   const [recordConversionEvent] = useRecordConversionEventMutation()
 
   useEffect(() => {
-    if ((isPlatformAdmin && !isImpersonating) || !billingStatus?.access) return
-    const pending = billingStatus.access.pendingActivation && billingStatus.access.isLocked
-    if (!pending) return
-    if (!location.pathname.startsWith('/app/activate')) {
-      navigate('/app/activate', { replace: true })
+    if (
+      !shouldRedirectToActivate({
+        isPlatformAdmin,
+        isImpersonating,
+        pathname: location.pathname,
+        access: billingStatus?.access,
+      })
+    ) {
+      return
     }
-  }, [user?.role, billingStatus, location.pathname, navigate])
+    navigate('/app/activate', { replace: true })
+  }, [isPlatformAdmin, isImpersonating, billingStatus?.access, location.pathname, navigate])
   const blockedCountLast7d = useAppSelector((state) => state.monetization.blockedCountLast7d)
   const recentBlockedSummary = useAppSelector((state) => state.monetization.recentBlockedSummary)
 
@@ -192,8 +199,9 @@ export function Layout() {
 
   return (
     <BranchProvider>
-      <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+      <div className="min-h-screen min-h-[100dvh]" style={{ background: 'var(--bg)' }}>
         <ImpersonationBanner />
+        <OfflineBanner />
         <UpgradeModal />
         <PaymentModal />
         <div className="flex">
