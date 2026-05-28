@@ -1291,6 +1291,25 @@ export const api = createApi({
         'Order',
       ],
     }),
+    recordSupplierPayment: builder.mutation<
+      { payment: unknown },
+      {
+        invoice_id: string
+        payment_amount: number
+        payment_date: string
+        payment_method: string
+        payment_reference?: string
+        bank_name?: string
+        notes?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/payments',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantFinance', 'Order'],
+    }),
     getInvoiceCredits: builder.query<any, string>({
       query: (invoiceId) => `/api/restaurant-finance/invoices/${invoiceId}/credits`,
       providesTags: ['RestaurantFinance'],
@@ -2379,7 +2398,7 @@ export const api = createApi({
       string
     >({
       query: (id) => ({ url: `/api/promotions/${id}/message`, method: 'POST' }),
-      invalidatesTags: ['Conversations'],
+      invalidatesTags: ['Chat'],
     }),
     promoteDeal: builder.mutation<
       { promotion: Record<string, unknown> },
@@ -3355,6 +3374,7 @@ export const {
   useGetRestaurantInvoicesQuery,
   useGetRestaurantInvoiceQuery,
   useMarkInvoicePaidMutation,
+  useRecordSupplierPaymentMutation,
   useGetInvoiceCreditsQuery,
   useGetInvoiceAnalyticsQuery,
   useGetOrderInvoicesQuery,

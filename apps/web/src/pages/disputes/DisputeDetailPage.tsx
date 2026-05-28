@@ -313,8 +313,8 @@ export function DisputeDetailPage() {
                         <td className="py-2">
                           {String(item.product_name ?? item.productName ?? '—')}
                         </td>
-                        <td>{item.quantity_ordered ?? item.quantityOrdered ?? '—'}</td>
-                        <td>{item.quantity_received ?? item.quantityReceived ?? '—'}</td>
+                        <td>{String(item.quantity_ordered ?? item.quantityOrdered ?? '—')}</td>
+                        <td>{String(item.quantity_received ?? item.quantityReceived ?? '—')}</td>
                         <td className="text-[var(--text-muted)]">
                           {String(item.issue_description ?? item.issueDescription ?? '—')}
                         </td>

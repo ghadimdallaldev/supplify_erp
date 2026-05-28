@@ -253,7 +253,7 @@ export interface DeliveryRouteSummary {
   rescheduledStops: number
 }
 
-export interface DeliveryRouteDetail extends DeliveryRouteSummary {
+export interface DeliveryRouteDetail extends Omit<DeliveryRouteSummary, 'stops'> {
   stops: DeliveryRouteStop[]
   startedAt?: string | null
   completedAt?: string | null

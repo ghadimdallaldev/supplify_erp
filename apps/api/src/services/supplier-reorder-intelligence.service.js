@@ -55,9 +55,12 @@ export async function getReorderIntelligence(supplierId, { graceDays = DEFAULT_G
     [supplierId, LOOKBACK_DAYS, MIN_ORDERS_FOR_PATTERN, graceDays]
   )
 
+  const restaurantIds = rows.map((row) => row.restaurant_id)
+  const suggestedByRestaurant = await getSuggestedProductsBatch(supplierId, restaurantIds)
+
   const dueCustomers = []
   for (const row of rows) {
-    const suggestedProducts = await getSuggestedProducts(supplierId, row.restaurant_id)
+    const suggestedProducts = suggestedByRestaurant.get(row.restaurant_id) ?? []
     const daysSinceLast = Math.floor(
       (Date.now() - new Date(row.last_order_at).getTime()) / (24 * 60 * 60 * 1000)
     )
@@ -85,33 +88,59 @@ export async function getReorderIntelligence(supplierId, { graceDays = DEFAULT_G
   }
 }
 
-async function getSuggestedProducts(supplierId, restaurantId) {
-  const { rows } = await query(
-    `
-    SELECT
-      p.id AS product_id,
-      p.name AS product_name,
-      p.sku,
-      SUM(oi.quantity)::numeric AS total_qty,
-      COUNT(DISTINCT o.id)::int AS order_count
-    FROM customer_order o
-    JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-    JOIN product p ON p.id = oi.product_id
-    WHERE o.restaurant_id = $2
-      AND o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
-    GROUP BY p.id, p.name, p.sku
-    ORDER BY total_qty DESC
-    LIMIT 5
-    `,
-    [supplierId, restaurantId]
-  )
-  return rows.map((r) => ({
+function mapSuggestedProductRow(r) {
+  return {
     productId: r.product_id,
     productName: r.product_name,
     sku: r.sku,
     totalQuantity: parseFloat(r.total_qty) || 0,
     orderCount: r.order_count,
-  }))
+  }
+}
+
+async function getSuggestedProductsBatch(supplierId, restaurantIds) {
+  const map = new Map()
+  if (!restaurantIds.length) return map
+
+  const { rows } = await query(
+    `
+    WITH ranked AS (
+      SELECT
+        o.restaurant_id,
+        p.id AS product_id,
+        p.name AS product_name,
+        p.sku,
+        SUM(oi.quantity)::numeric AS total_qty,
+        COUNT(DISTINCT o.id)::int AS order_count,
+        ROW_NUMBER() OVER (
+          PARTITION BY o.restaurant_id
+          ORDER BY SUM(oi.quantity) DESC
+        ) AS rn
+      FROM customer_order o
+      JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
+      JOIN product p ON p.id = oi.product_id
+      WHERE o.restaurant_id = ANY($2::uuid[])
+        AND o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
+      GROUP BY o.restaurant_id, p.id, p.name, p.sku
+    )
+    SELECT restaurant_id, product_id, product_name, sku, total_qty, order_count
+    FROM ranked
+    WHERE rn <= 5
+    `,
+    [supplierId, restaurantIds]
+  )
+
+  for (const r of rows) {
+    const list = map.get(r.restaurant_id) ?? []
+    list.push(mapSuggestedProductRow(r))
+    map.set(r.restaurant_id, list)
+  }
+  return map
+}
+
+async function getSuggestedProducts(supplierId, restaurantId) {
+  const batch = await getSuggestedProductsBatch(supplierId, [restaurantId])
+  return batch.get(restaurantId) ?? []
 }
 
 export async function createReorderReminderDraft(supplierId, restaurantId, createdBy) {

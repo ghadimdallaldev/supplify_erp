@@ -8,6 +8,7 @@ import {
   LOCK_REASON_FREE_SANDBOX_EXPIRED,
 } from './constants.js'
 import { clampFreeTrialDays, getFreeSandboxDays } from '../platform-settings.js'
+import { formatPlanDisplayName } from '../plan-codes.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -153,7 +154,7 @@ export async function getBillingStatus(tenantId, tenantType) {
           id: subscription.id,
           status: subscription.status,
           planId: subscription.plan_id,
-          planName: subscription.plan_name,
+          planName: formatPlanDisplayName(subscription.plan_code, subscription.plan_name),
           planCode: subscription.plan_code,
           billingCycle: subscription.billing_cycle,
           nextBillingDate: subscription.next_billing_date,

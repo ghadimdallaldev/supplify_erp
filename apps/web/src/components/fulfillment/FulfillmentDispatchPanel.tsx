@@ -8,6 +8,7 @@ import { DriverDispatchBoard } from './DriverDispatchBoard'
 import { FulfillmentDispatchFilters } from './FulfillmentDispatchFilters'
 import {
   DISPATCH_FILTER_ALL,
+  type DeliveryBoardOrder,
   type DispatchBoardData,
   type DispatchFilters,
   enrichOrderFromBoard,
@@ -62,23 +63,8 @@ export function FulfillmentDispatchPanel({ warehouseId }: Props) {
   } = useGetSupplierDeliveryBoardQuery(boardQueryArgs, { skip: !filtersActive })
 
   const boardById = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        orderId: string
-        deliveryArea?: string
-        deliveryStatus?: string
-        scheduledAt?: string
-      }
-    >()
-    const orders = enrichBoardData?.orders as
-      | Array<{
-          orderId: string
-          deliveryArea?: string
-          deliveryStatus?: string
-          scheduledAt?: string
-        }>
-      | undefined
+    const map = new Map<string, DeliveryBoardOrder>()
+    const orders = enrichBoardData?.orders as DeliveryBoardOrder[] | undefined
     if (!orders) return map
     for (const o of orders) {
       map.set(o.orderId, o)
@@ -103,7 +89,7 @@ export function FulfillmentDispatchPanel({ warehouseId }: Props) {
   const filteredDispatch = useMemo(() => {
     if (!enrichedDispatch) return null
     if (!filtersActive || !filterBoardData?.orders) return enrichedDispatch
-    const allowed = new Set(filterBoardData.orders.map((o) => o.orderId))
+    const allowed = new Set((filterBoardData.orders as DeliveryBoardOrder[]).map((o) => o.orderId))
     return filterDispatchBoard(enrichedDispatch, allowed)
   }, [enrichedDispatch, filtersActive, filterBoardData?.orders])
 
@@ -128,7 +114,7 @@ export function FulfillmentDispatchPanel({ warehouseId }: Props) {
     if (filtersActive) refetchBoard()
   }
 
-  const isLoading = dispatchLoading || (filtersActive && boardFetching && !boardData)
+  const isLoading = dispatchLoading || (filtersActive && boardFetching && !filterBoardData)
   const isError = dispatchError || (filtersActive && boardError)
 
   return (

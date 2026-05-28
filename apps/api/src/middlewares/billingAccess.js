@@ -1,6 +1,7 @@
 import { getRequestTenant } from '../lib/rbac.js'
 import { getBillingStatus, buildAccountLockedError } from '../lib/billing/billing-service.js'
 import { LOCK_REASON_FREE_SANDBOX_EXPIRED } from '../lib/billing/constants.js'
+import { isImpersonating } from '../lib/impersonation.js'
 import { logger } from '../lib/logger.js'
 
 const ALLOW_PREFIXES = ['/api/billing', '/api/register', '/auth', '/health', '/api/public']
@@ -31,7 +32,8 @@ export async function billingAccessMiddleware(req, res, next) {
   if (req.method === 'GET' && ALLOW_GET_PATHS.has(path)) return next()
 
   if (!req.userData) return next()
-  if (req.userData.role === 'ADMIN') return next()
+  // Platform admins bypass locks for admin APIs; impersonation must respect tenant billing state.
+  if (req.userData.role === 'ADMIN' && !isImpersonating(req)) return next()
 
   try {
     const tenant = await getRequestTenant(req)
@@ -51,6 +53,14 @@ export async function billingAccessMiddleware(req, res, next) {
   } catch (error) {
     if (error.code === '42P01') return next()
     logger.error('Billing access check failed', { error: error.message })
-    return next()
+    return res.status(503).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'BILLING_CHECK_UNAVAILABLE',
+        message: 'Unable to verify billing status. Try again shortly.',
+      },
+      requestId: req.requestId,
+    })
   }
 }

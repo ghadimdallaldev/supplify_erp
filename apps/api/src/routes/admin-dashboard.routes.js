@@ -56,6 +56,8 @@ import {
 import { isLimitKeyApplicable } from '../lib/limit-resolution.js'
 import { buildAdminOverviewMetrics } from '../lib/admin-overview-metrics.js'
 import { buildAdminActivityFeed } from '../lib/admin-activity-feed.js'
+import { adminDashboardPermissionGuard, requireAnyPermission } from '../lib/route-permissions.js'
+import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
 
 const router = Router()
 
@@ -63,7 +65,15 @@ router.use(
   requireAuth,
   requireRole(['ADMIN']),
   resolveAdminContext,
-  requirePermission('ADMIN_ACCESS')
+  requireAnyPermission(
+    P.ADMIN_ACCESS,
+    P.ADMIN_TENANTS,
+    P.ADMIN_PLANS,
+    P.ADMIN_FINANCE,
+    P.ADMIN_SUPPORT,
+    P.ADMIN_GROWTH
+  ),
+  adminDashboardPermissionGuard
 )
 
 // ========================================
