@@ -1,4 +1,5 @@
 import { query, withTransaction } from '../lib/db.js'
+import { buildBoostStatus } from './deal-boost.helpers.js'
 import { calculatePromotionDiscount, isPromotionEligible } from './promotions.service.js'
 import {
   buildDealConfigSnapshot,
@@ -81,6 +82,22 @@ export async function loadRestaurantForTargeting(restaurantId) {
 }
 
 /**
+ * Latest boost campaign row for a deal (active, scheduled, or most recent).
+ */
+export async function getLatestDealPromotion(db, dealId) {
+  const { rows } = await db.query(
+    `
+    SELECT * FROM deal_promotions
+    WHERE deal_id = $1
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [dealId]
+  )
+  return rows[0] || null
+}
+
+/**
  * Whether a deal is currently boosted (paid promotion active).
  */
 export async function getActiveDealPromotion(db, dealId) {
@@ -97,6 +114,25 @@ export async function getActiveDealPromotion(db, dealId) {
     [dealId]
   )
   return rows[0] || null
+}
+
+export async function getDealBoostStatusForSupplier(db, dealId) {
+  const latest = await getLatestDealPromotion(db, dealId)
+  if (!latest) return buildBoostStatus(null)
+
+  const active = await getActiveDealPromotion(db, dealId)
+  const promo = active || latest
+
+  let pricingRow = null
+  if (promo.pricing_key) {
+    const { rows } = await db.query(
+      `SELECT * FROM promotion_pricing_config WHERE pricing_key = $1`,
+      [promo.pricing_key]
+    )
+    pricingRow = rows[0] || null
+  }
+
+  return buildBoostStatus(promo, pricingRow)
 }
 
 /**
@@ -316,12 +352,18 @@ export async function createDealPromotionCampaign({
     pricing = rows[0] || null
   }
 
-  const resolvedBudget = budget ?? pricing?.amount ?? 0
+  if (pricingKey && !pricing) {
+    throw new Error('Boost package is not available')
+  }
+
+  const pricePaid = budget ?? pricing?.amount ?? 0
+  const resolvedBudget = pricePaid
   const resolvedStarts = startsAt || new Date().toISOString()
+  const durationDays = pricing?.duration_days ?? null
   let resolvedEnds = endsAt
-  if (!resolvedEnds && pricing?.duration_days) {
+  if (!resolvedEnds && durationDays) {
     const end = new Date(resolvedStarts)
-    end.setDate(end.getDate() + Number(pricing.duration_days))
+    end.setDate(end.getDate() + Number(durationDays))
     resolvedEnds = end.toISOString()
   }
 
@@ -343,8 +385,9 @@ export async function createDealPromotionCampaign({
       `
       INSERT INTO deal_promotions (
         deal_id, supplier_id, budget, starts_at, ends_at, target_audience,
-        billing_type, billing_status, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        billing_type, billing_status, status,
+        pricing_package_id, pricing_key, price_paid, duration_days, package_display_name
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
       `,
       [
@@ -357,6 +400,11 @@ export async function createDealPromotionCampaign({
         pricing?.billing_type || 'flat_fee',
         billingStatus,
         status,
+        pricing?.id ?? null,
+        pricing?.pricing_key ?? pricingKey ?? null,
+        pricePaid,
+        durationDays,
+        pricing?.display_name ?? null,
       ]
     )
     return rows[0]
@@ -559,12 +607,24 @@ export async function enrichPromotionRows(rows) {
   )
   const { rows: activePromos } = await query(
     `
-    SELECT DISTINCT ON (deal_id) deal_id, id
+    SELECT DISTINCT ON (deal_id)
+      deal_id, id, starts_at, ends_at, status,
+      pricing_key, price_paid, duration_days, package_display_name, budget
     FROM deal_promotions
     WHERE deal_id = ANY($1::uuid[])
       AND status = 'active'
-      AND starts_at <= NOW()
-      AND (ends_at IS NULL OR ends_at > NOW())
+    ORDER BY deal_id, created_at DESC
+    `,
+    [ids]
+  )
+
+  const { rows: latestPromos } = await query(
+    `
+    SELECT DISTINCT ON (deal_id)
+      deal_id, id, starts_at, ends_at, status,
+      pricing_key, price_paid, duration_days, package_display_name, budget
+    FROM deal_promotions
+    WHERE deal_id = ANY($1::uuid[])
     ORDER BY deal_id, created_at DESC
     `,
     [ids]
@@ -579,16 +639,28 @@ export async function enrichPromotionRows(rows) {
     if (t.category_id) list.categoryIds.push(t.category_id)
     targetsByDeal.set(t.promotion_id, list)
   }
-  const activeByDeal = new Map(activePromos.map((p) => [p.deal_id, p.id]))
+  const activeByDeal = new Map(activePromos.map((p) => [p.deal_id, p]))
+  const latestByDeal = new Map(latestPromos.map((p) => [p.deal_id, p]))
+  const now = Date.now()
+
   return rows.map((row) => {
     const t = targetsByDeal.get(row.id) || { productIds: [], categoryIds: [] }
-    const activeId = activeByDeal.get(row.id) || null
+    const activePromo = activeByDeal.get(row.id) || null
+    const latestPromo = latestByDeal.get(row.id) || null
+    const isCurrentlyBoosted =
+      activePromo &&
+      new Date(activePromo.starts_at).getTime() <= now &&
+      (!activePromo.ends_at || new Date(activePromo.ends_at).getTime() > now)
+
+    const boostStatus = buildBoostStatus(isCurrentlyBoosted ? activePromo : latestPromo)
+
     return {
       ...row,
       target_product_ids: t.productIds,
       target_category_ids: t.categoryIds,
-      is_promoted: Boolean(activeId),
-      active_deal_promotion_id: activeId,
+      is_promoted: Boolean(isCurrentlyBoosted),
+      active_deal_promotion_id: isCurrentlyBoosted ? activePromo?.id : null,
+      boost_status: boostStatus,
     }
   })
 }

@@ -14,7 +14,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { SupplifyLogo } from '../components/SupplifyLogo'
-import { redirectToAuth, redirectToLogout } from '../lib/authRedirect'
+import { redirectToAuth, redirectToLogout, isEmbeddedFrame } from '../lib/authRedirect'
 
 export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -23,11 +23,7 @@ export function LoginPage() {
   const [inEmbeddedFrame, setInEmbeddedFrame] = useState(false)
 
   useEffect(() => {
-    try {
-      setInEmbeddedFrame(window.self !== window.top)
-    } catch {
-      setInEmbeddedFrame(true)
-    }
+    setInEmbeddedFrame(isEmbeddedFrame())
   }, [])
 
   useEffect(() => {
@@ -46,11 +42,13 @@ export function LoginPage() {
   }, [])
 
   const handleLogin = () => {
+    if (inEmbeddedFrame) return
     setIsLoading(true)
     redirectToAuth('login')
   }
 
   const handleSignup = () => {
+    if (inEmbeddedFrame) return
     setIsLoading(true)
     redirectToAuth('register')
   }
@@ -205,7 +203,7 @@ export function LoginPage() {
               <Button
                 data-testid="login-button"
                 onClick={handleLogin}
-                disabled={isLoading}
+                disabled={isLoading || inEmbeddedFrame}
                 className="w-full h-12 text-base font-semibold transition-all"
                 size="lg"
                 style={{ background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff' }}

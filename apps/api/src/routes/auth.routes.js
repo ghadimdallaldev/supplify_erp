@@ -12,6 +12,7 @@ import { userNeedsTenantSetup } from '../lib/register-account.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
 import { clearImpersonationCookie } from '../lib/impersonation.js'
+import { clearActiveTenantCookie } from '../lib/tenant-switch.js'
 import {
   requireAuth,
   optionalAuth,
@@ -29,6 +30,7 @@ const router = express.Router()
 function clearLocalAuthSession(req, res) {
   clearAuthCookies(res)
   clearImpersonationCookie(res)
+  clearActiveTenantCookie(res)
   return new Promise((resolve) => {
     if (!req.session) {
       resolve()
@@ -45,6 +47,9 @@ function apiOrigin(req) {
 // Generate login URL and redirect to Keycloak
 router.get('/login', async (req, res) => {
   try {
+    clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
+
     // Generate CSRF token for this session
     const state = randomBytes(32).toString('hex')
 
@@ -65,16 +70,9 @@ router.get('/login', async (req, res) => {
     logger.debug('Redirecting to Keycloak for authentication')
     res.redirect(authUrl)
   } catch (error) {
-    logger.error('Login error', { error: error.message })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Login failed',
-      },
-      requestId: req.requestId,
-    })
+    logger.error('Login error', { error: error.message, stack: error.stack })
+    const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+    res.redirect(`${webOrigin}/login?error=callback_failed`)
   }
 })
 
@@ -181,6 +179,8 @@ router.get('/callback', async (req, res) => {
 
     // Set auth cookies
     setAuthCookies(res, tokens.access_token, tokens.refresh_token)
+    clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
 
     logger.info('User authenticated', { userId: user.id, role: user.role })
 
@@ -412,6 +412,7 @@ router.post('/logout', requireAuth, async (req, res) => {
     // Clear cookies (same path/sameSite as set so browser actually removes them)
     clearAuthCookies(res)
     clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
 
     // Destroy Express session so session cookie is cleared
     await new Promise((resolve, reject) => {
@@ -446,6 +447,7 @@ router.post('/logout', requireAuth, async (req, res) => {
     // Clear cookies and session even if revocation or destroy fails
     clearAuthCookies(res)
     clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
     req.session.destroy(() => {})
 
     let keycloakLogoutUrl = null
