@@ -42,10 +42,16 @@ import {
   assertAndDeductSupplierStock,
   restoreSupplierStockForOrder,
 } from '../services/supplier-inventory.service.js'
+import { ordersRouterMutationGuard } from '../lib/route-permissions.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requirePermission('ORDERS_VIEW'))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requirePermission('ORDERS_VIEW'),
+  ordersRouterMutationGuard
+)
 
 /** Build PDF buffer for a packing slip */
 function buildPackingSlipPdf(packingSlip) {
@@ -169,11 +175,11 @@ const orderListSchema = z.object({
   supplier: z.string().uuid().optional(),
   limit: z
     .string()
-    .transform((val) => parseInt(val, 10))
+    .transform((val) => Math.min(Math.max(parseInt(val, 10) || 20, 1), 100))
     .default('20'),
   offset: z
     .string()
-    .transform((val) => parseInt(val, 10))
+    .transform((val) => Math.max(parseInt(val, 10) || 0, 0))
     .default('0'),
 })
 

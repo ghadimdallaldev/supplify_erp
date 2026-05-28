@@ -34,7 +34,7 @@ const QUICK_ACTIONS = [
   { label: 'Reorder', href: '#reorder', icon: Users, testId: 'qa-reorder' },
   { label: 'Low stock', href: '/app/inventory', icon: Warehouse, testId: 'qa-inventory' },
   { label: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'qa-disputes' },
-  { label: 'Deals', href: '/app/deals', icon: Tag, testId: 'qa-deals' },
+  { label: 'Deals', href: '/app/promotions', icon: Tag, testId: 'qa-deals' },
 ]
 
 function KpiCard({
@@ -123,7 +123,7 @@ export function SupplierCommandCenterPage() {
       'CATALOG_EDIT',
       'FULFILLMENT_VIEW',
       'PROMOTIONS_MANAGE',
-    ] as const,
+    ],
     title: 'command center',
   }
 

@@ -1087,7 +1087,16 @@ export function DashboardPage() {
           overflow: 'hidden',
         }}
       >
-        <CalendarView role={effectiveRole ?? null} isAdmin={user?.role === 'ADMIN'} />
+        <CalendarView
+          role={
+            effectiveRole === 'ADMIN' ||
+            effectiveRole === 'RESTAURANT' ||
+            effectiveRole === 'SUPPLIER'
+              ? effectiveRole
+              : null
+          }
+          isAdmin={user?.role === 'ADMIN'}
+        />
       </div>
     </div>
   )

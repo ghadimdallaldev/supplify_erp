@@ -62,6 +62,23 @@ export function validateProductionConfig() {
       'TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set — WhatsApp notifications will not be delivered'
     )
   }
+  if (config.E2E_SECRET) {
+    issues.push('E2E_SECRET must not be set in production (disables /api/e2e data reset endpoint)')
+  }
+  if (
+    config.S3_ACCESS_KEY === 'minioadmin' ||
+    config.S3_SECRET_KEY === 'minioadmin' ||
+    WEAK_SECRETS.has(String(config.S3_ACCESS_KEY || '').toLowerCase())
+  ) {
+    issues.push(
+      'S3_ACCESS_KEY / S3_SECRET_KEY must not use default MinIO credentials in production'
+    )
+  }
+  if (config.S3_PUBLIC_READ !== false && config.S3_PUBLIC_READ !== 'false') {
+    logger.warn(
+      'S3_PUBLIC_READ is enabled — non-catalog uploads may be world-readable via object URL; set S3_PUBLIC_READ=false for private assets'
+    )
+  }
 
   if (issues.length > 0) {
     for (const issue of issues) {

@@ -5,7 +5,7 @@ type Props = {
   /** Single permission key */
   permission?: string
   /** Any one of these permissions grants access */
-  anyOf?: string[]
+  anyOf?: readonly string[]
   children: ReactNode
   fallback?: ReactNode
 }
