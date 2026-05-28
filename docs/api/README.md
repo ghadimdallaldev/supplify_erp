@@ -53,3 +53,7 @@ Base URL: `http://localhost:4000` (dev). All `/api/*` routes return JSON with sh
 | `/api/e2e`                     | `e2e.routes.js`                       | Test-only reset/seed (requires `E2E_SECRET` header)                                                                              |
 
 Authentication uses session cookies after Keycloak OAuth. Protected routes use `requireAuth`, tenant context, RBAC permissions, and optional `requireFeature()` plan gates.
+
+**Global billing lock:** `billingAccessMiddleware` (in `server.js`) returns **402** `ACCOUNT_LOCKED` when the tenant subscription is locked. Exemptions: `/api/billing/*`, `/api/register/*`, `/auth/*`, `/health/*`, and subscription entitlements GETs. **Free Trial expired** (`free_sandbox_expired`): tenant **GET** routes remain allowed (read-only); writes still **402**. See [free-trial-expiry.md](../features/free-trial-expiry.md).
+
+**Admin dashboard (subscription ops):** `POST /api/admin-dashboard/subscriptions/:id/unlock`, `POST …/extend-free-trial`, `GET/PATCH …/platform-settings` (`freeSandboxDays` 3–7).

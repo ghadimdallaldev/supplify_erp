@@ -37,6 +37,7 @@
     "seed:full": "node scripts/pnpm-run.mjs --filter @supplify/api seed:full",
     "seed:features": "node scripts/pnpm-run.mjs --filter @supplify/api seed:features",
     "seed:tier-catalog": "node apps/api/scripts/seed-tier-catalog.mjs",
+    "log:tier-limits": "node apps/api/scripts/log-tier-limits.mjs",
     "seed:audit-backfill": "node apps/api/scripts/seed-audit-backfill.mjs",
     "db:reset": "pnpm --filter @supplify/api db:reset",
     "db:wipe-commercial": "pnpm --filter @supplify/api db:wipe-commercial",

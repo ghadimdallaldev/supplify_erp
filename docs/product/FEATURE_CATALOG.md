@@ -201,9 +201,9 @@ Canonical list of all implemented features. Single source of truth for backend e
 
 ## Waste tracking
 
-| feature_key      | display_name   | applies_to | permissions_required | limit_key | backend_enforcement                                                                 | frontend_surfaces                                      | plan_availability        |
-| ---------------- | -------------- | ---------- | -------------------- | --------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------ |
-| waste_tracking   | Waste tracking | RESTAURANT | INVENTORY_EDIT       | —         | restaurant-inventory.routes.js adjust + waste-analytics; reports `/restaurant/waste` | RestaurantInventoryPage → Waste tab, RestaurantWastePanel | Free+ (`0115` migration) |
+| feature_key    | display_name   | applies_to | permissions_required | limit_key | backend_enforcement                                                                  | frontend_surfaces                                         | plan_availability        |
+| -------------- | -------------- | ---------- | -------------------- | --------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------- | ------------------------ |
+| waste_tracking | Waste tracking | RESTAURANT | INVENTORY_EDIT       | —         | restaurant-inventory.routes.js adjust + waste-analytics; reports `/restaurant/waste` | RestaurantInventoryPage → Waste tab, RestaurantWastePanel | Free+ (`0115` migration) |
 
 ---
 
@@ -358,6 +358,7 @@ Canonical source: `apps/api/src/lib/feature-keys.js`
 | recommended_badge          | Recommended badge on plan           | MULTI      | —                    | —         | — (frontend; uses GET /api/subscriptions/recommendation cache)                                                                                               | RecommendedBadge.tsx; SubscriptionInfo, UpgradeModal comparison header                | CURRENT_BEST → subtle style          |
 | nav_upgrade_cta            | Top-nav Upgrade button (contextual) | MULTI      | —                    | —         | — (frontend; OPEN_UPGRADE metadata source: nav_upgrade_cta, trigger: free\|near_limit\|blocked)                                                              | Header.tsx (visibility: Free or ≥80% usage or blockedCountLast7d ≥ 1)                 | Dot when urgency                     |
 | plan_subtitles             | Plan value copy (subtitles)         | MULTI      | —                    | —         | — (frontend constants PLAN_SUBTITLES in planComparison.ts)                                                                                                   | UpgradeModal headers, SubscriptionInfo, AdminDashboardPage plan cards                 | Free/Bronze/Gold/Platinum/Enterprise |
+| free_trial_expiry_lock     | Free Trial expiry (read-only)       | MULTI      | —                    | —         | `billingAccessMiddleware`; `free-sandbox-expiry.job`; `buildAccountLockedError`; admin `extend-free-trial` / unlock extends `free_sandbox_expires_at`        | BillingOverdueBanner, SubscriptionInfo, AdminPlatformSettingsPanel, Extend trial      | Plan `free` only; days 3–7           |
 
 **Flags**
 

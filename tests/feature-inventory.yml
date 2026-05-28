@@ -21,6 +21,12 @@ features:
     test_files:
       - api/registration-activation.spec.ts
 
+  - id: free_trial_expiry
+    name: Free Trial expiry
+    description: Expired trial read-only GET, write 402, admin extend; unit tests in apps/api (billingAccess, billing-service, platform-settings)
+    test_files:
+      - api/registration-activation.spec.ts
+
   - id: rbac
     name: Role-based access control
     description: Tenant roles, workspace membership (one account per user), admin UI/API gates

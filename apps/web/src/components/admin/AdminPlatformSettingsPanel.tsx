@@ -23,8 +23,8 @@ export function AdminPlatformSettingsPanel() {
 
   const handleSave = async () => {
     const n = Number(days)
-    if (!Number.isFinite(n) || n < 1 || n > 30) {
-      toast.error('Enter a number between 1 and 30 days')
+    if (!Number.isFinite(n) || n < 3 || n > 7) {
+      toast.error('Enter a number between 3 and 7 days')
       return
     }
     try {
@@ -41,10 +41,10 @@ export function AdminPlatformSettingsPanel() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Free tier sandbox</CardTitle>
+        <CardTitle>Free Trial length</CardTitle>
         <CardDescription>
-          Free plans are for evaluation only. Workspaces auto-lock after this many days unless the
-          tenant upgrades to a paid plan.
+          Free Trial workspaces auto-lock after this many days unless the tenant upgrades to a paid
+          plan. This is not a forever-free tier.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 max-w-sm">
@@ -57,13 +57,13 @@ export function AdminPlatformSettingsPanel() {
               <Input
                 id="freeSandboxDays"
                 type="number"
-                min={1}
-                max={30}
+                min={3}
+                max={7}
                 value={days}
                 onChange={(e) => setDays(e.target.value)}
                 className="mt-1"
               />
-              <p className="text-xs text-[var(--text-muted)] mt-1">Allowed range: 1–30 days</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">Allowed range: 3–7 days</p>
             </div>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}

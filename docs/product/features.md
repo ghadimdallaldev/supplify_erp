@@ -35,12 +35,12 @@ Fresh Keycloak users complete organization setup at `/register/complete`, then u
 
 The sidebar (`apps/web/src/components/Sidebar.tsx`) adapts by role and admin impersonation:
 
-| Role                  | Primary nav                                                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Role                  | Primary nav                                                                                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Restaurant**        | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Suppliers, Deals, Reports, Disputes, Staff, Inventory (+ waste), Invoices, Chat, Settings, Org |
-| **Supplier**          | Dashboard, Orders, Products, Fulfillment, Restaurants, Promotions, Reports, Disputes, Invoices, Chat, Settings, Org |
-| **Platform admin**    | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                    |
-| **Public (no login)** | Reservation portal, staff self-service                                                                                         |
+| **Supplier**          | Dashboard, Orders, Products, Fulfillment, Restaurants, Promotions, Reports, Disputes, Invoices, Chat, Settings, Org                                                     |
+| **Platform admin**    | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                                                             |
+| **Public (no login)** | Reservation portal, staff self-service                                                                                                                                  |
 
 RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) further filter restaurant nav items.
 
@@ -85,17 +85,17 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 ## Reports, disputes, promotions & reviews
 
-| Feature              | Web route            | API prefix                | Notes                                                                                   |
-| -------------------- | -------------------- | ------------------------- | --------------------------------------------------------------------------------------- |
-| Reports & analytics  | `/app/reports`       | `/api/reports`            | Restaurant & supplier dashboards (plan `reports`)                                       |
-| Disputes & returns   | `/app/disputes`      | `/api/disputes`           | Open/track disputes on orders                                                           |
-| Supplier promotions  | `/app/promotions`    | `/api/promotions`         | Supplier manages deals, targeting, boosts, analytics                                    |
-| Restaurant deals     | `/app/deals`         | `/api/promotions`         | Discovery feed with CTAs; sponsored deals from non-followers                            |
-| Admin deal approvals | `/app/admin` → Deals | `/api/promotions/admin/*` | Approve/reject deals; configure boost pricing                                           |
-| Supplier reviews     | Supplier detail      | `/api/reviews`            | Ratings and summaries per supplier                                                      |
+| Feature              | Web route                               | API prefix                                  | Notes                                                                      |
+| -------------------- | --------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------- |
+| Reports & analytics  | `/app/reports`                          | `/api/reports`                              | Restaurant & supplier dashboards (plan `reports`)                          |
+| Disputes & returns   | `/app/disputes`                         | `/api/disputes`                             | Open/track disputes on orders                                              |
+| Supplier promotions  | `/app/promotions`                       | `/api/promotions`                           | Supplier manages deals, targeting, boosts, analytics                       |
+| Restaurant deals     | `/app/deals`                            | `/api/promotions`                           | Discovery feed with CTAs; sponsored deals from non-followers               |
+| Admin deal approvals | `/app/admin` → Deals                    | `/api/promotions/admin/*`                   | Approve/reject deals; configure boost pricing                              |
+| Supplier reviews     | Supplier detail                         | `/api/reviews`                              | Ratings and summaries per supplier                                         |
 | Waste & spoilage     | `/app/restaurant-inventory` → Waste tab | `/api/restaurant-inventory/waste-analytics` | Plan `waste_tracking` — [waste-tracking.md](../features/waste-tracking.md) |
-| Order amendments     | Order detail         | `/api/orders/:id/amendments` | Plan `order_amendments` |
-| Tenant audit log     | Settings → Activity  | `/api/audit`              | Plan `tenant_audit_log` |
+| Order amendments     | Order detail                            | `/api/orders/:id/amendments`                | Plan `order_amendments`                                                    |
+| Tenant audit log     | Settings → Activity                     | `/api/audit`                                | Plan `tenant_audit_log`                                                    |
 
 **Verify:** Gold+ restaurant → Reports loads spend charts; supplier → Promotions CRUD. Tests: `reports.routes.test.js`, `disputes.routes.test.js`, `approvals.routes.test.js`.
 
@@ -111,14 +111,14 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 ## Restaurant operations
 
-| Feature              | Web route                   | API prefix                   | Notes                        |
-| -------------------- | --------------------------- | ---------------------------- | ---------------------------- |
-| Restaurant inventory | `/app/restaurant-inventory` | `/api/restaurant-inventory`  | On-hand; waste tab when `waste_tracking` |
-| Receiving            | `/app/receiving`            | `/api/receiving`             | Goods-in, quality checks     |
-| Disputes             | `/app/disputes`, `/app/disputes/:id` | `/api/disputes`     | Replacement orders, credit notes |
-| Onboarding           | `/app/onboarding`           | `/api/restaurant-onboarding` | Restaurant setup wizard      |
-| Restaurant pricing   | —                           | `/api/restaurant-pricing`    | Internal menu / cost pricing |
-| Restaurant finance   | —                           | `/api/restaurant-finance`    | COGS / finance hooks         |
+| Feature              | Web route                            | API prefix                   | Notes                                    |
+| -------------------- | ------------------------------------ | ---------------------------- | ---------------------------------------- |
+| Restaurant inventory | `/app/restaurant-inventory`          | `/api/restaurant-inventory`  | On-hand; waste tab when `waste_tracking` |
+| Receiving            | `/app/receiving`                     | `/api/receiving`             | Goods-in, quality checks                 |
+| Disputes             | `/app/disputes`, `/app/disputes/:id` | `/api/disputes`              | Replacement orders, credit notes         |
+| Onboarding           | `/app/onboarding`                    | `/api/restaurant-onboarding` | Restaurant setup wizard                  |
+| Restaurant pricing   | —                                    | `/api/restaurant-pricing`    | Internal menu / cost pricing             |
+| Restaurant finance   | —                                    | `/api/restaurant-finance`    | COGS / finance hooks                     |
 
 **Verify:** Restaurant → Receiving → record receipt against PO. Feature flags: `receiving_quality`, `inventory_management`.
 
@@ -195,17 +195,18 @@ Tests: `notification.service.test.js`, `push.service.test.js`, `orderStatusDispl
 
 ## Admin platform
 
-| Feature             | Web route                | API prefix                           | Notes                          |
-| ------------------- | ------------------------ | ------------------------------------ | ------------------------------ |
-| Admin dashboard     | `/app/admin`             | `/api/admin-dashboard`               | Metrics, tenants, plans        |
-| Supplier admin      | `/app/admin/suppliers`   | same                                 | Supplier tenant management     |
-| Restaurant admin    | `/app/admin/restaurants` | same                                 | Restaurant tenant management   |
-| Feature toggles     | Admin → **Features** tab | `/api/admin-dashboard/feature-flags` | Global + per-tenant overrides  |
-| Limit overrides     | Admin → Usage / limits   | `/api/admin-dashboard/limit-overrides` | Per-tenant meter caps          |
-| Deal review         | Admin → **Deals** tab    | `/api/promotions/admin/*`            | Approve, reject, insights     |
-| Free sandbox days   | Admin → Overview         | `/api/admin-dashboard/platform-settings` | Free tier auto-expiry        |
-| Impersonation       | Banner when active       | cookie + middleware                  | View app as tenant             |
-| Legacy admin routes | —                        | `/api/admin`                         | Internal maintenance endpoints |
+| Feature             | Web route                 | API prefix                                         | Notes                                      |
+| ------------------- | ------------------------- | -------------------------------------------------- | ------------------------------------------ |
+| Admin dashboard     | `/app/admin`              | `/api/admin-dashboard`                             | Metrics, tenants, plans                    |
+| Supplier admin      | `/app/admin/suppliers`    | same                                               | Supplier tenant management                 |
+| Restaurant admin    | `/app/admin/restaurants`  | same                                               | Restaurant tenant management               |
+| Feature toggles     | Admin → **Features** tab  | `/api/admin-dashboard/feature-flags`               | Global + per-tenant overrides              |
+| Limit overrides     | Admin → Usage / limits    | `/api/admin-dashboard/limit-overrides`             | Per-tenant meter caps                      |
+| Deal review         | Admin → **Deals** tab     | `/api/promotions/admin/*`                          | Approve, reject, insights                  |
+| Free Trial length   | Admin → Platform settings | `GET/PATCH /api/admin-dashboard/platform-settings` | Default **7** days; admin range **3–7**    |
+| Extend Free Trial   | Admin → Subscriptions     | `POST …/subscriptions/:id/extend-free-trial`       | Extends `free_sandbox_expires_at`, unlocks |
+| Impersonation       | Banner when active        | cookie + middleware                                | View app as tenant                         |
+| Legacy admin routes | —                         | `/api/admin`                                       | Internal maintenance endpoints             |
 
 See [admin-feature-flags.md](../admin/admin-feature-flags.md) for toggle API details. Tests: `admin-dashboard.routes.test.js`.
 

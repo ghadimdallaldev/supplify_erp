@@ -88,7 +88,7 @@ describe('billingAccessMiddleware', () => {
     expect(getBillingStatus).not.toHaveBeenCalled()
   })
 
-  it('returns 402 when tenant billing access is locked', async () => {
+  it('returns 402 when tenant billing access is locked (non-trial)', async () => {
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
     getBillingStatus.mockResolvedValue({
       access: { isLocked: true, pendingActivation: true },
@@ -106,6 +106,50 @@ describe('billingAccessMiddleware', () => {
     expect(next).not.toHaveBeenCalled()
     expect(res.statusCode).toBe(402)
     expect(res.body.error.name).toBe('ACCOUNT_LOCKED')
+  })
+
+  it('allows GET when locked for expired Free Trial', async () => {
+    getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
+    getBillingStatus.mockResolvedValue({
+      access: {
+        isLocked: true,
+        freeSandboxExpired: true,
+        lockReason: 'free_sandbox_expired',
+      },
+      amountDue: 0,
+    })
+    const next = vi.fn()
+    const req = {
+      method: 'GET',
+      path: '/api/orders',
+      userData: { role: 'RESTAURANT' },
+      requestId: 'req-trial-get',
+    }
+    await middleware(req, mockRes(), next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('returns 402 on POST when locked for expired Free Trial', async () => {
+    getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
+    getBillingStatus.mockResolvedValue({
+      access: {
+        isLocked: true,
+        freeSandboxExpired: true,
+        lockReason: 'free_sandbox_expired',
+      },
+      amountDue: 0,
+    })
+    const next = vi.fn()
+    const res = mockRes()
+    const req = {
+      method: 'POST',
+      path: '/api/orders',
+      userData: { role: 'RESTAURANT' },
+      requestId: 'req-trial-post',
+    }
+    await middleware(req, res, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(res.statusCode).toBe(402)
   })
 
   it('calls next when tenant is not locked', async () => {

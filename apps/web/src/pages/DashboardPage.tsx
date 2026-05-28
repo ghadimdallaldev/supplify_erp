@@ -30,6 +30,7 @@ import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
 import { featureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
+import { formatPlanDisplayName } from '../lib/planComparison'
 /** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
 const DASHBOARD_STACK_GAP = 24
 /** Horizontal gap between KPI cards and between the three content cards. */
@@ -304,7 +305,10 @@ export function DashboardPage() {
   )
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
-  const planName = entitlementsData?.entitlements?.plan?.name ?? 'Free'
+  const planName = formatPlanDisplayName(
+    entitlementsData?.entitlements?.plan?.code,
+    entitlementsData?.entitlements?.plan?.name
+  )
   const firstName = (user?.displayName || user?.email || '').split(/[\s@]/)[0] || 'there'
 
   const now = new Date()

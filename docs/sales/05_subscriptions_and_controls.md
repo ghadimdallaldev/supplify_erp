@@ -2,11 +2,11 @@
 
 ## Plans That Match How You Use the Platform
 
-Every restaurant and supplier has a **subscription** with a **plan** (Free, Bronze, Gold, Platinum). Plans define limits (e.g. orders per day, branches, products, chat messages) and which features are on (e.g. reports, smart reorder, multi-branch). This keeps the product clear and upgrade paths obvious.
+Every restaurant and supplier has a **subscription** with a **plan** (Free Trial, Bronze, Gold, Platinum). Plans define limits (e.g. orders per day, branches, products, chat messages) and which features are on (e.g. reports, smart reorder, multi-branch). This keeps the product clear and upgrade paths obvious.
 
 ### Plan tiers (conceptual)
 
-- **Free** — For setup and testing. Tight limits (e.g. few orders per day, one supplier, no reports) so value is clear and upgrading is natural.
+- **Free Trial** (DB code `free`) — **Time-limited** evaluation sandbox (default **7 days**, admin **3–7**). Broad features during trial; after expiry, **read-only** access to existing data until upgrade or admin extension.
 - **Bronze** — For single-location or small teams. Higher limits and core features (e.g. basic reports, photos on receiving).
 - **Gold** — The default plan for serious daily use. Multi-branch, more orders and products, analytics, and key features.
 - **Platinum** — For scale. Very high or unlimited limits and the full feature set so you don’t think about caps.
@@ -20,6 +20,7 @@ Tenants see their current plan, usage, and limits in the app. When they hit a li
 - Change a tenant’s plan (effective immediately or at period end).
 - Preview the impact (e.g. “usage will exceed new limits”) before applying.
 - Temporarily override specific limits (e.g. raise orders per day) with an optional expiry.
+- **Extend Free Trial** for locked `free` tenants (`extend-free-trial` / unlock with trial extension).
 
 ```mermaid
 flowchart TB

@@ -12,11 +12,14 @@ Supplify offers tiered subscription plans designed for **restaurants and supplie
 
 ## Plan Tiers
 
-### 🌟 Free Plan
+### 🌟 Free Trial (plan code: `free`)
 
-**Best for:** Setup and testing only — try the platform before upgrading
+**Best for:** Time-limited evaluation — try the platform before upgrading (not a forever-free production tier)
 
-**Pricing:** $0/month
+**Pricing:** $0 during trial  
+**Duration:** **3–7 days** (platform default **7**), set in Admin → Platform settings. After expiry, account locks to **read-only** until upgrade or admin extends trial.
+
+See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEHAVIOR_AUDIT.md](../qa/FREE_TRIAL_BEHAVIOR_AUDIT.md).
 
 - 1 branch account (your main location only — no extra branch accounts)
 - 1 supplier connection per restaurant
@@ -301,7 +304,7 @@ A: Orders are blocked with an upgrade prompt. Existing orders remain untouched.
 A: Contact admin for custom enterprise plans with tailored limits and features.
 
 **Q: Are there trials?**
-A: Free plan is forever. Bronze offers 14-day trials for new users. Gold/Platinum available on request.
+A: **Free Trial** (`free` plan) is time-limited (**3–7 days**, default 7). After expiry you can still log in and view data, but must upgrade to create or change operational records. Bronze may offer promotional trials separately. Gold/Platinum available on request.
 
 **Q: How do I upgrade?**
 A: In your restaurant settings → Subscription, click Upgrade and follow the flow.

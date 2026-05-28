@@ -2,6 +2,16 @@
 
 Plans are split by **tenant type**: each of Free, Bronze, Gold, and Platinum exists as separate rows for **RESTAURANT** and **SUPPLIER**. Limit keys are normalized per tenant type (no mixing of product/SKU keys).
 
+## Free Trial (plan code `free`)
+
+- **User-facing name:** Free Trial (not “forever free”).
+- **Duration:** `subscription.free_sandbox_expires_at`; default length from `platform_setting.free_sandbox_days` (**7**, admin-configurable **3–7**).
+- **During trial:** Broad sandbox features (`0112` parity) with plan limits still enforced.
+- **After expiry:** `lock_reason = 'free_sandbox_expired'` — **GET** APIs read-only; **writes 402**; billing/upgrade still available.
+- **Admin:** `POST …/extend-free-trial`, unlock extends expiry for expired trials.
+
+Details: [free-trial-expiry.md](../features/free-trial-expiry.md).
+
 ## Limit keys (normalized)
 
 - **RESTAURANT:** `branches`, `users`, `orders_per_day`, `suppliers_per_restaurant`, `restaurant_inventory_skus`, `chats_per_day`, `storage_mb`
@@ -22,7 +32,7 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 
 **chats_per_day** counts **chat messages sent** per day (enforced on `POST .../messages` via `usage_meter`).
 
-**Free plan:** Setup and testing only. Intentionally low limits (3 orders/day, 3 chats/day, 15 SKUs, 1 supplier, 1 location account) to demonstrate value and encourage upgrade. Gold is the default plan for serious usage.
+**Free Trial:** Time-limited sandbox (see above). Catalog limits below apply during the trial; after expiry, read-only until upgrade.
 
 - **reservations:** Plan feature / reservation capabilities (from plan `features`).
 - **receiving:** Plan feature (e.g. `receiving_quality`: manual_only, photos_enabled, quality_scoring).
@@ -37,7 +47,7 @@ Legacy key `products` is no longer used; it was replaced by `restaurant_inventor
 | Gold     | 3         | 3          | 10        | 1,000                  | 200           | 5,000      | warehouse   |
 | Platinum | unlimited | unlimited  | unlimited | unlimited              | unlimited     | 20,000     | full        |
 
-**Free plan:** Setup and testing only. Low limits (15 products, 3 chats/day, 50 MB storage, 1 branch account, 0 warehouses) to encourage upgrade to Gold for real usage.
+**Free Trial:** Time-limited sandbox; low limits during trial (15 products, 3 chats/day, etc.). See [free-trial-expiry.md](../features/free-trial-expiry.md).
 
 - **fulfillment:** Plan feature (e.g. `fulfillment_tools`: basic_orders, manual_orders_invoices, warehouse_pick_pack, routing_full_suite). Can be gated by plan.
 

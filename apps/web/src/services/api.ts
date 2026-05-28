@@ -2739,12 +2739,28 @@ export const api = createApi({
     }),
     unlockAdminSubscription: builder.mutation<
       { subscription: Subscription },
-      { id: string; reason?: string }
+      { id: string; reason?: string; freeTrialDays?: number }
     >({
-      query: ({ id, reason }) => ({
+      query: ({ id, reason, freeTrialDays }) => ({
         url: `/api/admin-dashboard/subscriptions/${id}/unlock`,
         method: 'POST',
-        body: { reason },
+        body: { reason, freeTrialDays },
+      }),
+      invalidatesTags: ['Admin', 'Billing', 'Subscription'],
+    }),
+
+    extendAdminFreeTrial: builder.mutation<
+      {
+        subscription: Subscription
+        freeTrialDays: number
+        freeSandboxExpiresAt: string | null
+      },
+      { id: string; days?: number }
+    >({
+      query: ({ id, days }) => ({
+        url: `/api/admin-dashboard/subscriptions/${id}/extend-free-trial`,
+        method: 'POST',
+        body: days != null ? { days } : {},
       }),
       invalidatesTags: ['Admin', 'Billing', 'Subscription'],
     }),
@@ -3218,6 +3234,7 @@ export const {
   useBillingPayNowMutation,
   useSetBillingAutoRenewMutation,
   useUnlockAdminSubscriptionMutation,
+  useExtendAdminFreeTrialMutation,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,
   useGetApprovalBudgetsQuery,

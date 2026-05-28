@@ -192,27 +192,27 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 3.1 Restaurant feature gates
 
-| ID       | Feature key            | Free account                                                          | Bronze account      | Gold account              | Pass? |
-| -------- | ---------------------- | --------------------------------------------------------------------- | ------------------- | ------------------------- | ----- |
-| GATE-R01 | `chat`                 | `/app/chat` → 403/paywall                                             | Loads               | Loads                     |       |
-| GATE-R02 | `quick_lists`          | `/app/quick-lists` → 403/paywall                                      | Loads               | Loads                     |       |
-| GATE-R03 | `receiving_quality`    | `/app/receiving` → 403/paywall                                        | Loads               | Loads                     |       |
-| GATE-R04 | `finance_invoices`     | `/app/invoices` → 403/paywall                                         | Loads               | Loads                     |       |
-| GATE-R05 | `inventory_management` | `/app/restaurant-inventory` → 403/paywall                             | Loads               | Loads                     |       |
-| GATE-R06 | `order_calendar`       | Dashboard calendar widget → paywall; `GET /api/orders/calendar` → 403 | 200 + calendar data | 200 + calendar data       |       |
-| GATE-R07 | `disputes_returns`     | `GET /api/disputes` → 403                                             | 200                 | 200                       |       |
-| GATE-R08 | `advanced_roles`       | Settings → Team: no role management UI                                | Available           | Available                 |       |
-| GATE-R09 | `reports`              | `GET /api/reports` → 403                                              | 403 (Gold+)         | 200                       |       |
-| GATE-R10 | `smart_reorder`        | Reorder suggestions API → 403                                         | 403 (Gold+)         | 200 or available          |       |
+| ID       | Feature key            | Free account                                                           | Bronze account      | Gold account              | Pass? |
+| -------- | ---------------------- | ---------------------------------------------------------------------- | ------------------- | ------------------------- | ----- |
+| GATE-R01 | `chat`                 | `/app/chat` → 403/paywall                                              | Loads               | Loads                     |       |
+| GATE-R02 | `quick_lists`          | `/app/quick-lists` → 403/paywall                                       | Loads               | Loads                     |       |
+| GATE-R03 | `receiving_quality`    | `/app/receiving` → 403/paywall                                         | Loads               | Loads                     |       |
+| GATE-R04 | `finance_invoices`     | `/app/invoices` → 403/paywall                                          | Loads               | Loads                     |       |
+| GATE-R05 | `inventory_management` | `/app/restaurant-inventory` → 403/paywall                              | Loads               | Loads                     |       |
+| GATE-R06 | `order_calendar`       | Dashboard calendar widget → paywall; `GET /api/orders/calendar` → 403  | 200 + calendar data | 200 + calendar data       |       |
+| GATE-R07 | `disputes_returns`     | `GET /api/disputes` → 403                                              | 200                 | 200                       |       |
+| GATE-R08 | `advanced_roles`       | Settings → Team: no role management UI                                 | Available           | Available                 |       |
+| GATE-R09 | `reports`              | `GET /api/reports` → 403                                               | 403 (Gold+)         | 200                       |       |
+| GATE-R10 | `smart_reorder`        | Reorder suggestions API → 403                                          | 403 (Gold+)         | 200 or available          |       |
 | GATE-R11 | `waste_tracking`       | Inventory → Waste tab; `GET /api/restaurant-inventory/waste-analytics` | Available (Free+)   | Available                 |       |
-| GATE-R12 | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                               | Blocked (Gold+)     | Visible and loads         |       |
-| GATE-R13 | `order_amendments`     | Order amendment API → 403                                             | 403 (Gold+)         | 200                       |       |
-| GATE-R14 | `push_notifications`   | Push endpoint → 403                                                   | 403 (Gold+)         | 200                       |       |
-| GATE-R15 | `supplier_reviews`     | Reviews API → 403                                                     | 403 (Gold+)         | 200                       |       |
-| GATE-R16 | `custom_branding`      | Settings branding section → hidden or locked                          | Locked (Gold+)      | Branding upload available |       |
-| GATE-R17 | `multi_branch`         | Settings → Branches: cannot add 2nd branch                            | Limited by plan     | Higher branch limit       |       |
-| GATE-R18 | `feature_flags_access` | Tenant flag override API → 403                                        | 403 (Gold+)         | 200 (if UI exposed)       |       |
-| GATE-R19 | `supplier_deals`       | `/app/deals` → 403/paywall; `GET /api/promotions/active` → 403        | Loads               | Loads                     |       |
+| GATE-R12 | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                                | Blocked (Gold+)     | Visible and loads         |       |
+| GATE-R13 | `order_amendments`     | Order amendment API → 403                                              | 403 (Gold+)         | 200                       |       |
+| GATE-R14 | `push_notifications`   | Push endpoint → 403                                                    | 403 (Gold+)         | 200                       |       |
+| GATE-R15 | `supplier_reviews`     | Reviews API → 403                                                      | 403 (Gold+)         | 200                       |       |
+| GATE-R16 | `custom_branding`      | Settings branding section → hidden or locked                           | Locked (Gold+)      | Branding upload available |       |
+| GATE-R17 | `multi_branch`         | Settings → Branches: cannot add 2nd branch                             | Limited by plan     | Higher branch limit       |       |
+| GATE-R18 | `feature_flags_access` | Tenant flag override API → 403                                         | 403 (Gold+)         | 200 (if UI exposed)       |       |
+| GATE-R19 | `supplier_deals`       | `/app/deals` → 403/paywall; `GET /api/promotions/active` → 403         | Loads               | Loads                     |       |
 
 ## 3.2 Supplier feature gates
 
@@ -328,7 +328,36 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | PLN-07  | Gold/Platinum → custom branding in settings         | Logo/colors upload (Gold); white-label if Platinum     |       |
 | PLN-08  | Header **Plans** button                             | Upgrade/browse modal; plan comparison table            |       |
 
-## 4.6 Shell UI (Layout, Header, Sidebar)
+## 4.6 Free Trial expiry (read-only lock)
+
+> **Spec:** [free-trial-expiry.md](../features/free-trial-expiry.md) · **Audit:** [FREE_TRIAL_BEHAVIOR_AUDIT.md](./FREE_TRIAL_BEHAVIOR_AUDIT.md)  
+> **Accounts:** Free restaurant or supplier (`restaurant-free@…` / `supplier-free@…`) or any tenant on plan `free`.  
+> **Simulate expiry:** run SQL below (replace subscription id) or set `free_sandbox_expires_at` in the past and wait for / trigger `free-sandbox-expiry` job.
+
+```sql
+UPDATE subscription
+SET free_sandbox_expires_at = now() - interval '1 day',
+    account_locked_at = now(),
+    lock_reason = 'free_sandbox_expired'
+WHERE id = '<subscription_id>';
+```
+
+| ID        | Steps                                                                     | Expected                                                                                         | Pass? |
+| --------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----- |
+| BIL-FT-01 | Free tenant → log in after expiry SQL                                     | Login succeeds; amber **Free Trial expired** banner; **Choose a plan** CTA                       |       |
+| BIL-FT-02 | Open `/app/orders` (list)                                                 | Page loads; existing orders visible (read-only)                                                  |       |
+| BIL-FT-03 | Open `/app/products` or supplier catalog                                  | List/detail **GET** works                                                                        |       |
+| BIL-FT-04 | Try place order / POST cart checkout / create product                     | **402**; message: _Your Free Trial has expired. Upgrade your plan to continue using Supplify._   |       |
+| BIL-FT-05 | `GET /api/billing/status` while locked                                    | **200**; `access.isLocked` true; `freeSandboxExpired` or `lockReason === 'free_sandbox_expired'` |       |
+| BIL-FT-06 | `POST /api/billing/checkout` (upgrade to Bronze)                          | Allowed (billing exempt from lock)                                                               |       |
+| BIL-FT-07 | Settings → Subscription tab                                               | Shows **Free Trial** label; expired copy; upgrade path                                           |       |
+| BIL-FT-08 | Admin → Platform settings → set trial length **2** or **10**              | Validation error; only **3–7** accepted                                                          |       |
+| BIL-FT-09 | Admin → Platform settings → save **7** days                               | Persists; new Free activations use clamped value                                                 |       |
+| BIL-FT-10 | Admin → Subscriptions → locked free tenant → **Extend trial**             | Lock cleared; `free_sandbox_expires_at` ~7 days ahead; tenant can write again                    |       |
+| BIL-FT-11 | Re-expire tenant; Admin → **Activate** / unlock on `free_sandbox_expired` | Unlock + trial extended (job should not re-lock immediately)                                     |       |
+| BIL-FT-12 | `POST …/extend-free-trial` with `{ "days": 5 }` (API or admin action)     | **200**; expiry ≈ now + 5 days                                                                   |       |
+
+## 4.7 Shell UI (Layout, Header, Sidebar)
 
 | ID     | Steps                                     | Expected                                             | Pass? |
 | ------ | ----------------------------------------- | ---------------------------------------------------- | ----- |
@@ -347,7 +376,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | UX-08  | Plan badge in sidebar footer              | Shows plan name for non-free paid tiers              |       |
 | UX-09  | Mobile/narrow viewport                    | Sidebar/layout usable; tabs wrap (supplier settings) |       |
 
-## 4.7 Notifications preferences
+## 4.8 Notifications preferences
 
 | ID     | Steps                                                   | Expected                                          | Pass? |
 | ------ | ------------------------------------------------------- | ------------------------------------------------- | ----- |
@@ -357,7 +386,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | UX-12a | Same event as UX-12 (foreground tab)                    | Toast ~10s + short sound; optional browser banner |       |
 | UX-12b | Log in as **second team user** (not contact_email only) | Same event visible in bell + toast for that user  |       |
 
-## 4.8 Realtime & impersonation
+## 4.9 Realtime & impersonation
 
 | ID         | Steps                                          | Expected                                           | Pass? |
 | ---------- | ---------------------------------------------- | -------------------------------------------------- | ----- |
@@ -366,7 +395,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | ADM-IMP-03 | Stop impersonation                             | Returns to admin context                           |       |
 | ADM-IMP-04 | Plan change while logged in (admin or billing) | `entitlements_refresh` toast or refetch updates UI |       |
 
-## 4.9 WebSocket connectivity
+## 4.10 WebSocket connectivity
 
 | ID    | Steps                                                                         | Expected                                                                                     | Pass? |
 | ----- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----- |
@@ -759,14 +788,14 @@ Hidden without RBAC permission or feature gate.
 
 ### Subscriptions tab
 
-| ID     | Steps                                                                     | Expected                                                         | Pass? |
-| ------ | ------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----- |
-| ADM-10 | List subscriptions                                                        | Status, plan, lock state                                         |       |
-| ADM-11 | Change plan (upgrade/downgrade)                                           | Preview + apply; cache invalidated; entitlements_refresh emitted |       |
-| ADM-12 | **Activate** pending-activation subscription                              | Tenant unlocked immediately                                      |       |
-| ADM-13 | **Unlock** past-due locked subscription                                   | Lock cleared; tenant can log in to full app                      |       |
-| ADM-14 | Cancel / extend trial (if UI)                                             | Status updated                                                   |       |
-| ADM-15 | After plan change: logged-in tenant receives `entitlements_refresh` event | UI updates features without manual reload                        |       |
+| ID     | Steps                                                                              | Expected                                                                     | Pass? |
+| ------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----- |
+| ADM-10 | List subscriptions                                                                 | Status, plan, lock state                                                     |       |
+| ADM-11 | Change plan (upgrade/downgrade)                                                    | Preview + apply; cache invalidated; entitlements_refresh emitted             |       |
+| ADM-12 | **Activate** pending-activation subscription                                       | Tenant unlocked immediately                                                  |       |
+| ADM-13 | **Unlock** past-due locked subscription                                            | Lock cleared; tenant can log in to full app                                  |       |
+| ADM-14 | **Extend trial** on `free_sandbox_expired` subscription (or API extend-free-trial) | Lock cleared; `free_sandbox_expires_at` extended 3–7 days; see **BIL-FT-10** |       |
+| ADM-15 | After plan change: logged-in tenant receives `entitlements_refresh` event          | UI updates features without manual reload                                    |       |
 
 ### Plans tab
 

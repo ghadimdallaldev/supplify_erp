@@ -13,7 +13,7 @@ describe('planComparison', () => {
   })
 
   it('returns plan subtitles for known tiers', () => {
-    expect(getPlanSubtitle('free')).toBe('Setup & Testing')
+    expect(getPlanSubtitle('free')).toBe('Time-limited trial')
     expect(getPlanSubtitle('gold')).toBe('Most Popular')
   })
 

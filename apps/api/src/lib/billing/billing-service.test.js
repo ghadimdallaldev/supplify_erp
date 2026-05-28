@@ -85,6 +85,22 @@ describe('buildAccountLockedError', () => {
     expect(err.message).toMatch(/overdue/i)
     expect(err.details.amountDue).toBe(50)
   })
+
+  it('returns Free Trial expired message', () => {
+    const err = buildAccountLockedError({
+      amountDue: 0,
+      access: {
+        pendingActivation: false,
+        freeSandboxExpired: true,
+        lockReason: 'free_sandbox_expired',
+      },
+    })
+    expect(err.message).toBe(
+      'Your Free Trial has expired. Upgrade your plan to continue using Supplify.'
+    )
+    expect(err.details.freeSandboxExpired).toBe(true)
+    expect(err.details.lockReason).toBe('free_sandbox_expired')
+  })
 })
 
 describe('checkoutSubscription free plan', () => {

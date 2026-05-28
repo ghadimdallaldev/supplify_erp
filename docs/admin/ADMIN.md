@@ -52,7 +52,7 @@ Navigate to `/app/admin` (visible only to users with ADMIN role).
 
 Shows all 4 Supplify plans:
 
-- Free (Free)
+- Free Trial (`free` — time-limited, not forever-free)
 - Bronze ($49/mo)
 - Gold ($149/mo)
 - Platinum ($349/mo)
@@ -134,21 +134,19 @@ To upgrade or downgrade a tenant:
 - Upgrade prompts shown to tenant
 - Existing data remains accessible
 
-### Grant Trial
+### Free Trial (plan code `free`)
 
-To give a tenant a trial:
+**Platform default length:** Admin → **Platform settings** → Free Trial length (**3–7** days, default **7**). Applies to new Free activations.
 
-1. Find tenant in **Subscriptions**
-2. Click "Grant Trial"
-3. Select trial plan and duration
-4. Confirm
+**Extend an expired trial:**
 
-**During Trial:**
+1. Find tenant in **Subscriptions** with `lock_reason = free_sandbox_expired`
+2. Click **Extend trial** (or call `POST /api/admin-dashboard/subscriptions/:id/extend-free-trial` with optional `{ "days": 5 }`)
+3. Lock clears; `free_sandbox_expires_at` is set from now + days (clamped 3–7)
 
-- Full plan features enabled
-- Usage tracked normally
-- Auto-converts to paid on expiry (or cancels)
-- Notifications sent before expiry
+**Unlock** on an expired Free Trial also extends expiry so the hourly expiry job does not immediately re-lock.
+
+See [free-trial-expiry.md](../features/free-trial-expiry.md) and QA **BIL-FT-\*** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md).
 
 ### Apply Override
 

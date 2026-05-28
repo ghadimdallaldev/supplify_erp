@@ -41,6 +41,11 @@
   ```
 - Artifacts: `playwright-report/` (HTML), `test-results/` (traces/screenshots on failure).
 
+## Free Trial expiry
+
+- **Unit tests (API app):** `pnpm exec vitest run src/middlewares/billingAccess.test.js src/lib/billing/billing-service.test.js src/lib/platform-settings.test.js` from `apps/api`.
+- **Manual QA:** `docs/qa/MANUAL_TEST_CHECKLIST.md` §4.6 (**BIL-FT-01 … BIL-FT-12**); spec [docs/features/free-trial-expiry.md](../docs/features/free-trial-expiry.md).
+
 ## Add tests
 
 - **E2E**: Add specs under `e2e/suites/smoke`, `e2e/suites/critical_e2e`, or `e2e/suites/nightly`. Use fixtures from `e2e/fixtures` and POMs from `e2e/pages`. Use **only** `data-testid` selectors; add `data-testid` in app code where missing.

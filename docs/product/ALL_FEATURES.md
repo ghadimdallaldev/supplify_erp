@@ -52,14 +52,14 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ## 2. User roles & access model
 
-| Role               | Description                                                      | Primary navigation                                                                                                             |
-| ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Role               | Description                                                      | Primary navigation                                                                                                                                                                         |
+| ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **RESTAURANT**     | Buyer: orders, inventory, reservations, staff, suppliers         | Dashboard, Orders, Products, Cart, Quick Lists, Reservations, Receiving, Staff, Inventory (+ waste tab), Suppliers, Deals, Reports, Disputes, Invoices, Chat, Settings, Org (multi-branch) |
-| **SUPPLIER**       | Seller: catalog, fulfillment, restaurants, invoices              | Dashboard, Orders, Products, Fulfillment, Restaurants, Invoices, Chat, Settings                                                |
-| **ADMIN**          | Platform operator: tenants, plans, billing, flags                | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                    |
-| **PENDING**        | New signup before tenant setup                                   | Redirected to `/register/complete`                                                                                             |
-| **Public guest**   | No account                                                       | Reservation booking, manage booking by token                                                                                   |
-| **Staff (portal)** | Operational staff only (`STAFF_PORTAL`); separate from Team RBAC | `/staff/login`, `/staff/dashboard` — **no** `/app` access unless also a platform user (dual link)                              |
+| **SUPPLIER**       | Seller: catalog, fulfillment, restaurants, invoices              | Dashboard, Orders, Products, Fulfillment, Restaurants, Invoices, Chat, Settings                                                                                                            |
+| **ADMIN**          | Platform operator: tenants, plans, billing, flags                | Admin Dashboard, Supplier Admin, Restaurant Admin, Settings                                                                                                                                |
+| **PENDING**        | New signup before tenant setup                                   | Redirected to `/register/complete`                                                                                                                                                         |
+| **Public guest**   | No account                                                       | Reservation booking, manage booking by token                                                                                                                                               |
+| **Staff (portal)** | Operational staff only (`STAFF_PORTAL`); separate from Team RBAC | `/staff/login`, `/staff/dashboard` — **no** `/app` access unless also a platform user (dual link)                                                                                          |
 
 **Additional controls:**
 
@@ -131,33 +131,33 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ### 5.2 Marketplace & ordering
 
-| Feature                                   | Web route            | API                                                                 |
-| ----------------------------------------- | -------------------- | ------------------------------------------------------------------- |
-| Product catalog browse                    | `/app/products`      | `/api/products`                                                     |
-| Product detail                            | `/app/products/:id`  | `/api/products/:id`                                                 |
-| Categories & tags filters                 | Products page        | `/api/products/categories`, `/tags`                                 |
-| Shopping cart                             | `/app/cart`          | Orders + products                                                   |
-| Place order                               | Cart                 | `POST /api/orders`                                                  |
-| Orders list & filters                     | `/app/orders`        | `GET /api/orders`                                                   |
-| Order detail & status                     | `/app/orders/:id`    | `GET/PATCH /api/orders/:id`                                         |
-| Supplier decline (reason required)        | Order list/detail    | `PATCH` with `decline_reason`; restaurant sees decline label        |
-| Order reminders to supplier               | Order detail         | `POST /api/orders/:id/remind`                                       |
-| Order calendar view                       | Orders / dashboard   | `/api/orders/calendar` (plan `order_calendar`)                      |
-| Order amendments (plan)                   | Order detail         | `/api/orders/:id/amendments` (plan `order_amendments`)              |
-| Tenant roles (plan)                       | Settings → Team      | `/api/roles/*` (gated); `auth/me` permissions always resolved       |
-| Manual order (supplier-created on behalf) | —                    | `POST /api/orders/manual` (supplier)                                |
-| Quick lists (saved templates)             | `/app/quick-lists`   | `/api/quick-lists`                                                  |
-| Quick list items CRUD                     | Quick Lists          | `/api/quick-lists/:id/items`                                        |
-| Schedule quick list → auto order          | Quick Lists          | Schedule endpoints on quick-lists                                   |
-| Scheduled order execution                 | —                    | Cron: `executeScheduledOrders`                                      |
-| Reorder suggestions                       | —                    | Restaurant inventory API                                            |
-| Supplier discovery                        | `/app/suppliers`     | `/api/suppliers`                                                    |
-| Supplier detail & follow/block            | `/app/suppliers/:id` | follow/block endpoints                                              |
-| Supplier statistics                       | Supplier detail      | `GET /api/suppliers/:id/statistics`                                 |
-| Reports & analytics (plan)                | `/app/reports`       | `/api/reports/restaurant/*` (spend, categories, top products, etc.) |
+| Feature                                   | Web route                            | API                                                                            |
+| ----------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------ |
+| Product catalog browse                    | `/app/products`                      | `/api/products`                                                                |
+| Product detail                            | `/app/products/:id`                  | `/api/products/:id`                                                            |
+| Categories & tags filters                 | Products page                        | `/api/products/categories`, `/tags`                                            |
+| Shopping cart                             | `/app/cart`                          | Orders + products                                                              |
+| Place order                               | Cart                                 | `POST /api/orders`                                                             |
+| Orders list & filters                     | `/app/orders`                        | `GET /api/orders`                                                              |
+| Order detail & status                     | `/app/orders/:id`                    | `GET/PATCH /api/orders/:id`                                                    |
+| Supplier decline (reason required)        | Order list/detail                    | `PATCH` with `decline_reason`; restaurant sees decline label                   |
+| Order reminders to supplier               | Order detail                         | `POST /api/orders/:id/remind`                                                  |
+| Order calendar view                       | Orders / dashboard                   | `/api/orders/calendar` (plan `order_calendar`)                                 |
+| Order amendments (plan)                   | Order detail                         | `/api/orders/:id/amendments` (plan `order_amendments`)                         |
+| Tenant roles (plan)                       | Settings → Team                      | `/api/roles/*` (gated); `auth/me` permissions always resolved                  |
+| Manual order (supplier-created on behalf) | —                                    | `POST /api/orders/manual` (supplier)                                           |
+| Quick lists (saved templates)             | `/app/quick-lists`                   | `/api/quick-lists`                                                             |
+| Quick list items CRUD                     | Quick Lists                          | `/api/quick-lists/:id/items`                                                   |
+| Schedule quick list → auto order          | Quick Lists                          | Schedule endpoints on quick-lists                                              |
+| Scheduled order execution                 | —                                    | Cron: `executeScheduledOrders`                                                 |
+| Reorder suggestions                       | —                                    | Restaurant inventory API                                                       |
+| Supplier discovery                        | `/app/suppliers`                     | `/api/suppliers`                                                               |
+| Supplier detail & follow/block            | `/app/suppliers/:id`                 | follow/block endpoints                                                         |
+| Supplier statistics                       | Supplier detail                      | `GET /api/suppliers/:id/statistics`                                            |
+| Reports & analytics (plan)                | `/app/reports`                       | `/api/reports/restaurant/*` (spend, categories, top products, etc.)            |
 | Disputes & returns (plan)                 | `/app/disputes`, `/app/disputes/:id` | `/api/disputes`, `/api/credit-notes`; replacement orders on dispute resolution |
-| Active supplier deals / promotions        | `/app/deals`         | `/api/promotions` (feed, redeem; `?highlight=` deep link from notifications) |
-| Supplier reviews                          | Supplier detail      | `/api/reviews/suppliers/:id`, summary, `POST` review                |
+| Active supplier deals / promotions        | `/app/deals`                         | `/api/promotions` (feed, redeem; `?highlight=` deep link from notifications)   |
+| Supplier reviews                          | Supplier detail                      | `/api/reviews/suppliers/:id`, summary, `POST` review                           |
 
 ### 5.3 Chat & collaboration
 
@@ -175,14 +175,14 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ### 5.4 Inventory & receiving
 
-| Feature                                    | Web route                   | API                                 |
-| ------------------------------------------ | --------------------------- | ----------------------------------- |
-| Restaurant inventory (on-hand, par levels) | `/app/restaurant-inventory` | `/api/restaurant-inventory`         |
-| Inventory history                          | Inventory tab               | `/api/restaurant-inventory/history` |
+| Feature                                    | Web route                        | API                                                                 |
+| ------------------------------------------ | -------------------------------- | ------------------------------------------------------------------- |
+| Restaurant inventory (on-hand, par levels) | `/app/restaurant-inventory`      | `/api/restaurant-inventory`                                         |
+| Inventory history                          | Inventory tab                    | `/api/restaurant-inventory/history`                                 |
 | Waste & spoilage logging (plan)            | Inventory → **Waste & spoilage** | `POST .../adjust` (`WASTAGE`/`SPOILAGE`), `GET .../waste-analytics` |
-| Reorder suggestions                        | Inventory                   | `/api/restaurant-inventory/reorder-suggestions` |
-| Receiving reports                          | `/app/receiving`            | `/api/receiving`                    |
-| Record goods-in / quality                  | Receiving                   | `POST /api/receiving/receive`       |
+| Reorder suggestions                        | Inventory                        | `/api/restaurant-inventory/reorder-suggestions`                     |
+| Receiving reports                          | `/app/receiving`                 | `/api/receiving`                                                    |
+| Record goods-in / quality                  | Receiving                        | `POST /api/receiving/receive`                                       |
 
 ### 5.5 Finance
 
@@ -308,27 +308,27 @@ Also available via API (not always separate pages):
 
 ### 7.2 Admin dashboard tabs
 
-| Tab               | Capabilities                                              |
-| ----------------- | --------------------------------------------------------- |
-| **Overview**      | MRR/ARR, tenant counts, alerts, KPIs                      |
-| **Activity**      | Recent platform activity feed                             |
-| **Tenants**       | List/search suppliers & restaurants, impersonate          |
-| **Subscriptions** | All tenant subscriptions, plan changes, unlock            |
-| **Plans**         | Create/edit subscription plans (limits + features JSON)   |
-| **Finance**       | GMV, outstanding, revenue by plan                         |
-| **Usage**         | Per-tenant usage meters & quota overrides                 |
-| **Features**      | Global + per-tenant feature flag overrides                |
-| **Deals**         | Approve/reject pending supplier deals; insights; payment activation |
-| **Limit overrides** | Per-tenant plan limit overrides                         |
-| **Platform settings** | Free sandbox expiry days (overview)                   |
-| **Health**        | DB pool, recent errors, system health                     |
-| **Audit**         | Admin audit log search & filters                          |
+| Tab                   | Capabilities                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| **Overview**          | MRR/ARR, tenant counts, alerts, KPIs                                                  |
+| **Activity**          | Recent platform activity feed                                                         |
+| **Tenants**           | List/search suppliers & restaurants, impersonate                                      |
+| **Subscriptions**     | All tenant subscriptions, plan changes, unlock, **Extend trial** (expired Free Trial) |
+| **Plans**             | Create/edit subscription plans (limits + features JSON)                               |
+| **Finance**           | GMV, outstanding, revenue by plan                                                     |
+| **Usage**             | Per-tenant usage meters & quota overrides                                             |
+| **Features**          | Global + per-tenant feature flag overrides                                            |
+| **Deals**             | Approve/reject pending supplier deals; insights; payment activation                   |
+| **Limit overrides**   | Per-tenant plan limit overrides                                                       |
+| **Platform settings** | Free Trial length (**3–7** days, default 7)                                           |
+| **Health**            | DB pool, recent errors, system health                                                 |
+| **Audit**             | Admin audit log search & filters                                                      |
 
 ### 7.3 Admin API capabilities (`/api/admin-dashboard`)
 
 - Overview & conversion stats
 - Plans CRUD
-- Subscriptions list / update / preview plan change / unlock billing
+- Subscriptions list / update / preview plan change / unlock billing / **extend Free Trial**
 - Usage per tenant
 - Financial overview
 - Audit logs
@@ -337,7 +337,7 @@ Also available via API (not always separate pages):
 - Per-tenant entitlements & usage
 - Limit overrides (create/delete)
 - Feature flags: global list, patch global, tenant overrides CRUD
-- Platform settings: `GET/PATCH /api/admin-dashboard/platform-settings` (e.g. `freeSandboxDays`)
+- Platform settings: `GET/PATCH /api/admin-dashboard/platform-settings` (`freeSandboxDays` **3–7**)
 - Deal admin: approve/reject/pause; pending queue & insights
 - System health
 
@@ -453,32 +453,32 @@ Canonical keys in `apps/api/src/lib/feature-keys.js`:
 
 ### Supplier plan features
 
-| Key                    | Display name                |
-| ---------------------- | --------------------------- |
-| `chat`                 | Chat                        |
-| `order_calendar`       | Order calendar              |
-| `reports`              | Reports & analytics         |
-| `multi_branch`         | Multi-branch org accounts   |
-| `warehouses`           | Warehouses                  |
-| `multi_warehouse`      | Multi-warehouse fulfillment |
-| `fulfillment_tools`    | Fulfillment tools           |
-| `disputes_returns`     | Disputes & returns          |
-| `quick_lists`          | Quick lists                 |
-| `inventory_management` | Inventory management        |
-| `advanced_roles`       | Named tenant roles          |
-| `notifications`        | Notifications               |
-| `api_integrations`     | API integrations            |
-| `support_sla`          | Support SLA                 |
-| `custom_branding`      | Custom branding             |
-| `feature_flags_access` | Feature flag admin          |
-| `promotions`           | Promotions & deals (supplier) |
-| `disputes_returns`     | Disputes & returns          |
-| `order_amendments`     | Order amendments            |
-| `order_calendar`       | Order calendar              |
-| `push_notifications`   | Web push                    |
-| `tenant_audit_log`     | Activity log                |
-| `warehouses` / `multi_warehouse` | Warehouse fulfillment |
-| `fulfillment` / `fulfillment_tools` / `driver_management` | Logistics |
+| Key                                                       | Display name                  |
+| --------------------------------------------------------- | ----------------------------- |
+| `chat`                                                    | Chat                          |
+| `order_calendar`                                          | Order calendar                |
+| `reports`                                                 | Reports & analytics           |
+| `multi_branch`                                            | Multi-branch org accounts     |
+| `warehouses`                                              | Warehouses                    |
+| `multi_warehouse`                                         | Multi-warehouse fulfillment   |
+| `fulfillment_tools`                                       | Fulfillment tools             |
+| `disputes_returns`                                        | Disputes & returns            |
+| `quick_lists`                                             | Quick lists                   |
+| `inventory_management`                                    | Inventory management          |
+| `advanced_roles`                                          | Named tenant roles            |
+| `notifications`                                           | Notifications                 |
+| `api_integrations`                                        | API integrations              |
+| `support_sla`                                             | Support SLA                   |
+| `custom_branding`                                         | Custom branding               |
+| `feature_flags_access`                                    | Feature flag admin            |
+| `promotions`                                              | Promotions & deals (supplier) |
+| `disputes_returns`                                        | Disputes & returns            |
+| `order_amendments`                                        | Order amendments              |
+| `order_calendar`                                          | Order calendar                |
+| `push_notifications`                                      | Web push                      |
+| `tenant_audit_log`                                        | Activity log                  |
+| `warehouses` / `multi_warehouse`                          | Warehouse fulfillment         |
+| `fulfillment` / `fulfillment_tools` / `driver_management` | Logistics                     |
 
 **Admin overrides:** global defaults + per-tenant overrides via Admin → Features tab.
 
@@ -542,14 +542,14 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 
 ## 14. Background jobs & automation
 
-| Job                         | Schedule                 | Purpose                              |
-| --------------------------- | ------------------------ | ------------------------------------ |
-| Scheduled quick-list orders | Every 5 min (dev config) | Auto-create orders from quick lists  |
-| Invoice overdue check       | Every 24h                | Mark overdue, notify                 |
-| Subscription billing        | Every 1h                 | Grace period, account lock, renewals |
-| Free sandbox expiry         | Every 1h                 | Lock Free tenants after sandbox days (admin-configurable) |
-| Reservations schema ensure  | API startup              | Runtime migration guard              |
-| Staff schema ensure         | API startup              | Runtime migration guard              |
+| Job                                       | Schedule                 | Purpose                                                                             |
+| ----------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------- |
+| Scheduled quick-list orders               | Every 5 min (dev config) | Auto-create orders from quick lists                                                 |
+| Invoice overdue check                     | Every 24h                | Mark overdue, notify                                                                |
+| Subscription billing                      | Every 1h                 | Grace period, account lock, renewals                                                |
+| Free Trial expiry (`free-sandbox-expiry`) | Every 1h + startup       | Lock `free` tenants when `free_sandbox_expires_at` passed; read-only GET after lock |
+| Reservations schema ensure                | API startup              | Runtime migration guard                                                             |
+| Staff schema ensure                       | API startup              | Runtime migration guard                                                             |
 
 ---
 
@@ -710,11 +710,11 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 
 | Document                                                         | Purpose                                 |
 | ---------------------------------------------------------------- | --------------------------------------- |
-| [waste-tracking.md](../features/waste-tracking.md)               | Restaurant waste & spoilage               |
+| [waste-tracking.md](../features/waste-tracking.md)               | Restaurant waste & spoilage             |
 | [warehouse-fulfillment.md](../features/warehouse-fulfillment.md) | Warehouses, routing, order assignments  |
-| [promotions-deals.md](../features/promotions-deals.md)           | Deals lifecycle & admin approval          |
-| [disputes-returns.md](../features/disputes-returns.md)           | Disputes & replacement orders             |
-| [BRANCHING.md](../BRANCHING.md)                                  | dev → preprod → prod release chain        |
+| [promotions-deals.md](../features/promotions-deals.md)           | Deals lifecycle & admin approval        |
+| [disputes-returns.md](../features/disputes-returns.md)           | Disputes & replacement orders           |
+| [BRANCHING.md](../BRANCHING.md)                                  | dev → preprod → prod release chain      |
 | [supplier-branches.md](../features/supplier-branches.md)         | Supplier org & branch accounts          |
 | [features.md](./features.md)                                     | Shorter catalog + verification commands |
 | [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md)       | QA smoke tests                          |

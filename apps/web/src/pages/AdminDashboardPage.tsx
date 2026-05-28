@@ -28,6 +28,7 @@ import {
   useGetAdminRestaurantsQuery,
   useStartImpersonationMutation,
   useUnlockAdminSubscriptionMutation,
+  useExtendAdminFreeTrialMutation,
 } from '../services/api'
 import {
   Loader2,
@@ -197,6 +198,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [previewPlanChange] = usePreviewSubscriptionPlanChangeMutation()
   const [startImpersonation] = useStartImpersonationMutation()
   const [unlockSubscription, { isLoading: isUnlocking }] = useUnlockAdminSubscriptionMutation()
+  const [extendFreeTrial, { isLoading: isExtendingTrial }] = useExtendAdminFreeTrialMutation()
 
   const [changePlanModal, setChangePlanModal] = useState<{
     open: boolean
@@ -1287,6 +1289,23 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-2">
+                          {sub.lock_reason === 'free_sandbox_expired' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={isExtendingTrial}
+                              onClick={async () => {
+                                try {
+                                  await extendFreeTrial({ id: sub.id }).unwrap()
+                                  toast.success('Free Trial extended')
+                                } catch {
+                                  toast.error('Failed to extend Free Trial')
+                                }
+                              }}
+                            >
+                              Extend trial
+                            </Button>
+                          )}
                           {(sub.account_locked_at || sub.lock_reason === 'pending_activation') && (
                             <Button
                               size="sm"
