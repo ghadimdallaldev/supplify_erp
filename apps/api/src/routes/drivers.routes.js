@@ -11,6 +11,12 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
+import {
+  linkDriverToUser,
+  unlinkDriverUser,
+  listUnlinkedDrivers,
+  assertUserNotLinkedToOtherDriver,
+} from '../lib/driver-user-link.js'
 
 const router = express.Router()
 
@@ -41,6 +47,7 @@ const createDriverSchema = z.object({
   vehicle_plate: z.string().max(50).optional().nullable(),
   warehouse_id: z.string().uuid().optional().nullable(),
   notes: z.string().optional().nullable(),
+  user_id: z.string().uuid().optional().nullable(),
 })
 
 const updateDriverSchema = createDriverSchema.partial().extend({
@@ -59,8 +66,40 @@ function mapDriver(row) {
     notes: row.notes,
     is_active: row.is_active,
     warehouse_name: row.warehouse_name ?? null,
+    user_id: row.user_id ?? null,
+    linked_user_email: row.linked_user_email ?? null,
+    linked_user_name: row.linked_user_name ?? null,
   }
 }
+
+router.get('/unlinked', requirePermission('FULFILLMENT_VIEW'), async (req, res) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const drivers = await listUnlinkedDrivers(supplierId)
+    res.json({
+      ok: true,
+      data: { drivers },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('List unlinked drivers error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list unlinked drivers' },
+      requestId: req.requestId,
+    })
+  }
+})
 
 router.get('/', requirePermission('FULFILLMENT_VIEW'), async (req, res) => {
   try {
@@ -78,9 +117,11 @@ router.get('/', requirePermission('FULFILLMENT_VIEW'), async (req, res) => {
     const activeOnly = req.query.active !== 'false'
     const params = [supplierId]
     let sql = `
-      SELECT d.*, w.name AS warehouse_name
+      SELECT d.*, w.name AS warehouse_name,
+             u.email AS linked_user_email, u.display_name AS linked_user_name
       FROM drivers d
       LEFT JOIN warehouse w ON w.id = d.warehouse_id
+      LEFT JOIN app_user u ON u.id = d.user_id
       WHERE d.supplier_id = $1
     `
     if (activeOnly) sql += ` AND d.is_active = true`
@@ -121,6 +162,9 @@ router.post('/', requirePermission('FULFILLMENT_MANAGE'), async (req, res) => {
     }
 
     const body = createDriverSchema.parse(req.body)
+    if (body.user_id) {
+      await assertUserNotLinkedToOtherDriver(body.user_id, supplierId)
+    }
     if (body.warehouse_id) {
       const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
       if (multiActive) {
@@ -133,8 +177,8 @@ router.post('/', requirePermission('FULFILLMENT_MANAGE'), async (req, res) => {
 
     const { rows } = await query(
       `INSERT INTO drivers (
-         supplier_id, warehouse_id, full_name, phone, vehicle_type, vehicle_plate, notes
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+         supplier_id, warehouse_id, full_name, phone, vehicle_type, vehicle_plate, notes, user_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         supplierId,
@@ -144,6 +188,7 @@ router.post('/', requirePermission('FULFILLMENT_MANAGE'), async (req, res) => {
         body.vehicle_type ?? null,
         body.vehicle_plate ?? null,
         body.notes ?? null,
+        body.user_id ?? null,
       ]
     )
 
@@ -237,7 +282,19 @@ router.patch('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) =
     setField('notes', body.notes)
     setField('is_active', body.is_active)
 
-    if (!fields.length) {
+    if (body.user_id !== undefined) {
+      if (body.user_id === null) {
+        setField('user_id', null)
+      } else {
+        await linkDriverToUser({
+          driverId: req.params.id,
+          userId: body.user_id,
+          supplierId,
+        })
+      }
+    }
+
+    if (!fields.length && body.user_id === undefined) {
       return res.status(400).json({
         ok: false,
         data: null,
@@ -249,16 +306,34 @@ router.patch('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) =
     fields.push('updated_at = now()')
     values.push(req.params.id, supplierId)
 
-    const { rows } = await query(
-      `UPDATE drivers SET ${fields.join(', ')}
-       WHERE id = $${i++} AND supplier_id = $${i}
-       RETURNING *`,
-      values
+    let driverRow
+    if (fields.length) {
+      const { rows } = await query(
+        `UPDATE drivers SET ${fields.join(', ')}
+         WHERE id = $${i++} AND supplier_id = $${i}
+         RETURNING *`,
+        values
+      )
+      driverRow = rows[0]
+    } else {
+      driverRow = existing[0]
+    }
+
+    const { rows: enriched } = await query(
+      `
+      SELECT d.*, w.name AS warehouse_name,
+             u.email AS linked_user_email, u.display_name AS linked_user_name
+      FROM drivers d
+      LEFT JOIN warehouse w ON w.id = d.warehouse_id
+      LEFT JOIN app_user u ON u.id = d.user_id
+      WHERE d.id = $1
+      `,
+      [driverRow.id]
     )
 
     res.json({
       ok: true,
-      data: { driver: mapDriver(rows[0]) },
+      data: { driver: mapDriver(enriched[0] || driverRow) },
       error: null,
       requestId: req.requestId,
     })

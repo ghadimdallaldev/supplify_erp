@@ -59,6 +59,7 @@ import { publicRoutes } from './routes/public.routes.js'
 import { e2eRoutes } from './routes/e2e.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
+import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
 import { runFulfillmentExceptionChecks } from './jobs/fulfillment-exceptions.job.js'
 import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
@@ -345,6 +346,7 @@ app.use('/api/public/invitations', branchInvitationsPublicRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
 app.use('/api/drivers', driversRoutes)
+app.use('/api/supplier', supplierOpsRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -521,9 +523,7 @@ server.listen(PORT, () => {
   )
   trackInterval(
     () => {
-      runFreeSandboxExpiryJob().catch((err) =>
-        logger.error('Free sandbox expiry job failed:', err)
-      )
+      runFreeSandboxExpiryJob().catch((err) => logger.error('Free sandbox expiry job failed:', err))
     },
     60 * 60 * 1000
   )

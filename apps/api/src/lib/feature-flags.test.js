@@ -42,6 +42,19 @@ describe('feature-flags', () => {
       expect(features.reports).toBe(false)
       expect(featureSources.reports).toBe('global')
     })
+
+    it('preserves tier strings on enabled plan features (e.g. quick_lists)', async () => {
+      const { resolveAllFeaturesForTenant } = await import('./feature-flags.js')
+      mockQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
+
+      const { features, featureSources } = await resolveAllFeaturesForTenant('t1', 'RESTAURANT', {
+        quick_lists: 'full_schedule',
+        reports: false,
+      })
+
+      expect(features.quick_lists).toBe('full_schedule')
+      expect(featureSources.quick_lists).toBe('plan')
+    })
   })
 
   describe('resolveFeatureEnabled', () => {

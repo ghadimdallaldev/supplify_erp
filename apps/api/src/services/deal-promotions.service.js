@@ -238,6 +238,10 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
     ) dp ON TRUE
     WHERE p.status = 'active'
       AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
+      AND p.boost_start_at IS NOT NULL
+      AND p.boost_start_at <= NOW()
+      AND p.boost_end_at IS NOT NULL
+      AND p.boost_end_at > NOW()
       AND p.starts_at <= NOW()
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.stock_quantity IS NULL OR p.usage_count < p.stock_quantity)
@@ -249,13 +253,7 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
           WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1
         )
       )
-      AND (
-        dp.id IS NOT NULL
-        OR EXISTS (
-          SELECT 1 FROM supplier_follow sf
-          WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
-        )
-      )
+      AND dp.id IS NOT NULL
   `
 
   if (previewSupplierId) {
@@ -605,19 +603,6 @@ export async function enrichPromotionRows(rows) {
     `SELECT promotion_id, product_id, category_id FROM promotion_targets WHERE promotion_id = ANY($1::uuid[])`,
     [ids]
   )
-  const { rows: activePromos } = await query(
-    `
-    SELECT DISTINCT ON (deal_id)
-      deal_id, id, starts_at, ends_at, status,
-      pricing_key, price_paid, duration_days, package_display_name, budget
-    FROM deal_promotions
-    WHERE deal_id = ANY($1::uuid[])
-      AND status = 'active'
-    ORDER BY deal_id, created_at DESC
-    `,
-    [ids]
-  )
-
   const { rows: latestPromos } = await query(
     `
     SELECT DISTINCT ON (deal_id)
@@ -639,27 +624,50 @@ export async function enrichPromotionRows(rows) {
     if (t.category_id) list.categoryIds.push(t.category_id)
     targetsByDeal.set(t.promotion_id, list)
   }
-  const activeByDeal = new Map(activePromos.map((p) => [p.deal_id, p]))
   const latestByDeal = new Map(latestPromos.map((p) => [p.deal_id, p]))
   const now = Date.now()
 
   return rows.map((row) => {
     const t = targetsByDeal.get(row.id) || { productIds: [], categoryIds: [] }
-    const activePromo = activeByDeal.get(row.id) || null
     const latestPromo = latestByDeal.get(row.id) || null
+    const boostStart = row.boost_start_at
+    const boostEnd = row.boost_end_at
     const isCurrentlyBoosted =
-      activePromo &&
-      new Date(activePromo.starts_at).getTime() <= now &&
-      (!activePromo.ends_at || new Date(activePromo.ends_at).getTime() > now)
+      row.status === 'active' &&
+      boostStart &&
+      boostEnd &&
+      new Date(boostStart).getTime() <= now &&
+      new Date(boostEnd).getTime() > now
 
-    const boostStatus = buildBoostStatus(isCurrentlyBoosted ? activePromo : latestPromo)
+    const syntheticPromo = isCurrentlyBoosted
+      ? {
+          starts_at: boostStart,
+          ends_at: boostEnd,
+          package_display_name: latestPromo?.package_display_name,
+          pricing_key: row.boost_pricing_key,
+          price_paid: row.boost_price_snapshot,
+          duration_days: row.boost_duration_days,
+        }
+      : latestPromo ||
+        (row.boost_end_at
+          ? {
+              starts_at: row.boost_start_at,
+              ends_at: row.boost_end_at,
+              package_display_name: null,
+              pricing_key: row.boost_pricing_key,
+              price_paid: row.boost_price_snapshot,
+              duration_days: row.boost_duration_days,
+            }
+          : null)
+
+    const boostStatus = buildBoostStatus(syntheticPromo)
 
     return {
       ...row,
       target_product_ids: t.productIds,
       target_category_ids: t.categoryIds,
       is_promoted: Boolean(isCurrentlyBoosted),
-      active_deal_promotion_id: isCurrentlyBoosted ? activePromo?.id : null,
+      active_deal_promotion_id: isCurrentlyBoosted ? latestPromo?.id : null,
       boost_status: boostStatus,
     }
   })

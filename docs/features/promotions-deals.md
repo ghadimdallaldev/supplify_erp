@@ -92,6 +92,8 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 
 Admin UI: **Admin → Deals** tab (`AdminDealsPanel`).
 
+See **[DEALS_BOOST_PUBLISHING_FLOW.md](../DEALS_BOOST_PUBLISHING_FLOW.md)** for the full submit → approve → publish flow.
+
 ## Boost packages (Facebook-style visibility)
 
 Suppliers pick a **boost package** when promoting an active deal. Packages are rows in `promotion_pricing_config` with `package_type = 'boost'`. Default tiers (migration `0123_deal_boost_packages.sql`):

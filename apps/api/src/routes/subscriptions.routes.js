@@ -110,6 +110,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
         },
         features,
         featureSources,
+        planFeatures: planFeat,
         limits: defaultLimits,
         baseLimits: defaultLimits,
         overrides: [],

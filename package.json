@@ -15,6 +15,7 @@
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "test": "pnpm --filter @supplify/api test && pnpm --filter @supplify/web test",
     "test:ci": "node scripts/pnpm-run.mjs --filter @supplify/api test:run && node scripts/pnpm-run.mjs --filter @supplify/web test:run",
+    "test:rbac": "node scripts/pnpm-run.mjs --filter @supplify/api test:rbac && node scripts/pnpm-run.mjs --filter @supplify/web exec vitest run src/hooks/rbacGating.test.tsx src/hooks/rbacFullAppGating.test.tsx src/hooks/rbacCatalogManagerGating.test.tsx src/hooks/rbacRestaurantHostGating.test.tsx",
     "qa": "pnpm lint && pnpm typecheck && pnpm test:ci && pnpm build",
     "e2e": "pnpm --filter @supplify/api test:e2e",
     "e2e:playwright": "node tests/scripts/probe-urls.mjs && playwright test --config=tests/playwright.config.ts",

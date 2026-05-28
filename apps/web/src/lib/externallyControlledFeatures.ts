@@ -1,4 +1,5 @@
 import type { Entitlements } from '../types'
+import { featureEnabled, isEntitlementFeatureEnabled } from './planLimits'
 import { isRemovedFeatureKey } from './removedFeatures'
 
 export function formatFeatureKeyLabel(featureKey: string): string {
@@ -32,7 +33,7 @@ export function getExternallyDisabledFeatures(
 
   for (const key of keys) {
     if (isRemovedFeatureKey(key)) continue
-    if (features[key] !== false) continue
+    if (featureEnabled(features[key])) continue
     const src = sources[key]
     if (src !== 'tenant_override' && src !== 'global') continue
     out.push({
@@ -65,11 +66,15 @@ export function getPlanTierDisabledFeatures(entitlements: Entitlements): PlanTie
   const keys = new Set([...Object.keys(features), ...Object.keys(sources)])
   const out: PlanTierDisabledFeature[] = []
 
+  const planFeatures = entitlements.planFeatures ?? {}
+
   for (const key of keys) {
     if (isRemovedFeatureKey(key)) continue
-    if (features[key] !== false) continue
     const src = sources[key]
     if (src !== 'plan' && src !== 'default') continue
+    // Keys never on the plan JSON are N/A for this tier, not "missing from subscription".
+    if (src === 'default' && !Object.prototype.hasOwnProperty.call(planFeatures, key)) continue
+    if (isEntitlementFeatureEnabled(entitlements, key)) continue
     out.push({
       key,
       label: formatFeatureKeyLabel(key),

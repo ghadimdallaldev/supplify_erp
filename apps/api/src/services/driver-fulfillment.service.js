@@ -5,9 +5,10 @@ import { syncWarehouseFulfillmentOnOrderStatus } from './warehouseInventory.js'
 import { notifyOrderStatusChange } from './notification.service.js'
 
 export const DRIVER_STATUS_TRANSITIONS = {
-  assigned: ['picked_up', 'failed', 'reassigned'],
-  picked_up: ['out_for_delivery', 'failed'],
-  out_for_delivery: ['delivered', 'failed'],
+  assigned: ['picked_up', 'failed', 'reassigned', 'rescheduled'],
+  picked_up: ['out_for_delivery', 'failed', 'rescheduled'],
+  out_for_delivery: ['delivered', 'failed', 'rescheduled'],
+  rescheduled: ['assigned'],
 }
 
 const ACTIVE_ASSIGNMENT_STATUSES = ['assigned', 'picked_up', 'out_for_delivery']
@@ -115,6 +116,8 @@ export async function updateDeliveryStatus({
     } else if (status === 'failed') {
       assignmentUpdate += `, failed_at = now(), failure_reason = $3`
       params.push(failureReason ?? null)
+    } else if (status === 'rescheduled') {
+      assignmentUpdate += `, notes = COALESCE($2, notes)`
     }
 
     const whereParam = params.length + 1
@@ -299,7 +302,10 @@ export async function confirmProofOfDelivery(orderId, restaurantId, userId) {
   return rows[0]
 }
 
-export async function getProofOfDelivery(orderId) {
+export async function getProofOfDelivery(orderId, supplierId = null) {
+  if (supplierId) {
+    await assertSupplierOwnsOrder(supplierId, orderId)
+  }
   const { rows } = await query(
     `SELECT * FROM proof_of_delivery WHERE order_id = $1 ORDER BY delivery_timestamp DESC LIMIT 1`,
     [orderId]

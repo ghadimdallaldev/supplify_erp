@@ -613,7 +613,7 @@ export function AdminDealsPanel() {
                                 {isPending && (
                                   <>
                                     <Button size="sm" onClick={() => handleApprove(id)}>
-                                      <Check className="h-3 w-3 mr-1" /> Approve
+                                      <Check className="h-3 w-3 mr-1" /> Approve & publish
                                     </Button>
                                     <Button
                                       size="sm"
@@ -669,6 +669,47 @@ export function AdminDealsPanel() {
                                         Rejection reason
                                       </dt>
                                       <dd className="mt-0.5">{String(deal.rejection_reason)}</dd>
+                                    </div>
+                                  ) : null}
+                                  {deal.boost_pricing_key ? (
+                                    <>
+                                      <div>
+                                        <dt className="font-medium text-[var(--text)]">
+                                          Boost package
+                                        </dt>
+                                        <dd className="mt-0.5 font-mono text-[11px]">
+                                          {String(deal.boost_pricing_key)}
+                                        </dd>
+                                      </div>
+                                      <div>
+                                        <dt className="font-medium text-[var(--text)]">
+                                          Boost price (snapshot)
+                                        </dt>
+                                        <dd className="mt-0.5 tabular-nums">
+                                          ${Number(deal.boost_price_snapshot || 0).toFixed(2)}
+                                        </dd>
+                                      </div>
+                                      <div>
+                                        <dt className="font-medium text-[var(--text)]">
+                                          Boost duration
+                                        </dt>
+                                        <dd className="mt-0.5">
+                                          {String(deal.boost_duration_days || '—')} day(s)
+                                        </dd>
+                                      </div>
+                                      <div className="sm:col-span-2">
+                                        <dt className="font-medium text-[var(--text)]">
+                                          Boost window (on approval)
+                                        </dt>
+                                        <dd className="mt-0.5">
+                                          Starts immediately for {String(deal.boost_duration_days)}{' '}
+                                          day(s) after publish
+                                        </dd>
+                                      </div>
+                                    </>
+                                  ) : isPending ? (
+                                    <div className="sm:col-span-2 text-amber-800">
+                                      No boost package selected — cannot approve for publishing.
                                     </div>
                                   ) : null}
                                 </dl>

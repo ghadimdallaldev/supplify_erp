@@ -112,35 +112,21 @@ describe('promotions.routes admin', () => {
     expect(res.body.data.deals[0].name).toBe('Test Deal')
   })
 
-  it('POST /admin/:id/approve moves deal to active or pending payment', async () => {
-    db.query
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'deal-1',
-            status: 'pending_approval',
-            starts_at: new Date(Date.now() - 86400000).toISOString(),
-            supplier_id: 'supplier-1',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ pricing_key: 'deal_activation', amount: 0 }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'deal-1',
-            status: 'active',
-            payment_status: 'not_required',
-            name: 'Test Deal',
-            supplier_id: 'supplier-1',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ name: 'Acme Supplier' }] })
+  it('POST /admin/:id/approve rejects deal without boost package', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'deal-1',
+          status: 'pending_approval',
+          supplier_id: 'supplier-1',
+        },
+      ],
+    })
 
-    const res = await request(app).post('/api/promotions/admin/deal-1/approve').expect(200)
+    const res = await request(app).post('/api/promotions/admin/deal-1/approve')
 
-    expect(res.body.data.deal.status).toBe('active')
+    expect(res.status).toBeGreaterThanOrEqual(400)
+    expect(res.body.error.message).toMatch(/boost package/i)
   })
 
   it('POST /admin/:id/reject marks deal rejected', async () => {

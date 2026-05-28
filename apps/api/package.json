@@ -12,6 +12,7 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:run": "vitest run",
+    "test:rbac": "vitest run src/lib/rbac-full-app.test.js src/lib/rbac-role-access.test.js src/lib/rbac-guards.test.js src/lib/rbac.impersonation.test.js src/lib/driver-user-link.test.js src/routes/promotions.rbac.test.js",
     "test:coverage": "vitest --coverage",
     "test:e2e": "vitest run --config ../../tests/e2e/vitest.config.js",
     "lint": "eslint src/**/*.js",

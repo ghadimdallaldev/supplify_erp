@@ -42,6 +42,8 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
     }
   }, [rolesData, roleId])
 
+  const selectedRoleName = (rolesData?.roles ?? []).find((r) => r.id === roleId)?.name
+
   const handleGenerate = async () => {
     if (!roleId || !managerEmail.trim()) return
     const result = await createInvitation({
@@ -102,6 +104,12 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
                 ))}
               </select>
             </label>
+            {selectedRoleName === 'Driver' && (
+              <p className="text-xs text-[var(--text-muted)] rounded-md border border-[var(--app-border)] p-2">
+                When they accept, a driver delivery profile is created and linked to their login
+                automatically.
+              </p>
+            )}
             <Button
               type="button"
               className="w-full"

@@ -4,6 +4,8 @@ import {
   useGetProductCategoriesQuery,
   useGetProductTagsQuery,
   useCreateProductMutation,
+  usePreviewProductImportMutation,
+  useExecuteProductImportMutation,
   useGeneratePresignedUrlMutation,
   useGetWarehousesQuery,
   useGetSuppliersQuery,
@@ -36,6 +38,7 @@ import {
 import { formatPrice, formatNumber } from '../utils/format'
 import { featureEnabled } from '../lib/planLimits'
 import { PermissionGate } from '../components/PermissionGate'
+import { RequirePermission } from '../components/RequirePermission'
 
 export function ProductsPage() {
   const [search, setSearch] = useState('')
@@ -79,6 +82,22 @@ export function ProductsPage() {
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
   const [createInventoryAdjustment, { isLoading: isAdjustingInventory }] =
     useCreateInventoryAdjustmentMutation()
+  const [previewImport] = usePreviewProductImportMutation()
+  const [executeImport, { isLoading: importing }] = useExecuteProductImportMutation()
+  const [importSummary, setImportSummary] = useState<{
+    created: number
+    updated: number
+    skipped: number
+    failed: number
+  } | null>(null)
+  const [importPreviewMeta, setImportPreviewMeta] = useState<{
+    totalRows: number
+    validCount: number
+    errorCount: number
+  } | null>(null)
+  const [importErrors, setImportErrors] = useState<
+    Array<{ rowNumber: number; errors: Array<{ field: string; message: string }> }>
+  >([])
 
   // Check if user is a supplier
   const isSupplier = isEffectiveSupplier
@@ -270,107 +289,94 @@ export function ProductsPage() {
     const file = event.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    if (
-      !file.name.endsWith('.xlsx') &&
-      !file.name.endsWith('.xls') &&
-      !file.name.endsWith('.csv')
-    ) {
-      toast.error('Please upload an Excel (.xlsx, .xls) or CSV file')
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Please upload a CSV file (Excel preview uses server validation on CSV export)')
       return
     }
 
     setUploadedFile(file)
+    setImportSummary(null)
+    setImportPreviewMeta(null)
+    setImportErrors([])
 
     try {
-      // Read file as text (for CSV) or use a library for Excel
       const text = await file.text()
-
-      // Parse CSV
-      const lines = text.split('\n').filter((line) => line.trim())
-      if (lines.length < 2) {
-        toast.error('File is empty or has no data rows')
-        return
-      }
-
-      const headers = lines[0].split(',').map((h) => h.trim())
-      const preview = lines.slice(1, 6).map((line) => {
-        const values = line.split(',').map((v) => v.trim())
-        const row: any = {}
-        headers.forEach((header, index) => {
-          row[header] = values[index] || ''
-        })
-        return row
+      const result = await previewImport({ csv: text }).unwrap()
+      setUploadPreview(result.preview || [])
+      setImportPreviewMeta({
+        totalRows: result.totalRows ?? 0,
+        validCount: result.validCount ?? 0,
+        errorCount: result.errorCount ?? 0,
       })
+      setImportErrors(result.errors || [])
+      if ((result.validCount ?? 0) === 0) {
+        toast.error('No valid rows to import — fix errors below')
+      } else {
+        toast.success(
+          `Preview: ${result.validCount} valid, ${result.errorCount} with issues (${result.totalRows} rows)`
+        )
+      }
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Failed to preview file')
+    }
+  }
 
-      setUploadPreview(preview)
-      toast.success(`File loaded. Found ${lines.length - 1} rows`)
-    } catch (error) {
-      toast.error('Failed to read file')
-      console.error(error)
+  const downloadErrorReport = async () => {
+    const errors =
+      importErrors.length > 0
+        ? importErrors
+        : (importSummary as { errors?: typeof importErrors })?.errors || []
+    if (!errors.length) {
+      toast.error('No errors to export')
+      return
+    }
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/supplier/products/import/error-report`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'Supplify' },
+          credentials: 'include',
+          body: JSON.stringify({ errors }),
+        }
+      )
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'import-errors.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Could not download error report')
     }
   }
 
   const handleBulkSubmit = async () => {
     if (!uploadedFile) return
+    if (importPreviewMeta && importPreviewMeta.validCount === 0) {
+      toast.error('Fix validation errors before importing')
+      return
+    }
 
     try {
       const text = await uploadedFile.text()
-      const lines = text.split('\n').filter((line) => line.trim())
-
-      if (lines.length < 2) {
-        toast.error('File is empty')
-        return
+      const result = await executeImport({ csv: text, partial: true }).unwrap()
+      const summary = result.summary
+      setImportSummary(summary)
+      if (result.errors?.length) setImportErrors(result.errors)
+      if (summary.failed > 0) {
+        toast.error(`Import finished with ${summary.failed} failed row(s). Valid rows were saved.`)
+      } else {
+        toast.success(`Import complete: ${summary.created} created, ${summary.updated} updated`)
+        setShowBulkUpload(false)
+        setUploadedFile(null)
+        setUploadPreview([])
+        setImportPreviewMeta(null)
+        setImportErrors([])
       }
-
-      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase())
-
-      // Map Excel columns to our product structure
-      // Expected columns: Name, SKU, Description, Category, Unit, Price, InitialStock
-      const nameIndex = headers.findIndex((h) => h.includes('name'))
-      const skuIndex = headers.findIndex((h) => h.includes('sku'))
-      const descIndex = headers.findIndex((h) => h.includes('description'))
-      const catIndex = headers.findIndex((h) => h.includes('category'))
-      const unitIndex = headers.findIndex((h) => h.includes('unit'))
-      const priceIndex = headers.findIndex((h) => h.includes('price'))
-      const stockIndex = headers.findIndex((h) => h.includes('stock') || h.includes('quantity'))
-
-      if (nameIndex === -1 || skuIndex === -1) {
-        toast.error('File must contain Name and SKU columns')
-        return
-      }
-
-      // Create products in batches
-      const rows = lines.slice(1).filter((line) => line.trim())
-      let successCount = 0
-      let errorCount = 0
-
-      for (const row of rows) {
-        const values = row.split(',').map((v) => v.trim())
-
-        try {
-          await createProduct({
-            name: values[nameIndex] || '',
-            sku: values[skuIndex] || '',
-            description: values[descIndex] || '',
-            category: values[catIndex] || 'Other',
-            unit: values[unitIndex] || 'unit',
-            price: parseFloat(values[priceIndex]) || 0,
-            initialStock: parseFloat(values[stockIndex]) || 0,
-          }).unwrap()
-          successCount++
-        } catch (error) {
-          errorCount++
-        }
-      }
-
-      toast.success(`Upload complete: ${successCount} created, ${errorCount} failed`)
-      setShowBulkUpload(false)
-      setUploadedFile(null)
-      setUploadPreview([])
-    } catch (error) {
-      toast.error('Bulk upload failed')
-      console.error(error)
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Bulk upload failed')
     }
   }
 
@@ -417,876 +423,933 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
   }
 
   return (
-    <div className="space-y-6" data-testid="products-page">
-      <PageHeader
-        title="Products"
-        description={
-          isSupplier ? 'Manage your product catalog' : 'Browse and search products from suppliers'
-        }
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {isSupplier ? (
-              <PermissionGate anyOf={['CATALOG_EDIT', 'CATALOG_MANAGE']}>
-                <>
-                  <Button onClick={() => setShowAddProduct(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Product
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Bulk Upload
-                  </Button>
-                </>
-              </PermissionGate>
-            ) : (
-              <PermissionGate permission="ORDERS_CREATE">
-                <Button asChild>
-                  <Link to="/app/cart">View Cart</Link>
-                </Button>
-              </PermissionGate>
-            )}
-          </div>
-        }
-      />
-      {isRestaurant && activeDeals.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 -mt-2">
-          <Badge variant="secondary">
-            {activeDeals.length} active deal{activeDeals.length === 1 ? '' : 's'}
-          </Badge>
-          <Button variant="link" size="sm" className="h-auto p-0" asChild>
-            <Link to="/app/deals">View all deals</Link>
-          </Button>
-        </div>
-      )}
-
-      <Card className="shadow-sm">
-        <CardContent className="space-y-4 p-4 pt-6">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                <Input
-                  placeholder="Search products..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            {!isSupplier && (
-              <div className="w-56">
-                <select
-                  value={supplierFilter}
-                  onChange={(e) => setSupplierFilter(e.target.value)}
-                  className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
-                >
-                  <option value="">All Suppliers</option>
-                  {uniqueSuppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <select
-              value={categoryId}
-              onChange={(e) => {
-                setCategoryId(e.target.value)
-                setCategory('') // Clear old category when using new one
-              }}
-              className="rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
-            >
-              <option value="">All Categories</option>
-              {categoriesData?.categories?.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Tags Filter */}
-          {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <Label className="text-sm font-medium">Filter by Tags:</Label>
-              <div className="flex flex-wrap gap-2">
-                {tagsData.tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                    className="cursor-pointer hover:bg-[var(--bg)]"
-                    onClick={() => {
-                      setSelectedTags((prev) =>
-                        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-                      )
-                    }}
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Price Range Filter */}
-          {!isSupplier && (
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <Label className="text-sm font-medium mb-2 block">Price Range:</Label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      type="number"
-                      placeholder="Min Price"
-                      value={minPrice}
-                      onChange={(e) => setMinPrice(e.target.value)}
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <span className="self-center text-[var(--text-muted)]">-</span>
-                  <div className="flex-1">
-                    <Input
-                      type="number"
-                      placeholder="Max Price"
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(e.target.value)}
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  {(minPrice || maxPrice) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setMinPrice('')
-                        setMaxPrice('')
-                      }}
-                    >
-                      Clear
+    <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
+      <div className="space-y-6" data-testid="products-page">
+        <PageHeader
+          title="Products"
+          description={
+            isSupplier ? 'Manage your product catalog' : 'Browse and search products from suppliers'
+          }
+          actions={
+            <div className="flex flex-wrap gap-2">
+              {isSupplier ? (
+                <PermissionGate anyOf={['CATALOG_EDIT', 'CATALOG_MANAGE']}>
+                  <>
+                    <Button onClick={() => setShowAddProduct(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Product
                     </Button>
-                  )}
+                    <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Bulk Upload
+                    </Button>
+                  </>
+                </PermissionGate>
+              ) : (
+                <PermissionGate permission="ORDERS_CREATE">
+                  <Button asChild>
+                    <Link to="/app/cart">View Cart</Link>
+                  </Button>
+                </PermissionGate>
+              )}
+            </div>
+          }
+        />
+        {isRestaurant && activeDeals.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 -mt-2">
+            <Badge variant="secondary">
+              {activeDeals.length} active deal{activeDeals.length === 1 ? '' : 's'}
+            </Badge>
+            <Button variant="link" size="sm" className="h-auto p-0" asChild>
+              <Link to="/app/deals">View all deals</Link>
+            </Button>
+          </div>
+        )}
+
+        <Card className="shadow-sm">
+          <CardContent className="space-y-4 p-4 pt-6">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                  <Input
+                    placeholder="Search products..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Filter Summary */}
-          {(supplierFilter ||
-            categoryId ||
-            category ||
-            selectedTags.length > 0 ||
-            minPrice ||
-            maxPrice) &&
-            !isSupplier && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
-                {supplierFilter && (
-                  <Badge
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                    onClick={() => setSupplierFilter('')}
+              {!isSupplier && (
+                <div className="w-56">
+                  <select
+                    value={supplierFilter}
+                    onChange={(e) => setSupplierFilter(e.target.value)}
+                    className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
                   >
-                    Supplier: {supplierFilter} ×
-                  </Badge>
-                )}
-                {(categoryId || category) && (
-                  <Badge
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                    onClick={() => {
-                      setCategoryId('')
-                      setCategory('')
-                    }}
-                  >
-                    Category:{' '}
-                    {categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category}{' '}
-                    ×
-                  </Badge>
-                )}
-                {selectedTags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                    onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
-                  >
-                    Tag: {tag} ×
-                  </Badge>
-                ))}
-                {(minPrice || maxPrice) && (
-                  <Badge
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-                    onClick={() => {
-                      setMinPrice('')
-                      setMaxPrice('')
-                    }}
-                  >
-                    Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
-                  </Badge>
-                )}
-              </div>
-            )}
-        </CardContent>
-      </Card>
-
-      <Card className="overflow-hidden p-0 shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
-            <thead className="border-b border-[var(--app-border)] bg-[var(--bg)]">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                  Product
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                  Category
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                  Supplier
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                  Price
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                  Stock
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--app-border)]">
-              {filteredProducts?.map((product) => (
-                <tr
-                  key={product.id}
-                  className="transition-colors hover:bg-[var(--bg)]"
-                  data-testid={`product-row-${product.id}`}
-                >
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--app-border)] bg-[var(--bg)]">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Package className="h-6 w-6 text-[var(--text-muted)]" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-[var(--text)] truncate">{product.name}</p>
-                        <p className="text-sm text-[var(--text-muted)] truncate">{product.sku}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-col gap-1">
-                      <Badge variant="secondary">
-                        {product.category_name || product.category || 'N/A'}
-                      </Badge>
-                      {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {product.tags.slice(0, 3).map((tag: string, idx: number) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                          {product.tags.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{product.tags.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <p className="text-sm text-[var(--text-muted)]">
-                      {product.supplier_name || 'N/A'}
-                    </p>
-                  </td>
-                  <td className="px-4 py-4">
-                    {product.current_price ? (
-                      <>
-                        <p className="font-semibold">{formatPrice(product.current_price)}</p>
-                        {product.unit && (
-                          <p className="text-xs text-[var(--text-muted)]">per {product.unit}</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-sm text-[var(--text-muted)]">N/A</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    <p
-                      className={`text-sm font-medium ${
-                        parseFloat(product.available_qty || 0) > 0
-                          ? 'text-[var(--mint)]'
-                          : 'text-[var(--red)]'
-                      }`}
-                    >
-                      {formatNumber(product.available_qty, { maximumFractionDigits: 2 })}{' '}
-                      {product.unit || 'units'}
-                    </p>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      {!isSupplier && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddToCart(product)}
-                          disabled={!product.available_qty || product.available_qty <= 0}
-                          data-testid={`product-add-to-cart-${product.id}`}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add to Cart
-                        </Button>
-                      )}
-                      {isSupplier && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedProductForAdjustment(product)
-                              setShowInventoryAdjustment(true)
-                            }}
-                          >
-                            <TrendingUp className="h-4 w-4 mr-1" />
-                            Adjust Stock
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              toast('Edit product functionality coming soon')
-                            }}
-                          >
-                            Edit
-                          </Button>
-                        </>
-                      )}
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/app/products/${product.id}`}>View</Link>
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {filteredProducts?.length === 0 && (
-        <EmptyState
-          title={isSupplier ? 'No products in your catalog' : 'No products found'}
-          description={
-            isSupplier
-              ? 'Add your first product or adjust filters to see existing items.'
-              : 'Try a different search or supplier filter.'
-          }
-          icon={<Package className="h-10 w-10" aria-hidden />}
-        />
-      )}
-
-      <Dialog open={showAddProduct} onOpenChange={setShowAddProduct}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Product</DialogTitle>
-            <DialogDescription>
-              Add a new product to your catalog. Fill in all required fields.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Product Name *</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., Fresh Tomatoes"
-                  value={productForm.name}
-                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sku">SKU *</Label>
-                <Input
-                  id="sku"
-                  placeholder="e.g., FT001"
-                  value={productForm.sku}
-                  onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Input
-                id="description"
-                placeholder="Product description"
-                value={productForm.description}
-                onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="category_id">Category *</Label>
-                <select
-                  id="category_id"
-                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
-                  value={productForm.category_id}
-                  onChange={(e) =>
-                    setProductForm({ ...productForm, category_id: e.target.value, category: '' })
-                  }
-                >
-                  <option value="">Select category</option>
-                  {categoriesData?.categories?.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unit">Unit *</Label>
-                <select
-                  id="unit"
-                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
-                  value={productForm.unit}
-                  onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
-                >
-                  <option value="">Select unit</option>
-                  <option value="kg">Kilogram (kg)</option>
-                  <option value="g">Gram (g)</option>
-                  <option value="lb">Pound (lb)</option>
-                  <option value="oz">Ounce (oz)</option>
-                  <option value="liter">Liter (L)</option>
-                  <option value="ml">Milliliter (ml)</option>
-                  <option value="pack">Pack</option>
-                  <option value="bottle">Bottle</option>
-                  <option value="box">Box</option>
-                  <option value="carton">Carton</option>
-                  <option value="bag">Bag</option>
-                  <option value="piece">Piece</option>
-                  <option value="can">Can</option>
-                  <option value="jar">Jar</option>
-                  <option value="unit">Unit</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Price (USD) *</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={productForm.price}
-                  onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="initialStock">Initial Stock Quantity *</Label>
-              <Input
-                id="initialStock"
-                type="number"
-                step="0.01"
-                placeholder="0"
-                value={productForm.initialStock}
-                onChange={(e) => setProductForm({ ...productForm, initialStock: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="warehouse">Warehouse (Optional)</Label>
+                    <option value="">All Suppliers</option>
+                    {uniqueSuppliers.map((supplier) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <select
-                id="warehouse"
-                className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
-                value={productForm.warehouse_id}
-                onChange={(e) => setProductForm({ ...productForm, warehouse_id: e.target.value })}
+                value={categoryId}
+                onChange={(e) => {
+                  setCategoryId(e.target.value)
+                  setCategory('') // Clear old category when using new one
+                }}
+                className="rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
               >
-                <option value="">Select a warehouse (optional)</option>
-                {warehousesData?.warehouses?.map((warehouse: any) => (
-                  <option key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
+                <option value="">All Categories</option>
+                {categoriesData?.categories?.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Tags Input */}
-            <div className="space-y-2">
-              <Label htmlFor="tags">Tags (comma-separated)</Label>
-              <div className="flex gap-2">
+            {/* Tags Filter */}
+            {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-medium">Filter by Tags:</Label>
+                <div className="flex flex-wrap gap-2">
+                  {tagsData.tags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant={selectedTags.includes(tag) ? 'default' : 'outline'}
+                      className="cursor-pointer hover:bg-[var(--bg)]"
+                      onClick={() => {
+                        setSelectedTags((prev) =>
+                          prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                        )
+                      }}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Price Range Filter */}
+            {!isSupplier && (
+              <div className="flex gap-4 items-end">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium mb-2 block">Price Range:</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Input
+                        type="number"
+                        placeholder="Min Price"
+                        value={minPrice}
+                        onChange={(e) => setMinPrice(e.target.value)}
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <span className="self-center text-[var(--text-muted)]">-</span>
+                    <div className="flex-1">
+                      <Input
+                        type="number"
+                        placeholder="Max Price"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    {(minPrice || maxPrice) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setMinPrice('')
+                          setMaxPrice('')
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Filter Summary */}
+            {(supplierFilter ||
+              categoryId ||
+              category ||
+              selectedTags.length > 0 ||
+              minPrice ||
+              maxPrice) &&
+              !isSupplier && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-[var(--text-muted)]">Filtered by:</span>
+                  {supplierFilter && (
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                      onClick={() => setSupplierFilter('')}
+                    >
+                      Supplier: {supplierFilter} ×
+                    </Badge>
+                  )}
+                  {(categoryId || category) && (
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                      onClick={() => {
+                        setCategoryId('')
+                        setCategory('')
+                      }}
+                    >
+                      Category:{' '}
+                      {categoriesData?.categories?.find((c) => c.id === categoryId)?.name ||
+                        category}{' '}
+                      ×
+                    </Badge>
+                  )}
+                  {selectedTags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                      onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+                    >
+                      Tag: {tag} ×
+                    </Badge>
+                  ))}
+                  {(minPrice || maxPrice) && (
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-[var(--app-border-mid)]"
+                      onClick={() => {
+                        setMinPrice('')
+                        setMaxPrice('')
+                      }}
+                    >
+                      Price: ${minPrice || '0'} - ${maxPrice || '∞'} ×
+                    </Badge>
+                  )}
+                </div>
+              )}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden p-0 shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead className="border-b border-[var(--app-border)] bg-[var(--bg)]">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                    Product
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                    Category
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                    Supplier
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                    Price
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                    Stock
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--app-border)]">
+                {filteredProducts?.map((product) => (
+                  <tr
+                    key={product.id}
+                    className="transition-colors hover:bg-[var(--bg)]"
+                    data-testid={`product-row-${product.id}`}
+                  >
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--app-border)] bg-[var(--bg)]">
+                          {product.image_url ? (
+                            <img
+                              src={product.image_url}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Package className="h-6 w-6 text-[var(--text-muted)]" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-[var(--text)] truncate">{product.name}</p>
+                          <p className="text-sm text-[var(--text-muted)] truncate">{product.sku}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="secondary">
+                          {product.category_name || product.category || 'N/A'}
+                        </Badge>
+                        {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {product.tags.slice(0, 3).map((tag: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {product.tags.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{product.tags.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="text-sm text-[var(--text-muted)]">
+                        {product.supplier_name || 'N/A'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4">
+                      {product.current_price ? (
+                        <>
+                          <p className="font-semibold">{formatPrice(product.current_price)}</p>
+                          {product.unit && (
+                            <p className="text-xs text-[var(--text-muted)]">per {product.unit}</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-[var(--text-muted)]">N/A</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <p
+                        className={`text-sm font-medium ${
+                          parseFloat(product.available_qty || 0) > 0
+                            ? 'text-[var(--mint)]'
+                            : 'text-[var(--red)]'
+                        }`}
+                      >
+                        {formatNumber(product.available_qty, { maximumFractionDigits: 2 })}{' '}
+                        {product.unit || 'units'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        {!isSupplier && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddToCart(product)}
+                            disabled={!product.available_qty || product.available_qty <= 0}
+                            data-testid={`product-add-to-cart-${product.id}`}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add to Cart
+                          </Button>
+                        )}
+                        {isSupplier && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedProductForAdjustment(product)
+                                setShowInventoryAdjustment(true)
+                              }}
+                            >
+                              <TrendingUp className="h-4 w-4 mr-1" />
+                              Adjust Stock
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                toast('Edit product functionality coming soon')
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          </>
+                        )}
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/app/products/${product.id}`}>View</Link>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {filteredProducts?.length === 0 && (
+          <EmptyState
+            title={isSupplier ? 'No products in your catalog' : 'No products found'}
+            description={
+              isSupplier
+                ? 'Add your first product or adjust filters to see existing items.'
+                : 'Try a different search or supplier filter.'
+            }
+            icon={<Package className="h-10 w-10" aria-hidden />}
+          />
+        )}
+
+        <Dialog open={showAddProduct} onOpenChange={setShowAddProduct}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add New Product</DialogTitle>
+              <DialogDescription>
+                Add a new product to your catalog. Fill in all required fields.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Product Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g., Fresh Tomatoes"
+                    value={productForm.name}
+                    onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sku">SKU *</Label>
+                  <Input
+                    id="sku"
+                    placeholder="e.g., FT001"
+                    value={productForm.sku}
+                    onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
                 <Input
-                  id="tags"
-                  placeholder="e.g., organic, fresh, local"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newTag.trim()) {
-                      e.preventDefault()
-                      if (!productForm.tags.includes(newTag.trim())) {
+                  id="description"
+                  placeholder="Product description"
+                  value={productForm.description}
+                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category_id">Category *</Label>
+                  <select
+                    id="category_id"
+                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                    value={productForm.category_id}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, category_id: e.target.value, category: '' })
+                    }
+                  >
+                    <option value="">Select category</option>
+                    {categoriesData?.categories?.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unit">Unit *</Label>
+                  <select
+                    id="unit"
+                    className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                    value={productForm.unit}
+                    onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
+                  >
+                    <option value="">Select unit</option>
+                    <option value="kg">Kilogram (kg)</option>
+                    <option value="g">Gram (g)</option>
+                    <option value="lb">Pound (lb)</option>
+                    <option value="oz">Ounce (oz)</option>
+                    <option value="liter">Liter (L)</option>
+                    <option value="ml">Milliliter (ml)</option>
+                    <option value="pack">Pack</option>
+                    <option value="bottle">Bottle</option>
+                    <option value="box">Box</option>
+                    <option value="carton">Carton</option>
+                    <option value="bag">Bag</option>
+                    <option value="piece">Piece</option>
+                    <option value="can">Can</option>
+                    <option value="jar">Jar</option>
+                    <option value="unit">Unit</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price (USD) *</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={productForm.price}
+                    onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="initialStock">Initial Stock Quantity *</Label>
+                <Input
+                  id="initialStock"
+                  type="number"
+                  step="0.01"
+                  placeholder="0"
+                  value={productForm.initialStock}
+                  onChange={(e) => setProductForm({ ...productForm, initialStock: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="warehouse">Warehouse (Optional)</Label>
+                <select
+                  id="warehouse"
+                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)] w-full"
+                  value={productForm.warehouse_id}
+                  onChange={(e) => setProductForm({ ...productForm, warehouse_id: e.target.value })}
+                >
+                  <option value="">Select a warehouse (optional)</option>
+                  {warehousesData?.warehouses?.map((warehouse: any) => (
+                    <option key={warehouse.id} value={warehouse.id}>
+                      {warehouse.name} {warehouse.code ? `(${warehouse.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tags Input */}
+              <div className="space-y-2">
+                <Label htmlFor="tags">Tags (comma-separated)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="tags"
+                    placeholder="e.g., organic, fresh, local"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newTag.trim()) {
+                        e.preventDefault()
+                        if (!productForm.tags.includes(newTag.trim())) {
+                          setProductForm({
+                            ...productForm,
+                            tags: [...productForm.tags, newTag.trim()],
+                          })
+                        }
+                        setNewTag('')
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (newTag.trim() && !productForm.tags.includes(newTag.trim())) {
                         setProductForm({
                           ...productForm,
                           tags: [...productForm.tags, newTag.trim()],
                         })
+                        setNewTag('')
                       }
-                      setNewTag('')
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (newTag.trim() && !productForm.tags.includes(newTag.trim())) {
-                      setProductForm({ ...productForm, tags: [...productForm.tags, newTag.trim()] })
-                      setNewTag('')
-                    }
-                  }}
-                >
-                  Add
-                </Button>
-              </div>
-              {productForm.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {productForm.tags.map((tag, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setProductForm({
-                          ...productForm,
-                          tags: productForm.tags.filter((_, i) => i !== index),
-                        })
-                      }}
-                    >
-                      {tag} ×
-                    </Badge>
-                  ))}
+                    }}
+                  >
+                    Add
+                  </Button>
                 </div>
-              )}
-              {tagsData?.tags && tagsData.tags.length > 0 && (
-                <div className="mt-2">
-                  <p className="text-xs text-[var(--text-muted)] mb-1">Suggested tags:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {tagsData.tags.slice(0, 10).map((tag) => (
+                {productForm.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {productForm.tags.map((tag, index) => (
                       <Badge
-                        key={tag}
-                        variant="outline"
-                        className="cursor-pointer text-xs"
+                        key={index}
+                        variant="secondary"
+                        className="cursor-pointer"
                         onClick={() => {
-                          if (!productForm.tags.includes(tag)) {
-                            setProductForm({ ...productForm, tags: [...productForm.tags, tag] })
-                          }
+                          setProductForm({
+                            ...productForm,
+                            tags: productForm.tags.filter((_, i) => i !== index),
+                          })
                         }}
                       >
-                        + {tag}
+                        {tag} ×
                       </Badge>
                     ))}
                   </div>
+                )}
+                {tagsData?.tags && tagsData.tags.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-[var(--text-muted)] mb-1">Suggested tags:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {tagsData.tags.slice(0, 10).map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="outline"
+                          className="cursor-pointer text-xs"
+                          onClick={() => {
+                            if (!productForm.tags.includes(tag)) {
+                              setProductForm({ ...productForm, tags: [...productForm.tags, tag] })
+                            }
+                          }}
+                        >
+                          + {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="productImage">Product Image</Label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    id="productImage"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="cursor-pointer"
+                  />
+                  {imagePreview && (
+                    <div className="relative w-24 h-24 rounded-md overflow-hidden border">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-[var(--text-muted)]">
+                  Recommended: Square image, max 5MB. Formats: JPG, PNG, WebP
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddProduct(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmitProduct} disabled={isCreating || isUploadingImage}>
+                {isCreating || isUploadingImage ? 'Creating...' : 'Create Product'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showBulkUpload} onOpenChange={setShowBulkUpload}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Bulk Upload Products</DialogTitle>
+              <DialogDescription>
+                Upload a CSV file to preview and import products. Required: Name, SKU. Optional:
+                Description, Category, Unit, Price, Stock. Duplicate SKUs in the file or existing
+                catalog update the matching product.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="file-upload">Select File</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadExampleFile}
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Example
+                  </Button>
+                </div>
+                <Input
+                  id="file-upload"
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleFileUpload}
+                  className="cursor-pointer"
+                />
+                <p className="text-sm text-[var(--text-muted)]">
+                  CSV only for server preview (export Excel as CSV first).
+                </p>
+              </div>
+
+              {importPreviewMeta && (
+                <div
+                  data-testid="import-preview-summary"
+                  className="rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
+                >
+                  <strong>{importPreviewMeta.validCount}</strong> valid ·{' '}
+                  <strong className="text-[var(--red)]">{importPreviewMeta.errorCount}</strong> with
+                  issues · {importPreviewMeta.totalRows} total rows
+                </div>
+              )}
+
+              {uploadedFile && (
+                <div className="space-y-2">
+                  <Label>File: {uploadedFile.name}</Label>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Size: {formatNumber(uploadedFile.size / 1024, { maximumFractionDigits: 2 })} KB
+                  </p>
+                </div>
+              )}
+
+              {uploadPreview.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Preview</Label>
+                  <div className="border rounded-md overflow-x-auto max-h-48">
+                    <table className="w-full text-sm" data-testid="import-preview-table">
+                      <thead>
+                        <tr className="bg-[var(--brand-ultra)] border-b">
+                          <th className="px-3 py-2 text-left">Row</th>
+                          <th className="px-3 py-2 text-left">Status</th>
+                          <th className="px-3 py-2 text-left">SKU</th>
+                          <th className="px-3 py-2 text-left">Name</th>
+                          <th className="px-3 py-2 text-left">Issues</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {uploadPreview.map((row: any) => (
+                          <tr
+                            key={row.rowNumber}
+                            className={
+                              row.status === 'valid' ? 'border-b' : 'border-b bg-red-50/50'
+                            }
+                          >
+                            <td className="px-3 py-2">{row.rowNumber}</td>
+                            <td className="px-3 py-2 font-medium">{row.status}</td>
+                            <td className="px-3 py-2">{row.mapped?.sku ?? '—'}</td>
+                            <td className="px-3 py-2">{row.mapped?.name ?? '—'}</td>
+                            <td className="px-3 py-2 text-xs text-[var(--red)]">
+                              {(row.errors || [])
+                                .map((e: { message: string }) => e.message)
+                                .join('; ')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {(importErrors.length > 0 || (importSummary && importSummary.failed > 0)) && (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm text-[var(--red)]">
+                    {importErrors.length || importSummary?.failed} row(s) need attention
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="import-download-errors"
+                    onClick={downloadErrorReport}
+                  >
+                    Download error CSV
+                  </Button>
+                </div>
+              )}
+
+              {importSummary && (
+                <div
+                  data-testid="import-summary"
+                  className="text-sm rounded-md bg-[var(--mint-pale)] px-3 py-2"
+                >
+                  Created {importSummary.created}, updated {importSummary.updated}, failed{' '}
+                  {importSummary.failed}
+                </div>
+              )}
+
+              <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
+                <p className="text-sm text-[var(--brand-mid)]">
+                  <strong>CSV Format Example:</strong>
+                  <br />
+                  Name,SKU,Description,Category,Unit,Price,Stock
+                  <br />
+                  Fresh Tomatoes,FT001,Premium tomatoes,Vegetables,kg,2.50,100
+                  <br />
+                  Organic Lettuce,OL002,Fresh organic lettuce,Vegetables,pack,1.80,50
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowBulkUpload(false)
+                  setUploadedFile(null)
+                  setUploadPreview([])
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkSubmit}
+                disabled={
+                  !uploadedFile || !importPreviewMeta?.validCount || importing || isCreating
+                }
+                data-testid="import-submit-btn"
+              >
+                {importing ? 'Importing…' : 'Import valid rows'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Inventory Adjustment Dialog */}
+        <Dialog open={showInventoryAdjustment} onOpenChange={setShowInventoryAdjustment}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Adjust Stock</DialogTitle>
+              <DialogDescription>
+                {adjustmentType === 'ADD' ? 'Add' : 'Remove'} stock for{' '}
+                {selectedProductForAdjustment?.name}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label>Adjustment Type</Label>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    type="button"
+                    variant={adjustmentType === 'ADD' ? 'default' : 'outline'}
+                    onClick={() => setAdjustmentType('ADD')}
+                    className="flex-1"
+                  >
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Add Stock
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={adjustmentType === 'REMOVE' ? 'default' : 'outline'}
+                    onClick={() => setAdjustmentType('REMOVE')}
+                    className="flex-1"
+                  >
+                    <TrendingDown className="h-4 w-4 mr-2" />
+                    Remove Stock
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={adjustmentQuantity}
+                  onChange={(e) => setAdjustmentQuantity(e.target.value)}
+                  placeholder="Enter quantity"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="reason">Reason</Label>
+                <select
+                  id="reason"
+                  className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                >
+                  <option value="">Select a reason</option>
+                  <option value="STOCK_TAKE">Stock Take / Count</option>
+                  <option value="DAMAGE">Damage / Spoilage</option>
+                  <option value="RETURN">Return</option>
+                  <option value="ADJUSTMENT">Manual Adjustment</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <textarea
+                  id="notes"
+                  className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
+                  rows={3}
+                  value={adjustmentNotes}
+                  onChange={(e) => setAdjustmentNotes(e.target.value)}
+                  placeholder="Additional notes (optional)"
+                />
+              </div>
+
+              {selectedProductForAdjustment && (
+                <div className="bg-[var(--brand-ultra)] p-4 rounded-md">
+                  <p className="text-sm font-medium text-[var(--text-mid)]">Current Stock</p>
+                  <p className="text-lg font-semibold text-[var(--mint)]">
+                    {formatNumber(selectedProductForAdjustment.available_qty, {
+                      maximumFractionDigits: 2,
+                    })}{' '}
+                    {selectedProductForAdjustment.unit || 'units'}
+                  </p>
+                  {adjustmentQuantity && (
+                    <p className="text-sm text-[var(--text-muted)] mt-2">
+                      New Stock:{' '}
+                      {formatNumber(
+                        parseFloat(String(selectedProductForAdjustment.available_qty || 0)) +
+                          (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity),
+                        { maximumFractionDigits: 2 }
+                      )}{' '}
+                      {selectedProductForAdjustment.unit || 'units'}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="productImage">Product Image</Label>
-              <div className="flex items-center gap-4">
-                <Input
-                  id="productImage"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="cursor-pointer"
-                />
-                {imagePreview && (
-                  <div className="relative w-24 h-24 rounded-md overflow-hidden border">
-                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                  </div>
-                )}
-              </div>
-              <p className="text-sm text-[var(--text-muted)]">
-                Recommended: Square image, max 5MB. Formats: JPG, PNG, WebP
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddProduct(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmitProduct} disabled={isCreating || isUploadingImage}>
-              {isCreating || isUploadingImage ? 'Creating...' : 'Create Product'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showBulkUpload} onOpenChange={setShowBulkUpload}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Bulk Upload Products</DialogTitle>
-            <DialogDescription>
-              Upload a CSV or Excel file to add multiple products at once.
-              <br />
-              <strong>Required columns:</strong> Name, SKU
-              <br />
-              <strong>Optional columns:</strong> Description, Category, Unit, Price, Stock (or
-              Quantity)
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="file-upload">Select File</Label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={downloadExampleFile}
-                  className="flex items-center gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Download Example
-                </Button>
-              </div>
-              <Input
-                id="file-upload"
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileUpload}
-                className="cursor-pointer"
-              />
-              <p className="text-sm text-[var(--text-muted)]">
-                Supported formats: CSV, Excel (.xlsx, .xls)
-              </p>
-            </div>
-
-            {uploadedFile && (
-              <div className="space-y-2">
-                <Label>File: {uploadedFile.name}</Label>
-                <p className="text-sm text-[var(--text-muted)]">
-                  Size: {formatNumber(uploadedFile.size / 1024, { maximumFractionDigits: 2 })} KB
-                </p>
-              </div>
-            )}
-
-            {uploadPreview.length > 0 && (
-              <div className="space-y-2">
-                <Label>Preview (first 5 rows):</Label>
-                <div className="border rounded-md overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-[var(--brand-ultra)] border-b">
-                        {Object.keys(uploadPreview[0] || {}).map((key) => (
-                          <th key={key} className="px-3 py-2 text-left font-medium">
-                            {key}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {uploadPreview.map((row, index) => (
-                        <tr key={index} className="border-b">
-                          {Object.values(row).map((value: any, i) => (
-                            <td key={i} className="px-3 py-2">
-                              {value}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-[var(--brand-ultra)] border border-[var(--app-border)] rounded-md p-4">
-              <p className="text-sm text-[var(--brand-mid)]">
-                <strong>CSV Format Example:</strong>
-                <br />
-                Name,SKU,Description,Category,Unit,Price,Stock
-                <br />
-                Fresh Tomatoes,FT001,Premium tomatoes,Vegetables,kg,2.50,100
-                <br />
-                Organic Lettuce,OL002,Fresh organic lettuce,Vegetables,pack,1.80,50
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowBulkUpload(false)
-                setUploadedFile(null)
-                setUploadPreview([])
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleBulkSubmit}
-              disabled={!uploadedFile || uploadPreview.length === 0 || isCreating}
-            >
-              {isCreating ? 'Uploading...' : 'Upload Products'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Inventory Adjustment Dialog */}
-      <Dialog open={showInventoryAdjustment} onOpenChange={setShowInventoryAdjustment}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Adjust Stock</DialogTitle>
-            <DialogDescription>
-              {adjustmentType === 'ADD' ? 'Add' : 'Remove'} stock for{' '}
-              {selectedProductForAdjustment?.name}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label>Adjustment Type</Label>
-              <div className="flex gap-2 mt-2">
-                <Button
-                  type="button"
-                  variant={adjustmentType === 'ADD' ? 'default' : 'outline'}
-                  onClick={() => setAdjustmentType('ADD')}
-                  className="flex-1"
-                >
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Add Stock
-                </Button>
-                <Button
-                  type="button"
-                  variant={adjustmentType === 'REMOVE' ? 'default' : 'outline'}
-                  onClick={() => setAdjustmentType('REMOVE')}
-                  className="flex-1"
-                >
-                  <TrendingDown className="h-4 w-4 mr-2" />
-                  Remove Stock
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="0"
-                step="0.01"
-                value={adjustmentQuantity}
-                onChange={(e) => setAdjustmentQuantity(e.target.value)}
-                placeholder="Enter quantity"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="reason">Reason</Label>
-              <select
-                id="reason"
-                className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
-                value={adjustmentReason}
-                onChange={(e) => setAdjustmentReason(e.target.value)}
-              >
-                <option value="">Select a reason</option>
-                <option value="STOCK_TAKE">Stock Take / Count</option>
-                <option value="DAMAGE">Damage / Spoilage</option>
-                <option value="RETURN">Return</option>
-                <option value="ADJUSTMENT">Manual Adjustment</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </div>
-
-            <div>
-              <Label htmlFor="notes">Notes</Label>
-              <textarea
-                id="notes"
-                className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
-                rows={3}
-                value={adjustmentNotes}
-                onChange={(e) => setAdjustmentNotes(e.target.value)}
-                placeholder="Additional notes (optional)"
-              />
-            </div>
-
-            {selectedProductForAdjustment && (
-              <div className="bg-[var(--brand-ultra)] p-4 rounded-md">
-                <p className="text-sm font-medium text-[var(--text-mid)]">Current Stock</p>
-                <p className="text-lg font-semibold text-[var(--mint)]">
-                  {formatNumber(selectedProductForAdjustment.available_qty, {
-                    maximumFractionDigits: 2,
-                  })}{' '}
-                  {selectedProductForAdjustment.unit || 'units'}
-                </p>
-                {adjustmentQuantity && (
-                  <p className="text-sm text-[var(--text-muted)] mt-2">
-                    New Stock:{' '}
-                    {formatNumber(
-                      parseFloat(String(selectedProductForAdjustment.available_qty || 0)) +
-                        (adjustmentType === 'ADD' ? 1 : -1) * parseFloat(adjustmentQuantity),
-                      { maximumFractionDigits: 2 }
-                    )}{' '}
-                    {selectedProductForAdjustment.unit || 'units'}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowInventoryAdjustment(false)
-                setSelectedProductForAdjustment(null)
-                setAdjustmentQuantity('')
-                setAdjustmentReason('')
-                setAdjustmentNotes('')
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                const qty = parseFloat(adjustmentQuantity)
-                if (!qty || qty <= 0 || !adjustmentReason || !selectedProductForAdjustment?.id)
-                  return
-                try {
-                  await createInventoryAdjustment({
-                    productId: selectedProductForAdjustment.id,
-                    adjustmentType: adjustmentType === 'ADD' ? 'IN' : 'OUT',
-                    quantity: qty,
-                    reason: adjustmentReason,
-                    notes: adjustmentNotes || undefined,
-                  }).unwrap()
-                  toast.success(
-                    `Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`
-                  )
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
                   setShowInventoryAdjustment(false)
                   setSelectedProductForAdjustment(null)
                   setAdjustmentQuantity('')
                   setAdjustmentReason('')
                   setAdjustmentNotes('')
-                } catch (err: any) {
-                  toast.error(err?.data?.error?.message || 'Failed to update inventory')
-                }
-              }}
-              disabled={!adjustmentQuantity || !adjustmentReason || isAdjustingInventory}
-            >
-              {adjustmentType === 'ADD' ? 'Add' : 'Remove'} Stock
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  const qty = parseFloat(adjustmentQuantity)
+                  if (!qty || qty <= 0 || !adjustmentReason || !selectedProductForAdjustment?.id)
+                    return
+                  try {
+                    await createInventoryAdjustment({
+                      productId: selectedProductForAdjustment.id,
+                      adjustmentType: adjustmentType === 'ADD' ? 'IN' : 'OUT',
+                      quantity: qty,
+                      reason: adjustmentReason,
+                      notes: adjustmentNotes || undefined,
+                    }).unwrap()
+                    toast.success(
+                      `Stock ${adjustmentType === 'ADD' ? 'added' : 'removed'} successfully`
+                    )
+                    setShowInventoryAdjustment(false)
+                    setSelectedProductForAdjustment(null)
+                    setAdjustmentQuantity('')
+                    setAdjustmentReason('')
+                    setAdjustmentNotes('')
+                  } catch (err: any) {
+                    toast.error(err?.data?.error?.message || 'Failed to update inventory')
+                  }
+                }}
+                disabled={!adjustmentQuantity || !adjustmentReason || isAdjustingInventory}
+              >
+                {adjustmentType === 'ADD' ? 'Add' : 'Remove'} Stock
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </RequirePermission>
   )
 }

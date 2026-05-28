@@ -118,6 +118,12 @@ export function isWithinActiveDateRange(deal, now = new Date()) {
   return true
 }
 
+export function isDealBoostWindowLive(deal, now = new Date()) {
+  if (!deal?.boost_start_at || !deal?.boost_end_at) return false
+  const ts = now instanceof Date ? now : new Date(now)
+  return new Date(deal.boost_start_at) <= ts && new Date(deal.boost_end_at) > ts
+}
+
 export function isRestaurantVisibleDeal(deal, { now = new Date(), restaurantId } = {}) {
   if (!deal) return false
   const status = normalizeDealStatus(deal.status)
@@ -125,6 +131,8 @@ export function isRestaurantVisibleDeal(deal, { now = new Date(), restaurantId }
 
   const paymentStatus = deal.payment_status || PAYMENT_STATUSES.NOT_REQUIRED
   if (!PAID_PAYMENT_STATUSES.has(paymentStatus)) return false
+
+  if (!isDealBoostWindowLive(deal, now)) return false
 
   if (!isWithinActiveDateRange(deal, now)) return false
 
@@ -149,8 +157,14 @@ export function getRestaurantIneligibilityMessage(deal, { now = new Date(), rest
   if (status === DEAL_STATUSES.DRAFT) return 'This deal is awaiting admin approval'
   if (isPendingAdminReview(deal)) return 'This deal is awaiting admin approval'
   if (status === DEAL_STATUSES.REJECTED) return 'This deal was rejected by admin'
-  if (status === DEAL_STATUSES.APPROVED_PENDING_PAYMENT) return 'This deal is pending payment'
-  if (deal.payment_status === PAYMENT_STATUSES.PENDING) return 'This deal is pending payment'
+  if (status === DEAL_STATUSES.APPROVED_PENDING_PAYMENT) return 'This deal is pending boost payment'
+  if (deal.payment_status === PAYMENT_STATUSES.PENDING) return 'This deal is pending boost payment'
+  if (status === DEAL_STATUSES.ACTIVE && !isDealBoostWindowLive(deal, now)) {
+    if (deal.boost_end_at && new Date(deal.boost_end_at) <= now) {
+      return 'This deal boost has ended'
+    }
+    return 'This deal is not currently boosted'
+  }
   if (status === DEAL_STATUSES.PAUSED) return 'This deal is currently paused'
   if (status === DEAL_STATUSES.CANCELLED) return 'This deal was cancelled'
   if (status === DEAL_STATUSES.EXPIRED) return 'This deal has expired'

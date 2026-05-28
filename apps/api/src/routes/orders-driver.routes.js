@@ -6,8 +6,14 @@ import {
   resolveTenantContext,
   getSupplierIdForRequest,
   requirePermission,
+  requireAnyPermission,
   getRequestTenant,
 } from '../lib/rbac.js'
+import {
+  assertDriverAssignmentAccess,
+  assertDriverStatusUpdate,
+  isDriverOnlyPermissions,
+} from '../lib/driver-rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { logger } from '../lib/logger.js'
 import {
@@ -41,7 +47,7 @@ async function resolveSupplierId(req) {
 
 const assignSchema = z.object({ driver_id: z.string().uuid() })
 const deliveryStatusSchema = z.object({
-  status: z.enum(['picked_up', 'out_for_delivery', 'delivered', 'failed']),
+  status: z.enum(['picked_up', 'out_for_delivery', 'delivered', 'failed', 'rescheduled']),
   notes: z.string().optional().nullable(),
   failure_reason: z.string().optional().nullable(),
 })
@@ -110,7 +116,7 @@ router.post(
 router.patch(
   '/:id/delivery-status',
   ...supplierFulfillmentGate,
-  requirePermission('FULFILLMENT_MANAGE'),
+  requireAnyPermission('FULFILLMENT_MANAGE', 'DRIVER_DELIVERIES_MANAGE'),
   async (req, res) => {
     try {
       const supplierId = await resolveSupplierId(req)
@@ -123,6 +129,16 @@ router.patch(
         })
       }
       const body = deliveryStatusSchema.parse(req.body)
+      const perms = req.tenantContext?.permissions ?? []
+      assertDriverStatusUpdate(body.status, perms)
+      if (isDriverOnlyPermissions(perms)) {
+        await assertDriverAssignmentAccess({
+          userId: req.userData.id,
+          supplierId,
+          orderId: req.params.id,
+          permissions: perms,
+        })
+      }
       if (body.status === 'failed' && !body.failure_reason?.trim()) {
         return res.status(400).json({
           ok: false,
@@ -226,7 +242,7 @@ router.post(
 router.post(
   '/:id/proof-of-delivery',
   ...supplierFulfillmentGate,
-  requirePermission('FULFILLMENT_MANAGE'),
+  requireAnyPermission('FULFILLMENT_MANAGE', 'DRIVER_DELIVERIES_MANAGE'),
   async (req, res) => {
     try {
       const supplierId = await resolveSupplierId(req)
@@ -236,6 +252,15 @@ router.post(
           data: null,
           error: { name: 'FORBIDDEN', message: 'Supplier not found' },
           requestId: req.requestId,
+        })
+      }
+      const perms = req.tenantContext?.permissions ?? []
+      if (isDriverOnlyPermissions(perms)) {
+        await assertDriverAssignmentAccess({
+          userId: req.userData.id,
+          supplierId,
+          orderId: req.params.id,
+          permissions: perms,
         })
       }
       const body = podSchema.parse(req.body)
@@ -269,10 +294,28 @@ router.post(
 router.get(
   '/:id/proof-of-delivery',
   ...supplierFulfillmentGate,
-  requirePermission('FULFILLMENT_VIEW'),
+  requireAnyPermission('FULFILLMENT_VIEW', 'DRIVER_DELIVERIES_VIEW'),
   async (req, res) => {
     try {
-      const proof = await getProofOfDelivery(req.params.id)
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const perms = req.tenantContext?.permissions ?? []
+      if (isDriverOnlyPermissions(perms)) {
+        await assertDriverAssignmentAccess({
+          userId: req.userData.id,
+          supplierId,
+          orderId: req.params.id,
+          permissions: perms,
+        })
+      }
+      const proof = await getProofOfDelivery(req.params.id, supplierId)
       res.json({
         ok: true,
         data: { proof },

@@ -9,12 +9,14 @@ export const DELIVERY_STATUSES = [
   'delivered',
   'failed',
   'reassigned',
+  'rescheduled',
 ]
 
 const NEXT_STATUS = {
-  assigned: ['picked_up'],
-  picked_up: ['out_for_delivery'],
-  out_for_delivery: ['delivered', 'failed'],
+  assigned: ['picked_up', 'rescheduled'],
+  picked_up: ['out_for_delivery', 'rescheduled'],
+  out_for_delivery: ['delivered', 'failed', 'rescheduled'],
+  rescheduled: ['assigned'],
 }
 
 export async function getSupplierIdForOrder(orderId) {

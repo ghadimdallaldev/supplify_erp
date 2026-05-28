@@ -21,6 +21,7 @@ import { invalidateUserPermissionCache } from '../lib/permissions.js'
 import { resolveWorkspaceScope } from '../lib/workspace-membership.js'
 import { assertCanAssignRole, assertCanGrantPermissions } from '../lib/rbac-guards.js'
 import { MAIN_ADMIN_ROLE_NAME } from '../lib/workspace-membership.js'
+import { syncDriverLinkForRoleAssignment } from '../lib/driver-user-link.js'
 
 const router = express.Router()
 
@@ -71,6 +72,8 @@ const updateRoleSchema = z.object({
 
 const assignRoleSchema = z.object({
   role_id: z.string().uuid(),
+  driver_id: z.string().uuid().optional().nullable(),
+  create_driver_profile: z.boolean().optional(),
 })
 
 /** GET /api/roles */
@@ -396,7 +399,12 @@ router.get('/users', requirePermission('SETTINGS_VIEW'), async (req, res) => {
 router.post('/users/:userId/assign', requirePermission('SETTINGS_MANAGE'), async (req, res) => {
   try {
     const { tenantId, tenantType } = assertTenantAccess(req)
-    const { role_id: roleId } = assignRoleSchema.parse(req.body)
+    const body = assignRoleSchema.parse(req.body)
+    const {
+      role_id: roleId,
+      driver_id: driverId,
+      create_driver_profile: createDriverProfile,
+    } = body
     const targetUserId = req.params.userId
 
     const scope = await resolveWorkspaceScope(tenantId, tenantType)
@@ -420,9 +428,25 @@ router.post('/users/:userId/assign', requirePermission('SETTINGS_MANAGE'), async
     })
     await invalidateUserPermissionCache(targetUserId, tenantId, tenantType)
 
+    let driverLink = null
+    if (tenantType === 'SUPPLIER') {
+      driverLink = await syncDriverLinkForRoleAssignment({
+        userId: targetUserId,
+        supplierId: tenantId,
+        roleName: role.name,
+        driverId: driverId ?? undefined,
+        createDriverProfile: createDriverProfile ?? true,
+      })
+    }
+
     res.json({
       ok: true,
-      data: { userId: targetUserId, roleId, roleName: role.name },
+      data: {
+        userId: targetUserId,
+        roleId,
+        roleName: role.name,
+        driverId: driverLink?.id ?? null,
+      },
       error: null,
       requestId: req.requestId,
     })

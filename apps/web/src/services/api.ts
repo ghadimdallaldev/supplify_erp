@@ -53,6 +53,8 @@ import type {
   PublicReservationDetails,
   DriverRecord,
   DispatchOrderCard,
+  DeliveryRouteSummary,
+  DeliveryRouteDetail,
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
@@ -222,6 +224,7 @@ export const api = createApi({
     'OrdersCalendar',
     'QuickList',
     'Fulfillment',
+    'SupplierOps',
     'Driver',
     'Reviews',
     'Reports',
@@ -468,6 +471,21 @@ export const api = createApi({
       },
       providesTags: ['Fulfillment'],
     }),
+    getUnlinkedDrivers: builder.query<
+      {
+        drivers: Array<{
+          id: string
+          full_name: string
+          phone?: string | null
+          vehicle_type?: string | null
+          is_active?: boolean
+        }>
+      },
+      void
+    >({
+      query: () => '/api/drivers/unlinked',
+      providesTags: ['Driver'],
+    }),
     getDrivers: builder.query<
       {
         drivers: Array<{
@@ -504,6 +522,7 @@ export const api = createApi({
         vehicle_plate?: string
         warehouse_id?: string
         notes?: string
+        user_id?: string | null
       }
     >({
       query: (body) => ({ url: '/api/drivers', method: 'POST', body }),
@@ -521,6 +540,7 @@ export const api = createApi({
           warehouse_id: string
           notes: string
           is_active: boolean
+          user_id?: string | null
         }>
       }
     >({
@@ -587,26 +607,87 @@ export const api = createApi({
       }),
       invalidatesTags: ['Fulfillment'],
     }),
-    getFulfillmentRoutes: builder.query<
-      {
-        routes: Array<{
-          id: string
-          routeNumber: string
-          driver: string
-          vehicle: string
-          status: string
-          stops: number
-          scheduledDate?: string
-        }>
-      },
-      { warehouseId?: string } | void
-    >({
-      query: (arg) => {
-        const id = arg && typeof arg === 'object' ? arg.warehouseId : undefined
-        const qs = id ? `?warehouse_id=${encodeURIComponent(id)}` : ''
-        return `/api/fulfillment/routes${qs}`
-      },
+    getFulfillmentRoutes: builder.query<{ routes: DeliveryRouteSummary[] }, void>({
+      query: () => '/api/fulfillment/routes',
       providesTags: ['Fulfillment'],
+    }),
+    getFulfillmentRoute: builder.query<{ route: DeliveryRouteDetail }, string>({
+      query: (id) => `/api/fulfillment/routes/${id}`,
+      providesTags: (_r, _e, id) => [{ type: 'Fulfillment', id }],
+    }),
+    getDriverActiveRoute: builder.query<{ route: DeliveryRouteDetail | null }, void>({
+      query: () => '/api/fulfillment/routes/active',
+      providesTags: ['Fulfillment'],
+    }),
+    createFulfillmentRoute: builder.mutation<
+      { route: DeliveryRouteDetail },
+      {
+        order_ids: string[]
+        driver_id: string
+        scheduled_date: string
+        route_label?: string
+        area?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/fulfillment/routes',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    updateFulfillmentRoute: builder.mutation<
+      { route: DeliveryRouteDetail },
+      {
+        id: string
+        route_label?: string
+        area?: string
+        scheduled_date?: string
+        driver_id?: string
+        status?: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/fulfillment/routes/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    cancelFulfillmentRoute: builder.mutation<{ route: DeliveryRouteDetail }, string>({
+      query: (id) => ({
+        url: `/api/fulfillment/routes/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    reorderFulfillmentRouteStops: builder.mutation<
+      { route: DeliveryRouteDetail },
+      { routeId: string; stop_ids: string[] }
+    >({
+      query: ({ routeId, stop_ids }) => ({
+        url: `/api/fulfillment/routes/${routeId}/stops/reorder`,
+        method: 'POST',
+        body: { stop_ids },
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    updateFulfillmentRouteStop: builder.mutation<
+      { route: DeliveryRouteDetail },
+      {
+        routeId: string
+        stopId: string
+        status?: 'PLANNED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED'
+        notes?: string
+        failure_reason?: string
+      }
+    >({
+      query: ({ routeId, stopId, ...body }) => ({
+        url: `/api/fulfillment/routes/${routeId}/stops/${stopId}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
     }),
     getFulfillmentExceptions: builder.query<
       {
@@ -647,7 +728,7 @@ export const api = createApi({
       { assignment: unknown },
       {
         orderId: string
-        status: 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed'
+        status: 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed' | 'rescheduled'
         notes?: string
         failure_reason?: string
       }
@@ -1252,6 +1333,108 @@ export const api = createApi({
       query: (params) => ({ url: '/api/invoices', params }),
       providesTags: ['RestaurantFinance'],
     }),
+    getSupplierReceivables: builder.query<any, void>({
+      query: () => '/api/supplier/invoices/receivables',
+      providesTags: ['SupplierOps', 'RestaurantFinance'],
+    }),
+    getSupplierCommandCenter: builder.query<any, void>({
+      query: () => '/api/supplier/command-center',
+      providesTags: ['SupplierOps', 'Order', 'Fulfillment', 'RestaurantFinance'],
+    }),
+    getSupplierReorderIntelligence: builder.query<any, { graceDays?: number } | void>({
+      query: (arg) => {
+        const params = new URLSearchParams()
+        if (arg?.graceDays) params.set('grace_days', String(arg.graceDays))
+        const qs = params.toString()
+        return `/api/supplier/reorder-intelligence${qs ? `?${qs}` : ''}`
+      },
+      providesTags: ['SupplierOps'],
+    }),
+    createReorderReminderDraft: builder.mutation<
+      { draft: { id: string; subject: string; body: string; status: string; autoSent: boolean } },
+      string
+    >({
+      query: (restaurantId) => ({
+        url: `/api/supplier/reorder-intelligence/${restaurantId}/reminder-draft`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['SupplierOps'],
+    }),
+    getSupplierDeliveryBoard: builder.query<
+      any,
+      { date?: string; status?: string; driverId?: string; area?: string } | void
+    >({
+      query: (arg) => {
+        const params = new URLSearchParams()
+        if (arg?.date) params.set('date', arg.date)
+        if (arg?.status) params.set('status', arg.status)
+        if (arg?.driverId) params.set('driver_id', arg.driverId)
+        if (arg?.area) params.set('area', arg.area)
+        const qs = params.toString()
+        return `/api/supplier/deliveries/board${qs ? `?${qs}` : ''}`
+      },
+      providesTags: ['Fulfillment', 'SupplierOps'],
+    }),
+    previewProductImport: builder.mutation<
+      any,
+      { csv: string; columnMapping?: Record<string, string> }
+    >({
+      query: (body) => ({
+        url: '/api/supplier/products/import/preview',
+        method: 'POST',
+        body,
+      }),
+    }),
+    executeProductImport: builder.mutation<any, { csv: string; partial?: boolean }>({
+      query: (body) => ({
+        url: '/api/supplier/products/import',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Product', 'Inventory'],
+    }),
+    getProductSubstitutes: builder.query<any, string>({
+      query: (productId) => `/api/supplier/products/${productId}/substitutes`,
+      providesTags: (_r, _e, id) => [{ type: 'Product', id }],
+    }),
+    createProductSubstitute: builder.mutation<
+      any,
+      { productId: string; substituteProductId: string; priority?: number; notes?: string }
+    >({
+      query: ({ productId, ...body }) => ({
+        url: `/api/supplier/products/${productId}/substitutes`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { productId }) => [{ type: 'Product', id: productId }],
+    }),
+    deleteProductSubstitute: builder.mutation<any, { productId: string; substituteId: string }>({
+      query: ({ productId, substituteId }) => ({
+        url: `/api/supplier/products/${productId}/substitutes/${substituteId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_r, _e, { productId }) => [{ type: 'Product', id: productId }],
+    }),
+    getOrderSubstitutions: builder.query<any, string>({
+      query: (orderId) => `/api/supplier/orders/${orderId}/substitutions`,
+      providesTags: (_r, _e, id) => [{ type: 'Order', id }],
+    }),
+    proposeOrderSubstitution: builder.mutation<
+      any,
+      {
+        orderId: string
+        orderItemId: string
+        substituteProductId: string
+        description?: string
+      }
+    >({
+      query: ({ orderId, ...body }) => ({
+        url: `/api/supplier/orders/${orderId}/substitutions/propose`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }],
+    }),
 
     // Notification endpoints
     getBranches: builder.query<{ branches: Array<Record<string, unknown>> }, void>({
@@ -1715,13 +1898,18 @@ export const api = createApi({
       invalidatesTags: ['TenantRoles'],
     }),
     assignTenantUserRole: builder.mutation<
-      { userId: string; roleId: string; roleName: string },
-      { userId: string; role_id: string }
+      { userId: string; roleId: string; roleName: string; driverId?: string | null },
+      {
+        userId: string
+        role_id: string
+        driver_id?: string | null
+        create_driver_profile?: boolean
+      }
     >({
-      query: ({ userId, role_id }) => ({
+      query: ({ userId, role_id, driver_id, create_driver_profile }) => ({
         url: `/api/roles/users/${userId}/assign`,
         method: 'POST',
-        body: { role_id },
+        body: { role_id, driver_id, create_driver_profile },
       }),
       invalidatesTags: ['TenantRoles', 'User'],
     }),
@@ -2252,8 +2440,15 @@ export const api = createApi({
       query: (id) => ({ url: `/api/promotions/admin/${id}/pause`, method: 'POST' }),
       invalidatesTags: ['Promotions'],
     }),
-    submitPromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
-      query: (id) => ({ url: `/api/promotions/${id}/submit`, method: 'POST' }),
+    submitPromotion: builder.mutation<
+      { promotion: Record<string, unknown> },
+      { id: string; pricingKey: string }
+    >({
+      query: ({ id, pricingKey }) => ({
+        url: `/api/promotions/${id}/submit`,
+        method: 'POST',
+        body: { pricingKey },
+      }),
       invalidatesTags: ['Promotions'],
     }),
     previewCartDeal: builder.mutation<
@@ -3078,9 +3273,17 @@ export const {
   useSendOrderReminderMutation,
   useGetFulfillmentBoardQuery,
   useGetFulfillmentRoutesQuery,
+  useGetFulfillmentRouteQuery,
+  useGetDriverActiveRouteQuery,
+  useCreateFulfillmentRouteMutation,
+  useUpdateFulfillmentRouteMutation,
+  useCancelFulfillmentRouteMutation,
+  useReorderFulfillmentRouteStopsMutation,
+  useUpdateFulfillmentRouteStopMutation,
   useGetFulfillmentExceptionsQuery,
   useGetFulfillmentDispatchQuery,
   useGetDriversQuery,
+  useGetUnlinkedDriversQuery,
   useCreateDriverMutation,
   useUpdateDriverMutation,
   useDeactivateDriverMutation,
@@ -3159,6 +3362,18 @@ export const {
   useGetRestaurantExpensesQuery,
   useGetOverdueInvoicesQuery,
   useGetSupplierInvoicesQuery,
+  useGetSupplierReceivablesQuery,
+  useGetSupplierCommandCenterQuery,
+  useGetSupplierReorderIntelligenceQuery,
+  useCreateReorderReminderDraftMutation,
+  useGetSupplierDeliveryBoardQuery,
+  usePreviewProductImportMutation,
+  useExecuteProductImportMutation,
+  useGetProductSubstitutesQuery,
+  useCreateProductSubstituteMutation,
+  useDeleteProductSubstituteMutation,
+  useGetOrderSubstitutionsQuery,
+  useProposeOrderSubstitutionMutation,
   useGetNotificationsQuery,
   useGetNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,

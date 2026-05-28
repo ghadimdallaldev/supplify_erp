@@ -8,6 +8,7 @@ import { getDealRedeemGate } from '../../lib/planLimits'
 import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import { Loader2, Sparkles } from 'lucide-react'
 import { useAppSelector } from '../../hooks/redux'
+import { RequirePermission } from '../../components/RequirePermission'
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -66,94 +67,96 @@ export function DealsPage() {
   }, [highlightDealId, isLoading, promotions.length])
 
   return (
-    <div className="space-y-6">
-      <MotionDealsHeader />
-      {!canRedeem ? (
-        <div
-          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          role="status"
-        >
-          {dealRedeemGate.message || redeemCopy.value}
-        </div>
-      ) : dealRedeemGate.limit != null ? (
-        <p className="text-sm text-[var(--text-muted)]">
-          Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
-        </p>
-      ) : null}
-      <Card>
-        <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
-          <div>
-            <Label>Sort</Label>
-            <select
-              className="mt-1 h-10 rounded-md border px-3 text-sm block min-w-[160px]"
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-            >
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+    <RequirePermission anyOf={['ORDERS_VIEW', 'CATALOG_VIEW']} title="deals">
+      <div className="space-y-6">
+        <MotionDealsHeader />
+        {!canRedeem ? (
+          <div
+            className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            role="status"
+          >
+            {dealRedeemGate.message || redeemCopy.value}
           </div>
-          <div>
-            <Label>Supplier</Label>
-            <select
-              className="mt-1 h-10 rounded-md border px-3 text-sm block min-w-[180px]"
-              value={supplierFilter}
-              onChange={(e) => setSupplierFilter(e.target.value)}
-            >
-              <option value="">All suppliers</option>
-              {suppliers.map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <label className="flex items-center gap-2 text-sm pb-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={expiringSoon}
-              onChange={(e) => setExpiringSoon(e.target.checked)}
-            />
-            Expiring within 7 days
-          </label>
-        </CardContent>
-      </Card>
-
-      {sponsoredCount > 0 ? (
-        <p className="text-xs text-[var(--text-muted)]">
-          {sponsoredCount} sponsored {sponsoredCount === 1 ? 'deal' : 'deals'} in your feed
-        </p>
-      ) : null}
-
-      {isLoading ? (
-        <Loader2 className="h-6 w-6 animate-spin" />
-      ) : promotions.length === 0 ? (
+        ) : dealRedeemGate.limit != null ? (
+          <p className="text-sm text-[var(--text-muted)]">
+            Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
+          </p>
+        ) : null}
         <Card>
-          <CardContent className="py-10 text-center text-sm text-[var(--text-muted)]">
-            No deals available right now. Follow suppliers or check back for sponsored promotions.
+          <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
+            <div>
+              <Label>Sort</Label>
+              <select
+                className="mt-1 h-10 rounded-md border px-3 text-sm block min-w-[160px]"
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Supplier</Label>
+              <select
+                className="mt-1 h-10 rounded-md border px-3 text-sm block min-w-[180px]"
+                value={supplierFilter}
+                onChange={(e) => setSupplierFilter(e.target.value)}
+              >
+                <option value="">All suppliers</option>
+                {suppliers.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm pb-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={expiringSoon}
+                onChange={(e) => setExpiringSoon(e.target.checked)}
+              />
+              Expiring within 7 days
+            </label>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {promotions.map((p) => (
-            <div
-              key={String(p.id)}
-              id={`deal-card-${String(p.id)}`}
-              className={
-                highlightDealId && String(p.id) === highlightDealId
-                  ? 'ring-2 ring-[var(--brand)] rounded-xl'
-                  : undefined
-              }
-            >
-              <DealCard deal={p} canRedeem={canRedeem} />
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+
+        {sponsoredCount > 0 ? (
+          <p className="text-xs text-[var(--text-muted)]">
+            {sponsoredCount} sponsored {sponsoredCount === 1 ? 'deal' : 'deals'} in your feed
+          </p>
+        ) : null}
+
+        {isLoading ? (
+          <Loader2 className="h-6 w-6 animate-spin" />
+        ) : promotions.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-[var(--text-muted)]">
+              No deals available right now. Follow suppliers or check back for sponsored promotions.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {promotions.map((p) => (
+              <div
+                key={String(p.id)}
+                id={`deal-card-${String(p.id)}`}
+                className={
+                  highlightDealId && String(p.id) === highlightDealId
+                    ? 'ring-2 ring-[var(--brand)] rounded-xl'
+                    : undefined
+                }
+              >
+                <DealCard deal={p} canRedeem={canRedeem} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </RequirePermission>
   )
 }
 

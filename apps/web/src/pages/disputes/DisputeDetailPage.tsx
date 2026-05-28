@@ -9,7 +9,8 @@ import {
   useCancelDisputeMutation,
 } from '../../services/api'
 import { useImpersonation } from '../../hooks/useImpersonation'
-import { featureEnabled } from '../../lib/planLimits'
+import { RequirePermission } from '../../components/RequirePermission'
+import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
 import { formatPrice } from '../../utils/format'
 import { formatOrderRef } from '../../lib/orderPlacement'
 import { PageHeader } from '../../components/ui/page-header'
@@ -43,7 +44,10 @@ export function DisputeDetailPage() {
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const disputesEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'disputes_returns'
+  )
 
   const { data, isLoading, error, refetch } = useGetDisputeQuery(id!, { skip: !id })
   const [reviewDispute] = useReviewDisputeMutation()
@@ -161,249 +165,254 @@ export function DisputeDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Button variant="outline" size="sm" asChild>
-        <Link to="/app/disputes">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to disputes
-        </Link>
-      </Button>
+    <RequirePermission permission="ORDERS_VIEW" title="dispute details">
+      <div className="space-y-6">
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/app/disputes">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to disputes
+          </Link>
+        </Button>
 
-      <PageHeader
-        title="Dispute details"
-        description={`${String(dispute.type || '').replace(/_/g, ' ')} · ${status.replace(/_/g, ' ')}`}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {isSupplier && status === 'open' && (
-              <Button size="sm" variant="outline" onClick={handleReview}>
-                Mark under review
-              </Button>
-            )}
-            {isSupplier && (status === 'open' || status === 'under_review') && (
-              <>
-                <Button size="sm" onClick={() => setResolveOpen(true)}>
-                  Resolve
+        <PageHeader
+          title="Dispute details"
+          description={`${String(dispute.type || '').replace(/_/g, ' ')} · ${status.replace(/_/g, ' ')}`}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              {isSupplier && status === 'open' && (
+                <Button size="sm" variant="outline" onClick={handleReview}>
+                  Mark under review
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setRejectOpen(true)}>
-                  Reject
+              )}
+              {isSupplier && (status === 'open' || status === 'under_review') && (
+                <>
+                  <Button size="sm" onClick={() => setResolveOpen(true)}>
+                    Resolve
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setRejectOpen(true)}>
+                    Reject
+                  </Button>
+                </>
+              )}
+              {!isSupplier && status === 'open' && (
+                <Button size="sm" variant="outline" onClick={handleCancel} disabled={cancelling}>
+                  Cancel dispute
                 </Button>
-              </>
-            )}
-            {!isSupplier && status === 'open' && (
-              <Button size="sm" variant="outline" onClick={handleCancel} disabled={cancelling}>
-                Cancel dispute
-              </Button>
-            )}
-          </div>
-        }
-      />
-
-      {replacementOrderId && (
-        <Card className="border-sky-300 bg-sky-50/50 dark:border-sky-800 dark:bg-sky-950/20">
-          <CardHeader>
-            <CardTitle className="text-base">Replacement order created</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <p className="text-[var(--text-muted)]">
-              The supplier resolved this dispute by shipping replacement goods on a new order.
-            </p>
-            <Button size="sm" asChild>
-              <Link to={`/app/orders/${replacementOrderId}`}>
-                View replacement order {formatOrderRef(replacementOrderId)}
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--text-muted)]">Status</span>
-              <Badge variant={statusBadge(status)}>{status}</Badge>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[var(--text-muted)]">Order</span>
-              {orderId ? (
-                <Link
-                  to={`/app/orders/${orderId}`}
-                  className="text-[var(--brand-mid)] hover:underline font-mono"
-                >
-                  {formatOrderRef(orderId)}
-                </Link>
-              ) : (
-                '—'
               )}
             </div>
-            {isSupplier && (
-              <div className="flex justify-between gap-4">
-                <span className="text-[var(--text-muted)]">Restaurant</span>
-                <span>{String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}</span>
-              </div>
-            )}
-            {!isSupplier && (
-              <div className="flex justify-between gap-4">
-                <span className="text-[var(--text-muted)]">Supplier</span>
-                <span>{String(dispute.supplierName ?? dispute.supplier_name ?? '—')}</span>
-              </div>
-            )}
-            {disputedAmount != null && Number(disputedAmount) > 0 && (
-              <div className="flex justify-between gap-4">
-                <span className="text-[var(--text-muted)]">Disputed amount</span>
-                <span>${formatPrice(Number(disputedAmount))}</span>
-              </div>
-            )}
-            {dispute.orderStatus != null && (
-              <div className="flex justify-between gap-4">
-                <span className="text-[var(--text-muted)]">Order status</span>
-                <span>
-                  {String(dispute.orderStatus ?? dispute.order_status).replace(/_/g, ' ')}
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          }
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm whitespace-pre-wrap">{String(dispute.description || '—')}</p>
-            {dispute.resolutionNotes != null || dispute.resolution_notes != null ? (
-              <div className="mt-4 pt-4 border-t">
-                <p className="text-xs text-[var(--text-muted)] mb-1">Resolution notes</p>
-                <p className="text-sm whitespace-pre-wrap">
-                  {String(dispute.resolutionNotes ?? dispute.resolution_notes)}
-                </p>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+        {replacementOrderId && (
+          <Card className="border-sky-300 bg-sky-50/50 dark:border-sky-800 dark:bg-sky-950/20">
+            <CardHeader>
+              <CardTitle className="text-base">Replacement order created</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
+              <p className="text-[var(--text-muted)]">
+                The supplier resolved this dispute by shipping replacement goods on a new order.
+              </p>
+              <Button size="sm" asChild>
+                <Link to={`/app/orders/${replacementOrderId}`}>
+                  View replacement order {formatOrderRef(replacementOrderId)}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
-      {items.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Disputed line items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-[var(--text-muted)]">
-                    <th className="py-2">Product</th>
-                    <th>Ordered</th>
-                    <th>Received</th>
-                    <th>Issue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={String(item.id)} className="border-b border-[var(--app-border)]">
-                      <td className="py-2">
-                        {String(item.product_name ?? item.productName ?? '—')}
-                      </td>
-                      <td>{item.quantity_ordered ?? item.quantityOrdered ?? '—'}</td>
-                      <td>{item.quantity_received ?? item.quantityReceived ?? '—'}</td>
-                      <td className="text-[var(--text-muted)]">
-                        {String(item.issue_description ?? item.issueDescription ?? '—')}
-                      </td>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <span className="text-[var(--text-muted)]">Status</span>
+                <Badge variant={statusBadge(status)}>{status}</Badge>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[var(--text-muted)]">Order</span>
+                {orderId ? (
+                  <Link
+                    to={`/app/orders/${orderId}`}
+                    className="text-[var(--brand-mid)] hover:underline font-mono"
+                  >
+                    {formatOrderRef(orderId)}
+                  </Link>
+                ) : (
+                  '—'
+                )}
+              </div>
+              {isSupplier && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-[var(--text-muted)]">Restaurant</span>
+                  <span>{String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}</span>
+                </div>
+              )}
+              {!isSupplier && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-[var(--text-muted)]">Supplier</span>
+                  <span>{String(dispute.supplierName ?? dispute.supplier_name ?? '—')}</span>
+                </div>
+              )}
+              {disputedAmount != null && Number(disputedAmount) > 0 && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-[var(--text-muted)]">Disputed amount</span>
+                  <span>${formatPrice(Number(disputedAmount))}</span>
+                </div>
+              )}
+              {dispute.orderStatus != null && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-[var(--text-muted)]">Order status</span>
+                  <span>
+                    {String(dispute.orderStatus ?? dispute.order_status).replace(/_/g, ' ')}
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Description</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm whitespace-pre-wrap">{String(dispute.description || '—')}</p>
+              {dispute.resolutionNotes != null || dispute.resolution_notes != null ? (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="text-xs text-[var(--text-muted)] mb-1">Resolution notes</p>
+                  <p className="text-sm whitespace-pre-wrap">
+                    {String(dispute.resolutionNotes ?? dispute.resolution_notes)}
+                  </p>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+
+        {items.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Disputed line items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-[var(--text-muted)]">
+                      <th className="py-2">Product</th>
+                      <th>Ordered</th>
+                      <th>Received</th>
+                      <th>Issue</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {creditNotes.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Credit notes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {creditNotes.map((cn) => (
-              <div key={String(cn.id)} className="flex justify-between border-b py-2 last:border-0">
-                <span>{String(cn.credit_note_number ?? cn.creditNoteNumber ?? cn.id)}</span>
-                <span>${formatPrice(Number(cn.credit_amount ?? cn.creditAmount ?? 0))}</span>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr key={String(item.id)} className="border-b border-[var(--app-border)]">
+                        <td className="py-2">
+                          {String(item.product_name ?? item.productName ?? '—')}
+                        </td>
+                        <td>{item.quantity_ordered ?? item.quantityOrdered ?? '—'}</td>
+                        <td>{item.quantity_received ?? item.quantityReceived ?? '—'}</td>
+                        <td className="text-[var(--text-muted)]">
+                          {String(item.issue_description ?? item.issueDescription ?? '—')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
 
-      <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Resolve dispute</DialogTitle>
-            <DialogDescription>
-              Choose how to close this dispute for the restaurant.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Resolution</Label>
-              <select
-                className="w-full h-10 rounded-md border px-3 text-sm"
-                value={resolutionType}
-                onChange={(e) => setResolutionType(e.target.value)}
-              >
-                <option value="credit_note">Credit note</option>
-                <option value="replacement">Replacement</option>
-                <option value="refund">Refund</option>
-                <option value="no_action">No action</option>
-              </select>
-            </div>
-            {resolutionType === 'credit_note' && (
+        {creditNotes.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Credit notes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {creditNotes.map((cn) => (
+                <div
+                  key={String(cn.id)}
+                  className="flex justify-between border-b py-2 last:border-0"
+                >
+                  <span>{String(cn.credit_note_number ?? cn.creditNoteNumber ?? cn.id)}</span>
+                  <span>${formatPrice(Number(cn.credit_amount ?? cn.creditAmount ?? 0))}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Resolve dispute</DialogTitle>
+              <DialogDescription>
+                Choose how to close this dispute for the restaurant.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
               <div>
-                <Label>Credit amount</Label>
-                <Input
-                  type="number"
-                  value={creditAmount}
-                  onChange={(e) => setCreditAmount(e.target.value)}
+                <Label>Resolution</Label>
+                <select
+                  className="w-full h-10 rounded-md border px-3 text-sm"
+                  value={resolutionType}
+                  onChange={(e) => setResolutionType(e.target.value)}
+                >
+                  <option value="credit_note">Credit note</option>
+                  <option value="replacement">Replacement</option>
+                  <option value="refund">Refund</option>
+                  <option value="no_action">No action</option>
+                </select>
+              </div>
+              {resolutionType === 'credit_note' && (
+                <div>
+                  <Label>Credit amount</Label>
+                  <Input
+                    type="number"
+                    value={creditAmount}
+                    onChange={(e) => setCreditAmount(e.target.value)}
+                  />
+                </div>
+              )}
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
                 />
               </div>
-            )}
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                value={resolutionNotes}
-                onChange={(e) => setResolutionNotes(e.target.value)}
-              />
             </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleResolve} disabled={resolving}>
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button onClick={handleResolve} disabled={resolving}>
+                Confirm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject dispute</DialogTitle>
-            <DialogDescription>Explain why this dispute is rejected.</DialogDescription>
-          </DialogHeader>
-          <Textarea
-            placeholder="Reason for rejection (required)"
-            value={resolutionNotes}
-            onChange={(e) => setResolutionNotes(e.target.value)}
-          />
-          <DialogFooter>
-            <Button variant="destructive" onClick={handleReject} disabled={rejecting}>
-              Reject
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reject dispute</DialogTitle>
+              <DialogDescription>Explain why this dispute is rejected.</DialogDescription>
+            </DialogHeader>
+            <Textarea
+              placeholder="Reason for rejection (required)"
+              value={resolutionNotes}
+              onChange={(e) => setResolutionNotes(e.target.value)}
+            />
+            <DialogFooter>
+              <Button variant="destructive" onClick={handleReject} disabled={rejecting}>
+                Reject
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </RequirePermission>
   )
 }

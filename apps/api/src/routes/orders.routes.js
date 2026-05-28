@@ -138,6 +138,7 @@ const deliveryStatusSchema = z.enum([
   'out_for_delivery',
   'delivered',
   'failed',
+  'rescheduled',
 ])
 
 const orderUpdateSchema = z.object({
