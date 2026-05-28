@@ -242,6 +242,8 @@ router.get(
   }
 )
 
+const BOOST_PRICING_WHERE = `package_type = 'boost' OR pricing_key LIKE 'boost_%'`
+
 router.get(
   '/pricing',
   requireAuth,
@@ -250,7 +252,13 @@ router.get(
   async (req, res, next) => {
     try {
       const { rows } = await query(
-        `SELECT * FROM promotion_pricing_config WHERE is_active = TRUE ORDER BY amount ASC`
+        `
+        SELECT *
+        FROM promotion_pricing_config
+        WHERE is_active = TRUE
+          AND (${BOOST_PRICING_WHERE})
+        ORDER BY sort_order ASC, amount ASC
+        `
       )
       res.json({ ok: true, data: { pricing: rows }, error: null, requestId: req.requestId })
     } catch (err) {
@@ -258,6 +266,17 @@ router.get(
     }
   }
 )
+
+router.get('/admin/pricing', ...adminDealGuards, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM promotion_pricing_config ORDER BY sort_order ASC, amount ASC`
+    )
+    res.json({ ok: true, data: { pricing: rows }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
 
 router.get('/admin/deals', ...adminDealGuards, async (req, res, next) => {
   try {
@@ -461,7 +480,10 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
       notifyDealApproved(approvedDeal, {
         supplierName: supplierRows[0]?.name,
       }).catch((err) => {
-        logger.error('Deal approval notifications failed', { err: err.message, dealId: approvedDeal.id })
+        logger.error('Deal approval notifications failed', {
+          err: err.message,
+          dealId: approvedDeal.id,
+        })
       })
     }
 
@@ -525,6 +547,10 @@ router.patch('/admin/pricing/:key', ...adminDealGuards, async (req, res, next) =
         isActive: z.boolean().optional(),
         displayName: z.string().optional(),
         description: z.string().optional().nullable(),
+        estimatedReachLabel: z.string().optional().nullable(),
+        badgeLabel: z.string().optional().nullable(),
+        isRecommended: z.boolean().optional(),
+        sortOrder: z.number().int().optional(),
       })
       .parse(req.body)
 
@@ -537,6 +563,10 @@ router.patch('/admin/pricing/:key', ...adminDealGuards, async (req, res, next) =
       isActive: 'is_active',
       displayName: 'display_name',
       description: 'description',
+      estimatedReachLabel: 'estimated_reach_label',
+      badgeLabel: 'badge_label',
+      isRecommended: 'is_recommended',
+      sortOrder: 'sort_order',
     }
     for (const [key, col] of Object.entries(map)) {
       if (body[key] !== undefined) {
@@ -1201,7 +1231,11 @@ router.post('/:id/promote', async (req, res, next) => {
       requestId: req.requestId,
     })
   } catch (err) {
-    if (err.message === 'Deal not found' || err.message?.includes('Only active')) {
+    if (
+      err.message === 'Deal not found' ||
+      err.message?.includes('Only active') ||
+      err.message?.includes('not available')
+    ) {
       next(new ValidationError(err.message))
     } else {
       next(err)

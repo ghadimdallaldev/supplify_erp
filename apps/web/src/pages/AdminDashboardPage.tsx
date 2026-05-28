@@ -75,8 +75,7 @@ import {
 import { formatCurrency } from '../utils/format'
 import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
 import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
-import { AdminLimitOverridesPanel } from '../components/admin/AdminLimitOverridesPanel'
-import { AdminLocationAddonsPanel } from '../components/admin/AdminLocationAddonsPanel'
+import { AdminLimitsTab } from '../components/admin/AdminLimitsTab'
 import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
 
@@ -2617,10 +2616,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         </TabsContent>
 
         <TabsContent value="limits">
-          <div className="space-y-10">
-            <AdminLocationAddonsPanel />
-            <AdminLimitOverridesPanel />
-          </div>
+          <AdminLimitsTab />
         </TabsContent>
 
         {/* ─── ACTIVITY FEED ──────────────────────────────────────────── */}

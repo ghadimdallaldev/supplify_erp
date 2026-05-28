@@ -2152,6 +2152,10 @@ export const api = createApi({
     getPromotionPricing: builder.query<{ pricing: Array<Record<string, unknown>> }, void>({
       query: () => '/api/promotions/pricing',
     }),
+    getAdminPromotionPricing: builder.query<{ pricing: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/promotions/admin/pricing',
+      providesTags: ['Promotions'],
+    }),
     getDealDetail: builder.query<{ deal: Record<string, unknown> }, string>({
       query: (id) => `/api/promotions/${id}/detail`,
       providesTags: (_r, _e, id) => [{ type: 'Promotions', id }],
@@ -2273,6 +2277,10 @@ export const api = createApi({
         isActive?: boolean
         displayName?: string
         description?: string
+        estimatedReachLabel?: string | null
+        badgeLabel?: string | null
+        isRecommended?: boolean
+        sortOrder?: number
       }
     >({
       query: ({ key, ...body }) => ({
@@ -2325,6 +2333,40 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['Admin'],
+    }),
+    createAdminTenantLimitOverride: builder.mutation<
+      { override: Record<string, unknown> },
+      {
+        tenantType: 'RESTAURANT' | 'SUPPLIER'
+        tenantId: string
+        limit_type: string
+        override_value: number
+        expiration_date?: string | null
+        reason?: string | null
+      }
+    >({
+      query: ({ tenantType, tenantId, ...body }) => ({
+        url: `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/override-limit`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Admin'],
+    }),
+    getAdminEffectiveLimit: builder.query<
+      {
+        resolved: {
+          baseLimit: number | null
+          effectiveLimit: number | null
+          tenantOverride?: unknown
+          planOverride?: unknown
+        }
+        usage: { current?: number; limit?: number }
+      },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string; limitKey: string }
+    >({
+      query: ({ tenantType, tenantId, limitKey }) =>
+        `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/effective-limit/${limitKey}`,
     }),
     updateAdminTenantLimitOverride: builder.mutation<
       { override: Record<string, unknown> },
@@ -2341,6 +2383,7 @@ export const api = createApi({
         method: 'PATCH',
         body,
       }),
+      invalidatesTags: ['Admin'],
     }),
     updateAdminPlanLimitOverride: builder.mutation<
       { override: Record<string, unknown> },
@@ -2357,18 +2400,27 @@ export const api = createApi({
         method: 'PATCH',
         body,
       }),
+      invalidatesTags: ['Admin'],
     }),
     getAdminSubscriptionAddons: builder.query<
       {
         billingTenantId: string
+        tenantName?: string | null
+        billingTenantName?: string | null
+        usesOrgBilling?: boolean
         addons: Array<Record<string, unknown>>
         locationLimits: Record<string, unknown>
         planCode: string | null
+        planName?: string | null
+        overrides?: Array<Record<string, unknown>>
       },
       { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string }
     >({
       query: ({ tenantType, tenantId }) =>
         `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/subscription-addons`,
+      providesTags: (_r, _e, { tenantId, tenantType }) => [
+        { type: 'Admin', id: `addons-${tenantType}-${tenantId}` },
+      ],
     }),
     upsertAdminSubscriptionAddon: builder.mutation<
       { addon: Record<string, unknown> | null; cancelled?: boolean },
@@ -2386,6 +2438,10 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
+      invalidatesTags: (_r, _e, { tenantId, tenantType }) => [
+        { type: 'Admin', id: `addons-${tenantType}-${tenantId}` },
+        'Admin',
+      ],
     }),
 
     // Reviews
@@ -3211,6 +3267,7 @@ export const {
   useDeletePromotionMutation,
   useGetPromotionAnalyticsQuery,
   useGetPromotionPricingQuery,
+  useGetAdminPromotionPricingQuery,
   useGetDealDetailQuery,
   useGetEligibleDealProductsQuery,
   useRecordDealInteractionMutation,
@@ -3230,6 +3287,8 @@ export const {
   useGetAdminLimitKeysQuery,
   useGetAdminLimitOverridesQuery,
   useCreateAdminPlanLimitOverrideMutation,
+  useCreateAdminTenantLimitOverrideMutation,
+  useGetAdminEffectiveLimitQuery,
   useUpdateAdminTenantLimitOverrideMutation,
   useUpdateAdminPlanLimitOverrideMutation,
   useUpdateAdminPromotionPricingMutation,
@@ -3259,6 +3318,8 @@ export const {
   useCreateAdminPlanMutation,
   useUpdateAdminPlanMutation,
   useGetAdminSubscriptionsQuery,
+  useGetAdminSubscriptionAddonsQuery,
+  useUpsertAdminSubscriptionAddonMutation,
   useUpdateAdminSubscriptionMutation,
   usePreviewSubscriptionPlanChangeMutation,
   useGetTenantUsageQuery,

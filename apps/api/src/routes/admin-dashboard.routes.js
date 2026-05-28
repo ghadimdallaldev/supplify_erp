@@ -12,6 +12,7 @@ import {
   verifyImpersonationToken,
   getImpersonationCookieName,
   getEffectiveTenant,
+  clearImpersonationCookie,
 } from '../lib/impersonation.js'
 import {
   getEntitlements,
@@ -23,6 +24,7 @@ import {
 } from '../lib/subscription.js'
 import { resolveEffectiveLimit } from '../lib/limit-resolution.js'
 import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
+import { clearActiveTenantCookie } from '../lib/tenant-switch.js'
 import {
   defaultAddonUnitPrice,
   getActiveTenantAddons,
@@ -1702,13 +1704,8 @@ router.post('/impersonate', async (req, res) => {
 router.post('/impersonate/stop', async (req, res) => {
   try {
     const ctx = req.impersonationContext
-    // Clear with same options as setCookie so the browser actually removes it
-    res.clearCookie(getImpersonationCookieName(), {
-      path: '/',
-      httpOnly: true,
-      secure: config.NODE_ENV === 'production',
-      sameSite: 'lax',
-    })
+    clearImpersonationCookie(res)
+    clearActiveTenantCookie(res)
 
     if (ctx) {
       await logAudit(
@@ -1855,6 +1852,109 @@ router.get('/tenants/restaurants', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get restaurants' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * GET /api/admin-dashboard/tenants/search?q=&type=RESTAURANT|SUPPLIER&orgMainOnly=true
+ * Lightweight tenant lookup for admin limits / billing tools.
+ */
+router.get('/tenants/search', async (req, res) => {
+  try {
+    const q = String(req.query.q || '')
+      .trim()
+      .toLowerCase()
+    const type = req.query.type ? String(req.query.type).toUpperCase() : null
+    const orgMainOnly = req.query.orgMainOnly === 'true'
+    const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 100)
+
+    const results = []
+
+    const matchesQuery = (row) => {
+      if (!q) return true
+      const haystack = [
+        row.name,
+        row.slug,
+        row.contact_email,
+        row.sales_contact_email,
+        row.plan_code,
+        row.plan_name,
+        row.subscription_status,
+        row.id,
+        row.tenant_type,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    }
+
+    if (!type || type === 'SUPPLIER') {
+      const { rows } = await query(`
+        SELECT
+          s.id,
+          s.name,
+          s.slug,
+          s.organization_id,
+          s.is_main_branch,
+          COALESCE(s.contact_email, s.sales_contact_email, s.accounting_contact_email) AS contact_email,
+          sub.status AS subscription_status,
+          sub.plan_name,
+          (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) AS plan_code,
+          'SUPPLIER' AS tenant_type
+        FROM supplier s
+        LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER'
+          AND sub.status IN ('ACTIVE', 'TRIALING')
+        ORDER BY s.name
+      `)
+      for (const row of rows) {
+        if (orgMainOnly && row.is_main_branch === false) continue
+        if (!matchesQuery(row)) continue
+        results.push(row)
+      }
+    }
+
+    if (!type || type === 'RESTAURANT') {
+      const { rows } = await query(`
+        SELECT
+          r.id,
+          r.name,
+          r.slug,
+          r.organization_id,
+          r.is_main_branch,
+          r.contact_email,
+          sub.status AS subscription_status,
+          sub.plan_name,
+          (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) AS plan_code,
+          'RESTAURANT' AS tenant_type
+        FROM restaurant r
+        LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT'
+          AND sub.status IN ('ACTIVE', 'TRIALING')
+        ORDER BY r.name
+      `)
+      for (const row of rows) {
+        if (orgMainOnly && row.is_main_branch === false) continue
+        if (!matchesQuery(row)) continue
+        results.push(row)
+      }
+    }
+
+    results.sort((a, b) => String(a.name).localeCompare(String(b.name)))
+
+    res.json({
+      ok: true,
+      data: { tenants: results.slice(0, limit) },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Tenant search error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to search tenants' },
       requestId: req.requestId,
     })
   }
@@ -2484,13 +2584,26 @@ router.get('/tenants/:tenantType/:id/subscription-addons', async (req, res) => {
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
     const entitlements = await getEntitlements(tenantId, tenantType)
     const addons = await getActiveTenantAddons(billingTenantId, tenantType)
+    const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+    const { rows: tenantRows } = await query(`SELECT id, name FROM ${table} WHERE id = $1`, [
+      tenantId,
+    ])
+    const { rows: billingRows } =
+      billingTenantId !== tenantId
+        ? await query(`SELECT id, name FROM ${table} WHERE id = $1`, [billingTenantId])
+        : tenantRows
     res.json({
       ok: true,
       data: {
         billingTenantId,
+        tenantName: tenantRows[0]?.name ?? null,
+        billingTenantName: billingRows[0]?.name ?? tenantRows[0]?.name ?? null,
+        usesOrgBilling: billingTenantId !== tenantId,
         addons,
         locationLimits: entitlements?.locationLimits ?? {},
         planCode: entitlements?.plan?.code ?? null,
+        planName: entitlements?.plan?.name ?? null,
+        overrides: entitlements?.overrides ?? [],
       },
       error: null,
       requestId: req.requestId,
