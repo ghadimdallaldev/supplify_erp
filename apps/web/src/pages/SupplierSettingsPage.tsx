@@ -54,11 +54,14 @@ import {
   warehousesFeatureEnabled,
   multiWarehousePlanEnabled,
   isMultiWarehouseActive,
+  featureEnabled,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { formatAddressLine, normalizeAddress } from '../lib/address'
 import { ActivityLogTab } from '../components/ActivityLogTab'
 import { DriversSettingsPanel } from '../components/fulfillment/DriversSettingsPanel'
+import { TeamRolesPanel } from '../components/TeamRolesPanel'
+import { BranchInvitationsPanel } from '../components/org/BranchInvitationsPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import {
   useGetSupplierMeQuery,
@@ -165,6 +168,7 @@ export function SupplierSettingsPage() {
     useUpdateNotificationPreferencesMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
+  const tenantAuditEnabled = featureEnabled(entitlements?.features?.tenant_audit_log)
   const supplier = supplierData?.supplier
   const warehousesEnabled = warehousesFeatureEnabled(entitlements)
   const multiWarehousePlan = multiWarehousePlanEnabled(entitlements)
@@ -574,6 +578,11 @@ export function SupplierSettingsPage() {
           <TabsTrigger value="contacts" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Contacts
           </TabsTrigger>
+          {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
+            <TabsTrigger value="team" className="flex-1 min-w-[5.5rem] sm:flex-none">
+              Team & roles
+            </TabsTrigger>
+          )}
           <TabsTrigger value="business" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Business
           </TabsTrigger>
@@ -595,7 +604,7 @@ export function SupplierSettingsPage() {
           <TabsTrigger value="plan" className="flex-1 min-w-[5.5rem] sm:flex-none">
             Plan & usage
           </TabsTrigger>
-          {can('SETTINGS_VIEW') && (
+          {can('SETTINGS_VIEW') && tenantAuditEnabled && (
             <TabsTrigger value="activity" className="flex-1 min-w-[5.5rem] sm:flex-none">
               Activity
             </TabsTrigger>
@@ -1032,7 +1041,9 @@ export function SupplierSettingsPage() {
             <Card>
               <CardContent className="py-8 text-center">
                 <p className="text-[var(--text-muted)] mb-3">
-                  Warehouse management requires Bronze or higher.
+                  Warehouse management requires Silver or higher. Free accounts do not include
+                  warehouse locations; any legacy default warehouse from older data is not usable
+                  until you upgrade.
                 </p>
                 <Button
                   variant="outline"
@@ -1080,8 +1091,8 @@ export function SupplierSettingsPage() {
                 <CardContent>
                   {!canAddWarehouse && (
                     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      Additional warehouses are not available on the Free plan. Upgrade to Bronze or
-                      higher to add warehouse locations.
+                      Your plan does not allow additional warehouses. Upgrade to Silver or higher to
+                      add locations. (Free tier: 0 warehouses; legacy default rows are not counted.)
                     </div>
                   )}
                   <div className="space-y-3">
@@ -1132,6 +1143,27 @@ export function SupplierSettingsPage() {
         <TabsContent value="branches" className="space-y-4">
           <BranchAccountsPanel entityLabel="supplier location" />
         </TabsContent>
+
+        {(can('STAFF_VIEW') || can('SETTINGS_VIEW')) && (
+          <TabsContent value="team" className="space-y-4">
+            <TeamRolesPanel
+              tenantType="SUPPLIER"
+              renderInviteForm={
+                can('STAFF_INVITE') && supplier?.id
+                  ? () => (
+                      <p className="text-sm text-[var(--text-muted)] mt-2">
+                        Use branch invitations below to invite staff with a role. Each person can
+                        only belong to one supplier account.
+                      </p>
+                    )
+                  : undefined
+              }
+            />
+            {can('STAFF_INVITE') && supplier?.id && (
+              <BranchInvitationsPanel supplierId={supplier.id} branchName={supplier.name} />
+            )}
+          </TabsContent>
+        )}
 
         <TabsContent value="notifications" className="space-y-4">
           <Card>
@@ -1250,7 +1282,7 @@ export function SupplierSettingsPage() {
           <DriversSettingsPanel />
         </TabsContent>
 
-        {can('SETTINGS_VIEW') && (
+        {can('SETTINGS_VIEW') && tenantAuditEnabled && (
           <TabsContent value="activity" className="space-y-4">
             <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
           </TabsContent>

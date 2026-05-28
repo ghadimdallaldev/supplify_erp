@@ -15,6 +15,7 @@ import { Badge } from '../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Input } from '../components/ui/input'
 import { formatPrice } from '../utils/format'
+import { pageHeaderRowClass, splitRowClass } from '../components/ui/card-layout'
 import {
   MapPin,
   CheckCircle,
@@ -40,6 +41,7 @@ import { isMultiWarehouseActive } from '../lib/planLimits'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { DriverDispatchBoard } from '../components/fulfillment/DriverDispatchBoard'
+import { RequirePermission } from '../components/RequirePermission'
 import {
   Dialog,
   DialogContent,
@@ -264,335 +266,345 @@ export function FulfillmentPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-[21px] font-black text-[var(--text)]">Fulfillment & Logistics</h1>
-        <p className="text-[var(--text-muted)] mt-2">
-          Pick lists, driver dispatch, and delivery tracking.
-        </p>
-      </div>
-
-      {multiWarehouseActive && warehouses.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3">
-          <label htmlFor="fulfillment-warehouse" className="text-sm font-medium text-[var(--text)]">
-            Warehouse
-          </label>
-          <select
-            id="fulfillment-warehouse"
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm min-w-[220px]"
-            value={selectedWarehouseId}
-            onChange={(e) => setSelectedWarehouseId(e.target.value)}
-          >
-            <option value="">All warehouses</option>
-            {warehouses.map((wh: { id: string; name: string }) => (
-              <option key={wh.id} value={wh.id}>
-                {wh.name}
-              </option>
-            ))}
-          </select>
+    <RequirePermission permission="FULFILLMENT_VIEW" title="fulfillment">
+      <div className="space-y-6 p-6">
+        <div>
+          <h1 className="text-[21px] font-black text-[var(--text)]">Fulfillment & Logistics</h1>
+          <p className="text-[var(--text-muted)] mt-2">
+            Pick lists, driver dispatch, and delivery tracking.
+          </p>
         </div>
-      )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="dispatch">Driver Dispatch</TabsTrigger>
-          <TabsTrigger value="picklists">Pick Lists</TabsTrigger>
-          <TabsTrigger value="routes">Routes</TabsTrigger>
-          <TabsTrigger value="tracking">Delivery Tracking</TabsTrigger>
-          <TabsTrigger value="exceptions" className="relative">
-            Exceptions
-            {(exceptionsResponse?.openCount ?? 0) > 0 && (
-              <span className="ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--red)] px-1 text-[10px] font-bold text-white">
-                {exceptionsResponse?.openCount}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        {multiWarehouseActive && warehouses.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <label
+              htmlFor="fulfillment-warehouse"
+              className="text-sm font-medium text-[var(--text)]"
+            >
+              Warehouse
+            </label>
+            <select
+              id="fulfillment-warehouse"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm min-w-[220px]"
+              value={selectedWarehouseId}
+              onChange={(e) => setSelectedWarehouseId(e.target.value)}
+            >
+              <option value="">All warehouses</option>
+              {warehouses.map((wh: { id: string; name: string }) => (
+                <option key={wh.id} value={wh.id}>
+                  {wh.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-        <TabsContent value="dispatch" className="space-y-4">
-          {dispatchData ? (
-            <DriverDispatchBoard
-              data={dispatchData}
-              warehouseId={warehouseFilter?.warehouseId}
-              isLoading={dispatchLoading}
-            />
-          ) : (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-10 w-10 animate-spin text-[var(--brand-mid)]" />
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="picklists" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <ClipboardList className="h-5 w-5" />
-                    Pick Lists
-                  </CardTitle>
-                  <CardDescription>Mobile-friendly picking interface</CardDescription>
-                </div>
-                <Input placeholder="Search pick list..." className="w-64" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {shippedOrders.length === 0 ? (
-                <div className="text-center py-8 text-[var(--text-muted)]">
-                  No orders ready for picking. Orders will appear here when they reach SHIPPED
-                  status.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {shippedOrders.map((order) => (
-                    <div
-                      key={order.id}
-                      className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Link to={`/app/orders/${order.id}`}>
-                              <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer">
-                                #{order.orderNumber}
-                              </h4>
-                            </Link>
-                            <Badge
-                              variant={
-                                order.status === 'SHIPPED'
-                                  ? 'default'
-                                  : order.status === 'PROCESSING'
-                                    ? 'secondary'
-                                    : 'outline'
-                              }
-                            >
-                              {order.status}
-                            </Badge>
-                          </div>
-                          <div className="text-sm text-[var(--text-muted)] space-y-1">
-                            <p>Restaurant: {order.restaurantName}</p>
-                            <p>
-                              Items: {order.itemCount} | Total: {formatPrice(order.totalAmount)}
-                            </p>
-                            <p>Placed: {new Date(order.placedAt).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to={`/app/orders/${order.id}`}>View Details</Link>
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            View Mobile
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="dispatch">Driver Dispatch</TabsTrigger>
+            <TabsTrigger value="picklists">Pick Lists</TabsTrigger>
+            <TabsTrigger value="routes">Routes</TabsTrigger>
+            <TabsTrigger value="tracking">Delivery Tracking</TabsTrigger>
+            <TabsTrigger value="exceptions" className="relative">
+              Exceptions
+              {(exceptionsResponse?.openCount ?? 0) > 0 && (
+                <span className="ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--red)] px-1 text-[10px] font-bold text-white">
+                  {exceptionsResponse?.openCount}
+                </span>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="routes" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Delivery Routes
-                  </CardTitle>
-                  <CardDescription>Route planning and sequencing</CardDescription>
-                </div>
-                <Button>Plan New Route</Button>
+          <TabsContent value="dispatch" className="space-y-4">
+            {dispatchData ? (
+              <DriverDispatchBoard
+                data={dispatchData}
+                warehouseId={warehouseFilter?.warehouseId}
+                isLoading={dispatchLoading}
+              />
+            ) : (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-10 w-10 animate-spin text-[var(--brand-mid)]" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {routeSummaries.length === 0 ? (
+            )}
+          </TabsContent>
+
+          <TabsContent value="picklists" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className={splitRowClass}>
+                  <div className="min-w-0">
+                    <CardTitle className="flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5 shrink-0" />
+                      Pick Lists
+                    </CardTitle>
+                    <CardDescription>Mobile-friendly picking interface</CardDescription>
+                  </div>
+                  <Input placeholder="Search pick list..." className="w-full sm:w-64 shrink-0" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {shippedOrders.length === 0 ? (
                   <div className="text-center py-8 text-[var(--text-muted)]">
-                    No delivery routes planned yet.
+                    No orders ready for picking. Orders will appear here when they reach SHIPPED
+                    status.
                   </div>
                 ) : (
-                  routeSummaries.map((route) => (
-                    <div key={route.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="font-semibold">{route.routeNumber}</h4>
-                            <Badge
-                              variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}
-                            >
-                              {route.status}
-                            </Badge>
-                          </div>
-                          <div className="text-sm text-[var(--text-muted)] space-y-1">
-                            <p>Driver: {route.driver}</p>
-                            <p>
-                              Vehicle: {route.vehicle} | Stops: {route.stops}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            View Map
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            Manifest
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tracking" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
-                Delivery Tracking & POD
-              </CardTitle>
-              <CardDescription>Real-time delivery status and proof of delivery</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {shippedOrders.length === 0 ? (
-                <div className="text-center py-8 text-[var(--text-muted)]">
-                  No deliveries currently in transit
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {shippedOrders
-                    .filter((o) => o.status === 'SHIPPED')
-                    .map((order) => (
-                      <div key={order.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <Link to={`/app/orders/${order.id}`}>
-                              <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer">
-                                Order #{order.orderNumber}
-                              </h4>
-                            </Link>
-                            <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
+                  <div className="space-y-4">
+                    {shippedOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)]"
+                      >
+                        <div className={splitRowClass}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <Link to={`/app/orders/${order.id}`} className="min-w-0">
+                                <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer truncate">
+                                  #{order.orderNumber}
+                                </h4>
+                              </Link>
+                              <Badge
+                                variant={
+                                  order.status === 'SHIPPED'
+                                    ? 'default'
+                                    : order.status === 'PROCESSING'
+                                      ? 'secondary'
+                                      : 'outline'
+                                }
+                              >
+                                {order.status}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-[var(--text-muted)] space-y-1">
                               <p>Restaurant: {order.restaurantName}</p>
                               <p>
                                 Items: {order.itemCount} | Total: {formatPrice(order.totalAmount)}
                               </p>
-                              <p>Status: {order.status}</p>
+                              <p>Placed: {new Date(order.placedAt).toLocaleDateString()}</p>
                             </div>
                           </div>
-                          <Badge variant="default" className="flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3" />
-                            Shipped
-                          </Badge>
+                          <div className="flex flex-wrap gap-2 shrink-0">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="whitespace-normal"
+                              asChild
+                            >
+                              <Link to={`/app/orders/${order.id}`}>View Details</Link>
+                            </Button>
+                            <Button variant="outline" size="sm" className="whitespace-normal">
+                              View Mobile
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="exceptions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                Delivery Exceptions & Returns
-              </CardTitle>
-              <CardDescription>Handle short/over deliveries and returns</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {exceptions.length === 0 ? (
-                  <div className="text-center py-8 text-[var(--text-muted)]">
-                    No delivery exceptions recorded.
                   </div>
-                ) : (
-                  exceptions.map((ex) => (
-                    <div key={ex.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold">
-                            {ex.orderLabel} â€” {ex.exceptionType.replace(/_/g, ' ')}
-                          </h4>
-                          <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
-                            {ex.productName && <p>Product: {ex.productName}</p>}
-                            {(ex.quantityExpected != null || ex.quantityActual != null) && (
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="routes" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className={splitRowClass}>
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      Delivery Routes
+                    </CardTitle>
+                    <CardDescription>Route planning and sequencing</CardDescription>
+                  </div>
+                  <Button>Plan New Route</Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {routeSummaries.length === 0 ? (
+                    <div className="text-center py-8 text-[var(--text-muted)]">
+                      No delivery routes planned yet.
+                    </div>
+                  ) : (
+                    routeSummaries.map((route) => (
+                      <div key={route.id} className="border rounded-lg p-4">
+                        <div className={splitRowClass}>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <h4 className="font-semibold">{route.routeNumber}</h4>
+                              <Badge
+                                variant={route.status === 'IN_PROGRESS' ? 'default' : 'secondary'}
+                              >
+                                {route.status}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-[var(--text-muted)] space-y-1">
+                              <p>Driver: {route.driver}</p>
                               <p>
-                                Expected: {ex.quantityExpected ?? 'â€”'}, Actual:{' '}
-                                {ex.quantityActual ?? 'â€”'}
+                                Vehicle: {route.vehicle} | Stops: {route.stops}
                               </p>
-                            )}
-                            {ex.damageDescription && <p>{ex.damageDescription}</p>}
-                            {ex.notes && <p>{ex.notes}</p>}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 shrink-0">
+                            <Button variant="outline" size="sm" className="whitespace-normal">
+                              View Map
+                            </Button>
+                            <Button variant="outline" size="sm" className="whitespace-normal">
+                              Manifest
+                            </Button>
                           </div>
                         </div>
-                        <Badge variant="destructive">Exception</Badge>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-      <Dialog
-        open={!!proofStop}
-        onOpenChange={(open) => {
-          if (!open) {
-            setProofStop(null)
-            setRecipientName('')
-            setProofNotes('')
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Capture proof of delivery</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="recipientName">Recipient name</Label>
-              <Input
-                id="recipientName"
-                value={recipientName}
-                onChange={(event) => setRecipientName(event.target.value)}
-                placeholder="Who signed for the delivery?"
-              />
+          <TabsContent value="tracking" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Truck className="h-5 w-5" />
+                  Delivery Tracking & POD
+                </CardTitle>
+                <CardDescription>Real-time delivery status and proof of delivery</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {shippedOrders.length === 0 ? (
+                  <div className="text-center py-8 text-[var(--text-muted)]">
+                    No deliveries currently in transit
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {shippedOrders
+                      .filter((o) => o.status === 'SHIPPED')
+                      .map((order) => (
+                        <div key={order.id} className="border rounded-lg p-4">
+                          <div className={splitRowClass}>
+                            <div className="flex-1 min-w-0">
+                              <Link to={`/app/orders/${order.id}`}>
+                                <h4 className="font-semibold hover:text-[var(--brand-mid)] cursor-pointer truncate">
+                                  Order #{order.orderNumber}
+                                </h4>
+                              </Link>
+                              <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
+                                <p>Restaurant: {order.restaurantName}</p>
+                                <p>
+                                  Items: {order.itemCount} | Total: {formatPrice(order.totalAmount)}
+                                </p>
+                                <p>Status: {order.status}</p>
+                              </div>
+                            </div>
+                            <Badge variant="default" className="flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Shipped
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="exceptions" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  Delivery Exceptions & Returns
+                </CardTitle>
+                <CardDescription>Handle short/over deliveries and returns</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {exceptions.length === 0 ? (
+                    <div className="text-center py-8 text-[var(--text-muted)]">
+                      No delivery exceptions recorded.
+                    </div>
+                  ) : (
+                    exceptions.map((ex) => (
+                      <div key={ex.id} className="border rounded-lg p-4">
+                        <div className={splitRowClass}>
+                          <div className="min-w-0">
+                            <h4 className="font-semibold break-words">
+                              {ex.orderLabel} - {ex.exceptionType.replace(/_/g, ' ')}
+                            </h4>
+                            <div className="text-sm text-[var(--text-muted)] space-y-1 mt-1">
+                              {ex.productName && <p>Product: {ex.productName}</p>}
+                              {(ex.quantityExpected != null || ex.quantityActual != null) && (
+                                <p>
+                                  Expected: {ex.quantityExpected ?? '-'}, Actual:{' '}
+                                  {ex.quantityActual ?? '-'}
+                                </p>
+                              )}
+                              {ex.damageDescription && <p>{ex.damageDescription}</p>}
+                              {ex.notes && <p>{ex.notes}</p>}
+                            </div>
+                          </div>
+                          <Badge variant="destructive">Exception</Badge>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <Dialog
+          open={!!proofStop}
+          onOpenChange={(open) => {
+            if (!open) {
+              setProofStop(null)
+              setRecipientName('')
+              setProofNotes('')
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Capture proof of delivery</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="recipientName">Recipient name</Label>
+                <Input
+                  id="recipientName"
+                  value={recipientName}
+                  onChange={(event) => setRecipientName(event.target.value)}
+                  placeholder="Who signed for the delivery?"
+                />
+              </div>
+              <div>
+                <Label htmlFor="proofNotes">Notes (optional)</Label>
+                <Textarea
+                  id="proofNotes"
+                  value={proofNotes}
+                  onChange={(event) => setProofNotes(event.target.value)}
+                  rows={3}
+                  placeholder="Any additional details (e.g. temperature, issues, etc.)"
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="proofNotes">Notes (optional)</Label>
-              <Textarea
-                id="proofNotes"
-                value={proofNotes}
-                onChange={(event) => setProofNotes(event.target.value)}
-                rows={3}
-                placeholder="Any additional details (e.g. temperature, issues, etc.)"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setProofStop(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmitProof} disabled={capturingProof}>
-              {capturingProof && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save proof
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setProofStop(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmitProof} disabled={capturingProof}>
+                {capturingProof && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save proof
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </RequirePermission>
   )
 }
 
@@ -776,8 +788,8 @@ function DispatchColumn({
             <div>
               <p className="font-medium text-[var(--text)]">{route.route_number}</p>
               <p>
-                <span className="font-semibold text-[var(--text)]">{route.status}</span> â€¢
-                Scheduled {new Date(route.scheduled_date).toLocaleDateString()}
+                <span className="font-semibold text-[var(--text)]">{route.status}</span> · Scheduled{' '}
+                {new Date(route.scheduled_date).toLocaleDateString()}
               </p>
             </div>
           </div>

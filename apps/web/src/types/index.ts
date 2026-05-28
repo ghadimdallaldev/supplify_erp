@@ -3,12 +3,26 @@ export interface User {
   id: string
   email: string
   displayName: string
-  role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'PENDING'
+  role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'PENDING' | 'STAFF_PORTAL'
+  /** platform = main app; staff_portal = operational staff only */
+  accessType?: 'platform' | 'staff_portal'
+  staffPortal?: {
+    staffId: string
+    restaurantId: string
+    displayName?: string | null
+  } | null
   createdAt: string
   /** Tenant-scoped role codes (e.g. RESTAURANT_OWNER, SUPPLIER_STAFF) */
   tenantRoles?: string[]
   /** Tenant-scoped permission codes for RBAC nav gating */
   tenantPermissions?: string[]
+  /** Active workspace (supplier/restaurant account + role label) */
+  workspace?: {
+    tenantId: string
+    tenantType: 'SUPPLIER' | 'RESTAURANT'
+    tenantName: string
+    roleName: string | null
+  }
   /** Admin role codes when user.role === 'ADMIN' */
   adminRoles?: string[]
   /** Admin permission codes for admin nav gating */
@@ -100,6 +114,8 @@ export interface Order {
   updated_at: string
   restaurant_name?: string
   restaurant_slug?: string
+  cancel_reason?: string | null
+  cancelled_by?: 'RESTAURANT' | 'SUPPLIER' | null
   items?: OrderItem[]
 }
 
@@ -125,6 +141,8 @@ export interface CreateOrderRequest {
     notes?: string
   }[]
   status?: 'DRAFT' | 'PLACED'
+  promotionId?: string
+  couponCode?: string
 }
 
 export interface CreateManualOrderRequest {
@@ -148,6 +166,8 @@ export interface UpdateOrderRequest {
     | 'COMPLETED'
     | 'CANCELLED'
   notes?: string
+  cancel_reason?: string
+  decline_reason?: string
   delivery_status?: 'assigned' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed'
   failure_reason?: string
 }
@@ -598,6 +618,7 @@ export interface Reservation {
   status: ReservationStatus
   customer_name: string
   customer_phone?: string | null
+  customer_email?: string | null
   party_size: number
   scheduled_at: string
   duration_minutes: number
@@ -647,6 +668,15 @@ export interface ReservationAnalyticsResponse {
 export type StaffStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
 export type StaffWageType = 'HOURLY' | 'SALARY' | 'CONTRACT' | 'OTHER'
 
+export interface StaffPortalAccessInfo {
+  hasAccount: boolean
+  enabled: boolean
+  status: 'none' | 'invited' | 'active' | 'disabled'
+  invitedAt?: string | null
+  lastLoginAt?: string | null
+  disabledAt?: string | null
+}
+
 export interface StaffMember {
   id: string
   restaurantId: string
@@ -661,6 +691,7 @@ export interface StaffMember {
   wageRate?: number | null
   hireDate?: string | null
   profileColor?: string | null
+  portalAccess?: StaffPortalAccessInfo
   createdAt: string
   updatedAt: string
 }
@@ -863,7 +894,7 @@ export interface StaffPayrollExport {
 // Admin Dashboard types
 export interface SubscriptionPlan {
   id: string
-  code: string // free, bronze, gold, platinum
+  code: string // free, silver, gold, platinum
   name: string
   description?: string
   price_per_month: number
@@ -927,6 +958,7 @@ export interface Entitlements {
   }>
   usage: Record<string, number>
   usageWindowMeta?: Record<string, { date?: string }>
+  freeSandbox?: { expiresAt: string | null } | null
 }
 
 export interface AdminFeatureFlag {
@@ -1065,11 +1097,21 @@ export interface PublicAvailabilitySlot {
   startTime: string
   endTime: string
   capacityAvailable: number
+  seatsLeft?: number
   isAvailable: boolean
+  status?: 'available' | 'limited' | 'full' | 'past'
 }
 
 export interface PublicAvailabilityResponse {
   slots: PublicAvailabilitySlot[]
+  totalCapacity?: number
+  tableCount?: number
+  bookingWindow?: {
+    closed?: boolean
+    source?: string
+    openTime?: string
+    closeTime?: string
+  } | null
 }
 
 export interface PublicReservationSummary {

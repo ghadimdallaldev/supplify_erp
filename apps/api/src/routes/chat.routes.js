@@ -5,7 +5,10 @@ import {
   getRequestTenant,
   resolveTenantContext,
   requirePermission,
+  getRestaurantIdForRequest,
+  getSupplierIdForRequest,
 } from '../lib/rbac.js'
+import { chatSendGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
@@ -15,6 +18,8 @@ import {
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
+  requireFeature,
+  checkLimit,
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyMessageReceived } from '../services/notification.service.js'
@@ -50,7 +55,7 @@ const quickReplySchema = z.object({
 })
 
 // Helper: Get or create conversation between supplier and restaurant
-async function getOrCreateConversation(supplierId, restaurantId) {
+async function getOrCreateConversation(supplierId, restaurantId, { enforceOpenLimit = true } = {}) {
   let { rows: conversations } = await query(
     `
     SELECT * FROM conversation
@@ -62,6 +67,28 @@ async function getOrCreateConversation(supplierId, restaurantId) {
   let conversation
 
   if (conversations.length === 0) {
+    if (enforceOpenLimit) {
+      for (const [tenantId, tenantType] of [
+        [restaurantId, 'RESTAURANT'],
+        [supplierId, 'SUPPLIER'],
+      ]) {
+        const limitCheck = await checkLimit(tenantId, tenantType, 'open_conversations')
+        if (!limitCheck.isUnlimited && limitCheck.isOverLimit) {
+          const err = new ValidationError(
+            `Open conversation limit reached (${limitCheck.current}/${limitCheck.limit})`
+          )
+          err.name = 'LIMIT_EXCEEDED'
+          err.details = {
+            limitKey: 'open_conversations',
+            limitValue: limitCheck.limit,
+            currentUsage: limitCheck.current,
+            tenantType,
+          }
+          throw err
+        }
+      }
+    }
+
     // Create new conversation
     const { rows: newConversations } = await query(
       `
@@ -115,7 +142,37 @@ async function getOrCreateConversation(supplierId, restaurantId) {
   return conversation
 }
 
-router.use(requireAuth, resolveTenantContext, requirePermission('CHAT_VIEW'))
+/** Tenant-scoped access (supports invited staff, not only contact_email on the tenant row). */
+async function userCanAccessConversation(req, conversation) {
+  const role = req.userData?.role
+  if (role === 'ADMIN') return true
+
+  if (role === 'RESTAURANT') {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    return Boolean(restaurantId && restaurantId === conversation.restaurant_id)
+  }
+
+  if (role === 'SUPPLIER') {
+    const supplierId = await getSupplierIdForRequest(req)
+    return Boolean(supplierId && supplierId === conversation.supplier_id)
+  }
+
+  return false
+}
+
+const chatFeatureGate = requireFeature(
+  'chat',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  chatFeatureGate,
+  requirePermission('CHAT_VIEW'),
+  chatSendGuard
+)
 
 // List conversations for current user
 router.get('/conversations', async (req, res) => {
@@ -235,53 +292,21 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
     }
 
     const conversation = conversations[0]
-    let participantTypeFilter = null
 
-    if (role === 'SUPPLIER') {
-      const { rows: suppliers } = await query(
-        `
-          SELECT id
-          FROM supplier
-          WHERE contact_email = $1
-        `,
-        [req.userData.email]
-      )
-
-      if (!suppliers.length || suppliers[0].id !== conversation.supplier_id) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Conversation does not belong to this supplier',
-          },
-          requestId: req.requestId,
-        })
-      }
-      participantTypeFilter = 'SUPPLIER'
-    } else if (role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        `
-          SELECT id
-          FROM restaurant
-          WHERE contact_email = $1
-        `,
-        [req.userData.email]
-      )
-
-      if (!restaurants.length || restaurants[0].id !== conversation.restaurant_id) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Conversation does not belong to this restaurant',
-          },
-          requestId: req.requestId,
-        })
-      }
-      participantTypeFilter = 'RESTAURANT'
+    if (role !== 'ADMIN' && !(await userCanAccessConversation(req, conversation))) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Conversation does not belong to this account',
+        },
+        requestId: req.requestId,
+      })
     }
+
+    const participantTypeFilter =
+      role === 'SUPPLIER' ? 'SUPPLIER' : role === 'RESTAURANT' ? 'RESTAURANT' : null
 
     const updateParams = participantTypeFilter
       ? [conversationId, participantTypeFilter]
@@ -342,12 +367,8 @@ router.post(
 
       // Verify that the user has permission to create this conversation
       if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1 AND id = $2',
-          [req.userData.email, supplierId]
-        )
-
-        if (suppliers.length === 0) {
+        const tenantSupplierId = await getSupplierIdForRequest(req)
+        if (!tenantSupplierId || tenantSupplierId !== supplierId) {
           return res.status(403).json({
             ok: false,
             data: null,
@@ -372,12 +393,8 @@ router.post(
           requestId: req.requestId,
         })
       } else if (req.userData.role === 'RESTAURANT') {
-        const { rows: restaurants } = await query(
-          'SELECT id FROM restaurant WHERE contact_email = $1',
-          [req.userData.email]
-        )
-
-        if (restaurants.length === 0) {
+        const restaurantId = await getRestaurantIdForRequest(req)
+        if (!restaurantId) {
           return res.status(403).json({
             ok: false,
             data: null,
@@ -389,7 +406,6 @@ router.post(
           })
         }
 
-        // For restaurants, validate that they're trying to create a conversation with a valid supplier
         const { rows: suppliers } = await query('SELECT id FROM supplier WHERE id = $1', [
           supplierId,
         ])
@@ -406,9 +422,8 @@ router.post(
           })
         }
 
-        // Use the resolved restaurant ID
-        resolvedRestaurantId = restaurants[0].id
-        resolvedSupplierId = supplierId
+        const resolvedRestaurantId = restaurantId
+        const resolvedSupplierId = supplierId
 
         const conversation = await getOrCreateConversation(resolvedSupplierId, resolvedRestaurantId)
 
@@ -478,24 +493,8 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
     }
 
     const conversation = conversations[0]
-    const role = req.userData?.role
 
-    if (role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-      if (restaurants.length === 0 || restaurants[0].id !== conversation.restaurant_id) {
-        throw new NotFoundError('Conversation not found')
-      }
-    } else if (role === 'SUPPLIER') {
-      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
-      if (suppliers.length === 0 || suppliers[0].id !== conversation.supplier_id) {
-        throw new NotFoundError('Conversation not found')
-      }
-    } else if (role !== 'ADMIN') {
+    if (!(await userCanAccessConversation(req, conversation))) {
       throw new NotFoundError('Conversation not found')
     }
 
@@ -585,27 +584,9 @@ router.post(
   async (req, res) => {
     try {
       // Check daily chat limit before sending message
-      let tenantId, tenantType
-
-      if (req.userData.role === 'RESTAURANT') {
-        const { rows: restaurants } = await query(
-          'SELECT id FROM restaurant WHERE contact_email = $1',
-          [req.userData.email]
-        )
-        if (restaurants.length > 0) {
-          tenantId = restaurants[0].id
-          tenantType = 'RESTAURANT'
-        }
-      } else if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1',
-          [req.userData.email]
-        )
-        if (suppliers.length > 0) {
-          tenantId = suppliers[0].id
-          tenantType = 'SUPPLIER'
-        }
-      }
+      const tenant = await getRequestTenant(req)
+      const tenantId = tenant?.tenantId
+      const tenantType = tenant?.tenantType
 
       if (tenantId && tenantType) {
         const usageCheck = await checkUsageWithWarning(tenantId, tenantType, 'chats_per_day')
@@ -655,46 +636,29 @@ router.post(
 
       const conversation = conversations[0]
 
-      // Get sender ID
-      let senderId
-      if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1 AND id = $2',
-          [req.userData.email, conversation.supplier_id]
-        )
+      if (!(await userCanAccessConversation(req, conversation))) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-        if (suppliers.length === 0) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'FORBIDDEN',
-              message: 'Access denied',
-            },
-            requestId: req.requestId,
-          })
-        }
-
-        senderId = suppliers[0].id
-      } else if (req.userData.role === 'RESTAURANT') {
-        const { rows: restaurants } = await query(
-          'SELECT id FROM restaurant WHERE contact_email = $1 AND id = $2',
-          [req.userData.email, conversation.restaurant_id]
-        )
-
-        if (restaurants.length === 0) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'FORBIDDEN',
-              message: 'Access denied',
-            },
-            requestId: req.requestId,
-          })
-        }
-
-        senderId = restaurants[0].id
+      const senderId = tenantId
+      if (!senderId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
       }
 
       // Verify reply_to message exists and is in the same conversation (before transaction)
@@ -759,23 +723,26 @@ router.post(
 
         // Usage already reserved atomically in checkAndIncrementUsage above (no second increment)
 
-        // Add attachments if any
+        // Add attachments if any — batch insert avoids N+1 for multi-attachment messages
         if (messageData.attachments && messageData.attachments.length > 0) {
+          const attVals = []
+          const attParams = []
+          let ap = 1
           for (const attachment of messageData.attachments) {
-            await query(
-              `
-            INSERT INTO message_attachment (message_id, file_url, file_type, file_name, file_size)
-            VALUES ($1, $2, $3, $4, $5)
-          `,
-              [
-                message.id,
-                attachment.fileUrl,
-                attachment.fileType,
-                attachment.fileName,
-                attachment.fileSize || null,
-              ]
+            attVals.push(`($${ap},$${ap + 1},$${ap + 2},$${ap + 3},$${ap + 4})`)
+            attParams.push(
+              message.id,
+              attachment.fileUrl,
+              attachment.fileType,
+              attachment.fileName,
+              attachment.fileSize || null
             )
+            ap += 5
           }
+          await query(
+            `INSERT INTO message_attachment (message_id, file_url, file_type, file_name, file_size) VALUES ${attVals.join(', ')}`,
+            attParams
+          )
         }
 
         await query('COMMIT')
@@ -1044,11 +1011,9 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
 // Quick reply templates (for suppliers)
 router.get('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
   try {
-    const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-      req.userData.email,
-    ])
+    const supplierId = await getSupplierIdForRequest(req)
 
-    if (suppliers.length === 0) {
+    if (!supplierId) {
       return res.json({
         ok: true,
         data: { templates: [] },
@@ -1063,7 +1028,7 @@ router.get('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req,
       WHERE supplier_id = $1 AND is_active = true
       ORDER BY usage_count DESC, title ASC
     `,
-      [suppliers[0].id]
+      [supplierId]
     )
 
     res.json({
@@ -1333,11 +1298,8 @@ router.post('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req
   try {
     const templateData = quickReplySchema.parse(req.body)
 
-    const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-      req.userData.email,
-    ])
-
-    if (suppliers.length === 0) {
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) {
       throw new ValidationError('Supplier not found')
     }
 
@@ -1347,7 +1309,7 @@ router.post('/quick-replies', requireAuth, requireRole(['SUPPLIER']), async (req
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `,
-      [suppliers[0].id, templateData.title, templateData.content, templateData.category || null]
+      [supplierId, templateData.title, templateData.content, templateData.category || null]
     )
 
     res.status(201).json({

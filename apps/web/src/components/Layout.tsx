@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
@@ -28,19 +28,25 @@ import {
 } from '../lib/externallyControlledFeatures'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useCartActions } from '../hooks/useCartActions'
-import {
-  formatAtPlanLimitMessage,
-  formatPlanBlockNudgeMessage,
-  getLimitLabel,
-} from '../lib/planComparison'
+import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planComparison'
+import { isAtEntitlementLimit, shouldShowEntitlementLimit } from '../lib/planLimits'
 import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
+import { LimitExceededBanner } from './LimitExceededBanner'
+import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
 
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [location.pathname])
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const { rehydrateCart } = useCartActions()
+
+  useNotificationAlerts()
 
   useEffect(() => {
     dispatch(refreshBlockedCount())
@@ -163,7 +169,7 @@ export function Layout() {
   const limits = e?.limits ?? {}
   const usage = e?.usage ?? {}
   const nearLimitKeys = Object.entries(limits)
-    .filter(([_, limit]) => limit != null && limit !== -1)
+    .filter(([key, limit]) => shouldShowEntitlementLimit(key) && limit != null && limit !== -1)
     .map(([key]) => {
       const current = usage[key] ?? 0
       const limit = limits[key] as number
@@ -173,17 +179,20 @@ export function Layout() {
     .filter(({ pct }) => pct >= 80 && pct < 100)
     .slice(0, 3)
 
-  const atLimitKeys = Object.entries(limits)
-    .filter(([_, limit]) => limit != null && limit !== -1)
-    .filter(([key, limit]) => (usage[key] ?? 0) >= (limit as number))
-    .map(([key]) => key)
+  const atLimitEntries = Object.entries(limits)
+    .filter(([key, limit]) => shouldShowEntitlementLimit(key) && limit != null && limit !== -1)
+    .map(([key, limit]) => ({
+      key,
+      current: usage[key] ?? 0,
+      limit: limit as number,
+    }))
+    .filter(({ current, limit }) => isAtEntitlementLimit(current, limit))
     .slice(0, 3)
 
   const recentBlockLimitKeys = recentBlockedSummary.limitKeys.map((x) => x.key)
   const recentBlockFeatureKeys = recentBlockedSummary.featureKeys.map((x) => x.key)
   const planBlockNudgeMessage =
     formatPlanBlockNudgeMessage(recentBlockLimitKeys, recentBlockFeatureKeys) ??
-    formatAtPlanLimitMessage(atLimitKeys) ??
     (blockedCountLast7d >= 3
       ? "You've hit your plan limits several times this week. Check usage in settings and upgrade for more room."
       : null)
@@ -195,12 +204,20 @@ export function Layout() {
         <UpgradeModal />
         <PaymentModal />
         <div className="flex">
-          <Sidebar />
-          <div className="flex-1 flex flex-col">
-            <Header />
+          {mobileNavOpen && (
+            <button
+              type="button"
+              className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+              aria-label="Close navigation menu"
+              onClick={() => setMobileNavOpen(false)}
+            />
+          )}
+          <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
             {user?.role !== 'ADMIN' && <BillingOverdueBanner />}
             {user?.role !== 'ADMIN' && externallyDisabledFeatures.length > 0 && e && (
-              <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <div className="mx-3 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:mx-6">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex gap-2">
                     <Lock className="h-4 w-4 shrink-0 text-amber-800 mt-0.5" aria-hidden />
@@ -229,7 +246,7 @@ export function Layout() {
               </div>
             )}
             {user?.role !== 'ADMIN' && planTierDisabledFeatures.length > 0 && e && (
-              <div className="mx-6 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
+              <div className="mx-3 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 sm:mx-6">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex gap-2">
                     <Layers className="h-4 w-4 shrink-0 text-slate-600 mt-0.5" aria-hidden />
@@ -256,8 +273,22 @@ export function Layout() {
                 </div>
               </div>
             )}
+            {user?.role !== 'ADMIN' && atLimitEntries.length > 0 && (
+              <div className="mx-3 mt-4 space-y-2 sm:mx-6">
+                {atLimitEntries.map(({ key, current, limit }) => (
+                  <LimitExceededBanner
+                    key={key}
+                    limitKey={key}
+                    currentUsage={current}
+                    limitValue={limit}
+                    currentPlan={e?.plan?.name ?? null}
+                    upgradeUrl="/app/settings?tab=subscription"
+                  />
+                ))}
+              </div>
+            )}
             {user?.role !== 'ADMIN' && nearLimitKeys.length > 0 && (
-              <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+              <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   Usage near limit: {nearLimitKeys
@@ -302,7 +333,7 @@ export function Layout() {
               </div>
             )}
             {user?.role !== 'ADMIN' && blockedCountLast7d >= 3 && planBlockNudgeMessage && (
-              <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)]">
+              <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)] sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span>{planBlockNudgeMessage}</span>
                 <button
                   type="button"
@@ -316,8 +347,8 @@ export function Layout() {
                 </button>
               </div>
             )}
-            <main className="flex-1 p-4 md:p-6">
-              <div className="min-h-[calc(100vh-5rem)] rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-4 shadow-sm md:p-6">
+            <main className="flex-1 p-3 sm:p-4 md:p-6">
+              <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
                 <Outlet />
               </div>
             </main>

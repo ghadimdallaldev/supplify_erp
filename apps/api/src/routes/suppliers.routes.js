@@ -6,13 +6,19 @@ import {
   resolveTenantContext,
   requirePermission,
   getSupplierIdForRequest,
+  getRestaurantIdForRequest,
+  getRequestTenant,
 } from '../lib/rbac.js'
 import { requireFeature, isFeatureEnabled } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
-import { logger } from '../lib/logger.js'
+import { createModuleLogger, logEvent, logQueryDebug, logger } from '../lib/logger.js'
+import { patchRequestLogTenant } from '../lib/request-log-context.js'
+
+const log = createModuleLogger('suppliers.routes')
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
+import { restaurantSupplierMutationGuard } from '../lib/route-permissions.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import {
@@ -100,28 +106,19 @@ router.get('/', optionalAuth, async (req, res) => {
     // Handle restaurant-specific filtering
     let restaurantId = null
 
-    logger.info('Supplier list request', {
-      hasUserData: !!req.userData,
-      role: req.userData?.role,
-      email: req.userData?.email,
-      query: req.query,
-    })
+    const listFilters = {
+      q: params.q ?? null,
+      city: params.city ?? null,
+      limit: params.limit,
+      offset: params.offset,
+    }
 
     if (req.userData?.role === 'RESTAURANT') {
       try {
-        // Get restaurant ID from database using email
-        const { rows: restaurants } = await query(
-          'SELECT id FROM restaurant WHERE contact_email = $1',
-          [req.userData.email]
-        )
+        restaurantId = await getRestaurantIdForRequest(req)
 
-        logger.info('Restaurant lookup result', {
-          found: restaurants.length,
-          restaurantId: restaurants[0]?.id,
-        })
-
-        if (restaurants.length > 0) {
-          restaurantId = restaurants[0].id
+        if (restaurantId) {
+          patchRequestLogTenant(req, restaurantId, 'RESTAURANT')
 
           // Exclude blocklisted suppliers
           whereConditions.push(`
@@ -134,9 +131,9 @@ router.get('/', optionalAuth, async (req, res) => {
           paramIndex++
         }
       } catch (error) {
-        logger.warn('Failed to get restaurant ID for supplier filtering', {
+        logEvent(log, 'warn', 'supplier.list.restaurant_lookup_failed', {
           error: error.message,
-          email: req.userData?.email,
+          role: req.userData?.role,
         })
         // Continue without restaurant-specific filtering
       }
@@ -184,14 +181,13 @@ router.get('/', optionalAuth, async (req, res) => {
 
     queryParams.push(params.limit, params.offset)
 
-    logger.info('Supplier query built', {
-      whereClause,
-      sql: sql.substring(0, 200) + '...',
-      queryParams: queryParams.slice(0, -2), // Hide limit/offset
+    logQueryDebug(log, 'supplier.list.query', sql, {
+      paramCount: queryParams.length,
+      filterCount: whereConditions.length,
+      hasRestaurantScope: Boolean(restaurantId),
     })
 
     const { rows } = await query(sql, queryParams)
-    logger.debug('Supplier list result', { count: rows.length })
 
     const suppliersWithReviews = await attachReviewFields(rows)
 
@@ -217,6 +213,15 @@ router.get('/', optionalAuth, async (req, res) => {
 
     const countSql = `SELECT COUNT(*) as total FROM supplier s ${whereClause}`
     const { rows: countRows } = await query(countSql, countParams)
+
+    logEvent(log, 'info', 'supplier.list', {
+      ...listFilters,
+      authenticated: Boolean(req.userData),
+      role: req.userData?.role ?? null,
+      restaurantScoped: Boolean(restaurantId),
+      returned: rows.length,
+      total: parseInt(countRows[0].total, 10),
+    })
 
     res.json({
       ok: true,
@@ -245,8 +250,7 @@ router.get('/', optionalAuth, async (req, res) => {
       })
     }
 
-    logger.error({
-      message: 'List suppliers error',
+    logEvent(log, 'error', 'supplier.list.failed', {
       error: error.message,
       stack: error.stack,
     })
@@ -384,73 +388,80 @@ router.patch(
 )
 
 // Get current supplier (for settings page) - MUST be before /:id route
-router.get('/me', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
-  try {
-    const { rows: suppliers } = await query('SELECT * FROM supplier WHERE contact_email = $1', [
-      req.userData.email,
-    ])
+router.get(
+  '/me',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_VIEW'),
+  async (req, res) => {
+    try {
+      const { rows: suppliers } = await query('SELECT * FROM supplier WHERE contact_email = $1', [
+        req.userData.email,
+      ])
 
-    if (suppliers.length === 0) {
-      return res.status(404).json({
+      if (suppliers.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Supplier not found',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      res.json({
+        ok: true,
+        data: { supplier: suppliers[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get supplier error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'NOT_FOUND',
-          message: 'Supplier not found',
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get supplier',
         },
         requestId: req.requestId,
       })
     }
-
-    res.json({
-      ok: true,
-      data: { supplier: suppliers[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get supplier error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get supplier',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Get supplier statistics for restaurant
-router.get('/:id/statistics', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const { id: supplierId } = req.params
+router.get(
+  '/:id/statistics',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  requirePermission('CATALOG_VIEW'),
+  async (req, res) => {
+    try {
+      const { id: supplierId } = req.params
 
-    // Get restaurant ID
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
+      const restaurantId = await getRestaurantIdForRequest(req)
 
-    if (restaurants.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Restaurant not found',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (!restaurantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Restaurant not found',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const restaurantId = restaurants[0].id
-
-    // Calculate statistics from orders
-    // Count distinct orders that have items from this supplier
-    const { rows: orderStats } = await query(
-      `
+      // Calculate statistics from orders
+      // Count distinct orders that have items from this supplier
+      const { rows: orderStats } = await query(
+        `
       SELECT 
         COUNT(DISTINCT o.id) as total_orders,
         COALESCE(SUM(oi.line_total), 0) as total_spent
@@ -459,52 +470,60 @@ router.get('/:id/statistics', requireAuth, requireRole(['RESTAURANT']), async (r
       WHERE o.restaurant_id = $1 
         AND oi.supplier_id = $2
     `,
-      [restaurantId, supplierId]
-    )
+        [restaurantId, supplierId]
+      )
 
-    const totalOrders = parseInt(orderStats[0]?.total_orders || 0)
-    const totalSpent = parseFloat(orderStats[0]?.total_spent || 0)
-    const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
+      const totalOrders = parseInt(orderStats[0]?.total_orders || 0)
+      const totalSpent = parseFloat(orderStats[0]?.total_spent || 0)
+      const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
 
-    res.json({
-      ok: true,
-      data: {
-        totalOrders,
-        totalSpent,
-        averageOrderValue,
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get supplier statistics error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get supplier statistics',
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: {
+          totalOrders,
+          totalSpent,
+          averageOrderValue,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get supplier statistics error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get supplier statistics',
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Get supplier by ID
-router.get('/:id', requireAuth, async (req, res) => {
+router.get(
+  '/:id',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
+  async (req, res) => {
+    if (req.userData?.role === 'RESTAURANT') {
+      return requirePermission('CATALOG_VIEW')(req, res, () => handleGetSupplierById(req, res))
+    }
+    return handleGetSupplierById(req, res)
+  }
+)
+
+async function handleGetSupplierById(req, res) {
   try {
     const { id } = req.params
 
     // Get restaurant ID for follow status if user is a restaurant
     let restaurantId = null
     if (req.userData && req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-      if (restaurants.length > 0) {
-        restaurantId = restaurants[0].id
-      }
+      restaurantId = await getRestaurantIdForRequest(req)
     }
 
     // Build query with product_count and avg_price
@@ -595,7 +614,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       requestId: req.requestId,
     })
   }
-})
+}
 
 // Create supplier (admin only)
 router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
@@ -756,140 +775,146 @@ router.post(
 )
 
 // Update supplier
-router.patch('/:id', requireAuth, async (req, res) => {
-  try {
-    const { id } = req.params
-    const updateData = supplierUpdateSchema.parse(req.body)
+router.patch(
+  '/:id',
+  requireAuth,
+  resolveTenantContext,
+  requirePermission('SETTINGS_EDIT'),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const updateData = supplierUpdateSchema.parse(req.body)
 
-    // Check permissions
-    const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [id])
+      // Check permissions
+      const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [id])
 
-    if (suppliers.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Supplier not found',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    const supplier = suppliers[0]
-
-    if (req.userData.role === 'SUPPLIER' && supplier.contact_email !== req.userData.email) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Access denied',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    const {
-      fields: updateFields,
-      values: updateValues,
-      nextIndex: paramIndex,
-    } = buildWhitelistedUpdate(
-      updateData,
-      {
-        name: 'name',
-        slug: 'slug',
-        vatNo: 'vat_no',
-        contactEmail: 'contact_email',
-        phone: 'phone',
-        address: 'address_json',
-      },
-      {
-        valueTransform: (dbField, value) =>
-          dbField === 'address_json' ? JSON.stringify(value) : value,
+      if (suppliers.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Supplier not found',
+          },
+          requestId: req.requestId,
+        })
       }
-    )
 
-    if (updateFields.length === 0) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'No fields to update',
+      const supplier = suppliers[0]
+
+      if (req.userData.role === 'SUPPLIER' && supplier.contact_email !== req.userData.email) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const {
+        fields: updateFields,
+        values: updateValues,
+        nextIndex: paramIndex,
+      } = buildWhitelistedUpdate(
+        updateData,
+        {
+          name: 'name',
+          slug: 'slug',
+          vatNo: 'vat_no',
+          contactEmail: 'contact_email',
+          phone: 'phone',
+          address: 'address_json',
         },
-        requestId: req.requestId,
-      })
-    }
+        {
+          valueTransform: (dbField, value) =>
+            dbField === 'address_json' ? JSON.stringify(value) : value,
+        }
+      )
 
-    updateFields.push(`updated_at = now()`)
-    updateValues.push(id)
+      if (updateFields.length === 0) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'No fields to update',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const { rows } = await query(
-      `
+      updateFields.push(`updated_at = now()`)
+      updateValues.push(id)
+
+      const { rows } = await query(
+        `
       UPDATE supplier 
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
       RETURNING *
     `,
-      updateValues
-    )
+        updateValues
+      )
 
-    logger.info('Supplier updated', {
-      supplierId: rows[0].id,
-      actor: req.userData.id,
-    })
+      logger.info('Supplier updated', {
+        supplierId: rows[0].id,
+        actor: req.userData.id,
+      })
 
-    res.json({
-      ok: true,
-      data: { supplier: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.json({
+        ok: true,
+        data: { supplier: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid update data',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('Update supplier error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid update data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to update supplier',
         },
         requestId: req.requestId,
       })
     }
-
-    logger.error('Update supplier error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to update supplier',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Get followed suppliers (restaurant only)
-router.get('/followed', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    // Get restaurant ID from email
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
+router.get(
+  '/followed',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  requirePermission('CATALOG_VIEW'),
+  async (req, res) => {
+    try {
+      const tenant = await getRequestTenant(req)
+      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
+        throw new ValidationError('Restaurant not found')
+      }
+      const restaurantId = tenant.tenantId
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found')
-    }
-
-    const restaurantId = restaurants[0].id
-
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       SELECT 
         s.*,
         sf.created_at as followed_at
@@ -898,259 +923,283 @@ router.get('/followed', requireAuth, requireRole(['RESTAURANT']), async (req, re
       WHERE sf.restaurant_id = $1
       ORDER BY sf.created_at DESC
     `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
 
-    res.json({
-      ok: true,
-      data: { suppliers: rows },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get followed suppliers error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get followed suppliers',
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: { suppliers: rows },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get followed suppliers error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get followed suppliers',
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Follow/Unfollow supplier (restaurant only)
-router.post('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const { id } = req.params
-    // Get restaurant ID from email
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
+router.post(
+  '/:id/follow',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  restaurantSupplierMutationGuard,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const tenant = await getRequestTenant(req)
+      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
+        throw new ValidationError('Restaurant not found')
+      }
+      const restaurantId = tenant.tenantId
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found')
-    }
+      // Check if already followed
+      const { rows: existing } = await query(
+        'SELECT * FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2',
+        [id, restaurantId]
+      )
 
-    const restaurantId = restaurants[0].id
-
-    // Check if already followed
-    const { rows: existing } = await query(
-      'SELECT * FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2',
-      [id, restaurantId]
-    )
-
-    if (existing.length > 0) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Supplier is already being followed',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    // Check plan limit for suppliers_per_restaurant
-    const { checkLimit } = await import('../lib/subscription.js')
-    const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'suppliers_per_restaurant')
-
-    // Get current follow count
-    const { rows: followCount } = await query(
-      'SELECT COUNT(*) as count FROM supplier_follow WHERE restaurant_id = $1',
-      [restaurantId]
-    )
-
-    const currentFollowCount = parseInt(followCount[0]?.count || 0)
-
-    // Check if within limit (or unlimited)
-    if (
-      !limitCheck.isUnlimited &&
-      limitCheck.limit !== null &&
-      currentFollowCount >= limitCheck.limit
-    ) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'SUPPLIER_FOLLOW_LIMIT_REACHED',
-          message: `You have reached your plan limit for followed suppliers (${limitCheck.limit}). Upgrade your plan to follow more suppliers.`,
-          details: {
-            current: currentFollowCount,
-            limit: limitCheck.limit,
-            requiredPlan: limitCheck.limit === 2 ? 'Bronze' : 'Gold',
+      if (existing.length > 0) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Supplier is already being followed',
           },
+          requestId: req.requestId,
+        })
+      }
+
+      // Check plan limit for suppliers_per_restaurant
+      const { checkLimit } = await import('../lib/subscription.js')
+      const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'suppliers_per_restaurant')
+
+      // Get current follow count
+      const { rows: followCount } = await query(
+        'SELECT COUNT(*) as count FROM supplier_follow WHERE restaurant_id = $1',
+        [restaurantId]
+      )
+
+      const currentFollowCount = parseInt(followCount[0]?.count || 0)
+
+      // Check if within limit (or unlimited)
+      if (
+        !limitCheck.isUnlimited &&
+        limitCheck.limit !== null &&
+        currentFollowCount >= limitCheck.limit
+      ) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'SUPPLIER_FOLLOW_LIMIT_REACHED',
+            message: `You have reached your plan limit for followed suppliers (${limitCheck.limit}). Upgrade your plan to follow more suppliers.`,
+            details: {
+              current: currentFollowCount,
+              limit: limitCheck.limit,
+              requiredPlan: limitCheck.limit === 2 ? 'Silver' : 'Gold',
+            },
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      await query('INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)', [
+        id,
+        restaurantId,
+      ])
+
+      logger.info('Supplier followed', {
+        supplierId: id,
+        restaurantId,
+        followCount: currentFollowCount + 1,
+      })
+
+      res.json({
+        ok: true,
+        data: { message: 'Supplier followed successfully' },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Follow supplier error:', error)
+
+      // ValidationError is already handled by the error handler middleware
+      if (error instanceof ValidationError) {
+        throw error
+      }
+
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to follow supplier',
         },
         requestId: req.requestId,
       })
     }
-
-    await query('INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)', [
-      id,
-      restaurantId,
-    ])
-
-    logger.info('Supplier followed', {
-      supplierId: id,
-      restaurantId,
-      followCount: currentFollowCount + 1,
-    })
-
-    res.json({
-      ok: true,
-      data: { message: 'Supplier followed successfully' },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Follow supplier error:', error)
-
-    // ValidationError is already handled by the error handler middleware
-    if (error instanceof ValidationError) {
-      throw error
-    }
-
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to follow supplier',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
-router.delete('/:id/follow', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const { id } = req.params
+router.delete(
+  '/:id/follow',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  restaurantSupplierMutationGuard,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const tenant = await getRequestTenant(req)
+      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
+        throw new ValidationError('Restaurant not found')
+      }
+      const restaurantId = tenant.tenantId
 
-    // Get restaurant ID from email
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
+      await query('DELETE FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2', [
+        id,
+        restaurantId,
+      ])
 
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found')
+      logger.info('Supplier unfollowed', { supplierId: id, restaurantId })
+
+      res.json({
+        ok: true,
+        data: { message: 'Supplier unfollowed successfully' },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Unfollow supplier error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to unfollow supplier',
+        },
+        requestId: req.requestId,
+      })
     }
-
-    const restaurantId = restaurants[0].id
-
-    await query('DELETE FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2', [
-      id,
-      restaurantId,
-    ])
-
-    logger.info('Supplier unfollowed', { supplierId: id, restaurantId })
-
-    res.json({
-      ok: true,
-      data: { message: 'Supplier unfollowed successfully' },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Unfollow supplier error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to unfollow supplier',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Block/Unblock supplier (restaurant only)
-router.post('/:id/block', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const { id } = req.params
-    const restaurantId = req.userData.id
-    const { reason } = req.body
+router.post(
+  '/:id/block',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  restaurantSupplierMutationGuard,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const tenant = await getRequestTenant(req)
+      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
+        throw new ValidationError('Restaurant not found')
+      }
+      const restaurantId = tenant.tenantId
+      const { reason } = req.body
 
-    // Check if already blocked
-    const { rows: existing } = await query(
-      'SELECT * FROM supplier_blocklist WHERE supplier_id = $1 AND restaurant_id = $2',
-      [id, restaurantId]
-    )
+      // Check if already blocked
+      const { rows: existing } = await query(
+        'SELECT * FROM supplier_blocklist WHERE supplier_id = $1 AND restaurant_id = $2',
+        [id, restaurantId]
+      )
 
-    if (existing.length > 0) {
-      return res.status(400).json({
+      if (existing.length > 0) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Supplier is already blocked',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      await query(
+        'INSERT INTO supplier_blocklist (supplier_id, restaurant_id, reason) VALUES ($1, $2, $3)',
+        [id, restaurantId, reason || null]
+      )
+
+      logger.info('Supplier blocked', { supplierId: id, restaurantId, reason })
+
+      res.json({
+        ok: true,
+        data: { message: 'Supplier blocked successfully' },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Block supplier error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Supplier is already blocked',
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to block supplier',
         },
         requestId: req.requestId,
       })
     }
-
-    await query(
-      'INSERT INTO supplier_blocklist (supplier_id, restaurant_id, reason) VALUES ($1, $2, $3)',
-      [id, restaurantId, reason || null]
-    )
-
-    logger.info('Supplier blocked', { supplierId: id, restaurantId, reason })
-
-    res.json({
-      ok: true,
-      data: { message: 'Supplier blocked successfully' },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Block supplier error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to block supplier',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
-router.delete('/:id/block', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const { id } = req.params
-    const restaurantId = req.userData.id
+router.delete(
+  '/:id/block',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  restaurantSupplierMutationGuard,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const tenant = await getRequestTenant(req)
+      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
+        throw new ValidationError('Restaurant not found')
+      }
+      const restaurantId = tenant.tenantId
 
-    await query('DELETE FROM supplier_blocklist WHERE supplier_id = $1 AND restaurant_id = $2', [
-      id,
-      restaurantId,
-    ])
+      await query('DELETE FROM supplier_blocklist WHERE supplier_id = $1 AND restaurant_id = $2', [
+        id,
+        restaurantId,
+      ])
 
-    logger.info('Supplier unblocked', { supplierId: id, restaurantId })
+      logger.info('Supplier unblocked', { supplierId: id, restaurantId })
 
-    res.json({
-      ok: true,
-      data: { message: 'Supplier unblocked successfully' },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Unblock supplier error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to unblock supplier',
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: { message: 'Supplier unblocked successfully' },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Unblock supplier error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to unblock supplier',
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 export { router as suppliersRoutes }

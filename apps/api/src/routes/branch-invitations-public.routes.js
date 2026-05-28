@@ -1,7 +1,6 @@
 import express from 'express'
 import { optionalAuth } from '../lib/rbac.js'
-import { setAuthCookies } from '../lib/rbac.js'
-import { exchangePasswordForTokens, getUserInfo } from '../lib/auth.js'
+import { completeInviteAcceptSession } from '../lib/invite-login.js'
 import { logger } from '../lib/logger.js'
 import {
   acceptBranchInvitation,
@@ -17,6 +16,9 @@ import { evaluateInvitationState, normalizeInviteType } from '../services/invita
 import { createActiveTenantToken, getActiveTenantCookieName } from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
 import { query } from '../lib/db.js'
+import { ValidationError } from '../middlewares/errorHandler.js'
+import { WorkspaceMembershipError } from '../lib/workspace-membership.js'
+import { resolveInvitationAcceptIdentity } from '../lib/invitation-accept.js'
 
 const router = express.Router()
 
@@ -104,15 +106,31 @@ router.get('/', async (req, res) => {
   }
 })
 
+function isKeycloakSetupError(error) {
+  const msg = error?.message || ''
+  return msg.includes('KEYCLOAK_ADMIN_PASSWORD') || msg.includes('Keycloak admin token failed')
+}
+
+function invitationAcceptErrorStatus(error) {
+  if (error.code === 'expired') return 410
+  if (error instanceof WorkspaceMembershipError) return 409
+  if (isKeycloakSetupError(error)) return 503
+  if (error instanceof ValidationError || error.code === 'email_mismatch') return 400
+  return 400
+}
+
+function invitationAcceptErrorName(error) {
+  if (error.code === 'expired') return 'INVITATION_EXPIRED'
+  if (error instanceof WorkspaceMembershipError) return 'WORKSPACE_MEMBERSHIP_CONFLICT'
+  if (error.code === 'email_mismatch') return 'INVITATION_EMAIL_MISMATCH'
+  if (error.code === 'already_used') return 'INVITATION_ALREADY_USED'
+  if (isKeycloakSetupError(error)) return 'KEYCLOAK_NOT_CONFIGURED'
+  return 'INVITATION_INVALID'
+}
+
 router.post('/accept', optionalAuth, async (req, res) => {
   try {
-    const {
-      token,
-      type: rawType,
-      full_name: fullName,
-      password,
-      email,
-    } = req.body
+    const { token, type: rawType, full_name: fullName, password, email } = req.body
     const type = normalizeInviteType(rawType)
     if (!token || !type) {
       return res.status(400).json({
@@ -123,7 +141,10 @@ router.post('/accept', optionalAuth, async (req, res) => {
       })
     }
 
-    const existingUserId = req.userData?.id || null
+    const { existingUserId, existingUserEmail } = resolveInvitationAcceptIdentity(req.userData, {
+      email,
+      password,
+    })
     if (!existingUserId && !password) {
       return res.status(400).json({
         ok: false,
@@ -133,13 +154,16 @@ router.post('/accept', optionalAuth, async (req, res) => {
       })
     }
 
+    const acceptEmail = existingUserId ? existingUserEmail : email
+
     if (type === 'supplier_branch') {
       return handleSupplierBranchAccept(req, res, {
         token,
         fullName,
-        email,
+        email: acceptEmail,
         password,
         existingUserId,
+        existingUserEmail,
       })
     }
 
@@ -149,26 +173,28 @@ router.post('/accept', optionalAuth, async (req, res) => {
         result = await acceptRestaurantMemberInvitation({
           token,
           fullName,
-          email,
+          email: acceptEmail,
           password,
           existingUserId,
+          existingUserEmail,
         })
       } else {
         result = await acceptRestaurantBranchInvitation({
           token,
           fullName,
-          email,
+          email: acceptEmail,
           password,
           existingUserId,
+          existingUserEmail,
         })
       }
     } catch (error) {
-      const status = error.code === 'expired' ? 410 : 400
+      const status = invitationAcceptErrorStatus(error)
       return res.status(status).json({
         ok: false,
         data: null,
         error: {
-          name: error.code === 'expired' ? 'INVITATION_EXPIRED' : 'INVITATION_INVALID',
+          name: invitationAcceptErrorName(error),
           message: error.message,
         },
         requestId: req.requestId,
@@ -195,35 +221,14 @@ router.post('/accept', optionalAuth, async (req, res) => {
       path: '/',
     })
 
-    if (result.needsLogin && result.password) {
-      const tokens = await exchangePasswordForTokens(result.email, result.password)
-      setAuthCookies(res, tokens.access_token, tokens.refresh_token)
-      const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
-      return res.json({
-        ok: true,
-        data: {
-          user: {
-            email: userInfo.email || result.email,
-            displayName: fullName || userInfo.given_name,
-          },
-          activeRestaurantId: result.restaurantId,
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    }
-
+    const login = await completeInviteAcceptSession(res, { result, fullName, req })
     return res.json({
       ok: true,
       data: {
-        user: req.userData
-          ? {
-              id: req.userData.id,
-              email: req.userData.email,
-              displayName: req.userData.display_name,
-            }
-          : null,
+        user: login.user,
         activeRestaurantId: result.restaurantId,
+        needsManualLogin: login.needsManualLogin || undefined,
+        loginMessage: login.loginMessage,
       },
       error: null,
       requestId: req.requestId,
@@ -239,7 +244,11 @@ router.post('/accept', optionalAuth, async (req, res) => {
   }
 })
 
-async function handleSupplierBranchAccept(req, res, { token, fullName, email, password, existingUserId }) {
+async function handleSupplierBranchAccept(
+  req,
+  res,
+  { token, fullName, email, password, existingUserId, existingUserEmail }
+) {
   let result
   try {
     result = await acceptBranchInvitation({
@@ -248,14 +257,15 @@ async function handleSupplierBranchAccept(req, res, { token, fullName, email, pa
       email,
       password,
       existingUserId,
+      existingUserEmail,
     })
   } catch (error) {
-    const status = error.code === 'expired' ? 410 : 400
+    const status = invitationAcceptErrorStatus(error)
     return res.status(status).json({
       ok: false,
       data: null,
       error: {
-        name: error.code === 'expired' ? 'INVITATION_EXPIRED' : 'INVITATION_INVALID',
+        name: invitationAcceptErrorName(error),
         message: error.message,
       },
       requestId: req.requestId,
@@ -282,35 +292,14 @@ async function handleSupplierBranchAccept(req, res, { token, fullName, email, pa
     path: '/',
   })
 
-  if (result.needsLogin && result.password) {
-    const tokens = await exchangePasswordForTokens(result.email, result.password)
-    setAuthCookies(res, tokens.access_token, tokens.refresh_token)
-    const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
-    return res.json({
-      ok: true,
-      data: {
-        user: {
-          email: userInfo.email || result.email,
-          displayName: fullName || userInfo.given_name,
-        },
-        activeSupplierId: result.supplierId,
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  }
-
+  const login = await completeInviteAcceptSession(res, { result, fullName, req })
   return res.json({
     ok: true,
     data: {
-      user: req.userData
-        ? {
-            id: req.userData.id,
-            email: req.userData.email,
-            displayName: req.userData.display_name,
-          }
-        : null,
+      user: login.user,
       activeSupplierId: result.supplierId,
+      needsManualLogin: login.needsManualLogin || undefined,
+      loginMessage: login.loginMessage,
     },
     error: null,
     requestId: req.requestId,
@@ -360,7 +349,10 @@ router.post('/branch/accept', optionalAuth, async (req, res) => {
       })
     }
 
-    const existingUserId = req.userData?.id || null
+    const { existingUserId, existingUserEmail } = resolveInvitationAcceptIdentity(req.userData, {
+      email,
+      password,
+    })
     if (!existingUserId && !password) {
       return res.status(400).json({
         ok: false,
@@ -375,17 +367,18 @@ router.post('/branch/accept', optionalAuth, async (req, res) => {
       result = await acceptBranchInvitation({
         token,
         fullName,
-        email,
+        email: existingUserId ? existingUserEmail : email,
         password,
         existingUserId,
+        existingUserEmail,
       })
     } catch (error) {
-      const status = error.code === 'expired' ? 410 : 400
+      const status = invitationAcceptErrorStatus(error)
       return res.status(status).json({
         ok: false,
         data: null,
         error: {
-          name: error.code === 'expired' ? 'INVITATION_EXPIRED' : 'INVITATION_INVALID',
+          name: invitationAcceptErrorName(error),
           message: error.message,
         },
         requestId: req.requestId,
@@ -412,35 +405,14 @@ router.post('/branch/accept', optionalAuth, async (req, res) => {
       path: '/',
     })
 
-    if (result.needsLogin && result.password) {
-      const tokens = await exchangePasswordForTokens(result.email, result.password)
-      setAuthCookies(res, tokens.access_token, tokens.refresh_token)
-      const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
-      return res.json({
-        ok: true,
-        data: {
-          user: {
-            email: userInfo.email || result.email,
-            displayName: fullName || userInfo.given_name,
-          },
-          activeSupplierId: result.supplierId,
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    }
-
+    const login = await completeInviteAcceptSession(res, { result, fullName, req })
     res.json({
       ok: true,
       data: {
-        user: req.userData
-          ? {
-              id: req.userData.id,
-              email: req.userData.email,
-              displayName: req.userData.display_name,
-            }
-          : null,
+        user: login.user,
         activeSupplierId: result.supplierId,
+        needsManualLogin: login.needsManualLogin || undefined,
+        loginMessage: login.loginMessage,
       },
       error: null,
       requestId: req.requestId,

@@ -23,7 +23,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY . .
 
-# Production image, copy all the files and run the app
+# Production image — copy only runtime-needed API files
 FROM base AS runner
 WORKDIR /app
 
@@ -33,15 +33,17 @@ ENV PORT=4000
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 supplify
 
-# Copy necessary files
-COPY --from=builder --chown=supplify:nodejs /app/apps/api ./apps/api
 COPY --from=builder --chown=supplify:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder --chown=supplify:nodejs /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder --chown=supplify:nodejs /app/apps/api/src ./apps/api/src
+COPY --from=builder --chown=supplify:nodejs /app/apps/api/db/migrations ./apps/api/db/migrations
+COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/migrate.js ./apps/api/scripts/migrate.js
+COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/run-migration.js ./apps/api/scripts/run-migration.js
+COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/lib ./apps/api/scripts/lib
 
 USER supplify
 
 EXPOSE 4000
-
-ENV NODE_ENV=production
 
 CMD ["node", "apps/api/src/server.js"]

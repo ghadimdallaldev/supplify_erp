@@ -1,17 +1,21 @@
-import { CreditCard, Lock, Shield } from 'lucide-react'
+import { CreditCard, Loader2, Lock, Shield } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { useGetBillingStatusQuery } from '../services/api'
+import { useGetBillingStatusQuery, useGetSubscriptionPlansQuery } from '../services/api'
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
-import { useEffect } from 'react'
+import { activateFreePlanFromPlans } from '../lib/activateFreePlan'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 
 export function AccountActivationPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const { data: billing, isLoading } = useGetBillingStatusQuery()
+  const { data: plansData } = useGetSubscriptionPlansQuery()
+  const [activatingFree, setActivatingFree] = useState(false)
 
   const pending = billing?.access?.pendingActivation && billing.access.isLocked
 
@@ -24,6 +28,18 @@ export function AccountActivationPage() {
 
   const tenantLabel = user?.role === 'SUPPLIER' ? 'supplier' : 'restaurant'
 
+  const handleActivateFree = async () => {
+    setActivatingFree(true)
+    const result = await activateFreePlanFromPlans(dispatch, plansData?.plans)
+    setActivatingFree(false)
+    if (result.ok) {
+      toast.success('Your free plan is active.')
+      navigate('/app', { replace: true })
+    } else {
+      toast.error(result.message)
+    }
+  }
+
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-lg items-center justify-center p-6">
       <Card className="w-full border-2 shadow-lg">
@@ -33,23 +49,37 @@ export function AccountActivationPage() {
           </div>
           <CardTitle className="text-2xl">Activate your account</CardTitle>
           <CardDescription>
-            Your {tenantLabel} workspace was created but is not active yet. Choose a paid plan and
-            complete checkout, or ask a Supplify administrator to activate you manually.
+            Your {tenantLabel} workspace was created but is not active yet. Start on the free plan,
+            upgrade to a paid tier, or ask a Supplify administrator to activate you manually.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)]/50 p-4 text-sm text-[var(--text-mid)]">
             <p className="flex items-start gap-2">
               <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
-              Pay for Bronze, Gold, or Platinum to unlock orders, inventory, and the full app
+              Pay for Silver, Gold, or Platinum to unlock orders, inventory, and the full app
               immediately.
             </p>
             <p className="mt-3 flex items-start gap-2">
               <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
-              Free-tier access is only available after an admin activates your account from the
-              admin console.
+              Free tier unlocks your workspace immediately with core features. Paid plans add more
+              capacity and modules.
             </p>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-2"
+            disabled={activatingFree}
+            onClick={handleActivateFree}
+          >
+            {activatingFree ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Shield className="h-4 w-4" />
+            )}
+            Activate free plan
+          </Button>
           <Button
             type="button"
             className="w-full gap-2"

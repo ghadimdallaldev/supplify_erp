@@ -1,5 +1,13 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getRestaurantIdForRequest,
+  getSupplierIdForRequest,
+} from '../lib/rbac.js'
+import { requireRestaurantId } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -8,7 +16,13 @@ import { z } from 'zod'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext)
+const financeInvoicesGate = requireFeature(
+  'finance_invoices',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.use(requireAuth, resolveTenantContext, financeInvoicesGate)
 
 // Validation schemas
 const markPaidSchema = z.object({
@@ -32,16 +46,7 @@ router.get(
     try {
       const { status, supplier, limit = '100', offset = '0' } = req.query
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found')
-      }
-
-      const restaurantId = restaurants[0].id
+      const restaurantId = await requireRestaurantId(req)
 
       let invoicesQuery = `
       SELECT 
@@ -129,25 +134,11 @@ router.get(
   '/invoices/analytics',
   requireRole(['RESTAURANT', 'ADMIN']),
   requirePermission('INVOICES_VIEW'),
-  requireFeature(
-    'reports',
-    (req) => req.tenantContext?.tenantId,
-    (req) => req.tenantContext?.tenantType
-  ),
   async (req, res) => {
     try {
       const { period = '30' } = req.query
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found')
-      }
-
-      const restaurantId = restaurants[0].id
+      const restaurantId = await requireRestaurantId(req)
 
       const periodDays = parseInt(period) || 30
 
@@ -228,23 +219,15 @@ router.get(
       let supplierId = null
 
       if (req.userData.role === 'RESTAURANT') {
-        const { rows: restaurants } = await query(
-          'SELECT id FROM restaurant WHERE contact_email = $1',
-          [req.userData.email]
-        )
-        if (restaurants.length === 0) {
+        restaurantId = await getRestaurantIdForRequest(req)
+        if (!restaurantId) {
           throw new ValidationError('Restaurant not found')
         }
-        restaurantId = restaurants[0].id
       } else if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1',
-          [req.userData.email]
-        )
-        if (suppliers.length === 0) {
+        supplierId = await getSupplierIdForRequest(req)
+        if (!supplierId) {
           throw new ValidationError('Supplier not found')
         }
-        supplierId = suppliers[0].id
       }
 
       let invoicesQuery = `
@@ -305,16 +288,7 @@ router.get(
     try {
       const { id } = req.params
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found')
-      }
-
-      const restaurantId = restaurants[0].id
+      const restaurantId = await requireRestaurantId(req)
 
       // Get invoice
       const { rows: invoices } = await query(
@@ -443,16 +417,7 @@ router.post(
       const { id } = req.params
       const paymentData = paymentSchemaEnhanced.parse(req.body)
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found')
-      }
-
-      const restaurantId = restaurants[0].id
+      const restaurantId = await requireRestaurantId(req)
 
       // Get invoice and check ownership
       const { rows: invoices } = await query(
@@ -691,16 +656,7 @@ router.get(
     try {
       const { id } = req.params
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found')
-      }
-
-      const restaurantId = restaurants[0].id
+      const restaurantId = await requireRestaurantId(req)
 
       // Get invoice to get supplier_id
       const { rows: invoices } = await query(
@@ -754,98 +710,6 @@ router.get(
   }
 )
 
-// Get comprehensive invoice analytics for restaurant
-router.get(
-  '/invoices/analytics',
-  requireRole(['RESTAURANT', 'ADMIN']),
-  requirePermission('INVOICES_VIEW'),
-  requireFeature(
-    'reports',
-    (req) => req.tenantContext?.tenantId,
-    (req) => req.tenantContext?.tenantType
-  ),
-  async (req, res) => {
-    try {
-      const { period = '30' } = req.query
-
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found')
-      }
-
-      const restaurantId = restaurants[0].id
-
-      const periodDays = parseInt(period) || 30
-
-      // Get comprehensive analytics
-      const { rows: analytics } = await query(
-        `
-      SELECT 
-        COUNT(*) FILTER (WHERE i.status = 'ISSUED') as issued_count,
-        COUNT(*) FILTER (WHERE i.status = 'PARTIALLY_PAID') as partial_count,
-        COUNT(*) FILTER (WHERE i.status = 'PAID') as paid_count,
-        COUNT(*) FILTER (WHERE i.status = 'OVERDUE') as overdue_count,
-        COUNT(*) FILTER (WHERE i.due_date < CURRENT_DATE AND i.status NOT IN ('PAID', 'VOID')) as overdue_count_alt,
-        SUM(i.total_amount) FILTER (WHERE i.status = 'ISSUED' OR i.status = 'PARTIALLY_PAID') as total_outstanding,
-        SUM(i.total_amount) FILTER (WHERE i.status = 'PAID') as total_paid_amount,
-        SUM(i.total_amount) FILTER (WHERE i.due_date < CURRENT_DATE AND i.status NOT IN ('PAID', 'VOID')) as total_overdue,
-        AVG(
-          CASE 
-            WHEN i.status = 'PAID' AND i.payment_date IS NOT NULL 
-            THEN i.payment_date - i.due_date 
-          END
-        ) as avg_days_to_pay
-      FROM invoice i
-      WHERE i.restaurant_id = $1
-        AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
-    `,
-        [restaurantId, periodDays]
-      )
-
-      // Time-series points for Spend Trend chart (daily totals by invoice_date)
-      const { rows: pointsRows } = await query(
-        `
-      SELECT 
-        invoice_date::text AS date,
-        COALESCE(SUM(total_amount), 0)::numeric AS total
-      FROM invoice i
-      WHERE i.restaurant_id = $1
-        AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
-      GROUP BY invoice_date
-      ORDER BY invoice_date
-    `,
-        [restaurantId, periodDays]
-      )
-      const points = (pointsRows || []).map((r) => ({
-        date: r.date,
-        total: parseFloat(r.total) || 0,
-      }))
-
-      return res.json({
-        ok: true,
-        data: {
-          analytics: analytics[0] || {},
-          points,
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.warn('Invoice analytics unavailable, returning empty analytics:', error.message)
-      return res.json({
-        ok: true,
-        data: { analytics: {}, points: [] },
-        error: null,
-        requestId: req.requestId,
-      })
-    }
-  }
-)
-
 // Get account statement for a supplier
 router.get(
   '/suppliers/:supplierId/statement',
@@ -856,16 +720,7 @@ router.get(
       const { supplierId } = req.params
       const { startDate, endDate } = req.query
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found')
-      }
-
-      const restaurantId = restaurants[0].id
+      const restaurantId = await requireRestaurantId(req)
 
       // Get statement data
       const { rows: invoices } = await query(
@@ -941,16 +796,7 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
   try {
     const { period = '30' } = req.query
 
-    const { rows: restaurants } = await query(
-      'SELECT id FROM restaurant WHERE contact_email = $1',
-      [req.userData.email]
-    )
-
-    if (restaurants.length === 0) {
-      throw new ValidationError('Restaurant not found')
-    }
-
-    const restaurantId = restaurants[0].id
+    const restaurantId = await requireRestaurantId(req)
 
     // Get expense breakdown by supplier
     const { rows: bySupplier } = await query(
@@ -1053,16 +899,7 @@ router.get(
         })
       }
 
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        throw new ValidationError('Restaurant not found')
-      }
-
-      const restaurantId = restaurants[0].id
+      const restaurantId = await requireRestaurantId(req)
 
       const { rows: overdue } = await query(
         `

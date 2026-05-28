@@ -5,6 +5,7 @@ import {
   resolveTenantContext,
   resolveAdminContext,
   requirePermission,
+  requireAnyPermission,
   getRequestTenant,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
@@ -24,12 +25,16 @@ import { writeAuditLog } from '../lib/audit.js'
 
 const router = express.Router()
 
-router.use(
-  requireAuth,
-  resolveTenantContext,
-  resolveAdminContext,
-  requirePermission('CATALOG_VIEW')
-)
+const catalogReadAccess = requireAnyPermission('CATALOG_VIEW', 'ORDERS_VIEW', 'INVENTORY_VIEW')
+
+router.use(requireAuth, resolveTenantContext, resolveAdminContext)
+
+router.use((req, res, next) => {
+  const method = req.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD') return catalogReadAccess(req, res, next)
+  if (method === 'DELETE') return requirePermission('CATALOG_MANAGE')(req, res, next)
+  return requireAnyPermission('CATALOG_EDIT', 'CATALOG_MANAGE')(req, res, next)
+})
 
 // Lazy cache: does product table have a tags column? (migration 0026 adds it)
 let _productHasTagsColumn = null
@@ -155,10 +160,18 @@ router.get('/tags', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const params = productListSchema.parse(req.query)
+    const tenant = await getRequestTenant(req)
+    const scopedSupplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
 
     const whereConditions = []
     const queryParams = []
     let paramIndex = 1
+
+    if (scopedSupplierId) {
+      whereConditions.push(`p.supplier_id = $${paramIndex}`)
+      queryParams.push(scopedSupplierId)
+      paramIndex++
+    }
 
     // Text search
     if (params.q) {

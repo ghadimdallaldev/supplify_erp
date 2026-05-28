@@ -22,7 +22,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { RecommendedBadge } from './RecommendedBadge'
-import { getPlanSubtitle } from '../lib/planComparison'
+import { formatPlanDisplayName, getPlanSubtitle } from '../lib/planComparison'
 import { useGetBillingStatusQuery } from '../services/api'
 import { openCheckoutPayment, openOverduePayment } from '../lib/openPaymentModal'
 import { getUsageMeterDisplay } from '../lib/usageDisplay'
@@ -30,17 +30,38 @@ import {
   getExternallyDisabledFeatures,
   getPlanTierDisabledFeatures,
 } from '../lib/externallyControlledFeatures'
+import { shouldShowEntitlementLimit } from '../lib/planLimits'
+import { getLimitLabel as getPlanLimitLabel } from '../lib/planComparison'
 
-const LIMIT_LABELS: Record<string, string> = {
-  branches: 'Branches',
-  users: 'Users',
-  orders_per_day: 'Orders (Today)',
-  suppliers_per_restaurant: 'Suppliers',
-  restaurant_inventory_skus: 'Inventory SKUs',
-  warehouses: 'Warehouses',
-  supplier_products_skus: 'Products',
-  chats_per_day: 'Chats (Today)',
-  storage_mb: 'Storage (MB)',
+/** Usage rows shown first in settings (supplier vs restaurant). */
+const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
+  SUPPLIER: [
+    'open_conversations',
+    'chats_per_day',
+    'supplier_products_skus',
+    'promotions',
+    'warehouses',
+    'branches',
+    'users',
+    'storage_mb',
+  ],
+  RESTAURANT: [
+    'orders_per_day',
+    'open_conversations',
+    'chats_per_day',
+    'suppliers_per_restaurant',
+    'restaurant_inventory_skus',
+    'branches',
+    'users',
+    'storage_mb',
+  ],
+}
+
+function getLimitLabel(tenantType: string, limitKey: string): string {
+  if (tenantType === 'SUPPLIER' && limitKey === 'open_conversations') {
+    return 'Chats'
+  }
+  return getPlanLimitLabel(limitKey)
 }
 
 export function SubscriptionInfo() {
@@ -144,9 +165,16 @@ export function SubscriptionInfo() {
     custom_branding: planTierOffNote('custom_branding'),
   } as const
 
-  const limitEntries = Object.entries(limits).filter(
-    ([_, limit]) => limit !== null && limit !== undefined
-  ) as [string, number][]
+  const limitEntries = (
+    Object.entries(limits).filter(
+      ([key, limit]) => shouldShowEntitlementLimit(key) && limit !== null && limit !== undefined
+    ) as [string, number][]
+  ).sort(([keyA], [keyB]) => {
+    const order = LIMIT_DISPLAY_ORDER[e.tenantType] ?? []
+    const indexA = order.indexOf(keyA)
+    const indexB = order.indexOf(keyB)
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB)
+  })
 
   return (
     <Card>
@@ -162,7 +190,9 @@ export function SubscriptionInfo() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-lg">{plan.name || 'Free'}</h3>
+                <h3 className="font-semibold text-lg">
+                  {formatPlanDisplayName(plan.code, plan.name)}
+                </h3>
                 <RecommendedBadge
                   planCode={plan.code ?? 'free'}
                   recommendedPlanCode={recommendation?.recommendedPlanCode}
@@ -204,9 +234,30 @@ export function SubscriptionInfo() {
           )}
           {(plan.code || '').toLowerCase() === 'free' ? (
             <div className="mt-3 space-y-2">
+              {e.freeSandbox?.expiresAt && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {billing?.access?.freeSandboxExpired ||
+                  billing?.access?.lockReason === 'free_sandbox_expired' ? (
+                    <p>
+                      Your free testing period has ended. Upgrade to a paid plan to restore access.
+                    </p>
+                  ) : (
+                    <p>
+                      Free testing access ends{' '}
+                      <span className="font-semibold">
+                        {new Date(e.freeSandbox.expiresAt).toLocaleDateString()}
+                      </span>
+                      {billing?.access?.freeSandboxDaysRemaining != null
+                        ? ` (${billing.access.freeSandboxDaysRemaining} day(s) left)`
+                        : ''}
+                      .
+                    </p>
+                  )}
+                </div>
+              )}
               <p className="text-sm text-[var(--text-muted)]">
-                Upgrade to a paid plan, then pay securely from this page (card or saved method via
-                our payment gateway).
+                Free Trial is time-limited and for evaluation only. Upgrade to a paid plan for
+                ongoing production use.
               </p>
               <Button
                 type="button"
@@ -283,8 +334,8 @@ export function SubscriptionInfo() {
                     {topNearLimit.map(({ limitKey, current, limit, pct }) => (
                       <li key={limitKey} className="flex items-center justify-between gap-2">
                         <span>
-                          {LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')}: {current} /{' '}
-                          {limit} ({Math.round(pct)}%)
+                          {getLimitLabel(e.tenantType, limitKey)}: {current} / {limit} (
+                          {Math.round(pct)}%)
                         </span>
                         <Button
                           type="button"
@@ -328,7 +379,7 @@ export function SubscriptionInfo() {
             if (effectiveLimit === null) return null
             const meter = getUsageMeterDisplay(current, effectiveLimit)
             const isWarning = meter.pct >= 80 && !meter.atCap
-            const label = LIMIT_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')
+            const label = getLimitLabel(e.tenantType, limitKey)
             return (
               <div key={limitKey} className="space-y-2">
                 <div className="flex justify-between text-sm">

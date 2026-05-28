@@ -64,6 +64,9 @@ export function PaymentModal() {
     return billingCycle === 'YEARLY' ? yearlyPrice : monthlyPrice
   }, [isPayOverdue, billingStatus?.amountDue, billingCycle, yearlyPrice, monthlyPrice])
 
+  const isFreeCheckout =
+    !isPayOverdue && ((plan?.planCode || '').toLowerCase() === 'free' || chargeAmount <= 0)
+
   useEffect(() => {
     if (!paymentModalOpen) return
     setError(null)
@@ -115,15 +118,14 @@ export function PaymentModal() {
   const handleSubmit = async () => {
     setError(null)
     try {
-      const paymentMethodId = await ensurePaymentMethod()
-      await setAutoRenew({ autoRenew }).unwrap()
-
       const idempotencyKey =
         typeof crypto !== 'undefined' && crypto.randomUUID
           ? crypto.randomUUID()
           : `pay_${Date.now()}`
 
       if (isPayOverdue) {
+        const paymentMethodId = await ensurePaymentMethod()
+        await setAutoRenew({ autoRenew }).unwrap()
         await payNow({ paymentMethodId, idempotencyKey }).unwrap()
         toast.success('Payment received. Your account has been restored.')
       } else {
@@ -131,13 +133,25 @@ export function PaymentModal() {
           setError('Plan not selected')
           return
         }
-        await checkout({
-          planId: plan.planId,
-          billingCycle,
-          paymentMethodId,
-          idempotencyKey,
-        }).unwrap()
-        toast.success(`You're now on ${plan.planName}`)
+        if (!isFreeCheckout) {
+          const paymentMethodId = await ensurePaymentMethod()
+          await setAutoRenew({ autoRenew }).unwrap()
+          await checkout({
+            planId: plan.planId,
+            billingCycle,
+            paymentMethodId,
+            idempotencyKey,
+          }).unwrap()
+        } else {
+          await checkout({
+            planId: plan.planId,
+            billingCycle,
+            idempotencyKey,
+          }).unwrap()
+        }
+        toast.success(
+          isFreeCheckout ? 'Your free plan is active.' : `You're now on ${plan.planName}`
+        )
       }
 
       dispatch(api.util.invalidateTags(['Subscription', 'Billing']))
@@ -185,7 +199,7 @@ export function PaymentModal() {
           </div>
         )}
 
-        {!isPayOverdue && plan && (
+        {!isPayOverdue && plan && !isFreeCheckout && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -363,6 +377,8 @@ export function PaymentModal() {
               </>
             ) : isPayOverdue ? (
               `Pay ${formatMoney(chargeAmount)} now`
+            ) : isFreeCheckout ? (
+              'Activate free plan'
             ) : (
               `Pay ${formatMoney(chargeAmount)} & activate`
             )}

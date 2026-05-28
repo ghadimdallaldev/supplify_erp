@@ -2,7 +2,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { sendMail } from './mailer.service.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
-import { getEntitlements } from '../lib/subscription.js'
+import { getEntitlements, isFeatureEnabled } from '../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from './whatsapp.service.js'
 import { sendWebPushToUser, isPushConfigured } from './push.service.js'
 
@@ -27,7 +27,7 @@ const DEFAULT_NOTIFICATION_PREFS = {
   email_enabled: true,
   sms_enabled: false,
   whatsapp_enabled: false,
-  push_enabled: false,
+  push_enabled: true,
   in_app_enabled: true,
   notify_order_new: true,
   notify_order_acknowledged: true,
@@ -73,7 +73,12 @@ const CATEGORY_PREF_MAP = {
   system_updates: 'notify_system_updates',
   promotions: 'notify_promotions',
   reservation_created: 'notify_reservation_created',
+  reservation_rescheduled: 'notify_reservation_created',
+  reservation_cancelled: 'notify_reservation_created',
   reservation_waitlist: 'notify_reservation_waitlist',
+  order_approval: 'notify_order_new',
+  order_amendment: 'notify_order_new',
+  amendment: 'notify_order_new',
   staff_pto: 'notify_staff_pto',
   staff_swap: 'notify_staff_swap',
   staff_clock: 'notify_staff_clock',
@@ -282,6 +287,77 @@ async function getTenantIdForUser(userId, userType) {
 }
 
 /**
+ * All app users for a restaurant or supplier (team roles + primary contact).
+ */
+export async function listTenantUserIds(tenantId, tenantType) {
+  if (!tenantId || !tenantType) return []
+  const tenantTable = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+  const { rows } = await query(
+    `
+      SELECT DISTINCT u.id
+      FROM app_user u
+      WHERE u.id IN (
+        SELECT tur.user_id
+        FROM tenant_user_roles tur
+        WHERE tur.tenant_id = $1 AND tur.tenant_type = $2
+      )
+      OR u.email = (
+        SELECT contact_email FROM ${tenantTable} WHERE id = $1 LIMIT 1
+      )
+    `,
+    [tenantId, tenantType]
+  )
+  return rows.map((row) => row.id).filter(Boolean)
+}
+
+/**
+ * Fan-out in-app / push / email to every user on the tenant account.
+ */
+export async function notifyTenantUsers({
+  tenantId,
+  tenantType,
+  notificationType,
+  notificationCategory,
+  title,
+  message,
+  referenceId = null,
+  referenceType = null,
+  metadata = null,
+}) {
+  const userIds = await listTenantUserIds(tenantId, tenantType)
+  if (!userIds.length) {
+    logger.warn('notifyTenantUsers: no recipients', { tenantId, tenantType, notificationCategory })
+    return []
+  }
+
+  const sent = []
+  for (const userId of userIds) {
+    try {
+      const row = await sendNotification({
+        userId,
+        userType: tenantType,
+        notificationType,
+        notificationCategory,
+        title,
+        message,
+        referenceId,
+        referenceType,
+        metadata,
+      })
+      if (row) sent.push(row)
+    } catch (error) {
+      logger.error('notifyTenantUsers: recipient failed', {
+        userId,
+        tenantId,
+        notificationCategory,
+        error: error.message,
+      })
+    }
+  }
+  return sent
+}
+
+/**
  * Send a notification to a user
  */
 export async function sendNotification({
@@ -302,11 +378,14 @@ export async function sendNotification({
 
     // Tier enforcement: derive allowed channels from subscription plan
     let allowedChannels = new Set(['in_app']) // safe default
+    let tenantId = null
+    let pushFeatureEnabled = false
     try {
-      const tenantId = await getTenantIdForUser(userId, userType)
+      tenantId = await getTenantIdForUser(userId, userType)
       if (tenantId) {
         const entitlements = await getEntitlements(tenantId, userType)
         allowedChannels = resolveAllowedChannels(entitlements?.features?.notifications)
+        pushFeatureEnabled = await isFeatureEnabled(tenantId, userType, 'push_notifications')
       }
     } catch (err) {
       logger.warn('Failed to resolve notification tier, defaulting to in_app', { err: err.message })
@@ -320,7 +399,7 @@ export async function sendNotification({
         isPrefEnabled(prefs, 'whatsapp_enabled') &&
         !!contact?.phone,
       sms: false,
-      push: isPushConfigured() && isPrefEnabled(prefs, 'push_enabled', false),
+      push: isPushConfigured() && isPrefEnabled(prefs, 'push_enabled', false) && pushFeatureEnabled,
       inApp: isPrefEnabled(prefs, 'in_app_enabled'),
     }
 
@@ -398,7 +477,15 @@ export async function sendNotification({
           ? `/app/disputes/${referenceId}`
           : referenceType === 'ORDER'
             ? `/app/orders/${referenceId}`
-            : '/app/notifications'
+            : referenceType === 'RESERVATION'
+              ? '/app/reservations'
+              : referenceType === 'INVOICE'
+                ? '/app/invoices'
+                : referenceType === 'CONVERSATION' || referenceType === 'CHAT'
+                  ? '/app/chat'
+                  : referenceType === 'QUICK_LIST'
+                    ? '/app/quick-lists'
+                    : '/app/notifications'
       sendWebPushToUser({
         userId,
         title,
@@ -593,9 +680,9 @@ export async function notifySupplierLowStock({
 
   const message = `Low stock: ${name}. Current: ${currentValue}, threshold: ${threshold}. Restock soon.`
   try {
-    return await sendNotification({
-      userId,
-      userType: 'SUPPLIER',
+    const sent = await notifyTenantUsers({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
       notificationType: 'LOW_STOCK',
       notificationCategory: 'inventory_alerts',
       title: 'Low stock alert',
@@ -604,6 +691,7 @@ export async function notifySupplierLowStock({
       referenceType: 'PRODUCT',
       metadata: { productId, warehouseId, threshold, currentValue },
     })
+    return sent[0] || null
   } catch (err) {
     logger.error('notifySupplierLowStock failed', { error: err.message, productId })
     return null
@@ -615,51 +703,6 @@ export async function notifySupplierLowStock({
  */
 
 export async function notifyOrderStatusChange(order, status) {
-  // Determine who to notify
-  let userId, userType
-
-  if (status === 'PLACED' || status === 'CANCELLED') {
-    // Notify supplier for new orders and cancellations
-    // Get supplier's Keycloak user ID from contact_email
-    const { rows: suppliers } = await query(
-      `
-      SELECT s.id as supplier_id, u.id as user_id 
-      FROM supplier s
-      JOIN app_user u ON u.email = s.contact_email
-      WHERE s.id = $1
-    `,
-      [order.supplier_id]
-    )
-
-    if (suppliers.length > 0 && suppliers[0].user_id) {
-      userId = suppliers[0].user_id
-      userType = 'SUPPLIER'
-    } else {
-      logger.warn('No user_id found for supplier', { supplier_id: order.supplier_id })
-      return null
-    }
-  } else {
-    // All other statuses (ACKNOWLEDGED, PROCESSING, SHIPPED, DELIVERED) notify restaurant
-    // Get restaurant's Keycloak user ID from contact_email
-    const { rows: restaurants } = await query(
-      `
-      SELECT r.id as restaurant_id, u.id as user_id 
-      FROM restaurant r
-      JOIN app_user u ON u.email = r.contact_email
-      WHERE r.id = $1
-    `,
-      [order.restaurant_id]
-    )
-
-    if (restaurants.length > 0 && restaurants[0].user_id) {
-      userId = restaurants[0].user_id
-      userType = 'RESTAURANT'
-    } else {
-      logger.warn('No user_id found for restaurant', { restaurant_id: order.restaurant_id })
-      return null
-    }
-  }
-
   const messages = {
     PLACED: {
       title: 'New Order Received',
@@ -693,21 +736,63 @@ export async function notifyOrderStatusChange(order, status) {
         ? `Order #${order.id.slice(0, 8)} from ${order.restaurant_name} has been cancelled`
         : `Order #${order.id.slice(0, 8)} has been cancelled`,
     },
+    SUPPLIER_DECLINED: {
+      title: 'Order declined by supplier',
+      message: order.cancel_reason
+        ? `Order #${order.id.slice(0, 8)} was declined: ${order.cancel_reason}`
+        : `Order #${order.id.slice(0, 8)} was declined by ${order.supplier_name || 'your supplier'}`,
+    },
   }
 
-  const msg = messages[status]
-  if (!msg) return
+  const isSupplierDecline =
+    status === 'CANCELLED' &&
+    (order.cancelled_by === 'SUPPLIER' || order.cancelledBy === 'SUPPLIER')
 
-  return sendNotification({
-    userId,
-    userType,
+  const msg = isSupplierDecline ? messages.SUPPLIER_DECLINED : messages[status]
+  if (!msg) return null
+
+  const payload = {
     notificationType: 'ORDER',
     notificationCategory: status,
     title: msg.title,
     message: msg.message,
     referenceId: order.id,
     referenceType: 'ORDER',
-    metadata: { order_id: order.id, status },
+    metadata: {
+      order_id: order.id,
+      status,
+      cancelled_by: order.cancelled_by || order.cancelledBy,
+      cancel_reason: order.cancel_reason || order.cancelReason,
+    },
+  }
+
+  if (status === 'PLACED') {
+    return notifyTenantUsers({
+      tenantId: order.supplier_id,
+      tenantType: 'SUPPLIER',
+      ...payload,
+    })
+  }
+
+  if (status === 'CANCELLED') {
+    if (isSupplierDecline) {
+      return notifyTenantUsers({
+        tenantId: order.restaurant_id,
+        tenantType: 'RESTAURANT',
+        ...payload,
+      })
+    }
+    return notifyTenantUsers({
+      tenantId: order.supplier_id,
+      tenantType: 'SUPPLIER',
+      ...payload,
+    })
+  }
+
+  return notifyTenantUsers({
+    tenantId: order.restaurant_id,
+    tenantType: 'RESTAURANT',
+    ...payload,
   })
 }
 
@@ -719,13 +804,10 @@ export async function notifyReservationCreated(reservation) {
   const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
   const status = reservation.status || reservation.reservationStatus
 
-  const context = await getRestaurantUserContext(restaurantId)
-  if (!context?.user_id) return null
-
   const timeslot = scheduledAt ? new Date(scheduledAt).toLocaleString() : 'unscheduled time'
-  return sendNotification({
-    userId: context.user_id,
-    userType: 'RESTAURANT',
+  const sent = await notifyTenantUsers({
+    tenantId: restaurantId,
+    tenantType: 'RESTAURANT',
     notificationType: 'RESERVATION_CREATED',
     notificationCategory: 'RESERVATION_CREATED',
     title: 'New reservation booked',
@@ -740,6 +822,7 @@ export async function notifyReservationCreated(reservation) {
       status,
     },
   })
+  return sent[0] || null
 }
 
 export async function notifyReservationWaitlist(reservation) {
@@ -750,12 +833,9 @@ export async function notifyReservationWaitlist(reservation) {
   const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
   const status = reservation.status || reservation.reservationStatus
 
-  const context = await getRestaurantUserContext(restaurantId)
-  if (!context?.user_id) return null
-
-  return sendNotification({
-    userId: context.user_id,
-    userType: 'RESTAURANT',
+  const sent = await notifyTenantUsers({
+    tenantId: restaurantId,
+    tenantType: 'RESTAURANT',
     notificationType: 'RESERVATION_WAITLIST',
     notificationCategory: 'RESERVATION_WAITLIST',
     title: 'Reservation moved to waitlist',
@@ -770,23 +850,68 @@ export async function notifyReservationWaitlist(reservation) {
       status,
     },
   })
+  return sent[0] || null
+}
+
+/**
+ * Restaurant team alert for reservation changes (reschedule, cancel, status).
+ */
+export async function notifyReservationStaffEvent(reservation, event = 'updated') {
+  const restaurantId = reservation.restaurant_id || reservation.restaurantId
+  if (!restaurantId) return null
+
+  const customerName = reservation.customer_name || reservation.customerName || 'Guest'
+  const partySize = reservation.party_size || reservation.partySize || 0
+  const scheduledAt = reservation.scheduled_at || reservation.scheduledAt
+  const timeslot = formatReservationTime(scheduledAt)
+  const status = reservation.status || 'CONFIRMED'
+
+  const copy = {
+    rescheduled: {
+      category: 'reservation_rescheduled',
+      title: 'Reservation rescheduled',
+      message: `${customerName} (party of ${partySize}) moved to ${timeslot}`,
+    },
+    cancelled: {
+      category: 'reservation_cancelled',
+      title: 'Reservation cancelled',
+      message: `${customerName} cancelled their booking for ${timeslot}`,
+    },
+    status_changed: {
+      category: 'reservation_created',
+      title: 'Reservation updated',
+      message: `${customerName} — now ${status} for ${timeslot}`,
+    },
+  }
+  const chosen = copy[event] || copy.status_changed
+
+  const sent = await notifyTenantUsers({
+    tenantId: restaurantId,
+    tenantType: 'RESTAURANT',
+    notificationType: 'RESERVATION',
+    notificationCategory: chosen.category,
+    title: chosen.title,
+    message: chosen.message,
+    referenceId: reservation.id,
+    referenceType: 'RESERVATION',
+    metadata: { restaurantId, partySize, scheduledAt, status, event },
+  })
+  return sent[0] || null
 }
 
 export async function notifyStaffPtoRequest(ptoRequest) {
   const staffId = ptoRequest.staff_id || ptoRequest.staffId
   const staffContext = await getStaffMemberContext(staffId)
   if (!staffContext) return null
-  const restaurantContext = await getRestaurantUserContext(staffContext.restaurant_id)
-  if (!restaurantContext?.user_id) return null
 
   const startDate = ptoRequest.start_date || ptoRequest.startDate
   const endDate = ptoRequest.end_date || ptoRequest.endDate
   const type = ptoRequest.type || ptoRequest.requestType || 'PTO'
   const status = ptoRequest.status || ptoRequest.requestStatus
   const dateRange = `${startDate} → ${endDate}`
-  return sendNotification({
-    userId: restaurantContext.user_id,
-    userType: 'RESTAURANT',
+  const sent = await notifyTenantUsers({
+    tenantId: staffContext.restaurant_id,
+    tenantType: 'RESTAURANT',
     notificationType: 'STAFF_PTO_REQUEST',
     notificationCategory: 'STAFF_PTO',
     title: 'New PTO request submitted',
@@ -801,6 +926,7 @@ export async function notifyStaffPtoRequest(ptoRequest) {
       endDate,
     },
   })
+  return sent[0] || null
 }
 
 export async function notifyStaffSwapRequest(swap) {
@@ -811,17 +937,14 @@ export async function notifyStaffSwapRequest(swap) {
   const staffContext = await getStaffMemberContext(requestedBy)
   if (!staffContext) return null
 
-  const restaurantContext = await getRestaurantUserContext(
-    restaurantId || staffContext.restaurant_id
-  )
   if (!staffContext) return null
-  if (!restaurantContext?.user_id) return null
 
   const shiftDate = shift.date || swap.shift_date || 'upcoming shift'
+  const targetRestaurantId = restaurantId || staffContext.restaurant_id
 
-  return sendNotification({
-    userId: restaurantContext.user_id,
-    userType: 'RESTAURANT',
+  const sent = await notifyTenantUsers({
+    tenantId: targetRestaurantId,
+    tenantType: 'RESTAURANT',
     notificationType: 'STAFF_SWAP_REQUEST',
     notificationCategory: 'STAFF_SWAP',
     title: 'Shift swap requested',
@@ -830,26 +953,26 @@ export async function notifyStaffSwapRequest(swap) {
     referenceType: 'STAFF_SWAP',
     metadata: {
       staffId: staffContext.id,
-      restaurantId: restaurantId || staffContext.restaurant_id,
+      restaurantId: targetRestaurantId,
       shiftId: swap.shift_id || shift.id,
       status: swap.status,
     },
   })
+  return sent[0] || null
 }
 
 export async function notifyScheduledOrderEvent(quickList, action) {
   const restaurantId = quickList.restaurant_id || quickList.restaurantId
-  const context = await getRestaurantUserContext(restaurantId)
-  if (!context?.user_id) return null
+  if (!restaurantId) return null
 
   const autoMessage =
     action === 'EXECUTED'
       ? `Scheduled order "${quickList.name}" has been created automatically.`
       : `Scheduled order "${quickList.name}" will run soon. Review inventory if you need to pause it.`
 
-  return sendNotification({
-    userId: context.user_id,
-    userType: 'RESTAURANT',
+  const sent = await notifyTenantUsers({
+    tenantId: restaurantId,
+    tenantType: 'RESTAURANT',
     notificationType: 'SCHEDULED_ORDER',
     notificationCategory: 'SCHEDULED_ORDER',
     title: action === 'EXECUTED' ? 'Scheduled order executed' : 'Scheduled order reminder',
@@ -862,13 +985,13 @@ export async function notifyScheduledOrderEvent(quickList, action) {
       nextExecutionDate: quickList.next_execution_date,
     },
   })
+  return sent[0] || null
 }
 
 export async function notifyInvoiceIssued(invoice) {
-  // Notify restaurant
-  return sendNotification({
-    userId: invoice.restaurant_id,
-    userType: 'RESTAURANT',
+  const sent = await notifyTenantUsers({
+    tenantId: invoice.restaurant_id,
+    tenantType: 'RESTAURANT',
     notificationType: 'INVOICE',
     notificationCategory: 'invoice_issued',
     title: 'Invoice Issued',
@@ -877,30 +1000,34 @@ export async function notifyInvoiceIssued(invoice) {
     referenceType: 'INVOICE',
     metadata: { invoice_number: invoice.invoice_number, total_amount: invoice.total_amount },
   })
+  return sent[0] || null
 }
 
 export async function notifyPaymentReceived(payment) {
-  // Notify supplier when payment is received
-  // Note: payment object should contain invoice with supplier_id
-  if (payment.invoice?.supplier_id) {
-    return sendNotification({
-      userId: payment.invoice.supplier_id,
-      userType: 'SUPPLIER',
-      notificationType: 'PAYMENT',
-      notificationCategory: 'payment_received',
-      title: 'Payment Received',
-      message: `Payment of $${payment.payment_amount} received for invoice ${payment.invoice_number || payment.invoice_id.slice(0, 8)}`,
-      referenceId: payment.invoice_id,
-      referenceType: 'INVOICE',
-      metadata: { payment_id: payment.id, amount: payment.payment_amount },
-    })
-  }
+  const supplierId = payment.invoice?.supplier_id
+  if (!supplierId) return null
+
+  const sent = await notifyTenantUsers({
+    tenantId: supplierId,
+    tenantType: 'SUPPLIER',
+    notificationType: 'PAYMENT',
+    notificationCategory: 'payment_received',
+    title: 'Payment Received',
+    message: `Payment of $${payment.payment_amount} received for invoice ${payment.invoice_number || payment.invoice_id?.slice(0, 8)}`,
+    referenceId: payment.invoice_id,
+    referenceType: 'INVOICE',
+    metadata: { payment_id: payment.id, amount: payment.payment_amount },
+  })
+  return sent[0] || null
 }
 
 export async function notifyLowStock(product, currentStock, threshold) {
-  return sendNotification({
-    userId: product.restaurant_id,
-    userType: 'RESTAURANT',
+  const restaurantId = product.restaurant_id
+  if (!restaurantId) return null
+
+  const sent = await notifyTenantUsers({
+    tenantId: restaurantId,
+    tenantType: 'RESTAURANT',
     notificationType: 'INVENTORY',
     notificationCategory: 'low_stock',
     title: 'Low Stock Alert',
@@ -909,51 +1036,40 @@ export async function notifyLowStock(product, currentStock, threshold) {
     referenceType: 'PRODUCT',
     metadata: { product_name: product.name, current_stock: currentStock, threshold },
   })
+  return sent[0] || null
 }
 
 export async function notifyInvoiceOverdue(invoice) {
-  const promises = []
-  const { rows: rRows } = await query(
-    `SELECT u.id FROM app_user u JOIN restaurant r ON r.contact_email = u.email WHERE r.id = $1`,
-    [invoice.restaurant_id]
-  )
-  if (rRows.length > 0) {
-    promises.push(
-      sendNotification({
-        userId: rRows[0].id,
-        userType: 'RESTAURANT',
-        notificationType: 'INVOICE',
-        notificationCategory: 'invoice_overdue',
-        title: 'Invoice Overdue',
-        message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} was due on ${invoice.due_date} and is now overdue.`,
-        referenceId: invoice.id,
-        referenceType: 'INVOICE',
-        metadata: { invoice_number: invoice.invoice_number, due_date: invoice.due_date },
-      }).catch((err) =>
-        logger.error('notifyInvoiceOverdue restaurant failed', { err: err.message })
-      )
-    )
+  const payload = {
+    notificationType: 'INVOICE',
+    notificationCategory: 'invoice_overdue',
+    referenceId: invoice.id,
+    referenceType: 'INVOICE',
+    metadata: { invoice_number: invoice.invoice_number, due_date: invoice.due_date },
   }
-  const { rows: sRows } = await query(
-    `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-    [invoice.supplier_id]
-  )
-  if (sRows.length > 0) {
-    promises.push(
-      sendNotification({
-        userId: sRows[0].id,
-        userType: 'SUPPLIER',
-        notificationType: 'INVOICE',
-        notificationCategory: 'invoice_overdue',
-        title: 'Payment Overdue',
-        message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} is overdue since ${invoice.due_date}.`,
-        referenceId: invoice.id,
-        referenceType: 'INVOICE',
-        metadata: { invoice_number: invoice.invoice_number, due_date: invoice.due_date },
-      }).catch((err) => logger.error('notifyInvoiceOverdue supplier failed', { err: err.message }))
-    )
+
+  const results = await Promise.allSettled([
+    notifyTenantUsers({
+      tenantId: invoice.restaurant_id,
+      tenantType: 'RESTAURANT',
+      ...payload,
+      title: 'Invoice Overdue',
+      message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} was due on ${invoice.due_date} and is now overdue.`,
+    }),
+    notifyTenantUsers({
+      tenantId: invoice.supplier_id,
+      tenantType: 'SUPPLIER',
+      ...payload,
+      title: 'Payment Overdue',
+      message: `Invoice ${invoice.invoice_number} for $${invoice.total_amount} is overdue since ${invoice.due_date}.`,
+    }),
+  ])
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      logger.error('notifyInvoiceOverdue failed', { err: result.reason?.message })
+    }
   }
-  return Promise.allSettled(promises)
+  return results
 }
 
 export async function notifyOutOfStock({ productId, warehouseId, productName }) {
@@ -962,25 +1078,24 @@ export async function notifyOutOfStock({ productId, warehouseId, productName }) 
     [productId]
   )
   if (!pRows.length) return null
-  const { rows: uRows } = await query(
-    `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-    [pRows[0].supplier_id]
-  )
-  if (!uRows.length) return null
-  return sendNotification({
-    userId: uRows[0].id,
-    userType: 'SUPPLIER',
-    notificationType: 'OUT_OF_STOCK',
-    notificationCategory: 'out_of_stock',
-    title: 'Out of Stock',
-    message: `${productName || pRows[0].name} is now out of stock.`,
-    referenceId: productId,
-    referenceType: 'PRODUCT',
-    metadata: { productId, warehouseId },
-  }).catch((err) => {
+
+  try {
+    const sent = await notifyTenantUsers({
+      tenantId: pRows[0].supplier_id,
+      tenantType: 'SUPPLIER',
+      notificationType: 'OUT_OF_STOCK',
+      notificationCategory: 'out_of_stock',
+      title: 'Out of Stock',
+      message: `${productName || pRows[0].name} is now out of stock.`,
+      referenceId: productId,
+      referenceType: 'PRODUCT',
+      metadata: { productId, warehouseId },
+    })
+    return sent[0] || null
+  } catch (err) {
     logger.error('notifyOutOfStock failed', { err: err.message })
     return null
-  })
+  }
 }
 
 export async function notifyMessageReceived({ conversationId, senderType, messagePreview }) {
@@ -990,41 +1105,189 @@ export async function notifyMessageReceived({ conversationId, senderType, messag
   )
   if (!cRows.length) return null
   const conv = cRows[0]
-  let recipientUserId
-  let recipientType
+
+  let tenantId
+  let tenantType
   let senderLabel
   if (senderType === 'RESTAURANT') {
-    const { rows } = await query(
-      `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-      [conv.supplier_id]
-    )
-    if (!rows.length) return null
-    recipientUserId = rows[0].id
-    recipientType = 'SUPPLIER'
+    tenantId = conv.supplier_id
+    tenantType = 'SUPPLIER'
     senderLabel = 'A restaurant'
   } else {
-    const { rows } = await query(
-      `SELECT u.id FROM app_user u JOIN restaurant r ON r.contact_email = u.email WHERE r.id = $1`,
-      [conv.restaurant_id]
-    )
-    if (!rows.length) return null
-    recipientUserId = rows[0].id
-    recipientType = 'RESTAURANT'
+    tenantId = conv.restaurant_id
+    tenantType = 'RESTAURANT'
     senderLabel = 'A supplier'
   }
+  if (!tenantId) return null
+
   const preview = messagePreview ? `: "${messagePreview.slice(0, 80)}"` : ''
-  return sendNotification({
-    userId: recipientUserId,
-    userType: recipientType,
-    notificationType: 'MESSAGE',
-    notificationCategory: 'message_received',
-    title: 'New message',
-    message: `${senderLabel} sent you a message${preview}`,
-    referenceId: conversationId,
-    referenceType: 'CONVERSATION',
-    metadata: { conversationId },
-  }).catch((err) => {
+  try {
+    const sent = await notifyTenantUsers({
+      tenantId,
+      tenantType,
+      notificationType: 'MESSAGE',
+      notificationCategory: 'message_received',
+      title: 'New message',
+      message: `${senderLabel} sent you a message${preview}`,
+      referenceId: conversationId,
+      referenceType: 'CONVERSATION',
+      metadata: { conversationId },
+    })
+    return sent[0] || null
+  } catch (err) {
     logger.error('notifyMessageReceived failed', { err: err.message })
     return null
-  })
+  }
+}
+
+export async function notifyDisputeOpened(dispute) {
+  const supplierId = dispute.supplierId || dispute.supplier_id
+  if (!supplierId) return null
+
+  try {
+    const sent = await notifyTenantUsers({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+      notificationType: 'DISPUTE',
+      notificationCategory: 'dispute_opened',
+      title: 'New dispute opened',
+      message: `A restaurant opened a dispute on order #${String(dispute.orderId || dispute.order_id || '').slice(0, 8)}`,
+      referenceId: dispute.id,
+      referenceType: 'DISPUTE',
+      metadata: {
+        disputeId: dispute.id,
+        orderId: dispute.orderId || dispute.order_id,
+        type: dispute.type,
+      },
+    })
+    return sent[0] || null
+  } catch (err) {
+    logger.error('notifyDisputeOpened failed', { err: err.message })
+    return null
+  }
+}
+
+/**
+ * Notify restaurants when a supplier deal is approved and live (or pending payment).
+ */
+export async function notifyDealApproved(deal, { supplierName } = {}) {
+  const supplierId = deal.supplier_id || deal.supplierId
+  const dealId = deal.id
+  const dealName = String(deal.name || 'New deal')
+  const supplierLabel = supplierName || deal.supplier_name || 'A supplier'
+  const link = `/app/deals?highlight=${encodeURIComponent(String(dealId))}`
+
+  if (!supplierId || !dealId) return { followers: 0, nonFollowers: 0 }
+
+  try {
+    const { rows: followers } = await query(
+      `SELECT restaurant_id FROM supplier_follow WHERE supplier_id = $1`,
+      [supplierId]
+    )
+    const followerIds = new Set(followers.map((r) => r.restaurant_id))
+
+    const { rows: nonFollowers } = await query(
+      `
+      SELECT id AS restaurant_id
+      FROM restaurant r
+      WHERE r.id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM supplier_follow sf
+          WHERE sf.supplier_id = $1 AND sf.restaurant_id = r.id
+        )
+      `,
+      [supplierId]
+    )
+
+    let followerCount = 0
+    let nonFollowerCount = 0
+
+    for (const { restaurant_id: restaurantId } of followers) {
+      await notifyTenantUsers({
+        tenantId: restaurantId,
+        tenantType: 'RESTAURANT',
+        notificationType: 'PROMOTION',
+        notificationCategory: 'promotions',
+        title: `New deal from ${supplierLabel}`,
+        message: `${dealName} is now available. Open Deals to view and redeem.`,
+        referenceId: dealId,
+        referenceType: 'DEAL',
+        metadata: { link, dealId, supplierId, audience: 'follower' },
+      })
+      followerCount += 1
+    }
+
+    for (const { restaurant_id: restaurantId } of nonFollowers) {
+      if (followerIds.has(restaurantId)) continue
+      await notifyTenantUsers({
+        tenantId: restaurantId,
+        tenantType: 'RESTAURANT',
+        notificationType: 'PROMOTION',
+        notificationCategory: 'promotions',
+        title: `New deal on Supplify`,
+        message: `${supplierLabel} published "${dealName}". Open Deals to explore.`,
+        referenceId: dealId,
+        referenceType: 'DEAL',
+        metadata: { link, dealId, supplierId, audience: 'non_follower' },
+      })
+      nonFollowerCount += 1
+    }
+
+    logger.info('notifyDealApproved completed', {
+      dealId,
+      supplierId,
+      followerCount,
+      nonFollowerCount,
+    })
+    return { followers: followerCount, nonFollowers: nonFollowerCount }
+  } catch (err) {
+    logger.error('notifyDealApproved failed', { err: err.message, dealId })
+    return { followers: 0, nonFollowers: 0, error: err.message }
+  }
+}
+
+export async function notifyDisputeResolved(dispute, outcome, { replacementOrderId = null } = {}) {
+  const restaurantId = dispute.restaurantId || dispute.restaurant_id
+  if (!restaurantId) return null
+
+  const resolutionType = dispute.resolutionType || dispute.resolution_type
+  const replacementId =
+    replacementOrderId || dispute.replacementOrderId || dispute.replacement_order_id
+
+  const title = outcome === 'rejected' ? 'Dispute rejected' : 'Dispute resolved'
+  let message =
+    outcome === 'rejected'
+      ? `Your dispute was rejected. ${dispute.resolutionNotes || dispute.resolution_notes || ''}`.trim()
+      : `Your dispute was resolved (${resolutionType || 'closed'}).`
+
+  if (outcome !== 'rejected' && resolutionType === 'replacement' && replacementId) {
+    message = `Your dispute was resolved with a replacement. Replacement order #${String(replacementId).slice(0, 8)} has been created.`
+  }
+
+  const metadata = {
+    disputeId: dispute.id,
+    resolutionType,
+  }
+  if (replacementId) {
+    metadata.replacementOrderId = replacementId
+    metadata.link = `/app/orders/${replacementId}`
+  }
+
+  try {
+    const sent = await notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationType: 'DISPUTE',
+      notificationCategory: outcome === 'rejected' ? 'dispute_rejected' : 'dispute_resolved',
+      title,
+      message,
+      referenceId: dispute.id,
+      referenceType: 'DISPUTE',
+      metadata,
+    })
+    return sent[0] || null
+  } catch (err) {
+    logger.error('notifyDisputeResolved failed', { err: err.message })
+    return null
+  }
 }

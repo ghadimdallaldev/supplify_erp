@@ -13,6 +13,8 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+docker/.env
+apps/api/.env.docker-sync
 
 # Logs
 npm-debug.log*
@@ -85,6 +87,11 @@ temp/
 # Editor directories and files
 .vscode/
 .idea/
+.cursor/
+.superpowers/
+.cursorrules
+.claude/
+agent-transcripts/
 *.swp
 *.swo
 *~

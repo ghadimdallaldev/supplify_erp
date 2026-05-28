@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Remove development-only files from the working tree for preprod/prod branches.
- * Run from repo root after merging dev: node scripts/prune-release-tree.mjs --tier preprod|prod
+ * Run from repo root after merging dev:
+ *   node scripts/prune-release-tree.mjs --tier preprod|prod
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -60,7 +61,13 @@ function pruneApiScripts() {
   const dir = path.join(ROOT, 'apps/api/scripts')
   if (!fs.existsSync(dir)) return
   for (const name of fs.readdirSync(dir)) {
-    const keep = new Set(['migrate.js', 'run-migration.js', 'migrate-users-to-roles.js', 'lib'])
+    const keep = new Set([
+      'migrate.js',
+      'run-migration.js',
+      'migrate-users-to-roles.js',
+      'sync-system-roles.mjs',
+      'lib',
+    ])
     if (!keep.has(name)) {
       rm(path.join('apps/api/scripts', name))
     }
@@ -72,32 +79,33 @@ function patchServerJs() {
   const abs = path.join(ROOT, rel)
   if (!fs.existsSync(abs)) return
   let src = fs.readFileSync(abs, 'utf8')
-  src = src.replace(/import \{ e2eRoutes \} from '\.\/routes\/e2e\.routes\.js'\n/, '')
+  src = src.replace(/import \{ e2eRoutes \} from '\.\/routes\/e2e\.routes\.js'\r?\n/, '')
   src = src.replace(
-    /\nif \(config\.E2E_SECRET\) \{\n  app\.use\('\/api\/e2e', e2eRoutes\)\n\}\n/,
+    /\r?\nif \(config\.E2E_SECRET\) \{\r?\n\s*app\.use\('\/api\/e2e', e2eRoutes\)\r?\n\}\r?\n/,
     '\n'
   )
   fs.writeFileSync(abs, src)
   console.log('patched apps/api/src/server.js (removed e2e routes)')
 }
 
-function pruneWorkflows() {
-  const remove = [
-    'ci.yml',
-    'ci-guards.yml',
-    'deploy-dev.yml',
-    'deploy-ec2-dev.yml',
-    'deploy-staging.yml',
-    'release.yml',
-  ]
+function pruneDeployArtifacts() {
   if (tier === 'preprod') {
-    remove.push('deploy-prod.yml', 'deploy-ec2-prod.yml', 'deploy.yml')
+    rm('deploy/docker-compose.dev.yml')
+    rmFile('deploy/scripts/deploy-dev.sh')
+    rmFile('deploy/scripts/deploy-prod.sh')
+    rmFile('deploy/env/.env.dev.example')
+    rmFile('deploy/env/.env.prod.example')
   } else {
-    remove.push('deploy-preprod.yml', 'deploy-ec2-preprod.yml')
+    rm('deploy/docker-compose.dev.yml')
+    rm('deploy/docker-compose.staging.yml')
+    rmFile('deploy/scripts/deploy-dev.sh')
+    rmFile('deploy/scripts/deploy-preprod.sh')
+    rmFile('deploy/scripts/deploy-staging.sh')
+    rmFile('deploy/env/.env.dev.example')
+    rmFile('deploy/env/.env.staging.example')
   }
-  for (const file of remove) {
-    rmFile(path.join('.github/workflows', file))
-  }
+  rm('docker-compose.yml')
+  rm('docker')
 }
 
 function writeJson(rel, data) {
@@ -115,6 +123,7 @@ function slimPackageJson() {
     scripts: {
       build: 'pnpm --filter @supplify/api build && pnpm --filter @supplify/web build',
       'db:migrate': 'node apps/api/scripts/migrate.js',
+      'db:sync-roles': 'node apps/api/scripts/sync-system-roles.mjs',
       ...(tier === 'preprod'
         ? {
             'deploy:preprod': 'bash deploy/scripts/deploy-preprod.sh',
@@ -173,25 +182,25 @@ function slimPackageJson() {
 
 function writeReadme() {
   const envLabel = tier === 'preprod' ? 'Pre-production' : 'Production'
+  const deployCmd =
+    tier === 'preprod' ? 'sudo ./deploy/scripts/deploy-preprod.sh' : 'sudo ./deploy/scripts/deploy-prod.sh'
   fs.writeFileSync(
     path.join(ROOT, 'README.md'),
     `# Supplify (${envLabel} branch)
 
-Deploy-only branch. **Do not develop here** — merge from \`dev\`, then run:
+Deploy-only branch — **do not develop here**. On \`dev\`: \`node scripts/promote-release.mjs --tier preprod\`, then after UAT \`--tier prod\` (prod merges **preprod**, not dev).
 
 \`\`\`bash
-node scripts/prune-release-tree.mjs --tier ${tier}
+node scripts/promote-release.mjs --tier ${tier}
 \`\`\`
 
-## Deploy
+## Deploy (EC2 Docker)
 
-| Environment | Command |
-| --- | --- |
-${tier === 'preprod' ? '| Pre-production | `sudo ./deploy/scripts/deploy-preprod.sh` |' : '| Production | `sudo ./deploy/scripts/deploy-prod.sh` |'}
+\`\`\`bash
+${deployCmd}
+\`\`\`
 
-Migrations: \`pnpm db:migrate\`
-
-Branching guide: see \`docs/BRANCHING.md\` on the \`dev\` branch.
+Migrations run automatically during deploy. Branching guide: see \`docs/BRANCHING.md\` on the \`dev\` branch.
 `
   )
   console.log('wrote README.md')
@@ -201,10 +210,13 @@ Branching guide: see \`docs/BRANCHING.md\` on the \`dev\` branch.
 const SHARED_DIRS = [
   'docs',
   'tests',
+  '.github',
   '.claude',
+  '.cursor',
   '.husky',
   'apps/web/src/test',
   'apps/api/db/seed',
+  'agent-transcripts',
 ]
 
 const SHARED_FILES = [
@@ -215,7 +227,9 @@ const SHARED_FILES = [
   '.lintstagedrc.js',
   'releaserc.json',
   '.releaserc',
+  '.releaserc.js',
   'AGENTS.md',
+  '.cursorrules',
   'scripts/dev-native.mjs',
   'scripts/dev-apps.mjs',
   'scripts/dev-infra.mjs',
@@ -224,17 +238,19 @@ const SHARED_FILES = [
   'scripts/run-local.ps1',
   'scripts/run-local.cmd',
   'scripts/ensure-native-env.mjs',
+  'scripts/prune-release-tree.mjs',
+  'scripts/promote-release.mjs',
 ]
 
 console.log(`\nPruning release tree (tier=${tier})...\n`)
 
 for (const d of SHARED_DIRS) rm(d)
-for (const f of SHARED_FILES) rm(f)
+for (const f of SHARED_FILES) rmFile(f)
 
 removeTestFiles()
 pruneApiScripts()
 patchServerJs()
-pruneWorkflows()
+pruneDeployArtifacts()
 slimPackageJson()
 writeReadme()
 

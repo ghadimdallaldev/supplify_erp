@@ -1,5 +1,9 @@
-import { useAppSelector } from '../hooks/redux'
-import { useCreateOrderMutation, useGetActivePromotionsQuery } from '../services/api'
+import { useAppDispatch, useAppSelector } from '../hooks/redux'
+import {
+  useCreateOrderMutation,
+  useGetActivePromotionsQuery,
+  useGetEntitlementsQuery,
+} from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -14,25 +18,51 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
+import { LimitExceededBanner } from '../components/LimitExceededBanner'
+import { pageHeaderRowClass, splitRowClass } from '../components/ui/card-layout'
 import { ShoppingCart, Trash2, Plus, Minus, Save, Calendar, FileText } from 'lucide-react'
 import { useCartActions } from '../hooks/useCartActions'
+import {
+  formatOrderPlaceGateMessage,
+  getOrderPlaceGate,
+  getDealRedeemGate,
+} from '../lib/planLimits'
+import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import toast from 'react-hot-toast'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
+import { usePermissions } from '../hooks/usePermissions'
 
 export function CartPage() {
+  const [searchParams] = useSearchParams()
+  const dispatch = useAppDispatch()
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
+  const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
+  const canPlaceOrders = can('ORDERS_CREATE')
   const { data: dealsData } = useGetActivePromotionsQuery()
-  const estimatedPromoDiscount = (dealsData?.promotions || []).reduce((max, p) => {
-    const val = Number(p.discount_value || 0)
-    if (p.type === 'percentage_discount') {
-      return Math.max(max, (total * val) / 100)
-    }
-    if (p.type === 'fixed_discount') {
-      return Math.max(max, val)
-    }
-    return max
-  }, 0)
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !user || user.role === 'ADMIN',
+  })
+  const orderGate = useMemo(
+    () => getOrderPlaceGate(entitlementsData?.entitlements, groups.length),
+    [entitlementsData?.entitlements, groups.length]
+  )
+  const dealRedeemGate = getDealRedeemGate(entitlementsData?.entitlements)
+  const canRedeemDeals = dealRedeemGate.canRedeem
+  const estimatedPromoDiscount = canRedeemDeals
+    ? (dealsData?.promotions || []).reduce((max, p) => {
+        const val = Number(p.discount_value || 0)
+        if (p.type === 'percentage_discount') {
+          return Math.max(max, (total * val) / 100)
+        }
+        if (p.type === 'fixed_discount') {
+          return Math.max(max, val)
+        }
+        return max
+      }, 0)
+    : 0
   const {
     updateQuantity,
     removeItem,
@@ -54,6 +84,15 @@ export function CartPage() {
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
+  const [couponCode, setCouponCode] = useState(searchParams.get('coupon') || '')
+  const [promotionId, setPromotionId] = useState(searchParams.get('dealId') || '')
+
+  useEffect(() => {
+    const c = searchParams.get('coupon')
+    if (c) setCouponCode(c)
+    const d = searchParams.get('dealId')
+    if (d) setPromotionId(d)
+  }, [searchParams])
 
   useEffect(() => {
     rehydrateCart()
@@ -96,11 +135,27 @@ export function CartPage() {
       return
     }
 
+    if (!orderGate.canPlace) {
+      openBrowseUpgrade(dispatch, {
+        currentPlan: orderGate.planName,
+        upgradeUrl: '/app/settings?tab=subscription',
+      })
+      return
+    }
+
     // Show order details dialog
     setShowOrderDetails(true)
   }
 
   const handleConfirmOrder = async () => {
+    if (!orderGate.canPlace) {
+      openBrowseUpgrade(dispatch, {
+        currentPlan: orderGate.planName,
+        upgradeUrl: '/app/settings?tab=subscription',
+      })
+      return
+    }
+
     setIsPlacingOrder(true)
     try {
       const items = groups.flatMap((group) =>
@@ -115,6 +170,8 @@ export function CartPage() {
         items,
         deliveryDate: deliveryDate || undefined,
         notes: deliveryNotes || undefined,
+        couponCode: canRedeemDeals ? couponCode.trim() || undefined : undefined,
+        promotionId: canRedeemDeals ? promotionId || undefined : undefined,
       }).unwrap()
 
       clearCart()
@@ -184,12 +241,12 @@ export function CartPage() {
 
   return (
     <div className="space-y-6" data-testid="cart-page">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className={pageHeaderRowClass}>
+        <div className="min-w-0">
           <h1 className="text-[21px] font-black text-[var(--text)]">Shopping Cart</h1>
           <p className="text-[var(--text-muted)] mt-2">Review your order before placing it</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           {drafts.length > 0 && (
             <Button variant="outline" onClick={() => setShowLoadDraft(true)}>
               Load Draft
@@ -209,14 +266,35 @@ export function CartPage() {
         </div>
       </div>
 
+      {!orderGate.canPlace && orderGate.reason === 'at_limit' && orderGate.limit != null && (
+        <LimitExceededBanner
+          limitKey="orders_per_day"
+          currentUsage={orderGate.current}
+          limitValue={orderGate.limit}
+          currentPlan={orderGate.planName}
+          upgradeUrl="/app/settings?tab=subscription"
+          className="border-red-200 bg-red-50 text-red-900 [&_p]:text-red-800"
+        />
+      )}
+      {!orderGate.canPlace && orderGate.reason === 'would_exceed' && (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="alert"
+        >
+          {formatOrderPlaceGateMessage(orderGate)}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {groups.map((group) => (
             <Card key={group.supplierId}>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{group.supplierName}</span>
-                  <Badge variant="secondary">${formatPrice(group.subtotal)}</Badge>
+                <CardTitle className={splitRowClass}>
+                  <span className="min-w-0 truncate">{group.supplierName}</span>
+                  <Badge variant="secondary" className="shrink-0">
+                    ${formatPrice(group.subtotal)}
+                  </Badge>
                 </CardTitle>
                 <CardDescription>
                   {group.items.length} item{group.items.length !== 1 ? 's' : ''}
@@ -226,10 +304,10 @@ export function CartPage() {
                 {group.items.map((item) => (
                   <div
                     key={item.productId}
-                    className="flex items-center space-x-4 p-4 border rounded-lg"
+                    className="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:gap-4"
                     data-testid={`cart-item-row-${item.productId}`}
                   >
-                    <div className="w-16 h-16 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
+                    <div className="w-16 h-16 shrink-0 bg-[var(--brand-ultra)] rounded-lg flex items-center justify-center">
                       {item.product.image_url ? (
                         <img
                           src={item.product.image_url}
@@ -241,8 +319,8 @@ export function CartPage() {
                       )}
                     </div>
 
-                    <div className="flex-1">
-                      <h4 className="font-medium">{item.product.name}</h4>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium truncate">{item.product.name}</h4>
                       <p className="text-sm text-[var(--text-muted)]">SKU: {item.product.sku}</p>
                       <p className="text-sm text-[var(--text-muted)]">
                         $
@@ -253,44 +331,45 @@ export function CartPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
-                        disabled={item.quantity <= 1}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center">{item.quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
+                          disabled={item.quantity <= 1}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center tabular-nums">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
 
-                    <div className="text-right">
-                      <p className="font-medium">
+                      <p className="font-medium tabular-nums sm:text-right">
                         $
                         {(typeof item.product.current_price === 'number'
                           ? item.product.current_price
                           : parseFloat(String(item.product.current_price ?? '')) || 0) *
                           item.quantity}
                       </p>
-                    </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (item.productId) handleRemoveItem(item.productId)
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (item.productId) handleRemoveItem(item.productId)
+                        }}
+                        aria-label="Remove item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </CardContent>
@@ -313,6 +392,11 @@ export function CartPage() {
                   <span>Est. promotion savings</span>
                   <span>-${formatPrice(estimatedPromoDiscount)}</span>
                 </div>
+              ) : dealRedeemGate.limit != null ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Deal redemptions today: {dealRedeemGate.current}/{dealRedeemGate.limit}
+                  {!canRedeemDeals && dealRedeemGate.message ? ` — ${dealRedeemGate.message}` : ''}
+                </p>
               ) : null}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-muted)]">Tax</span>
@@ -332,15 +416,41 @@ export function CartPage() {
             </CardContent>
           </Card>
 
+          {!canPlaceOrders ? (
+            <p className="text-sm text-[var(--text-muted)] text-center">
+              Your role does not have permission to place orders. Contact your workspace admin.
+            </p>
+          ) : null}
           <Button
             onClick={handlePlaceOrder}
-            disabled={isPlacingOrder}
+            disabled={isPlacingOrder || !orderGate.canPlace || !canPlaceOrders}
             className="w-full"
             size="lg"
             data-testid="cart-place-order"
           >
-            {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
+            {isPlacingOrder
+              ? 'Placing Order...'
+              : !canPlaceOrders
+                ? 'Cannot place orders'
+                : !orderGate.canPlace
+                  ? 'Daily order limit reached'
+                  : 'Place Order'}
           </Button>
+          {!orderGate.canPlace && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() =>
+                openBrowseUpgrade(dispatch, {
+                  currentPlan: orderGate.planName,
+                  upgradeUrl: '/app/settings?tab=subscription',
+                })
+              }
+            >
+              Upgrade to place more orders
+            </Button>
+          )}
         </div>
       </div>
 

@@ -142,16 +142,18 @@ const FEATURE_ALIASES = {
 export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey) {
   try {
     const { getTenantSubscription } = await import('./subscription.js')
+    const { resolveOrgBillingTenantId } = await import('./org-billing-tenant.js')
+    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
     const subscription = await getTenantSubscription(tenantId, tenantType)
     let result = await resolveFeatureEnabled(
-      tenantId,
+      billingTenantId,
       tenantType,
       featureKey,
       subscription?.features
     )
     if (!result.enabled && FEATURE_ALIASES[featureKey]) {
       result = await resolveFeatureEnabled(
-        tenantId,
+        billingTenantId,
         tenantType,
         FEATURE_ALIASES[featureKey],
         subscription?.features

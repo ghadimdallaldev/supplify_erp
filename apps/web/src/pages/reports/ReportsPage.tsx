@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { PageHeader } from '../../components/ui/page-header'
 import { Button } from '../../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { Label } from '../../components/ui/label'
@@ -11,7 +12,7 @@ import {
   useGetEntitlementsQuery,
 } from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
-import { featureEnabled } from '../../lib/planLimits'
+import { canUseGlobalReports } from '../../lib/planFeatureGates'
 import { downloadCsv, reportRowsToCsv } from '../../utils/csvExport'
 import { Loader2, Download } from 'lucide-react'
 import {
@@ -146,11 +147,11 @@ function ReportPanel({
 }) {
   const restaurantQuery = useGetRestaurantReportQuery(
     { path: def.path, from, to, branchId: branchId || undefined, granularity },
-    { skip: !isRestaurant }
+    { skip: !isRestaurant, refetchOnMountOrArgChange: true }
   )
   const supplierQuery = useGetSupplierReportQuery(
     { path: def.path, from, to, granularity },
-    { skip: isRestaurant }
+    { skip: isRestaurant, refetchOnMountOrArgChange: true }
   )
   const { data, isLoading, isFetching } = isRestaurant ? restaurantQuery : supplierQuery
   const rows = (data?.data as Array<Record<string, unknown>>) || []
@@ -260,7 +261,7 @@ export function ReportsPage() {
   )
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
+  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const { data: branchesData } = useGetBranchesQuery(undefined, { skip: !isRestaurant })
   const branches = branchesData?.branches || []
   const defs = isRestaurant ? RESTAURANT_REPORTS : SUPPLIER_REPORTS
@@ -269,10 +270,10 @@ export function ReportsPage() {
   if (!reportsEnabled) {
     return (
       <div className="space-y-4">
-        <h1 className="text-[21px] font-black text-[var(--text)]">Reports</h1>
+        <PageHeader title="Reports" />
         <Card>
           <CardContent className="py-8 text-sm text-[var(--text-muted)]">
-            Reports & analytics are not included on your current plan. Upgrade to unlock insights.
+            Reports are not available on your current plan. Contact support if this looks wrong.
           </CardContent>
         </Card>
       </div>
@@ -281,14 +282,14 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-[21px] font-black text-[var(--text)]">Reports & Analytics</h1>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          {isRestaurant
+      <PageHeader
+        title="Reports & Analytics"
+        description={
+          isRestaurant
             ? 'Restaurant purchasing and operations insights'
-            : 'Supplier revenue and fulfillment insights'}
-        </p>
-      </div>
+            : 'Supplier revenue and fulfillment insights'
+        }
+      />
 
       <Card>
         <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -340,21 +341,18 @@ export function ReportsPage() {
             </TabsTrigger>
           ))}
         </TabsList>
-        {defs.map((def) => (
-          <TabsContent key={def.key} value={def.key} className="mt-4">
-            <ReportPanel
-              def={def}
-              isRestaurant={isRestaurant}
-              from={from}
-              to={to}
-              branchId={branchId}
-              granularity={granularity}
-            />
-          </TabsContent>
-        ))}
+        <TabsContent value={current.key} className="mt-4">
+          <ReportPanel
+            key={`${current.key}-${from}-${to}-${branchId}-${granularity}`}
+            def={current}
+            isRestaurant={isRestaurant}
+            from={from}
+            to={to}
+            branchId={branchId}
+            granularity={granularity}
+          />
+        </TabsContent>
       </Tabs>
-
-      {!current ? null : null}
     </div>
   )
 }

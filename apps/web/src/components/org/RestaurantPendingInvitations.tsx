@@ -6,14 +6,23 @@ import {
   useRegenerateRestaurantMemberInvitationMutation,
   useRevokeRestaurantMemberInvitationMutation,
 } from '../../services/api'
+import { usePermissions } from '../../hooks/usePermissions'
 
 export function RestaurantPendingInvitations() {
-  const { data, refetch } = useGetRestaurantMemberInvitationsQuery()
+  const { canAny } = usePermissions()
+  const canManageInvites = canAny('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE')
+  const { data, refetch } = useGetRestaurantMemberInvitationsQuery(undefined, {
+    skip: !canManageInvites,
+  })
   const [revoke] = useRevokeRestaurantMemberInvitationMutation()
   const [regenerate] = useRegenerateRestaurantMemberInvitationMutation()
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
-  const invitations = data?.invitations ?? []
+  if (!canManageInvites) return null
+
+  const invitations = (data?.invitations ?? []).filter((inv) =>
+    ['pending', 'expired', 'revoked'].includes(inv.status)
+  )
   if (!invitations.length) return null
 
   const handleCopy = async (url: string, id: string) => {
@@ -88,7 +97,9 @@ export function RestaurantPendingInvitations() {
                     </Button>
                   )}
                   {inv.status === 'accepted' && (
-                    <span className="text-[var(--text-muted)]">{inv.accepted_by_name || 'Accepted'}</span>
+                    <span className="text-[var(--text-muted)]">
+                      {inv.accepted_by_name || 'Accepted'}
+                    </span>
                   )}
                 </td>
               </tr>

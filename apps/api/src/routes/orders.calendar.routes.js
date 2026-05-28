@@ -1,6 +1,11 @@
 import express from 'express'
 import { z } from 'zod'
-import { requireAuth, getRequestTenant, resolveTenantContext } from '../lib/rbac.js'
+import {
+  requireAuth,
+  getRequestTenant,
+  resolveTenantContext,
+  requirePermission,
+} from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -158,7 +163,7 @@ function buildInvoiceEvents(invoice, roleContext, orderLookup) {
   }
 }
 
-router.use(requireAuth, resolveTenantContext)
+router.use(requireAuth, resolveTenantContext, requirePermission('ORDERS_VIEW'))
 
 router.get(
   '/',

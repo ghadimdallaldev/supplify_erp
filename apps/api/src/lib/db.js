@@ -1,11 +1,12 @@
 import { Pool } from 'pg'
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
+import { summarizeQuery } from './log-helpers.js'
 
 // Create connection pool (production: set DATABASE_SSL=true, optional DATABASE_STATEMENT_TIMEOUT)
 const poolConfig = {
   connectionString: config.DATABASE_URL,
-  max: 20,
+  max: config.DATABASE_POOL_MAX,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
 }
@@ -16,6 +17,10 @@ if (config.DATABASE_STATEMENT_TIMEOUT) {
   poolConfig.statement_timeout = config.DATABASE_STATEMENT_TIMEOUT
 }
 export const pool = new Pool(poolConfig)
+
+export async function closePool() {
+  await pool.end()
+}
 
 pool.on('connect', () => {
   logger.debug('Database client connected')
@@ -47,11 +52,20 @@ export async function query(text, params = []) {
   try {
     const result = await pool.query(text, params)
     const duration = Date.now() - start
-    if (duration > 5000) {
-      logger.warn('Slow query', {
+    if (duration > 500) {
+      logger.warn({
+        event: 'db.query.slow',
         durationMs: duration,
         rowCount: result.rowCount,
-        queryPreview: text.substring(0, 80),
+        query: summarizeQuery(text),
+      })
+    } else if (process.env.LOG_SQL === '1') {
+      logger.debug({
+        event: 'db.query',
+        durationMs: duration,
+        rowCount: result.rowCount,
+        paramCount: params.length,
+        query: summarizeQuery(text),
       })
     }
     return result
@@ -60,11 +74,13 @@ export async function query(text, params = []) {
     if (error.code === '42P01') {
       // Table missing (e.g. optional staff feature); caller may handle
     } else {
-      logger.error('Query failed', {
+      logger.error({
+        event: 'db.query.failed',
         error: error.message,
         code: error.code,
         durationMs: duration,
-        queryPreview: text.substring(0, 100),
+        paramCount: params.length,
+        query: summarizeQuery(text),
       })
     }
     throw error

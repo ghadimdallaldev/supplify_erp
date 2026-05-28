@@ -2,6 +2,34 @@ import { query, withTransaction } from './db.js'
 import { logger } from './logger.js'
 import { resolveAllFeaturesForTenant } from './feature-flags.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
+import { getCache, setCache, deleteCache } from './cache.js'
+import {
+  RESTAURANT_LIMIT_KEYS,
+  SUPPLIER_LIMIT_KEYS,
+  resolveEffectiveLimit,
+  discoverLimitKeys,
+  fillMissingFreeTierLimits,
+  stripHiddenEntitlementLimits,
+  HIDDEN_ENTITLEMENT_LIMIT_KEYS,
+  isLimitKeyApplicable,
+} from './limit-resolution.js'
+import { PLAN_TIER_ORDER, normalizePlanCode, formatPlanDisplayName } from './plan-codes.js'
+import { countActiveBranchLocations } from './plan-enforcement.js'
+import { getWarehouseSupplierColumn } from './warehouse-helpers.js'
+import { resolveOrgBillingTenantId } from './org-billing-tenant.js'
+
+export { HIDDEN_ENTITLEMENT_LIMIT_KEYS }
+export { normalizePlanCode, formatPlanDisplayName } from './plan-codes.js'
+
+export { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS, discoverLimitKeys }
+
+/** Cache TTL for subscription data (seconds). Short enough to absorb burst traffic while staying fresh. */
+const SUBSCRIPTION_CACHE_TTL = 30
+
+/** Build a consistent cache key for a tenant subscription. */
+function subscriptionCacheKey(tenantId, tenantType) {
+  return 'sub:' + tenantType + ':' + tenantId
+}
 
 /**
  * Ensure tenant has an active subscription; if none, create one with the free plan.
@@ -45,13 +73,23 @@ async function ensureTenantSubscription(tenantId, tenantType) {
  * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
  * @returns {Promise<Object|null>} Subscription with plan details
  */
-export async function getTenantSubscription(tenantId, tenantType) {
+export async function getTenantSubscription(tenantId, tenantType, options = {}) {
+  const { skipOrgBilling = false } = options
+  const billingTenantId = skipOrgBilling
+    ? tenantId
+    : await resolveOrgBillingTenantId(tenantId, tenantType)
+
+  // Check cache first - avoids repeated DB hits on hot paths (requireFeature, checkLimit, etc.)
+  const cacheKey = subscriptionCacheKey(billingTenantId, tenantType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null) return cached
+
   try {
     try {
       const { rows: subRows } = await query(
         `SELECT id, plan_id, pending_plan_id, pending_effective_at FROM subscription
          WHERE tenant_id = $1 AND tenant_type = $2 AND status IN ('TRIALING', 'ACTIVE') ORDER BY created_at DESC LIMIT 1`,
-        [tenantId, tenantType]
+        [billingTenantId, tenantType]
       )
       if (subRows.length > 0) {
         const sub = subRows[0]
@@ -93,11 +131,11 @@ export async function getTenantSubscription(tenantId, tenantType) {
       ORDER BY s.created_at DESC
       LIMIT 1
     `,
-      [tenantId, tenantType]
+      [billingTenantId, tenantType]
     )
 
     if (rows.length === 0) {
-      await ensureTenantSubscription(tenantId, tenantType)
+      await ensureTenantSubscription(billingTenantId, tenantType)
       const result = await query(
         `
         SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code,
@@ -110,16 +148,30 @@ export async function getTenantSubscription(tenantId, tenantType) {
         ORDER BY s.created_at DESC
         LIMIT 1
       `,
-        [tenantId, tenantType]
+        [billingTenantId, tenantType]
       )
       rows = result.rows
     }
 
-    return rows[0] || null
+    const result = rows[0] || null
+    // Populate cache (TTL=30s). On cache miss (null result), do NOT cache — tenant may have
+    // just been created and ensureTenantSubscription will retry on next call.
+    if (result !== null) {
+      await setCache(cacheKey, result, SUBSCRIPTION_CACHE_TTL).catch(() => {})
+    }
+    return result
   } catch (error) {
     logger.error('Get tenant subscription error', { error: error.message })
     return null
   }
+}
+
+/**
+ * Invalidate the in-process/Redis cache for a tenant's subscription.
+ * Call this whenever a subscription is activated, upgraded, or cancelled.
+ */
+export async function invalidateTenantSubscriptionCache(tenantId, tenantType) {
+  await deleteCache(subscriptionCacheKey(tenantId, tenantType)).catch(() => {})
 }
 
 /**
@@ -143,6 +195,17 @@ export async function isFeatureEnabled(tenantId, tenantType, featureKey) {
  */
 export async function checkLimit(tenantId, tenantType, meterType) {
   try {
+    if (!isLimitKeyApplicable(tenantType, meterType)) {
+      return {
+        current: 0,
+        limit: 0,
+        isUnlimited: false,
+        isOverLimit: false,
+        effectiveLimit: 0,
+        notApplicable: true,
+      }
+    }
+
     const subscription = await getTenantSubscription(tenantId, tenantType)
 
     if (!subscription) {
@@ -156,43 +219,19 @@ export async function checkLimit(tenantId, tenantType, meterType) {
       }
     }
 
-    // Get limit from plan
-    let limit = subscription.limits?.[meterType]
-    const isUnlimited = limit === -1 || limit === null || limit === undefined
+    // Resolve limit: tenant override > plan override > plan default (increase-only)
+    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+    const resolved = await resolveEffectiveLimit({
+      tenantId: billingTenantId,
+      tenantType,
+      limitKey: meterType,
+      planId: subscription.plan_id,
+      planLimits: subscription.limits || {},
+    })
+    const limit = resolved.effectiveLimit
+    const isUnlimited = resolved.isUnlimited
 
-    // Check for admin override (table may not exist in all installations)
-    let overrides = []
-    try {
-      const result = await query(
-        `
-        SELECT override_value, expiration_date
-        FROM tenant_limit_override
-        WHERE tenant_id = $1 
-          AND tenant_type = $2 
-          AND limit_type = $3
-          AND (expiration_date IS NULL OR expiration_date > now())
-      `,
-        [tenantId, tenantType, meterType]
-      )
-      overrides = result.rows
-    } catch (error) {
-      // Table doesn't exist - that's OK, just skip override check
-      if (error.code === '42P01') {
-        // Table doesn't exist, continue without override
-      } else {
-        throw error
-      }
-    }
-
-    if (overrides.length > 0) {
-      const override = overrides[0]
-      // Override takes precedence
-      limit = parseInt(override.override_value)
-    } else {
-      limit = limit === -1 ? null : parseInt(limit)
-    }
-
-    if (isUnlimited && !overrides.length) {
+    if (isUnlimited) {
       return {
         current: 0,
         limit: null,
@@ -227,6 +266,29 @@ export async function checkLimit(tenantId, tenantType, meterType) {
         [tenantId]
       )
       current = parseInt(orderCount[0]?.count || 0)
+    } else if (meterType === 'quick_lists' && tenantType === 'RESTAURANT') {
+      const { rows: listCount } = await query(
+        `SELECT COUNT(*) as count FROM quick_list WHERE restaurant_id = $1`,
+        [tenantId]
+      )
+      current = parseInt(listCount[0]?.count || 0)
+    } else if (meterType === 'quick_list_items' && tenantType === 'RESTAURANT') {
+      const { rows: itemCount } = await query(
+        `
+        SELECT COUNT(*) as count
+        FROM quick_list_item qli
+        JOIN quick_list ql ON ql.id = qli.quick_list_id
+        WHERE ql.restaurant_id = $1
+      `,
+        [tenantId]
+      )
+      current = parseInt(itemCount[0]?.count || 0)
+    } else if (meterType === 'scheduled_quick_lists' && tenantType === 'RESTAURANT') {
+      const { rows: scheduledCount } = await query(
+        `SELECT COUNT(*) as count FROM quick_list WHERE restaurant_id = $1 AND is_scheduled = true`,
+        [tenantId]
+      )
+      current = parseInt(scheduledCount[0]?.count || 0)
     } else if (meterType === 'supplier_products_skus' && tenantType === 'SUPPLIER') {
       const { rows: productCount } = await query(
         `
@@ -249,6 +311,40 @@ export async function checkLimit(tenantId, tenantType, meterType) {
     } else if (meterType === 'users' && tenantType === 'SUPPLIER') {
       // Suppliers have single contact (no team table); count as 1
       current = 1
+    } else if (meterType === 'open_conversations') {
+      if (tenantType === 'RESTAURANT') {
+        const { rows: convCount } = await query(
+          `
+          SELECT COUNT(DISTINCT c.id) AS count
+          FROM conversation c
+          LEFT JOIN conversation_participant cp
+            ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
+          WHERE c.restaurant_id = $1
+            AND (cp.id IS NULL OR cp.is_archived = false)
+          `,
+          [tenantId]
+        )
+        current = parseInt(convCount[0]?.count || 0, 10)
+      } else {
+        const { rows: convCount } = await query(
+          `
+          SELECT COUNT(DISTINCT c.id) AS count
+          FROM conversation c
+          LEFT JOIN conversation_participant cp
+            ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
+          WHERE c.supplier_id = $1
+            AND (cp.id IS NULL OR cp.is_archived = false)
+          `,
+          [tenantId]
+        )
+        current = parseInt(convCount[0]?.count || 0, 10)
+      }
+    } else if (meterType === 'promotions' && tenantType === 'SUPPLIER') {
+      const { rows: promoCount } = await query(
+        `SELECT COUNT(*) AS count FROM promotions WHERE supplier_id = $1 AND status <> 'expired'`,
+        [tenantId]
+      )
+      current = parseInt(promoCount[0]?.count || 0, 10)
     } else if (meterType === 'storage_mb') {
       // Cumulative storage: one row per tenant with fixed period
       const { rows: storageRows } = await query(
@@ -301,6 +397,72 @@ export async function checkLimit(tenantId, tenantType, meterType) {
   }
 }
 
+async function getScheduledOrderGraceUsed(tenantId) {
+  const { rows } = await query(
+    `
+    SELECT current_value
+    FROM usage_meter
+    WHERE tenant_id = $1
+      AND tenant_type = 'RESTAURANT'
+      AND meter_type = 'scheduled_order_grace_per_day'
+      AND period_start_date = CURRENT_DATE
+  `,
+    [tenantId]
+  )
+  return rows.length > 0 ? parseInt(rows[0].current_value || 0, 10) : 0
+}
+
+/**
+ * Whether a scheduled quick-list run may create orders when the daily cap is already reached.
+ * Free tier may use scheduled_order_grace_per_day (default 1) for overflow orders.
+ */
+export async function evaluateScheduledOrderLimit(restaurantId, ordersToCreate) {
+  const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')
+  const subscription = await getTenantSubscription(restaurantId, 'RESTAURANT')
+  const graceLimitRaw = subscription?.limits?.scheduled_order_grace_per_day
+  const graceLimit =
+    graceLimitRaw == null || graceLimitRaw === -1 ? 0 : parseInt(graceLimitRaw, 10) || 0
+
+  if (limitCheck.isUnlimited || limitCheck.limit == null) {
+    return {
+      allowed: true,
+      usesGrace: false,
+      excess: 0,
+      graceUsed: 0,
+      graceLimit,
+      limitCheck,
+      ordersToCreate,
+    }
+  }
+
+  const newTotal = limitCheck.current + ordersToCreate
+  if (newTotal <= limitCheck.limit) {
+    return {
+      allowed: true,
+      usesGrace: false,
+      excess: 0,
+      graceUsed: 0,
+      graceLimit,
+      limitCheck,
+      ordersToCreate,
+    }
+  }
+
+  const excess = newTotal - limitCheck.limit
+  const graceUsed = await getScheduledOrderGraceUsed(restaurantId)
+  const allowed = graceLimit > 0 && graceUsed + excess <= graceLimit
+
+  return {
+    allowed,
+    usesGrace: allowed,
+    excess,
+    graceUsed,
+    graceLimit,
+    limitCheck,
+    ordersToCreate,
+  }
+}
+
 /**
  * Atomic check and increment for daily usage meters (orders_per_day, chats_per_day).
  * Uses transaction + row lock to avoid race conditions. Use this instead of checkLimit + incrementUsage for these meters.
@@ -316,7 +478,14 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
     return { allowed: false, current: 0, limit: 0 }
   }
   let limit = subscription.limits?.[meterType]
-  if (limit === -1 || limit === null || limit === undefined) {
+  const resolved = await resolveEffectiveLimit({
+    tenantId,
+    tenantType,
+    limitKey: meterType,
+    planId: subscription.plan_id,
+    planLimits: subscription.limits || {},
+  })
+  if (resolved.isUnlimited) {
     const res = await withTransaction(async (client) => {
       await client.query(
         `
@@ -335,20 +504,7 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
     })
     return res
   }
-  let overrides = []
-  try {
-    const result = await query(
-      `SELECT override_value FROM tenant_limit_override
-       WHERE tenant_id = $1 AND tenant_type = $2 AND limit_type = $3
-         AND (expiration_date IS NULL OR expiration_date > now())`,
-      [tenantId, tenantType, meterType]
-    )
-    overrides = result.rows
-  } catch (e) {
-    if (e.code !== '42P01') throw e
-  }
-  if (overrides.length > 0) limit = parseInt(overrides[0].override_value)
-  else limit = parseInt(limit)
+  limit = resolved.effectiveLimit
   const effectiveLimit = limit
 
   return withTransaction(async (client) => {
@@ -430,24 +586,7 @@ export async function incrementUsage(tenantId, tenantType, meterType, increment 
 /** Fixed date for cumulative meters (e.g. storage_mb) - one row per tenant */
 const CUMULATIVE_PERIOD_DATE = '2000-01-01'
 
-/** Canonical limit keys per tenant type (from docs/monetization/SUBSCRIPTIONS.md) */
-export const RESTAURANT_LIMIT_KEYS = [
-  'branches',
-  'users',
-  'orders_per_day',
-  'suppliers_per_restaurant',
-  'restaurant_inventory_skus',
-  'chats_per_day',
-  'storage_mb',
-]
-export const SUPPLIER_LIMIT_KEYS = [
-  'branches',
-  'warehouses',
-  'users',
-  'supplier_products_skus',
-  'chats_per_day',
-  'storage_mb',
-]
+/** Canonical limit keys re-exported from limit-resolution.js */
 
 /**
  * Get usage snapshot for all relevant meter keys (batch queries).
@@ -460,7 +599,18 @@ async function getUsageSnapshot(tenantId, tenantType) {
   const usage = Object.fromEntries(keys.map((k) => [k, 0]))
 
   if (tenantType === 'RESTAURANT') {
-    const [inv, orders, team, branches, suppliers, storage, meterRows] = await Promise.all([
+    const [
+      inv,
+      orders,
+      team,
+      suppliers,
+      storage,
+      quickLists,
+      quickListItems,
+      scheduledQuickLists,
+      meterRows,
+      branchCount,
+    ] = await Promise.all([
       query(
         `SELECT COUNT(DISTINCT product_id) as c FROM restaurant_inventory WHERE restaurant_id = $1`,
         [tenantId]
@@ -470,41 +620,60 @@ async function getUsageSnapshot(tenantId, tenantType) {
         [tenantId]
       ),
       query(`SELECT COUNT(*) as c FROM restaurant_team WHERE restaurant_id = $1`, [tenantId]),
-      query(
-        `SELECT COUNT(*) as c FROM tenant_account_link
-         WHERE parent_tenant_id = $1 AND parent_tenant_type = 'RESTAURANT'`,
-        [tenantId]
-      ),
       query(`SELECT COUNT(*) as c FROM supplier_follow WHERE restaurant_id = $1`, [tenantId]),
       query(
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND meter_type = 'storage_mb' AND period_start_date = $2`,
         [tenantId, CUMULATIVE_PERIOD_DATE]
       ),
+      query(`SELECT COUNT(*) as c FROM quick_list WHERE restaurant_id = $1`, [tenantId]),
+      query(
+        `SELECT COUNT(*) as c FROM quick_list_item qli
+         JOIN quick_list ql ON ql.id = qli.quick_list_id
+         WHERE ql.restaurant_id = $1`,
+        [tenantId]
+      ),
+      query(
+        `SELECT COUNT(*) as c FROM quick_list WHERE restaurant_id = $1 AND is_scheduled = true`,
+        [tenantId]
+      ),
       query(
         `SELECT meter_type, current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND period_start_date = CURRENT_DATE`,
         [tenantId]
       ),
+      countActiveBranchLocations(tenantId, 'RESTAURANT'),
     ])
     usage.restaurant_inventory_skus = parseInt(inv.rows[0]?.c || 0)
     usage.orders_per_day = parseInt(orders.rows[0]?.c || 0)
     usage.users = 1 + parseInt(team.rows[0]?.c || 0)
-    usage.branches = 1 + parseInt(branches.rows[0]?.c || 0, 10)
+    usage.branches = branchCount
     usage.suppliers_per_restaurant = parseInt(suppliers.rows[0]?.c || 0)
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
+    usage.quick_lists = parseInt(quickLists.rows[0]?.c || 0)
+    usage.quick_list_items = parseInt(quickListItems.rows[0]?.c || 0)
+    usage.scheduled_quick_lists = parseInt(scheduledQuickLists.rows[0]?.c || 0)
+    const { rows: openConvRows } = await query(
+      `
+      SELECT COUNT(DISTINCT c.id) AS c
+      FROM conversation c
+      LEFT JOIN conversation_participant cp
+        ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
+      WHERE c.restaurant_id = $1 AND (cp.id IS NULL OR cp.is_archived = false)
+      `,
+      [tenantId]
+    )
+    usage.open_conversations = parseInt(openConvRows[0]?.c || 0, 10)
     meterRows.rows.forEach((r) => {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
   } else {
-    const [products, warehouses, branches, storage, meterRows] = await Promise.all([
+    const supplierCol = await getWarehouseSupplierColumn()
+    const [products, warehouses, branchCount, storage, meterRows] = await Promise.all([
       query(`SELECT COUNT(*) as c FROM product WHERE supplier_id = $1`, [tenantId]),
-      query(`SELECT COUNT(*) as c FROM warehouse WHERE tenant_id = $1 AND is_active = TRUE`, [
-        tenantId,
-      ]),
       query(
-        `SELECT COUNT(*) as c FROM tenant_account_link
-         WHERE parent_tenant_id = $1 AND parent_tenant_type = 'SUPPLIER'`,
+        `SELECT COUNT(*)::int AS c FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
         [tenantId]
       ),
+      countActiveBranchLocations(tenantId, 'SUPPLIER'),
       query(
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND meter_type = 'storage_mb' AND period_start_date = $2`,
         [tenantId, CUMULATIVE_PERIOD_DATE]
@@ -515,10 +684,27 @@ async function getUsageSnapshot(tenantId, tenantType) {
       ),
     ])
     usage.supplier_products_skus = parseInt(products.rows[0]?.c || 0)
-    usage.warehouses = parseInt(warehouses.rows[0]?.c || 0)
-    usage.branches = 1 + parseInt(branches.rows[0]?.c || 0, 10)
+    usage.warehouses = parseInt(warehouses.rows[0]?.c || 0, 10)
+    usage.branches = branchCount
     usage.users = 1
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
+    const [openConvRows, promoRows] = await Promise.all([
+      query(
+        `
+        SELECT COUNT(DISTINCT c.id) AS c
+        FROM conversation c
+        LEFT JOIN conversation_participant cp
+          ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
+        WHERE c.supplier_id = $1 AND (cp.id IS NULL OR cp.is_archived = false)
+        `,
+        [tenantId]
+      ),
+      query(`SELECT COUNT(*) AS c FROM promotions WHERE supplier_id = $1 AND status <> 'expired'`, [
+        tenantId,
+      ]),
+    ])
+    usage.open_conversations = parseInt(openConvRows.rows[0]?.c || 0, 10)
+    usage.promotions = parseInt(promoRows.rows[0]?.c || 0, 10)
     meterRows.rows.forEach((r) => {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
@@ -535,46 +721,76 @@ async function getUsageSnapshot(tenantId, tenantType) {
  * @returns {Promise<Object|null>} Entitlements object or null if no subscription
  */
 export async function getEntitlements(tenantId, tenantType) {
-  const subscription = await getTenantSubscription(tenantId, tenantType)
+  const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+  const subscription = await getTenantSubscription(billingTenantId, tenantType, {
+    skipOrgBilling: true,
+  })
   if (!subscription) return null
 
-  const limitKeys = tenantType === 'RESTAURANT' ? RESTAURANT_LIMIT_KEYS : SUPPLIER_LIMIT_KEYS
+  const limitKeys =
+    tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
   const baseLimits = {}
   limitKeys.forEach((k) => {
     const v = subscription.limits?.[k]
     baseLimits[k] = v === -1 || v === null || v === undefined ? null : parseInt(v)
   })
 
-  let overrides = []
-  try {
-    const result = await query(
-      `SELECT limit_type as "limitKey", override_value as value, reason, expiration_date as "expiresAt"
-       FROM tenant_limit_override
-       WHERE tenant_id = $1 AND tenant_type = $2
-         AND (expiration_date IS NULL OR expiration_date > now())
-       ORDER BY limit_type`,
-      [tenantId, tenantType]
-    )
-    overrides = result.rows
-  } catch (e) {
-    if (e.code !== '42P01') throw e
+  const limits = { ...baseLimits }
+  const overrides = []
+  for (const k of limitKeys) {
+    const resolved = await resolveEffectiveLimit({
+      tenantId: billingTenantId,
+      tenantType,
+      limitKey: k,
+      planId: subscription.plan_id,
+      planLimits: subscription.limits || {},
+    })
+    limits[k] = resolved.effectiveLimit
+    if (resolved.tenantOverride) {
+      overrides.push({
+        limitKey: k,
+        value: parseInt(resolved.tenantOverride.override_value, 10),
+        reason: resolved.tenantOverride.reason || null,
+        expiresAt: resolved.tenantOverride.expiration_date
+          ? new Date(resolved.tenantOverride.expiration_date).toISOString()
+          : null,
+        scope: 'tenant',
+      })
+    } else if (resolved.planOverride) {
+      overrides.push({
+        limitKey: k,
+        value: parseInt(resolved.planOverride.override_value, 10),
+        reason: resolved.planOverride.reason || null,
+        expiresAt: resolved.planOverride.expiration_date
+          ? new Date(resolved.planOverride.expiration_date).toISOString()
+          : null,
+        scope: 'plan',
+      })
+    }
   }
 
-  const overrideByKey = Object.fromEntries(overrides.map((o) => [o.limitKey, o]))
-  const limits = { ...baseLimits }
-  overrides.forEach((o) => {
-    limits[o.limitKey] = o.value
-  })
-
   const { features, featureSources } = await resolveAllFeaturesForTenant(
-    tenantId,
+    billingTenantId,
     tenantType,
     subscription.features
   )
 
+  fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
+
   const usage = await getUsageSnapshot(tenantId, tenantType)
+  if (tenantType === 'SUPPLIER') {
+    const warehouseLimit = limits.warehouses
+    if (warehouseLimit === 0) {
+      usage.warehouses = 0
+    }
+  }
+  stripHiddenEntitlementLimits(limits, usage)
+  stripHiddenEntitlementLimits(baseLimits, null)
+  const visibleOverrides = stripHiddenEntitlementLimits(null, null, overrides)
+
   const usageWindowMeta = {}
   limitKeys.forEach((k) => {
+    if (HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(k)) return
     if (k === 'orders_per_day' || k === 'chats_per_day')
       usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
   })
@@ -582,6 +798,8 @@ export async function getEntitlements(tenantId, tenantType) {
   return {
     tenantType,
     tenantId,
+    billingTenantId,
+    usesOrgBilling: billingTenantId !== tenantId,
     plan: {
       id: subscription.plan_id,
       name: subscription.plan_name || subscription.plan_display_name,
@@ -598,14 +816,23 @@ export async function getEntitlements(tenantId, tenantType) {
     featureSources,
     limits,
     baseLimits,
-    overrides: overrides.map((o) => ({
+    overrides: visibleOverrides.map((o) => ({
       limitKey: o.limitKey,
       value: o.value,
       reason: o.reason || null,
-      expiresAt: o.expiresAt ? new Date(o.expiresAt).toISOString() : null,
+      expiresAt: o.expiresAt,
+      scope: o.scope,
     })),
     usage,
     usageWindowMeta,
+    freeSandbox:
+      (subscription.plan_code || '').toLowerCase() === 'free'
+        ? {
+            expiresAt: subscription.free_sandbox_expires_at
+              ? new Date(subscription.free_sandbox_expires_at).toISOString()
+              : null,
+          }
+        : null,
   }
 }
 
@@ -743,8 +970,8 @@ export async function decrementUsage(tenantId, tenantType, meterType, decrement 
 /** Default front-route for upgrade CTA (monetization UX) */
 const DEFAULT_UPGRADE_PATH = '/app/settings'
 
-/** Plan codes in tier order (free < bronze < gold < platinum); exclude enterprise for self-serve */
-const PLAN_ORDER = ['free', 'bronze', 'gold', 'platinum']
+/** Plan codes in tier order (free < silver < gold < platinum); exclude enterprise for self-serve */
+const PLAN_ORDER = [...PLAN_TIER_ORDER]
 
 /** Reason codes for deterministic, explainable recommendations */
 const REASON_CODES = {
@@ -799,14 +1026,16 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
   }
 
   const { plan, usage, limits, features } = entitlements
-  const currentCode = (plan?.code || 'free').toLowerCase().replace('enterprise', 'platinum')
+  const currentCode = normalizePlanCode(
+    (plan?.code || 'free').toLowerCase().replace('enterprise', 'platinum')
+  )
   const currentIndex = PLAN_ORDER.indexOf(currentCode)
   const planRowsRaw = await query(
     `SELECT code, name, limits, features FROM subscription_plan WHERE tenant_type = $1 AND is_active = true ORDER BY display_order, name`,
     [tenantType]
   )
-  const planRows = planRowsRaw.rows.filter((p) => PLAN_ORDER.includes((p.code || '').toLowerCase()))
-  const planIndex = planRows.findIndex((p) => (p.code || '').toLowerCase() === currentCode)
+  const planRows = planRowsRaw.rows.filter((p) => PLAN_ORDER.includes(normalizePlanCode(p.code)))
+  const planIndex = planRows.findIndex((p) => normalizePlanCode(p.code) === currentCode)
   const effectiveCurrentIndex = planIndex >= 0 ? planIndex : 0
 
   const limitDetails = []
@@ -861,15 +1090,20 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
   const featureKeysToCheck = ['reports', 'smart_reorder', 'multi_branch']
   for (const fk of featureKeysToCheck) {
     if (features[fk]) continue
-    blockedFeatureKeys.push(fk)
+    let unlockedAbove = false
     for (let i = effectiveCurrentIndex + 1; i < planRows.length; i++) {
       const p = planRows[i]
       const v = p.features?.[fk]
       const enabled = typeof v === 'boolean' ? v : v && v !== 'false' && v !== 'disabled'
       if (enabled) {
+        unlockedAbove = true
         unlocksFeaturesSet.add(fk)
         break
       }
+    }
+    if (unlockedAbove) {
+      blockedFeatureKeys.push(fk)
+      if (!triggeredBy) triggeredBy = { type: 'feature', key: fk }
     }
   }
 
@@ -899,7 +1133,7 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
 
   let recommendedIndex = minRecommendedIndex
   if (currentCode === 'free' && minRecommendedIndex <= effectiveCurrentIndex) {
-    const goldIdx = planRows.findIndex((p) => (p.code || '').toLowerCase() === 'gold')
+    const goldIdx = planRows.findIndex((p) => normalizePlanCode(p.code) === 'gold')
     recommendedIndex = goldIdx >= 0 ? goldIdx : Math.min(1, planRows.length - 1)
   }
   if (
@@ -908,12 +1142,10 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
   )
     recommendedIndex = effectiveCurrentIndex + 1
   if (recommendedIndex >= planRows.length) recommendedIndex = planRows.length - 1
-  if (recommendedIndex <= effectiveCurrentIndex) recommendedIndex = effectiveCurrentIndex + 1
-  if (recommendedIndex >= planRows.length) recommendedIndex = planRows.length - 1
 
   const recommended = planRows[recommendedIndex]
-  const recommendedPlanCode = (recommended?.code || 'gold').toLowerCase()
-  const recommendedPlanName = recommended?.name || 'Gold'
+  const recommendedPlanCode = normalizePlanCode(recommended?.code || 'gold')
+  const recommendedPlanName = formatPlanDisplayName(recommendedPlanCode, recommended?.name)
   const isCurrentBest = recommendedPlanCode === currentCode
 
   const evidence = {
@@ -981,17 +1213,17 @@ export async function recommendPlan({ tenantId, tenantType, blockedEvents = [] }
 /**
  * Get recommended plan names for a tenant type (for error payloads).
  * @param {string} tenantType - RESTAURANT | SUPPLIER
- * @returns {Promise<string[]>} Plan names (e.g. ['Bronze', 'Gold', 'Platinum'])
+ * @returns {Promise<string[]>} Plan names (e.g. ['Silver', 'Gold', 'Platinum'])
  */
 export async function getRecommendedPlanNames(tenantType) {
   try {
     const { rows } = await query(
-      `SELECT name FROM subscription_plan WHERE tenant_type = $1 AND code != 'free' AND is_active = true ORDER BY display_order, name`,
+      `SELECT code, name FROM subscription_plan WHERE tenant_type = $1 AND code != 'free' AND is_active = true ORDER BY display_order, name`,
       [tenantType]
     )
-    return rows.map((r) => r.name)
+    return rows.map((r) => formatPlanDisplayName(r.code, r.name))
   } catch (e) {
-    if (e.code === '42703') return ['Bronze', 'Gold', 'Platinum']
+    if (e.code === '42703') return ['Silver', 'Gold', 'Platinum']
     return []
   }
 }
@@ -1018,6 +1250,18 @@ export function buildLimitExceededPayload(
       upgradeUrl: upgradeUrl || DEFAULT_UPGRADE_PATH,
     },
   }
+}
+
+/**
+ * Whether the plan allows scheduled / automated quick lists (Silver+ tiers).
+ */
+export function isQuickListAutomationEnabled(featureValue) {
+  if (featureValue === true) return true
+  if (typeof featureValue === 'string') {
+    const v = featureValue.toLowerCase()
+    return v !== 'false' && v !== 'disabled' && v !== '' && v !== 'basic_manual_only'
+  }
+  return false
 }
 
 /**
@@ -1126,6 +1370,8 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
         })
       }
 
+      // Attach subscription so route handlers can reuse it without a second DB call
+      req.subscription = subscription
       next()
     } catch (error) {
       logger.error('Check feature middleware error:', error)

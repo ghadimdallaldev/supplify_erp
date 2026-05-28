@@ -5,6 +5,10 @@
 
 export const RESTAURANT_LIMIT_KEYS = [
   'orders_per_day',
+  'quick_lists',
+  'quick_list_items',
+  'scheduled_quick_lists',
+  'deal_redemptions_per_day',
   'branches',
   'users',
   'suppliers_per_restaurant',
@@ -16,7 +20,10 @@ export const RESTAURANT_LIMIT_KEYS = [
 export const SUPPLIER_LIMIT_KEYS = [
   'supplier_products_skus',
   'warehouses',
+  'branches',
   'users',
+  'promotions',
+  'open_conversations',
   'chats_per_day',
   'storage_mb',
 ] as const
@@ -26,19 +33,35 @@ export const RESTAURANT_FEATURE_KEYS = [
   'reports',
   'smart_reorder',
   'multi_branch',
+  'disputes_returns',
+  'advanced_roles',
+  'supplier_deals',
+  'supplier_reviews',
+  'tenant_audit_log',
   'custom_branding',
 ] as const
 
 export const SUPPLIER_FEATURE_KEYS = [
   'order_calendar',
   'reports',
-  'smart_reorder',
+  'warehouses',
+  'multi_warehouse',
+  'fulfillment',
+  'driver_management',
+  'disputes_returns',
+  'advanced_roles',
+  'promotions',
+  'tenant_audit_log',
   'custom_branding',
 ] as const
 
 export const LIMIT_KEY_LABELS: Record<string, string> = {
   orders_per_day: 'Daily orders',
-  chats_per_day: 'Daily chats',
+  quick_lists: 'Quick lists',
+  quick_list_items: 'Quick list products',
+  scheduled_quick_lists: 'Scheduled quick lists',
+  chats_per_day: 'Messages (today)',
+  open_conversations: 'Open chats',
   supplier_products_skus: 'Products',
   restaurant_inventory_skus: 'Inventory SKUs',
   branches: 'Branches',
@@ -46,6 +69,8 @@ export const LIMIT_KEY_LABELS: Record<string, string> = {
   users: 'Users',
   storage_mb: 'Storage (MB)',
   suppliers_per_restaurant: 'Suppliers',
+  promotions: 'Deals & promotions',
+  deal_redemptions_per_day: 'Deal redemptions (today)',
 }
 
 export const FEATURE_KEY_LABELS: Record<string, string> = {
@@ -53,7 +78,17 @@ export const FEATURE_KEY_LABELS: Record<string, string> = {
   reports: 'Reports',
   smart_reorder: 'Smart reorder',
   multi_branch: 'Multi-branch',
+  disputes_returns: 'Disputes & returns',
+  advanced_roles: 'Advanced roles',
+  supplier_reviews: 'Supplier reviews',
+  tenant_audit_log: 'Activity log',
   custom_branding: 'Custom branding',
+  warehouses: 'Warehouses',
+  multi_warehouse: 'Multi-warehouse',
+  fulfillment: 'Fulfillment & logistics',
+  driver_management: 'Driver management',
+  promotions: 'Promotions',
+  supplier_deals: 'Supplier deals',
 }
 
 /** Short label for plan comparison cells (tier-specific branding levels). */
@@ -79,17 +114,44 @@ export function formatPlanFeatureCell(
   return { enabled }
 }
 
-/** Plan value subtitles (pricing psychology). Do not change plan names/codes. */
+/** Self-serve tier order (excludes enterprise). */
+export const PLAN_TIER_ORDER = ['free', 'silver', 'gold', 'platinum'] as const
+
+/** Legacy API / cache codes mapped to canonical DB codes. */
+export const LEGACY_PLAN_CODE_ALIASES: Record<string, string> = {
+  bronze: 'silver',
+}
+
+export function normalizePlanCode(code: string | null | undefined): string {
+  const c = (code || '').toLowerCase().trim()
+  return LEGACY_PLAN_CODE_ALIASES[c] ?? c
+}
+
+/** Plan value subtitles (pricing psychology). */
 export const PLAN_SUBTITLES: Record<string, string> = {
-  free: 'Setup & Testing',
-  bronze: 'Starter',
+  free: 'Time-limited trial',
+  silver: 'Starter',
   gold: 'Most Popular',
   platinum: 'Unlimited Ops',
 }
 
+/** User-facing plan name; DB code `free` is marketed as Free Trial (not forever-free). */
+export function formatPlanDisplayName(
+  planCode: string | null | undefined,
+  planName?: string | null
+): string {
+  const code = normalizePlanCode(planCode)
+  if (code === 'free') return 'Free Trial'
+  if (code === 'silver') return 'Silver'
+  const name = (planName || '').trim()
+  if (name === 'Bronze') return 'Silver'
+  if (name) return name
+  return 'Plan'
+}
+
 export function getPlanSubtitle(planCode: string | null | undefined): string {
   if (!planCode) return ''
-  const key = planCode.toLowerCase().replace(/\s/g, '')
+  const key = normalizePlanCode(planCode).replace(/\s/g, '')
   return PLAN_SUBTITLES[key] ?? ''
 }
 
@@ -101,8 +163,12 @@ export function getFeatureKeys(tenantType: 'RESTAURANT' | 'SUPPLIER'): readonly 
   return tenantType === 'RESTAURANT' ? RESTAURANT_FEATURE_KEYS : SUPPLIER_FEATURE_KEYS
 }
 
+function titleCaseFromSnake(limitKey: string): string {
+  return limitKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 export function getLimitLabel(limitKey: string): string {
-  return LIMIT_KEY_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')
+  return LIMIT_KEY_LABELS[limitKey] ?? titleCaseFromSnake(limitKey)
 }
 
 export function getFeatureLabel(featureKey: string): string {
@@ -110,7 +176,7 @@ export function getFeatureLabel(featureKey: string): string {
 }
 
 /** Human-readable nudge when the user has been blocked repeatedly (Layout banner). */
-const IGNORED_BLOCK_KEYS = new Set(['upgrade_prompt'])
+const IGNORED_BLOCK_KEYS = new Set(['upgrade_prompt', 'scheduled_order_grace_per_day'])
 
 export function formatPlanBlockNudgeMessage(
   limitKeys: string[],

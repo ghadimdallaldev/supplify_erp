@@ -7,6 +7,7 @@ import { logger } from './logger.js'
 import { getCache, setCache, deleteCache } from './cache.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
 import { getOrgRolePermissions } from './supplier-org.js'
+import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
 
 export { PERMISSION_KEYS }
 
@@ -141,6 +142,28 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
       }
     }
 
+    if (tenantType === 'RESTAURANT') {
+      try {
+        const { rows: orgRows } = await query(
+          `SELECT organization_id FROM restaurant WHERE id = $1`,
+          [tenantId]
+        )
+        const organizationId = orgRows[0]?.organization_id
+        if (organizationId) {
+          const { rows: orgMembership } = await query(
+            `SELECT 1 FROM restaurant_org_user_roles WHERE user_id = $1 AND organization_id = $2`,
+            [userId, organizationId]
+          )
+          hasOrgRole = orgMembership.length > 0
+          if (hasOrgRole) {
+            orgPerms = await getRestaurantOrgRolePermissions(userId, organizationId, tenantId)
+          }
+        }
+      } catch (err) {
+        if (err.code !== '42P01') throw err
+      }
+    }
+
     if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
       try {
         named = await getTenantNamedPermissionsForUser(userId, tenantId, tenantType)
@@ -155,10 +178,23 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
       if (err.code !== '42P01') throw err
     }
 
-    const branchPerms = mergeUniquePermissions(named, legacy)
+    // When user has a named tenant role assignment, use ONLY that role's permissions (strict RBAC).
+    // Legacy user_role grants must not expand Viewer/Accountant into full owner access.
+    let hasNamedAssignment = false
+    if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
+      const { rows: tur } = await query(
+        `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 LIMIT 1`,
+        [userId, tenantId, tenantType]
+      )
+      hasNamedAssignment = tur.length > 0
+    }
 
-    if (tenantType === 'SUPPLIER' && hasOrgRole) {
-      const permissions = mergeUniquePermissions(orgPerms, branchPerms)
+    const branchPerms = hasNamedAssignment ? named : mergeUniquePermissions(named, legacy)
+
+    if ((tenantType === 'SUPPLIER' || tenantType === 'RESTAURANT') && hasOrgRole) {
+      const permissions = hasNamedAssignment
+        ? mergeUniquePermissions(orgPerms, named)
+        : mergeUniquePermissions(orgPerms, branchPerms)
       await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
       return permissions
     }

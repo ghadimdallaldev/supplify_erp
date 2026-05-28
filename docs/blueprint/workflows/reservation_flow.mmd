@@ -1,0 +1,9 @@
+flowchart LR
+  Public[Public /reserve] --> Book[Book slot]
+  Book --> Confirm[Confirmation]
+  Staff[Staff board] --> Manage[Manage reservations]
+  Guest[Guest manage link] --> CancelReschedule[Cancel / reschedule]
+  CancelReschedule --> NotifyStaff[Notify restaurant team]
+  Manage --> Book
+  Public --> ManageLink["/reserve/manage/:token"]
+  Staff --> Analytics[GET /api/reservations/analytics\nslots, waitlist by range]

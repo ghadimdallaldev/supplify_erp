@@ -1,11 +1,13 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
+import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import {
   useGetImpersonationStatusQuery,
-  useGetNotificationsQuery,
   useGetDashboardStatsQuery,
   useGetEntitlementsQuery,
+  useGetDisputesQuery,
+  useGetIncomingDisputesQuery,
 } from '../services/api'
 import { SupplifyLogo } from './SupplifyLogo'
 import {
@@ -25,26 +27,41 @@ import {
   Shield,
   CalendarDays,
   UserCircle2,
-  ClipboardCheck,
   BarChart3,
   Scale,
   Tag,
   Percent,
 } from 'lucide-react'
-import { featureEnabled } from '../lib/planLimits'
+import { featureEnabled, getOrderUsageBadge } from '../lib/planLimits'
+import { countActiveDisputes } from '../lib/disputeHelpers'
+import { canUseGlobalReports } from '../lib/planFeatureGates'
+import { formatPlanDisplayName } from '../lib/planComparison'
 
 type NavItem = {
   name: string
   href: string
   icon: any
   permission?: string
-  badge?: 'pending' | 'unread'
+  badge?: 'pending' | 'unread' | 'disputes'
   testId?: string
 }
 
 type NavSection = { label: string; items: NavItem[] }
 
-export function Sidebar() {
+function isNavItemActive(pathname: string, href: string): boolean {
+  if (href === '/app/dashboard') {
+    return pathname === href || pathname === '/app' || pathname === '/' || pathname === '/app/'
+  }
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+export function Sidebar({
+  mobileOpen = false,
+  onMobileClose,
+}: {
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+} = {}) {
   const location = useLocation()
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
@@ -57,10 +74,7 @@ export function Sidebar() {
   const { data: statsData } = useGetDashboardStatsQuery(undefined, {
     skip: user?.role === 'ADMIN' && !impersonation?.active,
   })
-  const { data: notificationsData } = useGetNotificationsQuery(
-    { limit: 10, offset: 0 },
-    { skip: !user, pollingInterval: 60000 }
-  )
+  const { unreadCount: notificationUnreadCount } = useNotificationBadge()
 
   const isPlatformAdmin =
     user?.role === 'ADMIN' &&
@@ -76,17 +90,27 @@ export function Sidebar() {
     isPlatformAdmin && impersonation?.active && impersonation?.tenantType === 'SUPPLIER'
 
   const pendingOrders = Number(statsData?.pendingOrders) || 0
-  const unreadCount = (notificationsData?.notifications || []).filter(
-    (n: { is_read?: boolean }) => !n.is_read
-  ).length
+  const unreadCount = notificationUnreadCount
   const planLabel = entitlementsData?.entitlements?.plan?.name ?? ''
   const planCode = (entitlementsData?.entitlements?.plan?.code ?? 'free').toLowerCase()
-  const approvalsEnabled = featureEnabled(
-    entitlementsData?.entitlements?.features?.approvals_budgets
+  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
+  const supplierDealsEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.supplier_deals
   )
-  const reportsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.reports)
-  const disputesEnabled =
-    featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns) || true
+  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
+    skip: !disputesEnabled || isSupplier || !user,
+    pollingInterval: 30_000,
+  })
+  const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
+    skip: !disputesEnabled || !isSupplier || !user,
+    pollingInterval: 30_000,
+  })
+  const activeDisputeCount = countActiveDisputes(
+    (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []
+  )
+  const promotionsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.promotions)
+  const orderUsageBadge = getOrderUsageBadge(entitlementsData?.entitlements)
 
   let sections: NavSection[] = []
 
@@ -97,11 +121,30 @@ export function Sidebar() {
         href: '/app/orders',
         icon: ShoppingCart,
         badge: 'pending' as const,
+        permission: 'ORDERS_VIEW',
         testId: 'nav-orders',
       },
-      { name: 'Products', href: '/app/products', icon: Package, testId: 'nav-products' },
-      { name: 'Quick Lists', href: '/app/quick-lists', icon: List, testId: 'nav-quick-lists' },
-      { name: 'Cart', href: '/app/cart', icon: ShoppingBag, testId: 'nav-cart' },
+      {
+        name: 'Products',
+        href: '/app/products',
+        icon: Package,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-products',
+      },
+      {
+        name: 'Quick Lists',
+        href: '/app/quick-lists',
+        icon: List,
+        permission: 'ORDERS_VIEW',
+        testId: 'nav-quick-lists',
+      },
+      {
+        name: 'Cart',
+        href: '/app/cart',
+        icon: ShoppingBag,
+        permission: 'ORDERS_CREATE',
+        testId: 'nav-cart',
+      },
       {
         name: 'Reservations',
         href: '/app/reservations',
@@ -109,28 +152,57 @@ export function Sidebar() {
         permission: 'RESERVATIONS_VIEW',
         testId: 'nav-reservations',
       },
-      { name: 'Receiving', href: '/app/receiving', icon: PackageCheck, testId: 'nav-receiving' },
+      {
+        name: 'Receiving',
+        href: '/app/receiving',
+        icon: PackageCheck,
+        permission: 'RECEIVING_VIEW',
+        testId: 'nav-receiving',
+      },
     ].filter((item) => !item.permission || can(item.permission))
 
     const intel: NavItem[] = [
-      { name: 'Suppliers', href: '/app/suppliers', icon: Building2, testId: 'nav-suppliers' },
-      ...(approvalsEnabled
+      {
+        name: 'Suppliers',
+        href: '/app/suppliers',
+        icon: Building2,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-suppliers',
+      },
+      ...(reportsEnabled
         ? [
             {
-              name: 'Approvals',
-              href: '/app/approvals',
-              icon: ClipboardCheck,
-              testId: 'nav-approvals',
+              name: 'Reports',
+              href: '/app/reports',
+              icon: BarChart3,
+              permission: 'ORDERS_VIEW',
+              testId: 'nav-reports',
             },
           ]
         : []),
-      ...(reportsEnabled
-        ? [{ name: 'Reports', href: '/app/reports', icon: BarChart3, testId: 'nav-reports' }]
-        : []),
       ...(disputesEnabled
-        ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
+        ? [
+            {
+              name: 'Disputes',
+              href: '/app/disputes',
+              icon: Scale,
+              permission: 'ORDERS_VIEW',
+              badge: 'disputes' as const,
+              testId: 'nav-disputes',
+            },
+          ]
         : []),
-      { name: 'Deals', href: '/app/deals', icon: Percent, testId: 'nav-deals' },
+      ...(supplierDealsEnabled
+        ? [
+            {
+              name: 'Deals',
+              href: '/app/deals',
+              icon: Percent,
+              permission: 'PROMOTIONS_VIEW',
+              testId: 'nav-deals',
+            },
+          ]
+        : []),
       {
         name: 'Invoices',
         href: '/app/invoices',
@@ -138,7 +210,13 @@ export function Sidebar() {
         permission: 'INVOICES_VIEW',
         testId: 'nav-invoices',
       },
-      { name: 'Chat', href: '/app/chat', icon: MessageSquare, testId: 'nav-chat' },
+      {
+        name: 'Chat',
+        href: '/app/chat',
+        icon: MessageSquare,
+        permission: 'CHAT_VIEW',
+        testId: 'nav-chat',
+      },
     ].filter((item) => !item.permission || can(item.permission))
 
     const acct: NavItem[] = [
@@ -156,7 +234,13 @@ export function Sidebar() {
         permission: 'INVENTORY_VIEW',
         testId: 'nav-inventory',
       },
-      { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
+      {
+        name: 'Settings',
+        href: '/app/settings',
+        icon: Settings,
+        permission: 'SETTINGS_VIEW',
+        testId: 'nav-settings',
+      },
     ].filter((item) => !item.permission || can(item.permission))
 
     sections = [
@@ -167,9 +251,10 @@ export function Sidebar() {
             name: 'Dashboard',
             href: '/app/dashboard',
             icon: LayoutDashboard,
+            permission: 'ORDERS_VIEW',
             testId: 'nav-dashboard',
           },
-        ],
+        ].filter((item) => !item.permission || can(item.permission)),
       },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
@@ -214,20 +299,66 @@ export function Sidebar() {
         href: '/app/orders',
         icon: ShoppingCart,
         badge: 'pending' as const,
+        permission: 'ORDERS_VIEW',
         testId: 'nav-orders',
       },
-      { name: 'Products', href: '/app/products', icon: Package, testId: 'nav-products' },
-      { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck, testId: 'nav-fulfillment' },
-      { name: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'nav-restaurants' },
-    ]
+      {
+        name: 'Products',
+        href: '/app/products',
+        icon: Package,
+        permission: 'CATALOG_VIEW',
+        testId: 'nav-products',
+      },
+      {
+        name: 'Fulfillment',
+        href: '/app/fulfillment',
+        icon: Truck,
+        permission: 'FULFILLMENT_VIEW',
+        testId: 'nav-fulfillment',
+      },
+      {
+        name: 'Restaurants',
+        href: '/app/restaurants',
+        icon: Users,
+        permission: 'ORDERS_VIEW',
+        testId: 'nav-restaurants',
+      },
+      ...(disputesEnabled
+        ? [
+            {
+              name: 'Disputes',
+              href: '/app/disputes',
+              icon: Scale,
+              permission: 'ORDERS_VIEW',
+              badge: 'disputes' as const,
+              testId: 'nav-disputes',
+            },
+          ]
+        : []),
+    ].filter((item) => !item.permission || can(item.permission))
     const intel: NavItem[] = [
       ...(reportsEnabled
-        ? [{ name: 'Reports', href: '/app/reports', icon: BarChart3, testId: 'nav-reports' }]
+        ? [
+            {
+              name: 'Reports',
+              href: '/app/reports',
+              icon: BarChart3,
+              permission: 'ORDERS_VIEW',
+              testId: 'nav-reports',
+            },
+          ]
         : []),
-      ...(disputesEnabled
-        ? [{ name: 'Disputes', href: '/app/disputes', icon: Scale, testId: 'nav-disputes' }]
+      ...(promotionsEnabled
+        ? [
+            {
+              name: 'Deals & Promotions',
+              href: '/app/promotions',
+              icon: Tag,
+              permission: 'PROMOTIONS_VIEW',
+              testId: 'nav-promotions',
+            },
+          ]
         : []),
-      { name: 'Promotions', href: '/app/promotions', icon: Tag, testId: 'nav-promotions' },
       {
         name: 'Invoices',
         href: '/app/invoices',
@@ -235,7 +366,13 @@ export function Sidebar() {
         permission: 'INVOICES_VIEW',
         testId: 'nav-invoices',
       },
-      { name: 'Chat', href: '/app/chat', icon: MessageSquare, testId: 'nav-chat' },
+      {
+        name: 'Chat',
+        href: '/app/chat',
+        icon: MessageSquare,
+        permission: 'CHAT_VIEW',
+        testId: 'nav-chat',
+      },
     ].filter((item) => !item.permission || can(item.permission))
 
     sections = [
@@ -246,17 +383,24 @@ export function Sidebar() {
             name: 'Dashboard',
             href: '/app/dashboard',
             icon: LayoutDashboard,
+            permission: 'ORDERS_VIEW',
             testId: 'nav-dashboard',
           },
-        ],
+        ].filter((item) => !item.permission || can(item.permission)),
       },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
       {
         label: 'ACCOUNT',
         items: [
-          { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
-        ],
+          {
+            name: 'Settings',
+            href: '/app/settings',
+            icon: Settings,
+            permission: 'SETTINGS_VIEW',
+            testId: 'nav-settings',
+          },
+        ].filter((item) => !item.permission || can(item.permission)),
       },
     ]
   }
@@ -270,21 +414,16 @@ export function Sidebar() {
     .slice(0, 2)
 
   return (
-    <div
+    <aside
       data-testid="sidebar"
-      style={{
-        width: 224,
-        minWidth: 224,
-        background: 'var(--surface)',
-        borderRight: '1px solid var(--app-border)',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        position: 'sticky',
-        top: 0,
-        overflowY: 'auto',
-        fontFamily: "'Inter', system-ui, sans-serif",
-      }}
+      aria-label="Main navigation"
+      className={[
+        'flex flex-col border-r border-[var(--app-border)] bg-[var(--surface)] font-sans',
+        'h-screen overflow-y-auto',
+        'fixed inset-y-0 left-0 z-50 w-56 transition-transform duration-200 lg:sticky lg:translate-x-0',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      ].join(' ')}
+      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {/* Brand block */}
       <div
@@ -294,29 +433,29 @@ export function Sidebar() {
       </div>
 
       {/* Navigation sections */}
-      <nav style={{ flex: 1, padding: '6px 10px', display: 'flex', flexDirection: 'column' }}>
+      <nav
+        style={{ flex: 1, padding: '6px 10px', display: 'flex', flexDirection: 'column' }}
+        aria-label="Application sections"
+      >
         {sections.map((section) => (
           <div key={section.label} style={{ marginBottom: 6 }}>
-            <div
-              style={{
-                fontSize: 9.5,
-                fontWeight: 700,
-                color: '#d4c8f0',
-                letterSpacing: '0.08em',
-                padding: '8px 6px 3px',
-              }}
-            >
+            <div className="px-1.5 pb-0.5 pt-2 text-[9.5px] font-bold uppercase tracking-wider text-[var(--sidebar-section)]">
               {section.label}
             </div>
             {section.items.map((item) => {
-              const isActive = location.pathname === item.href
+              const isActive = isNavItemActive(location.pathname, item.href)
               const showPendingBadge = item.badge === 'pending' && pendingOrders > 0
               const showUnreadBadge = item.badge === 'unread' && unreadCount > 0
+              const showDisputesBadge = item.badge === 'disputes' && activeDisputeCount > 0
+              const showOrderUsage =
+                item.name === 'Cart' && (isRestaurant || impersonatingRestaurant) && orderUsageBadge
 
               return (
                 <Link
                   key={item.name}
                   to={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => onMobileClose?.()}
                   data-testid={item.testId || `nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
                   style={{
                     display: 'flex',
@@ -393,6 +532,23 @@ export function Sidebar() {
                       {pendingOrders > 99 ? '99+' : pendingOrders}
                     </span>
                   )}
+                  {showDisputesBadge && (
+                    <span
+                      style={{
+                        background: 'var(--amber-mid)',
+                        color: '#000',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        borderRadius: 8,
+                        padding: '1px 5px',
+                        minWidth: 18,
+                        textAlign: 'center',
+                      }}
+                      title="Active disputes"
+                    >
+                      {activeDisputeCount > 99 ? '99+' : activeDisputeCount}
+                    </span>
+                  )}
                   {showUnreadBadge && (
                     <span
                       style={{
@@ -407,6 +563,31 @@ export function Sidebar() {
                       }}
                     >
                       {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                  {showOrderUsage && orderUsageBadge && (
+                    <span
+                      title="Daily orders used today"
+                      style={{
+                        background: orderUsageBadge.atLimit
+                          ? 'var(--red)'
+                          : orderUsageBadge.nearLimit
+                            ? 'var(--amber-mid)'
+                            : 'var(--brand-ultra)',
+                        color: orderUsageBadge.atLimit
+                          ? '#fff'
+                          : orderUsageBadge.nearLimit
+                            ? '#000'
+                            : 'var(--text-muted)',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        borderRadius: 8,
+                        padding: '1px 5px',
+                        minWidth: 18,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {orderUsageBadge.label}
                     </span>
                   )}
                 </Link>
@@ -461,11 +642,11 @@ export function Sidebar() {
             {user?.role?.toLowerCase()}
           </div>
         </div>
-        {planCode !== 'free' && planLabel && (
+        {planLabel && (
           <span
             style={{
-              background: 'var(--amber-pale)',
-              color: 'var(--amber)',
+              background: planCode === 'free' ? 'var(--amber-pale)' : 'var(--brand-pale)',
+              color: planCode === 'free' ? 'var(--amber)' : 'var(--brand-mid)',
               fontSize: 9,
               fontWeight: 700,
               borderRadius: 4,
@@ -475,10 +656,10 @@ export function Sidebar() {
               flexShrink: 0,
             }}
           >
-            {planLabel}
+            {formatPlanDisplayName(planCode, planLabel)}
           </span>
         )}
       </div>
-    </div>
+    </aside>
   )
 }

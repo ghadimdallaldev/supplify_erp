@@ -1,5 +1,12 @@
 import express from 'express'
-import { requireAuth, requireRole, getRestaurantIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getRestaurantIdForRequest,
+  resolveTenantContext,
+  requirePermission,
+} from '../lib/rbac.js'
+import { ordersCreateMutationGuard } from '../lib/route-permissions.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -9,10 +16,20 @@ import {
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
+  buildFeatureNotAvailablePayload,
+  requireFeature,
+  isQuickListAutomationEnabled,
 } from '../lib/subscription.js'
 import { z } from 'zod'
+import { mapQuickListRow } from '../lib/quick-list-schedule.js'
 
 const router = express.Router()
+
+const quickListsFeatureGate = requireFeature(
+  'quick_lists',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
 // Validation schemas
 const createQuickListSchema = z.object({
@@ -78,6 +95,45 @@ const addItemSchema = z.object({
   notes: z.string().optional(),
 })
 
+async function respondLimitExceeded(req, res, limitCheck, limitKey, restaurantId) {
+  const [subscription, recommendedPlans] = await Promise.all([
+    getTenantSubscription(restaurantId, 'RESTAURANT'),
+    getRecommendedPlanNames('RESTAURANT'),
+  ])
+  const err = buildLimitExceededPayload(
+    limitCheck,
+    limitKey,
+    subscription?.plan_name || subscription?.plan_display_name,
+    recommendedPlans
+  )
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: err,
+    requestId: req.requestId,
+  })
+}
+
+async function assertCanAddQuickListItems(restaurantId, additionalCount = 1) {
+  const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'quick_list_items')
+  if (limitCheck.isUnlimited || limitCheck.limit == null) return
+  if (limitCheck.current + additionalCount > limitCheck.limit) {
+    const err = new Error('Quick list item limit exceeded')
+    err.code = 'LIMIT_EXCEEDED'
+    err.limitCheck = limitCheck
+    err.limitKey = 'quick_list_items'
+    throw err
+  }
+}
+
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requirePermission('ORDERS_VIEW'),
+  quickListsFeatureGate,
+  ordersCreateMutationGuard
+)
+
 // Get all quick lists for restaurant
 router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
@@ -115,8 +171,14 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         FROM quick_list_item qli
         JOIN product p ON p.id = qli.product_id
         JOIN supplier s ON s.id = qli.supplier_id
-        LEFT JOIN price pr ON pr.product_id = p.id 
-          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+        LEFT JOIN LATERAL (
+          SELECT amount
+          FROM price
+          WHERE price.product_id = p.id
+            AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
+          ORDER BY valid_from DESC
+          LIMIT 1
+        ) pr ON true
         WHERE qli.quick_list_id = $1
         ORDER BY p.name
       `,
@@ -124,7 +186,7 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         )
 
         return {
-          ...list,
+          ...mapQuickListRow(list),
           items: items || [],
         }
       })
@@ -177,7 +239,7 @@ router.get('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
       throw new NotFoundError('Quick list not found')
     }
 
-    const quickList = lists[0]
+    const quickList = mapQuickListRow(lists[0])
 
     // Get items
     const { rows: items } = await query(
@@ -192,8 +254,14 @@ router.get('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
       FROM quick_list_item qli
       JOIN product p ON p.id = qli.product_id
       JOIN supplier s ON s.id = qli.supplier_id
-      LEFT JOIN price pr ON pr.product_id = p.id 
-        AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+      LEFT JOIN LATERAL (
+        SELECT amount
+        FROM price
+        WHERE price.product_id = p.id
+          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
+        ORDER BY valid_from DESC
+        LIMIT 1
+      ) pr ON true
       WHERE qli.quick_list_id = $1
       ORDER BY p.name
     `,
@@ -240,6 +308,16 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
       throw new ValidationError('Restaurant not found')
     }
 
+    const listLimit = await checkLimit(restaurantId, 'RESTAURANT', 'quick_lists')
+    if (!listLimit.isUnlimited && listLimit.limit != null && listLimit.current >= listLimit.limit) {
+      return respondLimitExceeded(req, res, listLimit, 'quick_lists', restaurantId)
+    }
+
+    const itemsToCreate = data.items || []
+    if (itemsToCreate.length > 0) {
+      await assertCanAddQuickListItems(restaurantId, itemsToCreate.length)
+    }
+
     const result = await withTransaction(async (client) => {
       // Create quick list
       const {
@@ -255,7 +333,6 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
 
       // Create items
       const items = []
-      const itemsToCreate = data.items || []
       for (const item of itemsToCreate) {
         // Verify product belongs to supplier
         const { rows: products } = await client.query(
@@ -317,6 +394,12 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
         },
         requestId: req.requestId,
       })
+    }
+    if (error?.code === 'LIMIT_EXCEEDED' && error.limitCheck) {
+      const restaurantId = await getRestaurantIdForRequest(req).catch(() => null)
+      if (restaurantId) {
+        return respondLimitExceeded(req, res, error.limitCheck, error.limitKey, restaurantId)
+      }
     }
 
     logger.error({
@@ -511,6 +594,14 @@ router.post('/:id/items', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
       throw new ValidationError('Product does not belong to supplier')
     }
 
+    const { rows: existingItem } = await query(
+      `SELECT id FROM quick_list_item WHERE quick_list_id = $1 AND product_id = $2`,
+      [id, data.productId]
+    )
+    if (existingItem.length === 0) {
+      await assertCanAddQuickListItems(restaurantId, 1)
+    }
+
     const { rows } = await query(
       `
       INSERT INTO quick_list_item (quick_list_id, product_id, supplier_id, quantity, notes)
@@ -537,6 +628,12 @@ router.post('/:id/items', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error?.code === 'LIMIT_EXCEEDED' && error.limitCheck) {
+      const restaurantId = await getRestaurantIdForRequest(req).catch(() => null)
+      if (restaurantId) {
+        return respondLimitExceeded(req, res, error.limitCheck, error.limitKey, restaurantId)
+      }
+    }
     logger.error({
       message: 'Add item to quick list error',
       error: error.message,
@@ -641,6 +738,22 @@ router.post(
         throw new ValidationError('Restaurant not found')
       }
 
+      const subscription = await getTenantSubscription(restaurantId, 'RESTAURANT')
+      if (!isQuickListAutomationEnabled(subscription?.features?.quick_lists)) {
+        const recommendedPlans = await getRecommendedPlanNames('RESTAURANT')
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: buildFeatureNotAvailablePayload(
+            'quick_lists',
+            subscription?.plan_name || subscription?.plan_display_name,
+            'Silver',
+            recommendedPlans
+          ),
+          requestId: req.requestId,
+        })
+      }
+
       // Verify quick list belongs to restaurant
       const { rows: lists } = await query(
         `
@@ -655,44 +768,25 @@ router.post(
 
       const quickList = lists[0]
 
-      // Check order limit if auto_create_order is enabled
-      if (scheduleData.autoCreateOrder) {
-        // Get quick list items to calculate how many orders would be created
-        const { rows: items } = await query(
-          `
-        SELECT DISTINCT supplier_id
-        FROM quick_list_item
-        WHERE quick_list_id = $1
-      `,
-          [id]
-        )
-
-        if (items.length > 0) {
-          const ordersToCreate = items.length // One order per supplier
-          const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')
-          const newTotal = limitCheck.current + ordersToCreate
-
-          if (!limitCheck.isUnlimited && limitCheck.limit !== null && newTotal > limitCheck.limit) {
-            const [subscription, recommendedPlans] = await Promise.all([
-              getTenantSubscription(restaurantId, 'RESTAURANT'),
-              getRecommendedPlanNames('RESTAURANT'),
-            ])
-            const err = buildLimitExceededPayload(
-              limitCheck,
-              'orders_per_day',
-              subscription?.plan_name || subscription?.plan_display_name,
-              recommendedPlans
-            )
-            err.details.requested = ordersToCreate
-            return res.status(403).json({
-              ok: false,
-              data: null,
-              error: err,
-              requestId: req.requestId,
-            })
-          }
+      if (!quickList.is_scheduled) {
+        const scheduleLimit = await checkLimit(restaurantId, 'RESTAURANT', 'scheduled_quick_lists')
+        if (
+          !scheduleLimit.isUnlimited &&
+          scheduleLimit.limit != null &&
+          scheduleLimit.current + 1 > scheduleLimit.limit
+        ) {
+          return respondLimitExceeded(
+            req,
+            res,
+            scheduleLimit,
+            'scheduled_quick_lists',
+            restaurantId
+          )
         }
       }
+
+      // Daily order limits are enforced when the schedule runs (see scheduled-orders.service),
+      // not when saving schedule settings — the next run may be on a future day.
 
       // Calculate next execution date if not provided
       let nextExecutionDate = scheduleData.nextExecutionDate

@@ -1,13 +1,40 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import { assertValidQuantityForUnit } from '../lib/quantity-unit.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
+import { requireFeature } from '../lib/subscription.js'
 import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext)
+const receivingQualityGate = requireFeature(
+  'receiving_quality',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.use(requireAuth, resolveTenantContext, receivingQualityGate)
+
+/** Supplier fulfillment statuses that mean the restaurant can record receiving. */
+const RECEIVABLE_ORDER_STATUSES = ['DELIVERED', 'COMPLETED']
+
+async function resolveRestaurantId(req) {
+  const tenantId = await getRestaurantIdForRequest(req)
+  if (tenantId) return tenantId
+  const { rows } = await query(
+    `SELECT id FROM restaurant WHERE LOWER(TRIM(contact_email)) = LOWER(TRIM($1)) LIMIT 1`,
+    [req.userData.email]
+  )
+  return rows[0]?.id || null
+}
 
 // Get delivered orders ready for receiving
 router.get(
@@ -16,13 +43,9 @@ router.get(
   requirePermission('RECEIVING_VIEW'),
   async (req, res) => {
     try {
-      // Get restaurant ID
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
+      const restaurantId = await resolveRestaurantId(req)
 
-      if (restaurants.length === 0) {
+      if (!restaurantId) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -34,10 +57,7 @@ router.get(
         })
       }
 
-      const restaurantId = restaurants[0].id
-
-      // Show only orders that are ready to be received: status = COMPLETED
-      // Note: supplier_id is in order_item, not customer_order
+      // Orders supplier marked delivered (or legacy COMPLETED) without a receiving report yet
       const { rows: orders } = await query(
         `
       SELECT DISTINCT ON (o.id)
@@ -56,7 +76,7 @@ router.get(
       JOIN order_item oi ON oi.order_id = o.id
       JOIN supplier s ON s.id = oi.supplier_id
       WHERE o.restaurant_id = $1 
-        AND o.status = 'COMPLETED'
+        AND o.status::text = ANY($2::text[])
         AND NOT EXISTS (
           SELECT 1 FROM receiving_report 
           WHERE order_id = o.id 
@@ -64,7 +84,7 @@ router.get(
         )
       ORDER BY o.id, o.created_at DESC
     `,
-        [restaurantId]
+        [restaurantId, RECEIVABLE_ORDER_STATUSES]
       )
 
       // For each order, fetch its items
@@ -127,6 +147,7 @@ router.get(
   '/pending-orders/supplier',
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('ORDERS_VIEW'),
   async (req, res) => {
     try {
       const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
@@ -200,13 +221,9 @@ router.post(
     try {
       const { orderId, lineItems, deliveryNotes, qualityScore, qualityNotes, receivedBy } = req.body
 
-      // Get restaurant ID first
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
+      const restaurantId = await resolveRestaurantId(req)
 
-      if (restaurants.length === 0) {
+      if (!restaurantId) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -217,8 +234,6 @@ router.post(
           requestId: req.requestId,
         })
       }
-
-      const restaurantId = restaurants[0].id
 
       // Get order details
       const { rows: orders } = await query(
@@ -234,6 +249,37 @@ router.post(
 
       const order = orders[0]
 
+      if (!RECEIVABLE_ORDER_STATUSES.includes(order.status)) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message:
+              'This order is not ready to receive yet. Wait until the supplier marks it as delivered.',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const { rows: existingReports } = await query(
+        `SELECT 1 FROM receiving_report
+         WHERE order_id = $1 AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
+         LIMIT 1`,
+        [orderId]
+      )
+      if (existingReports.length > 0) {
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'CONFLICT',
+            message: 'A receiving report already exists for this order',
+          },
+          requestId: req.requestId,
+        })
+      }
+
       // Get supplier_id from the first order_item
       const { rows: items } = await query(
         `
@@ -247,6 +293,45 @@ router.post(
       }
 
       const supplierId = items[0].supplier_id
+
+      for (const line of lineItems) {
+        const unit = line.unit || 'unit'
+        const ordered = parseFloat(line.ordered_quantity || 0)
+        const receivedRaw = parseFloat(line.received_quantity ?? line.ordered_quantity ?? 0)
+        try {
+          line.received_quantity = assertValidQuantityForUnit(receivedRaw, unit, {
+            fieldName: 'Received quantity',
+          })
+          if (line.ordered_quantity != null) {
+            line.ordered_quantity = assertValidQuantityForUnit(
+              parseFloat(line.ordered_quantity),
+              unit,
+              { fieldName: 'Ordered quantity' }
+            )
+          }
+        } catch (qtyErr) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: qtyErr.message,
+            },
+            requestId: req.requestId,
+          })
+        }
+        if (line.received_quantity > ordered) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: `Received quantity cannot exceed ordered quantity (${ordered} ${unit})`,
+            },
+            requestId: req.requestId,
+          })
+        }
+      }
 
       // Calculate totals
       const totalItemsOrdered = lineItems.reduce(
@@ -566,12 +651,9 @@ router.get(
   requirePermission('RECEIVING_VIEW'),
   async (req, res) => {
     try {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
+      const restaurantId = await resolveRestaurantId(req)
 
-      if (restaurants.length === 0) {
+      if (!restaurantId) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -582,8 +664,6 @@ router.get(
           requestId: req.requestId,
         })
       }
-
-      const restaurantId = restaurants[0].id
 
       const { rows: reports } = await query(
         `

@@ -12,6 +12,8 @@
     {
       "clientId": "supplify-api",
       "enabled": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
       "clientAuthenticatorType": "client-secret",
       "secret": "changeme",
       "redirectUris": [
@@ -55,7 +57,8 @@
     "realm": [
       { "name": "admin", "description": "Administrator role" },
       { "name": "supplier", "description": "Supplier role" },
-      { "name": "restaurant", "description": "Restaurant role" }
+      { "name": "restaurant", "description": "Restaurant role" },
+      { "name": "staff_portal", "description": "Operational staff portal (no admin app access)" }
     ]
   },
   "users": [

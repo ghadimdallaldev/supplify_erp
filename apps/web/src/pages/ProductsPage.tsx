@@ -9,12 +9,15 @@ import {
   useGetSuppliersQuery,
   useCreateInventoryAdjustmentMutation,
   useGetActivePromotionsQuery,
+  useGetEntitlementsQuery,
 } from '../services/api'
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
 import { Label } from '../components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
@@ -30,6 +33,8 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { formatPrice, formatNumber } from '../utils/format'
+import { featureEnabled } from '../lib/planLimits'
+import { PermissionGate } from '../components/PermissionGate'
 
 export function ProductsPage() {
   const [search, setSearch] = useState('')
@@ -76,7 +81,15 @@ export function ProductsPage() {
   // Check if user is a supplier
   const isSupplier = user?.role === 'SUPPLIER'
   const isRestaurant = user?.role === 'RESTAURANT'
-  const { data: activeDealsData } = useGetActivePromotionsQuery(undefined, { skip: !isRestaurant })
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !isRestaurant,
+  })
+  const supplierDealsEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.supplier_deals
+  )
+  const { data: activeDealsData } = useGetActivePromotionsQuery(undefined, {
+    skip: !isRestaurant || !supplierDealsEnabled,
+  })
   const activeDeals = activeDealsData?.promotions || []
 
   // Fetch warehouses only for suppliers (warehouse selection in product creation)
@@ -204,7 +217,11 @@ export function ProductsPage() {
             throw new Error('Failed to upload image')
           }
 
-          imageUrl = uploadUrl.split('?')[0]
+          imageUrl =
+            presignedResponse.publicUrl ||
+            (presignedResponse.fileKey
+              ? `${import.meta.env.VITE_S3_ENDPOINT || 'http://localhost:9000'}/${import.meta.env.VITE_S3_BUCKET || 'supplify'}/${presignedResponse.fileKey}`
+              : uploadUrl.split('?')[0])
         } catch (error: any) {
           toast.error(error?.data?.error?.message || 'Failed to upload image')
           return
@@ -399,44 +416,46 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
 
   return (
     <div className="space-y-6" data-testid="products-page">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Products</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            {isSupplier
-              ? 'Manage your product catalog'
-              : 'Browse and search products from suppliers'}
-          </p>
-          {isRestaurant && activeDeals.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">
-                {activeDeals.length} active deal{activeDeals.length === 1 ? '' : 's'}
-              </Badge>
-              <Button variant="link" size="sm" className="h-auto p-0" asChild>
-                <Link to="/app/deals">View all deals</Link>
-              </Button>
-            </div>
-          )}
+      <PageHeader
+        title="Products"
+        description={
+          isSupplier ? 'Manage your product catalog' : 'Browse and search products from suppliers'
+        }
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {isSupplier ? (
+              <PermissionGate anyOf={['CATALOG_EDIT', 'CATALOG_MANAGE']}>
+                <>
+                  <Button onClick={() => setShowAddProduct(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Product
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Bulk Upload
+                  </Button>
+                </>
+              </PermissionGate>
+            ) : (
+              <PermissionGate permission="ORDERS_CREATE">
+                <Button asChild>
+                  <Link to="/app/cart">View Cart</Link>
+                </Button>
+              </PermissionGate>
+            )}
+          </div>
+        }
+      />
+      {isRestaurant && activeDeals.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 -mt-2">
+          <Badge variant="secondary">
+            {activeDeals.length} active deal{activeDeals.length === 1 ? '' : 's'}
+          </Badge>
+          <Button variant="link" size="sm" className="h-auto p-0" asChild>
+            <Link to="/app/deals">View all deals</Link>
+          </Button>
         </div>
-        <div className="flex space-x-2">
-          {isSupplier ? (
-            <>
-              <Button onClick={() => setShowAddProduct(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Product
-              </Button>
-              <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Bulk Upload
-              </Button>
-            </>
-          ) : (
-            <Button asChild>
-              <Link to="/app/cart">View Cart</Link>
-            </Button>
-          )}
-        </div>
-      </div>
+      )}
 
       <Card className="shadow-sm">
         <CardContent className="space-y-4 p-4 pt-6">
@@ -613,162 +632,165 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
       </Card>
 
       <Card className="overflow-hidden p-0 shadow-sm">
-        <table className="w-full">
-          <thead className="border-b border-[var(--app-border)] bg-[var(--bg)]">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Product
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Category
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Supplier
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Price
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Stock
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--app-border)]">
-            {filteredProducts?.map((product) => (
-              <tr
-                key={product.id}
-                className="transition-colors hover:bg-[var(--bg)]"
-                data-testid={`product-row-${product.id}`}
-              >
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--app-border)] bg-[var(--bg)]">
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-6 w-6 text-[var(--text-muted)]" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-[var(--text)] truncate">{product.name}</p>
-                      <p className="text-sm text-[var(--text-muted)] truncate">{product.sku}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-4">
-                  <div className="flex flex-col gap-1">
-                    <Badge variant="secondary">
-                      {product.category_name || product.category || 'N/A'}
-                    </Badge>
-                    {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {product.tags.slice(0, 3).map((tag: string, idx: number) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {product.tags.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{product.tags.length - 3}
-                          </Badge>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px]">
+            <thead className="border-b border-[var(--app-border)] bg-[var(--bg)]">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                  Product
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                  Category
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                  Supplier
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                  Price
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                  Stock
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--text-mid)]">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--app-border)]">
+              {filteredProducts?.map((product) => (
+                <tr
+                  key={product.id}
+                  className="transition-colors hover:bg-[var(--bg)]"
+                  data-testid={`product-row-${product.id}`}
+                >
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded border border-[var(--app-border)] bg-[var(--bg)]">
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Package className="h-6 w-6 text-[var(--text-muted)]" />
                         )}
                       </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-4">
-                  <p className="text-sm text-[var(--text-muted)]">
-                    {product.supplier_name || 'N/A'}
-                  </p>
-                </td>
-                <td className="px-4 py-4">
-                  {product.current_price ? (
-                    <>
-                      <p className="font-semibold">{formatPrice(product.current_price)}</p>
-                      {product.unit && (
-                        <p className="text-xs text-[var(--text-muted)]">per {product.unit}</p>
+                      <div className="min-w-0">
+                        <p className="font-medium text-[var(--text)] truncate">{product.name}</p>
+                        <p className="text-sm text-[var(--text-muted)] truncate">{product.sku}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-col gap-1">
+                      <Badge variant="secondary">
+                        {product.category_name || product.category || 'N/A'}
+                      </Badge>
+                      {product.tags && Array.isArray(product.tags) && product.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {product.tags.slice(0, 3).map((tag: string, idx: number) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {product.tags.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{product.tags.length - 3}
+                            </Badge>
+                          )}
+                        </div>
                       )}
-                    </>
-                  ) : (
-                    <p className="text-sm text-[var(--text-muted)]">N/A</p>
-                  )}
-                </td>
-                <td className="px-4 py-4">
-                  <p
-                    className={`text-sm font-medium ${
-                      parseFloat(product.available_qty || 0) > 0
-                        ? 'text-[var(--mint)]'
-                        : 'text-[var(--red)]'
-                    }`}
-                  >
-                    {formatNumber(product.available_qty, { maximumFractionDigits: 2 })}{' '}
-                    {product.unit || 'units'}
-                  </p>
-                </td>
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-2">
-                    {!isSupplier && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleAddToCart(product)}
-                        disabled={!product.available_qty || product.available_qty <= 0}
-                        data-testid={`product-add-to-cart-${product.id}`}
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add to Cart
-                      </Button>
-                    )}
-                    {isSupplier && (
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <p className="text-sm text-[var(--text-muted)]">
+                      {product.supplier_name || 'N/A'}
+                    </p>
+                  </td>
+                  <td className="px-4 py-4">
+                    {product.current_price ? (
                       <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedProductForAdjustment(product)
-                            setShowInventoryAdjustment(true)
-                          }}
-                        >
-                          <TrendingUp className="h-4 w-4 mr-1" />
-                          Adjust Stock
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            toast('Edit product functionality coming soon')
-                          }}
-                        >
-                          Edit
-                        </Button>
+                        <p className="font-semibold">{formatPrice(product.current_price)}</p>
+                        {product.unit && (
+                          <p className="text-xs text-[var(--text-muted)]">per {product.unit}</p>
+                        )}
                       </>
+                    ) : (
+                      <p className="text-sm text-[var(--text-muted)]">N/A</p>
                     )}
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/app/products/${product.id}`}>View</Link>
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td className="px-4 py-4">
+                    <p
+                      className={`text-sm font-medium ${
+                        parseFloat(product.available_qty || 0) > 0
+                          ? 'text-[var(--mint)]'
+                          : 'text-[var(--red)]'
+                      }`}
+                    >
+                      {formatNumber(product.available_qty, { maximumFractionDigits: 2 })}{' '}
+                      {product.unit || 'units'}
+                    </p>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-2">
+                      {!isSupplier && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddToCart(product)}
+                          disabled={!product.available_qty || product.available_qty <= 0}
+                          data-testid={`product-add-to-cart-${product.id}`}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add to Cart
+                        </Button>
+                      )}
+                      {isSupplier && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedProductForAdjustment(product)
+                              setShowInventoryAdjustment(true)
+                            }}
+                          >
+                            <TrendingUp className="h-4 w-4 mr-1" />
+                            Adjust Stock
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              toast('Edit product functionality coming soon')
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        </>
+                      )}
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/app/products/${product.id}`}>View</Link>
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       {filteredProducts?.length === 0 && (
-        <div className="text-center py-12">
-          <Package className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
-          <p className="text-[var(--text-muted)]">
-            {isSupplier
-              ? 'No products yet. Click "Add Product" to get started!'
-              : 'No products found'}
-          </p>
-        </div>
+        <EmptyState
+          title={isSupplier ? 'No products in your catalog' : 'No products found'}
+          description={
+            isSupplier
+              ? 'Add your first product or adjust filters to see existing items.'
+              : 'Try a different search or supplier filter.'
+          }
+          icon={<Package className="h-10 w-10" aria-hidden />}
+        />
       )}
 
       <Dialog open={showAddProduct} onOpenChange={setShowAddProduct}>

@@ -1,19 +1,21 @@
-import { v4 as uuidv4 } from 'uuid';
-import { createRequestLogger } from '../lib/logger.js';
+import { randomUUID } from 'node:crypto'
+import { createRequestLogger } from '../lib/logger.js'
+import { requestLogStore } from '../lib/request-log-store.js'
+import { syncRequestLogContext } from '../lib/request-log-context.js'
 
 // Request context middleware
 export function requestContext(req, res, next) {
-  // Generate request ID
-  req.requestId = req.headers['x-request-id'] || uuidv4();
-  
-  // Extract IP address (don't try to set it, just read it)
-  const ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
-  
-  // Create request-specific logger
-  req.logger = createRequestLogger(req.requestId, ip);
-  
-  // Add request ID to response headers
-  res.set('X-Request-ID', req.requestId);
-  
-  next();
+  const headerId = req.headers['x-request-id']
+  req.requestId =
+    typeof headerId === 'string' && headerId.trim() ? headerId.trim() : randomUUID().split('-')[0]
+
+  const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress
+
+  req.logger = createRequestLogger(req.requestId, ip)
+  req.syncLogContext = () => syncRequestLogContext(req)
+
+  res.set('X-Request-ID', req.requestId)
+
+  const route = req.originalUrl?.split('?')[0] || req.path
+  requestLogStore.run({ requestId: req.requestId, ip, method: req.method, route }, () => next())
 }

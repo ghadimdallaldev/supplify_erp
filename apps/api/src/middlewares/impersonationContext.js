@@ -5,6 +5,7 @@
  */
 import { verifyImpersonationToken, getImpersonationCookieName } from '../lib/impersonation.js'
 import { config } from '../config/env.js'
+import { syncRequestLogContext } from '../lib/request-log-context.js'
 
 function clearImpersonationCookie(res) {
   res.clearCookie(getImpersonationCookieName(), {
@@ -33,6 +34,7 @@ export async function impersonationContext(req, res, next) {
       tenantName: payload.tenantName,
       exp: payload.exp,
     }
+    syncRequestLogContext(req)
     next()
   } catch (err) {
     next(err)

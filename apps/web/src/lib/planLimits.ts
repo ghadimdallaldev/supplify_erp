@@ -1,5 +1,19 @@
 import type { Entitlements } from '../types'
 
+/** Internal meter for Free-tier scheduled quick-list overflow; not a user-facing plan quota. */
+export const HIDDEN_ENTITLEMENT_LIMIT_KEYS = new Set(['scheduled_order_grace_per_day'])
+
+export function shouldShowEntitlementLimit(limitKey: string): boolean {
+  return !HIDDEN_ENTITLEMENT_LIMIT_KEYS.has(limitKey)
+}
+
+/** True when usage has hit a real plan cap (excludes hidden meters and N/A limits). */
+export function isAtEntitlementLimit(current: number, limit: number | null | undefined): boolean {
+  if (limit == null || limit === -1) return false
+  if (limit <= 0) return false
+  return current >= limit
+}
+
 function limitNumber(value: unknown): number | null {
   if (value == null) return null
   const n = Number(value)
@@ -11,6 +25,11 @@ export function featureEnabled(value: unknown): boolean {
   if (value === false || value == null) return false
   if (typeof value === 'string') return value !== 'false' && value.length > 0
   return Boolean(value)
+}
+
+/** Plan allows multi-branch (Gold boolean, Platinum tier string, Silver off). */
+export function multiBranchEnabled(entitlements: Entitlements | null | undefined): boolean {
+  return featureEnabled(entitlements?.features?.multi_branch)
 }
 
 export type BranchAddGate = {
@@ -38,7 +57,7 @@ export function getBranchAddGate(
   }
 
   const limit = limitNumber(entitlements.limits?.branches)
-  const multiBranch = featureEnabled(entitlements.features?.multi_branch)
+  const multiBranch = multiBranchEnabled(entitlements)
 
   if (limit === 0) {
     if (currentCount > 0) {
@@ -122,7 +141,7 @@ export function canAddBranches(
   return getBranchAddGate(entitlements, currentCount).canAdd
 }
 
-/** Warehouse management feature (Bronze+). */
+/** Warehouse management feature (Silver+). */
 export function warehousesFeatureEnabled(entitlements: Entitlements | null | undefined): boolean {
   return featureEnabled(entitlements?.features?.warehouses)
 }
@@ -164,4 +183,230 @@ export function canUseCustomBranding(entitlements: Entitlements | null | undefin
 export function customBrandingUpgradeMessage(planName?: string | null): string {
   const plan = planName ?? 'your current plan'
   return `Custom branding isn't included on ${plan}. Upgrade to Gold for logo and colors, or Platinum for white-label.`
+}
+
+export type OrderPlaceGate = {
+  canPlace: boolean
+  reason: 'ok' | 'at_limit' | 'would_exceed' | 'unlimited' | 'unknown'
+  current: number
+  limit: number | null
+  ordersRequested: number
+  remaining: number | null
+  planName: string | null
+}
+
+/** Whether the tenant can place N orders today (each supplier in cart = 1 order). */
+export function getOrderPlaceGate(
+  entitlements: Entitlements | null | undefined,
+  ordersToPlace = 1
+): OrderPlaceGate {
+  const planName = entitlements?.plan?.name ?? null
+  const requested = Math.max(1, ordersToPlace)
+
+  if (!entitlements) {
+    return {
+      canPlace: true,
+      reason: 'unknown',
+      current: 0,
+      limit: null,
+      ordersRequested: requested,
+      remaining: null,
+      planName,
+    }
+  }
+
+  const limit = limitNumber(entitlements.limits?.orders_per_day)
+  const current = limitNumber(entitlements.usage?.orders_per_day) ?? 0
+
+  if (limit == null || limit === -1) {
+    return {
+      canPlace: true,
+      reason: 'unlimited',
+      current,
+      limit: null,
+      ordersRequested: requested,
+      remaining: null,
+      planName,
+    }
+  }
+
+  const remaining = Math.max(0, limit - current)
+
+  if (current >= limit) {
+    return {
+      canPlace: false,
+      reason: 'at_limit',
+      current,
+      limit,
+      ordersRequested: requested,
+      remaining: 0,
+      planName,
+    }
+  }
+
+  if (current + requested > limit) {
+    return {
+      canPlace: false,
+      reason: 'would_exceed',
+      current,
+      limit,
+      ordersRequested: requested,
+      remaining,
+      planName,
+    }
+  }
+
+  return {
+    canPlace: true,
+    reason: 'ok',
+    current,
+    limit,
+    ordersRequested: requested,
+    remaining,
+    planName,
+  }
+}
+
+export function formatOrderPlaceGateMessage(gate: OrderPlaceGate): string {
+  const plan = gate.planName ?? 'your current plan'
+
+  if (gate.reason === 'at_limit') {
+    return `You've used all ${gate.limit} daily orders on ${plan}. Your limit resets tomorrow — upgrade for more orders today.`
+  }
+
+  if (gate.reason === 'would_exceed' && gate.limit != null) {
+    const remaining = gate.remaining ?? 0
+    const orderWord = gate.ordersRequested === 1 ? 'order' : 'orders'
+    const supplierNote =
+      gate.ordersRequested > 1
+        ? ` This cart creates ${gate.ordersRequested} orders (one per supplier).`
+        : ''
+    if (remaining === 0) {
+      return `You've reached your daily order limit (${gate.current}/${gate.limit}) on ${plan}.${supplierNote} Upgrade for more orders.`
+    }
+    return `You only have ${remaining} daily ${remaining === 1 ? 'order' : 'orders'} left (${gate.current}/${gate.limit} used), but this cart needs ${gate.ordersRequested}.${supplierNote} Remove items from a supplier or upgrade your plan.`
+  }
+
+  return `Daily order limit reached on ${plan}. Upgrade for higher limits.`
+}
+
+/** Usage badge for nav (e.g. Cart): null when unlimited or no entitlements. */
+/** Generic plan limit gate from entitlements usage/limits. */
+export function getPlanLimitGate(
+  entitlements: Entitlements | null | undefined,
+  limitKey: string,
+  additional = 0
+): { canUse: boolean; current: number; limit: number | null; message: string } {
+  const planName = entitlements?.plan?.name ?? 'your current plan'
+  const limit = limitNumber(entitlements?.limits?.[limitKey])
+  const current = limitNumber(entitlements?.usage?.[limitKey]) ?? 0
+
+  if (limit == null || limit === -1) {
+    return { canUse: true, current, limit: null, message: '' }
+  }
+
+  const canUse = current + additional <= limit
+  const label =
+    limitKey === 'quick_lists'
+      ? 'quick list'
+      : limitKey === 'quick_list_items'
+        ? 'quick list product'
+        : limitKey === 'scheduled_quick_lists'
+          ? 'scheduled quick list'
+          : limitKey === 'deal_redemptions_per_day'
+            ? 'deal redemption today'
+            : limitKey === 'promotions'
+              ? 'promotion'
+              : limitKey.replace(/_/g, ' ')
+
+  return {
+    canUse,
+    current,
+    limit,
+    message: canUse
+      ? ''
+      : `You've reached your ${label} limit (${current}/${limit}) on ${planName}. Upgrade for more.`,
+  }
+}
+
+export function isQuickListSchedulingEnabled(
+  entitlements: Entitlements | null | undefined
+): boolean {
+  const v = entitlements?.features?.quick_lists as unknown
+  if (v === true) return true
+  if (typeof v === 'string') {
+    const lower = v.toLowerCase()
+    return (
+      lower !== 'false' && lower !== 'disabled' && lower !== '' && lower !== 'basic_manual_only'
+    )
+  }
+  return false
+}
+
+/** Whether the tenant may schedule this list (respects scheduled_quick_lists cap). */
+export function getQuickListScheduleGate(
+  entitlements: Entitlements | null | undefined,
+  listAlreadyScheduled = false
+): { canSchedule: boolean; current: number; limit: number | null; message: string } {
+  if (!isQuickListSchedulingEnabled(entitlements)) {
+    return {
+      canSchedule: false,
+      current: 0,
+      limit: null,
+      message: 'Scheduled quick lists require Silver or higher. Upgrade in Settings.',
+    }
+  }
+
+  const gate = getPlanLimitGate(entitlements, 'scheduled_quick_lists', listAlreadyScheduled ? 0 : 1)
+  return {
+    canSchedule: gate.canUse,
+    current: gate.current,
+    limit: gate.limit,
+    message: gate.message,
+  }
+}
+
+export function getOrderUsageBadge(
+  entitlements: Entitlements | null | undefined
+): { label: string; atLimit: boolean; nearLimit: boolean } | null {
+  if (!entitlements) return null
+  const limit = limitNumber(entitlements.limits?.orders_per_day)
+  if (limit == null || limit === -1) return null
+  const current = limitNumber(entitlements.usage?.orders_per_day) ?? 0
+  const pct = limit > 0 ? (current / limit) * 100 : 0
+  return {
+    label: `${current}/${limit}`,
+    atLimit: current >= limit,
+    nearLimit: pct >= 80 && current < limit,
+  }
+}
+
+export function canBrowseSupplierDeals(entitlements: Entitlements | null | undefined): boolean {
+  return featureEnabled(entitlements?.features?.supplier_deals)
+}
+
+export function getDealRedeemGate(entitlements: Entitlements | null | undefined) {
+  const gate = getPlanLimitGate(entitlements, 'deal_redemptions_per_day', 1)
+  return {
+    canRedeem: gate.canUse,
+    current: gate.current,
+    limit: gate.limit,
+    message: gate.message,
+    planName: entitlements?.plan?.name ?? null,
+  }
+}
+
+export function getSupplierPromotionGate(entitlements: Entitlements | null | undefined) {
+  const gate = getPlanLimitGate(entitlements, 'promotions', 1)
+  return {
+    canCreate: gate.canUse,
+    current: gate.current,
+    limit: gate.limit,
+    message: gate.message,
+    planName: entitlements?.plan?.name ?? null,
+  }
+}
+
+export function canRedeemSupplierDeals(entitlements: Entitlements | null | undefined): boolean {
+  return getDealRedeemGate(entitlements).canRedeem
 }

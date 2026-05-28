@@ -4,6 +4,8 @@ import {
   requireAuth,
   requireRole,
   getRequestTenant,
+  getRestaurantIdForRequest,
+  getSupplierIdForRequest,
   resolveTenantContext,
   requirePermission,
 } from '../lib/rbac.js'
@@ -20,12 +22,11 @@ import {
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyOrderStatusChange } from '../services/notification.service.js'
-import {
-  applyOrderApprovalGate,
-  notifyApproverOfPendingOrder,
-  getOrderApprovalStatus,
-} from '../services/approvals.service.js'
 import { applyBestPromotionToOrder } from '../services/promotions.service.js'
+import {
+  applyPromotionByIdToOrder,
+  validateCouponForOrder,
+} from '../services/deal-promotions.service.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { orderAmendmentsRouter } from './order-amendments.routes.js'
 import { ordersDriverRoutes } from './orders-driver.routes.js'
@@ -37,7 +38,10 @@ import {
   getSupplierIdForOrder,
   orderHasProofOfDelivery,
 } from '../lib/driver-delivery.js'
-import { getSupplierIdForRequest } from '../lib/rbac.js'
+import {
+  assertAndDeductSupplierStock,
+  restoreSupplierStockForOrder,
+} from '../services/supplier-inventory.service.js'
 
 const router = express.Router()
 
@@ -95,6 +99,8 @@ const orderCreateSchema = z.object({
       })
     )
     .min(1),
+  promotionId: z.string().uuid().optional(),
+  couponCode: z.string().max(64).optional(),
   status: z
     .enum([
       'DRAFT',
@@ -151,6 +157,8 @@ const orderUpdateSchema = z.object({
     ])
     .optional(),
   notes: z.string().optional(),
+  cancel_reason: z.string().trim().min(1).max(2000).optional(),
+  decline_reason: z.string().trim().min(1).max(2000).optional(),
   delivery_status: deliveryStatusSchema.optional(),
   failure_reason: z.string().optional(),
 })
@@ -388,7 +396,7 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
 }
 
 // Helper function to handle order delivery and update restaurant inventory
-async function handleOrderDelivery(orderId, userData, res) {
+async function handleOrderDelivery(orderId, userData, res, req) {
   try {
     const result = await withTransaction(async (client) => {
       // Get order first
@@ -405,17 +413,10 @@ async function handleOrderDelivery(orderId, userData, res) {
 
       const order = orders[0]
 
-      // Get supplier ID
-      const { rows: suppliers } = await client.query(
-        'SELECT id FROM supplier WHERE contact_email = $1',
-        [userData.email]
-      )
-
-      if (suppliers.length === 0) {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
         throw new ValidationError('Supplier not found')
       }
-
-      const supplierId = suppliers[0].id
 
       // Get order items (orders are now single-supplier, so all items belong to this supplier)
       const { rows: orderItems } = await client.query(
@@ -441,37 +442,24 @@ async function handleOrderDelivery(orderId, userData, res) {
 
       const supplierItems = orderItems
 
-      // Update restaurant inventory ONLY for this supplier's items
-      for (const item of supplierItems) {
-        // Check if restaurant inventory exists for this product
-        const { rows: restaurantInventory } = await client.query(
-          `
-          SELECT * FROM restaurant_inventory 
-          WHERE restaurant_id = $1 AND product_id = $2
-        `,
-          [order.restaurant_id, item.product_id]
-        )
-
-        if (restaurantInventory.length > 0) {
-          // Update existing inventory
-          await client.query(
-            `
-            UPDATE restaurant_inventory 
-            SET quantity = quantity + $1, updated_at = now()
-            WHERE restaurant_id = $2 AND product_id = $3
-          `,
-            [item.quantity, order.restaurant_id, item.product_id]
-          )
-        } else {
-          // Create new inventory record
-          await client.query(
-            `
-            INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
-            VALUES ($1, $2, $3, now())
-          `,
-            [order.restaurant_id, item.product_id, item.quantity]
-          )
+      // Update restaurant inventory ONLY for this supplier's items (batch upsert — avoids N+1)
+      if (supplierItems.length > 0) {
+        // Build VALUES list: ($1,$2,$3), ($4,$5,$6), ...
+        const vals = []
+        const params = []
+        let p = 1
+        for (const item of supplierItems) {
+          vals.push(`($${p},$${p + 1},$${p + 2},now())`)
+          params.push(order.restaurant_id, item.product_id, item.quantity)
+          p += 3
         }
+        await client.query(
+          `INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
+           VALUES ${vals.join(', ')}
+           ON CONFLICT (restaurant_id, product_id)
+           DO UPDATE SET quantity = restaurant_inventory.quantity + EXCLUDED.quantity, updated_at = now()`,
+          params
+        )
       }
 
       // Create invoice from the order (orders are now single-supplier)
@@ -637,8 +625,6 @@ router.get('/', async (req, res) => {
     let items = []
     if (orderIds.length > 0) {
       try {
-        logger.debug('Fetching order items', { count: orderIds.length })
-
         const { rows: itemsRows } = await query(
           `
           SELECT 
@@ -653,7 +639,6 @@ router.get('/', async (req, res) => {
         )
 
         items = itemsRows
-        logger.debug('Fetched order items', { count: items.length })
       } catch (itemError) {
         logger.error({
           message: 'Failed to fetch order items',
@@ -738,52 +723,6 @@ router.get('/', async (req, res) => {
 
 router.use('/:orderId/amendments', orderAmendmentsRouter)
 router.use(ordersDriverRoutes)
-
-// Approval status for an order (approvals_budgets feature)
-router.get(
-  '/:id/approval-status',
-  requireAuth,
-  requireFeature(
-    'approvals_budgets',
-    (req) => req.tenantContext?.tenantId,
-    (req) => req.tenantContext?.tenantType
-  ),
-  async (req, res, next) => {
-    try {
-      const { id } = req.params
-      const tenant = await getRequestTenant(req)
-      const { rows: orders } = await query(
-        `SELECT restaurant_id FROM customer_order WHERE id = $1`,
-        [id]
-      )
-      if (!orders.length) throw new NotFoundError('Order not found')
-      if (tenant?.tenantType === 'RESTAURANT' && orders[0].restaurant_id !== tenant.tenantId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Access denied' },
-          requestId: req.requestId,
-        })
-      }
-      const { rows: orderRows } = await query(`SELECT status FROM customer_order WHERE id = $1`, [
-        id,
-      ])
-      const approval = await getOrderApprovalStatus(id)
-      res.json({
-        ok: true,
-        data: {
-          approval,
-          orderStatus: orderRows[0]?.status,
-          hasPendingApproval: approval?.status === 'pending',
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      next(error)
-    }
-  }
-)
 
 async function loadOrderWarehouseAssignments(orderId) {
   const { rows } = await query(
@@ -995,11 +934,8 @@ router.get('/:id', requireAuth, async (req, res, next) => {
         })
       }
     } else if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-      if (restaurants.length === 0 || restaurants[0].id !== order.restaurant_id) {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId || restaurantId !== order.restaurant_id) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -1052,6 +988,49 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 
     const warehouseAssignments = await loadOrderWarehouseAssignments(id)
 
+    const { rows: promotionRows } = await query(
+      `
+      SELECT
+        pu.promotion_id,
+        pu.discount_applied,
+        p.name AS promotion_name,
+        p.type AS promotion_type
+      FROM promotion_usages pu
+      JOIN promotions p ON p.id = pu.promotion_id
+      WHERE pu.order_id = $1
+      LIMIT 1
+      `,
+      [id]
+    )
+    const promotionUsage = promotionRows[0]
+    const appliedPromotion = promotionUsage
+      ? {
+          promotionId: promotionUsage.promotion_id,
+          promotionName: promotionUsage.promotion_name,
+          promotionType: promotionUsage.promotion_type,
+          discountAmount: Number(promotionUsage.discount_applied),
+        }
+      : null
+
+    const { rows: replacementOrders } = await query(
+      `
+      SELECT id, status, placement_source, source_order_id, source_dispute_id, created_at, total_amount
+      FROM customer_order
+      WHERE source_order_id = $1
+      ORDER BY created_at ASC
+      `,
+      [id]
+    )
+
+    let sourceDispute = null
+    if (order.source_dispute_id) {
+      const { rows: disputeRows } = await query(
+        `SELECT id, status, resolution_type, order_id FROM disputes WHERE id = $1`,
+        [order.source_dispute_id]
+      )
+      sourceDispute = disputeRows[0] || null
+    }
+
     res.json({
       ok: true,
       data: {
@@ -1060,6 +1039,10 @@ router.get('/:id', requireAuth, async (req, res, next) => {
           items,
           warehouseAssignments,
           multiLocationFulfillment: warehouseAssignments.some((a) => a.order_item_id != null),
+          appliedPromotion,
+          promotion: appliedPromotion,
+          replacementOrders,
+          sourceDispute,
         },
       },
       error: null,
@@ -1093,25 +1076,18 @@ router.post(
     try {
       const orderData = orderCreateSchema.parse(req.body)
 
-      // Get restaurant ID
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0) {
-        return res.status(400).json({
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(403).json({
           ok: false,
           data: null,
           error: {
-            name: 'VALIDATION_ERROR',
-            message: 'Restaurant record not found for user',
+            name: 'FORBIDDEN',
+            message: 'Restaurant workspace not found for user',
           },
           requestId: req.requestId,
         })
       }
-
-      const restaurantId = restaurants[0].id
 
       // Group items by supplier - split into separate orders per supplier
       const orderStatus = orderData.status || 'PLACED'
@@ -1209,15 +1185,9 @@ router.post(
 
           // Process items for this supplier
           for (const item of items) {
-            // Check inventory
-            const { rows: inventory } = await client.query(
-              'SELECT available_qty FROM inventory WHERE product_id = $1 FOR UPDATE',
-              [item.productId]
-            )
-
-            if (inventory.length === 0 || Number(inventory[0].available_qty) < item.quantity) {
-              throw new ValidationError(`Insufficient inventory for product ${item.product.sku}`)
-            }
+            await assertAndDeductSupplierStock(client, item.productId, item.quantity, {
+              sku: item.product.sku,
+            })
 
             // Calculate line total
             const lineTotal = item.unitPrice * item.quantity
@@ -1245,16 +1215,6 @@ router.post(
             )
 
             orderItems.push(orderItem)
-
-            // Update inventory
-            await client.query(
-              `
-            UPDATE inventory 
-            SET available_qty = available_qty - $1, updated_at = now()
-            WHERE product_id = $2
-          `,
-              [item.quantity, item.productId]
-            )
           }
 
           // Update order total and placed_at (only if status is PLACED)
@@ -1288,14 +1248,49 @@ router.post(
               unitPrice: item.unitPrice,
               lineTotal: item.unitPrice * item.quantity,
             }))
-            appliedPromotion = await applyBestPromotionToOrder({
-              client,
-              orderId: order.id,
-              supplierId,
-              restaurantId,
-              subtotal: totalAmount,
-              lineItems: promoLines,
-            })
+
+            if (orderData.promotionId) {
+              appliedPromotion = await applyPromotionByIdToOrder({
+                client,
+                promotionId: orderData.promotionId,
+                orderId: order.id,
+                supplierId,
+                restaurantId,
+                subtotal: totalAmount,
+                lineItems: promoLines,
+              })
+            } else if (orderData.couponCode) {
+              const couponMatch = await validateCouponForOrder({
+                couponCode: orderData.couponCode,
+                supplierId,
+                restaurantId,
+                subtotal: totalAmount,
+                lineItems: promoLines,
+              })
+              if (couponMatch) {
+                appliedPromotion = await applyPromotionByIdToOrder({
+                  client,
+                  promotionId: couponMatch.promotion.id,
+                  orderId: order.id,
+                  supplierId,
+                  restaurantId,
+                  subtotal: totalAmount,
+                  lineItems: promoLines,
+                })
+              }
+            }
+
+            if (!appliedPromotion) {
+              appliedPromotion = await applyBestPromotionToOrder({
+                client,
+                orderId: order.id,
+                supplierId,
+                restaurantId,
+                subtotal: totalAmount,
+                lineItems: promoLines,
+              })
+            }
+
             if (appliedPromotion) {
               totalAmount = appliedPromotion.totalAfterDiscount
             }
@@ -1307,23 +1302,6 @@ router.post(
             items: orderItems,
             status: orderStatus,
             appliedPromotion,
-          }
-
-          if (orderStatus === 'PLACED') {
-            const gate = await applyOrderApprovalGate({
-              client,
-              order: { ...order, total_amount: totalAmount },
-              restaurantId,
-              requestedByUserId: req.userData.id,
-            })
-            if (gate) {
-              finalOrder = {
-                ...finalOrder,
-                status: 'PENDING_APPROVAL',
-                approvalId: gate.approval.id,
-                approverId: gate.approverId,
-              }
-            }
           }
 
           const { rows: supplierRows } = await client.query(
@@ -1361,7 +1339,7 @@ router.post(
           actor: req.userData.id,
         })
 
-        if (order.status === 'PLACED' || order.status === 'PENDING_APPROVAL') {
+        if (order.status === 'PLACED') {
           await writeAuditLog(req, {
             action_type: 'order.created',
             tenant_type: 'RESTAURANT',
@@ -1375,19 +1353,7 @@ router.post(
           })
         }
 
-        if (order.status === 'PENDING_APPROVAL' && order.approverId) {
-          try {
-            await notifyApproverOfPendingOrder({
-              approverId: order.approverId,
-              orderId: order.id,
-              orderTotal: order.total_amount,
-            })
-          } catch (notifError) {
-            logger.error('Failed to send approval notification', { error: notifError.message })
-          }
-        }
-
-        // Send notification to supplier about new order (only if PLACED, not DRAFT/pending approval)
+        // Send notification to supplier about new order (only if PLACED, not DRAFT)
         if (order.status === 'PLACED' && order.items.length > 0) {
           try {
             const supplierId = order.items[0].supplier_id
@@ -1445,204 +1411,188 @@ router.post(
 )
 
 // Create order manually by supplier (for phone orders, chat orders, etc.)
-router.post('/manual', requireAuth, requireRole(['SUPPLIER']), async (req, res) => {
-  try {
-    const orderData = supplierOrderCreateSchema.parse(req.body)
+router.post(
+  '/manual',
+  requireAuth,
+  requireRole(['SUPPLIER']),
+  requirePermission('ORDERS_CREATE'),
+  async (req, res) => {
+    try {
+      const orderData = supplierOrderCreateSchema.parse(req.body)
 
-    // Get supplier ID
-    const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-      req.userData.email,
-    ])
+      const supplierId = await getSupplierIdForRequest(req)
 
-    if (suppliers.length === 0) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Supplier record not found for user',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (!supplierId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Supplier record not found for user',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const supplierId = suppliers[0].id
+      // Verify restaurant exists
+      const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
+        orderData.restaurant_id,
+      ])
 
-    // Verify restaurant exists
-    const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
-      orderData.restaurant_id,
-    ])
+      if (restaurants.length === 0) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Restaurant not found',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    if (restaurants.length === 0) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Restaurant not found',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    // Create order with transaction
-    const result = await withTransaction(async (client) => {
-      // Create order with status PLACED
-      const {
-        rows: [order],
-      } = await client.query(
-        `
+      // Create order with transaction
+      const result = await withTransaction(async (client) => {
+        // Create order with status PLACED
+        const {
+          rows: [order],
+        } = await client.query(
+          `
         INSERT INTO customer_order (restaurant_id, currency, status, notes)
         VALUES ($1, 'USD', 'PLACED', $2)
         RETURNING *
       `,
-        [orderData.restaurant_id, orderData.notes || null]
-      )
+          [orderData.restaurant_id, orderData.notes || null]
+        )
 
-      let totalAmount = 0
-      const orderItems = []
+        let totalAmount = 0
+        const orderItems = []
 
-      // Process each item
-      for (const item of orderData.items) {
-        // Get product and current price
-        const { rows: products } = await client.query(
-          `
+        // Process each item
+        for (const item of orderData.items) {
+          // Get product and current price
+          const { rows: products } = await client.query(
+            `
           SELECT p.*, pr.amount as current_price, pr.currency
           FROM product p
           LEFT JOIN price pr ON pr.product_id = p.id 
             AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
           WHERE p.id = $1 AND p.supplier_id = $2
         `,
-          [item.productId, supplierId]
-        )
-
-        if (products.length === 0) {
-          throw new ValidationError(
-            `Product ${item.productId} not found or doesn't belong to supplier`
+            [item.productId, supplierId]
           )
-        }
 
-        const product = products[0]
+          if (products.length === 0) {
+            throw new ValidationError(
+              `Product ${item.productId} not found or doesn't belong to supplier`
+            )
+          }
 
-        if (!product.current_price) {
-          throw new ValidationError(`No valid price found for product ${product.sku}`)
-        }
+          const product = products[0]
 
-        // Check inventory
-        const { rows: inventory } = await client.query(
-          'SELECT available_qty FROM inventory WHERE product_id = $1 FOR UPDATE',
-          [item.productId]
-        )
+          if (!product.current_price) {
+            throw new ValidationError(`No valid price found for product ${product.sku}`)
+          }
 
-        if (inventory.length === 0 || Number(inventory[0].available_qty) < item.quantity) {
-          throw new ValidationError(`Insufficient inventory for product ${product.sku}`)
-        }
+          await assertAndDeductSupplierStock(client, item.productId, item.quantity, {
+            sku: product.sku,
+            reserve: true,
+          })
 
-        // Calculate line total
-        const unitPrice = Number(product.current_price)
-        const lineTotal = unitPrice * item.quantity
-        totalAmount += lineTotal
+          // Calculate line total
+          const unitPrice = Number(product.current_price)
+          const lineTotal = unitPrice * item.quantity
+          totalAmount += lineTotal
 
-        // Create order item
-        const {
-          rows: [orderItem],
-        } = await client.query(
-          `
+          // Create order item
+          const {
+            rows: [orderItem],
+          } = await client.query(
+            `
           INSERT INTO order_item (
             order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING *
         `,
-          [order.id, item.productId, supplierId, item.quantity, unitPrice, lineTotal, item.notes]
-        )
+            [order.id, item.productId, supplierId, item.quantity, unitPrice, lineTotal, item.notes]
+          )
 
-        orderItems.push(orderItem)
+          orderItems.push(orderItem)
+        }
 
-        // Reserve inventory (decrease available, increase reserved)
+        // Update order total
         await client.query(
           `
-          UPDATE inventory 
-          SET available_qty = available_qty - $1,
-              reserved_qty = reserved_qty + $1,
-              updated_at = now()
-          WHERE product_id = $2
-        `,
-          [item.quantity, item.productId]
-        )
-      }
-
-      // Update order total
-      await client.query(
-        `
         UPDATE customer_order 
         SET total_amount = $1, placed_at = now()
         WHERE id = $2
       `,
-        [totalAmount, order.id]
-      )
+          [totalAmount, order.id]
+        )
 
-      const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
-        supplierId,
-      ])
-      let warehouseFulfillment = null
-      if (supplierRows.length) {
-        const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
-        warehouseFulfillment = await assignWarehousesToOrder(client, {
-          order: { ...order, restaurant_id: order.restaurant_id },
-          orderItems,
-          supplier: supplierRows[0],
-          multiWarehouseActive: multiActive,
+        const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
+          supplierId,
+        ])
+        let warehouseFulfillment = null
+        if (supplierRows.length) {
+          const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+          warehouseFulfillment = await assignWarehousesToOrder(client, {
+            order: { ...order, restaurant_id: order.restaurant_id },
+            orderItems,
+            supplier: supplierRows[0],
+            multiWarehouseActive: multiActive,
+          })
+        }
+
+        return {
+          ...order,
+          total_amount: totalAmount,
+          items: orderItems,
+          warehouseFulfillment,
+        }
+      })
+
+      logger.info('Manual order created by supplier', {
+        orderId: result.id,
+        restaurantId: result.restaurant_id,
+        totalAmount: result.total_amount,
+        itemCount: result.items.length,
+        actor: req.userData.id,
+      })
+
+      res.status(201).json({
+        ok: true,
+        data: { order: result },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid order data',
+            details: error.errors,
+          },
+          requestId: req.requestId,
         })
       }
 
-      return {
-        ...order,
-        total_amount: totalAmount,
-        items: orderItems,
-        warehouseFulfillment,
-      }
-    })
-
-    logger.info('Manual order created by supplier', {
-      orderId: result.id,
-      restaurantId: result.restaurant_id,
-      totalAmount: result.total_amount,
-      itemCount: result.items.length,
-      actor: req.userData.id,
-    })
-
-    res.status(201).json({
-      ok: true,
-      data: { order: result },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      logger.error('Create manual order error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid order data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to create order',
         },
         requestId: req.requestId,
       })
     }
-
-    logger.error('Create manual order error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to create order',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Update order status
 router.patch('/:id', async (req, res) => {
@@ -1750,13 +1700,8 @@ router.patch('/:id', async (req, res) => {
         })
       }
 
-      // Verify ownership
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-
-      if (restaurants.length === 0 || restaurants[0].id !== order.restaurant_id) {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId || restaurantId !== order.restaurant_id) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -1769,7 +1714,45 @@ router.patch('/:id', async (req, res) => {
       }
     } else if (req.userData.role === 'SUPPLIER') {
       const supplierPerms = req.tenantContext?.permissions ?? []
-      if (!hasPermission(supplierPerms, 'ORDERS_EDIT')) {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || supplierId !== supplier_id) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      if (updateData.status === 'CANCELLED') {
+        if (!hasPermission(supplierPerms, 'ORDERS_MANAGE')) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Missing permission: ORDERS_MANAGE',
+            },
+            requestId: req.requestId,
+          })
+        }
+        const declineReason = (updateData.decline_reason || updateData.cancel_reason || '').trim()
+        if (declineReason.length < 3) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'DECLINE_REASON_REQUIRED',
+              message: 'A reason is required when declining an order (at least 3 characters).',
+            },
+            requestId: req.requestId,
+          })
+        }
+        updateData.cancel_reason = declineReason
+      } else if (!hasPermission(supplierPerms, 'ORDERS_EDIT')) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -1779,10 +1762,7 @@ router.patch('/:id', async (req, res) => {
           },
           requestId: req.requestId,
         })
-      }
-
-      // Suppliers can acknowledge, process, ship, and complete orders
-      if (
+      } else if (
         updateData.status &&
         !['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(
           updateData.status
@@ -1793,7 +1773,7 @@ router.patch('/:id', async (req, res) => {
           data: null,
           error: {
             name: 'FORBIDDEN',
-            message: 'Suppliers can only confirm, fulfill, or complete orders',
+            message: 'Suppliers can only confirm, fulfill, deliver, or decline orders',
           },
           requestId: req.requestId,
         })
@@ -1801,7 +1781,7 @@ router.patch('/:id', async (req, res) => {
 
       // If completing, update restaurant inventory
       if (updateData.status === 'COMPLETED') {
-        return await handleOrderDelivery(id, req.userData, res)
+        return await handleOrderDelivery(id, req.userData, res, req)
       }
     }
 
@@ -1814,6 +1794,23 @@ router.patch('/:id', async (req, res) => {
       updateFields.push(`status = $${paramIndex}`)
       updateValues.push(updateData.status)
       paramIndex++
+    }
+
+    if (updateData.status === 'CANCELLED' && updateData.status !== order.status) {
+      const cancelledBy = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
+      const cancelReason =
+        (updateData.cancel_reason || updateData.decline_reason || updateData.notes || '').trim() ||
+        null
+
+      updateFields.push(`cancelled_by = $${paramIndex}`)
+      updateValues.push(cancelledBy)
+      paramIndex++
+
+      if (cancelReason) {
+        updateFields.push(`cancel_reason = $${paramIndex}`)
+        updateValues.push(cancelReason)
+        paramIndex++
+      }
     }
 
     if (updateFields.length === 0) {
@@ -1846,6 +1843,10 @@ router.patch('/:id', async (req, res) => {
 
       if (updateData.status && updateData.status !== order.status) {
         await syncWarehouseFulfillmentOnOrderStatus(client, id, updateData.status, order.status)
+      }
+
+      if (updateData.status === 'CANCELLED' && order.status !== 'CANCELLED') {
+        await restoreSupplierStockForOrder(client, id)
       }
 
       return updated
@@ -1892,7 +1893,6 @@ router.patch('/:id', async (req, res) => {
             updateData.status
           )
         } else if (updateData.status === 'CANCELLED') {
-          // Cancelled - notify supplier
           await notifyOrderStatusChange(
             {
               id: rows[0].id,
@@ -1901,6 +1901,8 @@ router.patch('/:id', async (req, res) => {
               restaurant_name: restaurantInfo[0]?.name || 'Restaurant',
               supplier_id: supplierIdForNotification,
               supplier_name: supplierInfo[0]?.name || 'Supplier',
+              cancelled_by: rows[0].cancelled_by,
+              cancel_reason: rows[0].cancel_reason,
             },
             updateData.status
           )
@@ -1981,12 +1983,9 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
 
     // Verify restaurant ownership (unless admin)
     if (req.userData.role === 'RESTAURANT') {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
+      const restaurantId = await getRestaurantIdForRequest(req)
 
-      if (restaurants.length === 0 || restaurants[0].id !== order.restaurant_id) {
+      if (!restaurantId || restaurantId !== order.restaurant_id) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -2057,7 +2056,7 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
     }
 
     // Import notification service
-    const { sendNotification } = await import('../services/notification.service.js')
+    const { notifyTenantUsers } = await import('../services/notification.service.js')
 
     // Send reminder notification
     const reminderMessage =
@@ -2066,9 +2065,9 @@ router.post('/:id/remind', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), as
         : `Reminder: You have an unacknowledged order #${order.id.slice(0, 8)} from ${order.restaurant_name} for $${order.total_amount || 0}. Please acknowledge when ready.`
 
     try {
-      await sendNotification({
-        userId: supplier.user_id,
-        userType: 'SUPPLIER',
+      await notifyTenantUsers({
+        tenantId: order.supplier_id,
+        tenantType: 'SUPPLIER',
         notificationType: 'ORDER',
         notificationCategory: 'PLACED',
         title: 'Order Reminder',
@@ -2155,11 +2154,7 @@ router.get(
       const order = orders[0]
       let supplierId = null
       if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1',
-          [req.userData.email]
-        )
-        if (suppliers.length > 0) supplierId = suppliers[0].id
+        supplierId = await getSupplierIdForRequest(req)
       }
       const itemsQuery = supplierId
         ? `
@@ -2239,14 +2234,7 @@ router.get(
       // If supplier, verify they own items in this order and filter items
       let supplierId = null
       if (req.userData.role === 'SUPPLIER') {
-        const { rows: suppliers } = await query(
-          'SELECT id FROM supplier WHERE contact_email = $1',
-          [req.userData.email]
-        )
-
-        if (suppliers.length > 0) {
-          supplierId = suppliers[0].id
-        }
+        supplierId = await getSupplierIdForRequest(req)
       }
 
       // Get order items (filter by supplier if supplier role)

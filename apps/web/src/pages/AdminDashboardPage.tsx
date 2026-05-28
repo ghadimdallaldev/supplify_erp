@@ -28,6 +28,7 @@ import {
   useGetAdminRestaurantsQuery,
   useStartImpersonationMutation,
   useUnlockAdminSubscriptionMutation,
+  useExtendAdminFreeTrialMutation,
 } from '../services/api'
 import {
   Loader2,
@@ -61,10 +62,22 @@ import {
   ListOrdered,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { notifyAdminPlanSaveError, notifyAdminPlanSaveSuccess } from '../lib/adminPlanSaveFeedback'
+import { getPaidActiveSubscriptionCount } from '../lib/adminOverview'
 import type { SubscriptionPlan } from '../types'
-import { getPlanSubtitle, getFeatureLabel, formatPlanFeatureCell } from '../lib/planComparison'
+import {
+  getPlanSubtitle,
+  getFeatureLabel,
+  getLimitLabel,
+  formatPlanFeatureCell,
+  formatPlanDisplayName,
+} from '../lib/planComparison'
 import { formatCurrency } from '../utils/format'
 import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
+import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
+import { AdminLimitOverridesPanel } from '../components/admin/AdminLimitOverridesPanel'
+import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
+import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
 
 interface AdminDashboardPageProps {
   initialTab?: string
@@ -85,13 +98,37 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [plansTenantFilter, setPlansTenantFilter] = useState<'RESTAURANT' | 'SUPPLIER' | undefined>(
     undefined
   )
-  const { data: overview, isLoading: overviewLoading } = useGetAdminOverviewQuery()
-  const { data: conversionStats } = useGetAdminConversionStatsQuery({ days: 30 })
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    isError: overviewError,
+    error: overviewQueryError,
+    refetch: refetchOverview,
+    isFetching: overviewFetching,
+  } = useGetAdminOverviewQuery(undefined, {
+    skip: !['overview', 'health'].includes(selectedTab),
+  })
+  const [overviewLastUpdated, setOverviewLastUpdated] = useState<Date | null>(null)
+  const [tenantSearch, setTenantSearch] = useState('')
+
+  useEffect(() => {
+    if (overview && !overviewLoading) {
+      setOverviewLastUpdated(new Date())
+    }
+  }, [overview, overviewLoading])
+  const { data: conversionStats } = useGetAdminConversionStatsQuery(
+    { days: 30 },
+    { skip: selectedTab !== 'overview' }
+  )
   const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery(
-    plansTenantFilter ? { tenant_type: plansTenantFilter } : {}
+    plansTenantFilter ? { tenant_type: plansTenantFilter } : {},
+    { skip: selectedTab !== 'plans' }
   )
   const { data: subscriptionsData, isLoading: subscriptionsLoading } =
-    useGetAdminSubscriptionsQuery({})
+    useGetAdminSubscriptionsQuery(
+      {},
+      { skip: !['subscriptions', 'plans', 'usage'].includes(selectedTab) }
+    )
 
   // Deduplicate plans by (code, tenant_type), exclude enterprise
   const plans =
@@ -120,43 +157,62 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     data: auditLogsData,
     isLoading: auditLoading,
     refetch: refetchAudit,
-  } = useGetAdminAuditLogsQuery({
-    limit: auditPageSize,
-    offset: auditOffset,
-    ...(auditActionType !== 'all' && { actionType: auditActionType }),
-    ...(auditDateFrom && { dateFrom: auditDateFrom }),
-    ...(auditDateTo && { dateTo: auditDateTo }),
-    ...(auditSearch && { search: auditSearch }),
-  })
+  } = useGetAdminAuditLogsQuery(
+    {
+      limit: auditPageSize,
+      offset: auditOffset,
+      ...(auditActionType !== 'all' && { actionType: auditActionType }),
+      ...(auditDateFrom && { dateFrom: auditDateFrom }),
+      ...(auditDateTo && { dateTo: auditDateTo }),
+      ...(auditSearch && { search: auditSearch }),
+    },
+    { skip: selectedTab !== 'audit' }
+  )
   const [activityType, setActivityType] = useState('all')
   const [activityOffset, setActivityOffset] = useState(0)
   const activityPageSize = 30
   const {
     data: activityData,
     isLoading: activityLoading,
+    isError: activityError,
+    error: activityQueryError,
     refetch: refetchActivity,
-  } = useGetAdminActivityQuery({
-    limit: activityPageSize,
-    offset: activityOffset,
-    ...(activityType !== 'all' && { type: activityType }),
-  })
+  } = useGetAdminActivityQuery(
+    {
+      limit: activityPageSize,
+      offset: activityOffset,
+      ...(activityType !== 'all' && { type: activityType }),
+    },
+    { skip: selectedTab !== 'activity' }
+  )
 
-  const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery()
-  const { data: financeData, isLoading: financeLoading } = (
-    api as any
-  ).useGetAdminFinancialOverviewQuery()
+  const { data: healthData, isLoading: healthLoading } = (api as any).useGetAdminHealthQuery(
+    undefined,
+    { skip: selectedTab !== 'health' }
+  )
+  const {
+    data: financeData,
+    isLoading: financeLoading,
+    isError: financeError,
+    error: financeQueryError,
+    refetch: refetchFinance,
+  } = (api as any).useGetAdminFinancialOverviewQuery(undefined, { skip: selectedTab !== 'finance' })
 
   // Load tenant data
   const {
     data: suppliersData,
     isLoading: suppliersLoading,
     error: suppliersError,
-  } = useGetAdminSuppliersQuery()
+  } = useGetAdminSuppliersQuery(undefined, {
+    skip: !['tenants', 'features', 'usage'].includes(selectedTab),
+  })
   const {
     data: restaurantsData,
     isLoading: restaurantsLoading,
     error: restaurantsError,
-  } = useGetAdminRestaurantsQuery()
+  } = useGetAdminRestaurantsQuery(undefined, {
+    skip: !['tenants', 'features', 'usage'].includes(selectedTab),
+  })
 
   const [createPlan] = useCreateAdminPlanMutation()
   const [updatePlan] = useUpdateAdminPlanMutation()
@@ -164,6 +220,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [previewPlanChange] = usePreviewSubscriptionPlanChangeMutation()
   const [startImpersonation] = useStartImpersonationMutation()
   const [unlockSubscription, { isLoading: isUnlocking }] = useUnlockAdminSubscriptionMutation()
+  const [extendFreeTrial, { isLoading: isExtendingTrial }] = useExtendAdminFreeTrialMutation()
 
   const [changePlanModal, setChangePlanModal] = useState<{
     open: boolean
@@ -192,6 +249,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     displayOrder: 0,
     isActive: true,
   })
+  const [confirmEnterpriseActivation, setConfirmEnterpriseActivation] = useState(false)
   const [createPlanOpen, setCreatePlanOpen] = useState(false)
   const [createPlanForm, setCreatePlanForm] = useState({
     code: '',
@@ -225,12 +283,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         displayOrder: 0,
         isActive: true,
       })
-    } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Failed to create plan')
+    } catch (e: unknown) {
+      notifyAdminPlanSaveError(e)
     }
   }
 
   const openEditPlanModal = (plan: SubscriptionPlan) => {
+    setConfirmEnterpriseActivation(false)
     setEditPlanModal({ open: true, plan })
     setEditPlanForm({
       name: plan.name,
@@ -245,23 +304,37 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
   const handleSaveEditPlan = async () => {
     if (!editPlanModal?.plan) return
+    const plan = editPlanModal.plan
+    const isEnterprise = (plan.code || '').toLowerCase() === 'enterprise'
     try {
-      await updatePlan({
-        id: editPlanModal.plan.id,
-        data: editPlanForm,
+      const payload: Record<string, unknown> = { ...editPlanForm }
+      if (isEnterprise && editPlanForm.isActive) {
+        payload.confirmEnterpriseActivation = confirmEnterpriseActivation
+      }
+      const result = await updatePlan({
+        id: plan.id,
+        data: payload,
       }).unwrap()
-      toast.success('Plan updated')
+      notifyAdminPlanSaveSuccess(result.plan.name || plan.name, result.validationWarnings)
       setEditPlanModal(null)
-    } catch (e: any) {
-      toast.error(e?.data?.error?.message || 'Failed to update plan')
+      setConfirmEnterpriseActivation(false)
+    } catch (e: unknown) {
+      notifyAdminPlanSaveError(e)
     }
   }
 
-  const handleUpdatePlan = async (id: string, data: any) => {
+  const handleUpdatePlan = async (
+    id: string,
+    data: Record<string, unknown>,
+    planLabel?: string
+  ) => {
     try {
-      await updatePlan({ id, data }).unwrap()
+      const result = await updatePlan({ id, data }).unwrap()
+      notifyAdminPlanSaveSuccess(planLabel || result.plan.name || 'Plan', result.validationWarnings)
+      return result
     } catch (error) {
-      console.error('Failed to update plan:', error)
+      notifyAdminPlanSaveError(error)
+      throw error
     }
   }
 
@@ -371,6 +444,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <TabsTrigger value="finance">Finance</TabsTrigger>
                 <TabsTrigger value="usage">Usage</TabsTrigger>
                 <TabsTrigger value="features">Features</TabsTrigger>
+                <TabsTrigger value="deals">Deals</TabsTrigger>
+                <TabsTrigger value="limits">Limits</TabsTrigger>
                 <TabsTrigger value="health">Health</TabsTrigger>
                 <TabsTrigger value="audit">Audit</TabsTrigger>
               </>
@@ -393,8 +468,35 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
+          ) : overviewError ? (
+            <Card className="border-red-200 bg-red-50 p-6">
+              <div className="flex flex-wrap items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-[200px]">
+                  <p className="font-semibold text-red-900">Could not load dashboard metrics</p>
+                  <p className="text-sm text-red-800 mt-1">
+                    {(overviewQueryError as { data?: { message?: string } })?.data?.message ||
+                      'The overview API request failed. Metrics are not shown as zero to avoid a misleading empty dashboard.'}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => refetchOverview()}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            </Card>
           ) : (
             <>
+              <AdminOverviewExtras
+                overview={overview}
+                onNavigateTab={setSelectedTab}
+                onRefresh={() => refetchOverview()}
+                refreshing={overviewFetching}
+                lastUpdated={overviewLastUpdated}
+              />
+
+              <AdminPlatformSettingsPanel />
+
               {/* Alerts banner — only visible if there are issues */}
               {((overview?.alerts?.pastDueSubscriptions || 0) > 0 ||
                 (overview?.alerts?.trialsExpiringSoon || 0) > 0) && (
@@ -651,10 +753,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       </span>
                     </div>
                     <p className="text-3xl font-black text-[var(--text)]">
-                      {(overview?.subscriptionStats as any)?.ACTIVE || 0}
+                      {getPaidActiveSubscriptionCount(overview)}
                     </p>
                     <p className="text-xs text-[var(--text-muted)] mt-2">
-                      {(overview?.subscriptionStats as any)?.TRIALING || 0} trialing
+                      Paid plans (excl. Free Trial)
+                      {(overview?.subscriptionStats as any)?.TRIALING
+                        ? ` · ${(overview?.subscriptionStats as any)?.TRIALING} trialing total`
+                        : ''}
                       {((overview?.subscriptionStats as any)?.PAST_DUE || 0) > 0 && (
                         <span className="text-red-500 ml-2">
                           · {(overview?.subscriptionStats as any)?.PAST_DUE} past due
@@ -867,7 +972,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div>
-                      <Label>Code (e.g. free, bronze)</Label>
+                      <Label>Code (e.g. free, silver)</Label>
                       <Input
                         value={createPlanForm.code}
                         onChange={(e) => setCreatePlanForm((s) => ({ ...s, code: e.target.value }))}
@@ -1001,7 +1106,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     {plan.limits && Object.keys(plan.limits).length > 0 ? (
                       Object.entries(plan.limits).map(([key, value]) => (
                         <div key={key} className="flex justify-between text-xs">
-                          <span className="text-[var(--text-muted)]">{key.replace(/_/g, ' ')}</span>
+                          <span className="text-[var(--text-muted)]">{getLimitLabel(key)}</span>
                           <span
                             className={`font-semibold ${value === -1 ? 'text-[var(--mint)]' : 'text-[var(--text)]'}`}
                           >
@@ -1046,11 +1151,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       Updated {new Date(plan.updated_at).toLocaleDateString()}
                     </p>
                   )}
-                  <div className="flex gap-2 mt-4">
+                  <div className="mt-4">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex-1"
+                      className="w-full whitespace-normal"
                       onClick={() => openEditPlanModal(plan)}
                     >
                       <Edit className="mr-2 h-4 w-4" />
@@ -1125,7 +1230,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       <Label>Trial days</Label>
                       <Input
                         type="number"
-                        min={0}
+                        min={editPlanModal.plan.code === 'free' ? 3 : 0}
+                        max={editPlanModal.plan.code === 'free' ? 7 : undefined}
                         value={editPlanForm.trialDays}
                         onChange={(e) =>
                           setEditPlanForm((s) => ({
@@ -1134,6 +1240,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           }))
                         }
                       />
+                      {editPlanModal.plan.code === 'free' ? (
+                        <p className="mt-1 text-xs text-amber-800">
+                          Free Trial catalog: trial days must be between 3 and 7.
+                        </p>
+                      ) : null}
                     </div>
                     <div>
                       <Label>Display order</Label>
@@ -1162,6 +1273,24 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     />
                     <Label htmlFor="edit-plan-active">Active</Label>
                   </div>
+                  {editPlanModal.plan.code === 'enterprise' && editPlanForm.isActive ? (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                      <p className="font-semibold">Enterprise activation</p>
+                      <p className="mt-1 text-amber-900">
+                        Enterprise is admin-assigned only. Enabling the catalog row requires
+                        explicit confirmation.
+                      </p>
+                      <label className="mt-2 flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={confirmEnterpriseActivation}
+                          onChange={(e) => setConfirmEnterpriseActivation(e.target.checked)}
+                          className="rounded border-[var(--app-border-mid)]"
+                        />
+                        <span>I confirm Enterprise catalog activation</span>
+                      </label>
+                    </div>
+                  ) : null}
                   <div className="flex justify-end gap-2 pt-2">
                     <Button variant="outline" onClick={() => setEditPlanModal(null)}>
                       Cancel
@@ -1217,7 +1346,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <Badge variant="outline">{sub.plan_name}</Badge>
+                        <Badge variant="outline">
+                          {formatPlanDisplayName(
+                            (sub as { plan_code?: string }).plan_code,
+                            sub.plan_name
+                          )}
+                        </Badge>
                       </td>
                       <td className="py-3 px-4">
                         <Badge
@@ -1242,6 +1376,23 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-2">
+                          {sub.lock_reason === 'free_sandbox_expired' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={isExtendingTrial}
+                              onClick={async () => {
+                                try {
+                                  await extendFreeTrial({ id: sub.id }).unwrap()
+                                  toast.success('Free Trial extended')
+                                } catch {
+                                  toast.error('Failed to extend Free Trial')
+                                }
+                              }}
+                            >
+                              Extend trial
+                            </Button>
+                          )}
                           {(sub.account_locked_at || sub.lock_reason === 'pending_activation') && (
                             <Button
                               size="sm"
@@ -1297,56 +1448,72 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
-          ) : (
-            <>
-              {/* Subscription health */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  {
-                    label: 'Active',
-                    value: (overview?.subscriptionStats as any)?.ACTIVE ?? 0,
-                    color: 'var(--mint)',
-                    bg: 'var(--mint-pale)',
-                  },
-                  {
-                    label: 'Trialing',
-                    value: (overview?.subscriptionStats as any)?.TRIALING ?? 0,
-                    color: 'var(--brand)',
-                    bg: 'var(--brand-ultra)',
-                  },
-                  {
-                    label: 'Past Due',
-                    value:
-                      (overview?.alerts as any)?.pastDueSubscriptions ??
-                      (overview?.subscriptionStats as any)?.PAST_DUE ??
-                      0,
-                    color: '#ef4444',
-                    bg: '#fef2f2',
-                  },
-                  {
-                    label: 'Trials expiring (7d)',
-                    value: (overview?.alerts as any)?.trialsExpiringSoon ?? 0,
-                    color: '#f59e0b',
-                    bg: '#fffbeb',
-                  },
-                ].map(({ label, value, color, bg }) => (
-                  <Card key={label} className="p-4">
-                    <p className="text-xs font-medium text-[var(--text-muted)] mb-1">{label}</p>
-                    <p className="text-2xl font-black" style={{ color }}>
-                      {value}
-                    </p>
-                    <div className="mt-2 h-1 rounded-full" style={{ background: bg }}>
-                      <div
-                        className="h-1 rounded-full"
-                        style={{ width: '100%', background: color + '40' }}
-                      />
-                    </div>
-                  </Card>
-                ))}
+          ) : null}
+          {!overviewLoading && overviewError && (
+            <Card className="p-6 border-red-200 bg-red-50/50 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-[var(--text)]">
+                    Subscription health metrics unavailable
+                  </p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    Overview metrics failed to load. Infrastructure checks below may still apply.
+                  </p>
+                </div>
               </div>
-
+            </Card>
+          )}
+          {!overviewLoading && !overviewError && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+              {[
+                {
+                  label: 'Active',
+                  value: (overview?.subscriptionStats as any)?.ACTIVE ?? 0,
+                  color: 'var(--mint)',
+                  bg: 'var(--mint-pale)',
+                },
+                {
+                  label: 'Trialing',
+                  value: (overview?.subscriptionStats as any)?.TRIALING ?? 0,
+                  color: 'var(--brand)',
+                  bg: 'var(--brand-ultra)',
+                },
+                {
+                  label: 'Past Due',
+                  value:
+                    (overview?.alerts as any)?.pastDueSubscriptions ??
+                    (overview?.subscriptionStats as any)?.PAST_DUE ??
+                    0,
+                  color: '#ef4444',
+                  bg: '#fef2f2',
+                },
+                {
+                  label: 'Trials expiring (7d)',
+                  value: (overview?.alerts as any)?.trialsExpiringSoon ?? 0,
+                  color: '#f59e0b',
+                  bg: '#fffbeb',
+                },
+              ].map(({ label, value, color, bg }) => (
+                <Card key={label} className="p-4">
+                  <p className="text-xs font-medium text-[var(--text-muted)] mb-1">{label}</p>
+                  <p className="text-2xl font-black" style={{ color }}>
+                    {value}
+                  </p>
+                  <div className="mt-2 h-1 rounded-full" style={{ background: bg }}>
+                    <div
+                      className="h-1 rounded-full"
+                      style={{ width: '100%', background: color + '40' }}
+                    />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+          {!healthLoading && (
+            <>
               {/* DB Pool */}
-              {healthData?.dbPool && (
+              {healthData?.dbPool ? (
                 <Card className="p-5">
                   <p className="text-sm font-semibold text-[var(--text)] mb-3">Database Pool</p>
                   <div className="grid grid-cols-3 gap-4 text-center">
@@ -1408,6 +1575,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     </div>
                   </div>
                 </Card>
+              ) : (
+                <Card className="p-5">
+                  <p className="text-sm font-semibold text-[var(--text)] mb-1">Database Pool</p>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Pool metrics not available from this environment.
+                  </p>
+                </Card>
               )}
 
               {/* Recent API errors */}
@@ -1419,12 +1593,17 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       className="flex items-center gap-1 text-xs font-medium"
                       style={{ color: 'var(--mint)' }}
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5" /> All clear
+                      <CheckCircle2 className="h-3.5 w-3.5" />{' '}
+                      {healthData ? 'No errors in system_event' : 'Health checks limited'}
                     </span>
                   )}
                 </div>
                 {!healthData?.recentApiErrors?.length ? (
-                  <p className="text-sm text-[var(--text-muted)]">No errors logged recently</p>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {healthData
+                      ? 'No errors logged in system_event (requires system_event table). Job/webhook failure tracking is not configured yet.'
+                      : 'Health endpoint did not return data.'}
+                  </p>
                 ) : (
                   <div className="rounded-lg overflow-hidden border border-[var(--app-border)]">
                     <table className="w-full text-xs">
@@ -1471,8 +1650,34 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
+          ) : financeError ? (
+            <Card className="p-6 border-red-200 bg-red-50/50">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-[var(--text)]">Finance data unavailable</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    {(financeQueryError as { data?: { message?: string } })?.data?.message ||
+                      'The finance API request failed. Figures are not shown as zero to avoid misleading data.'}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => refetchFinance()}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            </Card>
           ) : (
             <>
+              {financeData?.mrrExcludesFreeTrial && (
+                <p className="text-xs text-[var(--text-muted)] -mt-2">
+                  MRR and ARR exclude Free Trial and Enterprise plans (paid subscriptions only).
+                </p>
+              )}
               {/* Top KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
@@ -1488,7 +1693,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                     value: financeData?.mrr ?? 0,
                     color: 'var(--mint)',
                     bg: 'var(--mint-pale)',
-                    note: `ARR: ${formatCurrency(financeData?.arr ?? 0)}`,
+                    note: `ARR: ${formatCurrency(financeData?.arr ?? 0)} · paid plans only`,
                   },
                   {
                     label: 'Outstanding',
@@ -1538,7 +1743,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           <div key={i}>
                             <div className="flex items-center justify-between text-xs mb-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium text-[var(--text)]">{r.planName}</span>
+                                <span className="font-medium text-[var(--text)]">
+                                  {formatPlanDisplayName(r.planCode, r.planName)}
+                                </span>
                                 <Badge variant="outline" className="text-xs">
                                   {r.tenantType}
                                 </Badge>
@@ -1653,7 +1860,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         </TabsContent>
 
         <TabsContent value="tenants" className="space-y-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <h2 className="text-2xl font-bold text-[var(--text)]">
               {initialTab === 'suppliers'
                 ? 'Supplier Management'
@@ -1661,12 +1868,42 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   ? 'Restaurant Management'
                   : 'Tenant Management'}
             </h2>
+            {initialTab !== 'suppliers' && initialTab !== 'restaurants' && (
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
+                <Input
+                  className="pl-8 h-9"
+                  placeholder="Search suppliers or restaurants…"
+                  value={tenantSearch}
+                  onChange={(e) => setTenantSearch(e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           {(() => {
             // Show only suppliers or restaurants based on initialTab
             const showSuppliersOnly = initialTab === 'suppliers'
             const showRestaurantsOnly = initialTab === 'restaurants'
+            const q = tenantSearch.trim().toLowerCase()
+            const filteredSuppliers =
+              suppliersData?.suppliers?.filter((s: { name?: string; contact_email?: string }) => {
+                if (!q) return true
+                return (
+                  (s.name || '').toLowerCase().includes(q) ||
+                  (s.contact_email || '').toLowerCase().includes(q)
+                )
+              }) ?? []
+            const filteredRestaurants =
+              restaurantsData?.restaurants?.filter(
+                (r: { name?: string; contact_email?: string }) => {
+                  if (!q) return true
+                  return (
+                    (r.name || '').toLowerCase().includes(q) ||
+                    (r.contact_email || '').toLowerCase().includes(q)
+                  )
+                }
+              ) ?? []
 
             return (
               <div className="space-y-6">
@@ -1690,9 +1927,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <div className="flex justify-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
-                      ) : !suppliersData?.suppliers || suppliersData.suppliers.length === 0 ? (
+                      ) : !filteredSuppliers.length ? (
                         <p className="text-center py-8 text-[var(--text-muted)]">
-                          No suppliers found
+                          {q ? 'No suppliers match your search' : 'No suppliers found'}
                         </p>
                       ) : (
                         <div className="overflow-x-auto">
@@ -1723,7 +1960,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                               </tr>
                             </thead>
                             <tbody>
-                              {suppliersData.suppliers.map((supplier: any) => (
+                              {filteredSuppliers.map((supplier: any) => (
                                 <tr
                                   key={supplier.id}
                                   className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
@@ -1739,7 +1976,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                     </div>
                                   </td>
                                   <td className="py-3 px-4">
-                                    <Badge variant="outline">{supplier.plan_name || 'Free'}</Badge>
+                                    <Badge variant="outline">
+                                      {formatPlanDisplayName(
+                                        (supplier as { plan_code?: string }).plan_code,
+                                        supplier.plan_name || 'Free Trial'
+                                      )}
+                                    </Badge>
                                   </td>
                                   <td className="py-3 px-4">
                                     <Badge
@@ -1859,10 +2101,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <div className="flex justify-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
-                      ) : !restaurantsData?.restaurants ||
-                        restaurantsData.restaurants.length === 0 ? (
+                      ) : !filteredRestaurants.length ? (
                         <p className="text-center py-8 text-[var(--text-muted)]">
-                          No restaurants found
+                          {q ? 'No restaurants match your search' : 'No restaurants found'}
                         </p>
                       ) : (
                         <div className="overflow-x-auto">
@@ -1890,7 +2131,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                               </tr>
                             </thead>
                             <tbody>
-                              {restaurantsData.restaurants.map((restaurant: any) => (
+                              {filteredRestaurants.map((restaurant: any) => (
                                 <tr
                                   key={restaurant.id}
                                   className="border-b border-[var(--app-border)] hover:bg-[var(--brand-ultra)]"
@@ -1907,7 +2148,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                   </td>
                                   <td className="py-3 px-4">
                                     <Badge variant="outline">
-                                      {restaurant.plan_name || 'Free'}
+                                      {formatPlanDisplayName(
+                                        (restaurant as { plan_code?: string }).plan_code,
+                                        restaurant.plan_name || 'Free Trial'
+                                      )}
                                     </Badge>
                                   </td>
                                   <td className="py-3 px-4">
@@ -2072,7 +2316,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           const limit =
                             s.plan_name === 'Free'
                               ? 50
-                              : s.plan_name === 'Bronze'
+                              : s.plan_name === 'Silver'
                                 ? 1000
                                 : s.plan_name === 'Platinum'
                                   ? 999999
@@ -2098,7 +2342,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       const limit =
                         supplier.plan_name === 'Free'
                           ? 50
-                          : supplier.plan_name === 'Bronze'
+                          : supplier.plan_name === 'Silver'
                             ? 1000
                             : supplier.plan_name === 'Platinum'
                               ? 999999
@@ -2202,7 +2446,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       const dailyLimit =
                         restaurant.plan_name === 'Free'
                           ? 10
-                          : restaurant.plan_name === 'Bronze'
+                          : restaurant.plan_name === 'Silver'
                             ? 100
                             : restaurant.plan_name === 'Gold'
                               ? 500
@@ -2282,7 +2526,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                           const limit =
                             s.plan_name === 'Free'
                               ? 50
-                              : s.plan_name === 'Bronze'
+                              : s.plan_name === 'Silver'
                                 ? 1000
                                 : s.plan_name === 'Platinum'
                                   ? 999999
@@ -2341,6 +2585,14 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           />
         </TabsContent>
 
+        <TabsContent value="deals">
+          <AdminDealsPanel />
+        </TabsContent>
+
+        <TabsContent value="limits">
+          <AdminLimitOverridesPanel />
+        </TabsContent>
+
         {/* ─── ACTIVITY FEED ──────────────────────────────────────────── */}
         <TabsContent value="activity">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
@@ -2361,7 +2613,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               >
                 <option value="all">All events</option>
                 <option value="order_placed">Order placed</option>
-                <option value="order_confirmed">Order confirmed</option>
+                <option value="order_confirmed">Order acknowledged</option>
+                <option value="order_completed">Order completed</option>
+                <option value="deal_activity">Promotion / deal</option>
                 <option value="cart_updated">Cart updated</option>
                 <option value="new_tenant">New registration</option>
                 <option value="plan_changed">Plan changed</option>
@@ -2384,19 +2638,49 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
             </div>
+          ) : activityError ? (
+            <Card className="p-6 border-red-200 bg-red-50/50">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-[var(--text)]">Activity feed unavailable</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    {(activityQueryError as { data?: { message?: string } })?.data?.message ||
+                      'The activity API request failed. This is not shown as an empty feed.'}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => refetchActivity()}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            </Card>
           ) : !activityData?.events?.length ? (
             <div className="text-center py-16 text-[var(--text-muted)]">
               <Activity className="h-10 w-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm font-medium">No activity yet</p>
-              <p className="text-xs mt-1">
-                Events will appear as orders are placed, tenants register, and plans change
+              <p className="text-sm font-medium">No matching activity</p>
+              <p className="text-xs mt-1 max-w-md mx-auto">
+                {activityType !== 'all'
+                  ? 'Try “All events” or another filter. The feed includes orders, registrations, plan changes, promotions, reservations, and admin subscription actions when present in the database.'
+                  : 'No platform events found yet. Create tenants, place orders, or change subscriptions to populate this feed.'}
               </p>
             </div>
           ) : (
             <>
+              {(activityData as { partial?: boolean; failedSources?: string[] }).partial && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+                  Some activity sources could not be loaded (
+                  {(activityData as { failedSources?: string[] }).failedSources?.join(', ')}).
+                  Showing partial results.
+                </p>
+              )}
               {/* Count */}
               <p className="text-xs text-[var(--text-muted)] mb-4">
-                {activityData.total ?? activityData.events.length} total events
+                {activityData.total ?? activityData.events.length} events in current window
               </p>
 
               <div className="relative">

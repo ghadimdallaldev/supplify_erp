@@ -1,6 +1,6 @@
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
-import { sendNotification } from './notification.service.js'
+import { notifyTenantUsers } from './notification.service.js'
 
 export const MUTABLE_ORDER_STATUSES = new Set([
   'PLACED',
@@ -134,45 +134,31 @@ export async function notifyAmendmentParty(order, amendment, action) {
 
   const message = amendment.description || 'An order amendment was updated.'
 
+  const payload = {
+    notificationType: 'ORDER',
+    notificationCategory: 'order_amendment',
+    title,
+    message,
+    referenceId: order.id,
+    referenceType: 'ORDER',
+    metadata: { orderId: order.id, amendmentId: amendment.id, action },
+  }
+
   if (isRestaurantRequest && supplierId) {
-    const { rows: users } = await query(
-      `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-      [supplierId]
-    )
-    for (const u of users) {
-      await sendNotification({
-        userId: u.id,
-        tenantId: supplierId,
-        tenantType: 'SUPPLIER',
-        category: 'orders',
-        title,
-        message,
-        metadata: { orderId: order.id, amendmentId: amendment.id, action },
-      })
-    }
+    await notifyTenantUsers({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+      ...payload,
+    })
     return
   }
 
   if (!isRestaurantRequest && restaurantId) {
-    const { rows: users } = await query(
-      `
-      SELECT u.id FROM app_user u
-      JOIN user_role ur ON ur.user_id = u.id AND ur.tenant_type = 'RESTAURANT' AND ur.tenant_id = $1
-      LIMIT 20
-      `,
-      [restaurantId]
-    )
-    for (const u of users) {
-      await sendNotification({
-        userId: u.id,
-        tenantId: restaurantId,
-        tenantType: 'RESTAURANT',
-        category: 'orders',
-        title,
-        message,
-        metadata: { orderId: order.id, amendmentId: amendment.id, action },
-      })
-    }
+    await notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      ...payload,
+    })
   }
 }
 

@@ -9,6 +9,7 @@ import {
   api,
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { multiBranchEnabled } from '../lib/planLimits'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 
 export interface LinkedAccountRecord {
@@ -41,7 +42,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const isSupplier = user?.role === 'SUPPLIER'
   const isRestaurant = user?.role === 'RESTAURANT'
   const { entitlements } = useEntitlements()
-  const multiBranchFeature = entitlements?.features?.multi_branch === true
+  const multiBranchFeature = multiBranchEnabled(entitlements)
 
   const {
     data: supplierOrgData,
@@ -58,16 +59,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   } = useGetRestaurantOrgBranchesQuery(undefined, { skip: !isRestaurant })
 
   const useSupplierOrgBranches =
-    isSupplier &&
-    !supplierOrgError &&
-    Boolean(supplierOrgData?.organizationId) &&
-    (supplierOrgData?.branches?.length ?? 0) > 0
+    isSupplier && !supplierOrgError && Boolean(supplierOrgData?.organizationId)
 
   const useRestaurantOrgBranches =
-    isRestaurant &&
-    !restaurantOrgError &&
-    Boolean(restaurantOrgData?.organizationId) &&
-    (restaurantOrgData?.branches?.length ?? 0) > 0
+    isRestaurant && !restaurantOrgError && Boolean(restaurantOrgData?.organizationId)
 
   const useOrgBranches = useSupplierOrgBranches || useRestaurantOrgBranches
 

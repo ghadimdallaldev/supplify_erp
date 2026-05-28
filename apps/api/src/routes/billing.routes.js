@@ -1,6 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext, getRequestTenant } from '../lib/rbac.js'
+import { billingAccessGuard } from '../lib/route-permissions.js'
 import { logger } from '../lib/logger.js'
 import {
   getBillingStatus,
@@ -11,12 +12,18 @@ import {
   payOpenInvoices,
   setAutoRenew,
 } from '../lib/billing/billing-service.js'
+import { invalidateTenantSubscriptionCache } from '../lib/subscription.js'
 import { listBillingGateways } from '../lib/billing/gateway-registry.js'
 import { writeAuditLog } from '../lib/audit.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
+  billingAccessGuard
+)
 
 const cardSchema = z.object({
   number: z.string().min(13).max(19).optional(),
@@ -225,6 +232,7 @@ router.post('/checkout', async (req, res) => {
       tenant_id: tenant.tenantId,
       payload_json: { planId: body.planId, billingCycle: body.billingCycle },
     })
+    invalidateTenantSubscriptionCache(tenant.tenantId, tenant.tenantType).catch(() => {})
     res.json({ ok: true, data: result, error: null, requestId: req.requestId })
   } catch (error) {
     if (error.name === 'ZodError') {
@@ -294,6 +302,7 @@ router.post('/pay-now', async (req, res) => {
       tenant_type: tenant.tenantType,
       tenant_id: tenant.tenantId,
     })
+    invalidateTenantSubscriptionCache(tenant.tenantId, tenant.tenantType).catch(() => {})
     res.json({ ok: true, data: result, error: null, requestId: req.requestId })
   } catch (error) {
     if (error.name === 'ZodError') {

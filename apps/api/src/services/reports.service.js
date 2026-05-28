@@ -3,9 +3,21 @@ import { ValidationError } from '../middlewares/errorHandler.js'
 
 const GRANULARITIES = ['day', 'week', 'month']
 
+function startOfDay(d) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+
+function endOfDay(d) {
+  const x = new Date(d)
+  x.setHours(23, 59, 59, 999)
+  return x
+}
+
 export function parseReportQuery(query = {}) {
-  const from = query.from ? new Date(query.from) : defaultFrom()
-  const to = query.to ? new Date(query.to) : new Date()
+  const from = query.from ? startOfDay(new Date(query.from)) : startOfDay(defaultFrom())
+  const to = query.to ? endOfDay(new Date(query.to)) : endOfDay(new Date())
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
     throw new ValidationError('Invalid from or to date')
   }

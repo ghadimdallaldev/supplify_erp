@@ -47,6 +47,7 @@ const BLOCKED_KEY = 'supplify_monetization_blocked'
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 /** Voluntary "compare plans" opens — not real plan blocks */
 const IGNORED_FEATURE_KEYS = new Set(['upgrade_prompt'])
+const IGNORED_LIMIT_KEYS = new Set(['scheduled_order_grace_per_day'])
 
 const emptySummary = (): RecentBlockedSummary => ({
   limitKeys: [],
@@ -87,7 +88,9 @@ function summarizeBlocked(events: BlockedEvent[]): {
   const recent = events.filter((e) => now - e.at < WINDOW_MS)
 
   const trackable = recent.filter(
-    (e) => e.limitKey || (e.featureKey && !IGNORED_FEATURE_KEYS.has(e.featureKey))
+    (e) =>
+      (e.limitKey && !IGNORED_LIMIT_KEYS.has(e.limitKey)) ||
+      (e.featureKey && !IGNORED_FEATURE_KEYS.has(e.featureKey))
   )
 
   const limitCounts = new Map<string, number>()

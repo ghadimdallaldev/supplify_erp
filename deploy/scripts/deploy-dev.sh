@@ -75,8 +75,12 @@ sed -i \
   -e "s|^FRONTEND_IMAGE=.*|FRONTEND_IMAGE=${FRONTEND_IMAGE}|" \
   "$ENV_FILE"
 
+apply_vapid_env "$ENV_FILE"
+apply_minio_public_url "$ENV_FILE"
+
 # Load env for use in this script
 set -a
+# shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
 
@@ -117,13 +121,13 @@ wait_healthy "supplify-dev-minio"    60 3
 echo ""
 echo "▶ Phase 5: Initialising MinIO, Keycloak, and running migrations"
 
-echo "  Running minio-init..."
+echo "  Running minio-init (buckets: ${S3_BUCKETS:-${S3_BUCKET:-supplify}})..."
 "${COMPOSE_CMD[@]}" run --rm minio-init
 
 echo "  Running keycloak-init (this can take 2–3 minutes on first boot)..."
 "${COMPOSE_CMD[@]}" run --rm keycloak-init
 
-echo "  Running database migrations (54 SQL files + runtime migrators)..."
+echo "  Running database migrations, tenant role backfill, and RBAC system role sync..."
 "${COMPOSE_CMD[@]}" run --rm migrate
 
 # ── Phase 6: Start application ───────────────────────────────────────────────

@@ -11,13 +11,18 @@ export const RESTAURANT_FEATURE_KEYS = [
   'quick_lists',
   'inventory_management',
   'waste_tracking',
-  'approvals_budgets',
   'advanced_roles',
   'notifications',
   'api_integrations',
   'support_sla',
   'custom_branding',
   'feature_flags_access',
+  'supplier_reviews',
+  'push_notifications',
+  'order_amendments',
+  'tenant_audit_log',
+  'waitlist_auto_promo',
+  'supplier_deals',
 ]
 
 export const SUPPLIER_FEATURE_KEYS = [
@@ -39,6 +44,10 @@ export const SUPPLIER_FEATURE_KEYS = [
   'support_sla',
   'custom_branding',
   'feature_flags_access',
+  'promotions',
+  'push_notifications',
+  'order_amendments',
+  'tenant_audit_log',
 ]
 
 export const ALL_FEATURE_KEYS = [...new Set([...RESTAURANT_FEATURE_KEYS, ...SUPPLIER_FEATURE_KEYS])]
@@ -63,7 +72,6 @@ const DISPLAY_NAMES = {
   quick_lists: 'Quick lists',
   inventory_management: 'Inventory management',
   waste_tracking: 'Waste tracking',
-  approvals_budgets: 'Approvals & budgets',
   advanced_roles: 'Advanced roles',
   notifications: 'Notifications',
   api_integrations: 'API integrations',
@@ -75,6 +83,13 @@ const DISPLAY_NAMES = {
   warehouses: 'Warehouses',
   multi_warehouse: 'Multi-warehouse fulfillment',
   feature_flags_access: 'Feature flag admin',
+  supplier_reviews: 'Supplier Reviews',
+  promotions: 'Promotions & Deals',
+  push_notifications: 'Push Notifications',
+  order_amendments: 'Order Amendments',
+  tenant_audit_log: 'Activity Log',
+  waitlist_auto_promo: 'Waitlist Auto-Promotion',
+  supplier_deals: 'Supplier deals',
 }
 
 export function featureDisplayName(featureKey) {

@@ -2,10 +2,68 @@ import { query, withTransaction } from '../lib/db.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
-import { sendNotification } from './notification.service.js'
+import { notifyDisputeOpened, notifyDisputeResolved } from './notification.service.js'
+import { DELIVERED_ORDER_STATUSES } from './reviews.service.js'
+import {
+  createReplacementOrderFromDispute,
+  NO_REPLACEMENT_LINES_MESSAGE,
+} from '../lib/dispute-replacement-order.js'
 
 const ACTIVE_STATUSES = ['open', 'under_review', 'escalated']
-const DELIVERED_ORDER_STATUSES = ['COMPLETED']
+
+const RECEIVED_STATUSES_FOR_DISPUTE_FLAG = [
+  'RECEIVED_PARTIAL',
+  'RECEIVED_FULL',
+  'DELIVERED',
+  'COMPLETED',
+]
+
+async function setOrderReceivedWithDispute(client, orderId) {
+  await client.query(
+    `
+    UPDATE customer_order
+    SET status = 'RECEIVED_WITH_DISPUTE', updated_at = now()
+    WHERE id = $1
+      AND status::text = ANY($2::text[])
+    `,
+    [orderId, RECEIVED_STATUSES_FOR_DISPUTE_FLAG]
+  )
+}
+
+async function restoreOrderStatusAfterDisputeClosed(client, orderId) {
+  const { rows: orderRows } = await client.query(
+    `SELECT status FROM customer_order WHERE id = $1`,
+    [orderId]
+  )
+  if (orderRows[0]?.status !== 'RECEIVED_WITH_DISPUTE') return
+
+  const { rows: agg } = await client.query(
+    `
+    SELECT
+      COALESCE(SUM(rli.received_quantity), 0)::float8 AS received,
+      COALESCE(SUM(rli.ordered_quantity), 0)::float8 AS ordered
+    FROM receiving_report rr
+    INNER JOIN receiving_line_item rli ON rli.receiving_report_id = rr.id
+    WHERE rr.order_id = $1
+      AND rr.id = (
+        SELECT id FROM receiving_report
+        WHERE order_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+      )
+    `,
+    [orderId]
+  )
+
+  const received = Number(agg[0]?.received ?? 0)
+  const ordered = Number(agg[0]?.ordered ?? 0)
+  const nextStatus = ordered > 0 && received < ordered ? 'RECEIVED_PARTIAL' : 'RECEIVED_FULL'
+
+  await client.query(`UPDATE customer_order SET status = $2, updated_at = now() WHERE id = $1`, [
+    orderId,
+    nextStatus,
+  ])
+}
 
 function mapDisputeRow(row) {
   if (!row) return null
@@ -29,6 +87,7 @@ function mapDisputeRow(row) {
     restaurantName: row.restaurant_name,
     supplierName: row.supplier_name,
     orderStatus: row.order_status,
+    replacementOrderId: row.replacement_order_id,
   }
 }
 
@@ -72,65 +131,26 @@ async function loadDisputeDetail(disputeId, { restaurantId, supplierId } = {}) {
     [disputeId]
   )
 
+  let replacementOrder = null
+  if (dispute.replacementOrderId) {
+    const { rows: replacementRows } = await query(
+      `
+      SELECT id, status, placement_source, source_order_id, source_dispute_id, created_at, total_amount
+      FROM customer_order
+      WHERE id = $1
+      `,
+      [dispute.replacementOrderId]
+    )
+    replacementOrder = replacementRows[0] || null
+  }
+
   return {
     dispute,
     items,
     attachments,
     creditNotes,
+    replacementOrder,
   }
-}
-
-async function getSupplierUserId(supplierId) {
-  const { rows } = await query(
-    `SELECT u.id FROM app_user u JOIN supplier s ON s.contact_email = u.email WHERE s.id = $1`,
-    [supplierId]
-  )
-  return rows[0]?.id || null
-}
-
-async function getRestaurantUserId(restaurantId) {
-  const { rows } = await query(
-    `SELECT u.id FROM app_user u JOIN restaurant r ON r.contact_email = u.email WHERE r.id = $1`,
-    [restaurantId]
-  )
-  return rows[0]?.id || null
-}
-
-async function notifyDisputeOpened(dispute) {
-  const userId = await getSupplierUserId(dispute.supplierId)
-  if (!userId) return
-  await sendNotification({
-    userId,
-    userType: 'SUPPLIER',
-    notificationType: 'DISPUTE',
-    notificationCategory: 'dispute_opened',
-    title: 'New dispute opened',
-    message: `A restaurant opened a dispute on order #${dispute.orderId.slice(0, 8)}`,
-    referenceId: dispute.id,
-    referenceType: 'DISPUTE',
-    metadata: { disputeId: dispute.id, orderId: dispute.orderId, type: dispute.type },
-  }).catch((err) => logger.error('notifyDisputeOpened failed', { err: err.message }))
-}
-
-async function notifyDisputeResolved(dispute, outcome) {
-  const userId = await getRestaurantUserId(dispute.restaurantId)
-  if (!userId) return
-  const title = outcome === 'rejected' ? 'Dispute rejected' : 'Dispute resolved'
-  const message =
-    outcome === 'rejected'
-      ? `Your dispute was rejected. ${dispute.resolutionNotes || ''}`.trim()
-      : `Your dispute was resolved (${dispute.resolutionType || 'closed'}).`
-  await sendNotification({
-    userId,
-    userType: 'RESTAURANT',
-    notificationType: 'DISPUTE',
-    notificationCategory: outcome === 'rejected' ? 'dispute_rejected' : 'dispute_resolved',
-    title,
-    message,
-    referenceId: dispute.id,
-    referenceType: 'DISPUTE',
-    metadata: { disputeId: dispute.id, resolutionType: dispute.resolutionType },
-  }).catch((err) => logger.error('notifyDisputeResolved failed', { err: err.message }))
 }
 
 async function generateCreditNoteNumber(client) {
@@ -170,7 +190,9 @@ export async function createDispute({
   )
   if (!orders.length) throw new NotFoundError('Order not found')
   if (!DELIVERED_ORDER_STATUSES.includes(orders[0].status)) {
-    throw new ValidationError('Disputes can only be opened on delivered (completed) orders')
+    throw new ValidationError(
+      'Disputes can only be opened after delivery (status must be delivered, received, invoiced, or completed)'
+    )
   }
 
   const { rows: supplierCheck } = await query(
@@ -249,6 +271,8 @@ export async function createDispute({
         [dispute.id, att.fileKey, att.fileName || null, userId]
       )
     }
+
+    await setOrderReceivedWithDispute(client, orderId)
 
     return dispute
   })
@@ -342,9 +366,16 @@ export async function cancelDispute(disputeId, restaurantId) {
     throw new ValidationError('Only open disputes can be cancelled')
   }
 
-  await query(`UPDATE disputes SET status = 'cancelled', updated_at = NOW() WHERE id = $1`, [
-    disputeId,
-  ])
+  const orderId = rows[0].order_id
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `UPDATE disputes SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+      [disputeId]
+    )
+    await restoreOrderStatusAfterDisputeClosed(client, orderId)
+  })
+
   return loadDisputeDetail(disputeId, { restaurantId })
 }
 
@@ -378,18 +409,23 @@ export async function rejectDispute(disputeId, supplierId, resolutionNotes) {
     throw new ValidationError('Dispute is already closed')
   }
 
-  await query(
-    `
-    UPDATE disputes
-    SET status = 'rejected',
-        resolution_type = 'no_action',
-        resolution_notes = $2,
-        resolved_at = NOW(),
-        updated_at = NOW()
-    WHERE id = $1
-    `,
-    [disputeId, resolutionNotes]
-  )
+  const orderId = rows[0].order_id
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `
+      UPDATE disputes
+      SET status = 'rejected',
+          resolution_type = 'no_action',
+          resolution_notes = $2,
+          resolved_at = NOW(),
+          updated_at = NOW()
+      WHERE id = $1
+      `,
+      [disputeId, resolutionNotes]
+    )
+    await restoreOrderStatusAfterDisputeClosed(client, orderId)
+  })
 
   const detail = await loadDisputeDetail(disputeId, { supplierId })
   await notifyDisputeResolved({ ...detail.dispute, resolutionNotes }, 'rejected')
@@ -429,7 +465,33 @@ export async function resolveDispute(
     }
   }
 
+  if (resolutionType === 'replacement' && disputeRow.replacement_order_id) {
+    throw new ValidationError('A replacement order already exists for this dispute')
+  }
+
+  let replacementOrderId = null
+
   await withTransaction(async (client) => {
+    if (resolutionType === 'replacement') {
+      const { rows: disputeItems } = await client.query(
+        `SELECT * FROM dispute_items WHERE dispute_id = $1 ORDER BY created_at`,
+        [disputeId]
+      )
+      const { rows: originalOrders } = await client.query(
+        `SELECT * FROM customer_order WHERE id = $1`,
+        [disputeRow.order_id]
+      )
+      if (!originalOrders.length) {
+        throw new ValidationError('Original order not found for replacement')
+      }
+
+      replacementOrderId = await createReplacementOrderFromDispute(client, {
+        disputeRow,
+        disputeItems,
+        originalOrder: originalOrders[0],
+      })
+    }
+
     await client.query(
       `
       UPDATE disputes
@@ -471,6 +533,8 @@ export async function resolveDispute(
         ]
       )
     }
+
+    await restoreOrderStatusAfterDisputeClosed(client, disputeRow.order_id)
   })
 
   const detail = await loadDisputeDetail(disputeId, { supplierId })
@@ -482,9 +546,13 @@ export async function resolveDispute(
     detail.creditNote = rows[0] || null
   }
 
-  await notifyDisputeResolved(detail.dispute, 'resolved')
+  await notifyDisputeResolved(detail.dispute, 'resolved', {
+    replacementOrderId: replacementOrderId || detail.dispute.replacementOrderId || null,
+  })
   return detail
 }
+
+export { NO_REPLACEMENT_LINES_MESSAGE }
 
 export async function listCreditNotesForTenant(tenantId, tenantType) {
   const column = tenantType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id'

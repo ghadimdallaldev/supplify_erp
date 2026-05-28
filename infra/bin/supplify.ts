@@ -15,8 +15,6 @@ const app = new cdk.App()
 const AWS_ACCOUNT_ID = process.env.AWS_ACCOUNT_ID || process.env.CDK_DEFAULT_ACCOUNT || ''
 const AWS_REGION = process.env.AWS_REGION || process.env.CDK_DEFAULT_REGION || 'me-south-1'
 const PROJECT_NAME = 'Supplify'
-const GITHUB_REPO = process.env.GITHUB_REPO || 'ghadimdallaldev/supplify_erp'
-
 // Environment configurations
 const ENVIRONMENTS = {
   dev: {
@@ -53,15 +51,12 @@ const awsEnv = {
 const resourceName = (baseName: string) => `${baseName}-${envName}`
 
 // IAM Stack (must be created first for roles)
-// This creates:
-// - OIDC Provider for GitHub Actions (if it doesn't exist - shared across environments)
-// - Deploy Role for GitHub Actions (per environment)
+// - Deploy Role for CDK CLI / pipeline (per environment)
 // - AI Access Role for Cursor AI (per environment)
 const iamStack = new IAMStack(app, `${PROJECT_NAME}-IAMStack-${envName}`, {
   env: awsEnv,
   environment: envName,
   projectName: PROJECT_NAME,
-  githubRepo: GITHUB_REPO,
 })
 
 // VPC Stack

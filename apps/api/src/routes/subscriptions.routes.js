@@ -6,6 +6,7 @@ import {
   resolveTenantContext,
   requirePermission,
 } from '../lib/rbac.js'
+import { subscriptionRouteGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import {
@@ -22,8 +23,8 @@ import {
 
 const router = express.Router()
 
-// Auth + tenant context for all subscription routes (permission only on sensitive endpoints)
-router.use(requireAuth, resolveTenantContext)
+// Auth + tenant context; billing permissions on plans/usage (entitlements/current stay open)
+router.use(requireAuth, resolveTenantContext, subscriptionRouteGuard)
 
 /**
  * Get canonical entitlements (plan, limits with overrides, features, usage snapshot).
@@ -65,16 +66,24 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
               users: 1,
               orders_per_day: 3,
               suppliers_per_restaurant: 1,
-              restaurant_inventory_skus: 15,
+              restaurant_inventory_skus: 10,
               chats_per_day: 3,
               storage_mb: 50,
+              quick_lists: 1,
+              quick_list_items: 1,
+              scheduled_quick_lists: 1,
+              scheduled_order_grace_per_day: 1,
+              open_conversations: 1,
             }
           : {
               warehouses: 0,
               users: 1,
-              supplier_products_skus: 15,
+              supplier_products_skus: 10,
               chats_per_day: 3,
               storage_mb: 50,
+              branches: 1,
+              promotions: 1,
+              open_conversations: 1,
             }
       const defaultLimits = Object.fromEntries(limitKeys.map((k) => [k, freeDefaults[k] ?? 0]))
       const planFeat = {

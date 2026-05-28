@@ -6,13 +6,43 @@ import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { useNavigate } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
-import { 
-  Building2, Mail, Phone, MapPin, FileText, Search, Pin, BarChart3, ShoppingCart, 
-  TrendingUp, DollarSign, Grid3x3, List, Filter, Calendar, Award, MessageCircle,
-  Users, Store, Clock, Sparkles, ArrowUpDown, Package
+import {
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  FileText,
+  Search,
+  Pin,
+  BarChart3,
+  ShoppingCart,
+  TrendingUp,
+  DollarSign,
+  Grid3x3,
+  List,
+  Filter,
+  Calendar,
+  Award,
+  MessageCircle,
+  Users,
+  Store,
+  Clock,
+  Sparkles,
+  ArrowUpDown,
+  Package,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatPrice } from '../utils/format'
+import {
+  CardActionGrid,
+  CardStatusBadges,
+  cardActionBtnClass,
+  cardShellClass,
+  CardAddressBlock,
+  CardFooterMeta,
+  formatAddressLine,
+  pageHeaderRowClass,
+} from '../components/ui/card-layout'
 
 export function RestaurantsPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -23,86 +53,101 @@ export function RestaurantsPage() {
   const [sortBy, setSortBy] = useState<'name' | 'orders' | 'revenue' | 'recent'>('name')
   const [filterBy, setFilterBy] = useState<'all' | 'active' | 'new'>('all')
   const isSupplier = user?.role === 'SUPPLIER'
-  
+
   // Get supplier info to filter orders
   const { data: supplierData } = useGetSupplierMeQuery(undefined, { skip: !isSupplier })
   const supplierId = supplierData?.supplier?.id
-  
+
   // Get orders to find restaurants (filter by supplier if supplier)
-  const { data: ordersData } = useGetOrdersQuery({
-    limit: 1000,
-    offset: 0,
-  }, { skip: !isSupplier })
-  
+  const { data: ordersData } = useGetOrdersQuery(
+    {
+      limit: 1000,
+      offset: 0,
+    },
+    { skip: !isSupplier }
+  )
+
   // Get all restaurants
-  const { data: restaurantsData, isLoading, error } = useGetRestaurantsQuery({
+  const {
+    data: restaurantsData,
+    isLoading,
+    error,
+  } = useGetRestaurantsQuery({
     limit: 1000,
     offset: 0,
   })
 
   // Supplier view: Show restaurants that purchased from this supplier
   const restaurantsWithOrders = useMemo(() => {
-    if (!isSupplier || !ordersData?.orders || !restaurantsData?.restaurants || !supplierId) return []
-    
+    if (!isSupplier || !ordersData?.orders || !restaurantsData?.restaurants || !supplierId)
+      return []
+
     // Filter orders to only include those with items from this supplier
-    const supplierOrders = ordersData.orders.filter(order => {
+    const supplierOrders = ordersData.orders.filter((order) => {
       return order.items?.some((item: any) => item.supplier_id === supplierId)
     })
-    
+
     // Get unique restaurant IDs from supplier orders
     const restaurantIds = new Set(
-      supplierOrders
-        .filter(order => order.restaurant_id)
-        .map(order => order.restaurant_id)
+      supplierOrders.filter((order) => order.restaurant_id).map((order) => order.restaurant_id)
     )
-    
+
     // Get restaurant details and order statistics
-    return Array.from(restaurantIds).map(restaurantId => {
-      const restaurant = restaurantsData.restaurants.find(r => r.id === restaurantId)
-      if (!restaurant) return null
-      
-      // Filter restaurant orders to only include orders with items from this supplier
-      const restaurantOrders = supplierOrders.filter(
-        order => order.restaurant_id === restaurantId
-      )
-      
-      const totalOrders = restaurantOrders.length
-      const totalSpent = restaurantOrders.reduce((sum, order) => {
-        // Only sum items from this supplier
-        const supplierItemsTotal = order.items
-          ?.filter((item: any) => item.supplier_id === supplierId)
-          .reduce((itemSum: number, item: any) => itemSum + (item.line_total || 0), 0) || 0
-        return sum + supplierItemsTotal
-      }, 0)
-      
-      const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
-      
-      const latestOrder = restaurantOrders.sort((a, b) => 
-        new Date(b.placed_at || b.created_at).getTime() - new Date(a.placed_at || a.created_at).getTime()
-      )[0]
-      
-      // Get most purchased products from this supplier
-      const productCount = new Map()
-      restaurantOrders.forEach(order => {
-        order.items
-          ?.filter((item: any) => item.supplier_id === supplierId)
-          .forEach((item: any) => {
-            productCount.set(item.product_id, (productCount.get(item.product_id) || 0) + item.quantity)
-          })
+    return Array.from(restaurantIds)
+      .map((restaurantId) => {
+        const restaurant = restaurantsData.restaurants.find((r) => r.id === restaurantId)
+        if (!restaurant) return null
+
+        // Filter restaurant orders to only include orders with items from this supplier
+        const restaurantOrders = supplierOrders.filter(
+          (order) => order.restaurant_id === restaurantId
+        )
+
+        const totalOrders = restaurantOrders.length
+        const totalSpent = restaurantOrders.reduce((sum, order) => {
+          // Only sum items from this supplier
+          const supplierItemsTotal =
+            order.items
+              ?.filter((item: any) => item.supplier_id === supplierId)
+              .reduce((itemSum: number, item: any) => itemSum + (item.line_total || 0), 0) || 0
+          return sum + supplierItemsTotal
+        }, 0)
+
+        const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
+
+        const latestOrder = restaurantOrders.sort(
+          (a, b) =>
+            new Date(b.placed_at || b.created_at).getTime() -
+            new Date(a.placed_at || a.created_at).getTime()
+        )[0]
+
+        // Get most purchased products from this supplier
+        const productCount = new Map()
+        restaurantOrders.forEach((order) => {
+          order.items
+            ?.filter((item: any) => item.supplier_id === supplierId)
+            .forEach((item: any) => {
+              productCount.set(
+                item.product_id,
+                (productCount.get(item.product_id) || 0) + item.quantity
+              )
+            })
+        })
+
+        const mostPurchasedProduct = Array.from(productCount.entries()).sort(
+          (a, b) => b[1] - a[1]
+        )[0]
+
+        return {
+          ...restaurant,
+          totalOrders,
+          totalSpent,
+          averageOrderValue,
+          latestOrder,
+          mostPurchasedProduct,
+        }
       })
-      
-      const mostPurchasedProduct = Array.from(productCount.entries())
-        .sort((a, b) => b[1] - a[1])[0]
-      
-      return {
-        ...restaurant,
-        totalOrders,
-        totalSpent,
-        averageOrderValue,
-        latestOrder,
-        mostPurchasedProduct,
-      }
-    }).filter(Boolean)
+      .filter(Boolean)
   }, [ordersData, restaurantsData, supplierId, isSupplier])
 
   // Filter and sort restaurants
@@ -114,8 +159,10 @@ export function RestaurantsPage() {
       // Active = ordered in last 30 days
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      restaurants = restaurants.filter((r: any) => 
-        r.latestOrder && new Date(r.latestOrder.placed_at || r.latestOrder.created_at) > thirtyDaysAgo
+      restaurants = restaurants.filter(
+        (r: any) =>
+          r.latestOrder &&
+          new Date(r.latestOrder.placed_at || r.latestOrder.created_at) > thirtyDaysAgo
       )
     } else if (filterBy === 'new') {
       // New = restaurant joined in last 30 days
@@ -127,19 +174,20 @@ export function RestaurantsPage() {
     // Search filter
     if (search.trim()) {
       const searchLower = search.toLowerCase()
-      restaurants = restaurants.filter((r: any) => 
-        r.name?.toLowerCase().includes(searchLower) ||
-        r.contact_email?.toLowerCase().includes(searchLower) ||
-        r.slug?.toLowerCase().includes(searchLower) ||
-        r.address_json?.city?.toLowerCase().includes(searchLower) ||
-        r.address_json?.country?.toLowerCase().includes(searchLower)
+      restaurants = restaurants.filter(
+        (r: any) =>
+          r.name?.toLowerCase().includes(searchLower) ||
+          r.contact_email?.toLowerCase().includes(searchLower) ||
+          r.slug?.toLowerCase().includes(searchLower) ||
+          r.address_json?.city?.toLowerCase().includes(searchLower) ||
+          r.address_json?.country?.toLowerCase().includes(searchLower)
       )
     }
 
     // City filter
     if (cityFilter.trim()) {
       const cityLower = cityFilter.toLowerCase()
-      restaurants = restaurants.filter((r: any) => 
+      restaurants = restaurants.filter((r: any) =>
         r.address_json?.city?.toLowerCase().includes(cityLower)
       )
     }
@@ -154,8 +202,12 @@ export function RestaurantsPage() {
         case 'revenue':
           return (b.totalSpent || 0) - (a.totalSpent || 0)
         case 'recent': {
-          const aDate = a.latestOrder ? new Date(a.latestOrder.placed_at || a.latestOrder.created_at).getTime() : 0
-          const bDate = b.latestOrder ? new Date(b.latestOrder.placed_at || b.latestOrder.created_at).getTime() : 0
+          const aDate = a.latestOrder
+            ? new Date(a.latestOrder.placed_at || a.latestOrder.created_at).getTime()
+            : 0
+          const bDate = b.latestOrder
+            ? new Date(b.latestOrder.placed_at || b.latestOrder.created_at).getTime()
+            : 0
           return bDate - aDate
         }
         default:
@@ -174,11 +226,12 @@ export function RestaurantsPage() {
       return sum + (isNaN(spent) ? 0 : spent)
     }, 0)
     const totalOrders = restaurants.reduce((sum: number, r: any) => {
-      const orders = typeof r.totalOrders === 'number' ? r.totalOrders : parseInt(r.totalOrders || 0)
+      const orders =
+        typeof r.totalOrders === 'number' ? r.totalOrders : parseInt(r.totalOrders || 0)
       return sum + (isNaN(orders) ? 0 : orders)
     }, 0)
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
-    
+
     return {
       total: restaurants.length,
       totalOrders,
@@ -209,53 +262,46 @@ export function RestaurantsPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Restaurants</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            Manage restaurants in the marketplace
-          </p>
+          <p className="text-[var(--text-muted)] mt-2">Manage restaurants in the marketplace</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {restaurantsData?.restaurants.map((restaurant) => (
-            <Card key={restaurant.id}>
+            <Card key={restaurant.id} className={cardShellClass}>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Building2 className="h-5 w-5" />
-                  <span>{restaurant.name}</span>
+                <CardTitle className="flex items-center gap-2 min-w-0">
+                  <Building2 className="h-5 w-5 shrink-0" />
+                  <span className="truncate">{restaurant.name}</span>
                 </CardTitle>
-                <CardDescription>
-                  {restaurant.slug}
-                </CardDescription>
+                <CardDescription className="truncate">{restaurant.slug}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Mail className="h-4 w-4 text-[var(--text-muted)]" />
-                    <span>{restaurant.contact_email}</span>
-                  </div>
+                <div className="space-y-2 text-sm min-w-0">
+                  {restaurant.contact_email && (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Mail className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+                      <span className="truncate">{restaurant.contact_email}</span>
+                    </div>
+                  )}
                   {restaurant.phone && (
-                    <div className="flex items-center space-x-2">
-                      <Phone className="h-4 w-4 text-[var(--text-muted)]" />
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                       <span>{restaurant.phone}</span>
                     </div>
                   )}
-                  {restaurant.address_json && (
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-[var(--text-muted)]" />
-                      <span>
-                        {restaurant.address_json.city}, {restaurant.address_json.country}
-                      </span>
-                    </div>
-                  )}
+                  <CardAddressBlock address={restaurant.address_json} icon={MapPin} />
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline">
-                    {restaurant.trade_license_no ? `License: ${restaurant.trade_license_no}` : 'No License'}
-                  </Badge>
-                  <span className="text-xs text-[var(--text-muted)]">
-                    Joined {new Date(restaurant.created_at).toLocaleDateString()}
-                  </span>
-                </div>
+
+                <CardFooterMeta
+                  left={
+                    <Badge variant="outline" className="max-w-full truncate">
+                      {restaurant.trade_license_no
+                        ? `License: ${restaurant.trade_license_no}`
+                        : 'No License'}
+                    </Badge>
+                  }
+                  right={<>Joined {new Date(restaurant.created_at).toLocaleDateString()}</>}
+                />
               </CardContent>
             </Card>
           ))}
@@ -290,29 +336,29 @@ export function RestaurantsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className={pageHeaderRowClass}>
+        <div className="min-w-0">
           <h1 className="text-[21px] font-black text-[var(--text)]">My Restaurants</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            Restaurants that purchase from you
-          </p>
+          <p className="text-[var(--text-muted)] mt-2">Restaurants that purchase from you</p>
         </div>
         {isSupplier && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 shrink-0">
             <Button
               variant={viewMode === 'grid' ? 'default' : 'outline'}
               size="sm"
+              className="whitespace-normal"
               onClick={() => setViewMode('grid')}
             >
-              <Grid3x3 className="h-4 w-4 mr-1" />
+              <Grid3x3 className="h-4 w-4 mr-1 shrink-0" />
               Grid
             </Button>
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="sm"
+              className="whitespace-normal"
               onClick={() => setViewMode('list')}
             >
-              <List className="h-4 w-4 mr-1" />
+              <List className="h-4 w-4 mr-1 shrink-0" />
               List
             </Button>
           </div>
@@ -321,7 +367,7 @@ export function RestaurantsPage() {
 
       {/* Statistics Cards */}
       {isSupplier && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -349,7 +395,9 @@ export function RestaurantsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-[var(--text-muted)]">Total Revenue</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{formatCurrency(stats.totalRevenue, { maximumFractionDigits: 0 })}</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">
+                    {formatCurrency(stats.totalRevenue, { maximumFractionDigits: 0 })}
+                  </p>
                 </div>
                 <DollarSign className="h-8 w-8 text-[var(--brand-mid)]" />
               </div>
@@ -360,7 +408,9 @@ export function RestaurantsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-[var(--text-muted)]">Avg Order Value</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{formatCurrency(stats.avgOrderValue, { maximumFractionDigits: 0 })}</p>
+                  <p className="text-2xl font-bold text-[var(--text)]">
+                    {formatCurrency(stats.avgOrderValue, { maximumFractionDigits: 0 })}
+                  </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-[var(--amber-mid)]" />
               </div>
@@ -437,7 +487,9 @@ export function RestaurantsPage() {
           <CardContent className="py-12">
             <div className="text-center">
               <Building2 className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No restaurants found</h3>
+              <h3 className="text-lg font-semibold text-[var(--text)] mb-2">
+                No restaurants found
+              </h3>
               <p className="text-[var(--text-muted)] mb-4">
                 {search || cityFilter || filterBy !== 'all'
                   ? 'Try adjusting your search or filters'
@@ -460,246 +512,280 @@ export function RestaurantsPage() {
           </CardContent>
         </Card>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedRestaurants.map((restaurant: any) => (
-            <Card key={restaurant.id} className="hover:shadow-lg transition-all duration-200 relative group">
-              {/* Active/New Badge */}
-              {(() => {
-                const thirtyDaysAgo = new Date()
-                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-                const isActive = restaurant.latestOrder && new Date(restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at) > thirtyDaysAgo
-                const isNew = new Date(restaurant.created_at) > thirtyDaysAgo
-                
-                if (isActive || isNew) {
-                  return (
-                    <div className="absolute top-3 right-3 z-10">
-                      {isActive && (
-                        <Badge className="bg-[var(--mint)] text-white">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Active
-                        </Badge>
-                      )}
-                      {isNew && (
-                        <Badge className="bg-[var(--brand)] text-white ml-1">
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          New
-                        </Badge>
-                      )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+          {filteredAndSortedRestaurants.map((restaurant: any) => {
+            const locationLine = formatAddressLine(restaurant.address_json)
+            const thirtyDaysAgo = new Date()
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+            const isActive =
+              restaurant.latestOrder &&
+              new Date(restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at) >
+                thirtyDaysAgo
+            const isNew = new Date(restaurant.created_at) > thirtyDaysAgo
+            return (
+              <Card
+                key={restaurant.id}
+                className={`${cardShellClass} hover:shadow-lg transition-all duration-200 group`}
+              >
+                <CardHeader className="pb-3 space-y-2">
+                  <CardStatusBadges>
+                    {isActive && (
+                      <Badge className="bg-[var(--mint)] text-white flex items-center gap-1">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        Active
+                      </Badge>
+                    )}
+                    {isNew && (
+                      <Badge className="bg-[var(--brand)] text-white flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 shrink-0" />
+                        New
+                      </Badge>
+                    )}
+                  </CardStatusBadges>
+                  <div className="flex items-start gap-3 min-w-0">
+                    {restaurant.logo_url ? (
+                      <img
+                        src={restaurant.logo_url}
+                        alt={restaurant.name}
+                        className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const fallback = target.nextElementSibling as HTMLDivElement
+                          if (fallback) fallback.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`h-12 w-12 rounded-lg bg-gradient-to-br from-[var(--amber-mid)] to-[var(--red)] flex items-center justify-center text-white font-bold text-lg shadow-md ${restaurant.logo_url ? 'hidden' : ''}`}
+                    >
+                      {restaurant.name.charAt(0).toUpperCase()}
                     </div>
-                  )
-                }
-                return null
-              })()}
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg truncate">{restaurant.name}</CardTitle>
+                      <CardDescription className="truncate">{restaurant.slug}</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Contact Info */}
+                  <div className="space-y-2 text-sm">
+                    {restaurant.contact_email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+                        <a
+                          href={`mailto:${restaurant.contact_email}`}
+                          className="text-[var(--brand-mid)] hover:underline truncate"
+                        >
+                          {restaurant.contact_email}
+                        </a>
+                      </div>
+                    )}
+                    {restaurant.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+                        <a
+                          href={`tel:${restaurant.phone}`}
+                          className="text-[var(--text-mid)] hover:text-[var(--brand-mid)]"
+                        >
+                          {restaurant.phone}
+                        </a>
+                      </div>
+                    )}
+                    {locationLine ? (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <MapPin className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
+                        <span className="text-[var(--text-mid)] truncate">{locationLine}</span>
+                      </div>
+                    ) : null}
+                  </div>
 
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-3">
-                  {restaurant.logo_url ? (
-                    <img 
-                      src={restaurant.logo_url} 
-                      alt={restaurant.name} 
-                      className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.style.display = 'none'
-                        const fallback = target.nextElementSibling as HTMLDivElement
-                        if (fallback) fallback.style.display = 'flex'
-                      }}
-                    />
-                  ) : null}
-                  <div className={`h-12 w-12 rounded-lg bg-gradient-to-br from-[var(--amber-mid)] to-[var(--red)] flex items-center justify-center text-white font-bold text-lg shadow-md ${restaurant.logo_url ? 'hidden' : ''}`}>
-                    {restaurant.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg truncate">{restaurant.name}</CardTitle>
-                    <CardDescription className="truncate">{restaurant.slug}</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Contact Info */}
-                <div className="space-y-2 text-sm">
-                  {restaurant.contact_email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
-                      <a href={`mailto:${restaurant.contact_email}`} className="text-[var(--brand-mid)] hover:underline truncate">
-                        {restaurant.contact_email}
-                      </a>
-                    </div>
-                  )}
-                  {restaurant.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
-                      <a href={`tel:${restaurant.phone}`} className="text-[var(--text-mid)] hover:text-[var(--brand-mid)]">
-                        {restaurant.phone}
-                      </a>
-                    </div>
-                  )}
-                  {restaurant.address_json && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
-                      <span className="text-[var(--text-mid)]">
-                        {restaurant.address_json.city}, {restaurant.address_json.country}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Statistics */}
-                <div className="grid grid-cols-3 gap-3 pt-3 border-t">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
-                      <ShoppingCart className="h-4 w-4" />
-                      <p className="text-xl font-bold">{restaurant.totalOrders || 0}</p>
-                    </div>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Orders</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
-                      <DollarSign className="h-4 w-4" />
-                      <p className="text-xl font-bold">{formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}</p>
-                    </div>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Revenue</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-[var(--text-muted)]">
-                      <TrendingUp className="h-4 w-4" />
-                      <p className="text-lg font-semibold">
-                        {restaurant.latestOrder 
-                          ? new Date(restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                          : 'N/A'}
+                  {/* Statistics */}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-3 border-t">
+                    <div className="text-center min-w-0">
+                      <p className="text-lg sm:text-xl font-bold tabular-nums">
+                        {restaurant.totalOrders || 0}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">
+                        Orders
                       </p>
                     </div>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Last Order</p>
-                  </div>
-                </div>
-
-                {/* Latest Order Info */}
-                {restaurant.latestOrder && (
-                  <div className="pt-3 border-t">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-[var(--text-muted)]">Latest Order</span>
-                      <Badge variant={restaurant.latestOrder.status === 'COMPLETED' ? 'default' : 'secondary'} className="text-xs">
-                        {restaurant.latestOrder.status}
-                      </Badge>
+                    <div className="text-center min-w-0">
+                      <p className="text-lg sm:text-xl font-bold tabular-nums truncate">
+                        {formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">
+                        Revenue
+                      </p>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[var(--text-muted)]">Order #{restaurant.latestOrder.id.substring(0, 8)}</span>
-                      <span className="font-semibold text-[var(--text)]">
-                        {formatPrice(restaurant.latestOrder.total_amount)}
-                      </span>
+                    <div className="text-center min-w-0">
+                      <p className="text-sm sm:text-base font-semibold tabular-nums">
+                        {restaurant.latestOrder
+                          ? new Date(
+                              restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at
+                            ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                          : 'N/A'}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">
+                        Last order
+                      </p>
                     </div>
                   </div>
-                )}
 
-                {/* Actions */}
-                <div className="flex gap-2 pt-3 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => navigate(`/app/orders?restaurant=${restaurant.id}`)}
-                  >
-                    <ShoppingCart className="h-4 w-4 mr-1" />
-                    View Orders
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => navigate(`/app/restaurants/${restaurant.id}`)}
-                  >
-                    <BarChart3 className="h-4 w-4 mr-1" />
-                    Details
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  {/* Latest Order Info */}
+                  {restaurant.latestOrder && (
+                    <div className="pt-3 border-t">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-[var(--text-muted)]">
+                          Latest Order
+                        </span>
+                        <Badge
+                          variant={
+                            restaurant.latestOrder.status === 'COMPLETED' ? 'default' : 'secondary'
+                          }
+                          className="text-xs"
+                        >
+                          {restaurant.latestOrder.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[var(--text-muted)]">
+                          Order #{restaurant.latestOrder.id.substring(0, 8)}
+                        </span>
+                        <span className="font-semibold text-[var(--text)]">
+                          {formatPrice(restaurant.latestOrder.total_amount)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <CardActionGrid>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cardActionBtnClass()}
+                      onClick={() => navigate(`/app/orders?restaurant=${restaurant.id}`)}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-1 shrink-0" />
+                      <span className="truncate">Orders</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      className={cardActionBtnClass()}
+                      onClick={() => navigate(`/app/restaurants/${restaurant.id}`)}
+                    >
+                      <BarChart3 className="h-4 w-4 mr-1 shrink-0" />
+                      Details
+                    </Button>
+                  </CardActionGrid>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <div className="space-y-4">
           {filteredAndSortedRestaurants.map((restaurant: any) => (
-            <Card key={restaurant.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4 flex-1">
-                  {restaurant.logo_url ? (
-                    <img 
-                      src={restaurant.logo_url} 
-                      alt={restaurant.name} 
-                      className="h-16 w-16 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.style.display = 'none'
-                        const fallback = target.nextElementSibling as HTMLDivElement
-                        if (fallback) fallback.style.display = 'flex'
-                      }}
-                    />
-                  ) : null}
-                  <div className={`h-16 w-16 rounded-lg bg-gradient-to-br from-[var(--amber-mid)] to-[var(--red)] flex items-center justify-center text-white font-bold text-xl shadow-md ${restaurant.logo_url ? 'hidden' : ''}`}>
-                    {restaurant.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-bold text-[var(--text)]">{restaurant.name}</h3>
-                      {(() => {
-                        const thirtyDaysAgo = new Date()
-                        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-                        const isActive = restaurant.latestOrder && new Date(restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at) > thirtyDaysAgo
-                        const isNew = new Date(restaurant.created_at) > thirtyDaysAgo
-                        
-                        return (
-                          <>
-                            {isActive && (
-                              <Badge className="bg-[var(--mint)] text-white">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Active
-                              </Badge>
-                            )}
-                            {isNew && (
-                              <Badge className="bg-[var(--brand)] text-white">
-                                <Sparkles className="h-3 w-3 mr-1" />
-                                New
-                              </Badge>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </div>
-                    <p className="text-sm text-[var(--text-muted)]">{restaurant.slug}</p>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-center">
-                      <p className="text-xl font-bold text-[var(--text)]">{restaurant.totalOrders || 0}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Orders</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xl font-bold text-[var(--text)]">{formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Revenue</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-[var(--text)]">
-                        {restaurant.latestOrder 
-                          ? new Date(restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                          : 'N/A'}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)]">Last Order</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/app/orders?restaurant=${restaurant.id}`)}
+            <Card
+              key={restaurant.id}
+              className={`${cardShellClass} hover:shadow-md transition-shadow`}
+            >
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    {restaurant.logo_url ? (
+                      <img
+                        src={restaurant.logo_url}
+                        alt={restaurant.name}
+                        className="h-16 w-16 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const fallback = target.nextElementSibling as HTMLDivElement
+                          if (fallback) fallback.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`h-16 w-16 rounded-lg bg-gradient-to-br from-[var(--amber-mid)] to-[var(--red)] flex items-center justify-center text-white font-bold text-xl shadow-md ${restaurant.logo_url ? 'hidden' : ''}`}
                     >
-                      <ShoppingCart className="h-4 w-4 mr-1" />
-                      Orders
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`/app/restaurants/${restaurant.id}`)}
-                    >
-                      <BarChart3 className="h-4 w-4 mr-1" />
-                      Details
-                    </Button>
+                      {restaurant.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-lg font-bold text-[var(--text)]">{restaurant.name}</h3>
+                        {(() => {
+                          const thirtyDaysAgo = new Date()
+                          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+                          const isActive =
+                            restaurant.latestOrder &&
+                            new Date(
+                              restaurant.latestOrder.placed_at || restaurant.latestOrder.created_at
+                            ) > thirtyDaysAgo
+                          const isNew = new Date(restaurant.created_at) > thirtyDaysAgo
+
+                          return (
+                            <>
+                              {isActive && (
+                                <Badge className="bg-[var(--mint)] text-white">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Active
+                                </Badge>
+                              )}
+                              {isNew && (
+                                <Badge className="bg-[var(--brand)] text-white">
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  New
+                                </Badge>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </div>
+                      <p className="text-sm text-[var(--text-muted)]">{restaurant.slug}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                      <div className="text-center min-w-[4rem]">
+                        <p className="text-xl font-bold text-[var(--text)]">
+                          {restaurant.totalOrders || 0}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">Orders</p>
+                      </div>
+                      <div className="text-center min-w-[4rem]">
+                        <p className="text-xl font-bold text-[var(--text)]">
+                          {formatCurrency(restaurant.totalSpent, { maximumFractionDigits: 0 })}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">Revenue</p>
+                      </div>
+                      <div className="text-center min-w-[4rem]">
+                        <p className="text-sm font-semibold text-[var(--text)]">
+                          {restaurant.latestOrder
+                            ? new Date(
+                                restaurant.latestOrder.placed_at ||
+                                  restaurant.latestOrder.created_at
+                              ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            : 'N/A'}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">Last Order</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/app/orders?restaurant=${restaurant.id}`)}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-1" />
+                        Orders
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => navigate(`/app/restaurants/${restaurant.id}`)}
+                      >
+                        <BarChart3 className="h-4 w-4 mr-1" />
+                        Details
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

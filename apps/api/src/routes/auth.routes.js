@@ -12,7 +12,12 @@ import { userNeedsTenantSetup } from '../lib/register-account.js'
 import { upsertUser } from '../lib/rbac.js'
 import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
 import { clearImpersonationCookie } from '../lib/impersonation.js'
-import { requireAuth, getRequestTenant, assignDefaultRoleForTenant } from '../lib/rbac.js'
+import {
+  requireAuth,
+  optionalAuth,
+  getRequestTenant,
+  assignDefaultRoleForTenant,
+} from '../lib/rbac.js'
 import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -20,6 +25,22 @@ import { ValidationError } from '../middlewares/errorHandler.js'
 import { randomBytes } from 'crypto'
 
 const router = express.Router()
+
+function clearLocalAuthSession(req, res) {
+  clearAuthCookies(res)
+  clearImpersonationCookie(res)
+  return new Promise((resolve) => {
+    if (!req.session) {
+      resolve()
+      return
+    }
+    req.session.destroy(() => resolve())
+  })
+}
+
+function apiOrigin(req) {
+  return `${req.protocol}://${req.get('host')}`
+}
 
 // Generate login URL and redirect to Keycloak
 router.get('/login', async (req, res) => {
@@ -59,26 +80,52 @@ router.get('/login', async (req, res) => {
 
 // Redirect to Keycloak self-registration (hosted signup form)
 router.get('/register', async (req, res) => {
+  const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
   try {
+    // Keycloak blocks registration when another SSO session is active — end it first.
+    if (req.query.continue !== '1') {
+      await clearLocalAuthSession(req, res)
+      const continueUrl = `${apiOrigin(req)}/auth/register?continue=1`
+      const logoutUrl = await getKeycloakLogoutUrl(continueUrl)
+      logger.info('Registration: clearing Keycloak SSO session before signup')
+      return res.redirect(logoutUrl)
+    }
+
     const state = randomBytes(32).toString('hex')
     req.session.oauthState = state
     req.session.save((err) => {
       if (err) logger.error('Error saving session', { error: err.message })
     })
 
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/callback`
+    const redirectUri = `${apiOrigin(req)}/auth/callback`
     const registrationUrl = await getRegistrationUrl(redirectUri, state)
 
     logger.info('Registration initiated')
     res.redirect(registrationUrl)
   } catch (error) {
     logger.error('Registration redirect error', { error: error.message })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Registration redirect failed' },
-      requestId: req.requestId,
-    })
+    res.redirect(`${webOrigin}/login?error=registration_failed`)
+  }
+})
+
+// Public sign-out: clears app cookies/session and Keycloak SSO (no auth required)
+router.get('/logout', async (req, res) => {
+  try {
+    const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+    await clearLocalAuthSession(req, res)
+
+    let redirectAfter = `${webOrigin}/login`
+    if (req.query.redirect === 'register') {
+      redirectAfter = `${webOrigin}/auth/register`
+    } else if (typeof req.query.redirect === 'string' && req.query.redirect.startsWith('http')) {
+      redirectAfter = req.query.redirect
+    }
+
+    const logoutUrl = await getKeycloakLogoutUrl(redirectAfter)
+    res.redirect(logoutUrl)
+  } catch (error) {
+    logger.error('Public logout error', { error: error.message })
+    res.redirect(`${process.env.WEB_ORIGIN || 'http://localhost:5173'}/login`)
   }
 })
 
@@ -138,14 +185,37 @@ router.get('/callback', async (req, res) => {
     logger.info('User authenticated', { userId: user.id, role: user.role })
 
     const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
-    const needsSetup = await userNeedsTenantSetup(user)
-    const redirectUrl = needsSetup ? `${webOrigin}/register/complete` : `${webOrigin}/app`
+    let redirectUrl
+    if (user.role === 'STAFF_PORTAL') {
+      redirectUrl = `${webOrigin}/staff/dashboard`
+    } else {
+      const needsSetup = await userNeedsTenantSetup(user)
+      redirectUrl = needsSetup ? `${webOrigin}/register/complete` : `${webOrigin}/app`
+    }
     res.redirect(redirectUrl)
   } catch (error) {
     logger.error('Callback error', { error: error.message })
     const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
     res.redirect(`${origin}/login?error=callback_failed`)
   }
+})
+
+/** Public invite pages: detect session without 401 when logged out. */
+router.get('/session', optionalAuth, async (req, res) => {
+  const user = req.userData
+  if (!user) {
+    return res.json({ ok: true, data: null, error: null, requestId: req.requestId })
+  }
+  return res.json({
+    ok: true,
+    data: {
+      id: user.id,
+      email: user.email,
+      displayName: user.display_name || user.displayName || user.email,
+    },
+    error: null,
+    requestId: req.requestId,
+  })
 })
 
 // Get current user info (includes tenant-scoped roles and permissions for RBAC)
@@ -156,44 +226,78 @@ router.get('/me', requireAuth, async (req, res) => {
     // Get additional user data based on role
     let additionalData = {}
 
-    const emailLower = (user.email || '').trim().toLowerCase()
-    if (user.role === 'SUPPLIER' && emailLower) {
-      const { rows: suppliers } = await query(
-        'SELECT * FROM supplier WHERE LOWER(TRIM(contact_email)) = $1',
-        [emailLower]
-      )
-      if (suppliers.length > 0) {
-        additionalData.supplier = suppliers[0]
-      }
-    } else if (user.role === 'RESTAURANT' && emailLower) {
-      const { rows: restaurants } = await query(
-        'SELECT * FROM restaurant WHERE LOWER(TRIM(contact_email)) = $1',
-        [emailLower]
-      )
-      if (restaurants.length > 0) {
-        additionalData.restaurant = restaurants[0]
-      }
-    }
-
     // Tenant-scoped RBAC: roles and permissions for current tenant (or admin scope)
     let tenantRoles = []
     let tenantPermissions = []
     let adminRoles = []
     let adminPermissions = []
+    let workspace = null
     const tenant = await getRequestTenant(req)
     if (tenant) {
+      const { ensurePrimaryContactOwnerRole, assignDefaultRoleForTenant: assignDefault } =
+        await import('../lib/rbac.js')
+      const { isPrimaryTenantContact, getTenantAssignmentForUser } = await import(
+        '../lib/workspace-tenant.js'
+      )
+      await ensurePrimaryContactOwnerRole(user.id, user.email, tenant.tenantId, tenant.tenantType)
+
       tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
       tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
-      // If tenant user has no role (e.g. new user or migration not run), assign default owner role so they get permissions
       if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
-        await assignDefaultRoleForTenant(user.id, tenant.tenantId, tenant.tenantType)
-        tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
-        tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
+        const isPrimary = await isPrimaryTenantContact(
+          user.id,
+          user.email,
+          tenant.tenantId,
+          tenant.tenantType
+        )
+        if (isPrimary) {
+          await assignDefault(user.id, tenant.tenantId, tenant.tenantType)
+          tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
+          tenantPermissions = await getPermissionsForUser(
+            user.id,
+            tenant.tenantId,
+            tenant.tenantType
+          )
+        }
+      }
+
+      const assignment = await getTenantAssignmentForUser(user.id, user.role)
+      workspace = {
+        tenantId: tenant.tenantId,
+        tenantType: tenant.tenantType,
+        tenantName: tenant.tenantName || assignment?.tenantName || '',
+        roleName: assignment?.roleName || tenantRoles[0] || null,
+      }
+
+      if (tenant.tenantType === 'SUPPLIER') {
+        const { rows: suppliers } = await query('SELECT * FROM supplier WHERE id = $1', [
+          tenant.tenantId,
+        ])
+        if (suppliers.length > 0) additionalData.supplier = suppliers[0]
+      } else if (tenant.tenantType === 'RESTAURANT') {
+        const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [
+          tenant.tenantId,
+        ])
+        if (restaurants.length > 0) additionalData.restaurant = restaurants[0]
       }
     }
     if (user.role === 'ADMIN') {
       adminRoles = await getRolesForUser(user.id, null, 'ADMIN')
       adminPermissions = await getPermissionsForUser(user.id, null, 'ADMIN')
+    }
+
+    const accessType = user.role === 'STAFF_PORTAL' ? 'staff_portal' : 'platform'
+    let staffPortal = null
+    if (user.role === 'STAFF_PORTAL') {
+      const { getStaffMemberForPortalUser } = await import('../lib/staff-portal-auth.js')
+      const staffMember = await getStaffMemberForPortalUser(user.id)
+      if (staffMember) {
+        staffPortal = {
+          staffId: staffMember.id,
+          restaurantId: staffMember.restaurant_id,
+          displayName: staffMember.display_name,
+        }
+      }
     }
 
     res.json({
@@ -203,9 +307,12 @@ router.get('/me', requireAuth, async (req, res) => {
         email: user.email,
         displayName: user.display_name,
         role: user.role,
+        accessType,
+        staffPortal,
         createdAt: user.created_at,
         tenantRoles,
         tenantPermissions,
+        workspace,
         adminRoles,
         adminPermissions,
         ...additionalData,

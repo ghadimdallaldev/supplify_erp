@@ -1,63 +1,70 @@
-import { logger } from '../lib/logger.js';
-import { writeSystemEvent } from '../lib/systemEvent.js';
+import { logger } from '../lib/logger.js'
+import { syncRequestLogContext } from '../lib/request-log-context.js'
+import { writeSystemEvent } from '../lib/systemEvent.js'
 
 // Error handling middleware
 export function errorHandler(err, req, res, next) {
-  const requestId = req.requestId || 'unknown';
+  const ids = syncRequestLogContext(req)
+  const requestId = ids.requestId || 'unknown'
 
   writeSystemEvent({
     type: 'api_error',
     severity: 'error',
     source: req.url?.split('?')[0] || 'unknown',
-    payload: { requestId, method: req.method, message: err.message },
-  }).catch(() => {});
+    payload: { ...ids, method: req.method, message: err.message },
+  }).catch(() => {})
 
-  // Log the error
   logger.error('Unhandled error:', {
     error: err.message,
     stack: err.stack,
-    requestId,
+    ...ids,
     url: req.url,
     method: req.method,
     ip: req.ip,
-  });
+  })
 
   // Don't leak error details in production
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  
+  const isDevelopment = process.env.NODE_ENV === 'development'
+
   // Determine error type and status code
-  let statusCode = 500;
-  let errorName = 'INTERNAL_ERROR';
-  let message = 'Internal server error';
-  
+  let statusCode = 500
+  let errorName = 'INTERNAL_ERROR'
+  let message = 'Internal server error'
+
   if (err.name === 'ValidationError') {
-    statusCode = 400;
-    errorName = 'VALIDATION_ERROR';
-    message = err.message;
-  } else if (err.name === 'UnauthorizedError' || err.name === 'JWTExpired' || err.code === 'ERR_JWT_EXPIRED') {
-    statusCode = 401;
-    errorName = 'JWT_EXPIRED';
-    message = err.message || 'Token has expired. Please log in again.';
+    statusCode = 400
+    errorName = 'VALIDATION_ERROR'
+    message = err.message
+  } else if (
+    err.name === 'UnauthorizedError' ||
+    err.name === 'JWTExpired' ||
+    err.code === 'ERR_JWT_EXPIRED'
+  ) {
+    statusCode = 401
+    errorName = 'JWT_EXPIRED'
+    message = err.message || 'Token has expired. Please log in again.'
   } else if (err.name === 'ForbiddenError') {
-    statusCode = 403;
-    errorName = 'FORBIDDEN';
-    message = 'Forbidden';
+    statusCode = 403
+    errorName = 'FORBIDDEN'
+    message = 'Forbidden'
   } else if (err.name === 'NotFoundError') {
-    statusCode = 404;
-    errorName = 'NOT_FOUND';
-    message = 'Resource not found';
+    statusCode = 404
+    errorName = 'NOT_FOUND'
+    message = 'Resource not found'
   } else if (err.name === 'ConflictError') {
-    statusCode = 409;
-    errorName = 'CONFLICT';
-    message = 'Resource conflict';
-  } else if (err.code === '23505') { // PostgreSQL unique violation
-    statusCode = 409;
-    errorName = 'CONFLICT';
-    message = 'Resource already exists';
-  } else if (err.code === '23503') { // PostgreSQL foreign key violation
-    statusCode = 400;
-    errorName = 'VALIDATION_ERROR';
-    message = 'Referenced resource does not exist';
+    statusCode = 409
+    errorName = 'CONFLICT'
+    message = 'Resource conflict'
+  } else if (err.code === '23505') {
+    // PostgreSQL unique violation
+    statusCode = 409
+    errorName = 'CONFLICT'
+    message = 'Resource already exists'
+  } else if (err.code === '23503') {
+    // PostgreSQL foreign key violation
+    statusCode = 400
+    errorName = 'VALIDATION_ERROR'
+    message = 'Referenced resource does not exist'
   }
 
   // Send error response only if headers haven't been sent
@@ -72,47 +79,47 @@ export function errorHandler(err, req, res, next) {
         ...(err.details && { details: err.details }),
       },
       requestId,
-    });
+    })
   } else {
     // If headers already sent, just log the error
-    logger.error('Headers already sent, cannot send error response');
+    logger.error('Headers already sent, cannot send error response')
   }
 }
 
 // Custom error classes
 export class ValidationError extends Error {
   constructor(message, details = null) {
-    super(message);
-    this.name = 'ValidationError';
-    this.details = details;
+    super(message)
+    this.name = 'ValidationError'
+    this.details = details
   }
 }
 
 export class UnauthorizedError extends Error {
   constructor(message = 'Unauthorized') {
-    super(message);
-    this.name = 'UnauthorizedError';
+    super(message)
+    this.name = 'UnauthorizedError'
   }
 }
 
 export class ForbiddenError extends Error {
   constructor(message = 'Forbidden') {
-    super(message);
-    this.name = 'ForbiddenError';
+    super(message)
+    this.name = 'ForbiddenError'
   }
 }
 
 export class NotFoundError extends Error {
   constructor(message = 'Resource not found') {
-    super(message);
-    this.name = 'NotFoundError';
-    this.statusCode = 404;
+    super(message)
+    this.name = 'NotFoundError'
+    this.statusCode = 404
   }
 }
 
 export class ConflictError extends Error {
   constructor(message = 'Resource conflict') {
-    super(message);
-    this.name = 'ConflictError';
+    super(message)
+    this.name = 'ConflictError'
   }
 }

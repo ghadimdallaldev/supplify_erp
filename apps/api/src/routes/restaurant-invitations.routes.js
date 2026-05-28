@@ -1,5 +1,11 @@
 import express from 'express'
-import { requireAuth, requireRole, requirePermission, getRestaurantIdForRequest } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  requireAnyPermission,
+  getRestaurantIdForRequest,
+  resolveTenantContext,
+} from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -14,6 +20,7 @@ import {
   revokeRestaurantInvitation,
   validateRestaurantRoleForBranch,
 } from '../lib/restaurant-invitations.js'
+import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
 
 const router = express.Router()
 
@@ -76,10 +83,9 @@ async function requireRestaurantBranchContext(req, res, next) {
       requestId: req.requestId,
     })
   }
-  const { rows } = await query(
-    `SELECT organization_id FROM restaurant WHERE id = $1`,
-    [restaurantId]
-  )
+  const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
+    restaurantId,
+  ])
   req.restaurantBranchContext = {
     restaurantId,
     organizationId: rows[0]?.organization_id || null,
@@ -91,8 +97,9 @@ const membersRouter = express.Router()
 membersRouter.use(
   requireAuth,
   requireRole(['RESTAURANT', 'ADMIN']),
+  resolveTenantContext,
   requireRestaurantBranchContext,
-  requirePermission('STAFF_MANAGE')
+  requireAnyPermission('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE')
 )
 
 membersRouter.post('/', async (req, res) => {
@@ -108,6 +115,15 @@ membersRouter.post('/', async (req, res) => {
           name: 'VALIDATION_ERROR',
           message: 'role_id is required and restaurant must belong to an organization',
         },
+        requestId: req.requestId,
+      })
+    }
+
+    if (!invitedEmail || !String(invitedEmail).trim()) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'invited_email is required' },
         requestId: req.requestId,
       })
     }
@@ -172,11 +188,13 @@ membersRouter.get('/', async (req, res) => {
 membersRouter.get('/roles', async (req, res) => {
   try {
     const { restaurantId } = req.restaurantBranchContext
+    await ensureTenantSystemRoles(restaurantId, 'RESTAURANT')
     const { rows } = await query(
       `
       SELECT id, name, description
       FROM tenant_roles
       WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND is_system = true
+        AND name != 'Owner'
       ORDER BY name ASC
       `,
       [restaurantId]
@@ -370,6 +388,7 @@ branchesRouter.get('/roles', async (req, res) => {
       SELECT id, name, description
       FROM tenant_roles
       WHERE tenant_id = $1 AND tenant_type = 'RESTAURANT' AND is_system = true
+        AND name != 'Owner'
       ORDER BY name ASC
       `,
       [restaurantId]

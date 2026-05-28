@@ -14,12 +14,12 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { SupplifyLogo } from '../components/SupplifyLogo'
-import { DemoLoginAccountsPanel } from '../components/DemoLoginAccountsPanel'
-import { redirectToAuth } from '../lib/authRedirect'
+import { redirectToAuth, redirectToLogout } from '../lib/authRedirect'
 
 export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [inviteRegistered, setInviteRegistered] = useState(false)
   const [inEmbeddedFrame, setInEmbeddedFrame] = useState(false)
 
   useEffect(() => {
@@ -34,10 +34,14 @@ export function LoginPage() {
     const urlParams = new URLSearchParams(window.location.search)
     const errorParam = urlParams.get('error')
     const expiredParam = urlParams.get('expired')
-    if (expiredParam === 'true') {
+    if (urlParams.get('registered') === '1') {
+      setInviteRegistered(true)
+    } else if (expiredParam === 'true') {
       setError('Your session expired. Please sign in again.')
     } else if (errorParam) {
-      setError('Authentication failed. Please try again.')
+      setError(
+        'Authentication failed. If you were signed in as a demo user, sign out first and try again.'
+      )
     }
   }, [])
 
@@ -183,6 +187,15 @@ export function LoginPage() {
                 </Alert>
               )}
 
+              {inviteRegistered && (
+                <Alert className="animate-in slide-in-from-top-2 border-emerald-200 bg-emerald-50">
+                  <AlertDescription className="text-emerald-900">
+                    Your account was created. Sign in with the email and password you set on the
+                    invitation page.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert variant="destructive" className="animate-in slide-in-from-top-2">
                   <AlertDescription>{error}</AlertDescription>
@@ -222,16 +235,16 @@ export function LoginPage() {
                 </button>
               </p>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-[var(--text-muted)]">Demo Accounts</span>
-                </div>
-              </div>
-
-              <DemoLoginAccountsPanel />
+              <p className="text-center text-xs text-[var(--text-muted)]">
+                Stuck on an old session?{' '}
+                <button
+                  type="button"
+                  onClick={() => redirectToLogout()}
+                  className="font-medium text-[var(--brand-mid)] hover:underline"
+                >
+                  Sign out completely
+                </button>
+              </p>
 
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-center space-x-6 text-xs text-[var(--text-muted)]">

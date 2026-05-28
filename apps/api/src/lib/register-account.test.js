@@ -32,6 +32,28 @@ vi.mock('./restaurant-org.js', () => ({
   invalidateRestaurantOrgPermissionCaches: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('./warehouse-helpers.js', () => ({
+  createDefaultWarehouseForSupplier: vi.fn().mockResolvedValue('wh-1'),
+}))
+
+vi.mock('./supplier-org.js', () => ({
+  ensureOrgSystemRoles: vi.fn().mockResolvedValue(undefined),
+  assignOrgUserRole: vi.fn().mockResolvedValue(undefined),
+  invalidateOrgPermissionCaches: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('./workspace-membership.js', () => ({
+  getUserWorkspaceMembership: vi.fn().mockResolvedValue(null),
+  bindUserToWorkspace: vi.fn().mockResolvedValue(undefined),
+  resolveWorkspaceScope: vi.fn().mockImplementation((_type, { organizationId, tenantId }) =>
+    Promise.resolve({
+      workspaceType: _type,
+      organizationId,
+      homeTenantId: tenantId,
+    })
+  ),
+}))
+
 describe('register-account', () => {
   beforeEach(() => {
     mockQuery.mockReset()
@@ -72,7 +94,7 @@ describe('register-account', () => {
 
       mockQuery
         .mockResolvedValueOnce({ rows: [{ id: 'u1', role: 'PENDING' }] })
-        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] }) // existing tenant by email
 
       mockClientQuery.mockImplementation(async (sql) => {
         const text = typeof sql === 'string' ? sql : ''
@@ -103,6 +125,48 @@ describe('register-account', () => {
         'RESTAURANT',
         'free'
       )
+    })
+
+    it('creates supplier with pending activation subscription', async () => {
+      const { completeTenantRegistration } = await import('./register-account.js')
+
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ id: 'u2', role: 'PENDING' }] })
+        .mockResolvedValueOnce({ rows: [] }) // existing tenant by email
+
+      mockClientQuery.mockImplementation(async (sql) => {
+        const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('SELECT 1 FROM supplier')) return { rows: [] }
+        if (text.includes('INSERT INTO supplier (name')) {
+          return { rows: [{ id: 'sup-1', name: 'Test Supply', slug: 'test-supply' }] }
+        }
+        if (text.includes('INSERT INTO catalog')) return { rows: [] }
+        if (text.includes('INSERT INTO supplier_organizations')) {
+          return { rows: [{ id: 'org-s1', name: 'Test Supply', slug: 'test-supply-org' }] }
+        }
+        return { rows: [] }
+      })
+
+      const result = await completeTenantRegistration({
+        userId: 'u2',
+        keycloakSub: 'kc-2',
+        email: 'owner@supplier.test',
+        accountType: 'SUPPLIER',
+        businessName: 'Test Supply',
+        phone: '+971',
+      })
+
+      expect(result.tenantType).toBe('SUPPLIER')
+      expect(result.tenant.id).toBe('sup-1')
+      expect(createPendingActivationSubscription).toHaveBeenCalledWith(
+        expect.anything(),
+        'sup-1',
+        'SUPPLIER',
+        'free'
+      )
+
+      const { createDefaultWarehouseForSupplier } = await import('./warehouse-helpers.js')
+      expect(createDefaultWarehouseForSupplier).not.toHaveBeenCalled()
     })
   })
 })

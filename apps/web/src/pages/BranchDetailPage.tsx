@@ -2,13 +2,14 @@ import { Link, useParams } from 'react-router-dom'
 import { useGetOrgQuery } from '../services/api'
 import { useAppSelector } from '../hooks/redux'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { multiBranchEnabled } from '../lib/planLimits'
 import { BranchInvitationsPanel } from '../components/org/BranchInvitationsPanel'
 
 export function BranchDetailPage() {
   const { supplierId } = useParams<{ supplierId: string }>()
   const { user } = useAppSelector((state) => state.auth)
   const { entitlements } = useEntitlements()
-  const multiBranch = entitlements?.features?.multi_branch === true
+  const multiBranch = multiBranchEnabled(entitlements)
   const { data, isLoading } = useGetOrgQuery(undefined, { skip: user?.role !== 'SUPPLIER' })
 
   const branch = data?.branches?.find((b) => (b as { id: string }).id === supplierId) as

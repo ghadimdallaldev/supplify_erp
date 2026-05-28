@@ -11,7 +11,9 @@ import {
   useGetSupplierReviewsQuery,
   useGetSupplierRatingSummaryQuery,
   useCreateSupplierReviewMutation,
+  useGetEntitlementsQuery,
 } from '../services/api'
+import { featureEnabled } from '../lib/planLimits'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -48,12 +50,17 @@ import { useAppSelector } from '../hooks/redux'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatPrice } from '../utils/format'
+import { CardAddressBlock, pageHeaderRowClass } from '../components/ui/card-layout'
 
 export function SupplierDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const isRestaurant = user?.role === 'RESTAURANT'
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !isRestaurant })
+  const reviewsWriteEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.supplier_reviews
+  )
 
   const { data, isLoading, error, refetch } = useGetSupplierQuery(id!)
   const { data: restaurantsData } = useGetRestaurantsQuery()
@@ -150,8 +157,8 @@ export function SupplierDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header with Logo */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className={pageHeaderRowClass}>
+        <div className="flex items-center gap-4 min-w-0">
           {supplier.logo_url ? (
             <img
               src={supplier.logo_url}
@@ -194,11 +201,12 @@ export function SupplierDetailPage() {
             )}
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           {isRestaurant && (
             <>
               <Button
                 variant={supplier.is_followed ? 'default' : 'outline'}
+                className="whitespace-normal"
                 onClick={handleFollowToggle}
                 disabled={isFollowing || isUnfollowing}
               >
@@ -207,6 +215,7 @@ export function SupplierDetailPage() {
               </Button>
               <Button
                 variant="outline"
+                className="whitespace-normal"
                 onClick={handleSendMessage}
                 disabled={isCreatingConversation}
               >
@@ -304,19 +313,7 @@ export function SupplierDetailPage() {
                 </a>
               </div>
             )}
-            {supplier.address_json && (
-              <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0 mt-0.5" />
-                <div>
-                  {supplier.address_json.street && (
-                    <p className="text-[var(--text-mid)]">{supplier.address_json.street}</p>
-                  )}
-                  <p className="text-[var(--text-mid)]">
-                    {supplier.address_json.city}, {supplier.address_json.country}
-                  </p>
-                </div>
-              </div>
-            )}
+            <CardAddressBlock address={supplier.address_json} icon={MapPin} />
             {supplier.website && (
               <div className="flex items-center gap-2">
                 <Globe className="h-4 w-4 text-[var(--text-muted)] flex-shrink-0" />
@@ -426,10 +423,15 @@ export function SupplierDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Supplier reviews</CardTitle>
-              {isRestaurant && (
+              {isRestaurant && reviewsWriteEnabled && (
                 <Button size="sm" onClick={() => setShowReviewModal(true)}>
                   Write review
                 </Button>
+              )}
+              {isRestaurant && !reviewsWriteEnabled && (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Upgrade your plan to write supplier reviews.
+                </p>
               )}
             </CardHeader>
             <CardContent className="space-y-3">

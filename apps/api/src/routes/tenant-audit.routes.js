@@ -4,6 +4,7 @@ import { requireAuth, requireRole, resolveTenantContext, requirePermission } fro
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { formatAuditLogRow } from '../lib/audit.js'
+import { requireFeature } from '../lib/subscription.js'
 import {
   buildAuditFilterOptions,
   AUDIT_ACTION_LABELS,
@@ -71,47 +72,58 @@ function buildAuditQuery(tenant, filters) {
 
 router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']))
 
-router.get('/logs/filters', requirePermission('SETTINGS_VIEW'), async (req, res, next) => {
-  try {
-    const tenant = resolveTenant(req)
-    const { rows: actionRows } = await query(
-      `SELECT DISTINCT action_type FROM audit_logs
+const tenantAuditGate = requireFeature(
+  'tenant_audit_log',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.get(
+  '/logs/filters',
+  requirePermission('SETTINGS_VIEW'),
+  tenantAuditGate,
+  async (req, res, next) => {
+    try {
+      const tenant = resolveTenant(req)
+      const { rows: actionRows } = await query(
+        `SELECT DISTINCT action_type FROM audit_logs
        WHERE tenant_type = $1 AND tenant_id = $2
        ORDER BY action_type`,
-      [tenant.tenantType, tenant.tenantId]
-    )
-    const { rows: resourceRows } = await query(
-      `SELECT DISTINCT payload_json->>'resource_type' AS resource_type
+        [tenant.tenantType, tenant.tenantId]
+      )
+      const { rows: resourceRows } = await query(
+        `SELECT DISTINCT payload_json->>'resource_type' AS resource_type
        FROM audit_logs
        WHERE tenant_type = $1 AND tenant_id = $2
          AND payload_json->>'resource_type' IS NOT NULL
        ORDER BY 1`,
-      [tenant.tenantType, tenant.tenantId]
-    )
+        [tenant.tenantType, tenant.tenantId]
+      )
 
-    const actions = buildAuditFilterOptions(
-      actionRows.map((r) => r.action_type),
-      AUDIT_ACTION_LABELS,
-      getAuditActionLabel
-    )
-    const resourceTypes = buildAuditFilterOptions(
-      resourceRows.map((r) => r.resource_type),
-      AUDIT_RESOURCE_LABELS,
-      getAuditResourceLabel
-    )
+      const actions = buildAuditFilterOptions(
+        actionRows.map((r) => r.action_type),
+        AUDIT_ACTION_LABELS,
+        getAuditActionLabel
+      )
+      const resourceTypes = buildAuditFilterOptions(
+        resourceRows.map((r) => r.resource_type),
+        AUDIT_RESOURCE_LABELS,
+        getAuditResourceLabel
+      )
 
-    res.json({
-      ok: true,
-      data: { actions, resourceTypes },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (err) {
-    next(err)
+      res.json({
+        ok: true,
+        data: { actions, resourceTypes },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (err) {
+      next(err)
+    }
   }
-})
+)
 
-router.get('/logs', requirePermission('SETTINGS_VIEW'), async (req, res, next) => {
+router.get('/logs', requirePermission('SETTINGS_VIEW'), tenantAuditGate, async (req, res, next) => {
   try {
     const tenant = resolveTenant(req)
     const filters = listSchema.parse(req.query)
@@ -155,14 +167,18 @@ router.get('/logs', requirePermission('SETTINGS_VIEW'), async (req, res, next) =
   }
 })
 
-router.get('/logs/export', requirePermission('SETTINGS_MANAGE'), async (req, res, next) => {
-  try {
-    const tenant = resolveTenant(req)
-    const filters = listSchema.parse(req.query)
-    const { where, params } = buildAuditQuery(tenant, filters)
+router.get(
+  '/logs/export',
+  requirePermission('SETTINGS_MANAGE'),
+  tenantAuditGate,
+  async (req, res, next) => {
+    try {
+      const tenant = resolveTenant(req)
+      const filters = listSchema.parse(req.query)
+      const { where, params } = buildAuditQuery(tenant, filters)
 
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       SELECT al.*, u.email AS user_email,
         COALESCE(u.display_name, u.email) AS user_name
       FROM audit_logs al
@@ -171,35 +187,36 @@ router.get('/logs/export', requirePermission('SETTINGS_MANAGE'), async (req, res
       ORDER BY al.created_at DESC
       LIMIT 5000
       `,
-      params
-    )
+        params
+      )
 
-    const header =
-      'id,created_at,action,resource_type,resource_id,user_name,user_email,ip_address,metadata'
-    const lines = rows.map((row) => {
-      const entry = formatAuditLogRow(row)
-      const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-      return [
-        entry.id,
-        entry.created_at,
-        entry.action,
-        entry.resource_type,
-        entry.resource_id,
-        entry.user_name,
-        entry.user_email,
-        entry.ip_address,
-        JSON.stringify(entry.metadata),
-      ]
-        .map(esc)
-        .join(',')
-    })
+      const header =
+        'id,created_at,action,resource_type,resource_id,user_name,user_email,ip_address,metadata'
+      const lines = rows.map((row) => {
+        const entry = formatAuditLogRow(row)
+        const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+        return [
+          entry.id,
+          entry.created_at,
+          entry.action,
+          entry.resource_type,
+          entry.resource_id,
+          entry.user_name,
+          entry.user_email,
+          entry.ip_address,
+          JSON.stringify(entry.metadata),
+        ]
+          .map(esc)
+          .join(',')
+      })
 
-    res.setHeader('Content-Type', 'text/csv')
-    res.setHeader('Content-Disposition', 'attachment; filename="audit-log.csv"')
-    res.send([header, ...lines].join('\n'))
-  } catch (err) {
-    next(err)
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', 'attachment; filename="audit-log.csv"')
+      res.send([header, ...lines].join('\n'))
+    } catch (err) {
+      next(err)
+    }
   }
-})
+)
 
 export { router as tenantAuditRoutes }

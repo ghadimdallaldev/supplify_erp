@@ -1,10 +1,26 @@
 import { verifyToken, refreshAccessToken } from './auth.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
+import { syncRequestLogContext } from './request-log-context.js'
 import { getEffectiveTenant } from './impersonation.js'
-import { getActiveTenantFromRequest, getPrimaryTenantForUser } from './tenant-switch.js'
-import { getRolesForUser, getPermissionsForUser, hasPermission } from './permissions.js'
-import { ensureTenantSystemRoles, assignOwnerRoleForUser } from './tenant-roles.js'
+import {
+  getActiveTenantFromRequest,
+  getPrimaryTenantForUser,
+  userCanAccessTenant,
+} from './tenant-switch.js'
+import { getTenantAssignmentForUser, isPrimaryTenantContact } from './workspace-tenant.js'
+import {
+  getRolesForUser,
+  getPermissionsForUser,
+  hasPermission,
+  invalidateUserPermissionCache,
+} from './permissions.js'
+import {
+  ensureTenantSystemRoles,
+  assignOwnerRoleForUser,
+  userHasOwnerRole,
+} from './tenant-roles.js'
+import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -26,16 +42,18 @@ export function setAuthCookies(res, accessToken, refreshToken) {
   // Access token cookie (short-lived)
   res.cookie('access_token', accessToken, {
     httpOnly: true,
-    secure: isProduction, // Must match sameSite requirements
+    secure: isProduction,
     sameSite,
+    path: '/',
     maxAge: 60 * 60 * 1000, // 1 hour (increased from 5 minutes)
   })
 
   // Refresh token cookie (longer-lived)
   res.cookie('refresh_token', refreshToken, {
     httpOnly: true,
-    secure: isProduction, // Must match sameSite requirements
+    secure: isProduction,
     sameSite,
+    path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   })
 }
@@ -75,6 +93,8 @@ export async function upsertUser(userInfo, roles = []) {
     let explicitRole = null
     if (hasRole('admin')) {
       explicitRole = 'ADMIN'
+    } else if (hasRole('staff_portal') || hasRole('staff_portal_user')) {
+      explicitRole = STAFF_PORTAL_APP_ROLE
     } else if (hasRole('supplier')) {
       explicitRole = 'SUPPLIER'
     } else if (hasRole('restaurant')) {
@@ -164,6 +184,11 @@ export async function requireAuth(req, res, next) {
       }
 
       req.userData = user
+      syncRequestLogContext(req)
+      const staffPortalBlock = assertStaffPortalRouteAccess(req, user)
+      if (staffPortalBlock) {
+        return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
+      }
       next()
     } catch (error) {
       logger.debug('Token verification failed, attempting refresh')
@@ -228,6 +253,11 @@ export async function requireAuth(req, res, next) {
       }
 
       req.userData = user
+      syncRequestLogContext(req)
+      const staffPortalBlock = assertStaffPortalRouteAccess(req, user)
+      if (staffPortalBlock) {
+        return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
+      }
       next()
     }
   } catch (error) {
@@ -265,6 +295,7 @@ export async function optionalAuth(req, res, next) {
       const user = await getUserBySub(payload.sub)
       if (user) {
         req.userData = user
+        syncRequestLogContext(req)
       }
     } catch (error) {
       // Token is invalid or expired, try to refresh
@@ -287,6 +318,7 @@ export async function optionalAuth(req, res, next) {
             const user = await getUserBySub(payload.sub)
             if (user) {
               req.userData = user
+              syncRequestLogContext(req)
             }
           }
         } catch (refreshError) {
@@ -408,6 +440,25 @@ export async function getRequestTenant(req) {
   const active = await getActiveTenantFromRequest(req)
   if (active) return active
 
+  if (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER') {
+    const assignment = await getTenantAssignmentForUser(req.userData.id, req.userData.role)
+    if (assignment?.tenantId) {
+      const allowed = await userCanAccessTenant(
+        req.userData.id,
+        req.userData.email,
+        assignment.tenantId,
+        assignment.tenantType
+      )
+      if (allowed) {
+        return {
+          tenantId: assignment.tenantId,
+          tenantType: assignment.tenantType,
+          tenantName: assignment.tenantName || '',
+        }
+      }
+    }
+  }
+
   const email = (req.userData.email || '').trim().toLowerCase()
   if (!email) return null
   if (req.userData.role === 'SUPPLIER') {
@@ -442,6 +493,51 @@ export async function getSupplierIdForRequest(req) {
 }
 
 /**
+ * Primary tenant contact (contact_email) always receives the Owner role so core flows work
+ * even if they were previously assigned a narrower role (e.g. Accountant).
+ */
+export async function ensurePrimaryContactOwnerRole(userId, email, tenantId, tenantType) {
+  if (!userId || !email || !tenantId || !tenantType) return false
+  if (tenantType !== 'RESTAURANT' && tenantType !== 'SUPPLIER') return false
+
+  const emailLower = email.trim().toLowerCase()
+  if (!emailLower) return false
+
+  const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
+  const { rows } = await query(
+    `SELECT LOWER(TRIM(contact_email)) AS contact_email FROM ${table} WHERE id = $1`,
+    [tenantId]
+  )
+  if (rows.length === 0 || rows[0].contact_email !== emailLower) return false
+
+  if (await userHasOwnerRole(userId, tenantId, tenantType)) return false
+
+  // Do not override explicit team roles from invitations (Viewer, Accountant, etc.)
+  const { rows: assigned } = await query(
+    `
+    SELECT tr.name
+    FROM tenant_user_roles tur
+    JOIN tenant_roles tr ON tr.id = tur.role_id
+    WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
+    LIMIT 1
+    `,
+    [userId, tenantId, tenantType]
+  )
+  if (assigned.length > 0 && assigned[0].name !== 'Owner') {
+    return false
+  }
+
+  await assignOwnerRoleForUser(userId, tenantId, tenantType)
+  await invalidateUserPermissionCache(userId, tenantId, tenantType)
+  logger.info('Assigned Owner role to primary tenant contact', {
+    userId,
+    tenantId,
+    tenantType,
+  })
+  return true
+}
+
+/**
  * Resolve tenant context and attach roles + permissions for the current user in that tenant.
  * Sets req.tenantContext = { tenantId, tenantType, tenantName, roles[], permissions[] }.
  * When admin is impersonating, context is for the impersonated tenant; permissions are still for the current user
@@ -470,24 +566,41 @@ export function resolveTenantContext(req, res, next) {
           requestId: req.requestId,
         })
       }
+      await ensurePrimaryContactOwnerRole(
+        req.userData.id,
+        req.userData.email,
+        tenant.tenantId,
+        tenant.tenantType
+      )
+
+      await ensureTenantSystemRoles(tenant.tenantId, tenant.tenantType).catch(() => {})
+
       let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
       let permissions = await getPermissionsForUser(
         req.userData.id,
         tenant.tenantId,
         tenant.tenantType
       )
-      // If tenant user has no role yet, assign default owner so permission checks succeed
+      // Only the primary tenant contact gets an automatic Owner role when unassigned.
       if (
         roles.length === 0 &&
         (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER')
       ) {
-        await assignDefaultRoleForTenant(req.userData.id, tenant.tenantId, tenant.tenantType)
-        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
-        permissions = await getPermissionsForUser(
+        const isPrimary = await isPrimaryTenantContact(
           req.userData.id,
+          req.userData.email,
           tenant.tenantId,
           tenant.tenantType
         )
+        if (isPrimary) {
+          await assignDefaultRoleForTenant(req.userData.id, tenant.tenantId, tenant.tenantType)
+          roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+          permissions = await getPermissionsForUser(
+            req.userData.id,
+            tenant.tenantId,
+            tenant.tenantType
+          )
+        }
       }
       req.tenantContext = {
         tenantId: tenant.tenantId,
@@ -496,6 +609,7 @@ export function resolveTenantContext(req, res, next) {
         roles,
         permissions,
       }
+      syncRequestLogContext(req)
       next()
     })
     .catch((err) => {
@@ -562,6 +676,31 @@ export function requirePermission(permissionKey) {
   }
 }
 
+/** Allow route when the user has any one of the listed permissions (or is admin). */
+export function requireAnyPermission(...permissionKeys) {
+  return (req, res, next) => {
+    const tenant = req.tenantContext
+    const admin = req.adminContext
+    const perms = tenant?.permissions ?? admin?.permissions ?? []
+    if (permissionKeys.some((key) => hasPermission(perms, key))) {
+      return next()
+    }
+    if (req.userData?.role === 'ADMIN') {
+      if (getEffectiveTenant(req)) return next()
+      if (!tenant && admin) return next()
+    }
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'FORBIDDEN',
+        message: `Missing one of: ${permissionKeys.join(', ')}`,
+      },
+      requestId: req.requestId,
+    })
+  }
+}
+
 // Check if user owns resource (for suppliers/restaurants)
 export function requireOwnership(ownerType) {
   return (req, res, next) => {
@@ -612,3 +751,20 @@ export function requireOwnership(ownerType) {
     next()
   }
 }
+
+export {
+  getUserWorkspaceMembership,
+  bindUserToWorkspace,
+  assertUserCanJoinWorkspace,
+  assertEmailCanJoinWorkspace,
+  resolveWorkspaceScope,
+  MAIN_ADMIN_ROLE_NAME,
+} from './workspace-membership.js'
+
+export {
+  requireTenantPermission,
+  requireSupplierPermission,
+  requireRestaurantPermission,
+  assertCanAssignRole,
+  assertCanGrantPermissions,
+} from './rbac-guards.js'

@@ -64,15 +64,15 @@ services:
     image: minio/mc:latest
     container_name: supplify-dev-minio-init
     env_file: ./env/.env.dev
+    volumes:
+      - ./scripts/minio-init-buckets.sh:/scripts/minio-init-buckets.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/minio-init-buckets.sh"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD 2>/dev/null; do sleep 2; done;
-      mc mb local/${S3_BUCKET:-supplify} --ignore-existing;
-      echo 'MinIO bucket ready';
-      "
+      S3_BUCKET: ${S3_BUCKET:-supplify}
+      S3_BUCKETS: ${S3_BUCKETS:-}
+      MINIO_PUBLIC_READ: ${MINIO_PUBLIC_READ:-true}
     depends_on:
       minio:
         condition: service_healthy
@@ -156,6 +156,7 @@ services:
         }
         "
         node apps/api/scripts/migrate-users-to-roles.js || { echo "Tenant role backfill failed"; exit 1; }
+        node apps/api/scripts/sync-system-roles.mjs || { echo "System roles sync failed"; exit 1; }
     depends_on:
       postgres:
         condition: service_healthy
@@ -179,7 +180,10 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-supplify-api}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}
       S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:9000}
       S3_BUCKET: ${S3_BUCKET:-supplify}
+      S3_BUCKETS: ${S3_BUCKETS:-}
+      S3_PUBLIC_READ: ${S3_PUBLIC_READ:-true}
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       REDIS_URL: redis://redis:6379

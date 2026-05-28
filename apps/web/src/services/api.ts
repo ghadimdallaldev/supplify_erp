@@ -1,4 +1,8 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import {
+  normalizeAdminPlanUpdateResult,
+  type AdminPlanUpdateResult,
+} from '../lib/adminPlanSaveFeedback'
 import type {
   User,
   Product,
@@ -198,6 +202,7 @@ export const api = createApi({
     'Price',
     'Inventory',
     'RestaurantInventory',
+    'RestaurantWaste',
     'Chat',
     'Receiving',
     'RestaurantFinance',
@@ -218,7 +223,6 @@ export const api = createApi({
     'QuickList',
     'Fulfillment',
     'Driver',
-    'Approvals',
     'Reviews',
     'Reports',
     'Disputes',
@@ -247,6 +251,12 @@ export const api = createApi({
       // Cache for 5 minutes to reduce requests
       keepUnusedDataFor: 300,
     }),
+    getInviteSession: builder.query<
+      { id: string; email: string; displayName: string } | null,
+      void
+    >({
+      query: () => '/auth/session',
+    }),
     logout: builder.mutation<{ message?: string; keycloakLogoutUrl?: string }, void>({
       query: () => ({
         url: '/auth/logout',
@@ -272,7 +282,15 @@ export const api = createApi({
       }),
       transformResponse: (response: { data?: { tenantType: string; tenant: unknown } }) =>
         response.data as { tenantType: string; tenant: unknown },
-      invalidatesTags: ['User', 'RegisterStatus'],
+      invalidatesTags: ['User', 'RegisterStatus', 'Billing', 'Subscription'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          await dispatch(api.endpoints.getMe.initiate(undefined, { forceRefetch: true })).unwrap()
+        } catch {
+          // Leave cache as-is on failure
+        }
+      },
     }),
 
     // Product endpoints
@@ -669,6 +687,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
         { type: 'Supplier', id: 'LIST' },
+        'Subscription',
       ],
     }),
     unfollowSupplier: builder.mutation<any, string>({
@@ -679,6 +698,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
         { type: 'Supplier', id: 'LIST' },
+        'Subscription',
       ],
     }),
     getSupplierMe: builder.query<{ supplier: Supplier }, void>({
@@ -1038,6 +1058,14 @@ export const api = createApi({
         adjustmentType: 'WASTAGE' | 'SPOILAGE' | 'COUNT_CORRECTION' | 'OTHER'
         quantity: number
         reason?: string
+        unitCost?: number
+        wasteCategory?:
+          | 'OVER_PRODUCTION'
+          | 'SPOILAGE'
+          | 'BREAKAGE'
+          | 'EXPIRED'
+          | 'OVERPORTIONING'
+          | 'OTHER'
       }
     >({
       query: (body) => ({
@@ -1045,7 +1073,22 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['RestaurantInventory'],
+      invalidatesTags: ['RestaurantInventory', 'RestaurantWaste'],
+    }),
+    getRestaurantWasteAnalytics: builder.query<
+      {
+        analytics: Array<Record<string, unknown>>
+        summary: Record<string, unknown>
+        trend: Array<Record<string, unknown>>
+        period: number
+      },
+      { period?: number }
+    >({
+      query: ({ period = 30 } = {}) => ({
+        url: '/api/restaurant-inventory/waste-analytics',
+        params: { period },
+      }),
+      providesTags: ['RestaurantWaste'],
     }),
     getReorderSuggestions: builder.query<ReorderSuggestionsResponse, void>({
       query: () => '/api/restaurant-inventory/reorder-suggestions',
@@ -1276,6 +1319,13 @@ export const api = createApi({
       query: (body) => ({ url: '/api/org/branches', method: 'POST', body }),
       invalidatesTags: ['Branch', 'Org', 'Supplier'],
     }),
+    deactivateOrgBranch: builder.mutation<{ deactivated: boolean }, string>({
+      query: (supplierId) => ({
+        url: `/api/org/branches/${supplierId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Branch', 'Org', 'Supplier'],
+    }),
     switchOrgBranchContext: builder.mutation<
       { activeSupplierId: string | null; tenantName?: string },
       { supplier_id: string | null }
@@ -1390,6 +1440,8 @@ export const api = createApi({
         user?: { email?: string; displayName?: string }
         activeSupplierId?: string
         activeRestaurantId?: string
+        needsManualLogin?: boolean
+        loginMessage?: string
       },
       {
         token: string
@@ -1724,11 +1776,16 @@ export const api = createApi({
     }),
     getPublicReservationAvailability: builder.query<
       PublicAvailabilityResponse,
-      { restaurantId: string; partySize: number; date: string }
+      { restaurantId: string; partySize: number; date: string; manageToken?: string }
     >({
-      query: ({ restaurantId, partySize, date }) => ({
+      query: ({ restaurantId, partySize, date, manageToken }) => ({
         url: '/api/public/reservations/availability',
-        params: { restaurantId, partySize, date },
+        params: {
+          restaurantId,
+          partySize,
+          date,
+          ...(manageToken ? { manageToken } : {}),
+        },
         credentials: 'omit',
       }),
     }),
@@ -1758,8 +1815,8 @@ export const api = createApi({
         scheduledAt: string
         durationMinutes?: number
         customerName: string
-        customerEmail?: string
-        customerPhone?: string
+        customerEmail: string
+        customerPhone: string
         notes?: string
       }
     >({
@@ -1769,6 +1826,7 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
+      invalidatesTags: [{ type: 'Reservation', id: 'BOARD' }],
     }),
     getPublicReservationDetails: builder.query<{ reservation: PublicReservationDetails }, string>({
       query: (token) => ({
@@ -1788,7 +1846,10 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
-      invalidatesTags: (_result, _error, { token }) => [{ type: 'Reservation', id: token }],
+      invalidatesTags: (_result, _error, { token }) => [
+        { type: 'Reservation', id: token },
+        { type: 'Reservation', id: 'BOARD' },
+      ],
     }),
     reschedulePublicReservation: builder.mutation<
       { reservation: PublicReservationDetails },
@@ -1800,7 +1861,10 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
-      invalidatesTags: (_result, _error, { token }) => [{ type: 'Reservation', id: token }],
+      invalidatesTags: (_result, _error, { token }) => [
+        { type: 'Reservation', id: token },
+        { type: 'Reservation', id: 'BOARD' },
+      ],
     }),
 
     // Staff self-service portal
@@ -1900,6 +1964,26 @@ export const api = createApi({
         'StaffDocument',
       ],
     }),
+    getStaffSelfTimeEntries: builder.query<StaffTimeEntry[], void>({
+      query: () => '/api/staff/self/time-entries',
+      providesTags: ['StaffTimeEntry'],
+    }),
+    staffSelfCheckIn: builder.mutation<StaffTimeEntry, { note?: string }>({
+      query: (body) => ({
+        url: '/api/staff/self/check-in',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['StaffTimeEntry'],
+    }),
+    staffSelfCheckOut: builder.mutation<StaffTimeEntry, { id: string }>({
+      query: ({ id }) => ({
+        url: `/api/staff/self/time-entries/${id}/check-out`,
+        method: 'POST',
+        body: {},
+      }),
+      invalidatesTags: ['StaffTimeEntry'],
+    }),
     submitStaffSelfPto: builder.mutation<
       StaffPtoRequest,
       {
@@ -1929,102 +2013,6 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-    }),
-
-    // Approvals & budgets
-    getApprovalBudgets: builder.query<
-      { periods: Array<Record<string, unknown>> },
-      { branchId?: string; year?: string } | void
-    >({
-      query: (params) => ({
-        url: '/api/approvals/budgets',
-        params: params || {},
-      }),
-      providesTags: ['Approvals'],
-    }),
-    getApprovalBudgetUsage: builder.query<Record<string, unknown>, string>({
-      query: (id) => `/api/approvals/budgets/${id}/usage`,
-      providesTags: ['Approvals'],
-    }),
-    createApprovalBudget: builder.mutation<
-      { period: Record<string, unknown> },
-      Record<string, unknown>
-    >({
-      query: (body) => ({ url: '/api/approvals/budgets', method: 'POST', body }),
-      invalidatesTags: ['Approvals'],
-    }),
-    updateApprovalBudget: builder.mutation<
-      { period: Record<string, unknown> },
-      { id: string; body: Record<string, unknown> }
-    >({
-      query: ({ id, body }) => ({ url: `/api/approvals/budgets/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['Approvals'],
-    }),
-    deleteApprovalBudget: builder.mutation<{ deleted: boolean }, string>({
-      query: (id) => ({ url: `/api/approvals/budgets/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Approvals'],
-    }),
-    getApprovalRules: builder.query<{ rules: Array<Record<string, unknown>> }, void>({
-      query: () => '/api/approvals/rules',
-      providesTags: ['Approvals'],
-    }),
-    createApprovalRule: builder.mutation<
-      { rule: Record<string, unknown> },
-      Record<string, unknown>
-    >({
-      query: (body) => ({ url: '/api/approvals/rules', method: 'POST', body }),
-      invalidatesTags: ['Approvals'],
-    }),
-    updateApprovalRule: builder.mutation<
-      { rule: Record<string, unknown> },
-      { id: string; body: Record<string, unknown> }
-    >({
-      query: ({ id, body }) => ({ url: `/api/approvals/rules/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['Approvals'],
-    }),
-    deleteApprovalRule: builder.mutation<{ deactivated: boolean }, string>({
-      query: (id) => ({ url: `/api/approvals/rules/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Approvals'],
-    }),
-    getPendingApprovals: builder.query<{ approvals: Array<Record<string, unknown>> }, void>({
-      query: () => '/api/approvals/pending',
-      providesTags: ['Approvals', 'Order'],
-    }),
-    approveOrderRequest: builder.mutation<
-      { orderId: string; status: string },
-      { id: string; notes?: string }
-    >({
-      query: ({ id, notes }) => ({
-        url: `/api/approvals/requests/${id}/approve`,
-        method: 'POST',
-        body: { notes },
-      }),
-      invalidatesTags: ['Approvals', 'Order'],
-    }),
-    rejectOrderRequest: builder.mutation<
-      { orderId: string; status: string },
-      { id: string; notes: string }
-    >({
-      query: ({ id, notes }) => ({
-        url: `/api/approvals/requests/${id}/reject`,
-        method: 'POST',
-        body: { notes },
-      }),
-      invalidatesTags: ['Approvals', 'Order'],
-    }),
-    getOrderApprovalStatus: builder.query<
-      {
-        approval: Record<string, unknown> | null
-        orderStatus?: string
-        hasPendingApproval?: boolean
-      },
-      string
-    >({
-      query: (orderId) => `/api/orders/${orderId}/approval-status`,
-      providesTags: (_r, _e, id) => [
-        { type: 'Approvals', id },
-        { type: 'Order', id },
-      ],
     }),
 
     // Reports
@@ -2070,7 +2058,7 @@ export const api = createApi({
     }),
     createDispute: builder.mutation<Record<string, unknown>, Record<string, unknown>>({
       query: (body) => ({ url: '/api/disputes', method: 'POST', body }),
-      invalidatesTags: ['Disputes', 'Order'],
+      invalidatesTags: ['Disputes', 'Order', 'Receiving'],
     }),
     cancelDispute: builder.mutation<Record<string, unknown>, string>({
       query: (id) => ({ url: `/api/disputes/${id}/cancel`, method: 'POST' }),
@@ -2126,7 +2114,7 @@ export const api = createApi({
     }),
     getActivePromotions: builder.query<
       { promotions: Array<Record<string, unknown>> },
-      { supplierId?: string } | void
+      { supplierId?: string; categoryId?: string; sort?: string; expiringSoon?: string } | void
     >({
       query: (params) => ({ url: '/api/promotions/active', params: params || {} }),
       providesTags: ['Promotions'],
@@ -2160,6 +2148,215 @@ export const api = createApi({
     getPromotionAnalytics: builder.query<{ analytics: Record<string, unknown> }, string>({
       query: (id) => `/api/promotions/${id}/analytics`,
       providesTags: (_r, _e, id) => [{ type: 'Promotions', id }],
+    }),
+    getPromotionPricing: builder.query<{ pricing: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/promotions/pricing',
+    }),
+    getDealDetail: builder.query<{ deal: Record<string, unknown> }, string>({
+      query: (id) => `/api/promotions/${id}/detail`,
+      providesTags: (_r, _e, id) => [{ type: 'Promotions', id }],
+    }),
+    getEligibleDealProducts: builder.query<
+      { products: Array<Record<string, unknown>>; dealId: string; supplierId: string },
+      string
+    >({
+      query: (id) => `/api/promotions/${id}/eligible-products`,
+    }),
+    recordDealInteraction: builder.mutation<
+      { interaction: Record<string, unknown> },
+      { id: string; interactionType: string; metadata?: Record<string, unknown> }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/promotions/${id}/interact`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    useDealCoupon: builder.mutation<
+      { couponCode: string; dealId: string; supplierId: string },
+      string
+    >({
+      query: (id) => ({ url: `/api/promotions/${id}/use-coupon`, method: 'POST' }),
+    }),
+    messageFromDeal: builder.mutation<
+      {
+        conversation: Record<string, unknown>
+        message: Record<string, unknown>
+        initialMessage: string
+      },
+      string
+    >({
+      query: (id) => ({ url: `/api/promotions/${id}/message`, method: 'POST' }),
+      invalidatesTags: ['Conversations'],
+    }),
+    promoteDeal: builder.mutation<
+      { promotion: Record<string, unknown> },
+      { id: string; pricingKey?: string; budget?: number; targetAudience?: Record<string, unknown> }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/promotions/${id}/promote`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Promotions'],
+    }),
+    resumePromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/${id}/resume`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    previewDeal: builder.query<{ deal: Record<string, unknown> }, string>({
+      query: (id) => `/api/promotions/${id}/preview`,
+    }),
+    getAdminDeals: builder.query<
+      { deals: Array<Record<string, unknown>> },
+      {
+        status?: string
+        supplierId?: string
+        type?: string
+        search?: string
+        fromDate?: string
+        toDate?: string
+      }
+    >({
+      query: (params) => ({ url: '/api/promotions/admin/deals', params: params || {} }),
+      providesTags: ['Promotions'],
+    }),
+    getAdminDealInsights: builder.query<{ insights: Record<string, unknown> }, void>({
+      query: () => '/api/promotions/admin/deals/insights',
+      providesTags: ['Promotions'],
+    }),
+    getAdminPendingDeals: builder.query<{ deals: Array<Record<string, unknown>> }, void>({
+      query: () => '/api/promotions/admin/pending',
+      providesTags: ['Promotions'],
+    }),
+    approveAdminDeal: builder.mutation<{ deal: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/admin/${id}/approve`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    rejectAdminDeal: builder.mutation<
+      { deal: Record<string, unknown> },
+      { id: string; rejectionReason?: string; adminNotes?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/promotions/admin/${id}/reject`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Promotions'],
+    }),
+    pauseAdminDeal: builder.mutation<{ deal: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/admin/${id}/pause`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    submitPromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
+      query: (id) => ({ url: `/api/promotions/${id}/submit`, method: 'POST' }),
+      invalidatesTags: ['Promotions'],
+    }),
+    previewCartDeal: builder.mutation<
+      { preview: Record<string, unknown> },
+      {
+        supplierId: string
+        subtotal: number
+        promotionId?: string
+        couponCode?: string
+        lineItems?: Array<Record<string, unknown>>
+      }
+    >({
+      query: (body) => ({ url: '/api/promotions/cart-preview', method: 'POST', body }),
+    }),
+    updateAdminPromotionPricing: builder.mutation<
+      { pricing: Record<string, unknown> },
+      {
+        key: string
+        amount?: number
+        durationDays?: number
+        isActive?: boolean
+        displayName?: string
+        description?: string
+      }
+    >({
+      query: ({ key, ...body }) => ({
+        url: `/api/promotions/admin/pricing/${key}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Promotions'],
+    }),
+
+    getAdminLimitKeys: builder.query<
+      { keys: string[] },
+      { tenantType?: 'RESTAURANT' | 'SUPPLIER' } | void
+    >({
+      query: (params) => ({
+        url: '/api/admin-dashboard/limit-keys',
+        params: params || {},
+      }),
+    }),
+    getAdminLimitOverrides: builder.query<
+      {
+        tenantOverrides: Array<Record<string, unknown>>
+        planOverrides: Array<Record<string, unknown>>
+      },
+      {
+        tenantType?: string
+        tenantId?: string
+        planId?: string
+        limitKey?: string
+        active?: string
+      } | void
+    >({
+      query: (params) => ({
+        url: '/api/admin-dashboard/limit-overrides',
+        params: params || {},
+      }),
+    }),
+    createAdminPlanLimitOverride: builder.mutation<
+      { override: Record<string, unknown> },
+      {
+        planId: string
+        limit_type: string
+        override_value: number
+        expiration_date?: string | null
+        reason?: string | null
+      }
+    >({
+      query: ({ planId, ...body }) => ({
+        url: `/api/admin-dashboard/plans/${planId}/override-limit`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    updateAdminTenantLimitOverride: builder.mutation<
+      { override: Record<string, unknown> },
+      {
+        id: string
+        override_value?: number
+        expiration_date?: string | null
+        reason?: string | null
+        is_active?: boolean
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/admin-dashboard/tenant-overrides/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+    }),
+    updateAdminPlanLimitOverride: builder.mutation<
+      { override: Record<string, unknown> },
+      {
+        id: string
+        override_value?: number
+        expiration_date?: string | null
+        reason?: string | null
+        is_active?: boolean
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/admin-dashboard/plan-overrides/${id}`,
+        method: 'PATCH',
+        body,
+      }),
     }),
 
     // Reviews
@@ -2449,20 +2646,51 @@ export const api = createApi({
     }),
     unlockAdminSubscription: builder.mutation<
       { subscription: Subscription },
-      { id: string; reason?: string }
+      { id: string; reason?: string; freeTrialDays?: number }
     >({
-      query: ({ id, reason }) => ({
+      query: ({ id, reason, freeTrialDays }) => ({
         url: `/api/admin-dashboard/subscriptions/${id}/unlock`,
         method: 'POST',
-        body: { reason },
+        body: { reason, freeTrialDays },
+      }),
+      invalidatesTags: ['Admin', 'Billing', 'Subscription'],
+    }),
+
+    extendAdminFreeTrial: builder.mutation<
+      {
+        subscription: Subscription
+        freeTrialDays: number
+        freeSandboxExpiresAt: string | null
+      },
+      { id: string; days?: number }
+    >({
+      query: ({ id, days }) => ({
+        url: `/api/admin-dashboard/subscriptions/${id}/extend-free-trial`,
+        method: 'POST',
+        body: days != null ? { days } : {},
       }),
       invalidatesTags: ['Admin', 'Billing', 'Subscription'],
     }),
 
     // Admin Dashboard endpoints
-    getAdminOverview: builder.query<any, void>({
+    getAdminOverview: builder.query<import('../lib/adminOverview').AdminOverview, void>({
       query: () => '/api/admin-dashboard/overview',
       providesTags: ['Admin'],
+    }),
+    getAdminPlatformSettings: builder.query<{ freeSandboxDays: number }, void>({
+      query: () => '/api/admin-dashboard/platform-settings',
+      providesTags: ['Admin'],
+    }),
+    updateAdminPlatformSettings: builder.mutation<
+      { freeSandboxDays: number },
+      { freeSandboxDays: number }
+    >({
+      query: (body) => ({
+        url: '/api/admin-dashboard/platform-settings',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Admin'],
     }),
     getAdminConversionStats: builder.query<
       {
@@ -2520,12 +2748,19 @@ export const api = createApi({
       }),
       invalidatesTags: ['Admin'],
     }),
-    updateAdminPlan: builder.mutation<SubscriptionPlan, { id: string; data: any }>({
+    updateAdminPlan: builder.mutation<
+      AdminPlanUpdateResult,
+      { id: string; data: Record<string, unknown> }
+    >({
       query: ({ id, data }) => ({
         url: `/api/admin-dashboard/plans/${id}`,
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (raw) =>
+        normalizeAdminPlanUpdateResult(
+          raw as AdminPlanUpdateResult | import('../types').SubscriptionPlan
+        ),
       invalidatesTags: ['Admin'],
     }),
     getAdminSubscriptions: builder.query<{ subscriptions: Subscription[] }, any>({
@@ -2730,6 +2965,7 @@ export const api = createApi({
 
 export const {
   useGetMeQuery,
+  useGetInviteSessionQuery,
   useGetRegisterStatusQuery,
   useCompleteRegistrationMutation,
   useLogoutMutation,
@@ -2813,6 +3049,7 @@ export const {
   useGetRestaurantInventoryHistoryQuery,
   useAddRestaurantInventoryMutation,
   useAdjustRestaurantInventoryMutation,
+  useGetRestaurantWasteAnalyticsQuery,
   useGetReorderSuggestionsQuery,
   useGetPendingOrdersForReceivingQuery,
   useGetReceivingHistoryQuery,
@@ -2838,6 +3075,7 @@ export const {
   useGetOrgQuery,
   useGetOrgBranchesQuery,
   useCreateOrgBranchMutation,
+  useDeactivateOrgBranchMutation,
   useSwitchOrgBranchContextMutation,
   useGetBranchInviteRolesQuery,
   useGetBranchInvitationsQuery,
@@ -2892,6 +3130,9 @@ export const {
   useSubmitStaffPortalPtoMutation,
   useSubmitStaffPortalSwapMutation,
   useGetStaffSelfDashboardQuery,
+  useGetStaffSelfTimeEntriesQuery,
+  useStaffSelfCheckInMutation,
+  useStaffSelfCheckOutMutation,
   useSubmitStaffSelfPtoMutation,
   useSubmitStaffSelfSwapMutation,
   useGetCurrentSubscriptionQuery,
@@ -2907,21 +3148,9 @@ export const {
   useBillingPayNowMutation,
   useSetBillingAutoRenewMutation,
   useUnlockAdminSubscriptionMutation,
+  useExtendAdminFreeTrialMutation,
   useGetSubscriptionUsageQuery,
   useCheckFeatureQuery,
-  useGetApprovalBudgetsQuery,
-  useGetApprovalBudgetUsageQuery,
-  useCreateApprovalBudgetMutation,
-  useUpdateApprovalBudgetMutation,
-  useDeleteApprovalBudgetMutation,
-  useGetApprovalRulesQuery,
-  useCreateApprovalRuleMutation,
-  useUpdateApprovalRuleMutation,
-  useDeleteApprovalRuleMutation,
-  useGetPendingApprovalsQuery,
-  useApproveOrderRequestMutation,
-  useRejectOrderRequestMutation,
-  useGetOrderApprovalStatusQuery,
   useGetRestaurantReportQuery,
   useGetSupplierReportQuery,
   useGetDisputesQuery,
@@ -2942,6 +3171,29 @@ export const {
   usePausePromotionMutation,
   useDeletePromotionMutation,
   useGetPromotionAnalyticsQuery,
+  useGetPromotionPricingQuery,
+  useGetDealDetailQuery,
+  useGetEligibleDealProductsQuery,
+  useRecordDealInteractionMutation,
+  useUseDealCouponMutation,
+  useMessageFromDealMutation,
+  usePromoteDealMutation,
+  useResumePromotionMutation,
+  usePreviewDealQuery,
+  useGetAdminDealsQuery,
+  useGetAdminDealInsightsQuery,
+  useGetAdminPendingDealsQuery,
+  useApproveAdminDealMutation,
+  useRejectAdminDealMutation,
+  usePauseAdminDealMutation,
+  useSubmitPromotionMutation,
+  usePreviewCartDealMutation,
+  useGetAdminLimitKeysQuery,
+  useGetAdminLimitOverridesQuery,
+  useCreateAdminPlanLimitOverrideMutation,
+  useUpdateAdminTenantLimitOverrideMutation,
+  useUpdateAdminPlanLimitOverrideMutation,
+  useUpdateAdminPromotionPricingMutation,
   useGetSupplierReviewsQuery,
   useGetSupplierRatingSummaryQuery,
   useGetMyReviewsQuery,
@@ -2961,6 +3213,8 @@ export const {
   useAcceptWaitlistOfferMutation,
   useDeclineWaitlistOfferMutation,
   useGetAdminOverviewQuery,
+  useGetAdminPlatformSettingsQuery,
+  useUpdateAdminPlatformSettingsMutation,
   useGetAdminConversionStatsQuery,
   useGetAdminPlansQuery,
   useCreateAdminPlanMutation,
@@ -2971,6 +3225,7 @@ export const {
   useGetTenantUsageQuery,
   useGetAdminAuditLogsQuery,
   useGetAdminActivityQuery,
+  useGetAdminHealthQuery,
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
   useGetSupplierUsageQuery,

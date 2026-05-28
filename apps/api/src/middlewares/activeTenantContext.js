@@ -1,5 +1,6 @@
 import { verifyActiveTenantToken, getActiveTenantCookieName } from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
+import { syncRequestLogContext } from '../lib/request-log-context.js'
 
 export async function activeTenantContext(req, res, next) {
   try {
@@ -18,6 +19,7 @@ export async function activeTenantContext(req, res, next) {
     }
 
     req.activeTenantContext = payload
+    syncRequestLogContext(req)
     next()
   } catch (err) {
     next(err)

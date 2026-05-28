@@ -15,8 +15,13 @@ x-api-environment: &api-environment
   KEYCLOAK_REALM: Supplify
   KEYCLOAK_CLIENT_ID: supplify-api
   KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}
+  KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+  KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
   S3_ENDPOINT: http://minio:9000
+  S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:9000}
   S3_BUCKET: ${S3_BUCKET:-supplify}
+  S3_BUCKETS: ${S3_BUCKETS:-}
+  S3_PUBLIC_READ: ${S3_PUBLIC_READ:-true}
   S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
   S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
   REDIS_URL: redis://redis:6379
@@ -71,6 +76,11 @@ services:
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
     networks:
       - supplify
@@ -80,16 +90,16 @@ services:
     container_name: supplify-minio-init
     depends_on:
       minio:
-        condition: service_started
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD 2>/dev/null; do sleep 2; done;
-      mc mb local/${S3_BUCKET:-supplify} --ignore-existing;
-      echo 'MinIO bucket ready';
-      "
+        condition: service_healthy
+    volumes:
+      - ./deploy/scripts/minio-init-buckets.sh:/scripts/minio-init-buckets.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/minio-init-buckets.sh"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-supplify}
+      S3_BUCKETS: ${S3_BUCKETS:-}
+      MINIO_PUBLIC_READ: ${MINIO_PUBLIC_READ:-true}
     restart: "no"
     networks:
       - supplify
@@ -98,6 +108,8 @@ services:
     image: quay.io/keycloak/keycloak:24.0
     container_name: supplify-keycloak
     environment:
+      # Cap JVM heap for local dev (default Keycloak dev mode can exceed 1.5 GiB RSS)
+      JAVA_OPTS_APPEND: ${KEYCLOAK_JAVA_OPTS_APPEND:--Xms256m -Xmx768m}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_DB: postgres
@@ -168,6 +180,7 @@ services:
           console.warn('Runtime migrator warning:', e.message);
         }
         " || true
+        node apps/api/scripts/sync-system-roles.mjs || echo "WARN: sync-system-roles"
         exit 0
     depends_on:
       postgres:

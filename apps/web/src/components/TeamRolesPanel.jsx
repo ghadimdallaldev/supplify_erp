@@ -233,7 +233,7 @@ export function TeamRolesPanel({
               <p className="text-sm text-[var(--text-muted)] text-center py-6">
                 No team contacts yet.
               </p>
-            ) : teamMembers.length > 0 ? (
+            ) : !advancedRolesEnabled && teamMembers.length > 0 ? (
               <div className="space-y-3">
                 {teamMembers.map((member) => (
                   <div

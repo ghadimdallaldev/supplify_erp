@@ -5,11 +5,12 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
   resolveTenantContext,
-  requirePermission,
 } from '../lib/rbac.js'
+import { settingsMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
+import { requireFeature } from '../lib/subscription.js'
 import {
   listLinkedAccounts,
   createLinkedBranchAccount,
@@ -25,7 +26,13 @@ import { config } from '../config/env.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requirePermission('SETTINGS_VIEW'))
+const multiBranchFeature = requireFeature(
+  'multi_branch',
+  (req) => req.tenantContext?.tenantId || req.activeTenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType || req.userData?.role || 'RESTAURANT'
+)
+
+router.use(requireAuth, resolveTenantContext, settingsMutationGuard)
 
 async function resolveParentTenant(req) {
   if (req.userData.role === 'ADMIN') {
@@ -92,7 +99,7 @@ router.get('/', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), async (req, re
  * POST /api/branches
  * Create a new linked branch account (separate restaurant/supplier tenant).
  */
-router.post('/', requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res) => {
+router.post('/', requireRole(['RESTAURANT', 'SUPPLIER']), multiBranchFeature, async (req, res) => {
   try {
     const parent = await resolveParentTenant(req)
     if (!parent) {

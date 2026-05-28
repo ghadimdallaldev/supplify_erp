@@ -14,6 +14,7 @@ import { Switch } from '../ui/switch'
 import { Label } from '../ui/label'
 import { Badge } from '../ui/badge'
 import { Textarea } from '../ui/textarea'
+import { findReservationForTable, lookupTableAssignment } from '../../lib/reservation-tables'
 import { useSaveReservationTablesMutation } from '../../services/reservationsApi'
 import { toast } from 'react-hot-toast'
 import {
@@ -75,6 +76,8 @@ interface EditableTable {
 interface ReservationTableBuilderProps {
   tables: ReservationTable[]
   reservations?: Reservation[]
+  /** When true, floor canvas shows guest names on assigned tables (Live view). */
+  defaultLiveView?: boolean
 }
 
 interface ServiceInfo {
@@ -506,6 +509,7 @@ function ChairLayer({ shape, capacity, widthPx, heightPx, color, isActive }: Cha
 export function ReservationTableBuilder({
   tables,
   reservations = [],
+  defaultLiveView = false,
 }: ReservationTableBuilderProps) {
   // Core state
   const [editableTables, setEditableTables] = useState<EditableTable[]>(() => hydrateTables(tables))
@@ -523,7 +527,7 @@ export function ReservationTableBuilder({
   const [gridSnap, setGridSnap] = useState(false)
   const [zoom, setZoom] = useState(1.0)
   const [zoneFilter, setZoneFilter] = useState<TableZone | 'all'>('all')
-  const [serviceMode, setServiceMode] = useState(false)
+  const [serviceMode, setServiceMode] = useState(defaultLiveView)
 
   // Refs for keyboard handler (avoid stale closures)
   const editableTablesRef = useRef(editableTables)
@@ -694,22 +698,20 @@ export function ReservationTableBuilder({
   const zoomOut = () => setZoom((z) => Math.max(MIN_ZOOM, Math.round((z - ZOOM_STEP) * 100) / 100))
   const zoomReset = () => setZoom(1.0)
 
-  // ── Service mode map ────────────────────────────────────────────────────────
-  const tableServiceMap = useMemo((): Map<string, ServiceInfo> => {
-    if (!serviceMode) return new Map()
+  const tableAssignmentMap = useMemo((): Map<string, ServiceInfo> => {
     const map = new Map<string, ServiceInfo>()
-    for (const res of reservations) {
-      if (res.status === 'CANCELLED' || res.status === 'COMPLETED') continue
-      for (const tableId of res.tables) {
-        map.set(tableId, {
-          status: res.status,
-          customerName: res.customer_name,
-          partySize: res.party_size,
+    for (const table of editableTables) {
+      const info = findReservationForTable(table, reservations)
+      if (info && table.id) {
+        map.set(table.id, {
+          status: info.status,
+          customerName: info.customerName,
+          partySize: info.partySize,
         })
       }
     }
     return map
-  }, [serviceMode, reservations])
+  }, [editableTables, reservations])
 
   // ── Derived stats ───────────────────────────────────────────────────────────
   const totalCapacity = useMemo(
@@ -721,10 +723,11 @@ export function ReservationTableBuilder({
     () => editableTables.filter((t) => t.isActive).length,
     [editableTables]
   )
-  const occupiedCount = useMemo(() => {
-    if (!serviceMode) return 0
-    return editableTables.filter((t) => t.id && tableServiceMap.has(t.id)).length
-  }, [serviceMode, editableTables, tableServiceMap])
+  const occupiedCount = useMemo(
+    () =>
+      editableTables.filter((t) => t.id && lookupTableAssignment(tableAssignmentMap, t.id)).length,
+    [editableTables, tableAssignmentMap]
+  )
 
   const selectedTable = useMemo(
     () => editableTables.find((t) => t.localId === selectedTableId) ?? null,
@@ -903,15 +906,24 @@ export function ReservationTableBuilder({
             ? '32px 32px 12px 12px'
             : '18px'
 
-    // Service mode styling
     let bgColor = `${table.color}20`
     let borderColor = 'rgba(255,255,255,0.8)'
-    let serviceInfo: ServiceInfo | undefined
+    const serviceInfo =
+      findReservationForTable(table, reservations) ??
+      lookupTableAssignment(tableAssignmentMap, table.id)
 
-    if (serviceMode && table.id) {
-      serviceInfo = tableServiceMap.get(table.id)
-      const key = serviceInfo?.status ?? 'available'
+    if (serviceInfo) {
+      const key = serviceInfo.status ?? 'available'
       const style = SERVICE_STATUS_STYLES[key] ?? SERVICE_STATUS_STYLES.available
+      if (serviceMode) {
+        bgColor = style.bg
+        borderColor = style.border
+      } else {
+        bgColor = 'color-mix(in srgb, var(--brand) 12%, white)'
+        borderColor = 'var(--brand-mid)'
+      }
+    } else if (serviceMode) {
+      const style = SERVICE_STATUS_STYLES.available
       bgColor = style.bg
       borderColor = style.border
     }
@@ -965,15 +977,14 @@ export function ReservationTableBuilder({
             transform: `rotate(${table.rotation}deg)`,
           }}
         >
-          {/* Service mode: status badge */}
-          {serviceMode && serviceInfo && (
+          {serviceInfo ? (
             <span
-              className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow"
+              className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow"
               style={{ backgroundColor: borderColor }}
             >
               {SERVICE_STATUS_STYLES[serviceInfo.status]?.label ?? serviceInfo.status}
             </span>
-          )}
+          ) : null}
 
           {/* Inactive overlay */}
           {isInactive && (
@@ -982,13 +993,13 @@ export function ReservationTableBuilder({
             </span>
           )}
 
-          {serviceMode && serviceInfo ? (
+          {serviceInfo ? (
             <>
-              <span className="rounded-full bg-white/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-mid)] shadow">
+              <span className="max-w-full truncate rounded-full bg-white/90 px-2 py-1 text-[11px] font-semibold text-[var(--text)] shadow">
                 {serviceInfo.customerName}
               </span>
               <span className="mt-1 text-[10px] font-medium text-[var(--text-muted)]">
-                {serviceInfo.partySize} guests
+                {serviceInfo.partySize} guests · {table.name}
               </span>
             </>
           ) : (
@@ -1009,7 +1020,7 @@ export function ReservationTableBuilder({
                 variant="outline"
                 className="border-white/60 bg-white/80 text-[9px] font-medium text-[var(--text-muted)]"
               >
-                {f.replaceAll('_', ' ')}
+                {f.replace(/_/g, ' ')}
               </Badge>
             ))}
           </div>
@@ -1029,7 +1040,9 @@ export function ReservationTableBuilder({
     }
 
     if (serviceMode) {
-      const svcInfo = selectedTable.id ? tableServiceMap.get(selectedTable.id) : undefined
+      const svcInfo =
+        findReservationForTable(selectedTable, reservations) ??
+        lookupTableAssignment(tableAssignmentMap, selectedTable.id)
       return (
         <div className="mt-4 space-y-3">
           <p className="text-sm font-semibold text-[var(--text)]">{selectedTable.name}</p>
@@ -1253,7 +1266,9 @@ export function ReservationTableBuilder({
           <div>
             <CardTitle>Floor builder</CardTitle>
             <CardDescription className="mt-1">
-              Drag, resize, rotate, and tag tables.{' '}
+              {serviceMode
+                ? 'Live view: assigned tables show the guest name and status for today’s board.'
+                : 'Edit layout mode — turn on Live view to see table assignments from the board above.'}{' '}
               <span className="opacity-60">
                 Del: delete · Ctrl+D: duplicate · Ctrl+Z: undo · Ctrl+Y: redo · Esc: deselect
               </span>
@@ -1467,14 +1482,14 @@ export function ReservationTableBuilder({
                   Total capacity:{' '}
                   <span className="font-semibold text-[var(--text)]">{totalCapacity}</span>
                 </span>
-                {serviceMode && (
+                {occupiedCount > 0 ? (
                   <span>
-                    Occupied:{' '}
-                    <span className="font-semibold text-[var(--text)]">
+                    Assigned on floor:{' '}
+                    <span className="font-semibold text-[var(--brand-mid)]">
                       {occupiedCount} / {activeTableCount}
                     </span>
                   </span>
-                )}
+                ) : null}
                 {selectedTable && (
                   <span>
                     Selected:{' '}

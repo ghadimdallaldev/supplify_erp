@@ -1,7 +1,8 @@
 import express from 'express'
-import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
+import { requireRestaurantId, requireSupplierId } from '../lib/tenant-resolve.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { parseReportQuery } from '../services/reports.service.js'
@@ -21,29 +22,7 @@ const wasteFeature = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
-router.use(requireAuth, resolveTenantContext, reportsFeature)
-
-async function getRestaurantId(req) {
-  if (req.tenantContext?.tenantType === 'RESTAURANT' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Restaurant not found')
-  return rows[0].id
-}
-
-async function getSupplierId(req) {
-  if (req.tenantContext?.tenantType === 'SUPPLIER' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Supplier not found')
-  return rows[0].id
-}
+router.use(requireAuth, resolveTenantContext, reportsFeature, requirePermission('ORDERS_VIEW'))
 
 function sendReport(res, result, requestId) {
   res.json({
@@ -78,7 +57,7 @@ router.get(
   '/restaurant/spend-by-supplier',
   requireRole(['RESTAURANT', 'ADMIN']),
   handle(async (req, params) => {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     return reports.restaurantSpendBySupplier(restaurantId, params)
   })
 )
@@ -87,7 +66,7 @@ router.get(
   '/restaurant/spend-by-category',
   requireRole(['RESTAURANT', 'ADMIN']),
   handle(async (req, params) => {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     return reports.restaurantSpendByCategory(restaurantId, params)
   })
 )
@@ -96,7 +75,7 @@ router.get(
   '/restaurant/order-volume',
   requireRole(['RESTAURANT', 'ADMIN']),
   handle(async (req, params) => {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     return reports.restaurantOrderVolume(restaurantId, params)
   })
 )
@@ -105,7 +84,7 @@ router.get(
   '/restaurant/cogs-trend',
   requireRole(['RESTAURANT', 'ADMIN']),
   handle(async (req, params) => {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     return reports.restaurantCogsTrend(restaurantId, params)
   })
 )
@@ -114,7 +93,7 @@ router.get(
   '/restaurant/top-products',
   requireRole(['RESTAURANT', 'ADMIN']),
   handle(async (req, params) => {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     return reports.restaurantTopProducts(restaurantId, params)
   })
 )
@@ -123,7 +102,7 @@ router.get(
   '/restaurant/receiving-quality',
   requireRole(['RESTAURANT', 'ADMIN']),
   handle(async (req, params) => {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     return reports.restaurantReceivingQuality(restaurantId, params)
   })
 )
@@ -133,7 +112,7 @@ router.get(
   requireRole(['RESTAURANT', 'ADMIN']),
   wasteFeature,
   handle(async (req, params) => {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     return reports.restaurantWaste(restaurantId, params)
   })
 )
@@ -142,7 +121,7 @@ router.get(
   '/restaurant/invoice-aging',
   requireRole(['RESTAURANT', 'ADMIN']),
   handle(async (req, params) => {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     return reports.restaurantInvoiceAging(restaurantId, params)
   })
 )
@@ -152,7 +131,7 @@ router.get(
   '/supplier/revenue-trend',
   requireRole(['SUPPLIER', 'ADMIN']),
   handle(async (req, params) => {
-    const supplierId = await getSupplierId(req)
+    const supplierId = await requireSupplierId(req)
     return reports.supplierRevenueTrend(supplierId, params)
   })
 )
@@ -161,7 +140,7 @@ router.get(
   '/supplier/top-restaurants',
   requireRole(['SUPPLIER', 'ADMIN']),
   handle(async (req, params) => {
-    const supplierId = await getSupplierId(req)
+    const supplierId = await requireSupplierId(req)
     return reports.supplierTopRestaurants(supplierId, params)
   })
 )
@@ -170,7 +149,7 @@ router.get(
   '/supplier/top-products',
   requireRole(['SUPPLIER', 'ADMIN']),
   handle(async (req, params) => {
-    const supplierId = await getSupplierId(req)
+    const supplierId = await requireSupplierId(req)
     return reports.supplierTopProducts(supplierId, params)
   })
 )
@@ -179,7 +158,7 @@ router.get(
   '/supplier/fulfillment-performance',
   requireRole(['SUPPLIER', 'ADMIN']),
   handle(async (req, params) => {
-    const supplierId = await getSupplierId(req)
+    const supplierId = await requireSupplierId(req)
     return reports.supplierFulfillmentPerformance(supplierId, params)
   })
 )
@@ -188,7 +167,7 @@ router.get(
   '/supplier/order-volume',
   requireRole(['SUPPLIER', 'ADMIN']),
   handle(async (req, params) => {
-    const supplierId = await getSupplierId(req)
+    const supplierId = await requireSupplierId(req)
     const bucket = reports.dateBucketExpression('co.placed_at', params.granularity)
     const { rows } = await query(
       `
@@ -223,7 +202,7 @@ router.get(
   '/supplier/invoice-collection',
   requireRole(['SUPPLIER', 'ADMIN']),
   handle(async (req, params) => {
-    const supplierId = await getSupplierId(req)
+    const supplierId = await requireSupplierId(req)
     return reports.supplierInvoiceCollection(supplierId, params)
   })
 )

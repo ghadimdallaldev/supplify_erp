@@ -7,6 +7,7 @@ import {
 } from '../lib/billing/billing-service.js'
 import { getBillingGateway } from '../lib/billing/gateway-registry.js'
 import { withTransaction } from '../lib/db.js'
+import { invalidateTenantSubscriptionCache } from '../lib/subscription.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -64,6 +65,9 @@ async function attemptAutoRenewal(subscription) {
         updated_at = now()
        WHERE id = $1`,
       [subscription.id, periodStart, periodEnd]
+    )
+    invalidateTenantSubscriptionCache(subscription.tenant_id, subscription.tenant_type).catch(
+      () => {}
     )
     return { renewed: true }
   }

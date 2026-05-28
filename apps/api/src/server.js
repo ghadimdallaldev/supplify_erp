@@ -10,6 +10,7 @@ import { validateProductionConfig } from './lib/validate-config.js'
 import { logger } from './lib/logger.js'
 import { createSessionStore } from './lib/session-store.js'
 import { requestContext } from './middlewares/requestContext.js'
+import { requestLogger } from './middlewares/requestLogger.js'
 import { impersonationContext } from './middlewares/impersonationContext.js'
 import { activeTenantContext } from './middlewares/activeTenantContext.js'
 import { errorHandler } from './middlewares/errorHandler.js'
@@ -48,16 +49,20 @@ import { runSubscriptionBillingJob } from './jobs/subscription-billing.job.js'
 import { checkExpiredWaitlistOffers } from './services/waitlistPromotion.js'
 import { billingAccessMiddleware } from './middlewares/billingAccess.js'
 import { billingRoutes } from './routes/billing.routes.js'
-import { ensureReservationsSchema, ensureStaffAppSchema } from './lib/migrator.js'
+import {
+  ensureReservationsSchema,
+  ensureStaffAppSchema,
+  ensureOrderCancellationColumns,
+} from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
 import { runFulfillmentExceptionChecks } from './jobs/fulfillment-exceptions.job.js'
-import { approvalsRoutes } from './routes/approvals.routes.js'
 import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
 import { runDeactivateExpiredPromotionsJob } from './jobs/promotions-expiry.job.js'
+import { runFreeSandboxExpiryJob } from './jobs/free-sandbox-expiry.job.js'
 import { disputesRoutes } from './routes/disputes.routes.js'
 import { creditNotesRoutes } from './routes/credit-notes.routes.js'
 import { pushRoutes } from './routes/push.routes.js'
@@ -70,6 +75,14 @@ import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { expireOldBranchInvitations } from './lib/branch-invitations.js'
 import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
+import { ensureObjectStorageBuckets, checkObjectStorageHealth } from './lib/object-storage.js'
+import { pool, closePool } from './lib/db.js'
+import { disconnectCache, isRedisConnected } from './lib/cache.js'
+import {
+  getMemorySnapshot,
+  shouldExposeMemoryOnHealth,
+  startMemoryMonitor,
+} from './lib/memory-monitor.js'
 
 if (config.NODE_ENV === 'production') {
   validateProductionConfig()
@@ -79,11 +92,25 @@ if (config.NODE_ENV !== 'test') {
   try {
     await ensureReservationsSchema()
     await ensureStaffAppSchema()
+    await ensureOrderCancellationColumns()
   } catch (error) {
     logger.error('Aborting server startup due to reservations migration failure', {
       error: error.message,
     })
     process.exit(1)
+  }
+
+  try {
+    const bucketResults = await ensureObjectStorageBuckets()
+    logger.info('Object storage buckets ready', {
+      buckets: bucketResults.map((r) => r.bucket),
+    })
+  } catch (error) {
+    logger.error('Object storage bucket setup failed — uploads may not work', {
+      error: error.message,
+      endpoint: config.S3_ENDPOINT,
+      bucket: config.S3_BUCKET,
+    })
   }
 }
 
@@ -170,6 +197,26 @@ const chatSendLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const skipReadOnlyRequests = (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
+
+const ordersWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 120 : 500,
+  message: 'Too many order requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipReadOnlyRequests,
+})
+
+const promotionsWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 80 : 400,
+  message: 'Too many promotion requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipReadOnlyRequests,
+})
+
 app.use('/auth', authLimiter)
 app.use('/api/public', publicLimiter)
 app.use(limiter)
@@ -197,8 +244,9 @@ app.use(
   })
 )
 
-// Request context middleware
+// Request context + one log line per HTTP request
 app.use(requestContext)
+app.use(requestLogger)
 
 // Impersonation: read signed cookie and set req.impersonationContext when admin is "viewing as" a tenant
 app.use(impersonationContext)
@@ -217,13 +265,29 @@ app.use((req, res, next) => {
 })
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    ok: true,
-    status: 'healthy',
+app.get('/health', async (req, res) => {
+  const storage = await checkObjectStorageHealth()
+  const ok = storage.ok
+  const payload = {
+    ok,
+    status: ok ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
+    storage,
     requestId: req.requestId,
-  })
+  }
+
+  if (shouldExposeMemoryOnHealth()) {
+    payload.memory = getMemorySnapshot()
+    payload.dbPool = {
+      total: pool.totalCount,
+      idle: pool.idleCount,
+      waiting: pool.waitingCount,
+      max: pool.options.max,
+    }
+    payload.redis = { connected: isRedisConnected() }
+  }
+
+  res.status(ok ? 200 : 503).json(payload)
 })
 
 // API routes
@@ -237,8 +301,9 @@ app.use('/api/inventory', inventoryRoutes)
 app.use('/api/suppliers', suppliersRoutes)
 app.use('/api/restaurants', restaurantsRoutes)
 app.use('/api/orders/calendar', ordersCalendarRoutes)
+app.use('/api/orders', ordersWriteLimiter)
 app.use('/api/orders', ordersRoutes)
-app.use('/api/approvals', approvalsRoutes)
+app.use('/api/promotions', promotionsWriteLimiter)
 app.use('/api/promotions', promotionsRoutes)
 app.use('/api/audit', tenantAuditRoutes)
 app.use('/api/disputes', disputesRoutes)
@@ -296,14 +361,70 @@ app.use(errorHandler)
 // Start server
 const PORT = config.PORT || 4000
 const server = http.createServer(app)
+const cronTimers = []
+let stopMemoryMonitor = () => {}
+
+function trackInterval(fn, ms) {
+  const timer = setInterval(fn, ms)
+  cronTimers.push(timer)
+  return timer
+}
 
 // Initialize Socket.IO
 initializeSocket(server)
 
+let shuttingDown = false
+async function gracefulShutdown(signal) {
+  if (shuttingDown) return
+  shuttingDown = true
+  logger.info({ msg: 'Graceful shutdown started', signal })
+
+  for (const timer of cronTimers) {
+    clearInterval(timer)
+  }
+  stopMemoryMonitor()
+
+  await new Promise((resolve) => {
+    server.close(() => resolve())
+  })
+
+  try {
+    await closePool()
+  } catch (error) {
+    logger.warn('Error closing database pool', { error: error.message })
+  }
+
+  try {
+    await disconnectCache()
+  } catch (error) {
+    logger.warn('Error disconnecting Redis', { error: error.message })
+  }
+
+  logger.info({ msg: 'Graceful shutdown complete', signal })
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => {
+  gracefulShutdown('SIGTERM').catch((err) => {
+    logger.error('Shutdown failed', { error: err.message })
+    process.exit(1)
+  })
+})
+process.on('SIGINT', () => {
+  gracefulShutdown('SIGINT').catch((err) => {
+    logger.error('Shutdown failed', { error: err.message })
+    process.exit(1)
+  })
+})
+
 server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`)
-  logger.info(`Environment: ${config.NODE_ENV}`)
-  logger.info(`Web origin: ${config.WEB_ORIGIN}`)
+  stopMemoryMonitor = startMemoryMonitor()
+  logger.info({
+    msg: `Server started on port ${PORT}`,
+    port: PORT,
+    env: config.NODE_ENV,
+    webOrigin: config.WEB_ORIGIN,
+  })
 
   // Start scheduled orders cron job
   // Run every 5 minutes to check for scheduled orders (for testing)
@@ -314,8 +435,7 @@ server.listen(PORT, () => {
     logger.error('Error in initial scheduled orders execution:', err)
   })
 
-  // Then run every hour
-  setInterval(() => {
+  trackInterval(() => {
     executeScheduledOrders().catch((err) => {
       logger.error('Error in scheduled orders execution:', err)
     })
@@ -323,8 +443,23 @@ server.listen(PORT, () => {
 
   logger.info('Scheduled orders cron job started (runs every 5 minutes for testing)')
 
+  if (config.NODE_ENV !== 'production') {
+    import('./lib/keycloak-admin.js')
+      .then(({ ensureApiClientDirectAccessGrants }) => ensureApiClientDirectAccessGrants())
+      .then((updated) => {
+        if (updated) {
+          logger.info('Keycloak supplify-api client: direct access grants enabled for invite login')
+        }
+      })
+      .catch((err) => {
+        logger.warn('Could not enable Keycloak direct access grants (invite auto-login)', {
+          error: err.message,
+        })
+      })
+  }
+
   checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed on startup:', err))
-  setInterval(
+  trackInterval(
     () => {
       checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed:', err))
     },
@@ -335,7 +470,7 @@ server.listen(PORT, () => {
   runSubscriptionBillingJob().catch((err) =>
     logger.error('Subscription billing job failed on startup:', err)
   )
-  setInterval(
+  trackInterval(
     () => {
       runSubscriptionBillingJob().catch((err) =>
         logger.error('Subscription billing job failed:', err)
@@ -349,7 +484,7 @@ server.listen(PORT, () => {
   checkExpiredWaitlistOffers().catch((err) =>
     logger.error('Waitlist expired-offers job failed on startup:', err)
   )
-  setInterval(() => {
+  trackInterval(() => {
     checkExpiredWaitlistOffers().catch((err) =>
       logger.error('Waitlist expired-offers job failed:', err)
     )
@@ -359,7 +494,7 @@ server.listen(PORT, () => {
   runDeactivateExpiredPromotionsJob().catch((err) =>
     logger.error('Promotions expiry job failed on startup:', err)
   )
-  setInterval(
+  trackInterval(
     () => {
       runDeactivateExpiredPromotionsJob().catch((err) =>
         logger.error('Promotions expiry job failed:', err)
@@ -374,13 +509,26 @@ server.listen(PORT, () => {
       logger.error('Invitation expiry job failed:', err)
     )
   runInvitationExpiry()
-  setInterval(runInvitationExpiry, 60 * 60 * 1000)
+  trackInterval(runInvitationExpiry, 60 * 60 * 1000)
   logger.info('Invitation expiry job started (runs every 1h)')
+
+  runFreeSandboxExpiryJob().catch((err) =>
+    logger.error('Free sandbox expiry job failed on startup:', err)
+  )
+  trackInterval(
+    () => {
+      runFreeSandboxExpiryJob().catch((err) =>
+        logger.error('Free sandbox expiry job failed:', err)
+      )
+    },
+    60 * 60 * 1000
+  )
+  logger.info('Free sandbox expiry job started (runs every 1h)')
 
   runFulfillmentExceptionChecks().catch((err) =>
     logger.error('Fulfillment exceptions job failed on startup:', err)
   )
-  setInterval(
+  trackInterval(
     () => {
       runFulfillmentExceptionChecks().catch((err) =>
         logger.error('Fulfillment exceptions job failed:', err)

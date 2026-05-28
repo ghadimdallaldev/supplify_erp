@@ -2,7 +2,12 @@ import crypto from 'node:crypto'
 import { query, withTransaction } from '../db.js'
 import { logger } from '../logger.js'
 import { getBillingGateway } from './gateway-registry.js'
-import { GRACE_PERIOD_DAYS, LOCK_REASON_PENDING_ACTIVATION } from './constants.js'
+import {
+  GRACE_PERIOD_DAYS,
+  LOCK_REASON_PENDING_ACTIVATION,
+  LOCK_REASON_FREE_SANDBOX_EXPIRED,
+} from './constants.js'
+import { clampFreeTrialDays, getFreeSandboxDays } from '../platform-settings.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -77,6 +82,17 @@ export function computeBillingAccessState(subscription) {
 
   const lockReason = subscription.lock_reason || null
   const pendingActivation = lockReason === LOCK_REASON_PENDING_ACTIVATION
+  const freeSandboxExpired = lockReason === LOCK_REASON_FREE_SANDBOX_EXPIRED
+  const freeSandboxExpiresAt = subscription.free_sandbox_expires_at
+    ? new Date(subscription.free_sandbox_expires_at)
+    : null
+  let freeSandboxDaysRemaining = null
+  if (isFree && freeSandboxExpiresAt && !freeSandboxExpired) {
+    freeSandboxDaysRemaining = Math.max(
+      0,
+      Math.ceil((freeSandboxExpiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+    )
+  }
 
   return {
     requiresPayment: !isFree,
@@ -84,6 +100,9 @@ export function computeBillingAccessState(subscription) {
     inGracePeriod: pendingActivation ? false : inGracePeriod,
     isLocked,
     pendingActivation,
+    freeSandboxExpired,
+    freeSandboxExpiresAt: freeSandboxExpiresAt ? freeSandboxExpiresAt.toISOString() : null,
+    freeSandboxDaysRemaining,
     daysUntilLock,
     gracePeriodEndsAt: graceEnd ? graceEnd.toISOString() : null,
     pastDueSince: subscription.past_due_since
@@ -356,19 +375,39 @@ export async function checkoutSubscription({
 async function applyFreePlan(tenantId, tenantType, plan) {
   const subscription = await getSubscriptionForBilling(tenantId, tenantType)
   if (!subscription) return null
-  const pendingActivation = subscription.lock_reason === LOCK_REASON_PENDING_ACTIVATION
+  const wasPendingActivation = subscription.lock_reason === LOCK_REASON_PENDING_ACTIVATION
+  const sandboxDays = await getFreeSandboxDays()
   await query(
     `UPDATE subscription SET
       plan_id = $1, plan_name = $2, status = 'ACTIVE', billing_cycle = 'MONTHLY',
       past_due_since = NULL, grace_period_ends_at = NULL,
-      account_locked_at = CASE WHEN $4 THEN account_locked_at ELSE NULL END,
-      lock_reason = CASE WHEN $4 THEN lock_reason ELSE NULL END,
+      account_locked_at = NULL,
+      lock_reason = NULL,
+      free_sandbox_expires_at = now() + ($4::int * INTERVAL '1 day'),
       current_period_start = now(), current_period_end = now() + INTERVAL '1 month',
       next_billing_date = NULL, updated_at = now()
      WHERE id = $3`,
-    [plan.id, plan.name, subscription.id, pendingActivation]
+    [plan.id, plan.name, subscription.id, sandboxDays]
   )
-  return { success: true, plan: plan.code, pendingActivation }
+  if (wasPendingActivation) {
+    await query(
+      `INSERT INTO billing_event (subscription_id, tenant_id, tenant_type, event_type, payload)
+       VALUES ($1, $2, $3, 'account.activated', $4)`,
+      [
+        subscription.id,
+        tenantId,
+        tenantType,
+        JSON.stringify({ planCode: plan.code, unlockedBy: 'free_plan' }),
+      ]
+    )
+  }
+  return {
+    success: true,
+    plan: plan.code,
+    pendingActivation: false,
+    activated: wasPendingActivation,
+    freeSandboxDays: sandboxDays,
+  }
 }
 
 async function getPaymentMethodForCharge(client, tenantId, tenantType, paymentMethodId) {
@@ -614,10 +653,127 @@ export async function lockSubscriptionAccount(client, subscriptionId, reason) {
   )
 }
 
+async function recordAccountUnlockedEvent(
+  subscriptionId,
+  { tenantId, tenantType },
+  { unlockedBy, adminUserId, payload = {} }
+) {
+  await query(
+    `INSERT INTO billing_event (subscription_id, tenant_id, tenant_type, event_type, payload)
+     VALUES ($1, $2, $3, 'account.unlocked', $4)`,
+    [subscriptionId, tenantId, tenantType, JSON.stringify({ unlockedBy, adminUserId, ...payload })]
+  )
+}
+
+/**
+ * Extend Free Trial expiry, clear lock. Only for plan code `free`.
+ */
+export async function extendFreeSandboxTrial(
+  subscriptionId,
+  { days, adminUserId = null, unlockedBy = 'admin' } = {}
+) {
+  const { rows } = await query(
+    `SELECT s.*, sp.code AS plan_code
+     FROM subscription s
+     JOIN subscription_plan sp ON sp.id = s.plan_id
+     WHERE s.id = $1`,
+    [subscriptionId]
+  )
+  const sub = rows[0]
+  if (!sub) {
+    const err = new Error('Subscription not found')
+    err.code = 'NOT_FOUND'
+    throw err
+  }
+  if (sub.plan_code !== 'free') {
+    const err = new Error('Free Trial extension applies only to Free Trial subscriptions')
+    err.code = 'VALIDATION_ERROR'
+    throw err
+  }
+
+  const defaultDays = await getFreeSandboxDays()
+  const trialDays = clampFreeTrialDays(days, defaultDays)
+
+  await query(
+    `UPDATE subscription SET
+      status = 'ACTIVE',
+      past_due_since = NULL,
+      grace_period_ends_at = NULL,
+      account_locked_at = NULL,
+      lock_reason = NULL,
+      free_sandbox_expires_at = now() + ($2::int * INTERVAL '1 day'),
+      updated_at = now()
+     WHERE id = $1`,
+    [subscriptionId, trialDays]
+  )
+
+  await query(
+    `INSERT INTO billing_event (subscription_id, tenant_id, tenant_type, event_type, payload)
+     VALUES ($1, $2, $3, 'free_trial.extended', $4)`,
+    [
+      subscriptionId,
+      sub.tenant_id,
+      sub.tenant_type,
+      JSON.stringify({ unlockedBy, adminUserId, freeTrialDays: trialDays }),
+    ]
+  )
+
+  const { rows: updatedRows } = await query('SELECT * FROM subscription WHERE id = $1', [
+    subscriptionId,
+  ])
+  return {
+    subscription: updatedRows[0],
+    freeTrialDays: trialDays,
+    freeSandboxExpiresAt: updatedRows[0]?.free_sandbox_expires_at ?? null,
+  }
+}
+
 export async function unlockSubscriptionAccount(
   subscriptionId,
-  { unlockedBy = 'payment', adminUserId = null } = {}
+  { unlockedBy = 'payment', adminUserId = null, extendFreeTrialDays = undefined } = {}
 ) {
+  const { rows } = await query(
+    `SELECT s.*, sp.code AS plan_code
+     FROM subscription s
+     LEFT JOIN subscription_plan sp ON sp.id = s.plan_id
+     WHERE s.id = $1`,
+    [subscriptionId]
+  )
+  const sub = rows[0]
+  if (!sub) return
+
+  const shouldExtendFreeTrial =
+    sub.plan_code === 'free' &&
+    (extendFreeTrialDays !== undefined || sub.lock_reason === LOCK_REASON_FREE_SANDBOX_EXPIRED)
+
+  if (shouldExtendFreeTrial) {
+    const defaultDays = await getFreeSandboxDays()
+    const trialDays =
+      extendFreeTrialDays !== undefined
+        ? clampFreeTrialDays(extendFreeTrialDays, defaultDays)
+        : defaultDays
+
+    await query(
+      `UPDATE subscription SET
+        status = 'ACTIVE',
+        past_due_since = NULL,
+        grace_period_ends_at = NULL,
+        account_locked_at = NULL,
+        lock_reason = NULL,
+        free_sandbox_expires_at = now() + ($2::int * INTERVAL '1 day'),
+        updated_at = now()
+       WHERE id = $1`,
+      [subscriptionId, trialDays]
+    )
+
+    await recordAccountUnlockedEvent(
+      subscriptionId,
+      { tenantId: sub.tenant_id, tenantType: sub.tenant_type },
+      { unlockedBy, adminUserId, freeTrialDays: trialDays, freeTrialExtended: true }
+    )
+    return
+  }
+
   await query(
     `UPDATE subscription SET
       status = 'ACTIVE',
@@ -629,21 +785,12 @@ export async function unlockSubscriptionAccount(
      WHERE id = $1`,
     [subscriptionId]
   )
-  const { rows } = await query('SELECT tenant_id, tenant_type FROM subscription WHERE id = $1', [
+
+  await recordAccountUnlockedEvent(
     subscriptionId,
-  ])
-  if (rows[0]) {
-    await query(
-      `INSERT INTO billing_event (subscription_id, tenant_id, tenant_type, event_type, payload)
-       VALUES ($1, $2, $3, 'account.unlocked', $4)`,
-      [
-        subscriptionId,
-        rows[0].tenant_id,
-        rows[0].tenant_type,
-        JSON.stringify({ unlockedBy, adminUserId }),
-      ]
-    )
-  }
+    { tenantId: sub.tenant_id, tenantType: sub.tenant_type },
+    { unlockedBy, adminUserId }
+  )
 }
 
 export async function setAutoRenew(tenantId, tenantType, autoRenew) {
@@ -657,7 +804,26 @@ export async function setAutoRenew(tenantId, tenantType, autoRenew) {
 }
 
 export function buildAccountLockedError(billingStatus) {
-  const pendingActivation = billingStatus?.access?.pendingActivation
+  const access = billingStatus?.access ?? {}
+  const pendingActivation = access.pendingActivation
+  const freeSandboxExpired =
+    access.freeSandboxExpired === true || access.lockReason === LOCK_REASON_FREE_SANDBOX_EXPIRED
+
+  if (freeSandboxExpired) {
+    return {
+      name: 'ACCOUNT_LOCKED',
+      message: 'Your Free Trial has expired. Upgrade your plan to continue using Supplify.',
+      details: {
+        amountDue: billingStatus?.amountDue ?? 0,
+        gracePeriodEndsAt: access.gracePeriodEndsAt ?? null,
+        lockReason: LOCK_REASON_FREE_SANDBOX_EXPIRED,
+        pendingActivation: false,
+        freeSandboxExpired: true,
+        upgradeUrl: '/app/settings?tab=subscription',
+      },
+    }
+  }
+
   return {
     name: 'ACCOUNT_LOCKED',
     message: pendingActivation
@@ -665,8 +831,8 @@ export function buildAccountLockedError(billingStatus) {
       : 'Your account is locked due to an overdue subscription payment. Pay your balance to restore access.',
     details: {
       amountDue: billingStatus?.amountDue ?? 0,
-      gracePeriodEndsAt: billingStatus?.access?.gracePeriodEndsAt,
-      lockReason: billingStatus?.access?.lockReason ?? null,
+      gracePeriodEndsAt: access.gracePeriodEndsAt ?? null,
+      lockReason: access.lockReason ?? null,
       pendingActivation: Boolean(pendingActivation),
       upgradeUrl: pendingActivation ? '/app/activate' : '/app/settings?tab=subscription',
     },

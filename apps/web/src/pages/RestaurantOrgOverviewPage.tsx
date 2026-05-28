@@ -7,13 +7,17 @@ import {
 } from '../services/api'
 import { useAppSelector } from '../hooks/redux'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { multiBranchEnabled } from '../lib/planLimits'
+import { usePermissions } from '../hooks/usePermissions'
 import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
 
 export function RestaurantOrgOverviewPage() {
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
+  const canManageOrg = can('SETTINGS_MANAGE')
   const { entitlements } = useEntitlements()
-  const multiBranch = entitlements?.features?.multi_branch === true
+  const multiBranch = multiBranchEnabled(entitlements)
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
     skip: user?.role !== 'RESTAURANT',
   })
@@ -21,23 +25,7 @@ export function RestaurantOrgOverviewPage() {
   const [switchBranch] = useSwitchRestaurantOrgBranchContextMutation()
 
   const orgRole = data?.orgRole
-  const canView = orgRole === 'Org Owner' || orgRole === 'Org Manager' || user?.role === 'ADMIN'
-
-  if (user?.role === 'RESTAURANT' && !canView && !isLoading) {
-    return (
-      <div className="p-6">
-        <p className="text-[var(--text-muted)]">
-          Organization overview is available to Org Owner and Org Manager roles.
-        </p>
-        <Link to="/app/settings" className="text-sm underline mt-2 inline-block">
-          Back to settings
-        </Link>
-      </div>
-    )
-  }
-
   const branches = data?.branches ?? []
-  const isOrgOwner = orgRole === 'Org Owner'
 
   const handleOpenBranch = async (restaurantId: string) => {
     await switchBranch({ restaurant_id: restaurantId }).unwrap()
@@ -73,7 +61,7 @@ export function RestaurantOrgOverviewPage() {
             {branches.length} branch{branches.length === 1 ? '' : 'es'} · {orgRole}
           </p>
         </div>
-        {isOrgOwner && (
+        {canManageOrg && (
           <button
             type="button"
             onClick={() => setAddBranchOpen(true)}
@@ -107,7 +95,9 @@ export function RestaurantOrgOverviewPage() {
         ))}
       </div>
 
-      <RestaurantAddBranchModal open={addBranchOpen} onClose={() => setAddBranchOpen(false)} />
+      {canManageOrg && (
+        <RestaurantAddBranchModal open={addBranchOpen} onClose={() => setAddBranchOpen(false)} />
+      )}
     </div>
   )
 }

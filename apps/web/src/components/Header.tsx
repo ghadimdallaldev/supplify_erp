@@ -2,17 +2,17 @@ import { useState } from 'react'
 import { useAppSelector, useAppDispatch } from '../hooks/redux'
 import {
   useLogoutMutation,
-  useGetNotificationsQuery,
   useMarkAllNotificationsReadMutation,
   useGetEntitlementsQuery,
   useRecordConversionEventMutation,
 } from '../services/api'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { Button } from './ui/button'
-import { Bell, X, TrendingUp, Settings, ChevronRight } from 'lucide-react'
+import { Bell, X, TrendingUp, Settings, ChevronRight, Menu } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { BranchSwitcher } from './BranchSwitcher'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useNotificationBadge } from '../hooks/useNotificationBadge'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'Dashboard',
@@ -35,9 +35,17 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/admin': 'Admin Dashboard',
   '/app/admin/suppliers': 'Supplier Admin',
   '/app/admin/restaurants': 'Restaurant Admin',
+  '/app/reports': 'Reports',
+  '/app/disputes': 'Disputes',
+  '/app/deals': 'Deals',
+  '/app/promotions': 'Promotions',
+  '/app/onboarding': 'Onboarding',
+  '/app/org': 'Organization',
+  '/app/inventory': 'Inventory',
+  '/app/supplier-settings': 'Supplier Settings',
 }
 
-export function Header() {
+export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {}) {
   const { user } = useAppSelector((state) => state.auth)
   const dispatch = useAppDispatch()
   const location = useLocation()
@@ -64,6 +72,12 @@ export function Header() {
     })
     .filter(({ pct }) => pct >= 80)
     .slice(0, 3)
+  const workspace = user?.workspace
+  const workspaceLabel =
+    workspace?.tenantName &&
+    `${workspace.tenantType === 'SUPPLIER' ? 'Supplier' : 'Restaurant'}: ${workspace.tenantName}${
+      workspace.roleName ? ` · ${workspace.roleName}` : ''
+    }`
   const showUpgrade = user?.role !== 'ADMIN' && user?.role !== 'PENDING'
   const hasUrgency = usagePressure.length > 0 || (blockedCountLast7d ?? 0) >= 1
   const settingsPlanTab =
@@ -86,13 +100,7 @@ export function Header() {
     })
   }
 
-  const { data: notificationsData } = useGetNotificationsQuery(
-    { limit: 10, offset: 0 },
-    { pollingInterval: 60000, skip: !user }
-  )
-
-  const notifications = notificationsData?.notifications || []
-  const unreadCount = notifications.filter((n: { is_read?: boolean }) => !n.is_read).length
+  const { notifications, unreadCount } = useNotificationBadge()
 
   const handleLogout = async () => {
     try {
@@ -137,11 +145,33 @@ export function Header() {
         flexShrink: 0,
       }}
     >
+      {onOpenMobileNav && (
+        <button
+          type="button"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] lg:hidden"
+          aria-label="Open navigation menu"
+          onClick={onOpenMobileNav}
+        >
+          <Menu size={18} style={{ color: 'var(--text-muted)' }} />
+        </button>
+      )}
+
       {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
         <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400 }}>Supplify</span>
         <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
         <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{pageName}</span>
+        {workspaceLabel && (
+          <>
+            <ChevronRight size={13} style={{ color: 'var(--text-muted)' }} />
+            <span
+              style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}
+              data-testid="workspace-context"
+            >
+              {workspaceLabel}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Right side controls */}
@@ -179,22 +209,14 @@ export function Header() {
           </Button>
         )}
 
-        {/* Search bar */}
-        <div
-          style={{
-            width: 200,
-            height: 34,
-            borderRadius: 8,
-            background: 'var(--brand-ultra)',
-            border: '1px solid var(--app-border)',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 10px',
-            gap: 6,
-            cursor: 'text',
-          }}
+        {/* Quick jump to catalog */}
+        <button
+          type="button"
+          className="hidden h-[34px] min-w-[140px] items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-2.5 text-left transition-colors hover:border-[var(--app-border-mid)] md:flex lg:min-w-[200px] cursor-pointer"
+          aria-label="Go to products catalog"
+          onClick={() => navigate('/app/products')}
         >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
             <circle cx="5.5" cy="5.5" r="4" stroke="var(--text-muted)" strokeWidth="1.3" />
             <path
               d="M9 9l2.5 2.5"
@@ -203,25 +225,17 @@ export function Header() {
               strokeLinecap="round"
             />
           </svg>
-          <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>Search…</span>
-          <kbd
-            style={{
-              fontSize: 10,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: 'var(--text-muted)',
-              background: 'var(--surface)',
-              border: '1px solid var(--app-border)',
-              borderRadius: 4,
-              padding: '1px 4px',
-            }}
-          >
-            ⌘K
-          </kbd>
-        </div>
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>
+            Search products…
+          </span>
+        </button>
 
         {/* Notification bell */}
         <div style={{ position: 'relative' }}>
           <button
+            type="button"
+            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            aria-expanded={showNotifications}
             style={{
               width: 36,
               height: 36,
@@ -321,15 +335,13 @@ export function Header() {
 
               <div>
                 {notifications.length === 0 ? (
-                  <div
-                    style={{
-                      padding: 20,
-                      textAlign: 'center',
-                      fontSize: 12,
-                      color: 'var(--text-muted)',
-                    }}
-                  >
-                    No notifications
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm font-medium text-[var(--text)]">
+                      You&apos;re all caught up
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Order updates and alerts will appear here.
+                    </p>
                   </div>
                 ) : (
                   notifications.map((notification: any) => (
@@ -342,8 +354,28 @@ export function Header() {
                         background: !notification.is_read ? 'var(--brand-ultra)' : 'transparent',
                       }}
                       onClick={() => {
+                        const meta =
+                          typeof notification.metadata === 'string'
+                            ? (() => {
+                                try {
+                                  return JSON.parse(notification.metadata || '{}')
+                                } catch {
+                                  return {}
+                                }
+                              })()
+                            : notification.metadata || {}
+                        const link = typeof meta.link === 'string' ? meta.link : null
+                        if (link) {
+                          navigate(link)
+                          setShowNotifications(false)
+                          return
+                        }
                         if (notification.reference_type === 'ORDER' && notification.reference_id) {
                           navigate(`/app/orders/${notification.reference_id}`)
+                          setShowNotifications(false)
+                        }
+                        if (notification.reference_type === 'DEAL' && notification.reference_id) {
+                          navigate(`/app/deals?highlight=${notification.reference_id}`)
                           setShowNotifications(false)
                         }
                       }}
@@ -415,6 +447,7 @@ export function Header() {
 
         {/* Settings icon button */}
         <button
+          type="button"
           style={{
             width: 36,
             height: 36,
@@ -427,6 +460,7 @@ export function Header() {
             cursor: 'pointer',
           }}
           onClick={() => navigate('/app/settings')}
+          aria-label="Settings"
           title="Settings"
         >
           <Settings size={15} style={{ color: 'var(--text-muted)' }} />
@@ -434,6 +468,7 @@ export function Header() {
 
         {/* User avatar */}
         <button
+          type="button"
           data-testid="logout-button"
           style={{
             width: 34,

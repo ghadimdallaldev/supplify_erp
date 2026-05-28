@@ -1,14 +1,10 @@
 import { query } from '../lib/db.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
-import { sendNotification } from './notification.service.js'
+import { notifyTenantUsers } from './notification.service.js'
 
-export const DELIVERED_ORDER_STATUSES = [
-  'COMPLETED',
-  'DELIVERED',
-  'RECEIVED_PARTIAL',
-  'RECEIVED_FULL',
-  'INVOICED',
-]
+import { DELIVERED_ORDER_STATUSES } from '../lib/order-statuses.js'
+
+export { DELIVERED_ORDER_STATUSES }
 
 const EDIT_WINDOW_DAYS = 7
 
@@ -250,6 +246,11 @@ export async function listMyReviews(restaurantId, { limit = 50, offset = 0 }) {
  * After receiving, prompt restaurant to review if order is delivered and no review exists.
  */
 export async function notifyLeaveReviewIfEligible({ orderId, supplierId, restaurantId }) {
+  const { isFeatureEnabled } = await import('../lib/subscription.js')
+  if (!(await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_reviews'))) {
+    return null
+  }
+
   const { rows: orders } = await query(
     `SELECT id, status FROM customer_order WHERE id = $1 AND restaurant_id = $2`,
     [orderId, restaurantId]
@@ -263,32 +264,24 @@ export async function notifyLeaveReviewIfEligible({ orderId, supplierId, restaur
   ])
   if (existing.length) return null
 
-  const { rows: users } = await query(
-    `
-    SELECT u.id AS user_id
-    FROM app_user u
-    WHERE u.email = (SELECT contact_email FROM restaurant WHERE id = $1)
-    LIMIT 1
-    `,
-    [restaurantId]
-  )
-  if (!users.length) return null
-
   const { rows: suppliers } = await query(`SELECT name FROM supplier WHERE id = $1`, [supplierId])
   const supplierName = suppliers[0]?.name || 'your supplier'
 
-  return sendNotification({
-    userId: users[0].user_id,
-    userType: 'RESTAURANT',
+  const sent = await notifyTenantUsers({
+    tenantId: restaurantId,
+    tenantType: 'RESTAURANT',
     notificationType: 'SYSTEM',
     notificationCategory: 'system_updates',
     title: 'How was your delivery?',
     message: `Leave a review for ${supplierName} on your recent order.`,
+    referenceId: orderId,
+    referenceType: 'ORDER',
     metadata: {
       orderId,
       supplierId,
       action: 'leave_review',
+      link: `/app/orders/${orderId}?review=1`,
     },
-    link: `/app/orders/${orderId}?review=1`,
   })
+  return sent[0] || null
 }

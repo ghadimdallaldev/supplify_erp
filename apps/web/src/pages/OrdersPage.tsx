@@ -6,11 +6,17 @@ import {
   useGetRestaurantsQuery,
   useGetProductsQuery,
   useSendOrderReminderMutation,
+  useGetDisputesQuery,
+  useGetIncomingDisputesQuery,
+  useGetEntitlementsQuery,
 } from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
+import { StatusBadge } from '../components/ui/status-badge'
 import { Input } from '../components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
@@ -33,11 +39,18 @@ import {
   Filter,
   Plus,
   AlertCircle,
+  Scale,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
+import { usePermissions } from '../hooks/usePermissions'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
+import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
+import { getOrderStatusLabel } from '../lib/orderStatusDisplay'
+import { featureEnabled } from '../lib/planLimits'
+import { getActiveDisputeForOrder } from '../lib/disputeHelpers'
+import { isDisputeReplacementOrder } from '../lib/orderPlacement'
 
 export function OrdersPage() {
   const [status, setStatus] = useState('')
@@ -48,6 +61,8 @@ export function OrdersPage() {
   const [selectedRestaurant, setSelectedRestaurant] = useState('')
   const [orderNotes, setOrderNotes] = useState('')
   const [productSearch, setProductSearch] = useState('')
+  const [declineOrderId, setDeclineOrderId] = useState<string | null>(null)
+  const [declineOrderLabel, setDeclineOrderLabel] = useState<string | undefined>()
   const [manualOrderItems, setManualOrderItems] = useState<
     Array<{
       productId: string
@@ -58,7 +73,12 @@ export function OrdersPage() {
     }>
   >([])
   const { user } = useAppSelector((state) => state.auth)
+  const { can } = usePermissions()
   const isSupplier = user?.role === 'SUPPLIER'
+  const canManageOrders = can('ORDERS_MANAGE')
+  const canEditOrders = can('ORDERS_EDIT') || canManageOrders
+  const canCreateOrders = can('ORDERS_CREATE') || canManageOrders
+  const canDeclineOrder = canManageOrders
 
   const { data, isLoading, error, refetch } = useGetOrdersQuery(
     {
@@ -77,8 +97,21 @@ export function OrdersPage() {
     }
   )
 
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
+    skip: isSupplier || !disputesEnabled,
+    pollingInterval: 30_000,
+  })
+  const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
+    skip: !isSupplier || !disputesEnabled,
+    pollingInterval: 30_000,
+  })
+  const allDisputes =
+    (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []
+
   const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
-  const { data: productsData } = useGetProductsQuery({ limit: 1000 })
+  const { data: productsData } = useGetProductsQuery({ limit: 1000 }, { skip: !isSupplier })
   const [updateOrder] = useUpdateOrderMutation()
   const [createManualOrder, { isLoading: isCreatingManualOrder }] = useCreateManualOrderMutation()
   const [sendReminder] = useSendOrderReminderMutation()
@@ -185,33 +218,6 @@ export function OrdersPage() {
       product.sku?.toLowerCase().includes(productSearch.toLowerCase())
   )
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PLACED':
-        return 'default'
-      case 'ACKNOWLEDGED':
-        return 'secondary'
-      case 'PROCESSING':
-        return 'default'
-      case 'SHIPPED':
-        return 'default'
-      case 'DELIVERED':
-        return 'secondary'
-      case 'RECEIVED_PARTIAL':
-        return 'secondary'
-      case 'RECEIVED_FULL':
-        return 'default'
-      case 'INVOICED':
-        return 'default'
-      case 'COMPLETED':
-        return 'default'
-      case 'CANCELLED':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'ACKNOWLEDGED':
@@ -224,6 +230,7 @@ export function OrdersPage() {
         return <Truck className="h-4 w-4" />
       case 'RECEIVED_PARTIAL':
       case 'RECEIVED_FULL':
+      case 'RECEIVED_WITH_DISPUTE':
         return <CheckCircle className="h-4 w-4" />
       case 'INVOICED':
         return <FileText className="h-4 w-4" />
@@ -236,13 +243,21 @@ export function OrdersPage() {
 
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
-  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+  const handleStatusUpdate = async (
+    orderId: string,
+    newStatus: string,
+    extra?: { decline_reason?: string }
+  ) => {
     if (updatingOrderId === orderId) return // Prevent multiple clicks
 
     try {
       setUpdatingOrderId(orderId) // Set immediately - button will be replaced by disabled button
-      await updateOrder({ id: orderId, data: { status: newStatus } }).unwrap()
-      toast.success(`Order status updated to ${newStatus}`)
+      await updateOrder({ id: orderId, data: { status: newStatus, ...extra } }).unwrap()
+      const successLabel =
+        newStatus === 'CANCELLED' && isSupplier
+          ? 'Order declined'
+          : `Order status updated to ${newStatus}`
+      toast.success(successLabel)
 
       // Refetch to get updated data
       const refetchResult = await refetch()
@@ -292,7 +307,7 @@ export function OrdersPage() {
         ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)) ||
       (activeTab === 'shipped' && order.status === 'SHIPPED') ||
       (activeTab === 'completed' &&
-        ['RECEIVED_FULL', 'INVOICED', 'COMPLETED'].includes(order.status))
+        ['RECEIVED_FULL', 'RECEIVED_WITH_DISPUTE', 'INVOICED', 'COMPLETED'].includes(order.status))
 
     return matchesSearch && matchesStatus
   })
@@ -326,44 +341,47 @@ export function OrdersPage() {
   if (error) {
     const errorMessage = (error as any)?.data?.error?.message || 'Failed to load orders'
     return (
-      <div className="text-center py-12">
-        <p className="text-[var(--red)] text-lg font-semibold mb-2">Failed to load orders</p>
-        <p className="text-[var(--text-muted)] text-sm">{errorMessage}</p>
-        <Button onClick={() => refetch()} className="mt-4">
-          Try Again
-        </Button>
-      </div>
+      <EmptyState
+        title="Failed to load orders"
+        description={errorMessage}
+        icon={<AlertCircle className="h-10 w-10" aria-hidden />}
+        action={
+          <Button onClick={() => refetch()} variant="outline">
+            Try again
+          </Button>
+        }
+      />
     )
   }
 
   return (
-    <div className="space-y-6 p-6" data-testid="orders-page">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Orders Inbox</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            {isSupplier
-              ? 'Manage inbound orders from restaurants'
-              : 'Track your orders and their status'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {isSupplier && (
-            <Button onClick={() => setShowManualOrderDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Order
-            </Button>
-          )}
-          {!isSupplier && (
-            <Button asChild>
-              <Link to="/app/cart" data-testid="orders-create-new-order">
+    <div className="space-y-6" data-testid="orders-page">
+      <PageHeader
+        title="Orders Inbox"
+        description={
+          isSupplier
+            ? 'Manage inbound orders from restaurants'
+            : 'Track your orders and their status'
+        }
+        actions={
+          <>
+            {isSupplier && canCreateOrders && (
+              <Button onClick={() => setShowManualOrderDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Create New Order
-              </Link>
-            </Button>
-          )}
-        </div>
-      </div>
+                Create Order
+              </Button>
+            )}
+            {!isSupplier && canCreateOrders && (
+              <Button asChild>
+                <Link to="/app/cart" data-testid="orders-create-new-order">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Order
+                </Link>
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Filters and Search */}
       <Card>
@@ -424,19 +442,44 @@ export function OrdersPage() {
                 data-testid={`order-row-${order.id}`}
               >
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                         <CardTitle className="text-lg">
                           Order #{order.id.slice(-8).toUpperCase()}
                         </CardTitle>
-                        <Badge
-                          variant={getStatusColor(order.status)}
-                          className="flex items-center gap-1"
-                        >
-                          {getStatusIcon(order.status)}
-                          {order.status}
-                        </Badge>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="text-[var(--text-muted)]" aria-hidden>
+                            {getStatusIcon(order.status)}
+                          </span>
+                          <StatusBadge
+                            status={order.status}
+                            label={getOrderStatusLabel(
+                              order,
+                              isSupplier ? 'SUPPLIER' : 'RESTAURANT'
+                            )}
+                          />
+                          {isDisputeReplacementOrder(order) && (
+                            <Badge variant="secondary">Replacement</Badge>
+                          )}
+                          {disputesEnabled && getActiveDisputeForOrder(allDisputes, order.id) && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-400 text-amber-800 bg-amber-50"
+                            >
+                              <Scale className="h-3 w-3 mr-1" aria-hidden />
+                              Dispute open
+                            </Badge>
+                          )}
+                          {!isSupplier &&
+                            order.status === 'CANCELLED' &&
+                            order.cancelled_by === 'SUPPLIER' &&
+                            order.cancel_reason && (
+                              <p className="text-xs text-red-700 mt-1 max-w-md">
+                                {order.cancel_reason}
+                              </p>
+                            )}
+                        </span>
                         {order.status === 'PLACED' && isSupplier && (
                           <Badge variant="destructive">Action Required</Badge>
                         )}
@@ -463,18 +506,20 @@ export function OrdersPage() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-[var(--brand-mid)]">
+                    <div className="text-left sm:text-right shrink-0">
+                      <div className="text-xl sm:text-2xl font-bold text-[var(--brand-mid)]">
                         {`$${formatPrice(order.total_amount)}`}
                       </div>
-                      <div className="text-sm text-[var(--text-muted)]">{order.items?.length || 0} items</div>
+                      <div className="text-sm text-[var(--text-muted)]">
+                        {order.items?.length || 0} items
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     {/* Order Items Preview */}
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="text-sm text-[var(--text-muted)] mb-2">Items:</div>
                       <div className="flex flex-wrap gap-2">
                         {order.items?.slice(0, 3).map((item: any, idx: number) => (
@@ -491,8 +536,8 @@ export function OrdersPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      {isSupplier && order.status === 'PLACED' && (
+                    <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
+                      {isSupplier && canEditOrders && order.status === 'PLACED' && (
                         <>
                           <Button
                             size="sm"
@@ -501,17 +546,22 @@ export function OrdersPage() {
                           >
                             Acknowledge
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
-                            data-testid={`order-${order.id}-decline`}
-                          >
-                            Decline
-                          </Button>
+                          {canDeclineOrder && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setDeclineOrderId(order.id)
+                                setDeclineOrderLabel(order.restaurant_name)
+                              }}
+                              data-testid={`order-${order.id}-decline`}
+                            >
+                              Decline
+                            </Button>
+                          )}
                         </>
                       )}
-                      {isSupplier && order.status === 'ACKNOWLEDGED' && (
+                      {isSupplier && canEditOrders && order.status === 'ACKNOWLEDGED' && (
                         <Button
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'PROCESSING')}
@@ -520,7 +570,7 @@ export function OrdersPage() {
                           Start Processing
                         </Button>
                       )}
-                      {isSupplier && order.status === 'PROCESSING' && (
+                      {isSupplier && canEditOrders && order.status === 'PROCESSING' && (
                         <Button
                           size="sm"
                           onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
@@ -529,16 +579,19 @@ export function OrdersPage() {
                           Mark as Shipped
                         </Button>
                       )}
-                      {isSupplier && order.status === 'SHIPPED' && updatingOrderId !== order.id && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
-                          disabled={false}
-                          data-testid={`order-${order.id}-deliver`}
-                        >
-                          Mark Delivered
-                        </Button>
-                      )}
+                      {isSupplier &&
+                        canEditOrders &&
+                        order.status === 'SHIPPED' &&
+                        updatingOrderId !== order.id && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleStatusUpdate(order.id, 'DELIVERED')}
+                            disabled={false}
+                            data-testid={`order-${order.id}-deliver`}
+                          >
+                            Mark Delivered
+                          </Button>
+                        )}
                       {isSupplier &&
                         (updatingOrderId === order.id || order.status === 'DELIVERED') && (
                           <Button
@@ -576,9 +629,11 @@ export function OrdersPage() {
                         </Link>
                       </Button>
                       {isSupplier && (
-                        <Button variant="outline" size="sm">
-                          <Package className="h-4 w-4 mr-1" />
-                          Packing Slip
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/app/orders/${order.id}?tab=packing`}>
+                            <Package className="h-4 w-4 mr-1" />
+                            Packing Slip
+                          </Link>
                         </Button>
                       )}
                     </div>
@@ -589,23 +644,31 @@ export function OrdersPage() {
           </div>
 
           {(!filteredOrders || filteredOrders.length === 0) && (
-            <div className="text-center py-12 rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)]/90">
-              <ShoppingCart className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
-              <p className="text-[var(--text-muted)] font-medium">No orders yet</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
-                {!isSupplier
-                  ? 'Create your first order to get started.'
-                  : 'Orders from restaurants will appear here.'}
-              </p>
-              {!isSupplier && (
-                <Button asChild className="mt-4">
-                  <Link to="/app/cart">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create first order
-                  </Link>
-                </Button>
-              )}
-            </div>
+            <EmptyState
+              title={
+                search || status || activeTab !== 'all'
+                  ? 'No orders match your filters'
+                  : 'No orders yet'
+              }
+              description={
+                search || status || activeTab !== 'all'
+                  ? 'Try adjusting search or status filters.'
+                  : !isSupplier
+                    ? 'Create your first order to get started.'
+                    : 'Orders from restaurants will appear here.'
+              }
+              icon={<ShoppingCart className="h-10 w-10" aria-hidden />}
+              action={
+                !isSupplier && canCreateOrders && !search && !status && activeTab === 'all' ? (
+                  <Button asChild>
+                    <Link to="/app/cart">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create first order
+                    </Link>
+                  </Button>
+                ) : undefined
+              }
+            />
           )}
         </TabsContent>
       </Tabs>
@@ -662,7 +725,9 @@ export function OrdersPage() {
                       <div key={item.productId} className="flex items-center justify-between p-3">
                         <div className="flex-1">
                           <p className="font-medium">{item.productName}</p>
-                          <p className="text-sm text-[var(--text-muted)]">${formatPrice(item.price)} each</p>
+                          <p className="text-sm text-[var(--text-muted)]">
+                            ${formatPrice(item.price)} each
+                          </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
@@ -784,6 +849,24 @@ export function OrdersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeclineOrderDialog
+        open={Boolean(declineOrderId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeclineOrderId(null)
+            setDeclineOrderLabel(undefined)
+          }
+        }}
+        orderLabel={declineOrderLabel}
+        isSubmitting={Boolean(declineOrderId && updatingOrderId === declineOrderId)}
+        onConfirm={async (reason) => {
+          if (!declineOrderId) return
+          await handleStatusUpdate(declineOrderId, 'CANCELLED', { decline_reason: reason })
+          setDeclineOrderId(null)
+          setDeclineOrderLabel(undefined)
+        }}
+      />
     </div>
   )
 }

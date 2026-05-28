@@ -60,10 +60,20 @@ export function usePushNotifications() {
       throw new Error('Notification permission denied')
     }
     const registration = await navigator.serviceWorker.ready
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidData.publicKey),
-    })
+    let subscription
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidData.publicKey),
+      })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new Error(
+          'Push notifications are not available in this browser (use HTTPS or localhost with valid VAPID keys).'
+        )
+      }
+      throw err
+    }
     const json = subscription.toJSON()
     await subscribePush({
       endpoint: json.endpoint!,

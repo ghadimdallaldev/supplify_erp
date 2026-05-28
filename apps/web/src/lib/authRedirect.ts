@@ -29,3 +29,10 @@ export function redirectToAuth(path: 'login' | 'register'): void {
 
   window.location.replace(url)
 }
+
+/** Clears Supplify cookies and Keycloak SSO session (use before signup if stuck on a demo user). */
+export function redirectToLogout(options?: { thenRegister?: boolean }): void {
+  const base = getOAuthStartUrl('login').replace(/\/auth\/login$/, '/auth/logout')
+  const url = options?.thenRegister ? `${base}?redirect=register` : base
+  window.location.replace(url)
+}

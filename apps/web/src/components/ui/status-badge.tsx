@@ -1,0 +1,103 @@
+export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'muted'
+
+const STATUS_TONE_MAP: Record<string, StatusTone> = {
+  ACTIVE: 'success',
+  active: 'success',
+  healthy: 'success',
+  HEALTHY: 'success',
+  PAID: 'success',
+  paid: 'success',
+  approved: 'success',
+  APPROVED: 'success',
+  RECEIVED_FULL: 'success',
+  COMPLETED: 'success',
+  INVOICED: 'success',
+  DELIVERED: 'success',
+  SHIPPED: 'info',
+  ACKNOWLEDGED: 'info',
+  PROCESSING: 'info',
+  TRIALING: 'info',
+  trialing: 'info',
+  scheduled: 'info',
+  SCHEDULED: 'info',
+  PLACED: 'warning',
+  PENDING: 'warning',
+  pending: 'warning',
+  pending_approval: 'warning',
+  pending_admin_approval: 'warning',
+  approved_pending_payment: 'warning',
+  RECEIVED_PARTIAL: 'warning',
+  RECEIVED_WITH_DISPUTE: 'warning',
+  PAST_DUE: 'danger',
+  past_due: 'danger',
+  failed: 'danger',
+  FAILED: 'danger',
+  rejected: 'danger',
+  REJECTED: 'danger',
+  DECLINED: 'danger',
+  CANCELLED: 'muted',
+  cancelled: 'muted',
+  expired: 'muted',
+  EXPIRED: 'muted',
+  paused: 'muted',
+  PAUSED: 'muted',
+  inactive: 'muted',
+  INACTIVE: 'muted',
+  draft: 'neutral',
+  DRAFT: 'neutral',
+}
+
+const TONE_CLASSES: Record<StatusTone, string> = {
+  success: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  warning: 'bg-amber-50 text-amber-800 border-amber-200',
+  danger: 'bg-red-50 text-red-800 border-red-200',
+  info: 'bg-sky-50 text-sky-800 border-sky-200',
+  neutral: 'bg-slate-50 text-slate-700 border-slate-200',
+  muted: 'bg-[var(--app-border)]/40 text-[var(--text-muted)] border-[var(--app-border)]',
+}
+
+export function formatStatusLabel(status: string): string {
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+export function getStatusTone(status: string): StatusTone {
+  const key = status?.trim() || ''
+  if (STATUS_TONE_MAP[key]) return STATUS_TONE_MAP[key]
+  if (key.includes('pending')) return 'warning'
+  if (
+    key.includes('fail') ||
+    key.includes('reject') ||
+    key.includes('declin') ||
+    key.includes('past')
+  )
+    return 'danger'
+  if (
+    key.includes('active') ||
+    key.includes('paid') ||
+    key.includes('approve') ||
+    key.includes('received')
+  )
+    return 'success'
+  if (key.includes('ship') || key.includes('deliver') || key.includes('process')) return 'info'
+  return 'neutral'
+}
+
+export function StatusBadge({
+  status,
+  className = '',
+  label,
+}: {
+  status: string
+  className?: string
+  label?: string
+}) {
+  const tone = getStatusTone(status)
+  return (
+    <span
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${TONE_CLASSES[tone]} ${className}`}
+      title={label ?? formatStatusLabel(status)}
+    >
+      {label ?? formatStatusLabel(status || 'unknown')}
+    </span>
+  )
+}

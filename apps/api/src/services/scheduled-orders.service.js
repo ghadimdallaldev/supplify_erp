@@ -1,6 +1,7 @@
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { checkLimit } from '../lib/subscription.js'
+import { normalizeDaysOfWeek } from '../lib/quick-list-schedule.js'
+import { evaluateScheduledOrderLimit, incrementUsage } from '../lib/subscription.js'
 import { notifyScheduledOrderEvent } from './notification.service.js'
 
 /**
@@ -143,16 +144,24 @@ async function createOrderFromQuickList(quickList) {
 
   const restaurantId = quickList.restaurant_id
 
-  // Check plan limits
-  const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'orders_per_day')
-  const ordersToCreate = new Set(items.map((item) => item.supplier_id)).size // Group by supplier
-  const newTotal = limitCheck.current + ordersToCreate
+  const ordersToCreate = new Set(items.map((item) => item.supplier_id)).size
+  const scheduleLimit = await evaluateScheduledOrderLimit(restaurantId, ordersToCreate)
 
-  if (!limitCheck.isUnlimited && limitCheck.limit !== null && newTotal > limitCheck.limit) {
+  if (!scheduleLimit.allowed) {
+    const { limitCheck } = scheduleLimit
     const errorMessage = `Order limit exceeded: Cannot create ${ordersToCreate} order(s) as it would exceed your daily limit of ${limitCheck.limit} orders. Current usage: ${limitCheck.current}/${limitCheck.limit}. Please upgrade your subscription to obtain more features and higher order limits.`
     logger.warn(`Order limit exceeded for restaurant ${restaurantId}: ${errorMessage}`)
-    // Throw error so it's properly tracked in the execution results
     throw new Error(errorMessage)
+  }
+
+  if (scheduleLimit.usesGrace) {
+    logger.info('Scheduled order using daily grace slot', {
+      restaurantId,
+      excess: scheduleLimit.excess,
+      graceUsed: scheduleLimit.graceUsed,
+      graceLimit: scheduleLimit.graceLimit,
+      quickListId: quickList.id,
+    })
   }
 
   // Group items by supplier
@@ -220,8 +229,8 @@ async function createOrderFromQuickList(quickList) {
     } = await query(
       `
       INSERT INTO customer_order (
-        restaurant_id, status, total_amount, placed_at
-      ) VALUES ($1, 'PLACED', $2, now())
+        restaurant_id, status, total_amount, placed_at, placement_source
+      ) VALUES ($1, 'PLACED', $2, now(), 'scheduled_quick_list')
       RETURNING *
     `,
       [restaurantId, totalAmount]
@@ -263,6 +272,15 @@ async function createOrderFromQuickList(quickList) {
     )
   }
 
+  if (scheduleLimit.usesGrace && scheduleLimit.excess > 0) {
+    await incrementUsage(
+      restaurantId,
+      'RESTAURANT',
+      'scheduled_order_grace_per_day',
+      scheduleLimit.excess
+    )
+  }
+
   return createdOrders
 }
 
@@ -298,7 +316,7 @@ async function updateNextExecutionDate(quickList) {
         'SATURDAY',
       ]
       const currentDay = today.getDay()
-      const scheduledDays = quickList.days_of_week || []
+      const scheduledDays = normalizeDaysOfWeek(quickList.days_of_week) || []
 
       // Find the next scheduled day within the next 7 days
       for (let i = 1; i <= 7; i++) {

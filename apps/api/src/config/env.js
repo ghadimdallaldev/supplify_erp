@@ -1,9 +1,18 @@
 import dotenv from 'dotenv'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
+import { resolveNativeDatabaseUrl } from '../../../../scripts/lib/local-infra-urls.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-dotenv.config({ path: path.resolve(__dirname, '../../.env') })
+const apiEnvDir = path.resolve(__dirname, '../..')
+dotenv.config({ path: path.join(apiEnvDir, '.env') })
+const dockerSyncPath = path.join(apiEnvDir, '.env.docker-sync')
+if (existsSync(dockerSyncPath)) {
+  dotenv.config({ path: dockerSyncPath, override: true })
+}
+const envDatabaseUrl = process.env.DATABASE_URL
+const resolvedDatabaseUrl = resolveNativeDatabaseUrl(envDatabaseUrl)
 
 export const config = {
   PORT: process.env.PORT || 4000,
@@ -17,8 +26,7 @@ export const config = {
     : process.env.NODE_ENV === 'production'
       ? [process.env.WEB_ORIGIN || 'http://localhost:5173']
       : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
-  DATABASE_URL:
-    process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/supplify',
+  DATABASE_URL: resolvedDatabaseUrl,
   /** Enable SSL for DB (e.g. DATABASE_SSL=true in production). */
   DATABASE_SSL: process.env.DATABASE_SSL === 'true',
   /** Statement timeout in ms (optional; e.g. 30000 for 30s in production). */
@@ -34,7 +42,9 @@ export const config = {
   KEYCLOAK_CLIENT_SECRET:
     process.env.KEYCLOAK_CLIENT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'changeme'),
   KEYCLOAK_ADMIN: process.env.KEYCLOAK_ADMIN || 'admin',
-  KEYCLOAK_ADMIN_PASSWORD: process.env.KEYCLOAK_ADMIN_PASSWORD || '',
+  /** Required for invite signup (creates Keycloak users). Defaults to admin in non-production. */
+  KEYCLOAK_ADMIN_PASSWORD:
+    process.env.KEYCLOAK_ADMIN_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : 'admin'),
   SESSION_SECRET:
     process.env.SESSION_SECRET ||
     (process.env.NODE_ENV === 'production' ? '' : 'dev-session-secret-change-me'),
@@ -47,10 +57,25 @@ export const config = {
   IMPERSONATION_MAX_DURATION_MINUTES: process.env.IMPERSONATION_MAX_DURATION_MINUTES
     ? parseInt(process.env.IMPERSONATION_MAX_DURATION_MINUTES, 10)
     : 60,
+  /** MinIO API URL reachable from the API container (Docker: http://minio:9000). */
   S3_ENDPOINT: process.env.S3_ENDPOINT || 'http://localhost:9000',
+  /**
+   * Browser-facing base URL for stored objects (product images). Defaults to S3_ENDPOINT.
+   * Deploy: http://<your-host>:9000 or https://<domain>/storage if nginx proxies MinIO.
+   */
+  S3_PUBLIC_URL: process.env.S3_PUBLIC_URL || process.env.S3_ENDPOINT || 'http://localhost:9000',
+  /** Primary bucket for uploads (product images, chat files, logos). */
   S3_BUCKET: process.env.S3_BUCKET || 'supplify',
+  /**
+   * Comma-separated buckets to create on init (defaults to S3_BUCKET).
+   * Example: supplify,supplify-archive — add new names here before switching S3_BUCKET.
+   */
+  S3_BUCKETS: process.env.S3_BUCKETS || '',
+  S3_REGION: process.env.S3_REGION || 'us-east-1',
   S3_ACCESS_KEY: process.env.S3_ACCESS_KEY || 'minioadmin',
   S3_SECRET_KEY: process.env.S3_SECRET_KEY || 'minioadmin',
+  /** When true (default), buckets allow anonymous GetObject for stored URLs. Set false if using signed GET only. */
+  S3_PUBLIC_READ: process.env.S3_PUBLIC_READ !== 'false',
   REDIS_URL: process.env.REDIS_URL || '',
   /** Test-only: secret for E2E reset-seed endpoint. When set, POST /api/e2e/reset-seed is enabled. */
   E2E_SECRET: process.env.E2E_SECRET || '',
@@ -80,4 +105,23 @@ export const config = {
   VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || '',
   VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY || '',
   VAPID_EMAIL: process.env.VAPID_EMAIL || 'notifications@supplify.local',
+  /** Log process.memoryUsage() on an interval (also enabled in NODE_ENV=development). */
+  MEMORY_DEBUG: process.env.MEMORY_DEBUG === '1' || process.env.MEMORY_DEBUG === 'true',
+  ADMIN_OVERVIEW_DEBUG:
+    process.env.ADMIN_OVERVIEW_DEBUG === '1' || process.env.ADMIN_OVERVIEW_DEBUG === 'true',
+  /** Include memory + db pool on GET /health (default: on in non-production). */
+  MEMORY_HEALTH_EXPOSE:
+    process.env.MEMORY_HEALTH_EXPOSE === '1' || process.env.MEMORY_HEALTH_EXPOSE === 'true',
+  /** RSS (MB) threshold for warn logs when memory monitoring is active. */
+  MEMORY_WARN_RSS_MB: process.env.MEMORY_WARN_RSS_MB
+    ? parseInt(process.env.MEMORY_WARN_RSS_MB, 10)
+    : 512,
+  /** Interval for dev memory debug logs (ms). Default 5 minutes. */
+  MEMORY_LOG_INTERVAL_MS: process.env.MEMORY_LOG_INTERVAL_MS
+    ? parseInt(process.env.MEMORY_LOG_INTERVAL_MS, 10)
+    : 5 * 60 * 1000,
+  /** PostgreSQL pool max connections (default 20; use 10 in constrained dev). */
+  DATABASE_POOL_MAX: process.env.DATABASE_POOL_MAX
+    ? parseInt(process.env.DATABASE_POOL_MAX, 10)
+    : 20,
 }

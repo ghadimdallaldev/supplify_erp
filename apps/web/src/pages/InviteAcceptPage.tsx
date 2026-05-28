@@ -1,10 +1,23 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useValidateInviteQuery, useAcceptInviteMutation } from '../services/api'
-import { useAppSelector, useAppDispatch } from '../hooks/redux'
+import {
+  useValidateInviteQuery,
+  useAcceptInviteMutation,
+  useGetInviteSessionQuery,
+} from '../services/api'
+import { useAppDispatch } from '../hooks/redux'
 import { Button } from '../components/ui/button'
 import { api } from '../services/api'
 import { normalizeInviteTypeParam } from '../lib/invite-types'
+import {
+  formEmailMatchesInvite,
+  inviteFormEmailMismatchMessage,
+  inviteSessionEmailMismatch,
+  invitationAcceptErrorMessage,
+  finishInviteAcceptNavigation,
+} from '../lib/invite-session'
+import { InviteEmailMismatchCard } from '../components/invite/InviteEmailMismatchCard'
+import { InviteSignupEmailField } from '../components/invite/InviteSignupEmailField'
 
 export function InviteAcceptPage() {
   const [searchParams] = useSearchParams()
@@ -12,7 +25,7 @@ export function InviteAcceptPage() {
   const type = normalizeInviteTypeParam(searchParams.get('type'))
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { user, isAuthenticated } = useAppSelector((state) => state.auth)
+  const { data: sessionUser, isLoading: sessionLoading } = useGetInviteSessionQuery()
 
   const { data, isLoading, isError } = useValidateInviteQuery(
     { token, type: type || 'sb' },
@@ -31,11 +44,16 @@ export function InviteAcceptPage() {
   const orgLabel = invite?.org_name
   const isRestaurantMember = type === 'rm'
   const isRestaurantBranch = type === 'rb'
+  const loginHref = `/login?${searchParams.toString()}`
+  const invitePath = `/invite?${searchParams.toString()}`
+
+  const requiredInviteEmail = invite?.invited_email?.trim() || ''
 
   useEffect(() => {
-    if (invite?.invited_email) setEmail((prev) => prev || invite.invited_email || '')
+    if (requiredInviteEmail) setEmail(requiredInviteEmail)
+    else if (invite?.invited_email) setEmail((prev) => prev || invite.invited_email || '')
     if (invite?.invited_name) setFullName((prev) => prev || invite.invited_name || '')
-  }, [invite?.invited_email, invite?.invited_name])
+  }, [requiredInviteEmail, invite?.invited_email, invite?.invited_name])
 
   if (!token || !type) {
     return (
@@ -45,7 +63,7 @@ export function InviteAcceptPage() {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || sessionLoading) {
     return (
       <PageShell>
         <p>Validating your invitation…</p>
@@ -65,7 +83,9 @@ export function InviteAcceptPage() {
     return (
       <PageShell className="max-w-md text-center space-y-2">
         <h1 className="text-xl font-semibold">This invite link has expired.</h1>
-        <p className="text-[var(--text-muted)]">Contact your organization admin to get a new one.</p>
+        <p className="text-[var(--text-muted)]">
+          Contact your organization admin to get a new one.
+        </p>
       </PageShell>
     )
   }
@@ -75,7 +95,7 @@ export function InviteAcceptPage() {
       <PageShell className="max-w-md text-center space-y-3">
         <h1 className="text-xl font-semibold">This invite link is no longer valid.</h1>
         <p className="text-[var(--text-muted)]">If you already have an account, sign in.</p>
-        <Link to="/login" className="text-[var(--brand)] underline">
+        <Link to={loginHref} className="text-[var(--brand)] underline">
           Sign In
         </Link>
       </PageShell>
@@ -91,12 +111,16 @@ export function InviteAcceptPage() {
   const handleAcceptLoggedIn = async () => {
     setError(null)
     try {
-      await accept({ token, type }).unwrap()
+      const result = await accept({ token, type }).unwrap()
       dispatch(api.util.resetApiState())
-      navigate('/app/dashboard', { replace: true })
-      window.location.reload()
-    } catch {
-      setError('Could not accept invitation. Try signing in with a different account.')
+      finishInviteAcceptNavigation(result, navigate, searchParams)
+    } catch (err) {
+      setError(
+        invitationAcceptErrorMessage(
+          err,
+          'Could not accept invitation. Try signing in with a different account.'
+        )
+      )
     }
   }
 
@@ -111,42 +135,67 @@ export function InviteAcceptPage() {
       setError('Password must be at least 8 characters')
       return
     }
+    const signupEmail = (requiredInviteEmail || email).trim()
+    if (!formEmailMatchesInvite(requiredInviteEmail || invite?.invited_email, signupEmail)) {
+      setError(inviteFormEmailMismatchMessage(requiredInviteEmail))
+      return
+    }
     try {
-      await accept({
+      const result = await accept({
         token,
         type,
         full_name: fullName.trim(),
-        email: email.trim(),
+        email: signupEmail,
         password,
       }).unwrap()
       dispatch(api.util.resetApiState())
-      navigate('/app/dashboard', { replace: true })
-      window.location.reload()
-    } catch {
-      setError('Could not create your account. The link may have expired.')
+      finishInviteAcceptNavigation(result, navigate, searchParams)
+    } catch (err) {
+      setError(
+        invitationAcceptErrorMessage(
+          err,
+          'Could not create your account. The link may have expired.'
+        )
+      )
     }
   }
 
-  if (isAuthenticated && user) {
+  const emailMismatch =
+    sessionUser && inviteSessionEmailMismatch(invite.invited_email, sessionUser.email)
+
+  if (sessionUser) {
     return (
       <PageShell>
         <Card>
           <h1 className="text-xl font-semibold">Accept invitation</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            You&apos;re logged in as {user.displayName || user.email}. {headline}.
-          </p>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button
-            type="button"
-            className="w-full"
-            disabled={accepting}
-            onClick={() => handleAcceptLoggedIn()}
-          >
-            Accept & Join
-          </Button>
-          <Link to="/login" className="block text-center text-sm text-[var(--brand)] underline">
-            Sign in with a different account
-          </Link>
+          {emailMismatch && invite.invited_email ? (
+            <InviteEmailMismatchCard
+              invitedEmail={invite.invited_email}
+              sessionEmail={sessionUser.email}
+              invitePath={invitePath}
+            />
+          ) : (
+            <>
+              <p className="text-sm text-[var(--text-muted)]">
+                You&apos;re logged in as {sessionUser.displayName || sessionUser.email}. {headline}.
+              </p>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <Button
+                type="button"
+                className="w-full"
+                disabled={accepting}
+                onClick={() => handleAcceptLoggedIn()}
+              >
+                Accept & Join
+              </Button>
+              <Link
+                to={loginHref}
+                className="block text-center text-sm text-[var(--brand)] underline"
+              >
+                Sign in with a different account
+              </Link>
+            </>
+          )}
         </Card>
       </PageShell>
     )
@@ -167,16 +216,11 @@ export function InviteAcceptPage() {
               required
             />
           </label>
-          <label className="block text-sm">
-            Email
-            <input
-              type="email"
-              className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </label>
+          <InviteSignupEmailField
+            invitedEmail={requiredInviteEmail || invite?.invited_email}
+            value={email}
+            onChange={setEmail}
+          />
           <label className="block text-sm">
             Password
             <input
@@ -206,7 +250,7 @@ export function InviteAcceptPage() {
         </form>
         <p className="text-xs text-center text-[var(--text-muted)]">
           Already have an account?{' '}
-          <Link to="/login" className="underline">
+          <Link to={loginHref} className="underline">
             Sign in
           </Link>
         </p>
@@ -217,7 +261,9 @@ export function InviteAcceptPage() {
 
 function PageShell({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`min-h-screen flex items-center justify-center p-6 ${className}`}>{children}</div>
+    <div className={`min-h-screen flex items-center justify-center p-6 ${className}`}>
+      {children}
+    </div>
   )
 }
 

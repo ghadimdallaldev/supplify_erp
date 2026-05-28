@@ -64,9 +64,7 @@ import {
   useDeactivateRestaurantOrgBranchMutation,
   useSwitchRestaurantOrgBranchContextMutation,
   useGetRestaurantTeamQuery,
-  useAddRestaurantTeamMemberMutation,
   useDeleteRestaurantTeamMemberMutation,
-  useGetTenantRolesQuery,
 } from '../services/api'
 import { BranchAccountsPanel } from '../components/BranchAccountsPanel'
 import { TeamRolesPanel } from '../components/TeamRolesPanel'
@@ -78,10 +76,10 @@ import {
   customBrandingUpgradeMessage,
   formatBranchGateMessage,
   getBranchAddGate,
+  multiBranchEnabled as isMultiBranchPlan,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useAppDispatch } from '../hooks/redux'
-import { ApprovalsSettingsTab } from './approvals/ApprovalsSettingsTab'
 import { ActivityLogTab } from '../components/ActivityLogTab'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { usePermissions } from '../hooks/usePermissions'
@@ -213,10 +211,7 @@ export function RestaurantOnboardingPage() {
 
   useEffect(() => {
     const tab = searchParams.get('tab')
-    if (
-      tab &&
-      ['profile', 'team', 'branches', 'subscription', 'notifications', 'approvals'].includes(tab)
-    ) {
+    if (tab && ['profile', 'team', 'branches', 'subscription', 'notifications'].includes(tab)) {
       setActiveTab(tab)
     }
   }, [searchParams])
@@ -332,13 +327,6 @@ export function RestaurantOnboardingPage() {
   // Team state
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false)
   const [showAddBranchDialog, setShowAddBranchDialog] = useState(false)
-  const [newMember, setNewMember] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: 'viewer',
-    isPrimary: false,
-  })
   const {
     data: teamData,
     isLoading: isLoadingTeam,
@@ -346,7 +334,6 @@ export function RestaurantOnboardingPage() {
   } = useGetRestaurantTeamQuery(undefined, {
     skip: !user?.id,
   })
-  const [addTeamMember, { isLoading: isAddingTeamMember }] = useAddRestaurantTeamMemberMutation()
   const [deleteTeamMember] = useDeleteRestaurantTeamMemberMutation()
   const teamMembers = teamData?.team ?? []
   const [newBranch, setNewBranch] = useState({
@@ -358,10 +345,10 @@ export function RestaurantOnboardingPage() {
 
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
-  const multiBranchEnabled = entitlements?.features?.multi_branch === true
+  const multiBranchPlan = isMultiBranchPlan(entitlements)
   const { data: restaurantOrgBranches, refetch: refetchRestaurantOrgBranches } =
     useGetRestaurantOrgBranchesQuery(undefined, {
-      skip: !user?.id || !multiBranchEnabled,
+      skip: !user?.id || !multiBranchPlan,
     })
   const { data: branchesData, refetch: refetchBranches } = useGetBranchesQuery(undefined, {
     skip: !user?.id || Boolean(restaurantOrgBranches?.organizationId),
@@ -377,12 +364,8 @@ export function RestaurantOnboardingPage() {
   const refetchBranchesList = useRestaurantOrg ? refetchRestaurantOrgBranches : refetchBranches
   const branchGate = getBranchAddGate(entitlements, branches.length + 1)
   const brandingAllowed = canUseCustomBranding(entitlements)
-  const approvalsFeatureEnabled = featureEnabled(entitlements?.features?.approvals_budgets)
-  const advancedRolesEnabled = featureEnabled(entitlements?.features?.advanced_roles)
-  const { data: tenantRolesData } = useGetTenantRolesQuery(undefined, {
-    skip: !advancedRolesEnabled,
-  })
-  const tenantRoles = tenantRolesData?.roles ?? []
+  const tenantAuditEnabled = featureEnabled(entitlements?.features?.tenant_audit_log)
+  const pushNotificationsEnabled = featureEnabled(entitlements?.features?.push_notifications)
   const canAddBranch = branchGate.canAdd
 
   // Notification preferences
@@ -417,29 +400,6 @@ export function RestaurantOnboardingPage() {
       }))
     }
   }, [notificationPrefsData])
-
-  const handleAddMember = async () => {
-    if (!newMember.name || !newMember.email) {
-      toast.error('Please fill in name and email')
-      return
-    }
-
-    try {
-      await addTeamMember({
-        name: newMember.name,
-        email: newMember.email,
-        phone: newMember.phone || undefined,
-        role: newMember.role,
-        isPrimary: newMember.isPrimary,
-      }).unwrap()
-      setNewMember({ name: '', email: '', phone: '', role: 'manager', isPrimary: false })
-      setShowAddMemberDialog(false)
-      refetchTeam()
-      toast.success('Team member added!')
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Failed to add team member')
-    }
-  }
 
   const handleRemoveMember = async (memberId: string) => {
     try {
@@ -572,13 +532,7 @@ export function RestaurantOnboardingPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList
-          className={`grid w-full ${
-            approvalsFeatureEnabled && isOwner
-              ? 'grid-cols-8'
-              : approvalsFeatureEnabled || isOwner
-                ? 'grid-cols-7'
-                : 'grid-cols-6'
-          }`}
+          className={`grid w-full ${isOwner && tenantAuditEnabled ? 'grid-cols-7' : 'grid-cols-6'}`}
         >
           <TabsTrigger value="profile">
             <Building2 className="h-4 w-4 mr-2" />
@@ -600,13 +554,7 @@ export function RestaurantOnboardingPage() {
             <Settings className="h-4 w-4 mr-2" />
             Notifications
           </TabsTrigger>
-          {approvalsFeatureEnabled && (
-            <TabsTrigger value="approvals">
-              <FileText className="h-4 w-4 mr-2" />
-              Approvals
-            </TabsTrigger>
-          )}
-          {isOwner && (
+          {isOwner && tenantAuditEnabled && (
             <TabsTrigger value="activity">
               <FileText className="h-4 w-4 mr-2" />
               Activity
@@ -1095,30 +1043,38 @@ export function RestaurantOnboardingPage() {
                     </div>
                   </div>
 
-                  <div className="border-t pt-6">
-                    <h4 className="text-sm font-semibold text-[var(--text-mid)]">Browser push</h4>
-                    <p className="text-xs text-[var(--text-muted)] mt-1 mb-3">
-                      Get real-time alerts even when Supplify is in the background.
-                    </p>
-                    {push.pushAvailable ? (
-                      <div className="flex items-center justify-between rounded-xl border p-4">
-                        <span className="text-sm">Enable push notifications</span>
-                        <Button
-                          type="button"
-                          variant={push.subscribed ? 'outline' : 'default'}
-                          size="sm"
-                          disabled={push.subscribing || push.unsubscribing}
-                          onClick={() => (push.subscribed ? push.disablePush() : push.enablePush())}
-                        >
-                          {push.subscribed ? 'Disable' : 'Enable'}
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Push is not configured on this server.
+                  {pushNotificationsEnabled ? (
+                    <div className="border-t pt-6">
+                      <h4 className="text-sm font-semibold text-[var(--text-mid)]">Browser push</h4>
+                      <p className="text-xs text-[var(--text-muted)] mt-1 mb-3">
+                        Get real-time alerts even when Supplify is in the background.
                       </p>
-                    )}
-                  </div>
+                      {push.pushAvailable ? (
+                        <div className="flex items-center justify-between rounded-xl border p-4">
+                          <span className="text-sm">Enable push notifications</span>
+                          <Button
+                            type="button"
+                            variant={push.subscribed ? 'outline' : 'default'}
+                            size="sm"
+                            disabled={push.subscribing || push.unsubscribing}
+                            onClick={() =>
+                              push.subscribed ? push.disablePush() : push.enablePush()
+                            }
+                          >
+                            {push.subscribed ? 'Disable' : 'Enable'}
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Push is not configured on this server.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--text-muted)] border-t pt-6">
+                      Browser push is not included on your plan. Upgrade to enable real-time alerts.
+                    </p>
+                  )}
 
                   <Button
                     onClick={handleSaveNotifications}
@@ -1138,13 +1094,7 @@ export function RestaurantOnboardingPage() {
           </Card>
         </TabsContent>
 
-        {approvalsFeatureEnabled && (
-          <TabsContent value="approvals" className="space-y-4">
-            <ApprovalsSettingsTab />
-          </TabsContent>
-        )}
-
-        {isOwner && (
+        {isOwner && tenantAuditEnabled && (
           <TabsContent value="activity" className="space-y-4">
             <ActivityLogTab canExport={can('SETTINGS_MANAGE')} />
           </TabsContent>
@@ -1184,7 +1134,7 @@ export function RestaurantOnboardingPage() {
         </TabsContent>
       </Tabs>
 
-      {push.bannerVisible && (
+      {pushNotificationsEnabled && push.bannerVisible && (
         <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border bg-white p-4 shadow-lg">
           <p className="text-sm font-medium">Enable push notifications?</p>
           <p className="text-xs text-[var(--text-muted)] mt-1">
@@ -1203,103 +1153,6 @@ export function RestaurantOnboardingPage() {
           </div>
         </div>
       )}
-
-      {/* Add Team Member Dialog */}
-      <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Team Member</DialogTitle>
-            <DialogDescription>Add a contact to your restaurant team</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="memberName">Name *</Label>
-              <Input
-                id="memberName"
-                placeholder="Enter name"
-                value={newMember.name}
-                onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="memberEmail">Email *</Label>
-              <Input
-                id="memberEmail"
-                type="email"
-                placeholder="Enter email"
-                value={newMember.email}
-                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="memberPhone">Phone</Label>
-              <Input
-                id="memberPhone"
-                placeholder="Enter phone"
-                value={newMember.phone}
-                onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="memberRole">Role</Label>
-              <select
-                id="memberRole"
-                className="w-full px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
-                value={newMember.role}
-                onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
-              >
-                {advancedRolesEnabled ? (
-                  tenantRoles.map((r) => (
-                    <option key={r.id} value={r.name.toLowerCase()}>
-                      {r.name}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="owner">Owner</option>
-                    <option value="viewer">Viewer</option>
-                  </>
-                )}
-              </select>
-              <p className="text-xs text-[var(--text-muted)] mt-1">
-                {advancedRolesEnabled
-                  ? 'Invite email will mention their assigned role.'
-                  : 'Owner has full access; Viewer is read-only.'}
-              </p>
-            </div>
-
-            <Label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={newMember.isPrimary}
-                onChange={(e) => setNewMember({ ...newMember, isPrimary: e.target.checked })}
-                className="h-4 w-4"
-              />
-              <span>Set as primary contact</span>
-            </Label>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddMember} disabled={isAddingTeamMember}>
-              {isAddingTeamMember ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Adding…
-                </>
-              ) : (
-                'Add Member'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Add Branch Dialog */}
       <Dialog open={showAddBranchDialog} onOpenChange={setShowAddBranchDialog}>

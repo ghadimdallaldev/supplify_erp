@@ -2,6 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import { Button } from './ui/button'
 import { useNavigate } from 'react-router-dom'
 import { getLimitUpgradeCopy } from '../lib/upgradeCopy'
+import { splitRowClass } from './ui/card-layout'
 
 type LimitExceededBannerProps = {
   limitKey: string
@@ -15,6 +16,9 @@ type LimitExceededBannerProps = {
 
 const LIMIT_LABELS: Record<string, string> = {
   orders_per_day: 'Daily orders',
+  quick_lists: 'Quick lists',
+  quick_list_items: 'Quick list products',
+  scheduled_quick_lists: 'Scheduled quick lists',
   chats_per_day: 'Daily chats',
   supplier_products_skus: 'Products',
   restaurant_inventory_skus: 'Inventory SKUs',
@@ -42,7 +46,7 @@ export function LimitExceededBanner({
 
   return (
     <div
-      className={`flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 ${className}`}
+      className={`${splitRowClass} rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 ${className}`}
       role="alert"
       title={valueProp ?? undefined}
     >
@@ -65,7 +69,7 @@ export function LimitExceededBanner({
       <Button
         size="sm"
         variant="outline"
-        className="border-amber-300 bg-[var(--surface)] hover:bg-amber-100"
+        className="shrink-0 whitespace-normal border-amber-300 bg-[var(--surface)] hover:bg-amber-100"
         onClick={() => navigate(upgradeUrl)}
         title={valueProp ?? `Upgrade to ${planToUnlock} for higher ${label} limit`}
       >

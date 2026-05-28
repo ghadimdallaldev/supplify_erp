@@ -28,6 +28,15 @@ import toast from 'react-hot-toast'
 import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
+import { featureEnabled } from '../lib/planLimits'
+import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
+import { formatPlanDisplayName } from '../lib/planComparison'
+/** Vertical rhythm between dashboard sections (KPIs, cards row, calendar). */
+const DASHBOARD_STACK_GAP = 24
+/** Horizontal gap between KPI cards and between the three content cards. */
+const DASHBOARD_GRID_GAP = 20
+/** Extra space above the calendar so it separates clearly from the cards row. */
+const DASHBOARD_CALENDAR_EXTRA_GAP = 12
 import { CalendarView } from '../components/CalendarView'
 import { formatCurrency } from '../utils/format'
 
@@ -274,24 +283,32 @@ export function DashboardPage() {
   const { data: inventoryData } = useGetInventoryListQuery(undefined, {
     skip: isAdminNotImpersonating || !isSupplier,
   })
+  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
+    skip: !user || user.role === 'ADMIN',
+  })
+  const smartReorderEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.smart_reorder
+  )
+  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
-    skip: !isRestaurant,
+    skip: !isRestaurant || !smartReorderEnabled,
   })
   const { data: quickListsData } = useGetQuickListsQuery(undefined, {
     skip: !isRestaurant,
   })
   const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null)
+  const financeInvoicesEnabled = canUseFinanceInvoices(entitlementsData?.entitlements)
   const { data: invoiceAnalytics } = useGetInvoiceAnalyticsQuery(
     { period: 30 },
-    { skip: !isRestaurant }
+    { skip: !isRestaurant || !financeInvoicesEnabled }
   )
-  const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: !user || user.role === 'ADMIN',
-  })
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
-  const planName = entitlementsData?.entitlements?.plan?.name ?? 'Free'
+  const planName = formatPlanDisplayName(
+    entitlementsData?.entitlements?.plan?.code,
+    entitlementsData?.entitlements?.plan?.name
+  )
   const firstName = (user?.displayName || user?.email || '').split(/[\s@]/)[0] || 'there'
 
   const now = new Date()
@@ -308,7 +325,7 @@ export function DashboardPage() {
   if (isLoading) {
     return (
       <div
-        style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+        style={{ display: 'flex', flexDirection: 'column', gap: DASHBOARD_STACK_GAP }}
         data-testid="dashboard-page"
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -318,7 +335,7 @@ export function DashboardPage() {
           </div>
           <Skeleton className="h-8 w-36" style={{ background: 'var(--brand-ultra)' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div className="dashboard-kpi-grid">
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
@@ -338,7 +355,7 @@ export function DashboardPage() {
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: 12 }}>
+        <div className="dashboard-content-grid">
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
           <Skeleton className="h-64 rounded-xl" style={{ background: 'var(--brand-ultra)' }} />
@@ -490,7 +507,7 @@ export function DashboardPage() {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
+        gap: DASHBOARD_STACK_GAP,
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
@@ -502,13 +519,11 @@ export function DashboardPage() {
             border: '1px solid var(--brand-light)',
             borderRadius: 12,
             padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             gap: 12,
           }}
+          className="dashboard-split-row"
         >
-          <div>
+          <div className="min-w-0">
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
               You&apos;re all set
             </div>
@@ -539,13 +554,11 @@ export function DashboardPage() {
             border: '1px solid var(--brand-light)',
             borderRadius: 12,
             padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             gap: 12,
           }}
+          className="dashboard-split-row"
         >
-          <div>
+          <div className="min-w-0">
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
               You&apos;re all set
             </div>
@@ -571,8 +584,8 @@ export function DashboardPage() {
       )}
 
       {/* Page heading */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
+      <div className="dashboard-page-header">
+        <div className="min-w-0">
           <h1 style={{ fontSize: 21, fontWeight: 900, color: 'var(--text)', margin: 0 }}>
             {greeting}, {firstName} ☀️
           </h1>
@@ -615,14 +628,14 @@ export function DashboardPage() {
       </div>
 
       {/* KPI grid — 4 columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="dashboard-kpi-grid">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
       </div>
 
       {/* 3-col content row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '5fr 3fr 4fr', gap: 12 }}>
+      <div className="dashboard-content-grid">
         {/* Col 1 — Recent Orders */}
         <SectionCard
           title="Recent Orders"
@@ -658,14 +671,11 @@ export function DashboardPage() {
                 <Link
                   key={o.id}
                   to={`/app/orders/${o.id}`}
+                  className="dashboard-split-row"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
                     padding: '8px 4px',
                     borderBottom: '1px solid var(--app-border)',
                     textDecoration: 'none',
-                    gap: 8,
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
@@ -788,7 +798,9 @@ export function DashboardPage() {
                   alignItems: 'center',
                 }}
               >
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total orders</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  Total orders (all time)
+                </span>
                 <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>
                   {stats?.totalOrders ?? 0}
                 </span>
@@ -1065,6 +1077,7 @@ export function DashboardPage() {
       {/* Calendar row */}
       <div
         style={{
+          marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
           background: 'var(--surface)',
           border: '1px solid var(--app-border)',
           borderRadius: 12,

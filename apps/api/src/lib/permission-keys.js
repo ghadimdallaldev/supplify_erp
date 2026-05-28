@@ -1,4 +1,16 @@
-/** Permission key constants (match permission.code in DB). No imports — safe for circular-dep-free use. */
+/**
+ * Permission key constants (match permission.code in DB). No imports — safe for circular-dep-free use.
+ *
+ * Conceptual groups (for docs/UI):
+ * - team.* → STAFF_VIEW, STAFF_INVITE, STAFF_EDIT, STAFF_MANAGE
+ * - roles.* → SETTINGS_MANAGE (create/update/delete custom roles)
+ * - products/catalog → CATALOG_*
+ * - orders → ORDERS_*
+ * - deals/promotions → PROMOTIONS_*
+ * - insights → reports use ORDERS_VIEW / tenant analytics gates
+ * - settings → SETTINGS_*
+ * - billing → SUBSCRIPTIONS_*, PAYMENTS_*, INVOICES_*
+ */
 export const PERMISSION_KEYS = Object.freeze({
   ORDERS_VIEW: 'ORDERS_VIEW',
   ORDERS_CREATE: 'ORDERS_CREATE',
@@ -47,4 +59,47 @@ export const PERMISSION_KEYS = Object.freeze({
   FULFILLMENT_MANAGE: 'FULFILLMENT_MANAGE',
   PROMOTIONS_VIEW: 'PROMOTIONS_VIEW',
   PROMOTIONS_MANAGE: 'PROMOTIONS_MANAGE',
+})
+
+/** Conceptual key → stored permission code (for docs/UI). */
+export const PERMISSION_ALIASES = Object.freeze({
+  'workspace.view': PERMISSION_KEYS.SETTINGS_VIEW,
+  'workspace.update': PERMISSION_KEYS.SETTINGS_EDIT,
+  'settings.view': PERMISSION_KEYS.SETTINGS_VIEW,
+  'settings.update': PERMISSION_KEYS.SETTINGS_MANAGE,
+  'team.view': PERMISSION_KEYS.STAFF_VIEW,
+  'team.invite': PERMISSION_KEYS.STAFF_INVITE,
+  'team.remove': PERMISSION_KEYS.STAFF_MANAGE,
+  'team.update_role': PERMISSION_KEYS.STAFF_MANAGE,
+  'roles.view': PERMISSION_KEYS.SETTINGS_VIEW,
+  'roles.create': PERMISSION_KEYS.SETTINGS_MANAGE,
+  'roles.update': PERMISSION_KEYS.SETTINGS_MANAGE,
+  'roles.delete': PERMISSION_KEYS.SETTINGS_MANAGE,
+  'orders.view': PERMISSION_KEYS.ORDERS_VIEW,
+  'orders.create': PERMISSION_KEYS.ORDERS_CREATE,
+  'orders.update': PERMISSION_KEYS.ORDERS_EDIT,
+  'orders.cancel': PERMISSION_KEYS.ORDERS_MANAGE,
+  'orders.accept': PERMISSION_KEYS.ORDERS_EDIT,
+  'orders.decline': PERMISSION_KEYS.ORDERS_MANAGE,
+  'orders.receive': PERMISSION_KEYS.RECEIVING_MANAGE,
+  'orders.fulfill': PERMISSION_KEYS.FULFILLMENT_MANAGE,
+  'orders.view_financials': PERMISSION_KEYS.ORDERS_VIEW,
+  'disputes.view': PERMISSION_KEYS.ORDERS_VIEW,
+  'disputes.create': PERMISSION_KEYS.RECEIVING_MANAGE,
+  'products.view': PERMISSION_KEYS.CATALOG_VIEW,
+  'products.create': PERMISSION_KEYS.CATALOG_EDIT,
+  'products.update': PERMISSION_KEYS.CATALOG_EDIT,
+  'products.delete': PERMISSION_KEYS.CATALOG_MANAGE,
+  'catalog.view': PERMISSION_KEYS.CATALOG_VIEW,
+  'catalog.update': PERMISSION_KEYS.CATALOG_MANAGE,
+  'deals.view': PERMISSION_KEYS.PROMOTIONS_VIEW,
+  'deals.create': PERMISSION_KEYS.PROMOTIONS_MANAGE,
+  'deals.update': PERMISSION_KEYS.PROMOTIONS_MANAGE,
+  'billing.view': PERMISSION_KEYS.SUBSCRIPTIONS_VIEW,
+  'billing.manage': PERMISSION_KEYS.SUBSCRIPTIONS_MANAGE,
+  'invoices.view': PERMISSION_KEYS.INVOICES_VIEW,
+  'payments.view': PERMISSION_KEYS.PAYMENTS_VIEW,
+  'payments.manage': PERMISSION_KEYS.PAYMENTS_MANAGE,
+  'insights.view': PERMISSION_KEYS.ORDERS_VIEW,
+  'reports.financial.view': PERMISSION_KEYS.INVOICES_VIEW,
 })

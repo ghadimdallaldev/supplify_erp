@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
+import { Skeleton } from '../components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -15,12 +16,19 @@ import {
 } from '../components/ui/select'
 import { toast } from 'react-hot-toast'
 import {
+  useGetMeQuery,
   useGetStaffPortalDashboardQuery,
   useGetStaffPortalTimeEntriesQuery,
+  useGetStaffSelfDashboardQuery,
+  useGetStaffSelfTimeEntriesQuery,
   useStaffPortalCheckInMutation,
   useStaffPortalCheckOutMutation,
+  useStaffSelfCheckInMutation,
+  useStaffSelfCheckOutMutation,
   useSubmitStaffPortalPtoMutation,
   useSubmitStaffPortalSwapMutation,
+  useSubmitStaffSelfPtoMutation,
+  useSubmitStaffSelfSwapMutation,
 } from '../services/api'
 import type { StaffPortalDashboard, StaffTimeEntry } from '../types'
 
@@ -51,17 +59,48 @@ function useStaffToken() {
 export function StaffSelfServiceDashboard() {
   const navigate = useNavigate()
   const token = useStaffToken()
-  const skip = !token
+  const magicLinkMode = Boolean(token)
 
-  const { data, isLoading, refetch } = useGetStaffPortalDashboardQuery({ token }, { skip })
-  const { data: timeEntries = [], refetch: refetchTimeEntries } = useGetStaffPortalTimeEntriesQuery(
-    { token },
-    { skip }
-  )
-  const [checkIn, { isLoading: checkingIn }] = useStaffPortalCheckInMutation()
-  const [checkOut, { isLoading: checkingOut }] = useStaffPortalCheckOutMutation()
-  const [submitPto, { isLoading: submittingPto }] = useSubmitStaffPortalPtoMutation()
-  const [submitSwap, { isLoading: submittingSwap }] = useSubmitStaffPortalSwapMutation()
+  const { data: me } = useGetMeQuery(undefined, { skip: magicLinkMode })
+  const accountMode =
+    !magicLinkMode && (me?.role === 'STAFF_PORTAL' || me?.accessType === 'staff_portal')
+
+  const {
+    data: magicData,
+    isLoading: magicLoading,
+    refetch: refetchMagic,
+  } = useGetStaffPortalDashboardQuery({ token }, { skip: !magicLinkMode })
+  const {
+    data: accountData,
+    isLoading: accountLoading,
+    refetch: refetchAccount,
+  } = useGetStaffSelfDashboardQuery(undefined, { skip: !accountMode })
+
+  const data = magicLinkMode ? magicData : accountData
+  const isLoading = magicLinkMode ? magicLoading : accountLoading
+  const refetch = magicLinkMode ? refetchMagic : refetchAccount
+
+  const { data: magicTimeEntries = [], refetch: refetchMagicTime } =
+    useGetStaffPortalTimeEntriesQuery({ token }, { skip: !magicLinkMode })
+  const { data: accountTimeEntries = [], refetch: refetchAccountTime } =
+    useGetStaffSelfTimeEntriesQuery(undefined, { skip: !accountMode })
+  const timeEntries = magicLinkMode ? magicTimeEntries : accountTimeEntries
+  const refetchTimeEntries = magicLinkMode ? refetchMagicTime : refetchAccountTime
+
+  const [magicCheckIn, { isLoading: magicCheckingIn }] = useStaffPortalCheckInMutation()
+  const [magicCheckOut, { isLoading: magicCheckingOut }] = useStaffPortalCheckOutMutation()
+  const [accountCheckIn, { isLoading: accountCheckingIn }] = useStaffSelfCheckInMutation()
+  const [accountCheckOut, { isLoading: accountCheckingOut }] = useStaffSelfCheckOutMutation()
+  const checkingIn = magicLinkMode ? magicCheckingIn : accountCheckingIn
+  const checkingOut = magicLinkMode ? magicCheckingOut : accountCheckingOut
+
+  const [magicSubmitPto, { isLoading: magicSubmittingPto }] = useSubmitStaffPortalPtoMutation()
+  const [accountSubmitPto, { isLoading: accountSubmittingPto }] = useSubmitStaffSelfPtoMutation()
+  const submittingPto = magicLinkMode ? magicSubmittingPto : accountSubmittingPto
+
+  const [magicSubmitSwap, { isLoading: magicSubmittingSwap }] = useSubmitStaffPortalSwapMutation()
+  const [accountSubmitSwap, { isLoading: accountSubmittingSwap }] = useSubmitStaffSelfSwapMutation()
+  const submittingSwap = magicLinkMode ? magicSubmittingSwap : accountSubmittingSwap
 
   const [ptoForm, setPtoForm] = useState({
     type: 'VACATION',
@@ -78,11 +117,10 @@ export function StaffSelfServiceDashboard() {
   })
 
   useEffect(() => {
-    if (!token) {
-      toast.error('Staff session expired. Request a new link.')
-      navigate('/staff', { replace: true })
+    if (!magicLinkMode && me && !accountMode) {
+      navigate('/staff/login', { replace: true })
     }
-  }, [token, navigate])
+  }, [magicLinkMode, me, accountMode, navigate])
 
   useEffect(() => {
     if (data?.upcomingShifts?.length && !swapForm.shiftId) {
@@ -92,21 +130,25 @@ export function StaffSelfServiceDashboard() {
 
   const handleSubmitPto = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!token) return
+    if (!magicLinkMode && !accountMode) return
     if (new Date(ptoForm.endDate) < new Date(ptoForm.startDate)) {
       toast.error('End date cannot be before start date')
       return
     }
 
     try {
-      await submitPto({
-        token,
+      const body = {
         type: ptoForm.type as any,
         startDate: ptoForm.startDate,
         endDate: ptoForm.endDate,
         hoursRequested: ptoForm.hoursRequested ? Number(ptoForm.hoursRequested) : undefined,
         reason: ptoForm.reason || undefined,
-      }).unwrap()
+      }
+      if (magicLinkMode) {
+        await magicSubmitPto({ token, ...body }).unwrap()
+      } else {
+        await accountSubmitPto(body).unwrap()
+      }
       toast.success('Time-off request submitted')
       setPtoForm((prev) => ({ ...prev, reason: '' }))
       refetch()
@@ -119,18 +161,22 @@ export function StaffSelfServiceDashboard() {
 
   const handleSubmitSwap = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!token || !swapForm.shiftId) {
+    if ((!magicLinkMode && !accountMode) || !swapForm.shiftId) {
       toast.error('Select a shift to request a swap')
       return
     }
 
     try {
-      await submitSwap({
-        token,
+      const body = {
         shiftId: swapForm.shiftId,
         proposedCoverId: swapForm.proposedCoverId || undefined,
         reason: swapForm.reason || undefined,
-      }).unwrap()
+      }
+      if (magicLinkMode) {
+        await magicSubmitSwap({ token, ...body }).unwrap()
+      } else {
+        await accountSubmitSwap(body).unwrap()
+      }
       toast.success('Shift swap request sent')
       setSwapForm((prev) => ({ ...prev, reason: '' }))
       refetch()
@@ -143,9 +189,13 @@ export function StaffSelfServiceDashboard() {
 
   const openEntry = timeEntries.find((e: StaffTimeEntry) => !e.clockOutAt)
   const handleClockIn = async () => {
-    if (!token) return
+    if (!magicLinkMode && !accountMode) return
     try {
-      await checkIn({ token }).unwrap()
+      if (magicLinkMode) {
+        await magicCheckIn({ token }).unwrap()
+      } else {
+        await accountCheckIn({}).unwrap()
+      }
       toast.success('Clocked in')
       refetchTimeEntries()
     } catch (error: any) {
@@ -153,9 +203,13 @@ export function StaffSelfServiceDashboard() {
     }
   }
   const handleClockOut = async () => {
-    if (!token || !openEntry) return
+    if ((!magicLinkMode && !accountMode) || !openEntry) return
     try {
-      await checkOut({ token, id: openEntry.id }).unwrap()
+      if (magicLinkMode) {
+        await magicCheckOut({ token, id: openEntry.id }).unwrap()
+      } else {
+        await accountCheckOut({ id: openEntry.id }).unwrap()
+      }
       toast.success('Clocked out')
       refetchTimeEntries()
     } catch (error: any) {
@@ -163,14 +217,18 @@ export function StaffSelfServiceDashboard() {
     }
   }
 
-  if (skip) {
+  if (!magicLinkMode && !accountMode && !isLoading) {
     return null
   }
 
   if (isLoading || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-900/90 text-white">
-        <p className="text-sm text-[var(--text-muted)]">Loading your schedule…</p>
+      <div className="min-h-screen bg-slate-900/90 px-4 py-12" role="status" aria-live="polite">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+          <Skeleton className="h-10 w-64 bg-white/10" />
+          <Skeleton className="h-32 w-full rounded-lg bg-white/10" />
+          <Skeleton className="h-48 w-full rounded-lg bg-white/10" />
+        </div>
       </div>
     )
   }
@@ -185,12 +243,19 @@ export function StaffSelfServiceDashboard() {
             <p className="text-sm uppercase tracking-wide text-[var(--text-muted)]">Welcome back</p>
             <h1 className="text-3xl font-bold tracking-tight">{staff.display_name}</h1>
             <p className="text-sm text-[var(--text-muted)]">Role: {staff.role}</p>
+            <p className="mt-1 max-w-xl text-xs text-slate-400">
+              Staff portal — view your schedule, clock in/out, and submit requests. Restaurant
+              managers use the main app under Staff operations.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="bg-[var(--mint-pale)]/10 text-[var(--mint)]">
               {upcomingShifts.length} upcoming shifts
             </Badge>
-            <Badge variant="secondary" className="bg-[var(--brand-pale)]/10 text-[var(--brand-mid)]">
+            <Badge
+              variant="secondary"
+              className="bg-[var(--brand-pale)]/10 text-[var(--brand-mid)]"
+            >
               {announcements.length} announcements
             </Badge>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -244,7 +309,9 @@ export function StaffSelfServiceDashboard() {
                 Recent check-ins & check-outs
               </p>
               {timeEntries.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No time entries yet. Clock in to start.</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  No time entries yet. Clock in to start.
+                </p>
               ) : (
                 <ul className="space-y-2">
                   {timeEntries.slice(0, 15).map((entry: StaffTimeEntry) => (
@@ -286,7 +353,9 @@ export function StaffSelfServiceDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {upcomingShifts.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No scheduled shifts yet. Check back soon!</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  No scheduled shifts yet. Check back soon!
+                </p>
               ) : (
                 upcomingShifts.map((shift: StaffPortalDashboard['upcomingShifts'][number]) => (
                   <div
@@ -471,10 +540,15 @@ export function StaffSelfServiceDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {announcements.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">No announcements yet. Check again soon.</p>
+                <p className="text-sm text-[var(--text-muted)]">
+                  No announcements yet. Check again soon.
+                </p>
               ) : (
                 announcements.map((announcement: StaffPortalDashboard['announcements'][number]) => (
-                  <div key={announcement.id} className="rounded-xl border border-[var(--app-border)] p-4">
+                  <div
+                    key={announcement.id}
+                    className="rounded-xl border border-[var(--app-border)] p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <p className="font-semibold text-[var(--text)]">{announcement.title}</p>
                       <Badge variant={announcement.acknowledged ? 'default' : 'outline'}>

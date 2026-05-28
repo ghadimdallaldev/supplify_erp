@@ -1,6 +1,7 @@
 import express from 'express'
 import { z } from 'zod'
-import { requireAuth } from '../lib/rbac.js'
+import { requireAuth, resolveTenantContext } from '../lib/rbac.js'
+import { requireFeature } from '../lib/subscription.js'
 import {
   getVapidPublicKey,
   savePushSubscription,
@@ -37,30 +38,48 @@ router.get('/vapid-public-key', (req, res) => {
   res.json({ ok: true, data: { publicKey }, error: null, requestId: req.requestId })
 })
 
-router.post('/subscribe', requireAuth, async (req, res, next) => {
-  try {
-    const body = subscribeSchema.parse(req.body)
-    const subscription = await savePushSubscription(req.userData.id, {
-      endpoint: body.endpoint,
-      keys: body.keys,
-      userAgent: req.headers['user-agent'],
-    })
-    res
-      .status(201)
-      .json({ ok: true, data: { subscription }, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
-  }
-})
+const pushFeatureGate = requireFeature(
+  'push_notifications',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
-router.delete('/unsubscribe', requireAuth, async (req, res, next) => {
-  try {
-    const body = unsubscribeSchema.parse(req.body)
-    const removed = await removePushSubscription(req.userData.id, body.endpoint)
-    res.json({ ok: true, data: { removed }, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
+router.post(
+  '/subscribe',
+  requireAuth,
+  resolveTenantContext,
+  pushFeatureGate,
+  async (req, res, next) => {
+    try {
+      const body = subscribeSchema.parse(req.body)
+      const subscription = await savePushSubscription(req.userData.id, {
+        endpoint: body.endpoint,
+        keys: body.keys,
+        userAgent: req.headers['user-agent'],
+      })
+      res
+        .status(201)
+        .json({ ok: true, data: { subscription }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
   }
-})
+)
+
+router.delete(
+  '/unsubscribe',
+  requireAuth,
+  resolveTenantContext,
+  pushFeatureGate,
+  async (req, res, next) => {
+    try {
+      const body = unsubscribeSchema.parse(req.body)
+      const removed = await removePushSubscription(req.userData.id, body.endpoint)
+      res.json({ ok: true, data: { removed }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 export { router as pushRoutes }

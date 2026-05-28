@@ -12,10 +12,47 @@ const STAFF_BASE_MIGRATION = '0034_staff_app.sql'
 const STAFF_EXTENSIONS_MIGRATION = '0035_staff_app_extensions.sql'
 const PORTAL_SUPPORT_MIGRATION = '0037_portal_support.sql'
 
-const RESERVATIONS_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', RESERVATIONS_MIGRATION)
-const STAFF_BASE_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', STAFF_BASE_MIGRATION)
-const STAFF_EXTENSIONS_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', STAFF_EXTENSIONS_MIGRATION)
-const PORTAL_SUPPORT_MIGRATION_PATH = join(__dirname, '..', '..', 'db', 'migrations', PORTAL_SUPPORT_MIGRATION)
+const RESERVATIONS_MIGRATION_PATH = join(
+  __dirname,
+  '..',
+  '..',
+  'db',
+  'migrations',
+  RESERVATIONS_MIGRATION
+)
+const STAFF_BASE_MIGRATION_PATH = join(
+  __dirname,
+  '..',
+  '..',
+  'db',
+  'migrations',
+  STAFF_BASE_MIGRATION
+)
+const STAFF_EXTENSIONS_MIGRATION_PATH = join(
+  __dirname,
+  '..',
+  '..',
+  'db',
+  'migrations',
+  STAFF_EXTENSIONS_MIGRATION
+)
+const PORTAL_SUPPORT_MIGRATION_PATH = join(
+  __dirname,
+  '..',
+  '..',
+  'db',
+  'migrations',
+  PORTAL_SUPPORT_MIGRATION
+)
+const ORDER_CANCELLATION_MIGRATION = '0108_order_cancellation_details.sql'
+const ORDER_CANCELLATION_MIGRATION_PATH = join(
+  __dirname,
+  '..',
+  '..',
+  'db',
+  'migrations',
+  ORDER_CANCELLATION_MIGRATION
+)
 
 async function reservationsSchemaExists() {
   const { rows } = await query(`
@@ -113,6 +150,35 @@ async function staffExtensionsSchemaExists() {
   return Boolean(rows[0]?.has_pto)
 }
 
+async function orderCancellationColumnsExist() {
+  const { rows } = await query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'customer_order'
+        AND column_name = 'cancelled_by'
+    ) AS has_cancelled_by
+  `)
+  return Boolean(rows[0]?.has_cancelled_by)
+}
+
+export async function ensureOrderCancellationColumns() {
+  try {
+    if (await orderCancellationColumnsExist()) {
+      logger.debug('Order cancellation columns already present, skipping migration 0108')
+      return
+    }
+    logger.info('Applying order cancellation columns migration (0108)')
+    const sql = await readFile(ORDER_CANCELLATION_MIGRATION_PATH, 'utf8')
+    await query(sql)
+    logger.info('Order cancellation columns migration applied successfully')
+  } catch (error) {
+    logger.error('Failed to apply order cancellation columns migration', { error: error.message })
+    throw error
+  }
+}
+
 export async function ensureStaffAppSchema() {
   try {
     if (!(await staffBaseSchemaExists())) {
@@ -137,4 +203,3 @@ export async function ensureStaffAppSchema() {
     throw error
   }
 }
-

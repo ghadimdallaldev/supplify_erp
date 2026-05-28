@@ -1,7 +1,9 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
-import { query } from '../lib/db.js'
+import { reviewsAccessGuard } from '../lib/route-permissions.js'
+import { requireFeature } from '../lib/subscription.js'
+import { requireRestaurantId } from '../lib/tenant-resolve.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import {
   createSupplierReview,
@@ -39,17 +41,6 @@ const paginationSchema = z.object({
     .transform((v) => (v ? parseInt(v, 10) : 0)),
 })
 
-async function getRestaurantId(req) {
-  if (req.tenantContext?.tenantType === 'RESTAURANT' && req.tenantContext?.tenantId) {
-    return req.tenantContext.tenantId
-  }
-  const { rows } = await query('SELECT id FROM restaurant WHERE contact_email = $1', [
-    req.userData.email,
-  ])
-  if (!rows.length) throw new ValidationError('Restaurant not found')
-  return rows[0].id
-}
-
 // Public routes (no auth)
 router.get('/suppliers/:supplierId', async (req, res, next) => {
   try {
@@ -83,11 +74,22 @@ router.get('/suppliers/:supplierId/summary', async (req, res, next) => {
 })
 
 // Authenticated restaurant routes
-router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN']))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  reviewsAccessGuard
+)
+
+const reviewsWriteGate = requireFeature(
+  'supplier_reviews',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
 router.get('/my', async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const { limit, offset } = paginationSchema.parse(req.query)
     const reviews = await listMyReviews(restaurantId, { limit, offset })
     res.json({
@@ -101,9 +103,9 @@ router.get('/my', async (req, res, next) => {
   }
 })
 
-router.post('/suppliers/:supplierId', async (req, res, next) => {
+router.post('/suppliers/:supplierId', reviewsWriteGate, async (req, res, next) => {
   try {
-    const restaurantId = await getRestaurantId(req)
+    const restaurantId = await requireRestaurantId(req)
     const body = reviewBodySchema.parse(req.body)
     const review = await createSupplierReview({
       supplierId: req.params.supplierId,
@@ -127,7 +129,7 @@ router.post('/suppliers/:supplierId', async (req, res, next) => {
   }
 })
 
-router.patch('/:id', async (req, res, next) => {
+router.patch('/:id', reviewsWriteGate, async (req, res, next) => {
   try {
     const body = reviewPatchSchema.parse(req.body)
     const review = await updateSupplierReview(req.params.id, req.userData.id, body)
@@ -142,7 +144,7 @@ router.patch('/:id', async (req, res, next) => {
   }
 })
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', reviewsWriteGate, async (req, res, next) => {
   try {
     const result = await deleteSupplierReview(req.params.id, req.userData.id)
     res.json({

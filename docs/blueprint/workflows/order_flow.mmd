@@ -1,0 +1,12 @@
+flowchart LR
+  A[Cart / Quick list] --> B[Checkout]
+  B --> C[Place order]
+  C --> D{checkAndIncrementUsage\norders_per_day}
+  D -->|allowed| E[Create customer_order]
+  D -->|blocked| F[403 LIMIT_EXCEEDED\nUpgradeModal]
+  E --> G[Notify supplier team]
+  G --> H{Supplier action}
+  H -->|Acknowledge / fulfill| I[Fulfillment]
+  H -->|Decline + reason| J[CANCELLED\ncancelled_by SUPPLIER]
+  J --> K[Notify restaurant team\nDeclined by supplier]
+  I --> L[Receiving]

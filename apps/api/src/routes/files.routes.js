@@ -1,30 +1,22 @@
 import express from 'express'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import { filesUploadGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
 import { sanitizeUploadFileName, assertUploadKeyOwnedByUser } from '../lib/sanitize-upload.js'
+import { createPresignedUpload, buildObjectPublicUrl } from '../lib/object-storage.js'
 
 const router = express.Router()
-
-const s3 = new S3Client({
-  endpoint: config.S3_ENDPOINT,
-  region: config.S3_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: config.S3_ACCESS_KEY,
-    secretAccessKey: config.S3_SECRET_KEY,
-  },
-  forcePathStyle: true,
-})
 
 // Generate presigned URL for file upload
 router.post(
   '/presign',
   requireAuth,
   requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
+  resolveTenantContext,
+  filesUploadGuard,
   async (req, res) => {
     try {
       const { fileName, fileType, fileSize } = req.body
@@ -94,19 +86,16 @@ router.post(
         })
       }
 
-      // Generate unique file key
       const fileKey = `uploads/${req.userData.id}/${Date.now()}-${safeFileName}`
-
-      const command = new PutObjectCommand({
-        Bucket: config.S3_BUCKET,
-        Key: fileKey,
-        ContentType: fileType,
+      const { presignedUrl, publicUrl, bucket } = await createPresignedUpload({
+        fileKey,
+        fileType,
       })
-      const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 300 })
 
       logger.info('Presigned URL generated', {
         fileName,
         fileType,
+        bucket,
         actor: req.userData.id,
       })
 
@@ -115,9 +104,11 @@ router.post(
         data: {
           presignedUrl,
           url: presignedUrl,
+          publicUrl,
           fileKey,
           fileName,
           fileType,
+          bucket,
           storageMetered: sizeBytes > 0,
         },
         error: null,
@@ -125,12 +116,18 @@ router.post(
       })
     } catch (error) {
       logger.error('Generate presigned URL error:', error)
-      res.status(500).json({
+      const isBucket =
+        error?.name === 'NoSuchBucket' ||
+        error?.Code === 'NoSuchBucket' ||
+        /bucket/i.test(error?.message || '')
+      res.status(isBucket ? 503 : 500).json({
         ok: false,
         data: null,
         error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to generate presigned URL',
+          name: isBucket ? 'STORAGE_UNAVAILABLE' : 'INTERNAL_ERROR',
+          message: isBucket
+            ? `Storage bucket "${config.S3_BUCKET}" is missing. Run MinIO init or set S3_BUCKET.`
+            : 'Failed to generate presigned URL',
         },
         requestId: req.requestId,
       })
@@ -143,6 +140,8 @@ router.post(
   '/product/:productId/attach',
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
+  resolveTenantContext,
+  filesUploadGuard,
   async (req, res) => {
     try {
       const { productId } = req.params
@@ -174,7 +173,6 @@ router.post(
         })
       }
 
-      // Resolve product and supplier for ownership and storage tracking
       const { rows: products } = await query(
         `
         SELECT p.*, s.id as supplier_id, s.contact_email
@@ -211,11 +209,8 @@ router.post(
 
       const supplierId = products[0].supplier_id
       const sizeBytes = fileSize != null ? Math.max(0, parseInt(String(fileSize), 10) || 0) : 0
+      const fileUrl = buildObjectPublicUrl(config.S3_BUCKET, fileKey)
 
-      // Generate file URL
-      const fileUrl = `${config.S3_ENDPOINT}/${config.S3_BUCKET}/${fileKey}`
-
-      // Create attachment record (file_size_bytes for storage quota; column added in 0040)
       const { rows } = await query(
         `
       INSERT INTO attachment (owner_type, owner_id, url, type, meta, file_size_bytes)
@@ -231,8 +226,6 @@ router.post(
         ]
       )
 
-      // Storage is metered at presign when clients upload via /files/presign first.
-      // Direct attach without presign still records usage here.
       if (supplierId && sizeBytes > 0 && !req.body.storageMeteredAtPresign) {
         const { ensureStorageForUpload } = await import('../lib/subscription.js')
         const metered = await ensureStorageForUpload(supplierId, 'SUPPLIER', sizeBytes)
@@ -249,7 +242,6 @@ router.post(
         }
       }
 
-      // Update product image URL if it's an image
       if (fileType && fileType.startsWith('image/')) {
         await query(
           `
