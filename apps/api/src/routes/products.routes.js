@@ -7,6 +7,7 @@ import {
   requirePermission,
   requireAnyPermission,
   getRequestTenant,
+  getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -22,6 +23,7 @@ import {
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { writeAuditLog } from '../lib/audit.js'
+import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
 
 const router = express.Router()
 
@@ -265,7 +267,14 @@ router.get('/', async (req, res) => {
 
     queryParams.push(params.limit, params.offset)
 
-    const { rows } = await query(sql, queryParams)
+    let { rows } = await query(sql, queryParams)
+
+    if (tenant?.tenantType === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (restaurantId) {
+        rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
+      }
+    }
 
     // Get total count for pagination
     const countSql = `
@@ -360,9 +369,19 @@ router.get('/:id', async (req, res) => {
       })
     }
 
+    let product = rows[0]
+    const detailTenant = await getRequestTenant(req)
+    if (detailTenant?.tenantType === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (restaurantId) {
+        const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
+        product = enriched
+      }
+    }
+
     res.json({
       ok: true,
-      data: { product: rows[0] },
+      data: { product },
       error: null,
       requestId: req.requestId,
     })

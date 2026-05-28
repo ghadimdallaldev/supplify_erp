@@ -12,6 +12,7 @@ import {
 } from './workspace-membership.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { sendNotification } from '../services/notification.service.js'
+import { recordRegistrationLegalAcceptances } from './legal-acceptance.js'
 
 const KC_ROLE = { RESTAURANT: 'restaurant', SUPPLIER: 'supplier', ADMIN: 'admin' }
 
@@ -164,6 +165,9 @@ export async function completeTenantRegistration({
   accountType,
   businessName,
   phone,
+  legalAcceptance,
+  ipAddress,
+  userAgent,
 }) {
   const normalizedEmail = email.trim().toLowerCase()
   const type = accountType === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
@@ -236,6 +240,20 @@ export async function completeTenantRegistration({
         organizationId: scope.organizationId,
         homeTenantId: scope.homeTenantId,
         isMainAdmin: true,
+      },
+      client
+    )
+
+    await recordRegistrationLegalAcceptances(
+      {
+        userId,
+        tenantId: registrationResult.tenant.id,
+        tenantType: registrationResult.tenantType,
+        acceptedDocuments: legalAcceptance.acceptedDocuments,
+        electronicSignatureAttestation: legalAcceptance.electronicSignatureAttestation,
+        packVersion: legalAcceptance.packVersion,
+        ipAddress,
+        userAgent,
       },
       client
     )

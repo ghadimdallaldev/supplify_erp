@@ -42,6 +42,10 @@ vi.mock('./supplier-org.js', () => ({
   invalidateOrgPermissionCaches: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('./legal-acceptance.js', () => ({
+  recordRegistrationLegalAcceptances: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('./workspace-membership.js', () => ({
   getUserWorkspaceMembership: vi.fn().mockResolvedValue(null),
   bindUserToWorkspace: vi.fn().mockResolvedValue(undefined),
@@ -55,6 +59,33 @@ vi.mock('./workspace-membership.js', () => ({
 }))
 
 describe('register-account', () => {
+  const legalAcceptance = {
+    packVersion: '2026-05-28',
+    acceptedDocuments: [
+      'terms_and_conditions',
+      'privacy_policy',
+      'acceptable_use_policy',
+      'data_processing_addendum',
+      'cookie_policy',
+      'mobile_app_terms',
+      'restaurant_agreement',
+    ],
+    electronicSignatureAttestation: true,
+  }
+
+  const supplierLegalAcceptance = {
+    ...legalAcceptance,
+    acceptedDocuments: [
+      'terms_and_conditions',
+      'privacy_policy',
+      'acceptable_use_policy',
+      'data_processing_addendum',
+      'cookie_policy',
+      'mobile_app_terms',
+      'supplier_agreement',
+    ],
+  }
+
   beforeEach(() => {
     mockQuery.mockReset()
     mockClientQuery.mockReset()
@@ -115,6 +146,7 @@ describe('register-account', () => {
         accountType: 'RESTAURANT',
         businessName: 'Test Rest',
         phone: '+123',
+        legalAcceptance,
       })
 
       expect(result.tenantType).toBe('RESTAURANT')
@@ -154,6 +186,7 @@ describe('register-account', () => {
         accountType: 'SUPPLIER',
         businessName: 'Test Supply',
         phone: '+971',
+        legalAcceptance: supplierLegalAcceptance,
       })
 
       expect(result.tenantType).toBe('SUPPLIER')

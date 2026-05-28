@@ -54,6 +54,14 @@ export interface Product {
   available_qty?: number
   current_price?: number
   currency?: string
+  /** Catalog list price before contract override */
+  catalog_price?: number
+  pricing_source?: 'DEFAULT_PRICE' | 'CONTRACT_PRICE'
+  contract_price_id?: string | null
+  contract_discount_percent?: number | null
+  contract_valid_from?: string | null
+  contract_valid_until?: string | null
+  contract_min_order_quantity?: number | null
 }
 
 export interface CreateProductRequest {

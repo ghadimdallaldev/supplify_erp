@@ -100,6 +100,29 @@ const cartSlice = createSlice({
         persist(state, ownerEmail)
       }
     },
+    updateItemResolvedPrice: (
+      state,
+      action: PayloadAction<{
+        productId: string
+        currentPrice: number
+        pricingSource?: string
+        catalogPrice?: number
+        ownerEmail?: string | null
+      }>
+    ) => {
+      const { productId, currentPrice, pricingSource, catalogPrice, ownerEmail } = action.payload
+      const item = state.items.find((i) => i.productId === productId)
+      if (item) {
+        item.product = {
+          ...item.product,
+          current_price: currentPrice,
+          pricing_source: pricingSource as CartItem['product']['pricing_source'],
+          catalog_price: catalogPrice ?? item.product.catalog_price,
+        }
+        recomputeGroups(state)
+        persist(state, ownerEmail)
+      }
+    },
     clearCart: (state, action: PayloadAction<{ ownerEmail?: string | null } | undefined>) => {
       state.items = []
       state.groups = []
@@ -138,6 +161,7 @@ export const {
   addItem,
   removeItem,
   updateQuantity,
+  updateItemResolvedPrice,
   clearCart,
   saveDraft,
   loadDraft,
