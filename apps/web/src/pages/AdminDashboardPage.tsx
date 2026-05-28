@@ -76,6 +76,7 @@ import { formatCurrency } from '../utils/format'
 import { AdminFeatureFlagsPanel } from '../components/admin/AdminFeatureFlagsPanel'
 import { AdminDealsPanel } from '../components/admin/AdminDealsPanel'
 import { AdminLimitOverridesPanel } from '../components/admin/AdminLimitOverridesPanel'
+import { AdminLocationAddonsPanel } from '../components/admin/AdminLocationAddonsPanel'
 import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
 
@@ -219,6 +220,48 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [updateSubscription] = useUpdateAdminSubscriptionMutation()
   const [previewPlanChange] = usePreviewSubscriptionPlanChangeMutation()
   const [startImpersonation] = useStartImpersonationMutation()
+
+  const handleStartImpersonation = async (
+    tenantId: string,
+    tenantType: 'RESTAURANT' | 'SUPPLIER',
+    tenantLabel: string,
+    acknowledgeSuspended = false
+  ) => {
+    try {
+      const result = await startImpersonation({
+        tenantId,
+        tenantType,
+        acknowledgeSuspended,
+      }).unwrap()
+      toast.success(`Impersonating ${tenantLabel}`)
+      window.location.href = result.redirectTo || '/app/dashboard'
+    } catch (err: unknown) {
+      const e = err as {
+        data?: {
+          error?: {
+            name?: string
+            message?: string
+            requiresAcknowledgement?: boolean
+          }
+        }
+      }
+      if (
+        e?.data?.error?.name === 'TENANT_SUSPENDED' &&
+        e?.data?.error?.requiresAcknowledgement &&
+        !acknowledgeSuspended
+      ) {
+        const ok = window.confirm(
+          `${e.data.error.message || 'This tenant is suspended or inactive.'}\n\nContinue impersonation for support?`
+        )
+        if (ok) {
+          return handleStartImpersonation(tenantId, tenantType, tenantLabel, true)
+        }
+        return
+      }
+      toast.error(e?.data?.error?.message || 'Failed to start impersonation')
+    }
+  }
+
   const [unlockSubscription, { isLoading: isUnlocking }] = useUnlockAdminSubscriptionMutation()
   const [extendFreeTrial, { isLoading: isExtendingTrial }] = useExtendAdminFreeTrialMutation()
 
@@ -2008,21 +2051,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                       size="sm"
                                       variant="outline"
                                       title="View as this supplier"
-                                      onClick={async () => {
-                                        try {
-                                          await startImpersonation({
-                                            tenantId: supplier.id,
-                                            tenantType: 'SUPPLIER',
-                                          }).unwrap()
-                                          toast.success(`Impersonating ${supplier.name}`)
-                                          window.location.reload()
-                                        } catch (e: any) {
-                                          toast.error(
-                                            e?.data?.error?.message ||
-                                              'Failed to start impersonation'
-                                          )
-                                        }
-                                      }}
+                                      onClick={() =>
+                                        handleStartImpersonation(
+                                          supplier.id,
+                                          'SUPPLIER',
+                                          supplier.name
+                                        )
+                                      }
                                     >
                                       <UserCog className="h-4 w-4 mr-1" />
                                       Impersonate
@@ -2176,21 +2211,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                       size="sm"
                                       variant="outline"
                                       title="View as this restaurant"
-                                      onClick={async () => {
-                                        try {
-                                          await startImpersonation({
-                                            tenantId: restaurant.id,
-                                            tenantType: 'RESTAURANT',
-                                          }).unwrap()
-                                          toast.success(`Impersonating ${restaurant.name}`)
-                                          window.location.reload()
-                                        } catch (e: any) {
-                                          toast.error(
-                                            e?.data?.error?.message ||
-                                              'Failed to start impersonation'
-                                          )
-                                        }
-                                      }}
+                                      onClick={() =>
+                                        handleStartImpersonation(
+                                          restaurant.id,
+                                          'RESTAURANT',
+                                          restaurant.name
+                                        )
+                                      }
                                     >
                                       <UserCog className="h-4 w-4 mr-1" />
                                       Impersonate
@@ -2590,7 +2617,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
         </TabsContent>
 
         <TabsContent value="limits">
-          <AdminLimitOverridesPanel />
+          <div className="space-y-10">
+            <AdminLocationAddonsPanel />
+            <AdminLimitOverridesPanel />
+          </div>
         </TabsContent>
 
         {/* ─── ACTIVITY FEED ──────────────────────────────────────────── */}

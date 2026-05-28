@@ -2,6 +2,7 @@ import * as jose from 'jose'
 import { config } from '../config/env.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
+import { getEffectiveTenant, impersonationCanAccessBranch } from './impersonation.js'
 
 const COOKIE_NAME = 'active_tenant_token'
 const ALG = 'HS256'
@@ -172,6 +173,24 @@ export async function getActiveTenantFromRequest(req) {
   if (!ctx || !req.userData) return null
   if (ctx.userId !== req.userData.id) return null
 
+  const effective = getEffectiveTenant(req)
+  if (effective && req.userData.role === 'ADMIN') {
+    const allowed = await impersonationCanAccessBranch(
+      effective.tenantId,
+      effective.tenantType,
+      ctx.tenantId,
+      ctx.tenantType
+    )
+    if (allowed) {
+      return {
+        tenantId: ctx.tenantId,
+        tenantType: ctx.tenantType,
+        tenantName: ctx.tenantName || '',
+      }
+    }
+    return null
+  }
+
   const allowed = await userCanAccessTenant(
     req.userData.id,
     req.userData.email,
@@ -185,4 +204,18 @@ export async function getActiveTenantFromRequest(req) {
     tenantType: ctx.tenantType,
     tenantName: ctx.tenantName || '',
   }
+}
+
+/** Allow branch/account switch when impersonating (same org or linked account). */
+export async function canSwitchActiveTenant(req, tenantId, tenantType) {
+  const effective = getEffectiveTenant(req)
+  if (effective && req.userData?.role === 'ADMIN') {
+    return impersonationCanAccessBranch(
+      effective.tenantId,
+      effective.tenantType,
+      tenantId,
+      tenantType
+    )
+  }
+  return userCanAccessTenant(req.userData.id, req.userData.email, tenantId, tenantType)
 }

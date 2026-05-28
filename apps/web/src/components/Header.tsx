@@ -13,6 +13,7 @@ import toast from 'react-hot-toast'
 import { BranchSwitcher } from './BranchSwitcher'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useNotificationBadge } from '../hooks/useNotificationBadge'
+import { useImpersonation } from '../hooks/useImpersonation'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'Dashboard',
@@ -47,6 +48,8 @@ const PAGE_NAMES: Record<string, string> = {
 
 export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {}) {
   const { user } = useAppSelector((state) => state.auth)
+  const { isImpersonating, isPlatformAdmin, isEffectiveSupplier, shouldLoadTenantEntitlements } =
+    useImpersonation()
   const dispatch = useAppDispatch()
   const location = useLocation()
   const [logout] = useLogoutMutation()
@@ -55,7 +58,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   const [markAllAsRead] = useMarkAllNotificationsReadMutation()
   const [recordConversionEvent] = useRecordConversionEventMutation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: !user || user.role === 'ADMIN',
+    skip: !shouldLoadTenantEntitlements,
   })
   const blockedCountLast7d = useAppSelector((state) => state.monetization.blockedCountLast7d)
 
@@ -78,10 +81,11 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     `${workspace.tenantType === 'SUPPLIER' ? 'Supplier' : 'Restaurant'}: ${workspace.tenantName}${
       workspace.roleName ? ` · ${workspace.roleName}` : ''
     }`
-  const showUpgrade = user?.role !== 'ADMIN' && user?.role !== 'PENDING'
+  const showUpgrade = (!isPlatformAdmin || isImpersonating) && user?.role !== 'PENDING'
   const hasUrgency = usagePressure.length > 0 || (blockedCountLast7d ?? 0) >= 1
-  const settingsPlanTab =
-    user?.role === 'SUPPLIER' ? '/app/settings?tab=plan' : '/app/settings?tab=subscription'
+  const settingsPlanTab = isEffectiveSupplier
+    ? '/app/settings?tab=plan'
+    : '/app/settings?tab=subscription'
 
   const handleNavUpgrade = () => {
     const trigger =

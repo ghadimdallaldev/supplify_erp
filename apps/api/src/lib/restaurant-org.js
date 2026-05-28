@@ -256,6 +256,21 @@ export async function userHasRestaurantOrgBranchAccess(userId, restaurantId, org
   return assigned.length > 0
 }
 
+export async function listRestaurantOrgBranches(organizationId) {
+  const { rows } = await query(
+    `
+    SELECT r.id, r.name, r.slug, r.branch_code, r.is_main_branch, r.is_branch_active,
+           r.phone, r.address_json, r.contact_email,
+           ${BRANCH_ORDER_STATS_SELECT}
+    FROM restaurant r
+    WHERE r.organization_id = $1
+    ORDER BY r.is_main_branch DESC, r.name ASC
+  `,
+    [organizationId]
+  )
+  return rows
+}
+
 export async function listRestaurantOrgBranchesForUser(userId, organizationId) {
   const membership = await getUserRestaurantOrgMembership(userId)
   if (!membership || membership.organization_id !== organizationId) return []

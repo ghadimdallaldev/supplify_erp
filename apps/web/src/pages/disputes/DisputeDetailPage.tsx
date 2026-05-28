@@ -8,7 +8,7 @@ import {
   useRejectDisputeMutation,
   useCancelDisputeMutation,
 } from '../../services/api'
-import { useAppSelector } from '../../hooks/redux'
+import { useImpersonation } from '../../hooks/useImpersonation'
 import { featureEnabled } from '../../lib/planLimits'
 import { formatPrice } from '../../utils/format'
 import { formatOrderRef } from '../../lib/orderPlacement'
@@ -40,8 +40,7 @@ function statusBadge(status: string) {
 
 export function DisputeDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { user } = useAppSelector((state) => state.auth)
-  const isSupplier = user?.role === 'SUPPLIER'
+  const { isEffectiveSupplier: isSupplier } = useImpersonation()
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)

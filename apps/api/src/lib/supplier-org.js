@@ -244,6 +244,24 @@ export async function userHasOrgBranchAccess(userId, supplierId, organizationId)
   return assigned.length > 0
 }
 
+export async function listOrgBranches(organizationId) {
+  const { rows } = await query(
+    `
+    SELECT s.id, s.name, s.slug, s.branch_code, s.is_main_branch, s.is_branch_active,
+           s.phone, s.address_json, s.contact_email,
+           (SELECT COUNT(*)::int FROM app_user u
+            JOIN tenant_user_roles tur ON tur.user_id = u.id AND tur.tenant_id = s.id AND tur.tenant_type = 'SUPPLIER'
+           ) AS staff_count,
+           ${BRANCH_ORDER_STATS_SELECT}
+    FROM supplier s
+    WHERE s.organization_id = $1
+    ORDER BY s.is_main_branch DESC, s.name ASC
+  `,
+    [organizationId]
+  )
+  return rows
+}
+
 export async function listOrgBranchesForUser(userId, organizationId) {
   const membership = await getUserOrgMembership(userId)
   if (!membership || membership.organization_id !== organizationId) return []

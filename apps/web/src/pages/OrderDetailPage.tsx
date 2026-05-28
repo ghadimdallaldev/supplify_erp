@@ -44,7 +44,7 @@ import {
   MapPin,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useAppSelector } from '../hooks/redux'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
@@ -92,9 +92,8 @@ export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const tabFromUrl = searchParams.get('tab')
-  const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
-  const isSupplier = user?.role === 'SUPPLIER'
+  const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const canDeclineOrder = can('ORDERS_MANAGE')
   const canOpenDispute = can('ORDERS_CREATE') || can('RECEIVING_MANAGE')
   const [activeTab, setActiveTab] = useState<string>('timeline')
