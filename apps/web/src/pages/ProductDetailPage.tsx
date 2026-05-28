@@ -8,10 +8,13 @@ import { Link } from 'react-router-dom'
 import { useCartActions } from '../hooks/useCartActions'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
+import { useImpersonation } from '../hooks/useImpersonation'
+import { ProductSubstitutesSection } from '../components/supplier/ProductSubstitutesSection'
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { addItem } = useCartActions()
+  const { isEffectiveSupplier } = useImpersonation()
 
   const { data, isLoading, error } = useGetProductQuery(id!)
 
@@ -134,6 +137,8 @@ export function ProductDetailPage() {
               <Link to="/app/cart">View Cart</Link>
             </Button>
           </div>
+
+          {isEffectiveSupplier && id && <ProductSubstitutesSection productId={id} />}
         </div>
       </div>
     </div>

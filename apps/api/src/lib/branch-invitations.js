@@ -19,6 +19,7 @@ import {
   keycloakRealmRoleForWorkspace,
   normalizeInvitationEmail,
 } from './invitation-accept.js'
+import { syncDriverLinkForRoleAssignment } from './driver-user-link.js'
 
 export function generateBranchInviteToken() {
   return generateInviteToken()
@@ -328,13 +329,28 @@ export async function acceptBranchInvitation({
     const { rows: roleRows } = await client.query(`SELECT name FROM tenant_roles WHERE id = $1`, [
       row.role_id,
     ])
+    const roleName = roleRows[0]?.name || null
+
+    let driverLink = null
+    if (roleName === 'Driver') {
+      driverLink = await syncDriverLinkForRoleAssignment(
+        {
+          userId,
+          supplierId: row.supplier_id,
+          roleName,
+          createDriverProfile: true,
+        },
+        client
+      )
+    }
 
     return {
       userId,
       supplierId: row.supplier_id,
       email: resolvedEmail,
       roleId: row.role_id,
-      roleName: roleRows[0]?.name || null,
+      roleName,
+      driverId: driverLink?.id ?? null,
       needsLogin: !existingUserId,
       password: existingUserId ? null : password,
     }

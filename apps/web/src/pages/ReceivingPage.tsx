@@ -38,7 +38,7 @@ import {
   useGetReceivingHistoryQuery,
   useGetEntitlementsQuery,
 } from '../services/api'
-import { featureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 import { isOrderReadyForReceiving } from '../lib/orderReceiving'
@@ -72,7 +72,10 @@ export function ReceivingPage() {
   } | null>(null)
 
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const disputesEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'disputes_returns'
+  )
   const canShowDispute = disputesEnabled && canOpenDispute
 
   const beginDisputeFromReceiving = (

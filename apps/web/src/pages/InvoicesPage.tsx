@@ -54,9 +54,10 @@ import {
   useApplyCreditNoteMutation,
   useGetEntitlementsQuery,
 } from '../services/api'
-import { featureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import { Link } from 'react-router-dom'
+import { SupplierReceivablesPanel } from '../components/supplier/SupplierReceivablesPanel'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -115,7 +116,10 @@ export function InvoicesPage() {
   )
   const { data: overdueData } = useGetOverdueInvoicesQuery(undefined, { skip: !isRestaurant })
   const [markPaid, { isLoading: isProcessingPayment }] = useMarkInvoicePaidMutation()
-  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const disputesEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'disputes_returns'
+  )
   const { data: tenantCreditNotesData, refetch: refetchCreditNotes } = useGetCreditNotesQuery(
     undefined,
     {
@@ -288,6 +292,8 @@ export function InvoicesPage() {
             </Button>
           }
         />
+
+        {!isRestaurant && financeInvoicesEnabled && <SupplierReceivablesPanel />}
 
         {disputesEnabled && tenantCreditNotes.length > 0 && (
           <Card>

@@ -29,6 +29,15 @@ export const RESERVED_SYSTEM_ROLE_NAMES = Object.freeze([
   'Inventory Clerk',
   'Sales Rep',
   'Warehouse Staff',
+  'Driver',
+  'Warehouse Manager',
+  'Finance Staff',
+  'Sales/Deals Manager',
+  'Read-only Staff',
+  'Reservations/Host Staff',
+  'Admin/Manager',
+  'Catalog/Product Manager',
+  'Fulfillment Staff',
 ])
 
 const RESTAURANT_PERMISSIONS = [
@@ -106,6 +115,8 @@ const SUPPLIER_PERMISSIONS = [
   PERMISSION_KEYS.FULFILLMENT_MANAGE,
   PERMISSION_KEYS.PROMOTIONS_VIEW,
   PERMISSION_KEYS.PROMOTIONS_MANAGE,
+  PERMISSION_KEYS.DRIVER_DELIVERIES_VIEW,
+  PERMISSION_KEYS.DRIVER_DELIVERIES_MANAGE,
 ]
 
 export function getAllPermissionsForTenantType(tenantType) {

@@ -20,8 +20,10 @@ export function usePermissions() {
 
   const can = (permissionKey: string): boolean => {
     if (!user) return false
-    if (isImpersonating) return true
     if (user.role === 'ADMIN') {
+      if (isImpersonating) {
+        return hasPermission(user.tenantPermissions, permissionKey)
+      }
       return hasPermission(user.adminPermissions, permissionKey)
     }
     return hasPermission(user.tenantPermissions, permissionKey)

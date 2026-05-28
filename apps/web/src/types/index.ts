@@ -168,7 +168,13 @@ export interface UpdateOrderRequest {
   notes?: string
   cancel_reason?: string
   decline_reason?: string
-  delivery_status?: 'assigned' | 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed'
+  delivery_status?:
+    | 'assigned'
+    | 'picked_up'
+    | 'out_for_delivery'
+    | 'delivered'
+    | 'failed'
+    | 'rescheduled'
   failure_reason?: string
 }
 
@@ -183,6 +189,9 @@ export interface DriverRecord {
   notes?: string | null
   is_active?: boolean
   warehouse_name?: string | null
+  user_id?: string | null
+  linked_user_email?: string | null
+  linked_user_name?: string | null
 }
 
 export interface DispatchOrderCard {
@@ -193,6 +202,11 @@ export interface DispatchOrderCard {
   restaurant_name: string
   item_count: number
   has_pod?: boolean
+  delivery_area?: string | null
+  scheduled_at?: string | null
+  delivery_status?: string | null
+  active_route_id?: string | null
+  active_route_number?: string | null
   assignment?: {
     id: string
     status: string
@@ -206,6 +220,43 @@ export interface DispatchOrderCard {
       vehicle_plate?: string | null
     }
   } | null
+}
+
+export interface DeliveryRouteStop {
+  id: string
+  routeId: string
+  orderId: string
+  sequenceNumber: number
+  status: string
+  restaurantName: string
+  deliveryArea?: string | null
+  addressLine?: string | null
+  totalAmount: number
+  itemCount: number
+  notes?: string | null
+  assignmentStatus?: string | null
+}
+
+export interface DeliveryRouteSummary {
+  id: string
+  routeNumber: string
+  routeLabel: string
+  area?: string | null
+  driverId?: string | null
+  driverName: string
+  vehicle?: string | null
+  status: string
+  scheduledDate: string
+  stops: number
+  completedStops: number
+  failedStops: number
+  rescheduledStops: number
+}
+
+export interface DeliveryRouteDetail extends DeliveryRouteSummary {
+  stops: DeliveryRouteStop[]
+  startedAt?: string | null
+  completedAt?: string | null
 }
 
 export interface OrderFilters {

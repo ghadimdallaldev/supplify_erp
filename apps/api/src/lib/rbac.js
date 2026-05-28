@@ -2,7 +2,12 @@ import { verifyToken, refreshAccessToken } from './auth.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
-import { getEffectiveTenant, impersonationCanAccessBranch } from './impersonation.js'
+import {
+  getEffectiveTenant,
+  impersonationCanAccessBranch,
+  getImpersonationEffectivePermissions,
+  isImpersonating,
+} from './impersonation.js'
 import {
   getActiveTenantFromRequest,
   getPrimaryTenantForUser,
@@ -600,6 +605,21 @@ export function resolveTenantContext(req, res, next) {
         tenant.tenantId,
         tenant.tenantType
       )
+      const effectiveTenant = getEffectiveTenant(req)
+      if (req.userData.role === 'ADMIN' && effectiveTenant) {
+        permissions = await getImpersonationEffectivePermissions(
+          effectiveTenant.tenantId,
+          effectiveTenant.tenantType,
+          effectiveTenant.viewAsRoleId
+        )
+        roles = effectiveTenant.viewAsRoleId
+          ? (
+              await query(`SELECT name FROM tenant_roles WHERE id = $1`, [
+                effectiveTenant.viewAsRoleId,
+              ])
+            ).rows.map((r) => r.name)
+          : ['Owner (impersonation)']
+      }
       // Only the primary tenant contact gets an automatic Owner role when unassigned.
       if (
         roles.length === 0 &&
@@ -668,7 +688,7 @@ export async function resolveAdminContext(req, res, next) {
  * Require a permission in tenant or admin context. Use after resolveTenantContext or resolveAdminContext.
  * Allows access if:
  * - tenantContext.permissions or adminContext.permissions includes the key (or broader _MANAGE), or
- * - user is ADMIN and (impersonating a tenant, or on admin route with adminContext).
+ * - user is ADMIN on admin routes (adminContext), not when impersonating a tenant.
  * @param {string} permissionKey - e.g. 'ORDERS_VIEW', 'SETTINGS_MANAGE'
  */
 export function requirePermission(permissionKey) {
@@ -679,9 +699,8 @@ export function requirePermission(permissionKey) {
     if (hasPermission(perms, permissionKey)) {
       return next()
     }
-    if (req.userData?.role === 'ADMIN') {
-      if (getEffectiveTenant(req)) return next()
-      if (!tenant && admin) return next()
+    if (req.userData?.role === 'ADMIN' && !isImpersonating(req) && !tenant && admin) {
+      return next()
     }
     return res.status(403).json({
       ok: false,
@@ -704,9 +723,8 @@ export function requireAnyPermission(...permissionKeys) {
     if (permissionKeys.some((key) => hasPermission(perms, key))) {
       return next()
     }
-    if (req.userData?.role === 'ADMIN') {
-      if (getEffectiveTenant(req)) return next()
-      if (!tenant && admin) return next()
+    if (req.userData?.role === 'ADMIN' && !isImpersonating(req) && !tenant && admin) {
+      return next()
     }
     return res.status(403).json({
       ok: false,

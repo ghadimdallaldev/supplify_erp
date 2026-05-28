@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Loader2, Truck, Plus } from 'lucide-react'
+import { Loader2, Truck, Plus, Link2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -12,6 +12,7 @@ import type { DriverRecord } from '../../types'
 import {
   useGetDriversQuery,
   useGetWarehousesQuery,
+  useGetTenantRoleUsersQuery,
   useCreateDriverMutation,
   useUpdateDriverMutation,
   useDeactivateDriverMutation,
@@ -26,6 +27,7 @@ type DriverForm = {
   vehicle_plate: string
   warehouse_id: string
   notes: string
+  user_id: string
 }
 
 const emptyForm = (): DriverForm => ({
@@ -35,17 +37,20 @@ const emptyForm = (): DriverForm => ({
   vehicle_plate: '',
   warehouse_id: '',
   notes: '',
+  user_id: '',
 })
 
 export function DriversSettingsPanel() {
   const { data, isLoading, refetch } = useGetDriversQuery()
   const { data: warehousesData } = useGetWarehousesQuery()
+  const { data: teamUsersData } = useGetTenantRoleUsersQuery()
   const [createDriver, { isLoading: creating }] = useCreateDriverMutation()
   const [updateDriver, { isLoading: updating }] = useUpdateDriverMutation()
   const [deactivateDriver] = useDeactivateDriverMutation()
 
-  const drivers = data?.drivers ?? []
+  const drivers = (data?.drivers ?? []) as DriverRecord[]
   const warehouses = warehousesData?.warehouses ?? []
+  const teamUsers = teamUsersData?.users ?? []
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<DriverRecord | null>(null)
@@ -66,6 +71,7 @@ export function DriversSettingsPanel() {
       vehicle_plate: driver.vehicle_plate ?? '',
       warehouse_id: driver.warehouse_id ?? '',
       notes: driver.notes ?? '',
+      user_id: driver.user_id ?? '',
     })
     setModalOpen(true)
   }
@@ -83,6 +89,7 @@ export function DriversSettingsPanel() {
         vehicle_plate: form.vehicle_plate || null,
         warehouse_id: form.warehouse_id || null,
         notes: form.notes || null,
+        user_id: form.user_id ? form.user_id : null,
       }
       if (editing) {
         await updateDriver({ id: editing.id, data: body }).unwrap()
@@ -93,8 +100,9 @@ export function DriversSettingsPanel() {
       }
       setModalOpen(false)
       refetch()
-    } catch {
-      toast.error('Failed to save driver')
+    } catch (err: unknown) {
+      const msg = (err as { data?: { error?: { message?: string } } })?.data?.error?.message
+      toast.error(msg || 'Failed to save driver')
     }
   }
 
@@ -106,63 +114,83 @@ export function DriversSettingsPanel() {
       refetch()
     } catch (err: unknown) {
       const message =
-        err && typeof err === 'object' && 'data' in err
-          ? (err as { data?: { error?: { message?: string } } }).data?.error?.message
+        (err as { data?: { error?: { message?: string } } })?.data?.error?.message ===
+        'ACTIVE_DELIVERIES'
+          ? 'Reassign active deliveries first'
           : 'Cannot deactivate driver'
       toast.error(message || 'Cannot deactivate driver')
     }
   }
 
+  const linkableUsers = teamUsers.filter((u) => {
+    const linkedElsewhere = drivers.some((d) => d.user_id === u.id && d.id !== editing?.id)
+    return !linkedElsewhere
+  })
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              Drivers
-            </CardTitle>
-            <CardDescription>
-              Manage delivery drivers for dispatch and order assignment.
-            </CardDescription>
-          </div>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add driver
-          </Button>
+    <Card data-testid="drivers-settings-panel">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5" />
+            Drivers
+          </CardTitle>
+          <CardDescription>
+            Manage delivery drivers and link them to login accounts for the Driver role.
+          </CardDescription>
         </div>
+        <Button type="button" size="sm" onClick={openCreate}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add driver
+        </Button>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--brand-mid)]" />
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
           </div>
         ) : drivers.length === 0 ? (
-          <p className="text-center py-8 text-[var(--text-muted)]">
+          <p className="text-sm text-[var(--text-muted)]">
             No drivers yet. Add your first driver to start assigning deliveries.
           </p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-3">
             {drivers.map((driver) => (
               <div
                 key={driver.id}
-                className="rounded-lg border border-[var(--app-border)] p-4 space-y-2"
+                data-testid={`driver-row-${driver.id}`}
+                className="flex flex-col gap-2 rounded-lg border border-[var(--app-border)] p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold">{driver.full_name}</p>
-                    {driver.phone && (
-                      <p className="text-sm text-[var(--text-muted)]">{driver.phone}</p>
-                    )}
-                    <p className="text-xs text-[var(--text-muted)]">
-                      {[driver.vehicle_type, driver.vehicle_plate].filter(Boolean).join(' · ')}
+                <div>
+                  <p className="font-semibold">{driver.full_name}</p>
+                  {driver.phone && (
+                    <p className="text-sm text-[var(--text-muted)]">{driver.phone}</p>
+                  )}
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    {[driver.vehicle_type, driver.vehicle_plate].filter(Boolean).join(' · ')}
+                  </p>
+                  {driver.user_id ? (
+                    <p
+                      className="text-xs text-[var(--mint)] mt-1 flex items-center gap-1"
+                      data-testid={`driver-linked-${driver.id}`}
+                    >
+                      <Link2 className="h-3 w-3" aria-hidden />
+                      Linked:{' '}
+                      {driver.linked_user_name || driver.linked_user_email || driver.user_id}
                     </p>
-                  </div>
+                  ) : (
+                    <p
+                      className="text-xs text-amber-700 mt-1"
+                      data-testid={`driver-unlinked-${driver.id}`}
+                    >
+                      No login linked — assign Driver role or link below
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                   {driver.warehouse_name && (
                     <Badge variant="outline">{driver.warehouse_name}</Badge>
                   )}
-                </div>
-                <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => openEdit(driver)}>
                     Edit
                   </Button>
@@ -189,6 +217,26 @@ export function DriversSettingsPanel() {
                 value={form.full_name}
                 onChange={(e) => setForm({ ...form, full_name: e.target.value })}
               />
+            </div>
+            <div>
+              <Label htmlFor="link_user">Link to app user (Driver role)</Label>
+              <select
+                id="link_user"
+                data-testid="driver-link-user-select"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                value={form.user_id}
+                onChange={(e) => setForm({ ...form, user_id: e.target.value })}
+              >
+                <option value="">— No login (dispatch-only profile) —</option>
+                {linkableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.display_name || u.email} ({u.role_name || 'no role'})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                Invite team members with the Driver role under Settings → Team, then link them here.
+              </p>
             </div>
             <div>
               <Label htmlFor="phone">Phone</Label>

@@ -21,6 +21,7 @@ import { Badge } from '../components/ui/badge'
 import { Input } from '../components/ui/input'
 import { toast } from 'react-hot-toast'
 import { copyToClipboard } from '../utils/clipboard'
+import { RequirePermission } from '../components/RequirePermission'
 
 export function ReservationsPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -92,305 +93,308 @@ export function ReservationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Reservations cockpit</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            Track bookings, optimise capacity, and wow every guest from one unified view.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm">
-            <CalendarDays className="h-4 w-4 text-[var(--brand-mid)]" />
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-              className="border-none p-0 text-sm focus-visible:ring-0"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 text-xs"
-              onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
-            >
-              Today
-            </Button>
-          </div>
-          <ReservationCreateDrawer
-            tables={tables}
-            onCreated={() => {
-              refetch()
-              refetchAnalytics()
-            }}
-          />
-        </div>
-      </div>
-
-      {bookingLink ? (
-        <Card className="border border-[var(--app-border)] bg-[var(--surface)]">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Link2 className="h-4 w-4 text-[var(--brand-mid)]" />
-              Booking link for guests
-            </CardTitle>
-            <CardDescription>
-              Share this link so clients can book a table online. They’ll see availability and get a
-              confirmation by email or WhatsApp when contact details are provided.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div
-              className="min-w-0 flex-1 rounded-md border border-[var(--app-border)] bg-[var(--bg)] px-3 py-2 font-mono text-sm text-[var(--text-mid)] truncate"
-              title={bookingLink}
-            >
-              {bookingLink}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyBookingLink}
-              className="shrink-0"
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Copy link
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-l-4 border-l-[var(--brand-mid)] shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-              Covers today
-            </CardTitle>
-            <CardDescription className="text-2xl font-semibold text-[var(--text)]">
-              {summary.coversToday}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        <Card className="border-l-4 border-l-[var(--mint)] shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-              Confirmed
-            </CardTitle>
-            <CardDescription className="text-2xl font-semibold text-[var(--text)]">
-              {summary.confirmed}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        <Card className="border-l-4 border-l-[var(--amber)] shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-              Waitlist
-            </CardTitle>
-            <CardDescription className="text-2xl font-semibold text-[var(--text)]">
-              {summary.waitlisted}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        <Card className="border-l-4 border-l-[var(--brand)] shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
-              Currently seated
-            </CardTitle>
-            <CardDescription className="text-2xl font-semibold text-[var(--text)]">
-              {summary.seated}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Waitlist queue</CardTitle>
-          <CardDescription>
-            Offer status and manual promotion for guests waiting for a table
-          </CardDescription>
-          {!waitlistAutoPromoEnabled ? (
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
-              Automatic waitlist offers when a table frees up are not on your plan. You can still
-              promote guests manually. Upgrade to enable auto-promotion.
-            </p>
-          ) : (
-            <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
-              Auto-promotion is on: when a reservation is cancelled, the next waitlisted guest may
-              receive a timed table offer.
-            </p>
-          )}
-        </CardHeader>
-        <CardContent>
-          {(waitlistData?.waitlist || []).length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No guests on the waitlist.</p>
-          ) : (
-            <div className="space-y-2">
-              {(waitlistData?.waitlist || []).map((entry: Record<string, unknown>) => (
-                <div
-                  key={String(entry.id)}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
-                >
-                  <div>
-                    <p className="font-medium">{String(entry.customer_name)}</p>
-                    <p className="text-xs text-[var(--text-muted)]">
-                      {String(entry.party_size)} guests · #{String(entry.position ?? '—')} in queue
-                    </p>
-                    {entry.offer_status && String(entry.offer_status) !== 'none' ? (
-                      <Badge variant="outline" className="mt-1 capitalize">
-                        Offer: {String(entry.offer_status)}
-                        {entry.offer_expires_at
-                          ? ` · expires ${new Date(String(entry.offer_expires_at)).toLocaleString()}`
-                          : ''}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={promoting || entry.offer_status === 'offered'}
-                    onClick={async () => {
-                      try {
-                        await promoteWaitlist(String(entry.id)).unwrap()
-                        toast.success('Offer sent to guest')
-                        refetchWaitlist()
-                        refetch()
-                      } catch {
-                        toast.error('Could not promote guest')
-                      }
-                    }}
-                  >
-                    Promote
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {!boardLoading ? (
-        <ReservationAssignmentsSummary
-          reservations={reservations}
-          tables={tables}
-          boardDate={selectedDate}
-        />
-      ) : null}
-
-      {boardLoading ? (
-        <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-[var(--app-border)]">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin text-[var(--brand-mid)]" />
-          <p className="text-sm text-[var(--text-muted)]">Loading reservations…</p>
-        </div>
-      ) : (
-        <ReservationBoard
-          reservations={reservations}
-          tables={tables}
-          waitlist={waitlist}
-          boardDate={selectedDate}
-        />
-      )}
-
+    <RequirePermission permission="RESERVATIONS_VIEW" title="reservations">
       <div className="space-y-6">
-        <PublicBookingSettingsCard />
-
-        <div className="-mx-4 lg:-mx-6">
-          <ReservationTableBuilder tables={tables} reservations={reservations} defaultLiveView />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-[21px] font-black text-[var(--text)]">Reservations cockpit</h1>
+            <p className="text-sm text-[var(--text-muted)]">
+              Track bookings, optimise capacity, and wow every guest from one unified view.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm">
+              <CalendarDays className="h-4 w-4 text-[var(--brand-mid)]" />
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+                className="border-none p-0 text-sm focus-visible:ring-0"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 shrink-0 text-xs"
+                onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
+              >
+                Today
+              </Button>
+            </div>
+            <ReservationCreateDrawer
+              tables={tables}
+              onCreated={() => {
+                refetch()
+                refetchAnalytics()
+              }}
+            />
+          </div>
         </div>
 
-        <ReservationAnalyticsPanel
-          analytics={analytics}
-          activeRange={range}
-          onRangeChange={handleRangeChange}
-        />
+        {bookingLink ? (
+          <Card className="border border-[var(--app-border)] bg-[var(--surface)]">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Link2 className="h-4 w-4 text-[var(--brand-mid)]" />
+                Booking link for guests
+              </CardTitle>
+              <CardDescription>
+                Share this link so clients can book a table online. They’ll see availability and get
+                a confirmation by email or WhatsApp when contact details are provided.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div
+                className="min-w-0 flex-1 rounded-md border border-[var(--app-border)] bg-[var(--bg)] px-3 py-2 font-mono text-sm text-[var(--text-mid)] truncate"
+                title={bookingLink}
+              >
+                {bookingLink}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyBookingLink}
+                className="shrink-0"
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy link
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-l-4 border-l-[var(--brand-mid)] shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
+                Covers today
+              </CardTitle>
+              <CardDescription className="text-2xl font-semibold text-[var(--text)]">
+                {summary.coversToday}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="border-l-4 border-l-[var(--mint)] shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
+                Confirmed
+              </CardTitle>
+              <CardDescription className="text-2xl font-semibold text-[var(--text)]">
+                {summary.confirmed}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="border-l-4 border-l-[var(--amber)] shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
+                Waitlist
+              </CardTitle>
+              <CardDescription className="text-2xl font-semibold text-[var(--text)]">
+                {summary.waitlisted}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="border-l-4 border-l-[var(--brand)] shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm uppercase tracking-wide text-[var(--text-muted)]">
+                Currently seated
+              </CardTitle>
+              <CardDescription className="text-2xl font-semibold text-[var(--text)]">
+                {summary.seated}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Guest intelligence</CardTitle>
+            <CardTitle>Waitlist queue</CardTitle>
             <CardDescription>
-              Repeat guests, loyalty moments, and smart follow-ups for your location.
+              Offer status and manual promotion for guests waiting for a table
             </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-[var(--text-muted)]">
-            {guestIntelLoading ? (
-              <div className="flex items-center gap-2 text-[var(--text-muted)]">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading guest insights…
-              </div>
+            {!waitlistAutoPromoEnabled ? (
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                Automatic waitlist offers when a table frees up are not on your plan. You can still
+                promote guests manually. Upgrade to enable auto-promotion.
+              </p>
             ) : (
-              <>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                      <Users className="h-4 w-4" />
-                      Recent guests
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
-                      {guestIntel?.recentGuests?.length ?? 0}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                      <Sparkles className="h-4 w-4" />
-                      Repeat guests
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
-                      {guestIntel?.repeatGuests?.length ?? 0}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--amber-mid)]/35 bg-[var(--amber-pale)] p-4">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--amber)]">
-                      <Star className="h-4 w-4" />
-                      VIP guests
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
-                      {guestIntel?.vipGuests?.length ?? 0}
-                    </p>
-                  </div>
-                </div>
-
-                {(guestIntel?.followUps?.length ?? 0) > 0 ? (
-                  <div className="space-y-2">
-                    <p className="font-medium text-[var(--text)]">Suggested follow-ups</p>
-                    {guestIntel?.followUps?.map((guest, index) => (
-                      <div
-                        key={`${guest.customer_name}-${index}`}
-                        className="flex flex-col gap-1 rounded-xl border border-[var(--app-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div>
-                          <p className="font-medium text-[var(--text)]">
-                            {String(guest.customer_name)}
-                          </p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {Number(guest.visit_count)} visits · last{' '}
-                            {guest.last_visit
-                              ? new Date(String(guest.last_visit)).toLocaleDateString()
-                              : '—'}
-                          </p>
-                        </div>
-                        <Badge variant="secondary" className="w-fit">
-                          {String(guest.suggestion)}
+              <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
+                Auto-promotion is on: when a reservation is cancelled, the next waitlisted guest may
+                receive a timed table offer.
+              </p>
+            )}
+          </CardHeader>
+          <CardContent>
+            {(waitlistData?.waitlist || []).length === 0 ? (
+              <p className="text-sm text-[var(--text-muted)]">No guests on the waitlist.</p>
+            ) : (
+              <div className="space-y-2">
+                {(waitlistData?.waitlist || []).map((entry: Record<string, unknown>) => (
+                  <div
+                    key={String(entry.id)}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium">{String(entry.customer_name)}</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {String(entry.party_size)} guests · #{String(entry.position ?? '—')} in
+                        queue
+                      </p>
+                      {entry.offer_status && String(entry.offer_status) !== 'none' ? (
+                        <Badge variant="outline" className="mt-1 capitalize">
+                          Offer: {String(entry.offer_status)}
+                          {entry.offer_expires_at
+                            ? ` · expires ${new Date(String(entry.offer_expires_at)).toLocaleString()}`
+                            : ''}
                         </Badge>
-                      </div>
-                    ))}
+                      ) : null}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={promoting || entry.offer_status === 'offered'}
+                      onClick={async () => {
+                        try {
+                          await promoteWaitlist(String(entry.id)).unwrap()
+                          toast.success('Offer sent to guest')
+                          refetchWaitlist()
+                          refetch()
+                        } catch {
+                          toast.error('Could not promote guest')
+                        }
+                      }}
+                    >
+                      Promote
+                    </Button>
                   </div>
-                ) : (
-                  <p className="text-[var(--text-muted)]">
-                    Book more reservations to unlock repeat-guest and VIP insights.
-                  </p>
-                )}
-
-                <div className="rounded-2xl border border-dashed border-[var(--mint)]/35 bg-[var(--mint-pale)] p-4 text-xs text-[var(--mint)]">
-                  Email and WhatsApp confirmations are sent automatically for confirmed seats when
-                  guests provide contact details. Configure your channels in Settings →
-                  Notifications.
-                </div>
-              </>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
+
+        {!boardLoading ? (
+          <ReservationAssignmentsSummary
+            reservations={reservations}
+            tables={tables}
+            boardDate={selectedDate}
+          />
+        ) : null}
+
+        {boardLoading ? (
+          <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-[var(--app-border)]">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin text-[var(--brand-mid)]" />
+            <p className="text-sm text-[var(--text-muted)]">Loading reservations…</p>
+          </div>
+        ) : (
+          <ReservationBoard
+            reservations={reservations}
+            tables={tables}
+            waitlist={waitlist}
+            boardDate={selectedDate}
+          />
+        )}
+
+        <div className="space-y-6">
+          <PublicBookingSettingsCard />
+
+          <div className="-mx-4 lg:-mx-6">
+            <ReservationTableBuilder tables={tables} reservations={reservations} defaultLiveView />
+          </div>
+
+          <ReservationAnalyticsPanel
+            analytics={analytics}
+            activeRange={range}
+            onRangeChange={handleRangeChange}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Guest intelligence</CardTitle>
+              <CardDescription>
+                Repeat guests, loyalty moments, and smart follow-ups for your location.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-[var(--text-muted)]">
+              {guestIntelLoading ? (
+                <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading guest insights…
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4">
+                      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        <Users className="h-4 w-4" />
+                        Recent guests
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
+                        {guestIntel?.recentGuests?.length ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)] p-4">
+                      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        <Sparkles className="h-4 w-4" />
+                        Repeat guests
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
+                        {guestIntel?.repeatGuests?.length ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--amber-mid)]/35 bg-[var(--amber-pale)] p-4">
+                      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--amber)]">
+                        <Star className="h-4 w-4" />
+                        VIP guests
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
+                        {guestIntel?.vipGuests?.length ?? 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  {(guestIntel?.followUps?.length ?? 0) > 0 ? (
+                    <div className="space-y-2">
+                      <p className="font-medium text-[var(--text)]">Suggested follow-ups</p>
+                      {guestIntel?.followUps?.map((guest, index) => (
+                        <div
+                          key={`${guest.customer_name}-${index}`}
+                          className="flex flex-col gap-1 rounded-xl border border-[var(--app-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div>
+                            <p className="font-medium text-[var(--text)]">
+                              {String(guest.customer_name)}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {Number(guest.visit_count)} visits · last{' '}
+                              {guest.last_visit
+                                ? new Date(String(guest.last_visit)).toLocaleDateString()
+                                : '—'}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="w-fit">
+                            {String(guest.suggestion)}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[var(--text-muted)]">
+                      Book more reservations to unlock repeat-guest and VIP insights.
+                    </p>
+                  )}
+
+                  <div className="rounded-2xl border border-dashed border-[var(--mint)]/35 bg-[var(--mint-pale)] p-4 text-xs text-[var(--mint)]">
+                    Email and WhatsApp confirmations are sent automatically for confirmed seats when
+                    guests provide contact details. Configure your channels in Settings →
+                    Notifications.
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+    </RequirePermission>
   )
 }

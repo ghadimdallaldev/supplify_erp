@@ -22,6 +22,8 @@ const RESTAURANT_ACCOUNTANT = [
 
 const SUPPLIER_ACCOUNTANT = [...RESTAURANT_ACCOUNTANT]
 
+const DRIVER_DELIVERIES = [P.DRIVER_DELIVERIES_VIEW, P.DRIVER_DELIVERIES_MANAGE]
+
 export const RESTAURANT_SYSTEM_ROLES = [
   {
     name: 'Owner',
@@ -68,25 +70,25 @@ export const RESTAURANT_SYSTEM_ROLES = [
   {
     name: 'Receiving Staff',
     legacyNames: ['Inventory Clerk'],
-    description: 'Receive deliveries and open receiving disputes; cannot create orders',
+    description: 'Receive deliveries and open receiving disputes; cannot create orders or billing',
     permissions: [P.ORDERS_VIEW, P.RECEIVING_VIEW, P.RECEIVING_MANAGE],
   },
   {
     name: 'Accountant',
-    legacyNames: ['Accountant'],
+    legacyNames: ['Accountant', 'Finance Staff'],
     description: 'Finance, invoices, payments, and billing views only',
     permissions: RESTAURANT_ACCOUNTANT,
   },
   {
     name: 'Viewer',
-    legacyNames: ['Viewer'],
+    legacyNames: ['Viewer', 'Read-only Staff'],
     description: 'Read-only — no create, edit, invite, or manage actions',
     permissions: RESTAURANT_VIEWER,
   },
   {
     name: 'FOH Staff',
-    legacyNames: ['FOH Staff'],
-    description: 'Front-of-house reservations',
+    legacyNames: ['FOH Staff', 'Reservations/Host Staff'],
+    description: 'Front-of-house reservations; no billing, users, or catalog admin',
     permissions: [P.RESERVATIONS_VIEW, P.RESERVATIONS_CREATE, P.RESERVATIONS_EDIT],
   },
 ]
@@ -99,7 +101,7 @@ export const SUPPLIER_SYSTEM_ROLES = [
   },
   {
     name: 'Supplier Manager',
-    legacyNames: ['Manager'],
+    legacyNames: ['Manager', 'Admin/Manager'],
     description:
       'Orders (accept/decline/fulfill), catalog, fulfillment; no billing/roles/team admin',
     permissions: [
@@ -122,24 +124,46 @@ export const SUPPLIER_SYSTEM_ROLES = [
     ],
   },
   {
+    name: 'Warehouse Manager',
+    legacyNames: [],
+    description:
+      'Warehouses, fulfillment board, and delivery operations; no catalog import or billing',
+    permissions: [
+      P.FULFILLMENT_VIEW,
+      P.FULFILLMENT_MANAGE,
+      P.WAREHOUSES_VIEW,
+      P.WAREHOUSES_EDIT,
+      P.INVENTORY_VIEW,
+      P.INVENTORY_EDIT,
+      P.ORDERS_VIEW,
+      P.RECEIVING_VIEW,
+    ],
+  },
+  {
     name: 'Order Fulfillment Staff',
-    legacyNames: ['Warehouse Staff', 'Sales Rep'],
-    description: 'Fulfillment status updates only; cannot decline orders or manage team',
+    legacyNames: ['Warehouse Staff', 'Fulfillment Staff'],
+    description: 'Fulfillment and delivery board; cannot manage billing, catalog import, or team',
     permissions: [
       P.ORDERS_VIEW,
       P.ORDERS_EDIT,
       P.FULFILLMENT_VIEW,
       P.FULFILLMENT_MANAGE,
       P.INVENTORY_VIEW,
-      P.INVENTORY_EDIT,
       P.WAREHOUSES_VIEW,
       P.RECEIVING_VIEW,
     ],
   },
   {
+    name: 'Driver',
+    legacyNames: [],
+    description:
+      'Assigned deliveries only — update status and proof; no catalog, billing, or settings',
+    permissions: DRIVER_DELIVERIES,
+  },
+  {
     name: 'Catalog Manager',
-    legacyNames: ['Catalog Manager'],
-    description: 'Products, catalog, pricing, and inventory for catalog operations',
+    legacyNames: ['Catalog Manager', 'Catalog/Product Manager'],
+    description: 'Products, catalog, pricing, import; no receivables or team admin',
     permissions: [
       P.CATALOG_VIEW,
       P.CATALOG_EDIT,
@@ -151,19 +175,25 @@ export const SUPPLIER_SYSTEM_ROLES = [
   },
   {
     name: 'Promotions Manager',
-    legacyNames: [],
-    description: 'Deals and promotions; read-only order/catalog context',
-    permissions: [P.PROMOTIONS_VIEW, P.PROMOTIONS_MANAGE, P.ORDERS_VIEW, P.CATALOG_VIEW],
+    legacyNames: ['Sales Rep', 'Sales/Deals Manager'],
+    description: 'Deals, promotions, and reorder intelligence; read-only order/catalog context',
+    permissions: [
+      P.PROMOTIONS_VIEW,
+      P.PROMOTIONS_MANAGE,
+      P.ORDERS_VIEW,
+      P.ORDERS_MANAGE,
+      P.CATALOG_VIEW,
+    ],
   },
   {
     name: 'Accountant',
-    legacyNames: ['Accountant'],
-    description: 'Finance and billing only; cannot accept/decline orders',
+    legacyNames: ['Accountant', 'Finance Staff'],
+    description: 'Finance, receivables, and billing only; cannot accept orders or import products',
     permissions: SUPPLIER_ACCOUNTANT,
   },
   {
     name: 'Viewer',
-    legacyNames: ['Viewer'],
+    legacyNames: ['Viewer', 'Read-only Staff'],
     description:
       'Read-only supplier workspace — orders, catalog, fulfillment, inventory, chat (view), settings (view); no mutations',
     permissions: SUPPLIER_VIEWER,

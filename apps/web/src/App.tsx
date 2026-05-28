@@ -11,6 +11,9 @@ import { PageLoading } from './components/ui/page-loading'
 const DashboardPage = lazy(() =>
   import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
 )
+const SupplierHome = lazy(() =>
+  import('./pages/SupplierHome').then((m) => ({ default: m.SupplierHome }))
+)
 const ProductsPage = lazy(() =>
   import('./pages/ProductsPage').then((m) => ({ default: m.ProductsPage }))
 )
@@ -40,6 +43,16 @@ const CartPage = lazy(() => import('./pages/CartPage').then((m) => ({ default: m
 const ChatPage = lazy(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })))
 const FulfillmentPage = lazy(() =>
   import('./pages/FulfillmentPage').then((m) => ({ default: m.FulfillmentPage }))
+)
+const SupplierCommandCenterPage = lazy(() =>
+  import('./pages/SupplierCommandCenterPage').then((m) => ({
+    default: m.SupplierCommandCenterPage,
+  }))
+)
+const DriverDeliveriesPage = lazy(() =>
+  import('./pages/DriverDeliveriesPage').then((m) => ({
+    default: m.DriverDeliveriesPage,
+  }))
 )
 const InventoryPage = lazy(() =>
   import('./pages/InventoryPage').then((m) => ({ default: m.InventoryPage }))
@@ -237,7 +250,7 @@ const router = createBrowserRouter([
         index: true,
         element: (
           <LazyPage>
-            <DashboardPage />
+            <SupplierHome />
           </LazyPage>
         ),
       },
@@ -245,7 +258,7 @@ const router = createBrowserRouter([
         path: 'app',
         element: (
           <LazyPage>
-            <DashboardPage />
+            <SupplierHome />
           </LazyPage>
         ),
       },
@@ -254,6 +267,22 @@ const router = createBrowserRouter([
         element: (
           <LazyPage>
             <DashboardPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/command-center',
+        element: (
+          <LazyPage>
+            <SupplierCommandCenterPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: 'app/driver-deliveries',
+        element: (
+          <LazyPage>
+            <DriverDeliveriesPage />
           </LazyPage>
         ),
       },
