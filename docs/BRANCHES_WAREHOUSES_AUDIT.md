@@ -18,7 +18,7 @@
 
 **Critical finding (fixed in this audit):** Branch limit enforcement counted `tenant_account_link` only, while the product creates **org sub-tenants**. Gold could create unlimited org branches while usage UI still showed `1/N`. Fix: `countActiveBranchLocations()` in `plan-enforcement.js` + aligned usage snapshot in `subscription.js`.
 
-**Other high-risk gaps (documented, not all fixed):** Dual branch models (`branch` table vs org tenants), Platinum `multi_branch: "central_purchasing"` vs frontend `=== true`, Free tier seeded default warehouse vs `warehouses: 0` limit.
+**Other high-risk gaps (documented, not all fixed):** Dual branch models (`branch` table vs org tenants), Free tier seeded default warehouse vs `warehouses: 0` limit.
 
 ---
 
@@ -164,8 +164,7 @@ Implementation: `warehouses.routes.js`, `warehouseRouting.js`, `warehouse-helper
 | Products warehouse pick | `ProductsPage`                                            | `warehouse_id` on product create                                         |
 | Inventory               | `InventoryPage`                                           | Warehouse list + per-warehouse stock                                     |
 
-**Frontend gating:** `planLimits.ts` — `getBranchAddGate`, `canAddWarehouses`, `featureEnabled()` (string tier values OK).  
-**Gap:** `BranchContext` uses `multi_branch === true` only — Platinum `central_purchasing` may hide org switcher while API allows branch APIs.
+**Frontend gating:** `planLimits.ts` — `featureEnabled` / `evaluatePlanFeatureValue`, `isEntitlementFeatureEnabled`, `multiBranchEnabled`, `getBranchAddGate`, `canAddWarehouses`. Tier strings (`central_purchasing`, `logo_colors`, etc.) count as enabled. Entitlements include `planFeatures` (raw catalog JSON) when resolved `features` booleans are wrong or missing.
 
 ---
 
@@ -185,32 +184,51 @@ Implementation: `warehouses.routes.js`, `warehouseRouting.js`, `warehouse-helper
 
 ---
 
-## 7. Tier limits and features (catalog — not changed in this audit)
+## 7. Tier limits, add-ons, and enforcement (2026-05-28 monetization)
 
-### Restaurant `branches` limit (location count)
+Migrations: `0121_branch_warehouse_plan_limits.sql`, `0122_tenant_subscription_addons.sql`.
 
-| Plan         | Limit             | `multi_branch` feature                                   |
-| ------------ | ----------------- | -------------------------------------------------------- |
-| Free / Trial | 1                 | off                                                      |
-| Silver       | 1                 | **false**                                                |
-| Gold         | 3                 | **true**                                                 |
-| Platinum     | unlimited (`-1`)  | **`central_purchasing`** (string; API treats as enabled) |
-| Enterprise   | custom / inactive | varies                                                   |
+### Restaurant `branches` (included limits)
 
-Enforcement: `checkBranchLimit` / `checkLinkedAccountLimit` on **parent/main** tenant subscription. Compare `current < limit` (at limit blocks **another** create).
+| Plan         | Included branches | `multi_branch`           | Extra branches                          |
+| ------------ | ----------------- | ------------------------ | --------------------------------------- |
+| Free / Trial | 1                 | off                      | Upgrade to Gold (no add-ons)            |
+| Silver       | 1                 | **false**                | Upgrade to Gold (no add-ons)            |
+| Gold         | 2                 | **true**                 | $39/mo each (`restaurant_extra_branch`) |
+| Platinum     | 3                 | **`central_purchasing`** | $49/mo each                             |
+| Enterprise   | custom            | varies                   | Contact sales                           |
 
-**Inactive branches:** Org model uses `is_branch_active = false` — excluded from `countActiveBranchLocations`. Linked-account model has no equivalent on link row; deactivated org branches are the supported path.
+**Hard cap:** 6 total org branch accounts → Enterprise / contact sales (even with add-ons).
 
-### Supplier `warehouses` limit
+### Supplier `branches` (included limits)
 
-| Plan     | Limit     | `warehouses`          | `multi_warehouse` |
-| -------- | --------- | --------------------- | ----------------- |
-| Free     | 0         | typically off / no UI | off               |
-| Silver   | 1         | on                    | off               |
-| Gold     | 3         | on                    | on                |
-| Platinum | unlimited | on                    | on                |
+| Plan     | Included | Extra (`supplier_extra_branch`) |
+| -------- | -------- | ------------------------------- |
+| Free     | 1        | Upgrade to Gold                 |
+| Silver   | 1        | Upgrade to Gold                 |
+| Gold     | 2        | $49/mo each                     |
+| Platinum | 3        | $69/mo each                     |
 
-Restaurant plans: `warehouses` is **not** in `RESTAURANT_LIMIT_KEYS` (`isLimitKeyApplicable('RESTAURANT', 'warehouses') === false`).
+### Supplier `warehouses` (included limits)
+
+| Plan     | Included | Extra (`supplier_extra_warehouse`) |
+| -------- | -------- | ---------------------------------- |
+| Free     | 0        | Upgrade to Silver                  |
+| Silver   | 1        | Upgrade to Gold for add-ons        |
+| Gold     | 3        | $19/mo each                        |
+| Platinum | 5        | $25/mo each                        |
+
+Restaurant plans: `warehouses` is **not** in `RESTAURANT_LIMIT_KEYS`.
+
+### Effective limit formula
+
+`effective = resolveEffectiveLimit(plan + overrides) + sum(active tenant_subscription_addon quantity)`.
+
+Enforcement: `plan-enforcement.js` via `resolveOrgBillingTenantId` + `getTenantSubscription` (main branch). Org-wide counts: `countActiveBranchLocations`, `countActiveWarehouses`.
+
+**Grandfathering:** Over-limit existing rows remain readable; create blocked until upgrade or admin add-on.
+
+**Branch subscription rows:** New org branches still get `createPendingActivationSubscription(..., 'free')` for activation; **entitlements and limits use parent org billing tenant**, not the branch’s Free row.
 
 **Counting:** Active rows only: `warehouse WHERE {supplier_col} = $id AND is_active = TRUE`.
 

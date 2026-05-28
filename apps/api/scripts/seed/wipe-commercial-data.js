@@ -26,7 +26,7 @@ const WIPE_TABLES = [
   ['subscription_change_log'],
   ['tenant_user_roles', 'tenant_role_permissions', 'tenant_roles'],
   ['user_role'],
-  ['tenant_limit_override', 'tenant_account_link'],
+  ['tenant_subscription_addon', 'tenant_limit_override', 'tenant_account_link'],
   ['restaurant_invitations', 'branch_invitations'],
   [
     'restaurant_org_user_branch_access',

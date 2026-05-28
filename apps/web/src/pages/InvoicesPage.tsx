@@ -36,7 +36,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
-import { useAppSelector } from '../hooks/redux'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
@@ -81,10 +81,9 @@ export function InvoicesPage() {
   const [paidByHQ, setPaidByHQ] = useState(false)
   const [hqNotes, setHqNotes] = useState('')
 
-  const { user } = useAppSelector((state) => state.auth)
   const { canAny } = usePermissions()
   const canRecordPayments = canAny('INVOICES_MANAGE', 'INVOICES_EDIT', 'PAYMENTS_MANAGE')
-  const isRestaurant = user?.role === 'RESTAURANT'
+  const { isEffectiveRestaurant: isRestaurant } = useImpersonation()
 
   // Fetch invoices from database
   const {

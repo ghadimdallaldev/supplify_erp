@@ -62,7 +62,7 @@ Values from live `subscription_plan.features`. **On** = enabled (`evaluatePlanFe
 
 | Limit key                       | Free Trial | Silver |           Gold |       Platinum |
 | ------------------------------- | ---------: | -----: | -------------: | -------------: |
-| `branches`                      |          1 |      1 |              3 |      unlimited |
+| `branches`                      |          1 |      1 |              2 |              3 |
 | `users`                         |          1 |      3 |             15 |      unlimited |
 | `orders_per_day`                |          3 |     20 |            100 |      unlimited |
 | `suppliers_per_restaurant`      |          1 |      5 |             30 |      unlimited |
@@ -115,8 +115,8 @@ Values from live `subscription_plan.features`. **On** = enabled (`evaluatePlanFe
 
 | Limit key                | Free Trial | Silver |           Gold |       Platinum |
 | ------------------------ | ---------: | -----: | -------------: | -------------: |
-| `branches`               |          1 |      1 |              3 |      unlimited |
-| `warehouses`             |          0 |      1 |              3 |      unlimited |
+| `branches`               |          1 |      1 |              2 |              3 |
+| `warehouses`             |          0 |      1 |              3 |              5 |
 | `users`                  |          1 |      3 |             15 |      unlimited |
 | `supplier_products_skus` |         10 |    250 |          3,000 |      unlimited |
 | `chats_per_day`          |          3 |     30 |            500 |      unlimited |
@@ -125,6 +125,31 @@ Values from live `subscription_plan.features`. **On** = enabled (`evaluatePlanFe
 | `promotions`             |          1 |      3 |             25 |      unlimited |
 
 **Supplier-only:** `promotions` = count of **active** supplier deals (not deal-boost checkout).
+
+**Restaurants:** no `warehouses` limit (supplier operational locations only).
+
+---
+
+## 5b. Branch & warehouse add-ons (Gold / Platinum)
+
+Branches are **org location accounts** (each branch is nearly a full account). Warehouses are **supplier fulfillment locations** under the org, not separate accounts. Branch entitlements use the **parent org main-branch subscription** (`resolveOrgBillingTenantId`); branch rows may still have a pending Free subscription row for activation only.
+
+**Effective limit** = plan included limit (+ tenant/plan limit overrides, increase-only) + **active add-on quantity**.
+
+| Add-on key                 | Tenant     | Gold (USD/mo per unit) | Platinum (USD/mo per unit) |
+| -------------------------- | ---------- | ---------------------- | -------------------------- |
+| `restaurant_extra_branch`  | Restaurant | $39                    | $49                        |
+| `supplier_extra_branch`    | Supplier   | $49                    | $69                        |
+| `supplier_extra_warehouse` | Supplier   | $19                    | $25                        |
+
+**Rules**
+
+- **Silver / Free Trial:** cannot purchase add-ons; upgrade to Gold (branches) or Silver+ (first warehouse).
+- **Enterprise:** custom limits; self-serve add-ons disabled.
+- **Hard cap:** more than **6 total branch accounts** → contact sales for Enterprise (even if add-ons would allow more).
+- **Grandfathering:** existing branches/warehouses are never deleted; tenants over the new included limit stay readable but cannot create more until upgrade or admin-granted add-ons.
+
+Storage: `tenant_subscription_addon` (admin PUT `/api/admin-dashboard/tenants/:tenantType/:id/subscription-addons/:addonKey`). No automated billing yet.
 
 ---
 
@@ -144,8 +169,8 @@ Binary on/off per key (non-empty string = on). **Tier strings are not compared**
 
 | Area                     | Enforcement                                                                      |
 | ------------------------ | -------------------------------------------------------------------------------- |
-| Branches                 | `limits.branches` + `multi_branch` feature                                       |
-| Warehouses               | `limits.warehouses` + `warehouses` feature                                       |
+| Branches                 | `plan-enforcement` + org-wide count + add-ons + Enterprise cap (6)               |
+| Warehouses               | `limits.warehouses` + add-ons (supplier org-wide count) + `warehouses` feature   |
 | Smart reorder            | `smart_reorder` on/off                                                           |
 | Reports / waste reports  | `reports` / `waste_tracking` on/off                                              |
 | Advanced roles           | `advanced_roles`                                                                 |
@@ -227,16 +252,17 @@ Feature overrides: tenant `feature_flag_override` and global `feature_flag.globa
 
 ## 10. Known risks
 
-| Risk                                             | Severity             | Notes                                                                                    |
-| ------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------- |
-| **Free Trial feature parity with Gold (`0112`)** | High (GTM)           | Trial unlocks same feature flags as Gold; only limits differ — can confuse upgrade story |
-| **Tier feature strings not enforced**            | High (Platinum/Gold) | Buyers may expect AI/webhooks/white-label product not yet built                          |
-| **Webhook notification label**                   | Medium               | Platinum `email_whatsapp_webhook` does not enable webhooks                               |
-| **Storage soft enforcement**                     | Low                  | Documented grace; tenants may exceed before block                                        |
-| **Legacy `bronze` in API**                       | Low                  | Normalized to silver; stale clients safe                                                 |
-| **Enterprise catalog incomplete**                | Low                  | Inactive; sparse flags; not self-serve                                                   |
-| **Free `scheduled_order_grace_per_day: 1`**      | Low                  | Hidden meter; sandbox order overflow                                                     |
-| **Supplier Free high feature set**               | Medium               | Same `0112` copy pattern as restaurant Free                                              |
+| Risk                                             | Severity             | Notes                                                                                                                        |
+| ------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Free Trial feature parity with Gold (`0112`)** | High (GTM)           | Trial unlocks same feature flags as Gold; only limits differ — can confuse upgrade story                                     |
+| **Tier feature strings not enforced**            | High (Platinum/Gold) | Buyers may expect AI/webhooks/white-label product not yet built                                                              |
+| **Webhook notification label**                   | Medium               | Platinum `email_whatsapp_webhook` does not enable webhooks                                                                   |
+| **Storage soft enforcement**                     | Low                  | Documented grace; tenants may exceed before block                                                                            |
+| **Legacy `bronze` in API**                       | Low                  | Normalized to silver; stale clients safe                                                                                     |
+| **Enterprise catalog incomplete**                | Low                  | Inactive; sparse flags; not self-serve                                                                                       |
+| **Free `scheduled_order_grace_per_day: 1`**      | Low                  | Hidden meter; sandbox order overflow                                                                                         |
+| **Supplier Free high feature set**               | Medium               | Same `0112` copy pattern as restaurant Free                                                                                  |
+| **Platinum `multi_branch` tier string**          | Low (mitigated)      | Frontend uses `featureEnabled` / `isEntitlementFeatureEnabled` + `planFeatures` on entitlements; API still resolves booleans |
 
 **No catalog bugs found** requiring migration changes on this verification (prices, ladder, promotions key split, approvals removed, Enterprise inactive).
 

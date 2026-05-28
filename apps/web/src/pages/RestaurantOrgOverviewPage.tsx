@@ -5,21 +5,21 @@ import {
   useGetRestaurantOrgQuery,
   useSwitchRestaurantOrgBranchContextMutation,
 } from '../services/api'
-import { useAppSelector } from '../hooks/redux'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { multiBranchEnabled } from '../lib/planLimits'
 import { usePermissions } from '../hooks/usePermissions'
 import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
 
 export function RestaurantOrgOverviewPage() {
   const navigate = useNavigate()
-  const { user } = useAppSelector((state) => state.auth)
+  const { isEffectiveRestaurant } = useImpersonation()
   const { can } = usePermissions()
   const canManageOrg = can('SETTINGS_MANAGE')
   const { entitlements } = useEntitlements()
   const multiBranch = multiBranchEnabled(entitlements)
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
-    skip: user?.role !== 'RESTAURANT',
+    skip: !isEffectiveRestaurant,
   })
   const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchRestaurantOrgBranchContextMutation()
@@ -33,7 +33,7 @@ export function RestaurantOrgOverviewPage() {
     window.location.reload()
   }
 
-  if (user?.role === 'RESTAURANT' && !multiBranch && !isLoading) {
+  if (isEffectiveRestaurant && !multiBranch && !isLoading) {
     navigate('/app/dashboard', { replace: true })
     return null
   }

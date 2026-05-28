@@ -1,14 +1,10 @@
 import { Building2, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useBranchContext } from '../contexts/BranchContext'
-import { useAppSelector } from '../hooks/redux'
-import { useEntitlements } from '../hooks/useEntitlements'
-import { multiBranchEnabled } from '../lib/planLimits'
+import { useImpersonation } from '../hooks/useImpersonation'
 
 export function BranchSwitcher() {
-  const { user } = useAppSelector((state) => state.auth)
-  const { entitlements } = useEntitlements()
-  const multiBranch = multiBranchEnabled(entitlements)
+  const { isEffectiveTenant, isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
   const {
     accounts,
     activeAccountId,
@@ -19,7 +15,7 @@ export function BranchSwitcher() {
     isOrgScope,
   } = useBranchContext()
 
-  if (user?.role !== 'RESTAURANT' && user?.role !== 'SUPPLIER') {
+  if (!isEffectiveTenant) {
     return null
   }
 
@@ -52,25 +48,22 @@ export function BranchSwitcher() {
         disabled={isLoading || isSwitching}
         aria-label="Active account"
       >
-        {isOrgScope && multiBranch && <option value="">All branches</option>}
+        {isOrgScope && <option value="">All branches</option>}
         {accounts.map((account) => (
           <option key={account.id} value={account.id}>
             {account.isPrimary ? `${account.name} (main)` : account.name}
           </option>
         ))}
       </select>
-      {(user?.role === 'SUPPLIER' || user?.role === 'RESTAURANT') &&
-        multiBranch &&
-        isOrgScope &&
-        accounts.length > 1 && (
-          <Link
-            to="/app/org"
-            className="text-xs text-[var(--brand)] whitespace-nowrap hover:underline"
-            title="Organization overview"
-          >
-            Manage
-          </Link>
-        )}
+      {(isEffectiveSupplier || isEffectiveRestaurant) && isOrgScope && accounts.length > 1 && (
+        <Link
+          to="/app/org"
+          className="text-xs text-[var(--brand)] whitespace-nowrap hover:underline"
+          title="Organization overview"
+        >
+          Manage
+        </Link>
+      )}
       <span className="sr-only">{activeAccount?.name ?? 'Main account'}</span>
     </div>
   )

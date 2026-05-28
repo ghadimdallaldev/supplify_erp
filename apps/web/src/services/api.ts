@@ -2358,6 +2358,35 @@ export const api = createApi({
         body,
       }),
     }),
+    getAdminSubscriptionAddons: builder.query<
+      {
+        billingTenantId: string
+        addons: Array<Record<string, unknown>>
+        locationLimits: Record<string, unknown>
+        planCode: string | null
+      },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string }
+    >({
+      query: ({ tenantType, tenantId }) =>
+        `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/subscription-addons`,
+    }),
+    upsertAdminSubscriptionAddon: builder.mutation<
+      { addon: Record<string, unknown> | null; cancelled?: boolean },
+      {
+        tenantType: 'RESTAURANT' | 'SUPPLIER'
+        tenantId: string
+        addonKey: string
+        quantity: number
+        unit_price_monthly?: number | null
+        reason?: string | null
+      }
+    >({
+      query: ({ tenantType, tenantId, addonKey, ...body }) => ({
+        url: `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/subscription-addons/${addonKey}`,
+        method: 'PUT',
+        body,
+      }),
+    }),
 
     // Reviews
     getSupplierReviews: builder.query<
@@ -2885,8 +2914,18 @@ export const api = createApi({
       providesTags: ['Admin', 'User'],
     }),
     startImpersonation: builder.mutation<
-      { tenantId: string; tenantType: string; tenantName: string; expiresAt: string },
-      { tenantId: string; tenantType: 'RESTAURANT' | 'SUPPLIER' }
+      {
+        tenantId: string
+        tenantType: string
+        tenantName: string
+        expiresAt: string
+        redirectTo?: string
+      },
+      {
+        tenantId: string
+        tenantType: 'RESTAURANT' | 'SUPPLIER'
+        acknowledgeSuspended?: boolean
+      }
     >({
       query: (body) => ({
         url: '/api/admin-dashboard/impersonate',

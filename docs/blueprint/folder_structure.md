@@ -9,6 +9,7 @@ Supplify Core/
 │   │   │   ├── config/
 │   │   │   ├── lib/          # auth, db, subscription, plan-enforcement, audit, systemEvent
 │   │   │   ├── middlewares/  # requestContext, impersonationContext, errorHandler
+│   │   │   ├── lib/          # impersonation.js, impersonation-guards.js, rbac.js (getRequestTenant)
 │   │   │   ├── routes/       # admin-dashboard, subscriptions, orders, chat, public, etc.
 │   │   │   ├── services/
 │   │   │   └── server.js

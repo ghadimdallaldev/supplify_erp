@@ -8,23 +8,26 @@
 
 **Tech Stack:** React + TypeScript, Tailwind CSS, CSS custom properties, Recharts (BarChart/ResponsiveContainer), shadcn/ui (Card, Badge, Button, Skeleton), Lucide React, React Router, RTK Query hooks.
 
+**Note (2026-05-28):** Admin impersonation nav uses `useImpersonation()` — see [features/admin-impersonation.md](../../features/admin-impersonation.md). Prefer that hook over raw `useGetImpersonationStatusQuery` in new UI code.
+
 ---
 
 ## File Map
 
-| File | Action |
-|------|--------|
-| `apps/web/src/index.css` | Add `:root` design tokens + Google Fonts @import |
-| `apps/web/src/components/Layout.tsx` | 1-line bg change: `bg-gray-50` → `bg-[var(--bg)]` |
-| `apps/web/src/components/Sidebar.tsx` | Full rewrite — grouped nav, violet active states, brand block, user footer |
-| `apps/web/src/components/Header.tsx` | Full rewrite — breadcrumb, ⌘K search, notification bell, settings icon, avatar |
-| `apps/web/src/pages/DashboardPage.tsx` | Full rewrite — 4-KPI grid with sparklines, 3-col content row, calendar |
+| File                                   | Action                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------ |
+| `apps/web/src/index.css`               | Add `:root` design tokens + Google Fonts @import                               |
+| `apps/web/src/components/Layout.tsx`   | 1-line bg change: `bg-gray-50` → `bg-[var(--bg)]`                              |
+| `apps/web/src/components/Sidebar.tsx`  | Full rewrite — grouped nav, violet active states, brand block, user footer     |
+| `apps/web/src/components/Header.tsx`   | Full rewrite — breadcrumb, ⌘K search, notification bell, settings icon, avatar |
+| `apps/web/src/pages/DashboardPage.tsx` | Full rewrite — 4-KPI grid with sparklines, 3-col content row, calendar         |
 
 ---
 
 ## Task 1: CSS Design Tokens + Font Import
 
 **Files:**
+
 - Modify: `apps/web/src/index.css`
 
 - [ ] **Step 1: Add Google Fonts import and design tokens**
@@ -38,36 +41,36 @@ Add at the very top of `apps/web/src/index.css` (before `@tailwind base`):
 Then inside the existing `@layer base { :root { ... } }` block, append these tokens after `--radius: 0.5rem;`:
 
 ```css
-    /* Supplify brand tokens */
-    --brand: #5b21b6;
-    --brand-mid: #7c3aed;
-    --brand-light: #a78bfa;
-    --brand-pale: #ede9fe;
-    --brand-ultra: #f5f0ff;
-    --mint: #059669;
-    --mint-mid: #10b981;
-    --mint-light: #6ee7b7;
-    --mint-pale: #d1fae5;
-    --amber: #d97706;
-    --amber-mid: #f59e0b;
-    --amber-pale: #fef3c7;
-    --red: #dc2626;
-    --red-pale: #fee2e2;
-    --bg: #f5f0ff;
-    --surface: #ffffff;
-    --border: #ede8f5;
-    --border-mid: #e0d8f0;
-    --text: #1e0b3a;
-    --text-mid: #4a3570;
-    --text-muted: #8b7aaa;
+/* Supplify brand tokens */
+--brand: #5b21b6;
+--brand-mid: #7c3aed;
+--brand-light: #a78bfa;
+--brand-pale: #ede9fe;
+--brand-ultra: #f5f0ff;
+--mint: #059669;
+--mint-mid: #10b981;
+--mint-light: #6ee7b7;
+--mint-pale: #d1fae5;
+--amber: #d97706;
+--amber-mid: #f59e0b;
+--amber-pale: #fef3c7;
+--red: #dc2626;
+--red-pale: #fee2e2;
+--bg: #f5f0ff;
+--surface: #ffffff;
+--border: #ede8f5;
+--border-mid: #e0d8f0;
+--text: #1e0b3a;
+--text-mid: #4a3570;
+--text-muted: #8b7aaa;
 ```
 
 Also add Inter as the base body font at the bottom of `@layer base`:
 
 ```css
-  body {
-    font-family: 'Inter', system-ui, sans-serif;
-  }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
 ```
 
 - [ ] **Step 2: Verify no TS/build errors** — tokens are pure CSS, no compilation needed.
@@ -84,15 +87,19 @@ git commit -m "style: add supplify violet/mint design tokens and Inter font"
 ## Task 2: Layout.tsx Background Update
 
 **Files:**
+
 - Modify: `apps/web/src/components/Layout.tsx:65`
 
 - [ ] **Step 1: Change page background color**
 
 In `Layout.tsx` line 65, change:
+
 ```tsx
 <div className="min-h-screen bg-gray-50">
 ```
+
 to:
+
 ```tsx
 <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
 ```
@@ -109,9 +116,11 @@ git commit -m "style: update layout background to brand-ultra violet"
 ## Task 3: Sidebar.tsx — Full Rewrite
 
 **Files:**
+
 - Modify: `apps/web/src/components/Sidebar.tsx`
 
 Key requirements:
+
 - Width 224px, white background, right border `1px solid var(--border)`
 - Brand block: gradient logo mark + "Supplify" / "Enterprise ERP"
 - Navigation: grouped into sections (OVERVIEW / OPERATIONS / ACCOUNT) with role-based items
@@ -209,28 +218,68 @@ export function Sidebar() {
 
   if (isRestaurant || impersonatingRestaurant) {
     const ops: NavItem[] = [
-      { name: 'Orders', href: '/app/orders', icon: ShoppingCart, badge: 'pending', testId: 'nav-orders' },
+      {
+        name: 'Orders',
+        href: '/app/orders',
+        icon: ShoppingCart,
+        badge: 'pending',
+        testId: 'nav-orders',
+      },
       { name: 'Products', href: '/app/products', icon: Package, testId: 'nav-products' },
       { name: 'Quick Lists', href: '/app/quick-lists', icon: List, testId: 'nav-quick-lists' },
       { name: 'Cart', href: '/app/cart', icon: ShoppingBag, testId: 'nav-cart' },
-      { name: 'Reservations', href: '/app/reservations', icon: CalendarDays, permission: 'RESERVATIONS_VIEW', testId: 'nav-reservations' },
+      {
+        name: 'Reservations',
+        href: '/app/reservations',
+        icon: CalendarDays,
+        permission: 'RESERVATIONS_VIEW',
+        testId: 'nav-reservations',
+      },
       { name: 'Receiving', href: '/app/receiving', icon: PackageCheck, testId: 'nav-receiving' },
     ].filter((item) => !item.permission || can(item.permission))
 
     const intel: NavItem[] = [
       { name: 'Suppliers', href: '/app/suppliers', icon: Building2, testId: 'nav-suppliers' },
-      { name: 'Invoices', href: '/app/invoices', icon: FileText, permission: 'INVOICES_VIEW', testId: 'nav-invoices' },
+      {
+        name: 'Invoices',
+        href: '/app/invoices',
+        icon: FileText,
+        permission: 'INVOICES_VIEW',
+        testId: 'nav-invoices',
+      },
       { name: 'Chat', href: '/app/chat', icon: MessageSquare, testId: 'nav-chat' },
     ].filter((item) => !item.permission || can(item.permission))
 
     const acct: NavItem[] = [
-      { name: 'Staff', href: '/app/staff', icon: UserCircle2, permission: 'STAFF_VIEW', testId: 'nav-staff' },
-      { name: 'Inventory', href: '/app/restaurant-inventory', icon: Package2, permission: 'INVENTORY_VIEW', testId: 'nav-inventory' },
+      {
+        name: 'Staff',
+        href: '/app/staff',
+        icon: UserCircle2,
+        permission: 'STAFF_VIEW',
+        testId: 'nav-staff',
+      },
+      {
+        name: 'Inventory',
+        href: '/app/restaurant-inventory',
+        icon: Package2,
+        permission: 'INVENTORY_VIEW',
+        testId: 'nav-inventory',
+      },
       { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
     ].filter((item) => !item.permission || can(item.permission))
 
     sections = [
-      { label: 'OVERVIEW', items: [{ name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, testId: 'nav-dashboard' }] },
+      {
+        label: 'OVERVIEW',
+        items: [
+          {
+            name: 'Dashboard',
+            href: '/app/dashboard',
+            icon: LayoutDashboard,
+            testId: 'nav-dashboard',
+          },
+        ],
+      },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
       { label: 'ACCOUNT', items: acct },
@@ -240,33 +289,77 @@ export function Sidebar() {
       {
         label: 'ADMIN',
         items: [
-          { name: 'Admin Dashboard', href: '/app/admin', icon: Shield, testId: 'nav-admin-dashboard' },
-          { name: 'Supplier Admin', href: '/app/admin/suppliers', icon: Building2, testId: 'nav-supplier-admin' },
-          { name: 'Restaurant Admin', href: '/app/admin/restaurants', icon: Users, testId: 'nav-restaurant-admin' },
+          {
+            name: 'Admin Dashboard',
+            href: '/app/admin',
+            icon: Shield,
+            testId: 'nav-admin-dashboard',
+          },
+          {
+            name: 'Supplier Admin',
+            href: '/app/admin/suppliers',
+            icon: Building2,
+            testId: 'nav-supplier-admin',
+          },
+          {
+            name: 'Restaurant Admin',
+            href: '/app/admin/restaurants',
+            icon: Users,
+            testId: 'nav-restaurant-admin',
+          },
         ],
       },
       {
         label: 'ACCOUNT',
-        items: [{ name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' }],
+        items: [
+          { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
+        ],
       },
     ]
   } else if (isSupplier || impersonatingSupplier) {
     const ops: NavItem[] = [
-      { name: 'Orders', href: '/app/orders', icon: ShoppingCart, badge: 'pending', testId: 'nav-orders' },
+      {
+        name: 'Orders',
+        href: '/app/orders',
+        icon: ShoppingCart,
+        badge: 'pending',
+        testId: 'nav-orders',
+      },
       { name: 'Products', href: '/app/products', icon: Package, testId: 'nav-products' },
       { name: 'Fulfillment', href: '/app/fulfillment', icon: Truck, testId: 'nav-fulfillment' },
       { name: 'Restaurants', href: '/app/restaurants', icon: Users, testId: 'nav-restaurants' },
     ]
     const intel: NavItem[] = [
-      { name: 'Invoices', href: '/app/invoices', icon: FileText, permission: 'INVOICES_VIEW', testId: 'nav-invoices' },
+      {
+        name: 'Invoices',
+        href: '/app/invoices',
+        icon: FileText,
+        permission: 'INVOICES_VIEW',
+        testId: 'nav-invoices',
+      },
       { name: 'Chat', href: '/app/chat', icon: MessageSquare, testId: 'nav-chat' },
     ].filter((item) => !item.permission || can(item.permission))
 
     sections = [
-      { label: 'OVERVIEW', items: [{ name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, testId: 'nav-dashboard' }] },
+      {
+        label: 'OVERVIEW',
+        items: [
+          {
+            name: 'Dashboard',
+            href: '/app/dashboard',
+            icon: LayoutDashboard,
+            testId: 'nav-dashboard',
+          },
+        ],
+      },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
-      { label: 'ACCOUNT', items: [{ name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' }] },
+      {
+        label: 'ACCOUNT',
+        items: [
+          { name: 'Settings', href: '/app/settings', icon: Settings, testId: 'nav-settings' },
+        ],
+      },
     ]
   }
 
@@ -311,12 +404,30 @@ export function Sidebar() {
             }}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <polygon points="9,1 17,5 17,13 9,17 1,13 1,5" stroke="white" strokeWidth="1.5" fill="none" />
-              <polygon points="9,4 14,7 14,11 9,14 4,11 4,7" stroke="rgba(255,255,255,0.5)" strokeWidth="1" fill="none" />
+              <polygon
+                points="9,1 17,5 17,13 9,17 1,13 1,5"
+                stroke="white"
+                strokeWidth="1.5"
+                fill="none"
+              />
+              <polygon
+                points="9,4 14,7 14,11 9,14 4,11 4,7"
+                stroke="rgba(255,255,255,0.5)"
+                strokeWidth="1"
+                fill="none"
+              />
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.04em', lineHeight: 1.1 }}>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 800,
+                color: 'var(--text)',
+                letterSpacing: '-0.04em',
+                lineHeight: 1.1,
+              }}
+            >
               Supplify
             </div>
             <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-muted)' }}>
@@ -327,7 +438,9 @@ export function Sidebar() {
       </div>
 
       {/* Navigation sections */}
-      <nav style={{ flex: 1, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <nav
+        style={{ flex: 1, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}
+      >
         {sections.map((section) => (
           <div key={section.label} style={{ marginBottom: 4 }}>
             <div
@@ -369,13 +482,13 @@ export function Sidebar() {
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
-                      (e.currentTarget as HTMLElement).style.background = 'var(--brand-ultra)'
+                      ;(e.currentTarget as HTMLElement).style.background = 'var(--brand-ultra)'
                       ;(e.currentTarget as HTMLElement).style.color = 'var(--text-mid)'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
-                      (e.currentTarget as HTMLElement).style.background = 'transparent'
+                      ;(e.currentTarget as HTMLElement).style.background = 'transparent'
                       ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
                     }
                   }}
@@ -413,7 +526,14 @@ export function Sidebar() {
                       style={{ color: isActive ? 'var(--brand)' : 'var(--text-muted)' }}
                     />
                   </span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {item.name}
                   </span>
                   {/* Badges */}
@@ -535,9 +655,11 @@ git commit -m "feat(sidebar): redesign with violet palette, grouped nav, brand b
 ## Task 4: Header.tsx — Rewrite
 
 **Files:**
+
 - Modify: `apps/web/src/components/Header.tsx`
 
 Key requirements:
+
 - Height 56px, white background, bottom border `1px solid var(--border)`
 - Left: breadcrumb (muted "Supplify" + separator + bold current page)
 - Right: BranchSwitcher | Upgrade button | Search bar (200px, ⌘K) | Notification bell (with red dot) | Settings icon | Avatar circle
@@ -550,6 +672,7 @@ The current page name for breadcrumb is derived from `useLocation()` pathname.
 - [ ] **Step 1: Write new Header.tsx**
 
 The Header preserves all existing state and API hooks, just replaces the JSX with the new design. Key new elements:
+
 - Breadcrumb: map pathname to page name
 - Search bar: visual-only 200px input with ⌘K kbd hint (no functionality yet)
 - Notification bell: existing bell logic wrapped in new 36×36 button style
@@ -568,9 +691,11 @@ git commit -m "feat(header): redesign with breadcrumb, search bar, notification 
 ## Task 5: DashboardPage.tsx — Full Rewrite
 
 **Files:**
+
 - Modify: `apps/web/src/pages/DashboardPage.tsx`
 
 Key requirements:
+
 - Preserve ALL existing data hooks: useGetDashboardStatsQuery, useGetOrdersQuery, useGetReorderSuggestionsQuery, useGetInvoiceAnalyticsQuery, useGetProductCategoriesQuery, useGetQuickListsQuery, useAddItemToQuickListMutation, useGetImpersonationStatusQuery
 - Preserve admin-not-impersonating early return (simple CTA card)
 - Preserve loading skeleton and error state
@@ -583,6 +708,7 @@ Key requirements:
 - Calendar row: uses existing `<CalendarView>` component
 
 Sparkline data: generate 7 synthetic bars based on available stats for visual interest.
+
 - Revenue sparkline: ramp from 40% to 100% of totalRevenue/7
 - Orders sparkline: last 7 orders amounts from recentOrders
 - Pending sparkline: synthetic ramp from amber palette

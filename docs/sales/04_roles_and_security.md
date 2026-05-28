@@ -8,7 +8,7 @@ Supplify separates **restaurant**, **supplier**, and **admin** roles. Each role 
 
 - **Restaurant** — Order from suppliers, manage inventory (and branches on higher plans), receive goods, view and pay invoices, use chat, manage reservations. All within their tenant and plan limits.
 - **Supplier** — Manage catalog and warehouses, fulfill orders, send invoices, track payments, use chat. Scoped to their tenant and plan.
-- **Admin** — Manage tenants, plans, subscriptions, limit overrides, finance and health dashboards, and audit logs. Can impersonate a restaurant or supplier for support.
+- **Admin** — Manage tenants, plans, subscriptions, limit overrides, finance and health dashboards, and audit logs. Can **impersonate** a restaurant or supplier for support (full workspace, audited, short-lived session).
 
 ### How access is enforced
 

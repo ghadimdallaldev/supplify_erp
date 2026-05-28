@@ -42,8 +42,8 @@ import {
   Scale,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
+import { useImpersonation } from '../hooks/useImpersonation'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
@@ -72,9 +72,8 @@ export function OrdersPage() {
       price?: number
     }>
   >([])
-  const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
-  const isSupplier = user?.role === 'SUPPLIER'
+  const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const canManageOrders = can('ORDERS_MANAGE')
   const canEditOrders = can('ORDERS_EDIT') || canManageOrders
   const canCreateOrders = can('ORDERS_CREATE') || canManageOrders

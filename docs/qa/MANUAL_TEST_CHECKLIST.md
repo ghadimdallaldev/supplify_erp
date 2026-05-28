@@ -391,12 +391,21 @@ WHERE id = '<subscription_id>';
 
 ## 4.9 Realtime & impersonation
 
-| ID         | Steps                                          | Expected                                           | Pass? |
-| ---------- | ---------------------------------------------- | -------------------------------------------------- | ----- |
-| ADM-IMP-01 | Admin starts impersonation on restaurant       | Banner shows impersonation; restaurant nav         |       |
-| ADM-IMP-02 | While impersonating, open `/app/admin`         | Redirect to tenant dashboard                       |       |
-| ADM-IMP-03 | Stop impersonation                             | Returns to admin context                           |       |
-| ADM-IMP-04 | Plan change while logged in (admin or billing) | `entitlements_refresh` toast or refetch updates UI |       |
+Ref: [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md)
+
+| ID         | Steps                                               | Expected                                                 | Pass? |
+| ---------- | --------------------------------------------------- | -------------------------------------------------------- | ----- |
+| ADM-IMP-01 | Admin starts impersonation on restaurant            | Redirect `/app/dashboard`; sticky banner; restaurant nav |       |
+| ADM-IMP-02 | Navigate orders, products, settings, inventory      | Pages load with tenant data (not empty/admin-only)       |       |
+| ADM-IMP-03 | Switch branch (multi-branch tenant)                 | Branch switch works; data scoped to branch               |       |
+| ADM-IMP-04 | While impersonating, open `/app/admin`              | Redirect to tenant dashboard                             |       |
+| ADM-IMP-05 | Refresh browser during impersonation                | Session still active until cookie/JWT expiry             |       |
+| ADM-IMP-06 | Exit impersonation                                  | `/app/admin`; banner gone; admin nav                     |       |
+| ADM-IMP-07 | Impersonate supplier; navigate fulfillment/products | Supplier nav and APIs work                               |       |
+| ADM-IMP-08 | Billing checkout while impersonating                | 403 `IMPERSONATION_RESTRICTED` (or blocked UI)           |       |
+| ADM-IMP-09 | Impersonate suspended tenant without confirm        | 403 `TENANT_SUSPENDED`; confirm allows start             |       |
+| ADM-IMP-10 | Audit log                                           | `IMPERSONATION_START` / `IMPERSONATION_END` entries      |       |
+| ADM-IMP-11 | Plan change while logged in (admin or billing)      | `entitlements_refresh` toast or refetch updates UI       |       |
 
 ## 4.10 WebSocket connectivity
 
@@ -881,15 +890,16 @@ Hidden without RBAC permission or feature gate.
 
 ## 8.4 Admin support tools
 
-| ID     | Steps                                                    | Expected                                                    | Pass? |
-| ------ | -------------------------------------------------------- | ----------------------------------------------------------- | ----- |
-| ADM-45 | **Impersonate** restaurant from tenant detail            | Tenant app as restaurant; impersonation banner visible      |       |
-| ADM-46 | While impersonating restaurant: navigate to `/app/admin` | Redirect to tenant dashboard; admin routes inaccessible     |       |
-| ADM-47 | **Stop impersonation**                                   | Returns to admin context; banner gone                       |       |
-| ADM-48 | **Impersonate** supplier                                 | Tenant app as supplier                                      |       |
-| ADM-49 | Impersonation is audit-logged                            | Audit entry: admin actor, impersonate action, target tenant |       |
-| ADM-50 | Join chat as admin (if exposed)                          | Moderation/support view                                     |       |
-| ADM-51 | Admin settings (`/app/settings`)                         | Profile + notification prefs only; no tenant data           |       |
+| ID      | Steps                                                | Expected                                                 | Pass? |
+| ------- | ---------------------------------------------------- | -------------------------------------------------------- | ----- |
+| ADM-45  | **Impersonate** restaurant from Tenants tab          | `/app/dashboard`; restaurant nav; sticky banner          |       |
+| ADM-46  | While impersonating: orders, settings, inventory     | Tenant APIs succeed; correct entitlements in UI          |       |
+| ADM-47  | While impersonating: open `/app/admin`               | Redirect to tenant dashboard                             |       |
+| ADM-48  | **Exit impersonation**                               | `/app/admin`; banner gone                                |       |
+| ADM-49  | **Impersonate** supplier; products/orders/warehouses | Supplier workspace navigable                             |       |
+| ADM-49a | Impersonation audit + billing block                  | START/END in audit; checkout blocked while impersonating |       |
+| ADM-50  | Join chat as admin (if exposed)                      | Moderation/support view                                  |       |
+| ADM-51  | Admin settings (`/app/settings`)                     | Profile + notification prefs only; no tenant data        |       |
 
 ## 8.5 Admin RBAC (if multiple admin users)
 

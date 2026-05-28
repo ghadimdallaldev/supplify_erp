@@ -32,14 +32,16 @@ Supplify’s admin area is a subscription-based operator console for managing te
 
 ## Impersonation (View as Tenant)
 
-| Feature                  | Status | Description                                                                                                                                                                                                       |
-| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Start impersonation**  | ✅     | From Tenants tab: click **Impersonate** on a supplier or restaurant. Signed short-lived JWT cookie; configurable duration (`IMPERSONATION_MAX_DURATION_MINUTES`).                                                 |
-| **Impersonation banner** | ✅     | Amber banner at top of app: “You are impersonating [name]” with **Stop impersonating**; shows expiry.                                                                                                             |
-| **Stop impersonation**   | ✅     | Button in banner clears cookie and logs `IMPERSONATION_END`.                                                                                                                                                      |
-| **Security**             | ✅     | Cannot impersonate a user with Admin role; token includes admin user id so only that admin can use the session; start/stop audited in `admin_audit_log`.                                                          |
-| **API**                  | ✅     | `POST/GET /api/admin-dashboard/impersonate`, `POST /api/admin-dashboard/impersonate/stop`; middleware `impersonationContext` sets `req.impersonationContext`; `getRequestTenant(req)` for backend tenant scoping. |
-| **Orders calendar**      | ✅     | Calendar API uses request tenant when impersonating; no 404 when viewing as restaurant or supplier.                                                                                                               |
+| Feature                    | Status | Description                                                                                                                                                                   |
+| -------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Start impersonation**    | ✅     | Tenants tab → **Impersonate**; JWT cookie; redirect to `/app/dashboard`; suspended tenants require `acknowledgeSuspended`.                                                    |
+| **Full tenant navigation** | ✅     | Orders, products, inventory, settings, disputes, org/branches, entitlements via `useImpersonation()` + `getRequestTenant`.                                                    |
+| **Impersonation banner**   | ✅     | Sticky “Impersonating [name]” + **Exit impersonation**; expiry shown on desktop.                                                                                              |
+| **Branch switch**          | ✅     | Org/linked branch switch works under impersonation (`impersonationCanAccessBranch`).                                                                                          |
+| **Stop / logout**          | ✅     | Exit → `/app/admin`; logout clears cookie (`IMPERSONATION_END` audited).                                                                                                      |
+| **Security**               | ✅     | ADMIN + `ADMIN_ACCESS`; no admin-target impersonation; session bound to starting admin; billing mutations blocked while impersonating.                                        |
+| **API / middleware**       | ✅     | `impersonationContext`, `getEffectiveTenant`, `requireRole` impersonation bypass, `impersonation-guards` on billing POST/PATCH/DELETE.                                        |
+| **Docs / tests**           | ✅     | [features/admin-impersonation.md](../features/admin-impersonation.md), [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md); unit tests in `apps/api/src/lib/*impersonation*`. |
 
 ---
 

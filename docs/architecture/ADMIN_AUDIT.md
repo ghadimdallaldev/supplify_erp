@@ -1,8 +1,10 @@
 # Admin Implementation Audit — Step 1
 
-**Date:** 2026-02-13  
+**Date:** 2026-02-13 (impersonation section updated 2026-05-28)  
 **Goal:** Upgrade Admin to production-grade SaaS operator console.  
 **Scope:** Full scan of Admin routes, controllers, services, UI, middleware, RBAC, audit, subscriptions, chat admin.
+
+> **Impersonation is implemented.** See [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md). Historical “missing” notes below for impersonation are superseded.
 
 ---
 
@@ -46,7 +48,7 @@
 ### 1.5 Admin Middleware
 
 - **RBAC:** `requireAuth` and `requireRole(['ADMIN'])` from `apps/api/src/lib/rbac.js`. Used on all admin and admin-dashboard routes. No separate “admin middleware” module.
-- **No** impersonation middleware, no `impersonationContext`, no admin-role or admin-permission middleware.
+- **Impersonation (done):** `impersonationContext` middleware, `ImpersonationBanner`, `useImpersonation`, admin-dashboard `/impersonate*` routes. _Historical note:_ no separate admin-sub-role middleware beyond `ADMIN_ACCESS`.
 
 ### 1.6 RBAC Logic
 
@@ -89,7 +91,7 @@
 
 ## 2. What Is Missing
 
-- **Impersonation:** No endpoint, no signed token, no middleware, no “View as” or “Impersonating X” banner. No audit for impersonation start/stop or expiry.
+- ~~**Impersonation:**~~ **Done (2026-05-28)** — JWT cookie, middleware, banner, full tenant nav, branch switch, billing guard, audit start/end.
 - **Admin RBAC (sub-roles):** No SUPER_ADMIN / SUPPORT_ADMIN / FINANCE_ADMIN / GROWTH_ADMIN. No AdminPermission enum, no mapping table, no permission checks on plan edit, subscription change, suspend, financial views, impersonation, or overrides.
 - **System Health:** No admin tab or API for failed jobs, webhook failures, recent API errors, DB pool stats, or email failures. No placeholder structure for future queues/logging.
 - **Global Financial Dashboard:** No admin-only financial overview: GMV, outstanding/overdue invoices, MRR/ARR, top tenants by revenue/overdue, revenue by plan. No dedicated route or UI.
@@ -113,7 +115,7 @@
 ## 4. Security Concerns
 
 - **Single admin role:** Any ADMIN can do everything (plans, subscriptions, overrides, audit, chat, tenant data). No least-privilege.
-- **No impersonation controls:** When impersonation is added, must ensure: signed short-lived token, audit of start/end, no impersonation of Super Admin, session isolation.
+- **Impersonation controls (implemented):** Short-lived token, audit start/end, no ADMIN contact impersonation, session bound to starting admin; billing mutations blocked while impersonating.
 - **Admin audit readability:** Any user with ADMIN can read full audit log; no restriction by admin sub-role (e.g. only SUPER_ADMIN sees certain actions).
 - **Sensitive actions not gated:** Plan edit, subscription suspend, override create/delete are only gated by `requireRole(['ADMIN'])`; no rate limit or extra confirmation for dangerous actions.
 - **Chat admin:** Admin can join any conversation and see full history; no check that conversation belongs to a tenant (restaurant/supplier) — currently acceptable but should remain explicit.
@@ -126,7 +128,7 @@
 - **Tenant-scoped routes used by admin:** Many non-admin routes (e.g. orders, invoices, inventory) allow ADMIN in `requireRole(['ADMIN', 'RESTAURANT'])`. For those, **tenant is derived from the resource (e.g. restaurant_id on order), not from the logged-in user.** So when an admin calls “list orders,” they must pass or filter by tenant; there is no automatic “current tenant” for admin. This is consistent with “admin sees everything via explicit tenant choice or list-all” but:
   - **Risk:** If any endpoint returns “all orders” when caller is ADMIN without requiring tenant filter, it would leak cross-tenant data. Audit did not find such a pattern; admin-specific endpoints use explicit tenant IDs or global lists.
 - **Override and usage:** Override and usage APIs take `tenantId`/`tenantType` from params; admin can act on any tenant. No check that the admin’s “scope” (e.g. support vs super) limits which tenants they can touch — will matter once admin RBAC is added.
-- **Impersonation (future):** Must ensure impersonation context is the only source of “effective tenant” for the request and is never confused with the admin’s own identity in audit or logging.
+- **Impersonation:** `getRequestTenant` / `getEffectiveTenant` are the source of tenant scope; request logs include `[admin:adminUserId]` when impersonating.
 
 ---
 
@@ -143,14 +145,14 @@
 | Audit               | admin_audit_log + logAudit            | Fix admin.routes audit query; fix plan-enforcement changes_json; consistent chat audit fields |
 | Subscriptions       | Plans + subscriptions CRUD, overrides | Suspend/login enforcement; Grant Trial/Override UI                                            |
 | Chat admin          | Join, start, list                     | UI tab; optional permission gating                                                            |
-| Impersonation       | —                                     | Full feature (token, middleware, banner, audit, expiry)                                       |
+| Impersonation       | ✅ token, middleware, banner, audit   | Sub-role scoping (SUPPORT_ADMIN-only impersonate) optional future                             |
 | System Health       | —                                     | Tab + API (placeholders if no queues)                                                         |
 | Financial dashboard | —                                     | GMV, MRR, ARR, top tenants, overdue, by plan                                                  |
 
 ---
 
 **Next steps (implementation):**  
-Step 2 — Impersonation.  
+Step 2 — ~~Impersonation~~ ✅ (see [admin-impersonation.md](../features/admin-impersonation.md)).  
 Step 3 — Admin RBAC (roles + permissions).  
 Step 4 — System Health tab.  
 Step 5 — Global Financial Dashboard.  

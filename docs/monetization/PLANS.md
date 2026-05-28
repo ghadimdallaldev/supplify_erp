@@ -101,7 +101,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 **Restaurant limits:**
 
-- 3 branch accounts (main + 2 linked locations)
+- 2 branch accounts (main + 1 linked location); extra branches via add-on on Gold+
 - 15 users
 - 100 orders per day
 - Up to 30 suppliers
@@ -113,7 +113,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 **Supplier limits:**
 
-- 3 branch accounts, 3 warehouses
+- 2 branch accounts, 3 warehouses (extra via add-ons on Gold+)
 - 15 users, 3,000 product SKUs
 - 500 chats per day, 30 open conversations
 - 10 GB storage
@@ -149,13 +149,13 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 **Restaurant limits:**
 
-- Unlimited branch accounts, users, orders/day, suppliers, inventory SKUs
+- 3 included branch accounts (+ add-ons / Enterprise for more); unlimited users, orders/day, suppliers, inventory SKUs
 - Unlimited chats/day, open conversations, quick lists, deal redemptions
 - **30 GB** storage
 
 **Supplier limits:**
 
-- Unlimited branches, warehouses, users, product SKUs, chats, open conversations
+- 3 included branches, 5 included warehouses (+ add-ons); unlimited users, product SKUs, chats, open conversations
 - Unlimited active promotions
 - **30 GB** storage
 
@@ -210,17 +210,17 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 
 - **Free:** 1 location (main account only — no linked branch accounts)
 - **Silver:** 1 location (main account only)
-- **Gold:** Up to 3 locations (main + 2 linked branch accounts)
-- **Platinum:** Unlimited locations
+- **Gold:** 2 locations (main + 1 linked); extra branches via paid add-on
+- **Platinum:** 3 included locations; extra via add-on; **6+ locations** → Enterprise / contact sales
 
-**Enforcement:** Cannot create additional branches beyond limit. Existing branches remain accessible.
+**Enforcement:** Effective limit = included + add-ons + admin overrides. Existing branches are never deleted when over limit.
 
 ### Warehouses (Suppliers Only)
 
 - **Free:** 0 warehouses
 - **Silver:** 1 warehouse
 - **Gold:** Up to 3 warehouses
-- **Platinum:** Unlimited warehouses
+- **Platinum:** 5 warehouses included; extra via add-on ($25/mo each on Platinum)
 
 **Enforcement:** Cannot create warehouses beyond plan limit. Free plan inventory defaults to "Unassigned."
 

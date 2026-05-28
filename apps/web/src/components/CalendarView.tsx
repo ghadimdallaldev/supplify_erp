@@ -23,6 +23,7 @@ import { Badge } from './ui/badge'
 import { Select, SelectTrigger, SelectItem } from './ui/select'
 import { useOrdersCalendar, OrdersCalendarFetchError } from '../hooks/useOrdersCalendar'
 import { useGetEntitlementsQuery } from '../services/api'
+import { featureEnabled } from '../lib/planLimits'
 import { useAppDispatch } from '../hooks/redux'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { openPayOverdueModal } from '../features/billing/billingSlice'
@@ -63,7 +64,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
   const dispatch = useAppDispatch()
   const { data: entitlementsData, isLoading: entitlementsLoading } = useGetEntitlementsQuery()
   const entitlements = entitlementsData?.entitlements
-  const hasOrderCalendar = entitlements?.features?.order_calendar === true
+  const hasOrderCalendar = featureEnabled(entitlements?.features?.order_calendar)
   const planName = entitlements?.plan?.name ?? 'your plan'
 
   const initialRole: 'RESTAURANT' | 'SUPPLIER' = role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'

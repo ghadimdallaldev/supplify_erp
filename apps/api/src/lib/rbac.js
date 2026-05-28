@@ -2,7 +2,7 @@ import { verifyToken, refreshAccessToken } from './auth.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
-import { getEffectiveTenant } from './impersonation.js'
+import { getEffectiveTenant, impersonationCanAccessBranch } from './impersonation.js'
 import {
   getActiveTenantFromRequest,
   getPrimaryTenantForUser,
@@ -355,6 +355,12 @@ export function requireRole(allowedRoles) {
     const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
 
     if (!roles.includes(userRole)) {
+      if (userRole === 'ADMIN') {
+        const effective = getEffectiveTenant(req)
+        if (effective && roles.includes(effective.tenantType)) {
+          return next()
+        }
+      }
       return res.status(403).json({
         ok: false,
         data: null,
@@ -418,6 +424,16 @@ export async function getRequestTenant(req) {
   if (!req.userData) return null
   if (req.userData.role === 'PENDING') return null
   const effective = getEffectiveTenant(req)
+  const activeFromCookie = await getActiveTenantFromRequest(req)
+  if (effective && activeFromCookie) {
+    const branchOk = await impersonationCanAccessBranch(
+      effective.tenantId,
+      effective.tenantType,
+      activeFromCookie.tenantId,
+      activeFromCookie.tenantType
+    )
+    if (branchOk) return activeFromCookie
+  }
   if (effective) return effective
 
   const branchHeader = req.headers['x-branch-id']
@@ -437,8 +453,7 @@ export async function getRequestTenant(req) {
     }
   }
 
-  const active = await getActiveTenantFromRequest(req)
-  if (active) return active
+  if (activeFromCookie) return activeFromCookie
 
   if (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER') {
     const assignment = await getTenantAssignmentForUser(req.userData.id, req.userData.role)
@@ -555,7 +570,11 @@ export function resolveTenantContext(req, res, next) {
         `SELECT status FROM subscription WHERE tenant_id = $1 AND tenant_type = $2 ORDER BY created_at DESC LIMIT 1`,
         [tenant.tenantId, tenant.tenantType]
       )
-      if (subRows.length > 0 && subRows[0].status === 'SUSPENDED') {
+      if (
+        subRows.length > 0 &&
+        subRows[0].status === 'SUSPENDED' &&
+        req.userData.role !== 'ADMIN'
+      ) {
         return res.status(403).json({
           ok: false,
           data: null,

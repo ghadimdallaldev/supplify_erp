@@ -934,9 +934,32 @@ export interface Subscription {
   plan_features?: string[]
 }
 
+export interface LocationLimitSummary {
+  included: number | null
+  addonQuantity: number
+  effective: number | null
+  current: number
+  overIncludedLimit?: boolean
+  overEffectiveLimit?: boolean
+  enterpriseThreshold?: number
+  atEnterpriseThreshold?: boolean
+}
+
+export interface SubscriptionAddonEntitlement {
+  id: string
+  key: string
+  quantity: number
+  unitPriceMonthly: number | null
+  status: string
+  startsAt: string | null
+  endsAt: string | null
+}
+
 export interface Entitlements {
   tenantType: 'RESTAURANT' | 'SUPPLIER'
   tenantId: string
+  billingTenantId?: string
+  usesOrgBilling?: boolean
   plan: {
     id: string
     name: string
@@ -945,16 +968,25 @@ export interface Entitlements {
     price_monthly: number | null
     price_yearly: number | null
   }
-  features: Record<string, boolean>
+  features: Record<string, boolean | string>
+  /** Raw plan catalog feature JSON (tier strings); use with isEntitlementFeatureEnabled when features is incomplete. */
+  planFeatures?: Record<string, unknown>
   /** How each feature in `features` was resolved (tenant override → global → plan → default). */
   featureSources?: Record<string, 'tenant_override' | 'global' | 'plan' | 'default'>
   limits: Record<string, number | null>
   baseLimits: Record<string, number | null>
+  limitsBeforeAddons?: Record<string, number | null>
+  addons?: SubscriptionAddonEntitlement[]
+  locationLimits?: {
+    branches?: LocationLimitSummary
+    warehouses?: LocationLimitSummary
+  }
   overrides: Array<{
     limitKey: string
     value: number
     reason: string | null
     expiresAt: string | null
+    scope?: string
   }>
   usage: Record<string, number>
   usageWindowMeta?: Record<string, { date?: string }>

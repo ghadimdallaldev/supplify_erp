@@ -26,7 +26,7 @@ import {
   useRejectDisputeMutation,
   useGetEntitlementsQuery,
 } from '../../services/api'
-import { useAppSelector } from '../../hooks/redux'
+import { useImpersonation } from '../../hooks/useImpersonation'
 import { featureEnabled } from '../../lib/planLimits'
 import {
   disputeEligibilityMessage,
@@ -64,8 +64,7 @@ type DisputeRow = {
 }
 
 export function DisputesPage() {
-  const { user } = useAppSelector((state) => state.auth)
-  const isSupplier = user?.role === 'SUPPLIER'
+  const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const [searchParams, setSearchParams] = useSearchParams()
   const orderIdFromUrl = searchParams.get('orderId') || ''
   const supplierIdFromUrl = searchParams.get('supplierId') || ''

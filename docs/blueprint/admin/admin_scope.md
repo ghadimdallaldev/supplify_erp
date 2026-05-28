@@ -10,6 +10,6 @@ Admin users (role ADMIN) have access to:
 - **Health:** GET /health — recent API errors (system_event), DB pool stats; placeholders for job/webhook/email failures.
 - **Finance:** GET /financial-overview — GMV, outstanding, overdue, revenue by plan (MRR/ARR), top tenants by revenue/overdue.
 - **Audit logs:** GET /audit-logs (admin_audit_log).
-- **Impersonation:** Start/stop viewing as a Restaurant or Supplier (cannot impersonate ADMIN); short-lived token; cleared on logout.
+- **Impersonation:** Start/stop viewing as Restaurant or Supplier from Tenants tab; redirect to tenant dashboard; full tenant nav via `useImpersonation()`; sticky banner; branch switch; billing mutations blocked; cannot impersonate ADMIN contact; short-lived JWT cookie; cleared on logout. See [features/admin-impersonation.md](../../features/admin-impersonation.md).
 
 All admin-dashboard routes require: requireAuth, requireRole(['ADMIN']), resolveAdminContext, requirePermission('ADMIN_ACCESS').

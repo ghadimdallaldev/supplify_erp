@@ -36,11 +36,12 @@ Production-grade billing safety, auditability, race conditions, and security.
 ## A5) Security hardening
 
 - **Suspension:** `resolveTenantContext` in `lib/rbac.js` checks subscription status; if `SUSPENDED`, returns 403 `SUBSCRIPTION_SUSPENDED`. All tenant routes using `resolveTenantContext` are blocked when suspended.
-- **Impersonation:**
-  - Short-lived JWT (config: `IMPERSONATION_MAX_DURATION_MINUTES`); verified server-side on each request.
-  - Cannot impersonate a user with Admin role (checked in POST `/api/admin-dashboard/impersonate`).
-  - Banner and context: existing ImpersonationBanner and `getEffectiveTenant()`.
-  - **Force stop on logout:** Impersonation cookie is cleared in auth logout (`clearImpersonationCookie(res)`).
+- **Impersonation:** See [features/admin-impersonation.md](../features/admin-impersonation.md).
+  - Short-lived JWT (`sessionId`, `adminUserId`, tenant claims); `impersonationContext` on every request.
+  - Cannot impersonate ADMIN contact email; suspended/inactive tenant requires `acknowledgeSuspended`.
+  - `requireRole` impersonation bypass; `getRequestTenant` + branch cookie; org branch lists for impersonating admin.
+  - **Billing mutations blocked** while impersonating (`impersonation-guards.js`).
+  - **Force stop on logout:** `clearImpersonationCookie(res)` in auth routes.
 - **Rate limits** (in-memory; TODO: Redis for production):
   - `/api/public`: 200 requests per 15 min per IP (reservations, staff self-service).
   - `/api/chat`: 300 requests per 15 min per IP (chat send and other chat endpoints).

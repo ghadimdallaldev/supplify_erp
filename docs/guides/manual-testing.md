@@ -27,7 +27,7 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 - **Numbers:** Currency and numeric values should come from the API and use shared formatters (`formatCurrency` / `formatPrice`).
 - **Tiers & features:** Enforced via `requireFeature`, `checkLimit`. Silver limits/features: migration `0117` · `pnpm run log:tier-limits`. Full gate matrix: [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) Part 3.
 - **Free Trial expiry:** [free-trial-expiry.md](../features/free-trial-expiry.md); full regression cases **BIL-FT-01 … BIL-FT-12** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) §4.6.
-- **Impersonation:** Start from tenant management; stop via the amber banner.
+- **Impersonation:** [admin-impersonation.md](../features/admin-impersonation.md) — start from Tenants tab; full tenant nav; exit via sticky banner; QA **ADM-IMP-01 … ADM-IMP-10** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md).
 
 ---
 
@@ -104,7 +104,10 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 - [ ] Admin-only nav.
 - [ ] Tabs: overview, plans, subscriptions, tenants, health/finance/usage/audit as present.
 - [ ] Supplier admin / restaurant admin routes.
-- [ ] **Impersonate** and **stop** banner.
+- [ ] **Impersonate** restaurant → dashboard, orders, settings, branch switch (if applicable).
+- [ ] **Impersonate** supplier → products, orders, fulfillment/warehouses.
+- [ ] Sticky **Impersonating** banner; **Exit impersonation**; `/app/admin` redirects away while active.
+- [ ] Billing payment actions blocked while impersonating.
 - [ ] Admin **Settings** if any.
 
 ---

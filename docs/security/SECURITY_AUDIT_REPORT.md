@@ -38,7 +38,7 @@ The stack is **Node.js 18+ / Express / PostgreSQL / Keycloak OIDC / React (Vite)
 
 - **Keycloak** OAuth2 authorization code flow (`auth.routes.js`)
 - **JWT** access tokens in cookies, verified with `jwtVerify` + remote JWKS (`lib/auth.js`)
-- **Admin impersonation** signed HS256 JWT in `impersonation_token` cookie (`lib/impersonation.js`)
+- **Admin impersonation** signed HS256 JWT in `impersonation_token` cookie (`lib/impersonation.js`); billing mutations blocked via `impersonation-guards.js` — [features/admin-impersonation.md](../features/admin-impersonation.md)
 - **Staff portal** UUID session tokens (`staff_portal_session`)
 - **Public reservations** UUID `public_token` on reservation rows
 

@@ -181,6 +181,8 @@ Each card:
 
 ### Admin View (not impersonating)
 
+> Impersonation (full tenant workspace): [features/admin-impersonation.md](../../features/admin-impersonation.md)
+
 Unchanged from current — simple card pointing to `/app/admin`. No redesign needed.
 
 ---

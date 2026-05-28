@@ -30,7 +30,11 @@ import {
   getExternallyDisabledFeatures,
   getPlanTierDisabledFeatures,
 } from '../lib/externallyControlledFeatures'
-import { shouldShowEntitlementLimit } from '../lib/planLimits'
+import {
+  featureEnabled,
+  isEntitlementFeatureEnabled,
+  shouldShowEntitlementLimit,
+} from '../lib/planLimits'
 import { getLimitLabel as getPlanLimitLabel } from '../lib/planComparison'
 
 /** Usage rows shown first in settings (supplier vs restaurant). */
@@ -126,10 +130,10 @@ export function SubscriptionInfo() {
   const features = e.features
   const featureSources = e.featureSources
 
-  const getFeatureDisplay = (value: boolean) => (value ? 'Enabled' : 'Disabled')
+  const getFeatureDisplay = (value: unknown) => (featureEnabled(value) ? 'Enabled' : 'Disabled')
 
   function featureOffNote(featureKey: string): string | null {
-    if (features[featureKey as keyof typeof features]) return null
+    if (isEntitlementFeatureEnabled(e, featureKey)) return null
     const src = featureSources?.[featureKey]
     if (src === 'tenant_override') {
       return 'Turned off for your account by an administrator.'
@@ -141,7 +145,7 @@ export function SubscriptionInfo() {
   }
 
   function planTierOffNote(featureKey: string): string | null {
-    if (features[featureKey as keyof typeof features]) return null
+    if (isEntitlementFeatureEnabled(e, featureKey)) return null
     const src = featureSources?.[featureKey]
     if (src === 'plan' || src === 'default') {
       return 'Not included on your current plan tier.'
@@ -500,7 +504,10 @@ export function SubscriptionInfo() {
             <div>
               <div>
                 <span className="text-[var(--text-muted)]">Chat:</span>{' '}
-                <Badge variant={features.chat ? 'default' : 'secondary'} className="ml-2">
+                <Badge
+                  variant={featureEnabled(features.chat) ? 'default' : 'secondary'}
+                  className="ml-2"
+                >
                   {getFeatureDisplay(features.chat)}
                 </Badge>
               </div>
@@ -514,7 +521,10 @@ export function SubscriptionInfo() {
             <div>
               <div>
                 <span className="text-[var(--text-muted)]">Smart Reorder:</span>{' '}
-                <Badge variant={features.smart_reorder ? 'default' : 'secondary'} className="ml-2">
+                <Badge
+                  variant={featureEnabled(features.smart_reorder) ? 'default' : 'secondary'}
+                  className="ml-2"
+                >
                   {getFeatureDisplay(features.smart_reorder)}
                 </Badge>
               </div>
@@ -528,7 +538,10 @@ export function SubscriptionInfo() {
             <div>
               <div>
                 <span className="text-[var(--text-muted)]">Analytics:</span>{' '}
-                <Badge variant={features.reports ? 'default' : 'secondary'} className="ml-2">
+                <Badge
+                  variant={featureEnabled(features.reports) ? 'default' : 'secondary'}
+                  className="ml-2"
+                >
                   {getFeatureDisplay(features.reports)}
                 </Badge>
               </div>
@@ -542,8 +555,11 @@ export function SubscriptionInfo() {
             <div>
               <div>
                 <span className="text-[var(--text-muted)]">Multi-Branch:</span>{' '}
-                <Badge variant={features.multi_branch ? 'default' : 'secondary'} className="ml-2">
-                  {getFeatureDisplay(features.multi_branch)}
+                <Badge
+                  variant={isEntitlementFeatureEnabled(e, 'multi_branch') ? 'default' : 'secondary'}
+                  className="ml-2"
+                >
+                  {getFeatureDisplay(e.planFeatures?.multi_branch ?? features.multi_branch)}
                 </Badge>
               </div>
               {keyFeatureOffNotes.multi_branch && (
@@ -557,10 +573,12 @@ export function SubscriptionInfo() {
               <div>
                 <span className="text-[var(--text-muted)]">Custom branding:</span>{' '}
                 <Badge
-                  variant={features.custom_branding ? 'default' : 'secondary'}
+                  variant={
+                    isEntitlementFeatureEnabled(e, 'custom_branding') ? 'default' : 'secondary'
+                  }
                   className="ml-2"
                 >
-                  {getFeatureDisplay(features.custom_branding)}
+                  {getFeatureDisplay(e.planFeatures?.custom_branding ?? features.custom_branding)}
                 </Badge>
               </div>
               {keyFeatureOffNotes.custom_branding && (

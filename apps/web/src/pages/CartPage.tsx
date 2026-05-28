@@ -33,17 +33,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
+import { useImpersonation } from '../hooks/useImpersonation'
 
 export function CartPage() {
   const [searchParams] = useSearchParams()
   const dispatch = useAppDispatch()
   const { groups, total, drafts } = useAppSelector((state) => state.cart)
   const { user } = useAppSelector((state) => state.auth)
+  const { shouldLoadTenantEntitlements } = useImpersonation()
   const { can } = usePermissions()
   const canPlaceOrders = can('ORDERS_CREATE')
   const { data: dealsData } = useGetActivePromotionsQuery()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: !user || user.role === 'ADMIN',
+    skip: !shouldLoadTenantEntitlements,
   })
   const orderGate = useMemo(
     () => getOrderPlaceGate(entitlementsData?.entitlements, groups.length),

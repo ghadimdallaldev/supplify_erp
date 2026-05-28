@@ -9,7 +9,7 @@ Admins have a dedicated dashboard to manage tenants, plans, subscriptions, overr
 - **Overview** — Counts of tenants (restaurants/suppliers), subscription status, revenue (MRR/ARR), recent activity (orders, chats), and alerts (e.g. past-due invoices).
 - **Plans** — Create and edit plans per tenant type (restaurant vs supplier), set limits and features, and control display order and active state.
 - **Subscriptions** — List all subscriptions, change plan or status (e.g. suspend, resume), preview impact before changing plan, and force a change with reason when needed.
-- **Tenants** — List and manage restaurants and suppliers; impersonate a tenant for support (view the app as them).
+- **Tenants** — List and manage restaurants and suppliers; **impersonate** to open the full tenant workspace (orders, catalog, settings, branches) with audit trail — see [admin-impersonation.md](../features/admin-impersonation.md).
 - **Overrides** — Add or remove temporary limit overrides (e.g. higher orders per day) with optional expiry.
 - **Health** — Monitor recent errors, DB pool, and system health.
 - **Finance** — View GMV, MRR, overdue balances, and top tenants.
@@ -33,7 +33,7 @@ flowchart TB
 ### Why this matters to buyers
 
 - **Operators** — One place to see platform health, revenue, and risk (e.g. overdue invoices).
-- **Support** — Impersonation lets you see exactly what a tenant sees; overrides can unblock them while they upgrade or renew.
+- **Support** — Impersonation reproduces the tenant UI end-to-end (including branch context); billing changes stay in the admin console; overrides can unblock tenants while they upgrade or renew.
 - **Revenue** — Plan and subscription management plus conversion stats help tune pricing and positioning (e.g. Gold as default serious plan).
 
 Admin and operations are built so that running and growing the business is manageable and auditable.

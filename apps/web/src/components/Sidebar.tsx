@@ -3,12 +3,12 @@ import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import {
-  useGetImpersonationStatusQuery,
   useGetDashboardStatsQuery,
   useGetEntitlementsQuery,
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
 } from '../services/api'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { SupplifyLogo } from './SupplifyLogo'
 import {
   LayoutDashboard,
@@ -65,29 +65,31 @@ export function Sidebar({
   const location = useLocation()
   const { user } = useAppSelector((state) => state.auth)
   const { can } = usePermissions()
-  const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
-    skip: user?.role !== 'ADMIN',
-  })
+  const {
+    isImpersonating,
+    isEffectiveRestaurant,
+    isEffectiveSupplier,
+    isPlatformAdmin,
+    shouldLoadTenantEntitlements,
+  } = useImpersonation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: !user || user.role === 'ADMIN',
+    skip: !shouldLoadTenantEntitlements,
   })
   const { data: statsData } = useGetDashboardStatsQuery(undefined, {
-    skip: user?.role === 'ADMIN' && !impersonation?.active,
+    skip: isPlatformAdmin && !isImpersonating,
   })
   const { unreadCount: notificationUnreadCount } = useNotificationBadge()
 
-  const isPlatformAdmin =
-    user?.role === 'ADMIN' &&
+  const hasAdminNavAccess =
+    isPlatformAdmin &&
     Array.isArray(user?.adminPermissions) &&
     user.adminPermissions.length > 0 &&
     (user.adminPermissions.includes('ADMIN_ACCESS') ||
       user.adminPermissions.includes('ADMIN_TENANTS'))
-  const isSupplier = user?.role === 'SUPPLIER'
-  const isRestaurant = user?.role === 'RESTAURANT'
-  const impersonatingRestaurant =
-    isPlatformAdmin && impersonation?.active && impersonation?.tenantType === 'RESTAURANT'
-  const impersonatingSupplier =
-    isPlatformAdmin && impersonation?.active && impersonation?.tenantType === 'SUPPLIER'
+  const isSupplier = isEffectiveSupplier
+  const isRestaurant = isEffectiveRestaurant
+  const impersonatingRestaurant = isImpersonating && isEffectiveRestaurant
+  const impersonatingSupplier = isImpersonating && isEffectiveSupplier
 
   const pendingOrders = Number(statsData?.pendingOrders) || 0
   const unreadCount = notificationUnreadCount
@@ -260,7 +262,7 @@ export function Sidebar({
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
       { label: 'ACCOUNT', items: acct },
     ]
-  } else if (isPlatformAdmin && !impersonation?.active) {
+  } else if (hasAdminNavAccess && !isImpersonating) {
     sections = [
       {
         label: 'ADMIN',

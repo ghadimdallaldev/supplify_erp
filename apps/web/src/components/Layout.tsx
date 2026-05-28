@@ -15,7 +15,6 @@ import {
 } from '../features/monetization/monetizationSlice'
 import {
   api,
-  useGetImpersonationStatusQuery,
   useGetEntitlementsQuery,
   useGetBillingStatusQuery,
   useRecordConversionEventMutation,
@@ -31,6 +30,7 @@ import { useCartActions } from '../hooks/useCartActions'
 import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planComparison'
 import { isAtEntitlementLimit, shouldShowEntitlementLimit } from '../lib/planLimits'
 import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { LimitExceededBanner } from './LimitExceededBanner'
 import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
 
@@ -57,19 +57,17 @@ export function Layout() {
       rehydrateCart()
     }
   }, [user?.email, rehydrateCart])
-  const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
-    skip: user?.role !== 'ADMIN',
-  })
+  const { isImpersonating, isPlatformAdmin, shouldLoadTenantEntitlements } = useImpersonation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: user?.role === 'ADMIN' || !user,
+    skip: !shouldLoadTenantEntitlements,
   })
   const { data: billingStatus } = useGetBillingStatusQuery(undefined, {
-    skip: user?.role === 'ADMIN' || !user,
+    skip: isPlatformAdmin && !isImpersonating,
   })
   const [recordConversionEvent] = useRecordConversionEventMutation()
 
   useEffect(() => {
-    if (user?.role === 'ADMIN' || !billingStatus?.access) return
+    if ((isPlatformAdmin && !isImpersonating) || !billingStatus?.access) return
     const pending = billingStatus.access.pendingActivation && billingStatus.access.isLocked
     if (!pending) return
     if (!location.pathname.startsWith('/app/activate')) {
@@ -152,16 +150,11 @@ export function Layout() {
     }
   }, [user?.id, dispatch])
 
-  // When impersonating, if we're on an admin page, switch to tenant dashboard
   useEffect(() => {
-    if (
-      user?.role === 'ADMIN' &&
-      impersonation?.active &&
-      location.pathname.startsWith('/app/admin')
-    ) {
+    if (isImpersonating && location.pathname.startsWith('/app/admin')) {
       navigate('/app/dashboard', { replace: true })
     }
-  }, [user?.role, impersonation?.active, location.pathname, navigate])
+  }, [isImpersonating, location.pathname, navigate])
 
   const e = entitlementsData?.entitlements
   const externallyDisabledFeatures = useMemo(() => (e ? getExternallyDisabledFeatures(e) : []), [e])
@@ -215,37 +208,39 @@ export function Layout() {
           <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
           <div className="flex min-w-0 flex-1 flex-col">
             <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
-            {user?.role !== 'ADMIN' && <BillingOverdueBanner />}
-            {user?.role !== 'ADMIN' && externallyDisabledFeatures.length > 0 && e && (
-              <div className="mx-3 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:mx-6">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex gap-2">
-                    <Lock className="h-4 w-4 shrink-0 text-amber-800 mt-0.5" aria-hidden />
-                    <div>
-                      <p className="font-medium text-amber-950">
-                        Some features are not available on your account
-                      </p>
-                      <p className="mt-1 text-amber-900/90">
-                        This is set by your organization or platform administrators, not by your
-                        subscription plan alone. Restricted capabilities include:{' '}
-                        <span className="font-medium">
-                          {externallyDisabledFeatures.map((x) => x.label).join(', ')}
-                        </span>
-                        .
-                      </p>
+            {(!isPlatformAdmin || isImpersonating) && <BillingOverdueBanner />}
+            {(!isPlatformAdmin || isImpersonating) &&
+              externallyDisabledFeatures.length > 0 &&
+              e && (
+                <div className="mx-3 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:mx-6">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex gap-2">
+                      <Lock className="h-4 w-4 shrink-0 text-amber-800 mt-0.5" aria-hidden />
+                      <div>
+                        <p className="font-medium text-amber-950">
+                          Some features are not available on your account
+                        </p>
+                        <p className="mt-1 text-amber-900/90">
+                          This is set by your organization or platform administrators, not by your
+                          subscription plan alone. Restricted capabilities include:{' '}
+                          <span className="font-medium">
+                            {externallyDisabledFeatures.map((x) => x.label).join(', ')}
+                          </span>
+                          .
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      className="shrink-0 self-start font-medium text-amber-950 underline hover:no-underline sm:ml-4"
+                      onClick={() => navigate(settingsFeaturesTabPath(e.tenantType))}
+                    >
+                      View in Settings
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="shrink-0 self-start font-medium text-amber-950 underline hover:no-underline sm:ml-4"
-                    onClick={() => navigate(settingsFeaturesTabPath(e.tenantType))}
-                  >
-                    View in Settings
-                  </button>
                 </div>
-              </div>
-            )}
-            {user?.role !== 'ADMIN' && planTierDisabledFeatures.length > 0 && e && (
+              )}
+            {(!isPlatformAdmin || isImpersonating) && planTierDisabledFeatures.length > 0 && e && (
               <div className="mx-3 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 sm:mx-6">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex gap-2">
@@ -273,7 +268,7 @@ export function Layout() {
                 </div>
               </div>
             )}
-            {user?.role !== 'ADMIN' && atLimitEntries.length > 0 && (
+            {(!isPlatformAdmin || isImpersonating) && atLimitEntries.length > 0 && (
               <div className="mx-3 mt-4 space-y-2 sm:mx-6">
                 {atLimitEntries.map(({ key, current, limit }) => (
                   <LimitExceededBanner
@@ -287,7 +282,7 @@ export function Layout() {
                 ))}
               </div>
             )}
-            {user?.role !== 'ADMIN' && nearLimitKeys.length > 0 && (
+            {(!isPlatformAdmin || isImpersonating) && nearLimitKeys.length > 0 && (
               <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -332,21 +327,23 @@ export function Layout() {
                 </button>
               </div>
             )}
-            {user?.role !== 'ADMIN' && blockedCountLast7d >= 3 && planBlockNudgeMessage && (
-              <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)] sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span>{planBlockNudgeMessage}</span>
-                <button
-                  type="button"
-                  className="font-medium underline hover:no-underline shrink-0"
-                  onClick={() => {
-                    recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
-                    openBrowseUpgrade(dispatch, { currentPlan: e?.plan?.name })
-                  }}
-                >
-                  View plans
-                </button>
-              </div>
-            )}
+            {(!isPlatformAdmin || isImpersonating) &&
+              blockedCountLast7d >= 3 &&
+              planBlockNudgeMessage && (
+                <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)] sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <span>{planBlockNudgeMessage}</span>
+                  <button
+                    type="button"
+                    className="font-medium underline hover:no-underline shrink-0"
+                    onClick={() => {
+                      recordConversionEvent({ eventType: 'VIEW_PLANS' }).catch(() => {})
+                      openBrowseUpgrade(dispatch, { currentPlan: e?.plan?.name })
+                    }}
+                  >
+                    View plans
+                  </button>
+                </div>
+              )}
             <main className="flex-1 p-3 sm:p-4 md:p-6">
               <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
                 <Outlet />

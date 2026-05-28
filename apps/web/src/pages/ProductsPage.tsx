@@ -22,6 +22,7 @@ import { Label } from '../components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import toast from 'react-hot-toast'
 import {
@@ -73,14 +74,15 @@ export function ProductsPage() {
   const dispatch = useAppDispatch()
   const { addItem } = useCartActions()
   const { user } = useAppSelector((state) => state.auth)
+  const { isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
   const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
   const [createInventoryAdjustment, { isLoading: isAdjustingInventory }] =
     useCreateInventoryAdjustmentMutation()
 
   // Check if user is a supplier
-  const isSupplier = user?.role === 'SUPPLIER'
-  const isRestaurant = user?.role === 'RESTAURANT'
+  const isSupplier = isEffectiveSupplier
+  const isRestaurant = isEffectiveRestaurant
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !isRestaurant,
   })

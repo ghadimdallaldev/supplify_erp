@@ -9,7 +9,11 @@ import {
   getSupplierPromotionGate,
   canBrowseSupplierDeals,
   getPlanLimitGate,
+  featureEnabled,
+  evaluatePlanFeatureValue,
+  isEntitlementFeatureEnabled,
   multiBranchEnabled,
+  multiWarehousePlanEnabled,
   getBranchAddGate,
   canAddWarehouses,
   warehousesFeatureEnabled,
@@ -163,6 +167,42 @@ describe('deal and promotion limits', () => {
   })
 })
 
+describe('featureEnabled / evaluatePlanFeatureValue', () => {
+  it('featureEnabled(true) is true', () => {
+    expect(featureEnabled(true)).toBe(true)
+    expect(evaluatePlanFeatureValue(true)).toBe(true)
+  })
+
+  it('featureEnabled("central_purchasing") is true', () => {
+    expect(featureEnabled('central_purchasing')).toBe(true)
+  })
+
+  it('featureEnabled("full_api_webhooks") is true', () => {
+    expect(featureEnabled('full_api_webhooks')).toBe(true)
+  })
+
+  it('featureEnabled(false) is false', () => {
+    expect(featureEnabled(false)).toBe(false)
+  })
+
+  it('featureEnabled("false") is false', () => {
+    expect(featureEnabled('false')).toBe(false)
+  })
+
+  it('featureEnabled("disabled") is false', () => {
+    expect(featureEnabled('disabled')).toBe(false)
+  })
+
+  it('isEntitlementFeatureEnabled uses planFeatures when features is false', () => {
+    const ent = {
+      plan: { name: 'Platinum', code: 'platinum' },
+      features: { multi_branch: false },
+      planFeatures: { multi_branch: 'central_purchasing' },
+    } as Entitlements
+    expect(isEntitlementFeatureEnabled(ent, 'multi_branch')).toBe(true)
+  })
+})
+
 describe('multi_branch feature gates', () => {
   const entWithFeature = (multi_branch: unknown) =>
     ({
@@ -191,7 +231,67 @@ describe('multi_branch feature gates', () => {
     } as Entitlements
     expect(multiBranchEnabled(silver)).toBe(false)
     expect(getBranchAddGate(silver, 1).canAdd).toBe(false)
-    expect(getBranchAddGate(silver, 1).reason).toBe('at_limit')
+    expect(getBranchAddGate(silver, 1).reason).toBe('upgrade_to_gold')
+  })
+
+  it('Gold at included branch limit suggests add-on', () => {
+    const gold = {
+      plan: { name: 'Gold', code: 'gold' },
+      limits: { branches: 3 },
+      limitsBeforeAddons: { branches: 2 },
+      locationLimits: {
+        branches: {
+          included: 2,
+          addonQuantity: 1,
+          effective: 3,
+          current: 3,
+        },
+      },
+      features: { multi_branch: true },
+    } as Entitlements
+    expect(getBranchAddGate(gold, 3).canAdd).toBe(false)
+    expect(getBranchAddGate(gold, 3).reason).toBe('addon_or_upgrade')
+  })
+
+  it('blocks 7th branch with enterprise message', () => {
+    const ent = {
+      plan: { name: 'Platinum', code: 'platinum' },
+      limits: { branches: 8 },
+      locationLimits: {
+        branches: {
+          included: 3,
+          addonQuantity: 5,
+          effective: 8,
+          current: 6,
+          enterpriseThreshold: 6,
+          atEnterpriseThreshold: true,
+        },
+      },
+      features: { multi_branch: true },
+    } as Entitlements
+    expect(getBranchAddGate(ent, 6).canAdd).toBe(false)
+    expect(getBranchAddGate(ent, 6).reason).toBe('contact_enterprise')
+  })
+})
+
+describe('supplier warehouse and multi_warehouse strings', () => {
+  it('enables warehouses for tier string on planFeatures', () => {
+    const ent = {
+      plan: { name: 'Silver', code: 'silver' },
+      features: { warehouses: false },
+      planFeatures: { warehouses: true },
+      limits: { warehouses: 1 },
+      usage: { warehouses: 0 },
+    } as Entitlements
+    expect(warehousesFeatureEnabled(ent)).toBe(true)
+  })
+
+  it('enables multi_warehouse for Gold tier string', () => {
+    const ent = {
+      plan: { name: 'Gold', code: 'gold' },
+      features: { multi_warehouse: 'on' },
+    } as Entitlements
+    expect(multiWarehousePlanEnabled(ent)).toBe(true)
   })
 })
 

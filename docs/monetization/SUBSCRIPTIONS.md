@@ -76,7 +76,7 @@ Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_pr
 
 | Limit                     |          Value |
 | ------------------------- | -------------: |
-| branches                  |              3 |
+| branches                  |              2 |
 | users                     |             15 |
 | orders_per_day            |            100 |
 | suppliers_per_restaurant  |             30 |
@@ -97,7 +97,7 @@ Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_pr
 
 | Limit                  |             Value |
 | ---------------------- | ----------------: |
-| branches               |                 3 |
+| branches               |                 2 |
 | warehouses             |                 3 |
 | users                  |                15 |
 | supplier_products_skus |             3,000 |
@@ -110,24 +110,27 @@ Legacy key `products` was replaced by `restaurant_inventory_skus` / `supplier_pr
 
 ## Platinum tier ($349/mo, $3490/yr) — current catalog
 
-Top self-serve tier: **unlimited** operational meters (`-1`), **30 GB** storage (`30720` MB). Pricing unchanged.
+Top self-serve tier: most operational meters **unlimited** (`-1`), but **branches are capped at 3** (add-ons available). **30 GB** storage (`30720` MB). Pricing unchanged.
 
 ### Restaurant Platinum
 
-| Limit                           |          Value |
-| ------------------------------- | -------------: |
-| All canonical restaurant meters | unlimited (-1) |
-| storage_mb                      | 30,720 (30 GB) |
-| scheduled_order_grace_per_day   |              0 |
+| Limit                         |          Value |
+| ----------------------------- | -------------: |
+| branches                      |              3 |
+| Most other restaurant meters  | unlimited (-1) |
+| storage_mb                    | 30,720 (30 GB) |
+| scheduled_order_grace_per_day |              0 |
 
 **Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** `ai_smart_automation`, `ai_forecast_seasonality`, `advanced_forecasting_custom_reports`, `full_api_webhooks`, `white_label_domain`, `central_purchasing`, `cost_percentage_vs_sales`, etc. — many are **not tier-differentiated in route code yet**.
 
 ### Supplier Platinum
 
-| Limit                                                                    |          Value |
-| ------------------------------------------------------------------------ | -------------: |
-| branches, warehouses, users, SKUs, chats, open conversations, promotions | unlimited (-1) |
-| storage_mb                                                               |         30,720 |
+| Limit                                              |          Value |
+| -------------------------------------------------- | -------------: |
+| branches                                           |              3 |
+| warehouses                                         |              5 |
+| users, SKUs, chats, open conversations, promotions | unlimited (-1) |
+| storage_mb                                         |         30,720 |
 
 **Same catalog-only note** for AI, webhooks, advanced reports, white-label.
 
@@ -137,12 +140,14 @@ Top self-serve tier: **unlimited** operational meters (`-1`), **30 GB** storage 
 | -------- | -------: | ----: | ---------: | --------: | ----: | --------: | ---------: | ------: |
 | Free     |        1 |     1 |          3 |         1 |    10 |         3 |          1 |   50 MB |
 | Silver   |        1 |     3 |         20 |         5 |   250 |        30 |          5 |  500 MB |
-| Gold     |        3 |    15 |        100 |        30 | 3,000 |       500 |         30 |   10 GB |
-| Platinum |        ∞ |     ∞ |          ∞ |         ∞ |     ∞ |         ∞ |          ∞ |   30 GB |
+| Gold     |        2 |    15 |        100 |        30 | 3,000 |       500 |         30 |   10 GB |
+| Platinum |        3 |     ∞ |          ∞ |         ∞ |     ∞ |         ∞ |          ∞ |   30 GB |
 
 **Also (restaurant):** quick_lists **50**, quick_list_items **500**, scheduled_quick_lists **15**, deal_redemptions_per_day **50** on Gold — see Gold table above and [PLANS.md](./PLANS.md).
 
-**Branches** = primary account + linked branch accounts (not raw `branch` row count alone).
+**Branches** = org-wide active location accounts (main + linked). **Add-ons** (Gold/Platinum only): see [FINAL_TIER_MATRIX.md](./FINAL_TIER_MATRIX.md) §5b. Effective limit = included + add-ons + overrides. Hard cap: **6 branches** → Enterprise.
+
+**Warehouses (supplier):** org-wide active warehouse count; restaurants have no warehouse limit.
 
 **chats_per_day** = messages **sent** per day (`POST …/messages`).
 
@@ -152,8 +157,8 @@ Top self-serve tier: **unlimited** operational meters (`-1`), **30 GB** storage 
 | -------- | -------: | ---------: | ----: | ----: | --------: | ------------------------: | ------: |
 | Free     |        1 |          0 |     1 |    10 |         3 |                         1 |   50 MB |
 | Silver   |        1 |          1 |     3 |   250 |        30 |                         3 |  500 MB |
-| Gold     |        3 |          3 |    15 | 3,000 |       500 |                        25 |   10 GB |
-| Platinum |        ∞ |          ∞ |     ∞ |     ∞ |         ∞ |                         ∞ |   30 GB |
+| Gold     |        2 |          3 |    15 | 3,000 |       500 |                        25 |   10 GB |
+| Platinum |        3 |          5 |     ∞ |     ∞ |         ∞ |                         ∞ |   30 GB |
 
 ## Tier logger / admin display
 

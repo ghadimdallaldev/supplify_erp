@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { Router } from 'express'
 import { query, pool } from '../lib/db.js'
 import { requireAuth, requireRole, resolveAdminContext, requirePermission } from '../lib/rbac.js'
@@ -21,6 +22,12 @@ import {
   checkLimit,
 } from '../lib/subscription.js'
 import { resolveEffectiveLimit } from '../lib/limit-resolution.js'
+import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
+import {
+  defaultAddonUnitPrice,
+  getActiveTenantAddons,
+  isAddonKeyValidForTenant,
+} from '../lib/subscription-addons.js'
 import { getAllowedFeatureKeys, featureDisplayName } from '../lib/feature-keys.js'
 import {
   listGlobalFeatureFlags,
@@ -1551,6 +1558,8 @@ router.get('/audit-logs', async (req, res) => {
 const impersonateSchema = z.object({
   tenantId: z.string().uuid(),
   tenantType: z.enum(['RESTAURANT', 'SUPPLIER']),
+  /** Required when target tenant subscription is SUSPENDED or inactive */
+  acknowledgeSuspended: z.boolean().optional(),
 })
 
 /**
@@ -1559,12 +1568,12 @@ const impersonateSchema = z.object({
  */
 router.post('/impersonate', async (req, res) => {
   try {
-    const { tenantId, tenantType } = impersonateSchema.parse(req.body)
+    const { tenantId, tenantType, acknowledgeSuspended } = impersonateSchema.parse(req.body)
 
     // Resolve tenant and ensure it is not an admin user (no app_user with ADMIN for this tenant)
     const table = tenantType === 'RESTAURANT' ? 'restaurant' : 'supplier'
     const { rows: tenants } = await query(
-      `SELECT id, name, contact_email FROM ${table} WHERE id = $1`,
+      `SELECT id, name, contact_email, is_branch_active FROM ${table} WHERE id = $1`,
       [tenantId]
     )
     if (tenants.length === 0) {
@@ -1590,11 +1599,36 @@ router.post('/impersonate', async (req, res) => {
       })
     }
 
+    const { rows: subRows } = await query(
+      `SELECT status FROM subscription WHERE tenant_id = $1 AND tenant_type = $2 ORDER BY created_at DESC LIMIT 1`,
+      [tenantId, tenantType]
+    )
+    const subStatus = subRows[0]?.status
+    const tenantInactive = tenant.is_branch_active === false
+    const subRestricted = subStatus === 'SUSPENDED' || subStatus === 'CANCELLED'
+    if ((tenantInactive || subRestricted) && !acknowledgeSuspended) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'TENANT_SUSPENDED',
+          message:
+            'This tenant is inactive or suspended. Confirm to impersonate for support purposes.',
+          requiresAcknowledgement: true,
+          tenantInactive,
+          subscriptionStatus: subStatus || null,
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    const sessionId = randomUUID()
     const token = await createImpersonationToken({
       adminUserId: req.userData.id,
       tenantId,
       tenantType,
       tenantName: tenant.name || tenant.contact_email || tenantId,
+      sessionId,
     })
     const maxMin = config.IMPERSONATION_MAX_DURATION_MINUTES || 60
     const maxAgeMs = maxMin * 60 * 1000
@@ -1616,12 +1650,29 @@ router.post('/impersonate', async (req, res) => {
       tenantId,
       null,
       { tenantId, tenantType, tenantName: tenant.name },
-      { target_tenant_type: tenantType }
+      {
+        target_tenant_type: tenantType,
+        impersonation_session_id: sessionId,
+        acknowledged_suspended: Boolean(acknowledgeSuspended),
+      }
     )
+
+    logger.info('Impersonation started', {
+      adminUserId: req.userData.id,
+      tenantId,
+      tenantType,
+      requestId: req.requestId,
+    })
 
     res.json({
       ok: true,
-      data: { tenantId, tenantType, tenantName: tenant.name, expiresAt: expiresAt.toISOString() },
+      data: {
+        tenantId,
+        tenantType,
+        tenantName: tenant.name,
+        expiresAt: expiresAt.toISOString(),
+        redirectTo: '/app/dashboard',
+      },
       error: null,
       requestId: req.requestId,
     })
@@ -1714,6 +1765,8 @@ router.get('/impersonate', async (req, res) => {
         tenantType: effective.tenantType,
         tenantName: effective.tenantName,
         expiresAt,
+        sessionId: ctx?.sessionId || effective.sessionId || null,
+        realAdminUserId: ctx?.adminUserId || req.userData?.id || null,
       },
       error: null,
       requestId: req.requestId,
@@ -2408,6 +2461,173 @@ router.patch('/tenant-overrides/:overrideId', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to update tenant override' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * GET /api/admin-dashboard/tenants/:tenantType/:id/subscription-addons
+ */
+router.get('/tenants/:tenantType/:id/subscription-addons', async (req, res) => {
+  try {
+    const tenantType = req.params.tenantType.toUpperCase()
+    const { id: tenantId } = req.params
+    if (!['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid tenantType' },
+        requestId: req.requestId,
+      })
+    }
+    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+    const entitlements = await getEntitlements(tenantId, tenantType)
+    const addons = await getActiveTenantAddons(billingTenantId, tenantType)
+    res.json({
+      ok: true,
+      data: {
+        billingTenantId,
+        addons,
+        locationLimits: entitlements?.locationLimits ?? {},
+        planCode: entitlements?.plan?.code ?? null,
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get subscription addons error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get subscription add-ons' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * PUT /api/admin-dashboard/tenants/:tenantType/:id/subscription-addons/:addonKey
+ * Upsert active add-on quantity (admin-granted).
+ */
+router.put('/tenants/:tenantType/:id/subscription-addons/:addonKey', async (req, res) => {
+  try {
+    const tenantType = req.params.tenantType.toUpperCase()
+    const { id: tenantId, addonKey } = req.params
+    if (!['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid tenantType' },
+        requestId: req.requestId,
+      })
+    }
+    if (!isAddonKeyValidForTenant(tenantType, addonKey)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: `Invalid add-on key for ${tenantType}` },
+        requestId: req.requestId,
+      })
+    }
+
+    const body = z
+      .object({
+        quantity: z.number().int().min(0).max(99),
+        unit_price_monthly: z.number().min(0).optional().nullable(),
+        reason: z.string().max(500).optional().nullable(),
+      })
+      .parse(req.body)
+
+    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+    const entitlements = await getEntitlements(tenantId, tenantType)
+    const planCode = entitlements?.plan?.code ?? 'gold'
+
+    if (body.quantity === 0) {
+      await query(
+        `UPDATE tenant_subscription_addon
+         SET status = 'cancelled', ends_at = now(), updated_at = now()
+         WHERE tenant_id = $1 AND tenant_type = $2 AND addon_key = $3 AND status = 'active'`,
+        [billingTenantId, tenantType, addonKey]
+      )
+      await invalidateTenantSubscriptionCache(billingTenantId, tenantType)
+      return res.json({
+        ok: true,
+        data: { addon: null, cancelled: true },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
+    const unitPrice = body.unit_price_monthly ?? defaultAddonUnitPrice(addonKey, planCode) ?? null
+
+    const { rows: existing } = await query(
+      `SELECT * FROM tenant_subscription_addon
+       WHERE tenant_id = $1 AND tenant_type = $2 AND addon_key = $3 AND status = 'active'`,
+      [billingTenantId, tenantType, addonKey]
+    )
+
+    let addon
+    if (existing.length > 0) {
+      const { rows } = await query(
+        `UPDATE tenant_subscription_addon
+         SET quantity = $1, unit_price_monthly = COALESCE($2, unit_price_monthly),
+             metadata = metadata || $3::jsonb, updated_at = now()
+         WHERE id = $4
+         RETURNING *`,
+        [
+          body.quantity,
+          unitPrice,
+          JSON.stringify({ admin_reason: body.reason || null }),
+          existing[0].id,
+        ]
+      )
+      addon = rows[0]
+    } else {
+      const { rows } = await query(
+        `INSERT INTO tenant_subscription_addon (
+           tenant_id, tenant_type, addon_key, quantity, unit_price_monthly, metadata
+         ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+         RETURNING *`,
+        [
+          billingTenantId,
+          tenantType,
+          addonKey,
+          body.quantity,
+          unitPrice,
+          JSON.stringify({ admin_reason: body.reason || null }),
+        ]
+      )
+      addon = rows[0]
+    }
+
+    await invalidateTenantSubscriptionCache(billingTenantId, tenantType)
+
+    await logAudit(
+      req,
+      'addon.upsert',
+      `Set ${addonKey} quantity=${body.quantity} for billing tenant`,
+      tenantType,
+      billingTenantId,
+      existing[0] || null,
+      addon
+    )
+
+    res.json({ ok: true, data: { addon }, error: null, requestId: req.requestId })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.errors[0]?.message || 'Invalid body' },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Upsert subscription addon error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to update subscription add-on' },
       requestId: req.requestId,
     })
   }

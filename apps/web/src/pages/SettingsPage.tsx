@@ -5,6 +5,7 @@ import { Switch } from '../components/ui/switch'
 import { User, Mail, Shield, Bell, Loader2, Save } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { RequirePermission } from '../components/RequirePermission'
 import { SupplierSettingsPage } from './SupplierSettingsPage'
 import { RestaurantOnboardingPage } from './RestaurantOnboardingPage'
@@ -68,6 +69,7 @@ const NOTIFICATION_FIELDS: Array<{
 
 export function SettingsPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const { isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
   const { can } = usePermissions()
   const canEditSettings = can('SETTINGS_EDIT') || can('SETTINGS_MANAGE')
   const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
@@ -117,7 +119,7 @@ export function SettingsPage() {
   }
 
   // Show supplier-specific settings for suppliers
-  if (user?.role === 'SUPPLIER') {
+  if (isEffectiveSupplier) {
     return (
       <RequirePermission permission="SETTINGS_VIEW" title="settings">
         <SupplierSettingsPage />
@@ -126,7 +128,7 @@ export function SettingsPage() {
   }
 
   // Show restaurant onboarding for restaurants
-  if (user?.role === 'RESTAURANT') {
+  if (isEffectiveRestaurant) {
     return (
       <RequirePermission permission="SETTINGS_VIEW" title="settings">
         <RestaurantOnboardingPage />

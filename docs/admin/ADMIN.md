@@ -244,28 +244,36 @@ Conversation appears in tenant's chat with "From Supplify Admin" label.
 
 ## Impersonation (View as Tenant)
 
-Admins can **impersonate** a Restaurant or Supplier to see the app as that tenant would, without logging in as them.
+Admins can **impersonate** a Restaurant or Supplier to navigate the full tenant workspace for support—without logging in as that user.
+
+**Deep dive:** [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md)
 
 ### How to use
 
 1. Go to **Admin Dashboard** → **Tenants** (or Supplier Admin / Restaurant Admin).
-2. Find the tenant and click **Impersonate**.
-3. A banner appears at the top: **"You are impersonating [name]"** with a **Stop impersonating** button.
-4. Click **Stop impersonating** to end the session.
+2. Click **Impersonate** on a restaurant or supplier.
+3. You land on **`/app/dashboard`** with the correct tenant sidebar (orders, products, settings, org/branches, etc.).
+4. A sticky banner shows **Impersonating [name]** with **Exit impersonation**.
+5. Opening `/app/admin` while impersonating redirects back to the tenant dashboard.
+6. **Exit impersonation** returns to the admin dashboard; **logout** also ends the session.
+
+Suspended or inactive tenants prompt for confirmation before impersonation starts.
 
 ### Design and security
 
-- **Signed short-lived token:** Impersonation is stored in a signed JWT cookie (`impersonation_token`). Token includes admin user id, tenant id/type/name, and expiry.
-- **Duration:** Configurable via `IMPERSONATION_MAX_DURATION_MINUTES` (default 60). Token expires after that time.
-- **Cannot impersonate admins:** If the tenant’s contact email is an ADMIN user, the API returns 403. Only Restaurant or Supplier tenants can be impersonated.
-- **Audit:** Every start and stop is logged in `admin_audit_log` (`IMPERSONATION_START`, `IMPERSONATION_END`) with admin user, target tenant, and timestamp.
-- **Session isolation:** The effective tenant is only applied when the cookie is valid and the logged-in user is the same admin who started impersonation (`getEffectiveTenant(req)`). Other users cannot use a copied cookie to act as that tenant.
+- **Signed short-lived JWT** in httpOnly cookie `impersonation_token` (`adminUserId`, `tenantId`, `tenantType`, `tenantName`, `sessionId`, `exp`).
+- **Duration:** `IMPERSONATION_MAX_DURATION_MINUTES` (default 60).
+- **Cannot impersonate admins:** 403 if tenant `contact_email` belongs to an `app_user` with role `ADMIN`.
+- **Audit:** `IMPERSONATION_START` / `IMPERSONATION_END` in `admin_audit_log`; blocked billing actions → `audit_logs` `impersonation.blocked_action`.
+- **Session isolation:** `getEffectiveTenant(req)` only when cookie admin matches logged-in admin.
+- **Tenant scope:** `getRequestTenant(req)` uses impersonated tenant (and active branch cookie when in same org/links).
+- **Blocked while impersonating:** Billing payment mutations (checkout, pay-now, payment methods, auto-renew). Plan/tier changes remain in the admin dashboard.
 
 ### API
 
-- `POST /api/admin-dashboard/impersonate` — body: `{ tenantId, tenantType: "RESTAURANT" | "SUPPLIER" }`. Sets cookie and returns `expiresAt`.
-- `POST /api/admin-dashboard/impersonate/stop` — clears cookie and logs end.
-- `GET /api/admin-dashboard/impersonate` — returns `{ active: true, tenantId, tenantType, tenantName, expiresAt }` or `{ active: false }` for the UI banner.
+- `POST /api/admin-dashboard/impersonate` — `{ tenantId, tenantType, acknowledgeSuspended? }` → cookie + `{ expiresAt, redirectTo: "/app/dashboard" }`.
+- `POST /api/admin-dashboard/impersonate/stop` — clear cookie, audit end.
+- `GET /api/admin-dashboard/impersonate` — status for banner (`sessionId`, `realAdminUserId` when active).
 
 ---
 

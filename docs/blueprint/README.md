@@ -28,5 +28,5 @@ Use **subgraphs** to group related nodes and **shorter labels** (path + one line
 - **feature_overview.mmd** — Single map of every Supplify feature area (orders, cart, catalog, inventory, fulfillment, invoices, reservations, chat, staff, subscriptions, admin, files, notifications, analytics).
 - **folder_structure.md** — Repo folder layout.
 - **ui_sitemap/** — Restaurant, Supplier, Admin UI sitemaps (all under `/app/...`). Public / staff routes: `/login`, `/reserve/*`, `/staff/login`, `/staff/dashboard` (operational staff portal; `STAFF_PORTAL` role or magic-link token).
-- **workflows/** — Order (with checkout), invoice, inventory, reservation, subscription, admin, impersonation, receiving, chat, fulfillment flows; **conversion_funnel_flow.mmd** (conversion_event, blocks→upgrades, admin stats); **recommendation_flow.mmd** (recommendPlan, GET /recommendation).
+- **workflows/** — Order (with checkout), invoice, inventory, reservation, subscription, admin, **impersonation** ([admin_impersonation_flow.mmd](./workflows/admin_impersonation_flow.mmd) · [features/admin-impersonation.md](../features/admin-impersonation.md)), receiving, chat, fulfillment flows; **conversion_funnel_flow.mmd**; **recommendation_flow.mmd**.
 - **admin/** — Admin scope, RBAC matrix, endpoints.
