@@ -7,7 +7,6 @@ import {
   useGetInvoiceAnalyticsQuery,
   useGetQuickListsQuery,
   useAddItemToQuickListMutation,
-  useGetImpersonationStatusQuery,
   useGetEntitlementsQuery,
   useGetInventoryListQuery,
 } from '../services/api'
@@ -28,6 +27,7 @@ import toast from 'react-hot-toast'
 import { ResponsiveContainer, BarChart, Bar, Tooltip } from 'recharts'
 import { useState } from 'react'
 import { useAppSelector } from '../hooks/redux'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { featureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices, canUseGlobalReports } from '../lib/planFeatureGates'
 import { formatPlanDisplayName } from '../lib/planComparison'
@@ -249,10 +249,15 @@ function SectionCard({
 export function DashboardPage() {
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
-  const { data: impersonation } = useGetImpersonationStatusQuery(undefined, {
-    skip: user?.role !== 'ADMIN',
-  })
-  const isAdminNotImpersonating = user?.role === 'ADMIN' && !impersonation?.active
+  const {
+    isImpersonating,
+    isPlatformAdmin,
+    isEffectiveRestaurant,
+    isEffectiveSupplier,
+    effectiveRole,
+    shouldLoadTenantEntitlements,
+  } = useImpersonation()
+  const isAdminNotImpersonating = isPlatformAdmin && !isImpersonating
 
   useEffect(() => {
     if (isAdminNotImpersonating) {
@@ -267,10 +272,8 @@ export function DashboardPage() {
     skip: isAdminNotImpersonating,
   })
 
-  const effectiveRole =
-    user?.role === 'ADMIN' && impersonation?.active ? impersonation.tenantType : user?.role
-  const isRestaurant = effectiveRole === 'RESTAURANT'
-  const isSupplier = effectiveRole === 'SUPPLIER'
+  const isRestaurant = isEffectiveRestaurant
+  const isSupplier = isEffectiveSupplier
 
   const { data: recentOrders } = useGetOrdersQuery(
     { limit: 7, offset: 0 },
@@ -284,7 +287,7 @@ export function DashboardPage() {
     skip: isAdminNotImpersonating || !isSupplier,
   })
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
-    skip: !user || user.role === 'ADMIN',
+    skip: !shouldLoadTenantEntitlements,
   })
   const smartReorderEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.smart_reorder

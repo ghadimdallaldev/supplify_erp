@@ -14,9 +14,15 @@ import {
   isLimitKeyApplicable,
 } from './limit-resolution.js'
 import { PLAN_TIER_ORDER, normalizePlanCode, formatPlanDisplayName } from './plan-codes.js'
-import { countActiveBranchLocations } from './plan-enforcement.js'
+import { countActiveBranchLocations, countActiveWarehouses } from './plan-enforcement.js'
 import { getWarehouseSupplierColumn } from './warehouse-helpers.js'
 import { resolveOrgBillingTenantId } from './org-billing-tenant.js'
+import {
+  addonKeyForLimitKey,
+  computeEffectiveWithAddons,
+  ENTERPRISE_BRANCH_THRESHOLD,
+  getActiveTenantAddons,
+} from './subscription-addons.js'
 
 export { HIDDEN_ENTITLEMENT_LIMIT_KEYS }
 export { normalizePlanCode, formatPlanDisplayName } from './plan-codes.js'
@@ -666,13 +672,9 @@ async function getUsageSnapshot(tenantId, tenantType) {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
   } else {
-    const supplierCol = await getWarehouseSupplierColumn()
-    const [products, warehouses, branchCount, storage, meterRows] = await Promise.all([
+    const [products, warehouseCount, branchCount, storage, meterRows] = await Promise.all([
       query(`SELECT COUNT(*) as c FROM product WHERE supplier_id = $1`, [tenantId]),
-      query(
-        `SELECT COUNT(*)::int AS c FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
-        [tenantId]
-      ),
+      countActiveWarehouses(tenantId),
       countActiveBranchLocations(tenantId, 'SUPPLIER'),
       query(
         `SELECT current_value FROM usage_meter WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER' AND meter_type = 'storage_mb' AND period_start_date = $2`,
@@ -684,7 +686,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
       ),
     ])
     usage.supplier_products_skus = parseInt(products.rows[0]?.c || 0)
-    usage.warehouses = parseInt(warehouses.rows[0]?.c || 0, 10)
+    usage.warehouses = warehouseCount
     usage.branches = branchCount
     usage.users = 1
     usage.storage_mb = parseInt(storage.rows[0]?.current_value || 0)
@@ -736,6 +738,7 @@ export async function getEntitlements(tenantId, tenantType) {
   })
 
   const limits = { ...baseLimits }
+  const limitsBeforeAddons = { ...baseLimits }
   const overrides = []
   for (const k of limitKeys) {
     const resolved = await resolveEffectiveLimit({
@@ -746,6 +749,7 @@ export async function getEntitlements(tenantId, tenantType) {
       planLimits: subscription.limits || {},
     })
     limits[k] = resolved.effectiveLimit
+    limitsBeforeAddons[k] = resolved.effectiveLimit
     if (resolved.tenantOverride) {
       overrides.push({
         limitKey: k,
@@ -776,6 +780,26 @@ export async function getEntitlements(tenantId, tenantType) {
   )
 
   fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
+  fillMissingFreeTierLimits(limitsBeforeAddons, tenantType, subscription.plan_code)
+
+  const activeAddons = await getActiveTenantAddons(billingTenantId, tenantType)
+  const addonBoosts = { branches: 0, warehouses: 0 }
+  for (const a of activeAddons) {
+    const qty = parseInt(a.quantity, 10) || 0
+    if (a.addon_key === addonKeyForLimitKey(tenantType, 'branches')) {
+      addonBoosts.branches = qty
+    }
+    if (a.addon_key === addonKeyForLimitKey(tenantType, 'warehouses')) {
+      addonBoosts.warehouses = qty
+    }
+  }
+  for (const k of ['branches', 'warehouses']) {
+    if (!isLimitKeyApplicable(tenantType, k)) continue
+    const qty = addonBoosts[k] || 0
+    if (limits[k] != null && qty > 0) {
+      limits[k] = computeEffectiveWithAddons(limits[k], qty)
+    }
+  }
 
   const usage = await getUsageSnapshot(tenantId, tenantType)
   if (tenantType === 'SUPPLIER') {
@@ -786,7 +810,40 @@ export async function getEntitlements(tenantId, tenantType) {
   }
   stripHiddenEntitlementLimits(limits, usage)
   stripHiddenEntitlementLimits(baseLimits, null)
+  stripHiddenEntitlementLimits(limitsBeforeAddons, null)
   const visibleOverrides = stripHiddenEntitlementLimits(null, null, overrides)
+
+  const locationLimits = {}
+  if (isLimitKeyApplicable(tenantType, 'branches')) {
+    const included = limitsBeforeAddons.branches
+    const boost = addonBoosts.branches || 0
+    const effective = limits.branches
+    const current = usage.branches ?? 0
+    locationLimits.branches = {
+      included,
+      addonQuantity: boost,
+      effective,
+      current,
+      overIncludedLimit: included != null && current > included,
+      overEffectiveLimit: effective != null && current > effective,
+      enterpriseThreshold: ENTERPRISE_BRANCH_THRESHOLD,
+      atEnterpriseThreshold: current >= ENTERPRISE_BRANCH_THRESHOLD,
+    }
+  }
+  if (isLimitKeyApplicable(tenantType, 'warehouses')) {
+    const included = limitsBeforeAddons.warehouses
+    const boost = addonBoosts.warehouses || 0
+    const effective = limits.warehouses
+    const current = usage.warehouses ?? 0
+    locationLimits.warehouses = {
+      included,
+      addonQuantity: boost,
+      effective,
+      current,
+      overIncludedLimit: included != null && current > included,
+      overEffectiveLimit: effective != null && current > effective,
+    }
+  }
 
   const usageWindowMeta = {}
   limitKeys.forEach((k) => {
@@ -814,8 +871,20 @@ export async function getEntitlements(tenantId, tenantType) {
     },
     features,
     featureSources,
+    planFeatures: subscription.features || {},
     limits,
     baseLimits,
+    limitsBeforeAddons,
+    addons: activeAddons.map((a) => ({
+      id: a.id,
+      key: a.addon_key,
+      quantity: parseInt(a.quantity, 10) || 0,
+      unitPriceMonthly: a.unit_price_monthly != null ? Number(a.unit_price_monthly) : null,
+      status: a.status,
+      startsAt: a.starts_at ? new Date(a.starts_at).toISOString() : null,
+      endsAt: a.ends_at ? new Date(a.ends_at).toISOString() : null,
+    })),
+    locationLimits,
     overrides: visibleOverrides.map((o) => ({
       limitKey: o.limitKey,
       value: o.value,

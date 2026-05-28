@@ -9,8 +9,9 @@ import {
   api,
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { multiBranchEnabled } from '../lib/planLimits'
-import { useAppSelector, useAppDispatch } from '../hooks/redux'
+import { useAppDispatch } from '../hooks/redux'
 
 export interface LinkedAccountRecord {
   id: string
@@ -37,10 +38,10 @@ const BranchContext = createContext<BranchContextValue | undefined>(undefined)
 
 export function BranchProvider({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch()
-  const { user } = useAppSelector((state) => state.auth)
-  const isTenantUser = user?.role === 'RESTAURANT' || user?.role === 'SUPPLIER'
-  const isSupplier = user?.role === 'SUPPLIER'
-  const isRestaurant = user?.role === 'RESTAURANT'
+  const { isEffectiveTenant, isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
+  const isTenantUser = isEffectiveTenant
+  const isSupplier = isEffectiveSupplier
+  const isRestaurant = isEffectiveRestaurant
   const { entitlements } = useEntitlements()
   const multiBranchFeature = multiBranchEnabled(entitlements)
 
@@ -141,7 +142,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           await switchRestaurantOrgBranch({ restaurant_id: accountId }).unwrap()
         }
       } else {
-        const tenantType = user?.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
+        const tenantType = isSupplier ? 'SUPPLIER' : 'RESTAURANT'
         await switchBranchAccount({
           tenantId: accountId,
           tenantType: accountId ? tenantType : undefined,
@@ -157,7 +158,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       switchRestaurantOrgBranch,
       useOrgBranches,
       useSupplierOrgBranches,
-      user?.role,
+      isSupplier,
     ]
   )
 

@@ -2,6 +2,16 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { getWarehouseSupplierColumn } from './warehouse-helpers.js'
+import { resolveOrgBillingTenantId } from './org-billing-tenant.js'
+import { getTenantSubscription } from './subscription.js'
+import { resolveEffectiveLimit } from './limit-resolution.js'
+import {
+  ENTERPRISE_BRANCH_THRESHOLD,
+  addonKeyForLimitKey,
+  canPurchaseLocationAddons,
+  computeEffectiveWithAddons,
+  getAddonQuantity,
+} from './subscription-addons.js'
 
 /**
  * Count location accounts for plan enforcement and usage meters.
@@ -33,80 +43,325 @@ export async function countActiveBranchLocations(tenantId, tenantType) {
 }
 
 /**
- * Check if a tenant can create a branch (restaurants only)
- * @param {string} tenantId - Restaurant ID
- * @param {object} currentUsage - Current usage metrics
- * @returns {object} { allowed: boolean, reason?: string, requiredPlan?: string }
+ * Count active warehouses for the supplier org (all branch tenants) or single tenant.
  */
-async function checkBranchLimit(tenantId, currentUsage = null) {
-  try {
-    // Get tenant's current subscription and plan
-    const { rows: subscriptionRows } = await query(
-      `
-      SELECT s.*, sp.limits as plan_limits, sp.code as plan_code, sp.name as plan_name
-      FROM subscription s
-      JOIN subscription_plan sp ON sp.id = s.plan_id
-      WHERE s.tenant_id = $1 
-        AND s.tenant_type = 'RESTAURANT'
-        AND s.status IN ('ACTIVE', 'TRIALING')
-      ORDER BY s.created_at DESC
-      LIMIT 1
-    `,
-      [tenantId]
+export async function countActiveWarehouses(tenantId) {
+  const supplierCol = await getWarehouseSupplierColumn()
+  const { rows: orgRows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [
+    tenantId,
+  ])
+  const organizationId = orgRows[0]?.organization_id
+  if (organizationId) {
+    const { rows: suppliers } = await query(`SELECT id FROM supplier WHERE organization_id = $1`, [
+      organizationId,
+    ])
+    const ids = suppliers.map((r) => r.id)
+    if (ids.length === 0) return 0
+    const { rows: countRows } = await query(
+      `SELECT COUNT(*)::int AS count FROM warehouse
+       WHERE ${supplierCol} = ANY($1::uuid[]) AND is_active = TRUE`,
+      [ids]
     )
+    return parseInt(countRows[0]?.count || 0, 10)
+  }
 
-    if (subscriptionRows.length === 0) {
-      return {
-        allowed: false,
-        reason: 'No active subscription found. Please subscribe to a plan.',
-        currentPlan: 'None',
-      }
-    }
+  const { rows: countRows } = await query(
+    `SELECT COUNT(*)::int AS count FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
+    [tenantId]
+  )
+  return parseInt(countRows[0]?.count || 0, 10)
+}
 
-    const subscription = subscriptionRows[0]
-    const limits = subscription.plan_limits || {}
-    const branchLimit = limits.branches !== undefined ? parseInt(limits.branches) : -1
+async function loadBillingSubscription(tenantId, tenantType) {
+  const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+  const subscription = await getTenantSubscription(billingTenantId, tenantType, {
+    skipOrgBilling: true,
+  })
+  return { billingTenantId, subscription }
+}
 
-    let branchCount = currentUsage?.branches_count
-    if (branchCount === undefined || branchCount === null) {
-      branchCount = await countActiveBranchLocations(tenantId, 'RESTAURANT')
-    }
+async function resolveLocationLimitContext(tenantId, tenantType, limitKey, currentUsage = null) {
+  const { billingTenantId, subscription } = await loadBillingSubscription(tenantId, tenantType)
 
-    // Check if unlimited
-    if (branchLimit === -1) {
-      return {
-        allowed: true,
-        reason: null,
-        currentPlan: subscription.plan_name,
-        limit: -1,
-        current: branchCount,
-      }
-    }
-
-    // Check if under limit
-    if (branchCount < branchLimit) {
-      return {
-        allowed: true,
-        reason: null,
-        currentPlan: subscription.plan_name,
-        limit: branchLimit,
-        current: branchCount,
-        remaining: branchLimit - branchCount,
-      }
-    }
-
-    // Over limit
-    const eligiblePlans = ['Gold', 'Platinum']
+  if (!subscription) {
     return {
       allowed: false,
-      reason: `Branch limit reached. You have ${branchCount}/${branchLimit} branches on ${subscription.plan_name} plan.`,
-      currentPlan: subscription.plan_name,
-      requiredPlan: eligiblePlans.find((p) => p !== subscription.plan_name) || 'Gold',
-      limit: branchLimit,
-      current: branchCount,
+      reason: 'No active subscription found. Please subscribe to a plan.',
+      currentPlan: 'None',
+      billingTenantId,
+      action: 'NO_SUBSCRIPTION',
     }
+  }
+
+  const planCode = subscription.plan_code || ''
+  const planName = subscription.plan_name || subscription.plan_display_name || planCode
+  const planLimits = subscription.limits || {}
+
+  const resolved = await resolveEffectiveLimit({
+    tenantId: billingTenantId,
+    tenantType,
+    limitKey,
+    planId: subscription.plan_id,
+    planLimits,
+  })
+
+  let includedLimit = resolved.effectiveLimit
+  if (resolved.isUnlimited) {
+    includedLimit = null
+  }
+
+  const addonKey = addonKeyForLimitKey(tenantType, limitKey)
+  const addonQuantity = addonKey ? await getAddonQuantity(billingTenantId, tenantType, addonKey) : 0
+  const effectiveLimit =
+    includedLimit != null ? computeEffectiveWithAddons(includedLimit, addonQuantity) : null
+
+  let current = currentUsage?.[`${limitKey}_count`]
+  if (current === undefined || current === null) {
+    if (limitKey === 'branches') {
+      current = await countActiveBranchLocations(tenantId, tenantType)
+    } else if (limitKey === 'warehouses') {
+      current = await countActiveWarehouses(tenantId)
+    } else {
+      current = 0
+    }
+  }
+
+  return {
+    billingTenantId,
+    subscription,
+    planCode,
+    planName,
+    includedLimit,
+    addonQuantity,
+    effectiveLimit,
+    current,
+    addonKey,
+    canPurchaseAddons: canPurchaseLocationAddons(planCode),
+  }
+}
+
+function buildBranchBlockResult(ctx) {
+  const {
+    planName,
+    planCode,
+    includedLimit,
+    addonQuantity,
+    effectiveLimit,
+    current,
+    canPurchaseAddons,
+  } = ctx
+
+  if (limitKeyIsBranches(ctx) && current >= ENTERPRISE_BRANCH_THRESHOLD) {
+    return {
+      allowed: false,
+      reason: 'For more than 6 branches, contact sales for Enterprise.',
+      currentPlan: planName,
+      limit: effectiveLimit,
+      includedLimit,
+      addonQuantity,
+      effectiveLimit,
+      current,
+      action: 'CONTACT_ENTERPRISE',
+      enterpriseThreshold: ENTERPRISE_BRANCH_THRESHOLD,
+    }
+  }
+
+  if (effectiveLimit != null && current >= effectiveLimit) {
+    if (canPurchaseAddons) {
+      return {
+        allowed: false,
+        reason:
+          'You have reached your included branch limit. Add an extra branch or upgrade your plan.',
+        currentPlan: planName,
+        limit: effectiveLimit,
+        includedLimit,
+        addonQuantity,
+        effectiveLimit,
+        current,
+        action: 'ADDON_OR_UPGRADE',
+        requiredPlan: planCode.toLowerCase() === 'gold' ? 'Platinum' : 'Gold',
+      }
+    }
+
+    const planLower = (planCode || '').toLowerCase()
+    if (planLower === 'free' || planLower.includes('trial')) {
+      return {
+        allowed: false,
+        reason:
+          'Extra branch accounts are not available on Free Trial. Upgrade to Gold to add locations.',
+        currentPlan: planName,
+        limit: effectiveLimit,
+        includedLimit,
+        addonQuantity,
+        effectiveLimit,
+        current,
+        action: 'UPGRADE_TO_GOLD',
+        requiredPlan: 'Gold',
+      }
+    }
+
+    return {
+      allowed: false,
+      reason: `Branch limit reached (${current}/${effectiveLimit} locations on ${planName}). Upgrade to Gold to add more branches.`,
+      currentPlan: planName,
+      limit: effectiveLimit,
+      includedLimit,
+      addonQuantity,
+      effectiveLimit,
+      current,
+      action: 'UPGRADE_TO_GOLD',
+      requiredPlan: 'Gold',
+    }
+  }
+
+  return null
+}
+
+function limitKeyIsBranches(ctx) {
+  return ctx.limitKey === 'branches' || !ctx.limitKey
+}
+
+function buildWarehouseBlockResult(ctx) {
+  const {
+    planName,
+    planCode,
+    includedLimit,
+    addonQuantity,
+    effectiveLimit,
+    current,
+    canPurchaseAddons,
+  } = ctx
+
+  if (includedLimit === 0 && effectiveLimit === 0) {
+    return {
+      allowed: false,
+      reason:
+        'Warehouses are not available on Free Trial. Upgrade to Silver or higher to add a warehouse.',
+      currentPlan: planName,
+      limit: 0,
+      includedLimit: 0,
+      addonQuantity: 0,
+      effectiveLimit: 0,
+      current,
+      action: 'UPGRADE_TO_SILVER',
+      requiredPlan: 'Silver',
+    }
+  }
+
+  if (effectiveLimit != null && current >= effectiveLimit) {
+    if (canPurchaseAddons) {
+      return {
+        allowed: false,
+        reason:
+          'You have reached your included warehouse limit. Add an extra warehouse or upgrade your plan.',
+        currentPlan: planName,
+        limit: effectiveLimit,
+        includedLimit,
+        addonQuantity,
+        effectiveLimit,
+        current,
+        action: 'ADDON_OR_UPGRADE',
+        requiredPlan: planCode.toLowerCase() === 'gold' ? 'Platinum' : 'Gold',
+      }
+    }
+
+    const planLower = (planCode || '').toLowerCase()
+    if (planLower === 'free' || planLower.includes('trial')) {
+      return {
+        allowed: false,
+        reason:
+          'Extra warehouses are not available on Free Trial. Upgrade to Silver for your first warehouse.',
+        currentPlan: planName,
+        limit: effectiveLimit,
+        includedLimit,
+        addonQuantity,
+        effectiveLimit,
+        current,
+        action: 'UPGRADE_TO_SILVER',
+        requiredPlan: 'Silver',
+      }
+    }
+
+    return {
+      allowed: false,
+      reason: `Warehouse limit reached (${current}/${effectiveLimit} on ${planName}). Upgrade your plan for more warehouses.`,
+      currentPlan: planName,
+      limit: effectiveLimit,
+      includedLimit,
+      addonQuantity,
+      effectiveLimit,
+      current,
+      action: 'UPGRADE_PLAN',
+      requiredPlan: 'Gold',
+    }
+  }
+
+  return null
+}
+
+async function checkLocationLimit(tenantId, tenantType, limitKey, currentUsage = null) {
+  try {
+    const ctx = await resolveLocationLimitContext(tenantId, tenantType, limitKey, currentUsage)
+    if (ctx.allowed === false && ctx.reason && !ctx.subscription) {
+      return ctx
+    }
+
+    const { subscription, planName, effectiveLimit, current, includedLimit, addonQuantity } = ctx
+
+    if (limitKey === 'branches' && current >= ENTERPRISE_BRANCH_THRESHOLD) {
+      const enterpriseBlock = buildBranchBlockResult({ ...ctx, limitKey })
+      if (enterpriseBlock) return enterpriseBlock
+    }
+
+    if (effectiveLimit == null) {
+      return {
+        allowed: true,
+        reason: null,
+        currentPlan: planName,
+        limit: null,
+        includedLimit,
+        addonQuantity,
+        effectiveLimit: null,
+        current,
+      }
+    }
+
+    if (current < effectiveLimit) {
+      return {
+        allowed: true,
+        reason: null,
+        currentPlan: planName,
+        limit: effectiveLimit,
+        includedLimit,
+        addonQuantity,
+        effectiveLimit,
+        current,
+        remaining: effectiveLimit - current,
+        overIncludedLimit: current >= (includedLimit ?? effectiveLimit),
+      }
+    }
+
+    const blockCtx = { ...ctx, limitKey }
+    const blocked =
+      limitKey === 'warehouses'
+        ? buildWarehouseBlockResult(blockCtx)
+        : buildBranchBlockResult(blockCtx)
+
+    return (
+      blocked || {
+        allowed: false,
+        reason: `Limit reached (${current}/${effectiveLimit}).`,
+        currentPlan: planName,
+        limit: effectiveLimit,
+        includedLimit,
+        addonQuantity,
+        effectiveLimit,
+        current,
+        action: 'LIMIT_REACHED',
+      }
+    )
   } catch (error) {
-    logger.error('Error checking branch limit:', error)
+    logger.error(`Error checking ${limitKey} limit:`, error)
     return {
       allowed: false,
       reason: 'Unable to verify plan limits. Please try again.',
@@ -116,91 +371,17 @@ async function checkBranchLimit(tenantId, currentUsage = null) {
 }
 
 /**
+ * Check if a tenant can create a branch (restaurants only)
+ */
+async function checkBranchLimit(tenantId, currentUsage = null) {
+  return checkLocationLimit(tenantId, 'RESTAURANT', 'branches', currentUsage)
+}
+
+/**
  * Check if a tenant can create a warehouse (suppliers only)
- * @param {string} tenantId - Supplier ID
- * @param {object} currentUsage - Current usage metrics
- * @returns {object} { allowed: boolean, reason?: string, requiredPlan?: string }
  */
 async function checkWarehouseLimit(tenantId, currentUsage = null) {
-  try {
-    // Get tenant's current subscription and plan
-    const { rows: subscriptionRows } = await query(
-      `
-      SELECT s.*, sp.limits as plan_limits, sp.code as plan_code, sp.name as plan_name
-      FROM subscription s
-      JOIN subscription_plan sp ON sp.id = s.plan_id
-      WHERE s.tenant_id = $1 
-        AND s.tenant_type = 'SUPPLIER'
-        AND s.status IN ('ACTIVE', 'TRIALING')
-      ORDER BY s.created_at DESC
-      LIMIT 1
-    `,
-      [tenantId]
-    )
-
-    if (subscriptionRows.length === 0) {
-      return {
-        allowed: false,
-        reason: 'No active subscription found. Please subscribe to a plan.',
-        currentPlan: 'None',
-      }
-    }
-
-    const subscription = subscriptionRows[0]
-    const limits = subscription.plan_limits || {}
-    const warehouseLimit = limits.warehouses !== undefined ? parseInt(limits.warehouses) : -1
-
-    let warehouseCount = currentUsage?.warehouses_count
-    if (warehouseCount === undefined || warehouseCount === null) {
-      const supplierCol = await getWarehouseSupplierColumn()
-      const { rows: countRows } = await query(
-        `SELECT COUNT(*)::int AS count FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
-        [tenantId]
-      )
-      warehouseCount = parseInt(countRows[0]?.count || 0, 10)
-    }
-
-    // Check if unlimited
-    if (warehouseLimit === -1) {
-      return {
-        allowed: true,
-        reason: null,
-        currentPlan: subscription.plan_name,
-        limit: -1,
-        current: warehouseCount,
-      }
-    }
-
-    // Check if under limit
-    if (warehouseCount < warehouseLimit) {
-      return {
-        allowed: true,
-        reason: null,
-        currentPlan: subscription.plan_name,
-        limit: warehouseLimit,
-        current: warehouseCount,
-        remaining: warehouseLimit - warehouseCount,
-      }
-    }
-
-    // Over limit
-    const eligiblePlans = ['Silver', 'Gold', 'Platinum']
-    return {
-      allowed: false,
-      reason: `Warehouse limit reached. You have ${warehouseCount}/${warehouseLimit} warehouses on ${subscription.plan_name} plan.`,
-      currentPlan: subscription.plan_name,
-      requiredPlan: eligiblePlans.find((p) => p !== subscription.plan_name) || 'Silver',
-      limit: warehouseLimit,
-      current: warehouseCount,
-    }
-  } catch (error) {
-    logger.error('Error checking warehouse limit:', error)
-    return {
-      allowed: false,
-      reason: 'Unable to verify plan limits. Please try again.',
-      error: error.message,
-    }
-  }
+  return checkLocationLimit(tenantId, 'SUPPLIER', 'warehouses', currentUsage)
 }
 
 /** Linked branch accounts for suppliers (same model as restaurant branches). */
@@ -208,87 +389,7 @@ async function checkLinkedAccountLimit(tenantId, tenantType, currentUsage = null
   if (tenantType === 'RESTAURANT') {
     return checkBranchLimit(tenantId, currentUsage)
   }
-
-  try {
-    const { rows: subscriptionRows } = await query(
-      `
-      SELECT s.*, sp.limits as plan_limits, sp.code as plan_code, sp.name as plan_name
-      FROM subscription s
-      JOIN subscription_plan sp ON sp.id = s.plan_id
-      WHERE s.tenant_id = $1 
-        AND s.tenant_type = 'SUPPLIER'
-        AND s.status IN ('ACTIVE', 'TRIALING')
-      ORDER BY s.created_at DESC
-      LIMIT 1
-    `,
-      [tenantId]
-    )
-
-    if (subscriptionRows.length === 0) {
-      return {
-        allowed: false,
-        reason: 'No active subscription found. Please subscribe to a plan.',
-        currentPlan: 'None',
-      }
-    }
-
-    const subscription = subscriptionRows[0]
-    const limits = subscription.plan_limits || {}
-    const branchLimit = limits.branches !== undefined ? parseInt(limits.branches, 10) : -1
-
-    let branchCount = currentUsage?.branches_count
-    if (branchCount === undefined || branchCount === null) {
-      branchCount = await countActiveBranchLocations(tenantId, 'SUPPLIER')
-    }
-
-    if (branchLimit === -1) {
-      return {
-        allowed: true,
-        reason: null,
-        currentPlan: subscription.plan_name,
-        limit: -1,
-        current: branchCount,
-      }
-    }
-
-    if (branchLimit === 0) {
-      return {
-        allowed: false,
-        reason: 'Branch accounts are not available on your current plan. Upgrade to add locations.',
-        currentPlan: subscription.plan_name,
-        requiredPlan: 'Gold',
-        limit: branchLimit,
-        current: branchCount,
-      }
-    }
-
-    if (branchCount < branchLimit) {
-      return {
-        allowed: true,
-        reason: null,
-        currentPlan: subscription.plan_name,
-        limit: branchLimit,
-        current: branchCount,
-        remaining: branchLimit - branchCount,
-      }
-    }
-
-    return {
-      allowed: false,
-      reason: `Branch account limit reached. You have ${branchCount}/${branchLimit} on ${subscription.plan_name}.`,
-      currentPlan: subscription.plan_name,
-      requiredPlan: 'Gold',
-      limit: branchLimit,
-      current: branchCount,
-    }
-  } catch (error) {
-    logger.error('Error checking linked account limit:', error)
-    return {
-      allowed: false,
-      reason: 'Unable to verify plan limits. Please try again.',
-      error: error.message,
-    }
-  }
+  return checkLocationLimit(tenantId, 'SUPPLIER', 'branches', currentUsage)
 }
 
 /**
@@ -314,8 +415,13 @@ async function createAuditLog(action, details) {
     )
   } catch (error) {
     logger.error('Error creating audit log:', error)
-    // Don't throw - audit logs are non-critical
   }
 }
 
-export { checkBranchLimit, checkWarehouseLimit, checkLinkedAccountLimit, createAuditLog }
+export {
+  checkBranchLimit,
+  checkWarehouseLimit,
+  checkLinkedAccountLimit,
+  createAuditLog,
+  resolveLocationLimitContext,
+}

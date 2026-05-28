@@ -32,6 +32,7 @@ export async function impersonationContext(req, res, next) {
       tenantId: payload.tenantId,
       tenantType: payload.tenantType,
       tenantName: payload.tenantName,
+      sessionId: payload.sessionId || null,
       exp: payload.exp,
     }
     syncRequestLogContext(req)

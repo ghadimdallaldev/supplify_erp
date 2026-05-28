@@ -3,7 +3,7 @@ import { Building2, Plus, Settings } from 'lucide-react'
 import { RestaurantOrgOverviewPage } from './RestaurantOrgOverviewPage'
 import { Link, useNavigate } from 'react-router-dom'
 import { useGetOrgQuery, useSwitchOrgBranchContextMutation } from '../services/api'
-import { useAppSelector } from '../hooks/redux'
+import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { useEntitlements } from '../hooks/useEntitlements'
@@ -11,18 +11,18 @@ import { multiBranchEnabled } from '../lib/planLimits'
 import { AddBranchModal } from '../components/org/AddBranchModal'
 
 export function OrgOverviewPage() {
-  const { user } = useAppSelector((state) => state.auth)
+  const { isEffectiveRestaurant, isEffectiveSupplier } = useImpersonation()
   const { can } = usePermissions()
   const navigate = useNavigate()
   const { entitlements } = useEntitlements()
   const multiBranch = multiBranchEnabled(entitlements)
   const { data, isLoading } = useGetOrgQuery(undefined, {
-    skip: user?.role !== 'SUPPLIER',
+    skip: !isEffectiveSupplier,
   })
   const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchOrgBranchContextMutation()
 
-  if (user?.role === 'RESTAURANT') {
+  if (isEffectiveRestaurant) {
     return (
       <RequirePermission permission="SETTINGS_VIEW" title="organization">
         <RestaurantOrgOverviewPage />
@@ -41,7 +41,7 @@ export function OrgOverviewPage() {
     window.location.reload()
   }
 
-  if (user?.role === 'SUPPLIER' && !multiBranch && !isLoading) {
+  if (isEffectiveSupplier && !multiBranch && !isLoading) {
     navigate('/app/dashboard', { replace: true })
     return null
   }

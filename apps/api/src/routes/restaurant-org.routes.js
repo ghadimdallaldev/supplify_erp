@@ -10,8 +10,10 @@ import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import {
   getUserRestaurantOrgMembership,
+  listRestaurantOrgBranches,
   listRestaurantOrgBranchesForUser,
   createRestaurantOrgBranch,
   deactivateRestaurantOrgBranch,
@@ -44,6 +46,7 @@ async function requireRestaurantOrgContext(req, res, next) {
   const membership = await getUserRestaurantOrgMembership(req.userData.id)
 
   let organizationId = membership?.organization_id
+  let organizationName = membership?.organization_name || ''
   let primaryRestaurantId = null
 
   if (req.userData.role === 'ADMIN' && req.query.organization_id) {
@@ -63,7 +66,7 @@ async function requireRestaurantOrgContext(req, res, next) {
       )
       primaryRestaurantId = anyBranch[0]?.id || null
     }
-  } else if (req.userData.role === 'RESTAURANT') {
+  } else if (req.userData.role === 'RESTAURANT' || req.userData.role === 'ADMIN') {
     const restaurantId = await getRestaurantIdForRequest(req)
     if (restaurantId) {
       const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
@@ -74,9 +77,17 @@ async function requireRestaurantOrgContext(req, res, next) {
     }
   }
 
+  if (organizationId && !organizationName) {
+    const { rows: orgRows } = await query(
+      `SELECT name FROM restaurant_organization WHERE id = $1`,
+      [organizationId]
+    )
+    organizationName = orgRows[0]?.name || ''
+  }
+
   req.restaurantOrgContext = {
     organizationId,
-    organizationName: membership?.organization_name || '',
+    organizationName,
     roleName: membership?.role_name || null,
     primaryRestaurantId,
     isOrgOwner: membership?.role_name === 'Org Owner',
@@ -100,6 +111,15 @@ function requireRestaurantOrgOwner(req, res, next) {
     })
   }
   next()
+}
+
+async function listBranchesForRequest(req) {
+  const orgId = req.restaurantOrgContext?.organizationId
+  if (!orgId) return []
+  if (req.userData.role === 'ADMIN' && getEffectiveTenant(req)) {
+    return listRestaurantOrgBranches(orgId)
+  }
+  return listRestaurantOrgBranchesForUser(req.userData.id, orgId)
 }
 
 async function assertRestaurantBranchAccess(req, restaurantId) {
@@ -131,10 +151,7 @@ router.get('/', async (req, res) => {
       })
     }
 
-    const branches = await listRestaurantOrgBranchesForUser(
-      req.userData.id,
-      req.restaurantOrgContext.organizationId
-    )
+    const branches = await listBranchesForRequest(req)
 
     res.json({
       ok: true,
@@ -177,10 +194,7 @@ router.get('/branches', async (req, res) => {
       })
     }
 
-    const branches = await listRestaurantOrgBranchesForUser(
-      req.userData.id,
-      req.restaurantOrgContext.organizationId
-    )
+    const branches = await listBranchesForRequest(req)
 
     const activeRestaurantId =
       req.activeTenantContext?.tenantId ||
@@ -230,6 +244,11 @@ router.post('/branches', requireRestaurantOrgOwner, multiBranchFeature, async (r
           message: limitCheck.reason,
           details: {
             limitKey: 'branches',
+            action: limitCheck.action,
+            includedLimit: limitCheck.includedLimit,
+            addonQuantity: limitCheck.addonQuantity,
+            effectiveLimit: limitCheck.effectiveLimit,
+            current: limitCheck.current,
             upgradeUrl: '/app/settings?tab=subscription',
           },
         },
