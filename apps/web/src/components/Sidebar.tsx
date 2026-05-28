@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
+import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { useNotificationBadge } from '../hooks/useNotificationBadge'
 import {
   useGetDashboardStatsQuery,
@@ -31,8 +32,9 @@ import {
   Scale,
   Tag,
   Percent,
+  Radar,
 } from 'lucide-react'
-import { featureEnabled, getOrderUsageBadge } from '../lib/planLimits'
+import { featureEnabled, getOrderUsageBadge, isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { countActiveDisputes } from '../lib/disputeHelpers'
 import { canUseGlobalReports } from '../lib/planFeatureGates'
 import { formatPlanDisplayName } from '../lib/planComparison'
@@ -42,15 +44,29 @@ type NavItem = {
   href: string
   icon: any
   permission?: string
+  anyOf?: string[]
   badge?: 'pending' | 'unread' | 'disputes'
   testId?: string
+}
+
+function navItemAllowed(
+  item: NavItem,
+  can: (key: string) => boolean,
+  canAny: (...keys: string[]) => boolean
+) {
+  if (item.anyOf?.length) return canAny(...item.anyOf)
+  if (item.permission) return can(item.permission)
+  return true
 }
 
 type NavSection = { label: string; items: NavItem[] }
 
 function isNavItemActive(pathname: string, href: string): boolean {
-  if (href === '/app/dashboard') {
+  if (href === '/app/command-center') {
     return pathname === href || pathname === '/app' || pathname === '/' || pathname === '/app/'
+  }
+  if (href === '/app/dashboard') {
+    return pathname === href || pathname.startsWith(`${href}/`)
   }
   return pathname === href || pathname.startsWith(`${href}/`)
 }
@@ -64,7 +80,8 @@ export function Sidebar({
 } = {}) {
   const location = useLocation()
   const { user } = useAppSelector((state) => state.auth)
-  const { can } = usePermissions()
+  const { can, canAny } = usePermissions()
+  const { isDriverRole } = useWorkspaceRole()
   const {
     isImpersonating,
     isEffectiveRestaurant,
@@ -99,7 +116,10 @@ export function Sidebar({
   const supplierDealsEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.supplier_deals
   )
-  const disputesEnabled = featureEnabled(entitlementsData?.entitlements?.features?.disputes_returns)
+  const disputesEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'disputes_returns'
+  )
   const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
     skip: !disputesEnabled || isSupplier || !user,
     pollingInterval: 30_000,
@@ -111,7 +131,10 @@ export function Sidebar({
   const activeDisputeCount = countActiveDisputes(
     (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []
   )
-  const promotionsEnabled = featureEnabled(entitlementsData?.entitlements?.features?.promotions)
+  const promotionsEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'promotions'
+  )
   const orderUsageBadge = getOrderUsageBadge(entitlementsData?.entitlements)
 
   let sections: NavSection[] = []
@@ -161,7 +184,7 @@ export function Sidebar({
         permission: 'RECEIVING_VIEW',
         testId: 'nav-receiving',
       },
-    ].filter((item) => !item.permission || can(item.permission))
+    ].filter((item) => navItemAllowed(item, can, canAny))
 
     const intel: NavItem[] = [
       {
@@ -219,7 +242,7 @@ export function Sidebar({
         permission: 'CHAT_VIEW',
         testId: 'nav-chat',
       },
-    ].filter((item) => !item.permission || can(item.permission))
+    ].filter((item) => navItemAllowed(item, can, canAny))
 
     const acct: NavItem[] = [
       {
@@ -243,7 +266,7 @@ export function Sidebar({
         permission: 'SETTINGS_VIEW',
         testId: 'nav-settings',
       },
-    ].filter((item) => !item.permission || can(item.permission))
+    ].filter((item) => navItemAllowed(item, can, canAny))
 
     sections = [
       {
@@ -256,7 +279,7 @@ export function Sidebar({
             permission: 'ORDERS_VIEW',
             testId: 'nav-dashboard',
           },
-        ].filter((item) => !item.permission || can(item.permission)),
+        ].filter((item) => navItemAllowed(item, can, canAny)),
       },
       { label: 'OPERATIONS', items: ops },
       ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
@@ -295,116 +318,146 @@ export function Sidebar({
       },
     ]
   } else if (isSupplier || impersonatingSupplier) {
-    const ops: NavItem[] = [
-      {
-        name: 'Orders',
-        href: '/app/orders',
-        icon: ShoppingCart,
-        badge: 'pending' as const,
-        permission: 'ORDERS_VIEW',
-        testId: 'nav-orders',
-      },
-      {
-        name: 'Products',
-        href: '/app/products',
-        icon: Package,
-        permission: 'CATALOG_VIEW',
-        testId: 'nav-products',
-      },
-      {
-        name: 'Fulfillment',
-        href: '/app/fulfillment',
-        icon: Truck,
-        permission: 'FULFILLMENT_VIEW',
-        testId: 'nav-fulfillment',
-      },
-      {
-        name: 'Restaurants',
-        href: '/app/restaurants',
-        icon: Users,
-        permission: 'ORDERS_VIEW',
-        testId: 'nav-restaurants',
-      },
-      ...(disputesEnabled
-        ? [
+    if (isDriverRole) {
+      sections = [
+        {
+          label: 'DELIVERIES',
+          items: [
             {
-              name: 'Disputes',
-              href: '/app/disputes',
-              icon: Scale,
-              permission: 'ORDERS_VIEW',
-              badge: 'disputes' as const,
-              testId: 'nav-disputes',
+              name: 'My Deliveries',
+              href: '/app/driver-deliveries',
+              icon: Truck,
+              permission: 'DRIVER_DELIVERIES_VIEW',
+              testId: 'nav-driver-deliveries',
             },
-          ]
-        : []),
-    ].filter((item) => !item.permission || can(item.permission))
-    const intel: NavItem[] = [
-      ...(reportsEnabled
-        ? [
-            {
-              name: 'Reports',
-              href: '/app/reports',
-              icon: BarChart3,
-              permission: 'ORDERS_VIEW',
-              testId: 'nav-reports',
-            },
-          ]
-        : []),
-      ...(promotionsEnabled
-        ? [
-            {
-              name: 'Deals & Promotions',
-              href: '/app/promotions',
-              icon: Tag,
-              permission: 'PROMOTIONS_VIEW',
-              testId: 'nav-promotions',
-            },
-          ]
-        : []),
-      {
-        name: 'Invoices',
-        href: '/app/invoices',
-        icon: FileText,
-        permission: 'INVOICES_VIEW',
-        testId: 'nav-invoices',
-      },
-      {
-        name: 'Chat',
-        href: '/app/chat',
-        icon: MessageSquare,
-        permission: 'CHAT_VIEW',
-        testId: 'nav-chat',
-      },
-    ].filter((item) => !item.permission || can(item.permission))
+          ].filter((item) => navItemAllowed(item, can, canAny)),
+        },
+      ]
+    } else {
+      const ops: NavItem[] = [
+        {
+          name: 'Orders',
+          href: '/app/orders',
+          icon: ShoppingCart,
+          badge: 'pending' as const,
+          permission: 'ORDERS_VIEW',
+          testId: 'nav-orders',
+        },
+        {
+          name: 'Products',
+          href: '/app/products',
+          icon: Package,
+          permission: 'CATALOG_VIEW',
+          testId: 'nav-products',
+        },
+        {
+          name: 'Fulfillment',
+          href: '/app/fulfillment',
+          icon: Truck,
+          permission: 'FULFILLMENT_VIEW',
+          testId: 'nav-fulfillment',
+        },
+        {
+          name: 'Restaurants',
+          href: '/app/restaurants',
+          icon: Users,
+          permission: 'ORDERS_VIEW',
+          testId: 'nav-restaurants',
+        },
+        ...(disputesEnabled
+          ? [
+              {
+                name: 'Disputes',
+                href: '/app/disputes',
+                icon: Scale,
+                permission: 'ORDERS_VIEW',
+                badge: 'disputes' as const,
+                testId: 'nav-disputes',
+              },
+            ]
+          : []),
+      ].filter((item) => navItemAllowed(item, can, canAny))
+      const intel: NavItem[] = [
+        ...(reportsEnabled
+          ? [
+              {
+                name: 'Reports',
+                href: '/app/reports',
+                icon: BarChart3,
+                permission: 'ORDERS_VIEW',
+                testId: 'nav-reports',
+              },
+            ]
+          : []),
+        ...(promotionsEnabled
+          ? [
+              {
+                name: 'Deals & Promotions',
+                href: '/app/promotions',
+                icon: Tag,
+                permission: 'PROMOTIONS_VIEW',
+                testId: 'nav-promotions',
+              },
+            ]
+          : []),
+        {
+          name: 'Invoices',
+          href: '/app/invoices',
+          icon: FileText,
+          permission: 'INVOICES_VIEW',
+          testId: 'nav-invoices',
+        },
+        {
+          name: 'Chat',
+          href: '/app/chat',
+          icon: MessageSquare,
+          permission: 'CHAT_VIEW',
+          testId: 'nav-chat',
+        },
+      ].filter((item) => navItemAllowed(item, can, canAny))
 
-    sections = [
-      {
-        label: 'OVERVIEW',
-        items: [
-          {
-            name: 'Dashboard',
-            href: '/app/dashboard',
-            icon: LayoutDashboard,
-            permission: 'ORDERS_VIEW',
-            testId: 'nav-dashboard',
-          },
-        ].filter((item) => !item.permission || can(item.permission)),
-      },
-      { label: 'OPERATIONS', items: ops },
-      ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
-      {
-        label: 'ACCOUNT',
-        items: [
-          {
-            name: 'Settings',
-            href: '/app/settings',
-            icon: Settings,
-            permission: 'SETTINGS_VIEW',
-            testId: 'nav-settings',
-          },
-        ].filter((item) => !item.permission || can(item.permission)),
-      },
-    ]
+      sections = [
+        {
+          label: 'OVERVIEW',
+          items: [
+            {
+              name: 'Command Center',
+              href: '/app/command-center',
+              icon: Radar,
+              anyOf: [
+                'ORDERS_MANAGE',
+                'INVOICES_VIEW',
+                'CATALOG_EDIT',
+                'FULFILLMENT_VIEW',
+                'PROMOTIONS_MANAGE',
+              ],
+              testId: 'nav-command-center',
+            },
+            {
+              name: 'Analytics',
+              href: '/app/dashboard',
+              icon: LayoutDashboard,
+              permission: 'ORDERS_VIEW',
+              testId: 'nav-dashboard',
+            },
+          ].filter((item) => navItemAllowed(item, can, canAny)),
+        },
+        { label: 'OPERATIONS', items: ops },
+        ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
+        {
+          label: 'ACCOUNT',
+          items: [
+            {
+              name: 'Settings',
+              href: '/app/settings',
+              icon: Settings,
+              permission: 'SETTINGS_VIEW',
+              testId: 'nav-settings',
+            },
+          ].filter((item) => navItemAllowed(item, can, canAny)),
+        },
+      ]
+    }
   }
 
   const initials = (user?.displayName || user?.email || 'U')

@@ -83,7 +83,7 @@ import { useAppDispatch } from '../hooks/redux'
 import { ActivityLogTab } from '../components/ActivityLogTab'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { usePermissions } from '../hooks/usePermissions'
-import { featureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { normalizeAddress } from '../lib/address'
 import { useGetMyReviewsQuery } from '../services/api'
 import { Star } from 'lucide-react'
@@ -364,8 +364,8 @@ export function RestaurantOnboardingPage() {
   const refetchBranchesList = useRestaurantOrg ? refetchRestaurantOrgBranches : refetchBranches
   const branchGate = getBranchAddGate(entitlements, branches.length + 1)
   const brandingAllowed = canUseCustomBranding(entitlements)
-  const tenantAuditEnabled = featureEnabled(entitlements?.features?.tenant_audit_log)
-  const pushNotificationsEnabled = featureEnabled(entitlements?.features?.push_notifications)
+  const tenantAuditEnabled = isEntitlementFeatureEnabled(entitlements, 'tenant_audit_log')
+  const pushNotificationsEnabled = isEntitlementFeatureEnabled(entitlements, 'push_notifications')
   const canAddBranch = branchGate.canAdd
 
   // Notification preferences

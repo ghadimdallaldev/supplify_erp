@@ -122,7 +122,10 @@ export async function resolveAllFeaturesForTenant(tenantId, tenantType, planFeat
       continue
     }
     if (planFeatures && typeof planFeatures === 'object' && key in planFeatures) {
-      features[key] = evaluatePlanFeatureValue(planFeatures[key])
+      const raw = planFeatures[key]
+      const enabled = evaluatePlanFeatureValue(raw)
+      // Preserve tier strings (e.g. quick_lists full_schedule) for clients that read features.*
+      features[key] = enabled ? raw : false
       featureSources[key] = 'plan'
     } else {
       features[key] = false

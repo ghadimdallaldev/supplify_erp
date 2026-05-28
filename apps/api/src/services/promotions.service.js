@@ -235,6 +235,17 @@ export async function deactivateExpiredPromotions() {
     `
   )
 
+  const { rows: boostExpired } = await query(
+    `
+    UPDATE promotions
+    SET status = 'expired', updated_at = NOW()
+    WHERE status IN ('active', 'scheduled')
+      AND boost_end_at IS NOT NULL
+      AND boost_end_at < NOW()
+    RETURNING id
+    `
+  )
+
   const { rows } = await query(
     `
     UPDATE promotions
@@ -245,9 +256,11 @@ export async function deactivateExpiredPromotions() {
     RETURNING id
     `
   )
+
+  const expiredIds = new Set([...boostExpired.map((r) => r.id), ...rows.map((r) => r.id)])
   return {
-    expiredCount: rows.length,
+    expiredCount: expiredIds.size,
     activatedCount: scheduled.length,
-    ids: rows.map((r) => r.id),
+    ids: [...expiredIds],
   }
 }

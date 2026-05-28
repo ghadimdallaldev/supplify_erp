@@ -19,11 +19,12 @@ import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { RolePermissionChecklist } from './RolePermissionChecklist'
 import { labelForPermission } from '../lib/permissionLabels'
-import { featureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import {
   useGetEntitlementsQuery,
   useGetTenantRolesQuery,
   useGetTenantRoleUsersQuery,
+  useGetUnlinkedDriversQuery,
   useCreateTenantRoleMutation,
   useUpdateTenantRoleMutation,
   useDeleteTenantRoleMutation,
@@ -47,9 +48,15 @@ export function TeamRolesPanel({
   renderInviteForm,
 }) {
   const { data: entitlementsData } = useGetEntitlementsQuery()
-  const advancedRolesEnabled = featureEnabled(
-    entitlementsData?.entitlements?.features?.advanced_roles
+  const advancedRolesEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'advanced_roles'
   )
+  const isSupplier = tenantType === 'SUPPLIER'
+  const { data: unlinkedDriversData } = useGetUnlinkedDriversQuery(undefined, {
+    skip: !isSupplier || !advancedRolesEnabled,
+  })
+  const unlinkedDrivers = unlinkedDriversData?.drivers ?? []
 
   const {
     data: rolesData,
@@ -76,6 +83,7 @@ export function TeamRolesPanel({
   const [roleForm, setRoleForm] = useState({ name: '', description: '', permissions: [] })
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [ownerConfirm, setOwnerConfirm] = useState(null)
+  const [driverAssign, setDriverAssign] = useState(null)
 
   const roleOptions = useMemo(
     () => roles.map((r) => ({ id: r.id, name: r.name, isSystem: r.is_system })),
@@ -154,15 +162,25 @@ export function TeamRolesPanel({
       setOwnerConfirm({ userId, roleId })
       return
     }
+    if (roleName === 'Driver' && isSupplier) {
+      setDriverAssign({ userId, roleId, driverId: '' })
+      return
+    }
     await doAssign(userId, roleId)
   }
 
-  const doAssign = async (userId, roleId) => {
+  const doAssign = async (userId, roleId, { driver_id, create_driver_profile } = {}) => {
     try {
-      await assignRole({ userId, role_id: roleId }).unwrap()
+      await assignRole({
+        userId,
+        role_id: roleId,
+        driver_id: driver_id || undefined,
+        create_driver_profile,
+      }).unwrap()
       toast.success('Role updated')
       refetchUsers()
       setOwnerConfirm(null)
+      setDriverAssign(null)
     } catch (error) {
       toast.error(error?.data?.message || 'Failed to assign role')
     }
@@ -452,6 +470,54 @@ export function TeamRolesPanel({
               onClick={() => ownerConfirm && doAssign(ownerConfirm.userId, ownerConfirm.roleId)}
             >
               Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!driverAssign} onOpenChange={() => setDriverAssign(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link driver profile</DialogTitle>
+            <DialogDescription>
+              Drivers need a delivery profile linked to their login. Choose an existing unlinked
+              profile or create one automatically.
+            </DialogDescription>
+          </DialogHeader>
+          {unlinkedDrivers.length > 0 && (
+            <div>
+              <Label>Existing driver profile (optional)</Label>
+              <select
+                className="mt-1 w-full rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
+                value={driverAssign?.driverId ?? ''}
+                onChange={(e) =>
+                  setDriverAssign((prev) => (prev ? { ...prev, driverId: e.target.value } : null))
+                }
+              >
+                <option value="">Create new profile for this user</option>
+                {unlinkedDrivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.full_name}
+                    {d.phone ? ` · ${d.phone}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDriverAssign(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                driverAssign &&
+                doAssign(driverAssign.userId, driverAssign.roleId, {
+                  driver_id: driverAssign.driverId || undefined,
+                  create_driver_profile: !driverAssign.driverId,
+                })
+              }
+            >
+              Assign Driver
             </Button>
           </DialogFooter>
         </DialogContent>

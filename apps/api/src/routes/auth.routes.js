@@ -233,6 +233,10 @@ router.get('/me', requireAuth, async (req, res) => {
     let adminPermissions = []
     let workspace = null
     const tenant = await getRequestTenant(req)
+    const { getEffectiveTenant, getImpersonationEffectivePermissions } = await import(
+      '../lib/impersonation.js'
+    )
+    const effectiveTenant = getEffectiveTenant(req)
     if (tenant) {
       const { ensurePrimaryContactOwnerRole, assignDefaultRoleForTenant: assignDefault } =
         await import('../lib/rbac.js')
@@ -241,8 +245,24 @@ router.get('/me', requireAuth, async (req, res) => {
       )
       await ensurePrimaryContactOwnerRole(user.id, user.email, tenant.tenantId, tenant.tenantType)
 
-      tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
-      tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
+      if (user.role === 'ADMIN' && effectiveTenant) {
+        tenantPermissions = await getImpersonationEffectivePermissions(
+          effectiveTenant.tenantId,
+          effectiveTenant.tenantType,
+          effectiveTenant.viewAsRoleId
+        )
+        if (effectiveTenant.viewAsRoleId) {
+          const { rows: roleRows } = await query(`SELECT name FROM tenant_roles WHERE id = $1`, [
+            effectiveTenant.viewAsRoleId,
+          ])
+          tenantRoles = roleRows.map((r) => r.name)
+        } else {
+          tenantRoles = ['Owner (impersonation)']
+        }
+      } else {
+        tenantRoles = await getRolesForUser(user.id, tenant.tenantId, tenant.tenantType)
+        tenantPermissions = await getPermissionsForUser(user.id, tenant.tenantId, tenant.tenantType)
+      }
       if (tenantRoles.length === 0 && (user.role === 'RESTAURANT' || user.role === 'SUPPLIER')) {
         const isPrimary = await isPrimaryTenantContact(
           user.id,

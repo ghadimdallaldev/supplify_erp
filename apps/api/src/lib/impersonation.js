@@ -27,6 +27,7 @@ export async function createImpersonationToken(payload) {
     tenantType: payload.tenantType,
     tenantName: payload.tenantName || '',
     sessionId,
+    viewAsRoleId: payload.viewAsRoleId || null,
   })
     .setProtectedHeader({ alg: ALG })
     .setJti(sessionId)
@@ -52,6 +53,7 @@ export async function verifyImpersonationToken(token) {
       tenantType: payload.tenantType,
       tenantName: payload.tenantName || '',
       sessionId: payload.sessionId || payload.jti || null,
+      viewAsRoleId: payload.viewAsRoleId || null,
       exp: payload.exp,
     }
   } catch (err) {
@@ -97,7 +99,31 @@ export function getEffectiveTenant(req) {
     tenantType: ctx.tenantType,
     tenantName: ctx.tenantName || '',
     sessionId: ctx.sessionId || null,
+    viewAsRoleId: ctx.viewAsRoleId || null,
   }
+}
+
+/**
+ * Permissions for an admin impersonation session (view-as role or Owner fallback).
+ */
+export async function getImpersonationEffectivePermissions(tenantId, tenantType, viewAsRoleId) {
+  const { getRolePermissionSet } = await import('./rbac-guards.js')
+  const { getOwnerRoleId } = await import('./tenant-roles.js')
+
+  let roleId = viewAsRoleId
+  if (roleId) {
+    const { rows } = await query(
+      `SELECT id FROM tenant_roles
+       WHERE id = $1 AND tenant_id = $2 AND tenant_type = $3`,
+      [roleId, tenantId, tenantType]
+    )
+    if (!rows.length) roleId = null
+  }
+  if (!roleId) {
+    roleId = await getOwnerRoleId(tenantId, tenantType)
+  }
+  if (!roleId) return []
+  return getRolePermissionSet(roleId)
 }
 
 /** True when the authenticated admin is actively impersonating a tenant. */

@@ -11,6 +11,17 @@ import { logger } from '../lib/logger.js'
 import { isFeatureEnabled, requireFeature } from '../lib/subscription.js'
 import { isMultiWarehouseFulfillmentActive } from '../lib/warehouse-helpers.js'
 import { z } from 'zod'
+import {
+  listDeliveryRoutes,
+  getDeliveryRoute,
+  createDeliveryRoute,
+  updateDeliveryRoute,
+  reorderRouteStops,
+  updateRouteStop,
+  cancelDeliveryRoute,
+  getDriverActiveRoute,
+} from '../services/delivery-routes.service.js'
+import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
 
 const router = express.Router()
 
@@ -290,48 +301,29 @@ router.get('/routes', async (req, res) => {
       })
     }
 
-    const whFilter = await warehouseFilterClause(req, supplierId, 2)
-    const routeParams = [supplierId, ...whFilter.params]
-    const routeWarehouseClause = whFilter.warehouseId
-      ? ` AND EXISTS (
-          SELECT 1 FROM route_stop rs2
-          JOIN order_warehouse_assignment owa ON owa.order_id = rs2.order_id
-          WHERE rs2.route_id = dr.id AND owa.warehouse_id = $2
-        )`
-      : ''
+    const perms = req.tenantContext?.permissions ?? []
+    let driverScope = null
+    if (isDriverOnlyPermissions(perms)) {
+      driverScope = await getLinkedDriverId(req.userData.id, supplierId)
+      if (!driverScope) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Driver profile not linked' },
+          requestId: req.requestId,
+        })
+      }
+    }
 
-    const { rows } = await query(
-      `
-      SELECT
-        dr.id,
-        dr.route_number,
-        dr.driver_name,
-        dr.vehicle_info,
-        dr.status,
-        dr.scheduled_date,
-        COUNT(rs.id)::int AS stops
-      FROM delivery_route dr
-      LEFT JOIN route_stop rs ON rs.route_id = dr.id
-      WHERE dr.supplier_id = $1${routeWarehouseClause}
-      GROUP BY dr.id
-      ORDER BY dr.scheduled_date DESC, dr.route_number
-      `,
-      routeParams
-    )
+    const includeCancelled = req.query.include_cancelled === 'true'
+    const routes = await listDeliveryRoutes(supplierId, {
+      includeCancelled,
+      driverId: driverScope,
+    })
 
     res.json({
       ok: true,
-      data: {
-        routes: rows.map((row) => ({
-          id: row.id,
-          routeNumber: row.route_number,
-          driver: row.driver_name || 'Unassigned',
-          vehicle: row.vehicle_info || '—',
-          status: row.status,
-          stops: row.stops ?? 0,
-          scheduledDate: row.scheduled_date,
-        })),
-      },
+      data: { routes },
       error: null,
       requestId: req.requestId,
     })
@@ -354,6 +346,8 @@ function mapDispatchOrder(row) {
     created_at: row.created_at,
     restaurant_name: row.restaurant_name,
     item_count: row.item_count ?? 0,
+    active_route_id: row.active_route_id ?? null,
+    active_route_number: row.active_route_number ?? null,
     assignment: row.assignment_id
       ? {
           id: row.assignment_id,
@@ -405,7 +399,9 @@ router.get('/dispatch', async (req, res) => {
         d.phone AS driver_phone,
         d.vehicle_type,
         d.vehicle_plate,
-        EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id) AS has_pod
+        EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id) AS has_pod,
+        ar.route_id AS active_route_id,
+        ar.route_number AS active_route_number
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
       JOIN restaurant r ON r.id = o.restaurant_id
@@ -416,6 +412,15 @@ router.get('/dispatch', async (req, res) => {
         LIMIT 1
       ) da ON true
       LEFT JOIN drivers d ON d.id = da.driver_id
+      LEFT JOIN LATERAL (
+        SELECT dr.id AS route_id, dr.route_number
+        FROM route_stop rs
+        JOIN delivery_route dr ON dr.id = rs.route_id
+        WHERE rs.order_id = o.id
+          AND dr.supplier_id = $1
+          AND dr.status IN ('PLANNED', 'IN_PROGRESS')
+        LIMIT 1
+      ) ar ON true
       WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED')
         ${whFilter.clause}
     `
@@ -435,7 +440,7 @@ router.get('/dispatch', async (req, res) => {
       ),
       query(
         `${baseSelect}
-           AND da.status = 'assigned'
+           AND da.status IN ('assigned', 'rescheduled')
            ORDER BY o.id, da.assigned_at DESC`,
         params
       ),
@@ -628,6 +633,262 @@ router.post(
     }
   }
 )
+
+router.get('/routes/active', async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const perms = req.tenantContext?.permissions ?? []
+    if (!isDriverOnlyPermissions(perms)) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Drivers only' },
+        requestId: req.requestId,
+      })
+    }
+    const driverId = await getLinkedDriverId(req.userData.id, supplierId)
+    if (!driverId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Driver profile not linked' },
+        requestId: req.requestId,
+      })
+    }
+    const route = await getDriverActiveRoute(supplierId, driverId)
+    res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/routes/:id', async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const perms = req.tenantContext?.permissions ?? []
+    let driverScope = null
+    if (isDriverOnlyPermissions(perms)) {
+      driverScope = await getLinkedDriverId(req.userData.id, supplierId)
+      if (!driverScope) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Driver profile not linked' },
+          requestId: req.requestId,
+        })
+      }
+    }
+    const route = await getDeliveryRoute(supplierId, req.params.id, {
+      driverIdScope: driverScope,
+    })
+    res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+const createRouteSchema = z.object({
+  order_ids: z.array(z.string().uuid()).min(1),
+  driver_id: z.string().uuid(),
+  scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  route_label: z.string().max(120).optional(),
+  area: z.string().max(120).optional(),
+})
+
+router.post('/routes', requirePermission('FULFILLMENT_MANAGE'), async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const body = createRouteSchema.parse(req.body ?? {})
+    const route = await createDeliveryRoute({
+      supplierId,
+      orderIds: body.order_ids,
+      driverId: body.driver_id,
+      scheduledDate: body.scheduled_date,
+      routeLabel: body.route_label,
+      area: body.area,
+      userId: req.userData.id,
+    })
+    res.status(201).json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.patch('/routes/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const body = z
+      .object({
+        route_label: z.string().max(120).optional(),
+        area: z.string().max(120).optional(),
+        scheduled_date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional(),
+        driver_id: z.string().uuid().optional(),
+        status: z.enum(['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
+      })
+      .parse(req.body ?? {})
+    const route = await updateDeliveryRoute(supplierId, req.params.id, {
+      routeLabel: body.route_label,
+      area: body.area,
+      scheduledDate: body.scheduled_date,
+      driverId: body.driver_id,
+      status: body.status,
+    })
+    res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.delete('/routes/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const route = await cancelDeliveryRoute(supplierId, req.params.id)
+    res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post(
+  '/routes/:id/stops/reorder',
+  requirePermission('FULFILLMENT_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const body = z.object({ stop_ids: z.array(z.string().uuid()).min(1) }).parse(req.body ?? {})
+      const route = await reorderRouteStops(supplierId, req.params.id, body.stop_ids)
+      res.json({ ok: true, data: { route }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const stopStatusSchema = z.enum(['PLANNED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'FAILED'])
+
+router.patch('/routes/:id/stops/:stopId', async (req, res, next) => {
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+    const perms = req.tenantContext?.permissions ?? []
+    const canManage =
+      perms.includes('FULFILLMENT_MANAGE') ||
+      perms.includes('DRIVER_DELIVERIES_MANAGE') ||
+      isDriverOnlyPermissions(perms)
+    if (!canManage) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Insufficient permission' },
+        requestId: req.requestId,
+      })
+    }
+    if (isDriverOnlyPermissions(perms) && !perms.includes('DRIVER_DELIVERIES_MANAGE')) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Insufficient permission' },
+        requestId: req.requestId,
+      })
+    }
+    const body = z
+      .object({
+        status: stopStatusSchema.optional(),
+        notes: z.string().max(2000).optional(),
+        failure_reason: z.string().max(500).optional(),
+      })
+      .parse(req.body ?? {})
+
+    const route = await getDeliveryRoute(supplierId, req.params.id)
+    if (isDriverOnlyPermissions(perms)) {
+      const driverId = await getLinkedDriverId(req.userData.id, supplierId)
+      if (route.driverId !== driverId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Not your route' },
+          requestId: req.requestId,
+        })
+      }
+    } else if (!perms.includes('FULFILLMENT_MANAGE')) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Insufficient permission' },
+        requestId: req.requestId,
+      })
+    }
+
+    const updated = await updateRouteStop(supplierId, req.params.id, req.params.stopId, {
+      status: body.status,
+      notes: body.notes,
+      failureReason: body.failure_reason,
+      userId: req.userData.id,
+      permissions: perms,
+    })
+    res.json({ ok: true, data: { route: updated }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
 
 router.post('/exceptions/:id/ignore', requirePermission('FULFILLMENT_MANAGE'), async (req, res) => {
   try {
