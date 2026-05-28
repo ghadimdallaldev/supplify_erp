@@ -17,7 +17,6 @@ export const RESTAURANT_LIMIT_KEYS = [
   'scheduled_quick_lists',
   'scheduled_order_grace_per_day',
   'deal_redemptions_per_day',
-  'promotions',
 ]
 
 export function stripHiddenEntitlementLimits(limits, usage, overrides = []) {
@@ -41,6 +40,28 @@ export const SUPPLIER_LIMIT_KEYS = [
 
 export function limitKeysForTenantType(tenantType) {
   return tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
+}
+
+/** Supplier-only: active supplier deals/promotions count. Restaurants use deal_redemptions_per_day. */
+export const SUPPLIER_ONLY_LIMIT_KEYS = new Set(['promotions'])
+
+export function isLimitKeyApplicable(tenantType, limitKey) {
+  if (tenantType === 'RESTAURANT' && SUPPLIER_ONLY_LIMIT_KEYS.has(limitKey)) return false
+  return limitKeysForTenantType(tenantType).includes(limitKey)
+}
+
+/**
+ * Human-readable plan limit for tier logger / admin catalog display.
+ * Missing keys are not applicable (not unlimited). Only explicit -1 means unlimited.
+ * @param {unknown} value
+ * @param {{ defined?: boolean }} [opts]
+ */
+export function formatPlanLimitDisplay(value, opts = {}) {
+  const defined = opts.defined !== false
+  if (!defined) return 'n/a'
+  if (value === -1) return 'unlimited'
+  if (value === null || value === undefined) return 'unlimited'
+  return String(value)
 }
 
 /** Canonical Free-tier defaults when plan JSON is missing keys (e.g. migration not applied yet). */

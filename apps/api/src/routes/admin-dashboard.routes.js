@@ -37,32 +37,16 @@ import {
   unlockSubscriptionAccount,
 } from '../lib/billing/billing-service.js'
 import { clampFreeTrialDays } from '../lib/platform-settings.js'
-
-function getAllowedLimitKeys(tenantType) {
-  return tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
-}
-
-function validatePlanLimitsAndFeatures(limits, features, tenantType) {
-  const limitKeys = getAllowedLimitKeys(tenantType)
-  const featureKeys = getAllowedFeatureKeys(tenantType)
-  const unknownLimits = Object.keys(limits || {}).filter((k) => !limitKeys.includes(k))
-  const unknownFeatures = Object.keys(features || {}).filter((k) => !featureKeys.includes(k))
-  if (unknownLimits.length > 0 || unknownFeatures.length > 0) {
-    return {
-      valid: false,
-      message: `Unknown keys not allowed: limits: ${unknownLimits.join(', ') || 'none'}; features: ${unknownFeatures.join(', ') || 'none'}`,
-    }
-  }
-  for (const [k, v] of Object.entries(limits || {})) {
-    if (v !== null && v !== -1 && (typeof v !== 'number' || v < 0 || !Number.isInteger(v))) {
-      return {
-        valid: false,
-        message: `Limit ${k} must be a non-negative integer or null (-1 for unlimited)`,
-      }
-    }
-  }
-  return { valid: true }
-}
+import {
+  validatePlanLimitsAndFeatures,
+  validateFreePlanTrialDays,
+  validateEnterprisePlanActivation,
+  validateEnterprisePlanCreate,
+  buildTierLadderWarnings,
+} from '../lib/plan-admin-validation.js'
+import { isLimitKeyApplicable } from '../lib/limit-resolution.js'
+import { buildAdminOverviewMetrics } from '../lib/admin-overview-metrics.js'
+import { buildAdminActivityFeed } from '../lib/admin-activity-feed.js'
 
 const router = Router()
 
@@ -136,136 +120,11 @@ async function logAudit(
 // ========================================
 router.get('/overview', async (req, res) => {
   try {
-    const results = await Promise.all([
-      // Tenant counts (active/trialing)
-      query(
-        `SELECT tenant_type, COUNT(*) as count FROM subscription WHERE status IN ('ACTIVE','TRIALING') GROUP BY tenant_type`
-      ),
-      // All subscription statuses
-      query(`SELECT status, COUNT(*) as count FROM subscription GROUP BY status`),
-      // MRR
-      query(
-        `SELECT COALESCE(SUM(CASE WHEN s.billing_cycle='MONTHLY' THEN sp.price_per_month ELSE sp.price_per_month*12 END),0) as mrr, COUNT(*) as active_subscriptions FROM subscription s JOIN subscription_plan sp ON sp.id=s.plan_id WHERE s.status='ACTIVE'`
-      ),
-      // Orders: today, 7d, 30d, total placed
-      query(`SELECT
-        COUNT(*) FILTER (WHERE placed_at >= NOW()-INTERVAL '1 day')  AS today,
-        COUNT(*) FILTER (WHERE placed_at >= NOW()-INTERVAL '7 days') AS week,
-        COUNT(*) FILTER (WHERE placed_at >= NOW()-INTERVAL '30 days') AS month,
-        COUNT(*) FILTER (WHERE status NOT IN ('DRAFT','CANCELLED')) AS total
-        FROM customer_order`),
-      // Active carts (DRAFT orders with at least one item)
-      query(
-        `SELECT COUNT(DISTINCT co.id) as count FROM customer_order co INNER JOIN order_item oi ON oi.order_id=co.id WHERE co.status='DRAFT'`
-      ),
-      // Chats last 24h
-      query(`SELECT COUNT(*) as count FROM message WHERE created_at>=NOW()-INTERVAL '24 hours'`),
-      // Staff total
-      query(`SELECT COUNT(*) as count FROM staff_member WHERE status='ACTIVE'`),
-      // Reservations: today, week
-      query(`SELECT
-        COUNT(*) FILTER (WHERE scheduled_at::date=CURRENT_DATE) AS today,
-        COUNT(*) FILTER (WHERE scheduled_at>=NOW()-INTERVAL '7 days') AS week,
-        COUNT(*) FILTER (WHERE status IN ('CONFIRMED','SEATED')) AS confirmed
-        FROM reservation`),
-      // New tenants last 7d
-      query(`SELECT
-        COUNT(*) FILTER (WHERE created_at>=NOW()-INTERVAL '7 days') AS new_suppliers,
-        COUNT(*) FROM supplier`),
-      query(`SELECT
-        COUNT(*) FILTER (WHERE created_at>=NOW()-INTERVAL '7 days') AS new_restaurants,
-        COUNT(*) FROM restaurant`),
-      // Total active products across all suppliers
-      query(`SELECT COUNT(*) as count FROM product WHERE is_active=true`),
-      // Quick lists
-      query(`SELECT COUNT(*) as count FROM quick_list`),
-      // Past due subscriptions (alerts)
-      query(`SELECT COUNT(*) as count FROM subscription WHERE status='PAST_DUE'`),
-      // Upcoming trial expirations (next 7 days)
-      query(
-        `SELECT COUNT(*) as count FROM subscription WHERE status='TRIALING' AND trial_ends_at BETWEEN NOW() AND NOW()+INTERVAL '7 days'`
-      ),
-      // Pending deal approvals
-      query(
-        `SELECT COUNT(*) as count FROM promotions WHERE status IN ('pending_approval', 'pending_admin_approval')`
-      ),
-      query(`SELECT COUNT(*) as count FROM promotions WHERE status = 'approved_pending_payment'`),
-      query(`SELECT COUNT(*) as count FROM invoice WHERE status = 'OVERDUE' AND balance_due > 0`),
-    ])
-
-    const [
-      { rows: tenantCounts },
-      { rows: subscriptionStats },
-      { rows: revenueStats },
-      { rows: orderStats },
-      { rows: cartStats },
-      { rows: chatStats },
-      { rows: staffStats },
-      { rows: reservationStats },
-      { rows: supplierStats },
-      { rows: restaurantStats },
-      { rows: productStats },
-      { rows: quickListStats },
-      { rows: alertStats },
-      { rows: trialExpStats },
-      { rows: pendingDealStats },
-      { rows: pendingPaymentDealStats },
-      { rows: overdueInvoiceStats },
-    ] = results
-
-    const mrr = parseFloat(revenueStats[0]?.mrr || 0)
+    const data = await buildAdminOverviewMetrics()
 
     res.json({
       ok: true,
-      data: {
-        tenantCounts: tenantCounts.reduce((acc, row) => {
-          acc[row.tenant_type] = parseInt(row.count)
-          return acc
-        }, {}),
-        subscriptionStats: subscriptionStats.reduce((acc, row) => {
-          acc[row.status] = parseInt(row.count)
-          return acc
-        }, {}),
-        revenue: {
-          mrr,
-          arr: mrr * 12,
-          activeSubscriptions: parseInt(revenueStats[0]?.active_subscriptions || 0),
-        },
-        orders: {
-          today: parseInt(orderStats[0]?.today || 0),
-          week: parseInt(orderStats[0]?.week || 0),
-          month: parseInt(orderStats[0]?.month || 0),
-          total: parseInt(orderStats[0]?.total || 0),
-        },
-        activeCarts: parseInt(cartStats[0]?.count || 0),
-        chatsLast24h: parseInt(chatStats[0]?.count || 0),
-        totalActiveStaff: parseInt(staffStats[0]?.count || 0),
-        reservations: {
-          today: parseInt(reservationStats[0]?.today || 0),
-          week: parseInt(reservationStats[0]?.week || 0),
-          confirmed: parseInt(reservationStats[0]?.confirmed || 0),
-        },
-        tenants: {
-          totalSuppliers: parseInt(supplierStats[0]?.count || 0),
-          newSuppliers7d: parseInt(supplierStats[0]?.new_suppliers || 0),
-          totalRestaurants: parseInt(restaurantStats[0]?.count || 0),
-          newRestaurants7d: parseInt(restaurantStats[0]?.new_restaurants || 0),
-        },
-        totalActiveProducts: parseInt(productStats[0]?.count || 0),
-        totalQuickLists: parseInt(quickListStats[0]?.count || 0),
-        alerts: {
-          pastDueSubscriptions: parseInt(alertStats[0]?.count || 0),
-          trialsExpiringSoon: parseInt(trialExpStats[0]?.count || 0),
-          pendingDealApprovals: parseInt(pendingDealStats[0]?.count || 0),
-          pendingDealPayments: parseInt(pendingPaymentDealStats[0]?.count || 0),
-          overdueInvoices: parseInt(overdueInvoiceStats[0]?.count || 0),
-        },
-        // Keep legacy field for compatibility
-        activity: {
-          ordersLast24h: parseInt(orderStats[0]?.today || 0),
-          chatsLast24h: parseInt(chatStats[0]?.count || 0),
-        },
-      },
+      data,
       error: null,
       requestId: req.requestId,
     })
@@ -520,6 +379,12 @@ router.get('/plans', async (req, res) => {
   }
 })
 
+const planJsonObject = z
+  .record(z.any())
+  .refine((val) => val !== null && typeof val === 'object' && !Array.isArray(val), {
+    message: 'must be a JSON object',
+  })
+
 const createPlanSchema = z.object({
   code: z
     .string()
@@ -530,29 +395,68 @@ const createPlanSchema = z.object({
   description: z.string().optional(),
   pricePerMonth: z.number().nonnegative(),
   pricePerYear: z.number().nonnegative().optional(),
-  limits: z.record(z.any()),
-  features: z.record(z.any()),
+  limits: planJsonObject,
+  features: planJsonObject,
   trialDays: z.number().nonnegative().default(0),
   displayOrder: z.number().default(0),
   isActive: z.boolean().default(true),
+  confirmEnterpriseActivation: z.boolean().optional(),
 })
 
 router.post('/plans', async (req, res) => {
   try {
     const planData = createPlanSchema.parse(req.body)
-    const validation = validatePlanLimitsAndFeatures(
+    const catalogValidation = validatePlanLimitsAndFeatures(
       planData.limits,
       planData.features,
       planData.tenantType
     )
-    if (!validation.valid) {
+    if (!catalogValidation.valid) {
       return res.status(400).json({
         ok: false,
         data: null,
-        error: { name: 'VALIDATION_ERROR', message: validation.message },
+        error: { name: 'VALIDATION_ERROR', message: catalogValidation.message },
         requestId: req.requestId,
       })
     }
+
+    const enterpriseCreate = validateEnterprisePlanCreate(
+      planData.code,
+      planData.confirmEnterpriseActivation
+    )
+    if (!enterpriseCreate.valid) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: enterpriseCreate.message },
+        requestId: req.requestId,
+      })
+    }
+
+    const enterpriseActive = validateEnterprisePlanActivation(
+      planData.code,
+      planData.isActive,
+      planData.confirmEnterpriseActivation
+    )
+    if (!enterpriseActive.valid) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: enterpriseActive.message },
+        requestId: req.requestId,
+      })
+    }
+
+    const trialValidation = validateFreePlanTrialDays(planData.code, planData.trialDays)
+    if (!trialValidation.valid) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: trialValidation.message },
+        requestId: req.requestId,
+      })
+    }
+
     const planType = planData.tenantType === 'RESTAURANT' ? 'restaurant_only' : 'supplier_only'
 
     const {
@@ -594,7 +498,7 @@ router.post('/plans', async (req, res) => {
 
     res.json({
       ok: true,
-      data: { plan },
+      data: { plan, validationWarnings: [] },
       error: null,
       requestId: req.requestId,
     })
@@ -623,11 +527,12 @@ const updatePlanSchema = z.object({
   description: z.string().optional(),
   pricePerMonth: z.number().nonnegative().optional(),
   pricePerYear: z.number().nonnegative().optional(),
-  limits: z.record(z.any()).optional(),
-  features: z.record(z.any()).optional(),
+  limits: planJsonObject.optional(),
+  features: planJsonObject.optional(),
   trialDays: z.number().nonnegative().optional(),
   displayOrder: z.number().optional(),
   isActive: z.boolean().optional(),
+  confirmEnterpriseActivation: z.boolean().optional(),
 })
 
 router.patch('/plans/:id', async (req, res) => {
@@ -651,17 +556,67 @@ router.patch('/plans/:id', async (req, res) => {
 
     const existing = existingPlans[0]
     const planTenantType = existing.tenant_type || 'RESTAURANT'
+    const planCode = existing.code
+
+    const limitsForValidation =
+      updateData.limits !== undefined ? updateData.limits : existing.limits
+    const featuresForValidation =
+      updateData.features !== undefined ? updateData.features : existing.features
 
     if (updateData.limits !== undefined || updateData.features !== undefined) {
-      const limits = updateData.limits !== undefined ? updateData.limits : existing.limits
-      const features = updateData.features !== undefined ? updateData.features : existing.features
-      const validation = validatePlanLimitsAndFeatures(limits, features, planTenantType)
-      if (!validation.valid) {
+      const catalogValidation = validatePlanLimitsAndFeatures(
+        limitsForValidation,
+        featuresForValidation,
+        planTenantType
+      )
+      if (!catalogValidation.valid) {
         return res.status(400).json({
           ok: false,
           data: null,
-          error: { name: 'VALIDATION_ERROR', message: validation.message },
+          error: { name: 'VALIDATION_ERROR', message: catalogValidation.message },
           requestId: req.requestId,
+        })
+      }
+    }
+
+    const enterpriseActive = validateEnterprisePlanActivation(
+      planCode,
+      updateData.isActive,
+      updateData.confirmEnterpriseActivation
+    )
+    if (!enterpriseActive.valid) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: enterpriseActive.message },
+        requestId: req.requestId,
+      })
+    }
+
+    const trialDaysToValidate =
+      updateData.trialDays !== undefined ? updateData.trialDays : existing.trial_days
+    const trialValidation = validateFreePlanTrialDays(planCode, trialDaysToValidate)
+    if (!trialValidation.valid) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: trialValidation.message },
+        requestId: req.requestId,
+      })
+    }
+
+    let validationWarnings = []
+    if (updateData.limits !== undefined) {
+      const { rows: peerPlans } = await query(
+        `SELECT code, limits FROM subscription_plan WHERE tenant_type = $1 AND id != $2`,
+        [planTenantType, id]
+      )
+      validationWarnings = buildTierLadderWarnings(planCode, limitsForValidation, peerPlans)
+      if (validationWarnings.length > 0) {
+        logger.warn('Plan update tier ladder warnings', {
+          planId: id,
+          planCode,
+          validationWarnings,
         })
       }
     }
@@ -735,7 +690,7 @@ router.patch('/plans/:id', async (req, res) => {
 
     res.json({
       ok: true,
-      data: { plan: updated },
+      data: { plan: updated, validationWarnings },
       error: null,
       requestId: req.requestId,
     })
@@ -786,6 +741,7 @@ router.get('/subscriptions', async (req, res) => {
     const { rows: subscriptions } = await query(
       `
       SELECT sub.*,
+        sp.code as plan_code,
         sp.price_per_month, sp.price_per_year, sp.limits as plan_limits, sp.features as plan_features,
         COALESCE(
           CASE WHEN sub.tenant_type = 'SUPPLIER' THEN su.name ELSE NULL END,
@@ -1785,6 +1741,7 @@ router.get('/tenants/suppliers', async (req, res) => {
         s.*,
         sub.status as subscription_status,
         sub.plan_name,
+        (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) as plan_code,
         sub.id as subscription_id,
         (SELECT COUNT(*) FROM product WHERE supplier_id = s.id) as product_count,
         (SELECT COUNT(*) FROM warehouse WHERE supplier_id = s.id AND is_active = true) as warehouse_count,
@@ -1823,6 +1780,7 @@ router.get('/tenants/restaurants', async (req, res) => {
         r.*,
         sub.status as subscription_status,
         sub.plan_name,
+        (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) as plan_code,
         sub.id as subscription_id,
         (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as order_count,
         (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND ${deliveredOrderStatusInSql()}) as total_spent,
@@ -2195,7 +2153,19 @@ router.post('/plans/:planId/override-limit', async (req, res) => {
       })
     }
     const plan = plans[0]
-    const allowedKeys = await discoverLimitKeys(plan.tenant_type)
+    const tenantType = plan.tenant_type || 'RESTAURANT'
+    if (!isLimitKeyApplicable(tenantType, body.limit_type)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: `Limit "${body.limit_type}" is not applicable for ${tenantType} plans`,
+        },
+        requestId: req.requestId,
+      })
+    }
+    const allowedKeys = await discoverLimitKeys(tenantType)
     if (!allowedKeys.includes(body.limit_type)) {
       return res.status(400).json({
         ok: false,
@@ -2636,13 +2606,23 @@ router.get('/financial-overview', async (req, res) => {
         `SELECT COALESCE(SUM(balance_due), 0)::numeric as overdue FROM invoice WHERE status = 'OVERDUE' AND balance_due > 0`
       ),
       query(
-        `SELECT sp.name as plan_name, sp.type as tenant_type,
+        `SELECT sp.name as plan_name,
+         COALESCE(sp.tenant_type, sp.type) as tenant_type,
+         sp.code as plan_code,
          COUNT(s.id) as subscription_count,
-         COALESCE(SUM(CASE WHEN s.billing_cycle = 'MONTHLY' THEN sp.price_per_month ELSE sp.price_per_month * 12 END), 0)::numeric as mrr
+         COALESCE(SUM(
+           CASE
+             WHEN s.billing_cycle = 'YEARLY' AND COALESCE(sp.price_per_year, 0) > 0
+               THEN sp.price_per_year / 12.0
+             ELSE sp.price_per_month
+           END
+         ), 0)::numeric as mrr
          FROM subscription s
          JOIN subscription_plan sp ON sp.id = s.plan_id
          WHERE s.status IN ('ACTIVE', 'TRIALING')
-         GROUP BY sp.id, sp.name, sp.type, sp.price_per_month`
+           AND LOWER(sp.code) NOT IN ('free', 'enterprise')
+           AND COALESCE(sp.price_per_month, 0) > 0
+         GROUP BY sp.id, sp.name, sp.code, sp.tenant_type, sp.type, sp.price_per_month, sp.price_per_year`
       ),
       query(
         `SELECT restaurant_id as tenant_id, 'RESTAURANT' as tenant_type,
@@ -2673,6 +2653,7 @@ router.get('/financial-overview', async (req, res) => {
         overdue,
         revenueByPlan: mrrRows.map((r) => ({
           planName: r.plan_name,
+          planCode: r.plan_code,
           tenantType: r.tenant_type,
           subscriptionCount: parseInt(r.subscription_count || 0),
           mrr: parseFloat(r.mrr || 0),
@@ -2680,6 +2661,7 @@ router.get('/financial-overview', async (req, res) => {
         })),
         mrr,
         arr,
+        mrrExcludesFreeTrial: true,
         topTenantsByRevenue: topTenantsRevenueResult.rows || [],
         topTenantsByOverdue: topTenantsOverdueResult.rows || [],
       },
@@ -2925,228 +2907,10 @@ router.delete('/tenants/:tenantType/:id/feature-overrides/:featureKey', async (r
 router.get('/activity', async (req, res) => {
   try {
     const { limit = 50, offset = 0, type } = req.query
-    const lim = parseInt(limit)
-    const off = parseInt(offset)
-    const typeFilter = type && type !== 'all' ? type : null
-
-    // Each UNION branch: id, event_type, title, subtitle, actor, target, amount, occurred_at
-    const branches = []
-
-    // ── Orders (placed / confirmed / completed) ──────────────────────────────
-    if (!typeFilter || typeFilter === 'order_placed') {
-      branches.push(`
-        SELECT co.id::text, 'order_placed' AS event_type,
-          'Order placed — ' || r.name AS title,
-          r.name || ' → ' || COALESCE((SELECT s.name FROM supplier s INNER JOIN order_item oi ON oi.supplier_id=s.id WHERE oi.order_id=co.id LIMIT 1),'?') AS subtitle,
-          r.name AS actor, NULL::text AS target,
-          co.total_amount::float AS amount,
-          COALESCE(co.placed_at, co.created_at) AS occurred_at
-        FROM customer_order co INNER JOIN restaurant r ON r.id=co.restaurant_id
-        WHERE co.status NOT IN ('DRAFT','CANCELLED')
-      `)
-    }
-    if (!typeFilter || typeFilter === 'order_confirmed') {
-      branches.push(`
-        SELECT co.id::text, 'order_confirmed' AS event_type,
-          'Order confirmed — ' || r.name AS title,
-          COALESCE((SELECT s.name FROM supplier s INNER JOIN order_item oi ON oi.supplier_id=s.id WHERE oi.order_id=co.id LIMIT 1),'?') || ' confirmed delivery' AS subtitle,
-          COALESCE((SELECT s.name FROM supplier s INNER JOIN order_item oi ON oi.supplier_id=s.id WHERE oi.order_id=co.id LIMIT 1),'?') AS actor,
-          r.name AS target,
-          co.total_amount::float AS amount,
-          co.updated_at AS occurred_at
-        FROM customer_order co INNER JOIN restaurant r ON r.id=co.restaurant_id
-        WHERE co.status='CONFIRMED'
-      `)
-    }
-
-    // ── Active carts with items ──────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'cart_updated') {
-      branches.push(`
-        SELECT co.id::text, 'cart_updated' AS event_type,
-          r.name || ' updated cart' AS title,
-          COUNT(oi.id)::text || ' items · ' || COALESCE(SUM(oi.line_total),0)::float::text AS subtitle,
-          r.name AS actor, NULL::text AS target,
-          COALESCE(SUM(oi.line_total),0)::float AS amount,
-          co.updated_at AS occurred_at
-        FROM customer_order co
-        INNER JOIN restaurant r ON r.id=co.restaurant_id
-        INNER JOIN order_item oi ON oi.order_id=co.id
-        WHERE co.status='DRAFT'
-        GROUP BY co.id, r.name, co.updated_at
-      `)
-    }
-
-    // ── New tenants registered ───────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'new_tenant') {
-      branches.push(`
-        SELECT id::text, 'new_tenant' AS event_type,
-          'New supplier: ' || name AS title,
-          contact_email AS subtitle,
-          name AS actor, NULL::text AS target, NULL::float AS amount, created_at AS occurred_at
-        FROM supplier
-        UNION ALL
-        SELECT id::text, 'new_tenant',
-          'New restaurant: ' || name,
-          contact_email, name, NULL, NULL, created_at
-        FROM restaurant
-      `)
-    }
-
-    // ── Plan changes ─────────────────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'plan_changed') {
-      branches.push(`
-        SELECT scl.id::text, 'plan_changed' AS event_type,
-          COALESCE(r.name, s.name,'?') || ' changed plan' AS title,
-          COALESCE(fp.name,'?') || ' → ' || COALESCE(tp.name,'?') AS subtitle,
-          COALESCE(r.name, s.name) AS actor, tp.name AS target,
-          NULL::float AS amount, scl.created_at AS occurred_at
-        FROM subscription_change_log scl
-        LEFT JOIN subscription sub ON sub.id=scl.subscription_id
-        LEFT JOIN restaurant r ON r.id=sub.tenant_id AND sub.tenant_type='RESTAURANT'
-        LEFT JOIN supplier s ON s.id=sub.tenant_id AND sub.tenant_type='SUPPLIER'
-        LEFT JOIN subscription_plan fp ON fp.id=scl.from_plan_id
-        LEFT JOIN subscription_plan tp ON tp.id=scl.to_plan_id
-      `)
-    }
-
-    // ── Subscription status changes (admin actions) ──────────────────────────
-    if (!typeFilter || typeFilter === 'subscription_status') {
-      branches.push(`
-        SELECT aal.id::text, 'subscription_status' AS event_type,
-          aal.action_type AS title,
-          aal.action_description AS subtitle,
-          aal.admin_name AS actor, NULL::text AS target,
-          NULL::float AS amount, aal.created_at AS occurred_at
-        FROM admin_audit_log aal
-        WHERE aal.action_type IN ('subscription.suspend','subscription.resume','subscription.updated')
-      `)
-    }
-
-    // ── Staff added ──────────────────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'staff_added') {
-      branches.push(`
-        SELECT sm.id::text, 'staff_added' AS event_type,
-          'Staff added at ' || r.name AS title,
-          sm.first_name || ' ' || sm.last_name || ' (' || COALESCE(sm.role,'?') || ')' AS subtitle,
-          r.name AS actor, sm.first_name || ' ' || sm.last_name AS target,
-          NULL::float AS amount, sm.created_at AS occurred_at
-        FROM staff_member sm INNER JOIN restaurant r ON r.id=sm.restaurant_id
-      `)
-    }
-
-    // ── Reservations ─────────────────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'reservation') {
-      branches.push(`
-        SELECT rv.id::text, 'reservation' AS event_type,
-          'Reservation at ' || r.name AS title,
-          rv.customer_name || ' · ' || rv.party_size || ' guests · ' || TO_CHAR(rv.scheduled_at,'DD Mon HH24:MI') AS subtitle,
-          r.name AS actor, rv.customer_name AS target,
-          NULL::float AS amount, rv.created_at AS occurred_at
-        FROM reservation rv INNER JOIN restaurant r ON r.id=rv.restaurant_id
-        WHERE rv.status NOT IN ('CANCELLED')
-      `)
-    }
-
-    // ── Invoices issued ──────────────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'invoice_issued') {
-      branches.push(`
-        SELECT i.id::text, 'invoice_issued' AS event_type,
-          'Invoice #' || i.invoice_number AS title,
-          COALESCE(s.name,'?') || ' → ' || COALESCE(r.name,'?') AS subtitle,
-          COALESCE(s.name,'?') AS actor, COALESCE(r.name,'?') AS target,
-          i.total_amount::float AS amount, i.created_at AS occurred_at
-        FROM invoice i
-        LEFT JOIN supplier s ON s.id=i.supplier_id
-        LEFT JOIN restaurant r ON r.id=i.restaurant_id
-        WHERE i.status IN ('ISSUED','PARTIALLY_PAID','PAID','OVERDUE')
-      `)
-    }
-
-    // ── Payments received ────────────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'payment_received') {
-      branches.push(`
-        SELECT p.id::text, 'payment_received' AS event_type,
-          'Payment received' AS title,
-          COALESCE(r.name,'?') || ' paid ' || p.payment_method AS subtitle,
-          COALESCE(r.name,'?') AS actor, COALESCE(s.name,'?') AS target,
-          p.payment_amount::float AS amount, p.created_at AS occurred_at
-        FROM payment p
-        LEFT JOIN invoice i ON i.id=p.invoice_id
-        LEFT JOIN supplier s ON s.id=i.supplier_id
-        LEFT JOIN restaurant r ON r.id=i.restaurant_id
-        WHERE p.status='COMPLETED'
-      `)
-    }
-
-    // ── Quick lists created ──────────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'quick_list') {
-      branches.push(`
-        SELECT ql.id::text, 'quick_list' AS event_type,
-          'Quick list created' AS title,
-          r.name || ' → ' || COALESCE(s.name,'?') || ': ' || ql.name AS subtitle,
-          r.name AS actor, COALESCE(s.name,'?') AS target,
-          NULL::float AS amount, ql.created_at AS occurred_at
-        FROM quick_list ql
-        INNER JOIN restaurant r ON r.id=ql.restaurant_id
-        LEFT JOIN supplier s ON s.id=ql.supplier_id
-      `)
-    }
-
-    // ── Receiving reports ────────────────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'receiving') {
-      branches.push(`
-        SELECT rr.id::text, 'receiving' AS event_type,
-          'Delivery received' AS title,
-          r.name || ' received from ' || COALESCE(s.name,'?') || ' — score: ' || COALESCE(rr.quality_score::text,'?') || '/5' AS subtitle,
-          COALESCE(s.name,'?') AS actor, r.name AS target,
-          rr.total_actual_cost::float AS amount, rr.received_at AS occurred_at
-        FROM receiving_report rr
-        INNER JOIN restaurant r ON r.id=rr.restaurant_id
-        LEFT JOIN supplier s ON s.id=rr.supplier_id
-        WHERE rr.status IN ('ACCEPTED','PARTIAL')
-      `)
-    }
-
-    // ── Chat conversations started ───────────────────────────────────────────
-    if (!typeFilter || typeFilter === 'chat_started') {
-      branches.push(`
-        SELECT c.id::text, 'chat_started' AS event_type,
-          'Chat started' AS title,
-          COALESCE(r.name,'?') || ' ↔ ' || COALESCE(s.name,'?') AS subtitle,
-          COALESCE(r.name,'?') AS actor, COALESCE(s.name,'?') AS target,
-          NULL::float AS amount, c.created_at AS occurred_at
-        FROM conversation c
-        LEFT JOIN restaurant r ON r.id=c.restaurant_id
-        LEFT JOIN supplier s ON s.id=c.supplier_id
-      `)
-    }
-
-    if (branches.length === 0) {
-      return res.json({
-        ok: true,
-        data: { events: [], total: 0, limit: lim, offset: off },
-        error: null,
-        requestId: req.requestId,
-      })
-    }
-
-    const unionSql = branches.map((q) => `(${q})`).join('\nUNION ALL\n')
-    const countSql = `SELECT COUNT(*) FROM (${unionSql}) ae`
-    const dataSql = `SELECT * FROM (${unionSql}) ae ORDER BY occurred_at DESC LIMIT $1 OFFSET $2`
-
-    const [countResult, dataResult] = await Promise.all([
-      query(countSql),
-      query(dataSql, [lim, off]),
-    ])
-
+    const data = await buildAdminActivityFeed({ limit, offset, type })
     res.json({
       ok: true,
-      data: {
-        events: dataResult.rows,
-        total: parseInt(countResult.rows[0].count),
-        limit: lim,
-        offset: off,
-      },
+      data,
       error: null,
       requestId: req.requestId,
     })

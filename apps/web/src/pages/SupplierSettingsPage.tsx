@@ -1041,7 +1041,9 @@ export function SupplierSettingsPage() {
             <Card>
               <CardContent className="py-8 text-center">
                 <p className="text-[var(--text-muted)] mb-3">
-                  Warehouse management requires Bronze or higher.
+                  Warehouse management requires Silver or higher. Free accounts do not include
+                  warehouse locations; any legacy default warehouse from older data is not usable
+                  until you upgrade.
                 </p>
                 <Button
                   variant="outline"
@@ -1089,8 +1091,8 @@ export function SupplierSettingsPage() {
                 <CardContent>
                   {!canAddWarehouse && (
                     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      Additional warehouses are not available on the Free plan. Upgrade to Bronze or
-                      higher to add warehouse locations.
+                      Your plan does not allow additional warehouses. Upgrade to Silver or higher to
+                      add locations. (Free tier: 0 warehouses; legacy default rows are not counted.)
                     </div>
                   )}
                   <div className="space-y-3">

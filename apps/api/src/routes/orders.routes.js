@@ -22,11 +22,6 @@ import {
 } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyOrderStatusChange } from '../services/notification.service.js'
-import {
-  applyOrderApprovalGate,
-  notifyApproverOfPendingOrder,
-  getOrderApprovalStatus,
-} from '../services/approvals.service.js'
 import { applyBestPromotionToOrder } from '../services/promotions.service.js'
 import {
   applyPromotionByIdToOrder,
@@ -729,52 +724,6 @@ router.get('/', async (req, res) => {
 router.use('/:orderId/amendments', orderAmendmentsRouter)
 router.use(ordersDriverRoutes)
 
-// Approval status for an order (approvals_budgets feature)
-router.get(
-  '/:id/approval-status',
-  requireAuth,
-  requireFeature(
-    'approvals_budgets',
-    (req) => req.tenantContext?.tenantId,
-    (req) => req.tenantContext?.tenantType
-  ),
-  async (req, res, next) => {
-    try {
-      const { id } = req.params
-      const tenant = await getRequestTenant(req)
-      const { rows: orders } = await query(
-        `SELECT restaurant_id FROM customer_order WHERE id = $1`,
-        [id]
-      )
-      if (!orders.length) throw new NotFoundError('Order not found')
-      if (tenant?.tenantType === 'RESTAURANT' && orders[0].restaurant_id !== tenant.tenantId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Access denied' },
-          requestId: req.requestId,
-        })
-      }
-      const { rows: orderRows } = await query(`SELECT status FROM customer_order WHERE id = $1`, [
-        id,
-      ])
-      const approval = await getOrderApprovalStatus(id)
-      res.json({
-        ok: true,
-        data: {
-          approval,
-          orderStatus: orderRows[0]?.status,
-          hasPendingApproval: approval?.status === 'pending',
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      next(error)
-    }
-  }
-)
-
 async function loadOrderWarehouseAssignments(orderId) {
   const { rows } = await query(
     `SELECT owa.*, w.name AS warehouse_name, w.code AS warehouse_code,
@@ -1355,23 +1304,6 @@ router.post(
             appliedPromotion,
           }
 
-          if (orderStatus === 'PLACED') {
-            const gate = await applyOrderApprovalGate({
-              client,
-              order: { ...order, total_amount: totalAmount },
-              restaurantId,
-              requestedByUserId: req.userData.id,
-            })
-            if (gate) {
-              finalOrder = {
-                ...finalOrder,
-                status: 'PENDING_APPROVAL',
-                approvalId: gate.approval.id,
-                approverId: gate.approverId,
-              }
-            }
-          }
-
           const { rows: supplierRows } = await client.query(
             `SELECT * FROM supplier WHERE id = $1`,
             [supplierId]
@@ -1407,7 +1339,7 @@ router.post(
           actor: req.userData.id,
         })
 
-        if (order.status === 'PLACED' || order.status === 'PENDING_APPROVAL') {
+        if (order.status === 'PLACED') {
           await writeAuditLog(req, {
             action_type: 'order.created',
             tenant_type: 'RESTAURANT',
@@ -1421,19 +1353,7 @@ router.post(
           })
         }
 
-        if (order.status === 'PENDING_APPROVAL' && order.approverId) {
-          try {
-            await notifyApproverOfPendingOrder({
-              approverId: order.approverId,
-              orderId: order.id,
-              orderTotal: order.total_amount,
-            })
-          } catch (notifError) {
-            logger.error('Failed to send approval notification', { error: notifError.message })
-          }
-        }
-
-        // Send notification to supplier about new order (only if PLACED, not DRAFT/pending approval)
+        // Send notification to supplier about new order (only if PLACED, not DRAFT)
         if (order.status === 'PLACED' && order.items.length > 0) {
           try {
             const supplierId = order.items[0].supplier_id

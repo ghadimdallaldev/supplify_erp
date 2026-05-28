@@ -15,6 +15,7 @@ import {
   getWarehouseSupplierColumn,
   getWarehouseOwnerInsertSpec,
   isDefaultWarehouse,
+  ensureDefaultWarehouseForPaidSupplier,
 } from '../lib/warehouse-helpers.js'
 import { buildSimulationFromPayload } from '../services/warehouseRouting.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
@@ -69,6 +70,8 @@ router.get(
           requestId: req.requestId,
         })
       }
+
+      await ensureDefaultWarehouseForPaidSupplier(supplierId)
 
       const supplierCol = await getWarehouseSupplierColumn()
       const { rows: warehouses } = await query(

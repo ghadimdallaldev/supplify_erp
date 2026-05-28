@@ -8,8 +8,8 @@ export const FEATURE_UPGRADE_COPY: Record<string, { plan: string; value: string 
     value: 'Upgrade to Gold to unlock reports and see usage and cost trends.',
   },
   quick_lists: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze to save recurring orders as quick lists and schedule reorders.',
+    plan: 'Silver',
+    value: 'Upgrade to Silver to save recurring orders as quick lists and schedule reorders.',
   },
   smart_reorder: {
     plan: 'Gold',
@@ -20,35 +20,39 @@ export const FEATURE_UPGRADE_COPY: Record<string, { plan: string; value: string 
     value: 'Upgrade to Gold to unlock multi-branch inventory and avoid manual sync.',
   },
   chat: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze to chat with more suppliers and send more messages.',
+    plan: 'Silver',
+    value: 'Upgrade to Silver to chat with more suppliers and send more messages.',
   },
 }
 
 export const LIMIT_UPGRADE_COPY: Record<string, { plan: string; value: string }> = {
   quick_lists: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze for more saved quick lists and scheduled reorders.',
+    plan: 'Silver',
+    value: 'Upgrade to Silver for more saved quick lists and scheduled reorders.',
   },
   quick_list_items: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze to add more products to your quick lists.',
+    plan: 'Silver',
+    value: 'Upgrade to Silver to add more products to your quick lists.',
   },
   scheduled_quick_lists: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze to schedule more recurring quick list orders.',
+    plan: 'Silver',
+    value: 'Upgrade to Silver to schedule more recurring quick list orders.',
   },
   supplier_deals: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze for unlimited deal redemptions each day.',
+    plan: 'Silver',
+    value: 'Upgrade to Silver to browse and redeem supplier deals at checkout.',
   },
   deal_redemptions_per_day: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze to apply more deal discounts each day.',
+    plan: 'Gold',
+    value: 'Upgrade to Gold for more deal redemptions per day (up to 50).',
   },
   promotions: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze to create more supplier deals and promotions.',
+    plan: 'Gold',
+    value: 'Upgrade to Gold for more active promotions on your catalog (up to 25).',
+  },
+  open_conversations: {
+    plan: 'Gold',
+    value: 'Upgrade to Gold for more open chat conversations with customers.',
   },
   orders_per_day: {
     plan: 'Gold',
@@ -63,8 +67,8 @@ export const LIMIT_UPGRADE_COPY: Record<string, { plan: string; value: string }>
     value: 'Upgrade to Gold to add more locations and manage inventory per branch.',
   },
   warehouses: {
-    plan: 'Bronze',
-    value: 'Upgrade to Bronze to add warehouses and organize stock by location.',
+    plan: 'Silver',
+    value: 'Upgrade to Silver to add warehouses and organize stock by location.',
   },
   restaurant_inventory_skus: {
     plan: 'Gold',
@@ -83,8 +87,8 @@ export const LIMIT_UPGRADE_COPY: Record<string, { plan: string; value: string }>
     value: 'Upgrade to Gold to add more team members and roles.',
   },
   storage_mb: {
-    plan: 'Gold',
-    value: 'Upgrade to Gold for more storage for images and documents.',
+    plan: 'Platinum',
+    value: 'Upgrade to Platinum for 30 GB storage and unlimited operational limits.',
   },
 }
 

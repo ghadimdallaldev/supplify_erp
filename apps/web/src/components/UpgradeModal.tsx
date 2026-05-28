@@ -17,6 +17,7 @@ import { Button } from './ui/button'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { openCheckoutPayment } from '../lib/openPaymentModal'
 import { Check, Lock, Minus, TrendingUp } from 'lucide-react'
+import { cn } from '../lib/utils'
 import { useEffect, useRef } from 'react'
 import {
   getLimitKeys,
@@ -25,19 +26,14 @@ import {
   FEATURE_KEY_LABELS,
   formatPlanFeatureCell,
   getPlanSubtitle,
+  PLAN_TIER_ORDER,
+  normalizePlanCode,
   formatPlanDisplayName,
 } from '../lib/planComparison'
 
-const PLAN_LABELS: Record<string, string> = {
-  free: 'Free Trial',
-  bronze: 'Bronze',
-  gold: 'Gold',
-  platinum: 'Platinum',
-}
-
 const PLAN_PRICE_FALLBACK: Record<string, string> = {
   free: '$0 trial',
-  bronze: '$49/mo',
+  silver: '$49/mo',
   gold: '$149/mo',
   platinum: '$349/mo',
 }
@@ -48,7 +44,7 @@ function getPlanPrice(plan: any): string {
       ? formatPlanDisplayName(plan.code, plan.name)
       : `$${plan.price_monthly}/mo`
   }
-  return PLAN_PRICE_FALLBACK[(plan.code || '').toLowerCase()] ?? '—'
+  return PLAN_PRICE_FALLBACK[normalizePlanCode(plan.code)] ?? '—'
 }
 
 function formatLimit(val: number | null | undefined): string {
@@ -123,22 +119,27 @@ export function UpgradeModal() {
   )
 
   const entitlements = entitlementsData?.entitlements
-  const TIER_ORDER = ['free', 'bronze', 'gold', 'platinum']
   const plans = [...(plansData?.plans ?? [])]
     .filter((p) => (p.code || '').toLowerCase() !== 'enterprise')
     .sort((a, b) => {
-      const ai = TIER_ORDER.indexOf((a.code || '').toLowerCase())
-      const bi = TIER_ORDER.indexOf((b.code || '').toLowerCase())
+      const ai = PLAN_TIER_ORDER.indexOf(
+        normalizePlanCode(a.code) as (typeof PLAN_TIER_ORDER)[number]
+      )
+      const bi = PLAN_TIER_ORDER.indexOf(
+        normalizePlanCode(b.code) as (typeof PLAN_TIER_ORDER)[number]
+      )
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
     })
   const tenantType =
     entitlements?.tenantType ?? (user?.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT')
   const limitKeys = getLimitKeys(tenantType)
   const featureKeys = getFeatureKeys(tenantType)
-  const currentCode = (entitlements?.plan?.code ?? 'free').toLowerCase()
-  const recommendedCode = recommendation?.recommendedPlanCode?.toLowerCase() ?? null
-  const currentPlanIndex = plans.findIndex((p) => (p.code || '').toLowerCase() === currentCode)
-  const currentPlanRow = plans.find((p) => (p.code || '').toLowerCase() === currentCode)
+  const currentCode = normalizePlanCode(entitlements?.plan?.code ?? 'free')
+  const recommendedCode = recommendation?.recommendedPlanCode
+    ? normalizePlanCode(recommendation.recommendedPlanCode)
+    : null
+  const currentPlanIndex = plans.findIndex((p) => normalizePlanCode(p.code) === currentCode)
+  const currentPlanRow = plans.find((p) => normalizePlanCode(p.code) === currentCode)
   const plansLoadingState = plansLoading && plans.length === 0
   const showPlans = !plansLoadingState && plans.length >= 1
   const showComparison = showPlans && plans.length >= 2
@@ -189,9 +190,7 @@ export function UpgradeModal() {
     const onUpgradePage = isOnUpgradeDestination(location.pathname, location.search, upgradePath)
     const code = targetCode ?? recommendedCode ?? null
     const planLabel = code
-      ? (plans.find((p) => (p.code || '').toLowerCase() === code)?.name ??
-        PLAN_LABELS[code] ??
-        code)
+      ? formatPlanDisplayName(code, plans.find((p) => normalizePlanCode(p.code) === code)?.name)
       : (recommendation?.recommendedPlanName ?? 'a paid plan')
     const currentPlan =
       (payload as { currentPlan?: string }).currentPlan ??
@@ -212,8 +211,8 @@ export function UpgradeModal() {
     if (!canUpgrade) return
 
     const targetPlan = code
-      ? plans.find((p) => (p.code || '').toLowerCase() === code)
-      : plans.find((p) => (p.code || '').toLowerCase() === (recommendedCode ?? ''))
+      ? plans.find((p) => normalizePlanCode(p.code) === code)
+      : plans.find((p) => normalizePlanCode(p.code) === (recommendedCode ?? ''))
 
     if (targetPlan?.id && (targetPlan.code || '').toLowerCase() === 'free') {
       dispatch(closeMonetizationModal())
@@ -279,7 +278,7 @@ export function UpgradeModal() {
     (payload as { currentPlan?: string }).currentPlan ?? entitlements?.plan?.name ?? 'Current plan'
   const recommendedPlanName =
     recommendation?.recommendedPlanName ??
-    (recommendedCode ? (PLAN_LABELS[recommendedCode] ?? recommendedCode) : null)
+    (recommendedCode ? formatPlanDisplayName(recommendedCode) : null)
 
   const colCount = Math.max(plans.length, 1)
 
@@ -291,7 +290,7 @@ export function UpgradeModal() {
         if (!v) handleClose()
       }}
     >
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {type === 'limit' || (!isBrowseUpgrade && type === 'feature') ? (
@@ -377,8 +376,12 @@ export function UpgradeModal() {
           {/* Plan cards */}
           {showPlans && (
             <div
-              className="grid gap-3"
-              style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}
+              className={cn(
+                'grid gap-3 grid-cols-1 min-w-0',
+                colCount >= 2 && 'sm:grid-cols-2',
+                colCount >= 3 && 'lg:grid-cols-3',
+                colCount >= 4 && 'xl:grid-cols-4'
+              )}
             >
               {plans.map((plan, i) => {
                 const code = (plan.code || '').toLowerCase()
@@ -478,130 +481,133 @@ export function UpgradeModal() {
 
           {/* Comparison table */}
           {showComparison && (
-            <div className="overflow-hidden rounded-lg border border-[var(--app-border)]">
-              {/* Header row */}
-              <div
-                className="grid border-b border-[var(--app-border)] bg-[var(--bg)]"
-                style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
-              >
-                <div className="p-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                  Plan details
-                </div>
-                {plans.map((plan) => {
-                  const code = (plan.code || '').toLowerCase()
-                  const isCurrent = code === currentCode
-                  return (
-                    <div
-                      key={plan.code}
-                      className={`p-2 text-center ${isCurrent ? 'bg-[var(--brand-ultra)]' : ''}`}
-                    >
+            <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
+              <div className="min-w-[520px]">
+                {/* Header row */}
+                <div
+                  className="grid border-b border-[var(--app-border)] bg-[var(--bg)]"
+                  style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
+                >
+                  <div className="p-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                    Plan details
+                  </div>
+                  {plans.map((plan) => {
+                    const code = (plan.code || '').toLowerCase()
+                    const isCurrent = code === currentCode
+                    return (
                       <div
-                        className={`text-xs font-semibold ${
-                          isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)]'
-                        }`}
+                        key={plan.code}
+                        className={`p-2 text-center ${isCurrent ? 'bg-[var(--brand-ultra)]' : ''}`}
                       >
-                        {plan.name}
-                        {isCurrent && ' ✓'}
+                        <div
+                          className={`text-xs font-semibold ${
+                            isCurrent ? 'text-[var(--brand-mid)]' : 'text-[var(--text-mid)]'
+                          }`}
+                        >
+                          {plan.name}
+                          {isCurrent && ' ✓'}
+                        </div>
                       </div>
+                    )
+                  })}
+                </div>
+
+                {/* Limit rows */}
+                {limitKeys.map((key) => (
+                  <div
+                    key={key}
+                    className="grid border-b border-[var(--app-border)] last:border-b-0"
+                    style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
+                  >
+                    <div className="p-2 text-xs text-[var(--text-muted)]">
+                      {LIMIT_KEY_LABELS[key] ?? key}
                     </div>
-                  )
-                })}
+                    {plans.map((plan) => {
+                      const code = (plan.code || '').toLowerCase()
+                      const isCurrent = code === currentCode
+                      const rawVal = isCurrent
+                        ? (currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key])
+                        : plan.limits?.[key]
+                      const val = toLimitNum(rawVal)
+                      const curVal = toLimitNum(
+                        currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key]
+                      )
+                      const better = !isCurrent && isBetterLimit(val, curVal)
+                      const worse = !isCurrent && isWorseThanCurrent(val, curVal)
+                      return (
+                        <div
+                          key={plan.code}
+                          className={`p-2 text-center text-xs ${
+                            isCurrent
+                              ? 'bg-[var(--brand-ultra)] font-semibold text-[var(--brand-mid)]'
+                              : better
+                                ? 'font-medium text-emerald-700'
+                                : worse
+                                  ? 'text-[var(--text-muted)]'
+                                  : 'text-[var(--text)]'
+                          }`}
+                        >
+                          {formatLimit(val)}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+
+                {/* Feature rows */}
+                {featureKeys.map((key) => (
+                  <div
+                    key={key}
+                    className="grid border-b border-[var(--app-border)] last:border-b-0"
+                    style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
+                  >
+                    <div className="p-2 text-xs text-[var(--text-muted)]">
+                      {FEATURE_KEY_LABELS[key] ?? key}
+                    </div>
+                    {plans.map((plan) => {
+                      const code = (plan.code || '').toLowerCase()
+                      const isCurrent = code === currentCode
+                      const rawVal = isCurrent
+                        ? (currentPlanRow?.features?.[key] ?? entitlements?.features?.[key])
+                        : plan.features?.[key]
+                      const cell = formatPlanFeatureCell(key, rawVal)
+                      const curRaw =
+                        currentPlanRow?.features?.[key] ?? entitlements?.features?.[key]
+                      const curCell = formatPlanFeatureCell(key, curRaw)
+                      const better = !isCurrent && cell.enabled && !curCell.enabled
+                      return (
+                        <div
+                          key={plan.code}
+                          className={`flex flex-col items-center justify-center gap-0.5 p-2 ${
+                            isCurrent ? 'bg-[var(--brand-ultra)]' : ''
+                          }`}
+                        >
+                          {cell.enabled ? (
+                            <>
+                              <Check
+                                className={`h-3.5 w-3.5 ${
+                                  isCurrent
+                                    ? 'text-[var(--brand-mid)]'
+                                    : better
+                                      ? 'text-emerald-600'
+                                      : 'text-[var(--text-muted)]'
+                                }`}
+                              />
+                              {cell.caption && (
+                                <span className="text-[9px] leading-tight text-[var(--text-muted)] text-center">
+                                  {cell.caption}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <Minus className="h-3.5 w-3.5 text-[var(--app-border-mid)]" />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
               </div>
-
-              {/* Limit rows */}
-              {limitKeys.map((key) => (
-                <div
-                  key={key}
-                  className="grid border-b border-[var(--app-border)] last:border-b-0"
-                  style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
-                >
-                  <div className="p-2 text-xs text-[var(--text-muted)]">
-                    {LIMIT_KEY_LABELS[key] ?? key}
-                  </div>
-                  {plans.map((plan) => {
-                    const code = (plan.code || '').toLowerCase()
-                    const isCurrent = code === currentCode
-                    const rawVal = isCurrent
-                      ? (currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key])
-                      : plan.limits?.[key]
-                    const val = toLimitNum(rawVal)
-                    const curVal = toLimitNum(
-                      currentPlanRow?.limits?.[key] ?? entitlements?.limits?.[key]
-                    )
-                    const better = !isCurrent && isBetterLimit(val, curVal)
-                    const worse = !isCurrent && isWorseThanCurrent(val, curVal)
-                    return (
-                      <div
-                        key={plan.code}
-                        className={`p-2 text-center text-xs ${
-                          isCurrent
-                            ? 'bg-[var(--brand-ultra)] font-semibold text-[var(--brand-mid)]'
-                            : better
-                              ? 'font-medium text-emerald-700'
-                              : worse
-                                ? 'text-[var(--text-muted)]'
-                                : 'text-[var(--text)]'
-                        }`}
-                      >
-                        {formatLimit(val)}
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-
-              {/* Feature rows */}
-              {featureKeys.map((key) => (
-                <div
-                  key={key}
-                  className="grid border-b border-[var(--app-border)] last:border-b-0"
-                  style={{ gridTemplateColumns: `1.4fr repeat(${colCount}, 1fr)` }}
-                >
-                  <div className="p-2 text-xs text-[var(--text-muted)]">
-                    {FEATURE_KEY_LABELS[key] ?? key}
-                  </div>
-                  {plans.map((plan) => {
-                    const code = (plan.code || '').toLowerCase()
-                    const isCurrent = code === currentCode
-                    const rawVal = isCurrent
-                      ? (currentPlanRow?.features?.[key] ?? entitlements?.features?.[key])
-                      : plan.features?.[key]
-                    const cell = formatPlanFeatureCell(key, rawVal)
-                    const curRaw = currentPlanRow?.features?.[key] ?? entitlements?.features?.[key]
-                    const curCell = formatPlanFeatureCell(key, curRaw)
-                    const better = !isCurrent && cell.enabled && !curCell.enabled
-                    return (
-                      <div
-                        key={plan.code}
-                        className={`flex flex-col items-center justify-center gap-0.5 p-2 ${
-                          isCurrent ? 'bg-[var(--brand-ultra)]' : ''
-                        }`}
-                      >
-                        {cell.enabled ? (
-                          <>
-                            <Check
-                              className={`h-3.5 w-3.5 ${
-                                isCurrent
-                                  ? 'text-[var(--brand-mid)]'
-                                  : better
-                                    ? 'text-emerald-600'
-                                    : 'text-[var(--text-muted)]'
-                              }`}
-                            />
-                            {cell.caption && (
-                              <span className="text-[9px] leading-tight text-[var(--text-muted)] text-center">
-                                {cell.caption}
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <Minus className="h-3.5 w-3.5 text-[var(--app-border-mid)]" />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
             </div>
           )}
 
@@ -612,7 +618,7 @@ export function UpgradeModal() {
           )}
 
           {/* Bottom actions */}
-          <div className="-mb-2 -mx-6 flex flex-wrap gap-2 border-t border-[var(--app-border)] bg-[var(--surface)] px-6 pb-2 pt-4 sticky bottom-0">
+          <div className="-mb-2 -mx-4 flex flex-wrap gap-2 border-t border-[var(--app-border)] bg-[var(--surface)] px-4 pb-2 pt-4 sticky bottom-0 sm:-mx-6 sm:px-6">
             {canUpgrade && recommendedCode && recommendedCode !== currentCode && (
               <Button
                 type="button"

@@ -38,6 +38,21 @@ import { useAppSelector } from '../hooks/redux'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
+import {
+  CardActionGrid,
+  CardFooterMeta,
+  CardMetaLine,
+  CardStatusBadges,
+  cardActionBtnClass,
+  cardShellClass,
+  formatAddressLine,
+  pageHeaderRowClass,
+} from '../components/ui/card-layout'
+
+function isSupplierNew(createdAt: string) {
+  const daysSince = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
+  return daysSince <= 30
+}
 
 export function SuppliersPage() {
   const { user } = useAppSelector((state) => state.auth)
@@ -153,8 +168,8 @@ export function SuppliersPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-4 sm:p-6 min-w-0">
+      <div className={pageHeaderRowClass}>
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Suppliers</h1>
           <p className="text-[var(--text-muted)] mt-2">
@@ -239,8 +254,8 @@ export function SuppliersPage() {
       {isRestaurant && (
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
+            <div className="flex flex-col gap-4 md:flex-row md:flex-wrap">
+              <div className="flex-1 min-w-0 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
                   placeholder="Search suppliers by name, email, or city..."
@@ -253,9 +268,9 @@ export function SuppliersPage() {
                 placeholder="Filter by city..."
                 value={cityFilter}
                 onChange={(e) => setCityFilter(e.target.value)}
-                className="w-48"
+                className="w-full md:w-48"
               />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={filterBy === 'all' ? 'default' : 'outline'}
                   size="sm"
@@ -328,192 +343,194 @@ export function SuppliersPage() {
           </CardContent>
         </Card>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSuppliers.map((supplier: any) => (
-            <Card
-              key={supplier.id}
-              className="hover:shadow-lg transition-all duration-200 relative group"
-            >
-              {/* Follow Badge */}
-              {isRestaurant && supplier.is_followed && (
-                <div className="absolute top-4 right-4 z-10">
-                  <Badge className="bg-[var(--brand)] text-white flex items-center gap-1 shadow-md">
-                    <Heart className="h-3 w-3 fill-current" />
-                    Following
-                  </Badge>
-                </div>
-              )}
-
-              {/* New Badge */}
-              {(() => {
-                const created = new Date(supplier.created_at)
-                const daysSince = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24)
-                if (daysSince <= 30) {
-                  return (
-                    <div className="absolute top-4 left-4 z-10">
-                      <Badge className="bg-[var(--mint)] text-white flex items-center gap-1 shadow-md">
-                        <Sparkles className="h-3 w-3" />
-                        New
-                      </Badge>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {filteredSuppliers.map((supplier: any) => {
+            const locationLine = formatAddressLine(supplier.address_json)
+            const isNew = isSupplierNew(supplier.created_at)
+            return (
+              <Card
+                key={supplier.id}
+                className={`${cardShellClass} hover:shadow-lg transition-all duration-200 group`}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    {supplier.logo_url ? (
+                      <img
+                        src={supplier.logo_url}
+                        alt={supplier.name}
+                        className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
+                        onError={(e) => {
+                          // Fallback to gradient if image fails to load
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                          const fallback = target.nextElementSibling as HTMLDivElement
+                          if (fallback) fallback.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`h-12 w-12 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-lg shadow-md ${supplier.logo_url ? 'hidden' : ''}`}
+                    >
+                      {supplier.name.charAt(0).toUpperCase()}
                     </div>
-                  )
-                }
-                return null
-              })()}
-
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-3">
-                  {supplier.logo_url ? (
-                    <img
-                      src={supplier.logo_url}
-                      alt={supplier.name}
-                      className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
-                      onError={(e) => {
-                        // Fallback to gradient if image fails to load
-                        const target = e.target as HTMLImageElement
-                        target.style.display = 'none'
-                        const fallback = target.nextElementSibling as HTMLDivElement
-                        if (fallback) fallback.style.display = 'flex'
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className={`h-12 w-12 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--brand-mid)] flex items-center justify-center text-white font-bold text-lg shadow-md ${supplier.logo_url ? 'hidden' : ''}`}
-                  >
-                    {supplier.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg truncate flex items-center gap-2">
-                      <span className="truncate">{supplier.name}</span>
-                      {supplier.avg_rating != null && Number(supplier.avg_rating) > 0 ? (
-                        <span className="inline-flex items-center gap-0.5 text-sm font-normal text-amber-600 shrink-0">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          {Number(supplier.avg_rating).toFixed(1)}
-                        </span>
-                      ) : null}
-                    </CardTitle>
-                    <CardDescription className="truncate">{supplier.slug}</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                {/* Key Stats */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-[var(--brand-ultra)] rounded-lg p-3 border border-[var(--app-border)]">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Package className="h-4 w-4 text-[var(--brand-mid)]" />
-                      <span className="text-xs font-medium text-[var(--brand-mid)]">Products</span>
-                    </div>
-                    <p className="text-xl font-bold text-[var(--text)]">
-                      {Number(supplier.product_count || 0)}
-                    </p>
-                  </div>
-                  {supplier.avg_price > 0 && (
-                    <div className="bg-[var(--mint-pale)] rounded-lg p-3 border border-[var(--mint)]/25">
-                      <div className="flex items-center gap-2 mb-1">
-                        <TrendingUp className="h-4 w-4 text-[var(--mint)]" />
-                        <span className="text-xs font-medium text-[var(--mint)]">Avg Price</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-lg min-w-0 flex-1">
+                          <span className="block truncate">{supplier.name}</span>
+                          {supplier.avg_rating != null && Number(supplier.avg_rating) > 0 ? (
+                            <span className="inline-flex items-center gap-0.5 text-sm font-normal text-amber-600 mt-0.5">
+                              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                              {Number(supplier.avg_rating).toFixed(1)}
+                            </span>
+                          ) : null}
+                        </CardTitle>
+                        <CardStatusBadges className="shrink-0 max-w-[45%] justify-end">
+                          {isNew && (
+                            <Badge className="bg-[var(--mint)] text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
+                              <Sparkles className="h-3 w-3 shrink-0" />
+                              New
+                            </Badge>
+                          )}
+                          {isRestaurant && supplier.is_followed && (
+                            <Badge className="bg-[var(--brand)] text-white flex items-center gap-1 shadow-sm text-[10px] px-1.5 py-0">
+                              <Heart className="h-3 w-3 fill-current shrink-0" />
+                              Following
+                            </Badge>
+                          )}
+                        </CardStatusBadges>
                       </div>
-                      <p className="text-xl font-bold text-[var(--mint)]">
-                        ${formatPrice(supplier.avg_price)}
+                      <CardDescription className="truncate mt-1">{supplier.slug}</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  {/* Key Stats */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-[var(--brand-ultra)] rounded-lg p-3 border border-[var(--app-border)]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Package className="h-4 w-4 text-[var(--brand-mid)]" />
+                        <span className="text-xs font-medium text-[var(--brand-mid)]">
+                          Products
+                        </span>
+                      </div>
+                      <p className="text-xl font-bold text-[var(--text)]">
+                        {Number(supplier.product_count || 0)}
                       </p>
                     </div>
-                  )}
-                </div>
-
-                {/* Location */}
-                {supplier.address_json && (
-                  <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] bg-[var(--brand-ultra)] rounded-md p-2">
-                    <MapPin className="h-4 w-4 text-[var(--text-muted)]" />
-                    <span className="truncate">
-                      {supplier.address_json.city}, {supplier.address_json.country}
-                    </span>
+                    {supplier.avg_price > 0 && (
+                      <div className="bg-[var(--mint-pale)] rounded-lg p-3 border border-[var(--mint)]/25">
+                        <div className="flex items-center gap-2 mb-1">
+                          <TrendingUp className="h-4 w-4 text-[var(--mint)]" />
+                          <span className="text-xs font-medium text-[var(--mint)]">Avg Price</span>
+                        </div>
+                        <p className="text-xl font-bold text-[var(--mint)]">
+                          ${formatPrice(supplier.avg_price)}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
 
-                {/* Contact Quick Access */}
-                <div className="flex items-center gap-2 text-sm">
-                  {supplier.contact_email && (
-                    <a
-                      href={`mailto:${supplier.contact_email}`}
-                      className="flex items-center gap-1 text-[var(--brand-mid)] hover:text-[var(--brand-mid)] hover:underline"
-                    >
-                      <Mail className="h-3 w-3" />
-                      <span className="truncate text-xs">{supplier.contact_email}</span>
+                  {/* Location */}
+                  {locationLine ? (
+                    <CardMetaLine icon={MapPin} className="bg-[var(--brand-ultra)] rounded-md p-2">
+                      {locationLine}
+                    </CardMetaLine>
+                  ) : isRestaurant ? (
+                    <CardMetaLine icon={MapPin} className="italic">
+                      Location not provided
+                    </CardMetaLine>
+                  ) : null}
+
+                  {/* Contact */}
+                  {supplier.contact_email ? (
+                    <a href={`mailto:${supplier.contact_email}`} className="block min-w-0">
+                      <CardMetaLine
+                        icon={Mail}
+                        muted={false}
+                        className="text-[var(--brand-mid)] hover:underline"
+                      >
+                        {supplier.contact_email}
+                      </CardMetaLine>
                     </a>
-                  )}
-                </div>
+                  ) : null}
 
-                {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t flex-wrap">
-                  {isRestaurant && (
-                    <Button variant="default" size="sm" className="flex-1 min-w-0" asChild>
-                      <Link to={`/app/chat?supplier=${supplier.id}`}>
-                        <MessageCircle className="h-4 w-4 mr-1 shrink-0" />
-                        Message
+                  {/* Actions */}
+                  <CardActionGrid>
+                    {isRestaurant && (
+                      <Button variant="default" size="sm" className={cardActionBtnClass()} asChild>
+                        <Link to={`/app/chat?supplier=${supplier.id}`}>
+                          <MessageCircle className="h-4 w-4 mr-1 shrink-0" />
+                          Message
+                        </Link>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cardActionBtnClass()}
+                      onClick={() => handleViewProducts(supplier.id)}
+                    >
+                      <Package className="h-4 w-4 mr-1 shrink-0" />
+                      Products
+                    </Button>
+                    <Button variant="outline" size="sm" className={cardActionBtnClass()} asChild>
+                      <Link to={`/app/suppliers/${supplier.id}`}>
+                        <Eye className="h-4 w-4 mr-1 shrink-0" />
+                        View
                       </Link>
                     </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 min-w-0"
-                    onClick={() => handleViewProducts(supplier.id)}
-                  >
-                    <Package className="h-4 w-4 mr-1 shrink-0" />
-                    Products
-                  </Button>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/app/suppliers/${supplier.id}`}>
-                      <Eye className="h-4 w-4 mr-1 shrink-0" />
-                      View
-                    </Link>
-                  </Button>
-                  {isRestaurant && (
-                    <>
-                      {!supplier.is_followed ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleFollow(supplier.id)}
-                          className="text-[var(--red)] hover:text-[var(--red)] hover:bg-[var(--red-pale)]"
-                        >
-                          <Heart className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleUnfollow(supplier.id)}
-                          className="text-[var(--red)] bg-[var(--red-pale)] hover:bg-[var(--red-pale)]"
-                        >
-                          <Heart className="h-4 w-4 fill-current" />
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
+                    {isRestaurant && (
+                      <>
+                        {!supplier.is_followed ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleFollow(supplier.id)}
+                            className={`${cardActionBtnClass({ iconOnly: true })} text-[var(--red)] hover:text-[var(--red)] hover:bg-[var(--red-pale)]`}
+                            aria-label="Follow supplier"
+                          >
+                            <Heart className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUnfollow(supplier.id)}
+                            className={`${cardActionBtnClass({ iconOnly: true })} text-[var(--red)] bg-[var(--red-pale)] hover:bg-[var(--red-pale)]`}
+                            aria-label="Unfollow supplier"
+                          >
+                            <Heart className="h-4 w-4 fill-current" />
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </CardActionGrid>
 
-                {/* Additional Info */}
-                <div className="flex items-center justify-between text-xs text-[var(--text-muted)] pt-2 border-t">
-                  {supplier.vat_no && <span>VAT: {supplier.vat_no}</span>}
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {new Date(supplier.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <CardFooterMeta
+                    left={supplier.vat_no ? `VAT: ${supplier.vat_no}` : undefined}
+                    right={
+                      <>
+                        <Clock className="h-3 w-3 shrink-0" aria-hidden />
+                        <span>Joined {new Date(supplier.created_at).toLocaleDateString()}</span>
+                      </>
+                    }
+                  />
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <div className="space-y-4">
           {filteredSuppliers.map((supplier: any) => (
-            <Card key={supplier.id} className="hover:shadow-md transition-shadow">
+            <Card
+              key={supplier.id}
+              className={`${cardShellClass} hover:shadow-md transition-shadow`}
+            >
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
                     {supplier.logo_url ? (
                       <img
                         src={supplier.logo_url}
@@ -542,27 +559,29 @@ export function SuppliersPage() {
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
-                        <span className="flex items-center gap-1">
-                          <Package className="h-4 w-4" />
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--text-muted)]">
+                        <span className="flex items-center gap-1 shrink-0">
+                          <Package className="h-4 w-4 shrink-0" />
                           {Number(supplier.product_count || 0)} Products
                         </span>
                         {supplier.avg_price > 0 && (
-                          <span className="flex items-center gap-1">
-                            <TrendingUp className="h-4 w-4" />
+                          <span className="flex items-center gap-1 shrink-0">
+                            <TrendingUp className="h-4 w-4 shrink-0" />
                             Avg: ${formatPrice(supplier.avg_price)}
                           </span>
                         )}
-                        {supplier.address_json && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {supplier.address_json.city}, {supplier.address_json.country}
+                        {formatAddressLine(supplier.address_json) ? (
+                          <span className="flex min-w-0 items-center gap-1">
+                            <MapPin className="h-4 w-4 shrink-0" />
+                            <span className="truncate">
+                              {formatAddressLine(supplier.address_json)}
+                            </span>
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
                     {isRestaurant && (
                       <Button variant="default" size="sm" asChild>
                         <Link to={`/app/chat?supplier=${supplier.id}`}>

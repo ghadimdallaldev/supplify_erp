@@ -114,10 +114,23 @@ export function formatPlanFeatureCell(
   return { enabled }
 }
 
-/** Plan value subtitles (pricing psychology). Do not change DB plan codes. */
+/** Self-serve tier order (excludes enterprise). */
+export const PLAN_TIER_ORDER = ['free', 'silver', 'gold', 'platinum'] as const
+
+/** Legacy API / cache codes mapped to canonical DB codes. */
+export const LEGACY_PLAN_CODE_ALIASES: Record<string, string> = {
+  bronze: 'silver',
+}
+
+export function normalizePlanCode(code: string | null | undefined): string {
+  const c = (code || '').toLowerCase().trim()
+  return LEGACY_PLAN_CODE_ALIASES[c] ?? c
+}
+
+/** Plan value subtitles (pricing psychology). */
 export const PLAN_SUBTITLES: Record<string, string> = {
   free: 'Time-limited trial',
-  bronze: 'Starter',
+  silver: 'Starter',
   gold: 'Most Popular',
   platinum: 'Unlimited Ops',
 }
@@ -127,15 +140,18 @@ export function formatPlanDisplayName(
   planCode: string | null | undefined,
   planName?: string | null
 ): string {
-  const code = (planCode || '').toLowerCase()
+  const code = normalizePlanCode(planCode)
   if (code === 'free') return 'Free Trial'
-  if (planName?.trim()) return planName.trim()
+  if (code === 'silver') return 'Silver'
+  const name = (planName || '').trim()
+  if (name === 'Bronze') return 'Silver'
+  if (name) return name
   return 'Plan'
 }
 
 export function getPlanSubtitle(planCode: string | null | undefined): string {
   if (!planCode) return ''
-  const key = planCode.toLowerCase().replace(/\s/g, '')
+  const key = normalizePlanCode(planCode).replace(/\s/g, '')
   return PLAN_SUBTITLES[key] ?? ''
 }
 
@@ -147,8 +163,12 @@ export function getFeatureKeys(tenantType: 'RESTAURANT' | 'SUPPLIER'): readonly 
   return tenantType === 'RESTAURANT' ? RESTAURANT_FEATURE_KEYS : SUPPLIER_FEATURE_KEYS
 }
 
+function titleCaseFromSnake(limitKey: string): string {
+  return limitKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 export function getLimitLabel(limitKey: string): string {
-  return LIMIT_KEY_LABELS[limitKey] ?? limitKey.replace(/_/g, ' ')
+  return LIMIT_KEY_LABELS[limitKey] ?? titleCaseFromSnake(limitKey)
 }
 
 export function getFeatureLabel(featureKey: string): string {

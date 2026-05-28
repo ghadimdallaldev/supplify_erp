@@ -41,6 +41,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { formatCurrency, formatPrice } from '../utils/format'
+import { splitRowClass } from '../components/ui/card-layout'
 import {
   useGetRestaurantInvoicesQuery,
   useGetRestaurantInvoiceQuery,
@@ -531,9 +532,9 @@ export function InvoicesPage() {
                       setShowInvoiceDetail(true)
                     }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                    <div className={splitRowClass}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                           <h3 className="font-semibold">{invoice.invoice_number}</h3>
                           <Badge variant={getStatusColor(invoice.status)}>
                             {getStatusIcon(invoice.status)}
@@ -566,8 +567,10 @@ export function InvoicesPage() {
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-semibold">{formatPrice(invoice.total_amount)}</p>
+                      <div className="text-left sm:text-right shrink-0 min-w-[7rem]">
+                        <p className="text-lg font-semibold tabular-nums">
+                          {formatPrice(invoice.total_amount)}
+                        </p>
                         <p
                           className={`text-sm ${remaining > 0 ? 'text-[var(--red)] font-semibold' : 'text-[var(--mint)]'}`}
                         >

@@ -1,6 +1,36 @@
 // Plan enforcement utilities for branches and warehouses
 import { query } from './db.js'
 import { logger } from './logger.js'
+import { getWarehouseSupplierColumn } from './warehouse-helpers.js'
+
+/**
+ * Count location accounts for plan enforcement and usage meters.
+ * Prefers org sub-tenants (restaurant/supplier rows under organization_id);
+ * falls back to primary + tenant_account_link for legacy linked accounts.
+ */
+export async function countActiveBranchLocations(tenantId, tenantType) {
+  const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+  const { rows: orgRows } = await query(`SELECT organization_id FROM ${table} WHERE id = $1`, [
+    tenantId,
+  ])
+  const organizationId = orgRows[0]?.organization_id
+  if (organizationId) {
+    const { rows: countRows } = await query(
+      `SELECT COUNT(*)::int AS count FROM ${table}
+       WHERE organization_id = $1 AND is_branch_active = TRUE`,
+      [organizationId]
+    )
+    return parseInt(countRows[0]?.count || 0, 10)
+  }
+
+  const { rows: countRows } = await query(
+    `SELECT COUNT(*)::int AS count FROM tenant_account_link
+     WHERE parent_tenant_id = $1 AND parent_tenant_type = $2`,
+    [tenantId, tenantType]
+  )
+  const linked = parseInt(countRows[0]?.count || 0, 10)
+  return 1 + linked
+}
 
 /**
  * Check if a tenant can create a branch (restaurants only)
@@ -37,18 +67,9 @@ async function checkBranchLimit(tenantId, currentUsage = null) {
     const limits = subscription.plan_limits || {}
     const branchLimit = limits.branches !== undefined ? parseInt(limits.branches) : -1
 
-    // Total location accounts: primary + linked branch tenants
     let branchCount = currentUsage?.branches_count
     if (branchCount === undefined || branchCount === null) {
-      const { rows: countRows } = await query(
-        `
-        SELECT COUNT(*) as count FROM tenant_account_link
-        WHERE parent_tenant_id = $1 AND parent_tenant_type = 'RESTAURANT'
-      `,
-        [tenantId]
-      )
-      const linked = parseInt(countRows[0]?.count || 0, 10)
-      branchCount = 1 + linked
+      branchCount = await countActiveBranchLocations(tenantId, 'RESTAURANT')
     }
 
     // Check if unlimited
@@ -129,16 +150,14 @@ async function checkWarehouseLimit(tenantId, currentUsage = null) {
     const limits = subscription.plan_limits || {}
     const warehouseLimit = limits.warehouses !== undefined ? parseInt(limits.warehouses) : -1
 
-    // Get current warehouse count
     let warehouseCount = currentUsage?.warehouses_count
     if (warehouseCount === undefined || warehouseCount === null) {
+      const supplierCol = await getWarehouseSupplierColumn()
       const { rows: countRows } = await query(
-        `
-        SELECT COUNT(*) as count FROM warehouse WHERE tenant_id = $1 AND is_active = TRUE
-      `,
+        `SELECT COUNT(*)::int AS count FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
         [tenantId]
       )
-      warehouseCount = parseInt(countRows[0]?.count || 0)
+      warehouseCount = parseInt(countRows[0]?.count || 0, 10)
     }
 
     // Check if unlimited
@@ -165,12 +184,12 @@ async function checkWarehouseLimit(tenantId, currentUsage = null) {
     }
 
     // Over limit
-    const eligiblePlans = ['Bronze', 'Gold', 'Platinum']
+    const eligiblePlans = ['Silver', 'Gold', 'Platinum']
     return {
       allowed: false,
       reason: `Warehouse limit reached. You have ${warehouseCount}/${warehouseLimit} warehouses on ${subscription.plan_name} plan.`,
       currentPlan: subscription.plan_name,
-      requiredPlan: eligiblePlans.find((p) => p !== subscription.plan_name) || 'Bronze',
+      requiredPlan: eligiblePlans.find((p) => p !== subscription.plan_name) || 'Silver',
       limit: warehouseLimit,
       current: warehouseCount,
     }
@@ -219,15 +238,7 @@ async function checkLinkedAccountLimit(tenantId, tenantType, currentUsage = null
 
     let branchCount = currentUsage?.branches_count
     if (branchCount === undefined || branchCount === null) {
-      const { rows: countRows } = await query(
-        `
-        SELECT COUNT(*) as count FROM tenant_account_link
-        WHERE parent_tenant_id = $1 AND parent_tenant_type = 'SUPPLIER'
-      `,
-        [tenantId]
-      )
-      const linked = parseInt(countRows[0]?.count || 0, 10)
-      branchCount = 1 + linked
+      branchCount = await countActiveBranchLocations(tenantId, 'SUPPLIER')
     }
 
     if (branchLimit === -1) {

@@ -217,7 +217,7 @@ export function Layout() {
             <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
             {user?.role !== 'ADMIN' && <BillingOverdueBanner />}
             {user?.role !== 'ADMIN' && externallyDisabledFeatures.length > 0 && e && (
-              <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <div className="mx-3 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:mx-6">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex gap-2">
                     <Lock className="h-4 w-4 shrink-0 text-amber-800 mt-0.5" aria-hidden />
@@ -246,7 +246,7 @@ export function Layout() {
               </div>
             )}
             {user?.role !== 'ADMIN' && planTierDisabledFeatures.length > 0 && e && (
-              <div className="mx-6 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
+              <div className="mx-3 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 sm:mx-6">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex gap-2">
                     <Layers className="h-4 w-4 shrink-0 text-slate-600 mt-0.5" aria-hidden />
@@ -274,7 +274,7 @@ export function Layout() {
               </div>
             )}
             {user?.role !== 'ADMIN' && atLimitEntries.length > 0 && (
-              <div className="mx-6 mt-4 space-y-2">
+              <div className="mx-3 mt-4 space-y-2 sm:mx-6">
                 {atLimitEntries.map(({ key, current, limit }) => (
                   <LimitExceededBanner
                     key={key}
@@ -288,7 +288,7 @@ export function Layout() {
               </div>
             )}
             {user?.role !== 'ADMIN' && nearLimitKeys.length > 0 && (
-              <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+              <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   Usage near limit: {nearLimitKeys
@@ -333,7 +333,7 @@ export function Layout() {
               </div>
             )}
             {user?.role !== 'ADMIN' && blockedCountLast7d >= 3 && planBlockNudgeMessage && (
-              <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)]">
+              <div className="mx-3 mt-4 flex flex-col gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text-mid)] sm:mx-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span>{planBlockNudgeMessage}</span>
                 <button
                   type="button"
