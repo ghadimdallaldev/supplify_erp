@@ -1,3 +1,5 @@
+# Build context MUST be the repository root (not apps/web).
+# Railway: Root Directory = empty; Config file = /apps/web/railway.json; Dockerfile = apps/web/Dockerfile
 FROM node:22-alpine AS base
 
 # Install dependencies only when needed
@@ -12,8 +14,8 @@ RUN corepack enable && corepack prepare pnpm@8.15.9 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install web workspace and its dependency tree only
+RUN pnpm install --frozen-lockfile --filter @supplify/web...
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -23,8 +25,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 
-WORKDIR /app/apps/web
-
 ARG VITE_API_URL=http://localhost:4000
 ARG VITE_KEYCLOAK_URL=http://localhost:8080
 ARG VITE_KEYCLOAK_REALM=Supplify
@@ -32,8 +32,8 @@ ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
 ENV VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM
 
-# Build the application (skip tsc in container — typecheck runs in CI)
-RUN pnpm build:docker
+# Build web only (skip tsc in container — typecheck runs in CI)
+RUN pnpm --filter @supplify/web build:docker
 
 # Production image with nginx
 FROM nginx:alpine AS runner

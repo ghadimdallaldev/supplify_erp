@@ -37,7 +37,7 @@ export function isMemoryDebugEnabled() {
 export function shouldExposeMemoryOnHealth() {
   if (config.NODE_ENV === 'test') return false
   if (config.MEMORY_HEALTH_EXPOSE === true) return true
-  return config.NODE_ENV !== 'production'
+  return config.APP_ENV === 'dev'
 }
 
 /**

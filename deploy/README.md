@@ -1,6 +1,14 @@
 # Supplify deployment
 
-**Release branches (`preprod`, `prod`) contain runtime code only** — no docs, tests, or IDE/agent config. Promote from `dev` with `pnpm promote:preprod` or `pnpm promote:prod` (see `docs/BRANCHING.md`).
+**Primary hosting:** [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) (dev / preprod / prod on Railway).
+
+**Release branches (`preprod`, `prod`)** contain runtime code only — promote from `dev` with `pnpm promote:preprod` or `pnpm promote:prod` (see `docs/BRANCHING.md`).
+
+---
+
+## Legacy: EC2 Docker (optional VM)
+
+Historical design notes: [docs/archive/legacy-ec2/](../docs/archive/legacy-ec2/README.md).
 
 One-command **EC2 Docker** deploy per environment (run from repo root on the server):
 

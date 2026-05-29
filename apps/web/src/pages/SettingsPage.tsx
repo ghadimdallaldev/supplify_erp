@@ -14,6 +14,7 @@ import {
   useUpdateNotificationPreferencesMutation,
 } from '../services/api'
 import toast from 'react-hot-toast'
+import { keycloakRealm, keycloakUrl } from '../lib/env'
 
 const DEFAULT_NOTIFICATION_PREFS = {
   emailEnabled: true,
@@ -191,9 +192,7 @@ export function SettingsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080'
-                  const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'Supplify'
-                  window.open(`${keycloakUrl}/realms/${realm}/account`, '_blank')
+                  window.open(`${keycloakUrl}/realms/${keycloakRealm}/account`, '_blank')
                 }}
               >
                 Change Password

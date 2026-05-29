@@ -8,7 +8,9 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { store } from './store/index.ts'
 import './index.css'
 import { registerServiceWorker } from './lib/registerServiceWorker'
+import { assertHostedWebConfig } from './lib/env'
 
+assertHostedWebConfig()
 registerServiceWorker()
 
 const queryClient = new QueryClient()
