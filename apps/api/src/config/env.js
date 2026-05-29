@@ -29,6 +29,8 @@ export const config = {
   DATABASE_URL: resolvedDatabaseUrl,
   /** Enable SSL for DB (e.g. DATABASE_SSL=true in production). */
   DATABASE_SSL: process.env.DATABASE_SSL === 'true',
+  /** Railway/managed Postgres often use certs outside the public CA bundle; keep false unless you supply a CA. */
+  DATABASE_SSL_REJECT_UNAUTHORIZED: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true',
   /** Statement timeout in ms (optional; e.g. 30000 for 30s in production). */
   DATABASE_STATEMENT_TIMEOUT: process.env.DATABASE_STATEMENT_TIMEOUT
     ? parseInt(process.env.DATABASE_STATEMENT_TIMEOUT, 10)
