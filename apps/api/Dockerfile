@@ -1,3 +1,5 @@
+# Build context MUST be the repository root (not apps/api).
+# Railway: Root Directory = empty; Config file = /apps/api/railway.json; Dockerfile = apps/api/Dockerfile
 FROM node:22-alpine AS base
 
 # Install dependencies only when needed
@@ -12,8 +14,8 @@ RUN corepack enable && corepack prepare pnpm@8.15.9 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install API workspace and its dependency tree only
+RUN pnpm install --frozen-lockfile --filter @supplify/api...
 
 # Rebuild the source code only when needed
 FROM base AS builder

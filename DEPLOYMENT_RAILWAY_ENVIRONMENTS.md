@@ -68,6 +68,25 @@ Repo paths: API = `apps/api/`, Web = `apps/web/`. Env templates: `apps/api/.env.
 
 Config files: `apps/api/railway.json`, `apps/web/railway.json` (no secrets inside).
 
+## E.1 Monorepo Railway settings (required)
+
+Both services share root lockfiles (`pnpm-lock.yaml`, `pnpm-workspace.yaml`). **Root Directory must be empty** (repo root) for API and Web.
+
+| Setting          | API (`supplify-api-*`)        | Web (`supplify-web-*`)                 |
+| ---------------- | ----------------------------- | -------------------------------------- |
+| Root Directory   | _(empty)_                     | _(empty)_                              |
+| Config file path | `/apps/api/railway.json`      | `/apps/web/railway.json`               |
+| Builder          | Dockerfile                    | Dockerfile                             |
+| Dockerfile path  | `apps/api/Dockerfile`         | `apps/web/Dockerfile`                  |
+| Build Command    | _(empty)_                     | _(empty)_                              |
+| Start Command    | `node apps/api/src/server.js` | _(empty — nginx entrypoint)_           |
+| Healthcheck Path | `/health`                     | `/health`                              |
+| Public Port      | Railway `PORT`                | Railway `PORT` (default `80` in image) |
+
+**Common failure:** Root Directory = `apps/web` or `apps/api` → Docker `COPY` cannot find `pnpm-lock.yaml` at repo root. Fix by clearing Root Directory and redeploying.
+
+Docker builds use `pnpm --filter @supplify/api...` and `pnpm --filter @supplify/web build:docker` so each service builds only its app.
+
 ## F. Required backend variables (summary)
 
 See `apps/api/.env.<env>.example` and [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md).
@@ -98,8 +117,8 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 
 1. Create Railway project with environments: **dev**, **preprod**, **prod**.
 2. Per environment, add Postgres plugin → reference `DATABASE_URL` on API service.
-3. Deploy API: root directory = repo root, Dockerfile `apps/api/Dockerfile`, health check `/health`.
-4. Deploy Web: Dockerfile `apps/web/Dockerfile`, build args from `apps/web/.env.<env>.example`.
+3. Deploy API: Root Directory **empty**, config `/apps/api/railway.json`, Dockerfile `apps/api/Dockerfile`, health check `/health`.
+4. Deploy Web: Root Directory **empty**, config `/apps/web/railway.json`, Dockerfile `apps/web/Dockerfile`, build args from `apps/web/.env.<env>.example`.
 5. Copy variables from `.env.<env>.example` into Railway (no real secrets in git).
 6. Run migrations manually: `pnpm db:migrate` with that environment’s `DATABASE_URL`.
 7. Verify `GET /health` and `GET /ready` on API; open web app and sign in via Keycloak.
@@ -170,6 +189,7 @@ API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 - `PAYMENTS_MODE=mock` on preprod/prod (startup fails)
 - Forgetting to set `CORS_ORIGIN` on Railway (browser blocked)
 - Building web without `VITE_API_URL` (calls localhost)
+- Root Directory set to `apps/web` or `apps/api` (breaks monorepo lockfile COPY)
 - `STORAGE_DRIVER=local` on prod (validation fails)
 - Committing `.env` files with real secrets
 
