@@ -41,6 +41,9 @@ COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/migrate.js ./a
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/run-migration.js ./apps/api/scripts/run-migration.js
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/lib ./apps/api/scripts/lib
 
+# Writable local upload root (STORAGE_DRIVER=local). Mount a Railway volume here for persistence.
+RUN mkdir -p /app/uploads && chown supplify:nodejs /app/uploads
+
 USER supplify
 
 EXPOSE 4000
