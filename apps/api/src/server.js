@@ -80,6 +80,7 @@ import path from 'node:path'
 import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
 import { pool, closePool } from './lib/db.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
+import { baseSchemaExists, runAllSqlMigrations } from './lib/sql-migrator.js'
 import {
   getMemorySnapshot,
   shouldExposeMemoryOnHealth,
@@ -92,11 +93,20 @@ if (config.NODE_ENV === 'production') {
 
 if (config.NODE_ENV !== 'test') {
   try {
+    const hasBaseSchema = await baseSchemaExists()
+    if (config.RUN_MIGRATIONS_ON_START || !hasBaseSchema) {
+      logger.info('Running SQL migrations on startup', {
+        runMigrationsOnStart: config.RUN_MIGRATIONS_ON_START,
+        baseSchemaExists: hasBaseSchema,
+      })
+      await runAllSqlMigrations()
+    }
+
     await ensureReservationsSchema()
     await ensureStaffAppSchema()
     await ensureOrderCancellationColumns()
   } catch (error) {
-    logger.error('Aborting server startup due to reservations migration failure', {
+    logger.error('Aborting server startup due to database migration failure', {
       error: error.message,
     })
     process.exit(1)
