@@ -152,7 +152,7 @@ export const config = {
   ENABLE_SWAGGER: envBool(process.env.ENABLE_SWAGGER, APP_ENV === 'dev'),
   ENABLE_DEBUG_ROUTES: envBool(process.env.ENABLE_DEBUG_ROUTES, APP_ENV === 'dev'),
   ENABLE_SEED_ROUTES: envBool(process.env.ENABLE_SEED_ROUTES, APP_ENV === 'dev'),
-  RUN_MIGRATIONS_ON_START: envBool(process.env.RUN_MIGRATIONS_ON_START, APP_ENV === 'dev'),
+  RUN_MIGRATIONS_ON_START: envBool(process.env.RUN_MIGRATIONS_ON_START, false),
   ALLOW_DB_RESET: envBool(process.env.ALLOW_DB_RESET, APP_ENV === 'dev'),
   SEED_DEMO_DATA: envBool(process.env.SEED_DEMO_DATA, APP_ENV === 'dev'),
   STAFF_PORTAL_BASE_URL:

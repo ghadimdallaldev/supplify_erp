@@ -37,21 +37,22 @@ export async function runAllSqlMigrations() {
     )
   `)
 
+  const { rows: appliedRows } = await query('SELECT version FROM schema_migrations')
+  const applied = new Set(appliedRows.map((row) => row.version))
+
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql'))
     .sort()
 
-  for (const file of files) {
-    const { rows } = await query(
-      'SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1) AS applied',
-      [file]
-    )
+  const pending = files.filter((file) => !applied.has(file))
+  if (pending.length === 0) {
+    logger.info('SQL migrations up to date', { total: files.length })
+    return
+  }
 
-    if (rows[0]?.applied) {
-      logger.debug({ event: 'db.migration.skip', file })
-      continue
-    }
+  logger.info('Applying pending SQL migrations', { pending: pending.length, total: files.length })
 
+  for (const file of pending) {
     logger.info({ event: 'db.migration.run', file })
     const sql = readMigrationSql(join(migrationsDir, file))
     try {
@@ -65,8 +66,9 @@ export async function runAllSqlMigrations() {
     }
 
     await query('INSERT INTO schema_migrations (version) VALUES ($1)', [file])
+    applied.add(file)
     logger.info({ event: 'db.migration.applied', file })
   }
 
-  logger.info('SQL migrations completed')
+  logger.info('SQL migrations completed', { applied: pending.length })
 }
