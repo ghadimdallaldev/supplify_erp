@@ -53,6 +53,8 @@ export const config = {
     process.env.PUBLIC_FRONTEND_URL || primaryWebOrigin || 'http://localhost:5173',
   DATABASE_URL: resolvedDatabaseUrl,
   DATABASE_SSL: process.env.DATABASE_SSL === 'true',
+  /** Railway/managed Postgres often use certs outside the public CA bundle; keep false unless you supply a CA. */
+  DATABASE_SSL_REJECT_UNAUTHORIZED: envBool(process.env.DATABASE_SSL_REJECT_UNAUTHORIZED, false),
   DATABASE_STATEMENT_TIMEOUT: process.env.DATABASE_STATEMENT_TIMEOUT
     ? parseInt(process.env.DATABASE_STATEMENT_TIMEOUT, 10)
     : undefined,

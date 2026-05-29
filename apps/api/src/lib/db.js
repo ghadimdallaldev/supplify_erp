@@ -3,7 +3,7 @@ import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import { summarizeQuery } from './log-helpers.js'
 
-// Create connection pool (production: set DATABASE_SSL=true, optional DATABASE_STATEMENT_TIMEOUT)
+// Create connection pool (hosted: DATABASE_SSL=true; rejectUnauthorized defaults false for Railway)
 const poolConfig = {
   connectionString: config.DATABASE_URL,
   max: config.DATABASE_POOL_MAX,
@@ -11,7 +11,7 @@ const poolConfig = {
   connectionTimeoutMillis: 10000,
 }
 if (config.DATABASE_SSL) {
-  poolConfig.ssl = { rejectUnauthorized: true }
+  poolConfig.ssl = { rejectUnauthorized: config.DATABASE_SSL_REJECT_UNAUTHORIZED }
 }
 if (config.DATABASE_STATEMENT_TIMEOUT) {
   poolConfig.statement_timeout = config.DATABASE_STATEMENT_TIMEOUT
