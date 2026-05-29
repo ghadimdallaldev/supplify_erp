@@ -197,6 +197,9 @@ export function Layout() {
       ? "You've hit your plan limits several times this week. Check usage in settings and upgrade for more room."
       : null)
 
+  const isAdminPortalRoute =
+    isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
+
   return (
     <BranchProvider>
       <div className="min-h-screen min-h-[100dvh]" style={{ background: 'var(--bg)' }}>
@@ -205,7 +208,7 @@ export function Layout() {
         <UpgradeModal />
         <PaymentModal />
         <div className="flex">
-          {mobileNavOpen && (
+          {mobileNavOpen && !isAdminPortalRoute && (
             <button
               type="button"
               className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
@@ -213,7 +216,9 @@ export function Layout() {
               onClick={() => setMobileNavOpen(false)}
             />
           )}
-          <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+          {!isAdminPortalRoute && (
+            <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+          )}
           <div className="flex min-w-0 flex-1 flex-col">
             <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
             {(!isPlatformAdmin || isImpersonating) && <BillingOverdueBanner />}
@@ -352,10 +357,20 @@ export function Layout() {
                   </button>
                 </div>
               )}
-            <main className="flex-1 p-3 sm:p-4 md:p-6">
-              <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
-                <Outlet />
-              </div>
+            <main
+              className={
+                isAdminPortalRoute ? 'flex min-h-0 flex-1 flex-col' : 'flex-1 p-3 sm:p-4 md:p-6'
+              }
+            >
+              {isAdminPortalRoute ? (
+                <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-1 flex-col bg-[var(--surface)]">
+                  <Outlet />
+                </div>
+              ) : (
+                <div className="min-h-[calc(100vh-5rem)] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4 md:p-6">
+                  <Outlet />
+                </div>
+              )}
             </main>
           </div>
         </div>

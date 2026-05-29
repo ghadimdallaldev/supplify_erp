@@ -6,12 +6,31 @@
 import { useAppSelector } from './redux'
 import { useImpersonation } from './useImpersonation'
 
+/** Used when an ADMIN user has no RBAC roles yet (e.g. after a partial seed). */
+const ADMIN_FALLBACK_PERMISSIONS = [
+  'ADMIN_ACCESS',
+  'ADMIN_TENANTS',
+  'ADMIN_PLANS',
+  'ADMIN_FINANCE',
+  'ADMIN_GROWTH',
+  'ADMIN_SUPPORT',
+] as const
+
 function hasPermission(permissions: string[] | undefined, required: string): boolean {
   if (!Array.isArray(permissions)) return false
   if (permissions.includes(required)) return true
   const manageKey = required.replace(/_VIEW$|_CREATE$|_EDIT$|_SEND$|_MANAGE$/, '_MANAGE')
   if (manageKey !== required && permissions.includes(manageKey)) return true
   return false
+}
+
+function adminPermissionsForUser(
+  adminPermissions: string[] | undefined,
+  isImpersonating: boolean
+): string[] {
+  if (isImpersonating) return adminPermissions ?? []
+  if (Array.isArray(adminPermissions) && adminPermissions.length > 0) return adminPermissions
+  return [...ADMIN_FALLBACK_PERMISSIONS]
 }
 
 export function usePermissions() {
@@ -24,7 +43,10 @@ export function usePermissions() {
       if (isImpersonating) {
         return hasPermission(user.tenantPermissions, permissionKey)
       }
-      return hasPermission(user.adminPermissions, permissionKey)
+      return hasPermission(
+        adminPermissionsForUser(user.adminPermissions, isImpersonating),
+        permissionKey
+      )
     }
     return hasPermission(user.tenantPermissions, permissionKey)
   }

@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog'
+import { TableScroll } from '../../components/ui/table-scroll'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -292,37 +293,64 @@ export function DisputeDetailPage() {
         </div>
 
         {items.length > 0 && (
-          <Card>
+          <Card className="overflow-visible">
             <CardHeader>
               <CardTitle className="text-base">Disputed line items</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+            <CardContent className="space-y-3 p-4 sm:p-6 sm:pt-0">
+              <div className="space-y-2 md:hidden">
+                {items.map((item) => (
+                  <div
+                    key={String(item.id)}
+                    className="rounded-lg border border-[var(--app-border)] p-3 text-sm"
+                  >
+                    <p className="font-medium">
+                      {String(item.product_name ?? item.productName ?? '—')}
+                    </p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[var(--text-muted)]">
+                      <span>
+                        Ordered: {String(item.quantity_ordered ?? item.quantityOrdered ?? '—')}
+                      </span>
+                      <span>
+                        Received: {String(item.quantity_received ?? item.quantityReceived ?? '—')}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-[var(--text-muted)]">
+                      {String(item.issue_description ?? item.issueDescription ?? '—')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <TableScroll aria-label="Disputed line items" className="hidden md:block">
+                <table className="w-full min-w-[520px] text-sm">
                   <thead>
-                    <tr className="border-b text-left text-[var(--text-muted)]">
-                      <th className="py-2">Product</th>
-                      <th>Ordered</th>
-                      <th>Received</th>
-                      <th>Issue</th>
+                    <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
+                      <th className="px-4 py-3 pl-5 font-medium">Product</th>
+                      <th className="px-4 py-3 font-medium">Ordered</th>
+                      <th className="px-4 py-3 font-medium">Received</th>
+                      <th className="px-4 py-3 pr-5 font-medium">Issue</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item) => (
                       <tr key={String(item.id)} className="border-b border-[var(--app-border)]">
-                        <td className="py-2">
+                        <td className="px-4 py-3 pl-5">
                           {String(item.product_name ?? item.productName ?? '—')}
                         </td>
-                        <td>{String(item.quantity_ordered ?? item.quantityOrdered ?? '—')}</td>
-                        <td>{String(item.quantity_received ?? item.quantityReceived ?? '—')}</td>
-                        <td className="text-[var(--text-muted)]">
+                        <td className="px-4 py-3 tabular-nums">
+                          {String(item.quantity_ordered ?? item.quantityOrdered ?? '—')}
+                        </td>
+                        <td className="px-4 py-3 tabular-nums">
+                          {String(item.quantity_received ?? item.quantityReceived ?? '—')}
+                        </td>
+                        <td className="px-4 py-3 pr-5 text-[var(--text-muted)]">
                           {String(item.issue_description ?? item.issueDescription ?? '—')}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             </CardContent>
           </Card>
         )}

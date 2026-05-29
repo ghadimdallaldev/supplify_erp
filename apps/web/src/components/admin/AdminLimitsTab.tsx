@@ -5,6 +5,8 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import toast from 'react-hot-toast'
 import { Loader2, Minus, Plus } from 'lucide-react'
+import { PageHeader } from '../ui/page-header'
+import { TableScroll } from '../ui/table-scroll'
 import {
   useCreateAdminPlanLimitOverrideMutation,
   useCreateAdminTenantLimitOverrideMutation,
@@ -45,6 +47,8 @@ const SUPPLIER_ADDON_OPTIONS = [
 ]
 
 const RESTAURANT_ADDON_OPTIONS = [{ key: 'restaurant_extra_branch', label: 'Extra branch' }]
+const ADMIN_SELECT_CLASS =
+  'mt-1.5 h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30'
 
 type LocationMetric = {
   included?: number | null
@@ -325,14 +329,11 @@ export function AdminLimitsTab() {
   }
 
   return (
-    <div className="space-y-10">
-      <div>
-        <h2 className="text-lg font-bold text-[var(--text)]">Limits & add-ons</h2>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
-          Search for a tenant, review branch/warehouse usage, grant add-ons, and manage plan or
-          tenant limit overrides — without copying UUIDs.
-        </p>
-      </div>
+    <div className="page-stack">
+      <PageHeader
+        title="Limits & add-ons"
+        description="Search for a tenant, review branch/warehouse usage, grant add-ons, and manage plan or tenant limit overrides without raw UUID workflows."
+      />
 
       <Card>
         <CardHeader>
@@ -406,8 +407,8 @@ export function AdminLimitsTab() {
             </CardHeader>
             <CardContent className="space-y-6">
               {activeAddons.length > 0 ? (
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="w-full text-sm">
+                <TableScroll aria-label="Active subscription add-ons">
+                  <table className="w-full min-w-[520px] text-sm">
                     <thead>
                       <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
                         <th className="px-3 py-2">Type</th>
@@ -441,7 +442,7 @@ export function AdminLimitsTab() {
                       })}
                     </tbody>
                   </table>
-                </div>
+                </TableScroll>
               ) : (
                 <AdminEmptyState
                   title="No active add-ons"
@@ -453,7 +454,7 @@ export function AdminLimitsTab() {
                 <div>
                   <Label>Add-on type</Label>
                   <select
-                    className="mt-1 h-10 w-full rounded-md border border-[var(--border)] px-3 text-sm"
+                    className={ADMIN_SELECT_CLASS}
                     value={addonKey}
                     onChange={(e) => setAddonKey(e.target.value)}
                   >
@@ -502,15 +503,19 @@ export function AdminLimitsTab() {
                 <div className="md:col-span-2">
                   <Label>Reason (required)</Label>
                   <Input
-                    className="mt-1"
+                    className="mt-1.5"
                     value={addonReason}
                     onChange={(e) => setAddonReason(e.target.value)}
                     placeholder="e.g. Sales-approved Gold add-on pack"
                   />
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleGrantAddon} disabled={savingAddon || addonsFetching}>
+              <div className="action-bar">
+                <Button
+                  onClick={handleGrantAddon}
+                  disabled={savingAddon || addonsFetching}
+                  className="w-full sm:w-auto"
+                >
                   {savingAddon ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {addonQty === 0 ? 'Remove add-on' : 'Grant / update add-on'}
                 </Button>
@@ -540,7 +545,7 @@ export function AdminLimitsTab() {
             <div>
               <Label>Plan</Label>
               <select
-                className="mt-1 h-10 w-full rounded-md border border-[var(--border)] px-3 text-sm"
+                className={ADMIN_SELECT_CLASS}
                 value={planId}
                 onChange={(e) => {
                   setPlanId(e.target.value)
@@ -558,7 +563,7 @@ export function AdminLimitsTab() {
             <div>
               <Label>Limit</Label>
               <select
-                className="mt-1 h-10 w-full rounded-md border border-[var(--border)] px-3 text-sm"
+                className={ADMIN_SELECT_CLASS}
                 value={planLimitKey}
                 onChange={(e) => setPlanLimitKey(e.target.value)}
                 disabled={!planId}
@@ -598,7 +603,7 @@ export function AdminLimitsTab() {
               <Input
                 type="number"
                 min={0}
-                className="mt-1"
+                className="mt-1.5"
                 value={planOverrideValue}
                 onChange={(e) => setPlanOverrideValue(e.target.value)}
               />
@@ -606,13 +611,17 @@ export function AdminLimitsTab() {
             <div>
               <Label>Reason (required)</Label>
               <Input
-                className="mt-1"
+                className="mt-1.5"
                 value={planReason}
                 onChange={(e) => setPlanReason(e.target.value)}
               />
             </div>
           </div>
-          <Button onClick={handleSavePlanOverride} disabled={savingPlanOverride}>
+          <Button
+            onClick={handleSavePlanOverride}
+            disabled={savingPlanOverride}
+            className="w-full sm:w-auto"
+          >
             {savingPlanOverride ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Save plan override
           </Button>
@@ -633,7 +642,7 @@ export function AdminLimitsTab() {
               <div>
                 <Label>Limit</Label>
                 <select
-                  className="mt-1 h-10 w-full rounded-md border border-[var(--border)] px-3 text-sm"
+                  className={ADMIN_SELECT_CLASS}
                   value={tenantLimitKey}
                   onChange={(e) => setTenantLimitKey(e.target.value)}
                 >
@@ -650,7 +659,7 @@ export function AdminLimitsTab() {
                 <Input
                   type="number"
                   min={0}
-                  className="mt-1"
+                  className="mt-1.5"
                   value={tenantOverrideValue}
                   onChange={(e) => setTenantOverrideValue(e.target.value)}
                 />
@@ -690,7 +699,11 @@ export function AdminLimitsTab() {
                 />
               </div>
             </div>
-            <Button onClick={handleSaveTenantOverride} disabled={savingTenantOverride}>
+            <Button
+              onClick={handleSaveTenantOverride}
+              disabled={savingTenantOverride}
+              className="w-full sm:w-auto"
+            >
               {savingTenantOverride ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Save tenant override
             </Button>
@@ -786,8 +799,8 @@ function OverridesTable({
   onDisable: (id: string) => void
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
+    <TableScroll aria-label={`${kind} limit overrides`}>
+      <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
             {kind === 'plan' && <th className="px-3 py-2">Plan</th>}
@@ -833,6 +846,6 @@ function OverridesTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   )
 }

@@ -22,6 +22,9 @@ import { Input } from '../components/ui/input'
 import { toast } from 'react-hot-toast'
 import { copyToClipboard } from '../utils/clipboard'
 import { RequirePermission } from '../components/RequirePermission'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
+import { Skeleton } from '../components/ui/skeleton'
 
 export function ReservationsPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -97,42 +100,40 @@ export function ReservationsPage() {
 
   return (
     <RequirePermission permission="RESERVATIONS_VIEW" title="reservations">
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-[21px] font-black text-[var(--text)]">Reservations cockpit</h1>
-            <p className="text-sm text-[var(--text-muted)]">
-              Track bookings, optimise capacity, and wow every guest from one unified view.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm">
-              <CalendarDays className="h-4 w-4 text-[var(--brand-mid)]" />
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                className="border-none p-0 text-sm focus-visible:ring-0"
+      <div className="page-stack overflow-x-hidden">
+        <PageHeader
+          title="Reservations cockpit"
+          description="Track bookings, optimise capacity, and wow every guest from one unified view."
+          actions={
+            <div className="action-bar w-full sm:w-auto">
+              <div className="flex min-h-[44px] w-full items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 shadow-sm sm:w-auto">
+                <CalendarDays className="h-4 w-4 shrink-0 text-[var(--brand-mid)]" />
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                  className="min-w-0 flex-1 border-none p-0 text-sm focus-visible:ring-0"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 shrink-0 text-xs"
+                  onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
+                >
+                  Today
+                </Button>
+              </div>
+              <ReservationCreateDrawer
+                tables={tables}
+                onCreated={() => {
+                  refetch()
+                  refetchAnalytics()
+                }}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 shrink-0 text-xs"
-                onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
-              >
-                Today
-              </Button>
             </div>
-            <ReservationCreateDrawer
-              tables={tables}
-              onCreated={() => {
-                refetch()
-                refetchAnalytics()
-              }}
-            />
-          </div>
-        </div>
+          }
+        />
 
         {bookingLink ? (
           <Card className="border border-[var(--app-border)] bg-[var(--surface)]">
@@ -148,7 +149,7 @@ export function ReservationsPage() {
             </CardHeader>
             <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div
-                className="min-w-0 flex-1 rounded-md border border-[var(--app-border)] bg-[var(--bg)] px-3 py-2 font-mono text-sm text-[var(--text-mid)] truncate"
+                className="min-w-0 flex-1 break-all rounded-md border border-[var(--app-border)] bg-[var(--bg)] px-3 py-2 font-mono text-xs text-[var(--text-mid)] sm:text-sm"
                 title={bookingLink}
               >
                 {bookingLink}
@@ -157,7 +158,7 @@ export function ReservationsPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleCopyBookingLink}
-                className="shrink-0"
+                className="min-h-[44px] w-full shrink-0 sm:w-auto"
               >
                 <Copy className="mr-2 h-4 w-4" />
                 Copy link
@@ -229,7 +230,11 @@ export function ReservationsPage() {
           </CardHeader>
           <CardContent>
             {(waitlistData?.waitlist || []).length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">No guests on the waitlist.</p>
+              <EmptyState
+                title="Waitlist is empty"
+                description="Guests waiting for a table will appear here."
+                icon={<Users className="h-6 w-6" aria-hidden />}
+              />
             ) : (
               <div className="space-y-2">
                 {(waitlistData?.waitlist || []).map((entry: Record<string, unknown>) => (
@@ -255,6 +260,7 @@ export function ReservationsPage() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="min-h-[40px] w-full sm:w-auto"
                       disabled={promoting || entry.offer_status === 'offered'}
                       onClick={async () => {
                         try {
@@ -285,9 +291,10 @@ export function ReservationsPage() {
         ) : null}
 
         {boardLoading ? (
-          <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-[var(--app-border)]">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin text-[var(--brand-mid)]" />
-            <p className="text-sm text-[var(--text-muted)]">Loading reservations…</p>
+          <div className="space-y-3 rounded-2xl border border-dashed border-[var(--app-border)] p-4">
+            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-48 w-full rounded-xl" />
+            <Skeleton className="h-32 w-full rounded-xl" />
           </div>
         ) : (
           <ReservationBoard
@@ -301,7 +308,7 @@ export function ReservationsPage() {
         <div className="space-y-6">
           <PublicBookingSettingsCard />
 
-          <div className="-mx-4 lg:-mx-6">
+          <div className="overflow-x-hidden">
             <ReservationTableBuilder tables={tables} reservations={reservations} defaultLiveView />
           </div>
 

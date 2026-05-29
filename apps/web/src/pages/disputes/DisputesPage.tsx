@@ -34,23 +34,19 @@ import {
   isOrderEligibleForDispute,
 } from '../../lib/orderDisputeEligibility'
 import { OpenDisputeDialog } from '../../components/disputes/OpenDisputeDialog'
+import {
+  DisputeListCards,
+  formatOrderRef,
+  statusBadge,
+} from '../../components/disputes/DisputeListCards'
+import { TableScroll } from '../../components/ui/table-scroll'
+import { EmptyState } from '../../components/ui/empty-state'
 import { formatPrice } from '../../utils/format'
 import toast from 'react-hot-toast'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Scale } from 'lucide-react'
 
-function statusBadge(status: string) {
-  const s = status?.toLowerCase()
-  if (s === 'resolved') return 'default'
-  if (s === 'rejected' || s === 'cancelled') return 'destructive'
-  if (s === 'under_review') return 'secondary'
-  return 'outline'
-}
-
-function formatOrderRef(orderId: unknown): string {
-  const id = String(orderId || '')
-  if (!id) return '—'
-  return `#${id.slice(0, 8).toUpperCase()}`
-}
+const FORM_SELECT_CLASS =
+  'mt-1.5 h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30'
 
 type DisputeRow = {
   id: string
@@ -263,7 +259,7 @@ export function DisputesPage() {
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="disputes">
-      <div className="space-y-6">
+      <div className="page-stack">
         <PageHeader
           title="Disputes"
           description={
@@ -272,6 +268,7 @@ export function DisputesPage() {
           actions={
             !isSupplier ? (
               <Button
+                className="w-full sm:w-auto"
                 onClick={() => {
                   setCreateForm({
                     orderId: '',
@@ -289,12 +286,12 @@ export function DisputesPage() {
           }
         />
 
-        <Card>
-          <CardContent className="pt-6 flex flex-wrap gap-3 items-end">
-            <div>
-              <Label>Status</Label>
+        <Card className="overflow-visible">
+          <CardContent className="px-4 py-4 sm:px-6 sm:py-6">
+            <div className="flex w-full max-w-md flex-col gap-2">
+              <Label>Status filter</Label>
               <select
-                className="h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
+                className={FORM_SELECT_CLASS}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -308,108 +305,131 @@ export function DisputesPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        <Card className="overflow-visible">
+          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
             <CardTitle>{isSupplier ? 'Incoming' : 'My disputes'}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
             {isLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <div className="flex items-center justify-center py-10 text-[var(--text-muted)]">
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-mid)]" />
+              </div>
             ) : disputes.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">No disputes found.</p>
+              <EmptyState
+                title="No disputes found"
+                description={
+                  statusFilter
+                    ? 'Try clearing the status filter to see more results.'
+                    : 'Disputes opened from receiving or order issues will appear here.'
+                }
+                icon={<Scale className="h-6 w-6" aria-hidden />}
+              />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-[var(--text-muted)]">
-                      <th className="py-2">Order</th>
-                      {isSupplier && <th>Restaurant</th>}
-                      <th>Type</th>
-                      <th>Status</th>
-                      <th>Amount</th>
-                      <th className="text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {disputes.map((row) => {
-                      const dispute = row as DisputeRow
-                      const orderId = dispute.orderId || dispute.order_id
-                      const disputedAmount = dispute.disputedAmount ?? dispute.disputed_amount
-                      return (
-                        <tr
-                          key={String(dispute.id)}
-                          className="border-b border-[var(--app-border)]"
-                        >
-                          <td className="py-3">
-                            {orderId ? (
-                              <Link
-                                to={`/app/orders/${orderId}`}
-                                className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
-                              >
-                                {formatOrderRef(orderId)}
-                              </Link>
-                            ) : (
-                              <span className="text-[var(--text-muted)]">—</span>
-                            )}
-                          </td>
-                          {isSupplier && (
-                            <td className="text-sm">
-                              {String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}
+              <>
+                <DisputeListCards
+                  disputes={disputes as DisputeRow[]}
+                  isSupplier={isSupplier}
+                  formatAmount={(n) => `$${formatPrice(n)}`}
+                  onReview={isSupplier ? handleReview : undefined}
+                  onResolve={isSupplier ? (id) => setResolveId(id) : undefined}
+                  onReject={isSupplier ? (id) => setRejectId(id) : undefined}
+                />
+                <TableScroll aria-label="Disputes table" className="hidden md:block">
+                  <table className="w-full min-w-[720px] text-sm">
+                    <thead>
+                      <tr className="border-b bg-[var(--brand-ultra)]/40 text-left text-[var(--text-muted)]">
+                        <th className="px-4 py-3 pl-5 font-medium">Order</th>
+                        {isSupplier && <th className="px-4 py-3 font-medium">Restaurant</th>}
+                        <th className="px-4 py-3 font-medium">Type</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Amount</th>
+                        <th className="px-4 py-3 pr-5 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {disputes.map((row) => {
+                        const dispute = row as DisputeRow
+                        const orderId = dispute.orderId || dispute.order_id
+                        const disputedAmount = dispute.disputedAmount ?? dispute.disputed_amount
+                        return (
+                          <tr
+                            key={String(dispute.id)}
+                            className="border-b border-[var(--app-border)]"
+                          >
+                            <td className="px-4 py-3 pl-5">
+                              {orderId ? (
+                                <Link
+                                  to={`/app/orders/${orderId}`}
+                                  className="text-[var(--brand-mid)] hover:underline font-mono text-xs"
+                                >
+                                  {formatOrderRef(orderId)}
+                                </Link>
+                              ) : (
+                                <span className="text-[var(--text-muted)]">—</span>
+                              )}
                             </td>
-                          )}
-                          <td className="capitalize">
-                            <Link
-                              to={`/app/disputes/${dispute.id}`}
-                              className="text-[var(--brand-mid)] hover:underline"
-                            >
-                              {String(dispute.type || '').replace(/_/g, ' ')}
-                            </Link>
-                          </td>
-                          <td>
-                            <Badge variant={statusBadge(String(dispute.status))}>
-                              {String(dispute.status)}
-                            </Badge>
-                          </td>
-                          <td>
-                            {disputedAmount != null
-                              ? `$${formatPrice(Number(disputedAmount))}`
-                              : '—'}
-                          </td>
-                          <td className="text-right space-x-2">
-                            {isSupplier && dispute.status === 'open' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleReview(String(dispute.id))}
-                              >
-                                Review
-                              </Button>
+                            {isSupplier && (
+                              <td className="px-4 py-3 text-sm">
+                                {String(dispute.restaurantName ?? dispute.restaurant_name ?? '—')}
+                              </td>
                             )}
-                            {isSupplier &&
-                              (dispute.status === 'open' || dispute.status === 'under_review') && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => setResolveId(String(dispute.id))}
-                                  >
-                                    Resolve
-                                  </Button>
+                            <td className="px-4 py-3 capitalize">
+                              <Link
+                                to={`/app/disputes/${dispute.id}`}
+                                className="text-[var(--brand-mid)] hover:underline"
+                              >
+                                {String(dispute.type || '').replace(/_/g, ' ')}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant={statusBadge(String(dispute.status))}>
+                                {String(dispute.status)}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 tabular-nums">
+                              {disputedAmount != null
+                                ? `$${formatPrice(Number(disputedAmount))}`
+                                : '—'}
+                            </td>
+                            <td className="px-4 py-3 pr-5 text-right">
+                              <div className="flex flex-wrap justify-end gap-2">
+                                {isSupplier && dispute.status === 'open' && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => setRejectId(String(dispute.id))}
+                                    onClick={() => handleReview(String(dispute.id))}
                                   >
-                                    Reject
+                                    Review
                                   </Button>
-                                </>
-                              )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                                )}
+                                {isSupplier &&
+                                  (dispute.status === 'open' ||
+                                    dispute.status === 'under_review') && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => setResolveId(String(dispute.id))}
+                                      >
+                                        Resolve
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setRejectId(String(dispute.id))}
+                                      >
+                                        Reject
+                                      </Button>
+                                    </>
+                                  )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </TableScroll>
+              </>
             )}
           </CardContent>
         </Card>
@@ -448,7 +468,7 @@ export function DisputesPage() {
               <div>
                 <Label>Order</Label>
                 <select
-                  className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
+                  className={FORM_SELECT_CLASS}
                   value={createForm.orderId}
                   onChange={(e) =>
                     setCreateForm((f) => ({
@@ -476,7 +496,7 @@ export function DisputesPage() {
               <div>
                 <Label>Supplier</Label>
                 <select
-                  className="w-full h-10 rounded-md border border-[var(--app-border)] px-3 text-sm"
+                  className={FORM_SELECT_CLASS}
                   value={createForm.supplierId}
                   onChange={(e) => setCreateForm((f) => ({ ...f, supplierId: e.target.value }))}
                   disabled={!createForm.orderId || loadingSuppliers}
@@ -500,11 +520,16 @@ export function DisputesPage() {
                 products).
               </p>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreate(false)}>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => setShowCreate(false)}
+              >
                 Cancel
               </Button>
               <Button
+                className="w-full sm:w-auto"
                 onClick={() => {
                   if (!createForm.orderId) {
                     toast.error('Order is required')
@@ -538,7 +563,7 @@ export function DisputesPage() {
               <div>
                 <Label>Resolution</Label>
                 <select
-                  className="w-full h-10 rounded-md border px-3 text-sm"
+                  className={FORM_SELECT_CLASS}
                   value={resolutionType}
                   onChange={(e) => setResolutionType(e.target.value)}
                 >
@@ -567,7 +592,7 @@ export function DisputesPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleResolve} disabled={resolving}>
+              <Button className="w-full sm:w-auto" onClick={handleResolve} disabled={resolving}>
                 Confirm
               </Button>
             </DialogFooter>
@@ -585,7 +610,12 @@ export function DisputesPage() {
               onChange={(e) => setResolutionNotes(e.target.value)}
             />
             <DialogFooter>
-              <Button variant="destructive" onClick={handleReject} disabled={rejecting}>
+              <Button
+                variant="destructive"
+                className="w-full sm:w-auto"
+                onClick={handleReject}
+                disabled={rejecting}
+              >
                 Reject
               </Button>
             </DialogFooter>
