@@ -48,7 +48,8 @@ export function assertChatAttachmentUrl(fileUrl, userId) {
   } catch {
     throw new Error('Invalid attachment URL')
   }
-  const bucketPrefix = process.env.S3_BUCKET ? `${process.env.S3_BUCKET}/` : ''
+  const bucket = process.env.STORAGE_BUCKET || process.env.S3_BUCKET || ''
+  const bucketPrefix = bucket ? `${bucket}/` : ''
   const key = pathname.startsWith(bucketPrefix) ? pathname.slice(bucketPrefix.length) : pathname
   return assertUploadKeyOwnedByUser(key, userId)
 }

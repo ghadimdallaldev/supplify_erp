@@ -65,19 +65,21 @@ export function validateProductionConfig() {
   if (config.E2E_SECRET) {
     issues.push('E2E_SECRET must not be set in production (disables /api/e2e data reset endpoint)')
   }
-  if (
-    config.S3_ACCESS_KEY === 'minioadmin' ||
-    config.S3_SECRET_KEY === 'minioadmin' ||
-    WEAK_SECRETS.has(String(config.S3_ACCESS_KEY || '').toLowerCase())
-  ) {
-    issues.push(
-      'S3_ACCESS_KEY / S3_SECRET_KEY must not use default MinIO credentials in production'
-    )
-  }
-  if (config.S3_PUBLIC_READ !== false && config.S3_PUBLIC_READ !== 'false') {
-    logger.warn(
-      'S3_PUBLIC_READ is enabled — non-catalog uploads may be world-readable via object URL; set S3_PUBLIC_READ=false for private assets'
-    )
+  if (config.STORAGE_DRIVER === 's3') {
+    if (
+      config.STORAGE_ACCESS_KEY_ID === 'minioadmin' ||
+      config.STORAGE_SECRET_ACCESS_KEY === 'minioadmin' ||
+      WEAK_SECRETS.has(String(config.STORAGE_ACCESS_KEY_ID || '').toLowerCase())
+    ) {
+      issues.push(
+        'STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY must not use default credentials in production'
+      )
+    }
+    if (config.STORAGE_PUBLIC_READ !== false && config.STORAGE_PUBLIC_READ !== 'false') {
+      logger.warn(
+        'STORAGE_PUBLIC_READ is enabled — non-catalog uploads may be world-readable via object URL; set STORAGE_PUBLIC_READ=false for private assets'
+      )
+    }
   }
 
   if (issues.length > 0) {

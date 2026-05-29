@@ -57,25 +57,49 @@ export const config = {
   IMPERSONATION_MAX_DURATION_MINUTES: process.env.IMPERSONATION_MAX_DURATION_MINUTES
     ? parseInt(process.env.IMPERSONATION_MAX_DURATION_MINUTES, 10)
     : 60,
-  /** MinIO API URL reachable from the API container (Docker: http://minio:9000). */
-  S3_ENDPOINT: process.env.S3_ENDPOINT || 'http://localhost:9000',
   /**
-   * Browser-facing base URL for stored objects (product images). Defaults to S3_ENDPOINT.
-   * Deploy: http://<your-host>:9000 or https://<domain>/storage if nginx proxies MinIO.
+   * Storage driver: `local` (disk, Railway MVP) or `s3` (S3-compatible: MinIO, R2, etc.).
+   * Legacy: if STORAGE_DRIVER unset and S3_ENDPOINT is set, defaults to `s3`.
    */
-  S3_PUBLIC_URL: process.env.S3_PUBLIC_URL || process.env.S3_ENDPOINT || 'http://localhost:9000',
-  /** Primary bucket for uploads (product images, chat files, logos). */
-  S3_BUCKET: process.env.S3_BUCKET || 'supplify',
+  STORAGE_DRIVER:
+    process.env.STORAGE_DRIVER ||
+    (process.env.S3_ENDPOINT || process.env.STORAGE_ENDPOINT ? 's3' : 'local'),
+  /** Local disk root (STORAGE_DRIVER=local). */
+  STORAGE_LOCAL_PATH: process.env.STORAGE_LOCAL_PATH || 'uploads',
   /**
-   * Comma-separated buckets to create on init (defaults to S3_BUCKET).
-   * Example: supplify,supplify-archive — add new names here before switching S3_BUCKET.
+   * Browser-facing base URL for stored objects.
+   * Local: defaults to API_PUBLIC_URL/uploads. S3: STORAGE_ENDPOINT or legacy S3_PUBLIC_URL.
    */
-  S3_BUCKETS: process.env.S3_BUCKETS || '',
-  S3_REGION: process.env.S3_REGION || 'us-east-1',
-  S3_ACCESS_KEY: process.env.S3_ACCESS_KEY || 'minioadmin',
-  S3_SECRET_KEY: process.env.S3_SECRET_KEY || 'minioadmin',
-  /** When true (default), buckets allow anonymous GetObject for stored URLs. Set false if using signed GET only. */
-  S3_PUBLIC_READ: process.env.S3_PUBLIC_READ !== 'false',
+  STORAGE_PUBLIC_URL:
+    process.env.STORAGE_PUBLIC_URL ||
+    process.env.S3_PUBLIC_URL ||
+    (process.env.STORAGE_DRIVER === 'local' || !process.env.S3_ENDPOINT
+      ? ''
+      : process.env.S3_PUBLIC_URL || process.env.S3_ENDPOINT || ''),
+  /** S3-compatible API endpoint (from API container). */
+  STORAGE_ENDPOINT:
+    process.env.STORAGE_ENDPOINT || process.env.S3_ENDPOINT || 'http://localhost:9000',
+  STORAGE_BUCKET: process.env.STORAGE_BUCKET || process.env.S3_BUCKET || 'supplify',
+  STORAGE_BUCKETS: process.env.STORAGE_BUCKETS || process.env.S3_BUCKETS || '',
+  STORAGE_REGION: process.env.STORAGE_REGION || process.env.S3_REGION || 'auto',
+  STORAGE_ACCESS_KEY_ID:
+    process.env.STORAGE_ACCESS_KEY_ID ||
+    process.env.STORAGE_ACCESS_KEY ||
+    process.env.S3_ACCESS_KEY ||
+    'minioadmin',
+  STORAGE_SECRET_ACCESS_KEY:
+    process.env.STORAGE_SECRET_ACCESS_KEY || process.env.S3_SECRET_KEY || 'minioadmin',
+  /** When true (default for s3), buckets allow anonymous GetObject. Set false for private assets. */
+  STORAGE_PUBLIC_READ:
+    process.env.STORAGE_PUBLIC_READ != null
+      ? process.env.STORAGE_PUBLIC_READ !== 'false'
+      : process.env.S3_PUBLIC_READ !== 'false',
+  /** Public API base URL (presigned local uploads, health links). Railway: https://your-api.up.railway.app */
+  API_PUBLIC_URL:
+    process.env.API_PUBLIC_URL ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : `http://localhost:${process.env.PORT || 4000}`),
   REDIS_URL: process.env.REDIS_URL || '',
   /** Test-only: secret for E2E reset-seed endpoint. When set, POST /api/e2e/reset-seed is enabled. */
   E2E_SECRET: process.env.E2E_SECRET || '',
@@ -124,4 +148,13 @@ export const config = {
   DATABASE_POOL_MAX: process.env.DATABASE_POOL_MAX
     ? parseInt(process.env.DATABASE_POOL_MAX, 10)
     : 20,
+}
+
+if (!config.STORAGE_PUBLIC_URL) {
+  if (config.STORAGE_DRIVER === 'local') {
+    config.STORAGE_PUBLIC_URL = `${String(config.API_PUBLIC_URL).replace(/\/$/, '')}/uploads`
+  } else {
+    config.STORAGE_PUBLIC_URL =
+      process.env.S3_PUBLIC_URL || process.env.STORAGE_PUBLIC_URL || config.STORAGE_ENDPOINT
+  }
 }

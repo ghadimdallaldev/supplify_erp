@@ -55,7 +55,7 @@ Defaults are set in `apps/api/src/test/setup.js` (no real Postgres required for 
 | `JWT_SECRET`           | `test-jwt-secret`                         |
 | `IMPERSONATION_SECRET` | `test-impersonation-secret-for-api-tests` |
 
-CI sets the same values in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
+Set the same values when running tests locally or in your own CI runner.
 
 ## Common mock patterns (API route tests)
 
@@ -113,13 +113,13 @@ vi.mock('../lib/logger.js', async (importOriginal) => {
 
 ## CI
 
-GitHub Actions workflow **CI** (`.github/workflows/ci.yml`) on push/PR to `dev`, `main`, `preprod`:
+GitHub Actions was removed from this repo. Run before deploy or in your own pipeline:
 
 1. `pnpm install --frozen-lockfile`
-2. `pnpm test:api`
-3. `pnpm test:web`
+2. `pnpm test:ci` (API + web unit tests)
+3. `pnpm build`
 
-E2E (Playwright) is **not** in this workflow; run locally or add a separate job when infra is available. See [tests/README.md](../../tests/README.md).
+E2E (Playwright) is not part of the default check; run `pnpm e2e:playwright` locally when Docker infra is up. See [tests/README.md](../../tests/README.md).
 
 ## Related docs
 

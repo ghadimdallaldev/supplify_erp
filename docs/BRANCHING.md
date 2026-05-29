@@ -1,10 +1,10 @@
 # Branching & release workflow
 
-| Branch    | Purpose                                      | Deploy target                        |
-| --------- | -------------------------------------------- | ------------------------------------ |
-| `dev`     | Active development — docs, tests, seeds, CI  | AWS CDK / manual `deploy-dev.sh`     |
-| `preprod` | Pre-production / UAT — **runtime code only** | AWS CDK / manual `deploy-preprod.sh` |
-| `prod`    | Production — **runtime code only**           | AWS CDK / manual `deploy-prod.sh`    |
+| Branch    | Purpose                                      | Deploy target                     |
+| --------- | -------------------------------------------- | --------------------------------- |
+| `dev`     | Active development — docs, tests, seeds      | Railway or manual `deploy-dev.sh` |
+| `preprod` | Pre-production / UAT — **runtime code only** | Railway or `deploy-preprod.sh`    |
+| `prod`    | Production — **runtime code only**           | Railway or `deploy-prod.sh`       |
 
 Each environment can run on its **own host** with isolated Docker volumes, env files, and image tags:
 
@@ -41,7 +41,7 @@ Each promote:
 3. Runs `scripts/prune-release-tree.mjs` (removes docs, tests, seeds, e2e, dev deploy files, etc.)
 4. Commits the pruned tree and pushes
 
-Deploy on the target host with CDK (`infra/`) or `deploy/scripts/deploy-preprod.sh` / `deploy-prod.sh`.
+Deploy on the target host with `deploy/scripts/deploy-preprod.sh` / `deploy-prod.sh`, or use [DEPLOYMENT_RAILWAY.md](../DEPLOYMENT_RAILWAY.md) for Railway.
 
 ## What the prune script removes (preprod & prod)
 
@@ -53,6 +53,6 @@ Deploy on the target host with CDK (`infra/`) or `deploy/scripts/deploy-preprod.
 
 **Prod additionally removes** preprod-only deploy artifacts (staging compose, `deploy-preprod.sh`, etc.).
 
-## AWS CDK
+## Deployment
 
-Infrastructure and deployments live under `infra/`. See `infra/README.md` for `cdk deploy` usage per environment.
+Docker/EC2 assets live under `deploy/`. Railway guide: [DEPLOYMENT_RAILWAY.md](../DEPLOYMENT_RAILWAY.md).

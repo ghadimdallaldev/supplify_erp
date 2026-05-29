@@ -6,9 +6,50 @@ import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
 import { sanitizeUploadFileName, assertUploadKeyOwnedByUser } from '../lib/sanitize-upload.js'
-import { createPresignedUpload, buildObjectPublicUrl } from '../lib/object-storage.js'
+import {
+  createPresignedUpload,
+  buildObjectPublicUrl,
+  getStorageDriver,
+  getStorageProvider,
+} from '../services/storage/storage.service.js'
 
 const router = express.Router()
+
+// Local storage: complete PUT upload using signed token from /presign
+router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async (req, res) => {
+  if (getStorageDriver() !== 'local') {
+    return res.status(404).json({
+      ok: false,
+      data: null,
+      error: { name: 'NOT_FOUND', message: 'Direct upload not available for this storage driver' },
+      requestId: req.requestId,
+    })
+  }
+  try {
+    const contentType = req.headers['content-type'] || 'application/octet-stream'
+    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
+    const provider = getStorageProvider()
+    if (!provider.completeUpload) {
+      throw new Error('Storage provider does not support direct upload')
+    }
+    await provider.completeUpload(req.params.token, body, contentType)
+    res.status(204).end()
+  } catch (error) {
+    const invalid =
+      error?.name === 'UPLOAD_TOKEN_INVALID' ||
+      error?.name === 'UPLOAD_CONTENT_TYPE' ||
+      error?.name === 'UPLOAD_KEY_INVALID'
+    res.status(invalid ? 400 : 500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: invalid ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
+        message: error?.message || 'Upload failed',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
 
 // Generate presigned URL for file upload
 router.post(
@@ -90,6 +131,7 @@ router.post(
       const { presignedUrl, publicUrl, bucket } = await createPresignedUpload({
         fileKey,
         fileType,
+        userId: req.userData.id,
       })
 
       logger.info('Presigned URL generated', {
@@ -126,7 +168,7 @@ router.post(
         error: {
           name: isBucket ? 'STORAGE_UNAVAILABLE' : 'INTERNAL_ERROR',
           message: isBucket
-            ? `Storage bucket "${config.S3_BUCKET}" is missing. Run MinIO init or set S3_BUCKET.`
+            ? `Storage bucket "${config.STORAGE_BUCKET}" is missing. Check STORAGE_* settings or run storage init.`
             : 'Failed to generate presigned URL',
         },
         requestId: req.requestId,
@@ -209,7 +251,7 @@ router.post(
 
       const supplierId = products[0].supplier_id
       const sizeBytes = fileSize != null ? Math.max(0, parseInt(String(fileSize), 10) || 0) : 0
-      const fileUrl = buildObjectPublicUrl(config.S3_BUCKET, fileKey)
+      const fileUrl = buildObjectPublicUrl(fileKey)
 
       const { rows } = await query(
         `

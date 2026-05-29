@@ -40,7 +40,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/01-init-keycloak-db.sql:ro
+      - ./deploy/db/init.sql:/docker-entrypoint-initdb.d/01-init-keycloak-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-supplify}"]
       interval: 5s
@@ -126,7 +126,7 @@ services:
       - --import-realm
     volumes:
       - keycloak_data:/opt/keycloak/data
-      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/Supplify-realm.json:ro
+      - ./deploy/keycloak/realm-export.json:/opt/keycloak/data/import/Supplify-realm.json:ro
     ports:
       - "${KEYCLOAK_PORT:-8180}:8080"
     depends_on:
@@ -148,7 +148,7 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
     volumes:
-      - ./infra/keycloak/realm-export.json:/import/realm-export.json:ro
+      - ./deploy/keycloak/realm-export.json:/import/realm-export.json:ro
       - ./deploy/scripts/keycloak-init.sh:/scripts/keycloak-init.sh:ro
     depends_on:
       keycloak:

@@ -26,6 +26,20 @@ vi.mock('../lib/logger.js', () => ({
   logger: { error: vi.fn(), info: vi.fn() },
 }))
 
+const legalAcceptance = {
+  packVersion: '2026-05-28',
+  acceptedDocuments: [
+    'terms_and_conditions',
+    'privacy_policy',
+    'acceptable_use_policy',
+    'data_processing_addendum',
+    'cookie_policy',
+    'mobile_app_terms',
+    'restaurant_agreement',
+  ],
+  electronicSignatureAttestation: true,
+}
+
 describe('register.routes', () => {
   let app
 
@@ -64,6 +78,7 @@ describe('register.routes', () => {
         accountType: 'RESTAURANT',
         businessName: 'My Rest',
         phone: '+971500000001',
+        legalAcceptance,
       })
       .expect(201)
 
@@ -84,6 +99,18 @@ describe('register.routes', () => {
         accountType: 'SUPPLIER',
         businessName: 'My Supply Co',
         phone: '+971500000002',
+        legalAcceptance: {
+          ...legalAcceptance,
+          acceptedDocuments: [
+            'terms_and_conditions',
+            'privacy_policy',
+            'acceptable_use_policy',
+            'data_processing_addendum',
+            'cookie_policy',
+            'mobile_app_terms',
+            'supplier_agreement',
+          ],
+        },
       })
       .expect(201)
 
@@ -104,6 +131,7 @@ describe('register.routes', () => {
       .send({
         accountType: 'RESTAURANT',
         businessName: 'My Rest',
+        legalAcceptance,
       })
       .expect(409)
 

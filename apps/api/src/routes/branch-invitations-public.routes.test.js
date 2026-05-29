@@ -26,13 +26,19 @@ vi.mock('../lib/rbac.js', () => ({
   setAuthCookies: (...args) => setAuthCookies(...args),
 }))
 
-vi.mock('../lib/auth.js', () => ({
-  exchangePasswordForTokens: vi.fn().mockResolvedValue({
-    access_token: 'access',
-    refresh_token: 'refresh',
-    id_token: 'id',
+vi.mock('../lib/invite-login.js', () => ({
+  completeInviteAcceptSession: vi.fn(async (res) => {
+    res.cookie('access_token', 'access', { httpOnly: true })
+    res.cookie('refresh_token', 'refresh', { httpOnly: true })
+    return {
+      user: { email: 'alex@example.com', displayName: 'Alex' },
+      needsManualLogin: false,
+    }
   }),
-  getUserInfo: vi.fn().mockResolvedValue({ email: 'alex@example.com', given_name: 'Alex' }),
+}))
+
+vi.mock('../lib/legal-acceptance.js', () => ({
+  recordInviteLegalAcceptances: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../lib/tenant-switch.js', () => ({
@@ -49,6 +55,12 @@ vi.mock('../lib/logger.js', () => ({
 }))
 
 import publicRoutes from './branch-invitations-public.routes.js'
+
+const legalAcceptance = {
+  packVersion: '2026-05-28',
+  acceptedDocuments: ['terms_and_conditions', 'privacy_policy', 'supplier_agreement'],
+  electronicSignatureAttestation: true,
+}
 
 describe('branch-invitations-public.routes', () => {
   let app
@@ -94,7 +106,7 @@ describe('branch-invitations-public.routes', () => {
     })
     const res = await request(app)
       .post('/api/public/invitations/branch/accept')
-      .send({ token: 'tok', full_name: 'Alex', password: 'password123' })
+      .send({ token: 'tok', full_name: 'Alex', password: 'password123', legalAcceptance })
       .expect(200)
     expect(res.body.data.activeSupplierId).toBe('branch-1')
     expect(res.headers['set-cookie']?.join(';')).toContain('access_token')
@@ -106,7 +118,7 @@ describe('branch-invitations-public.routes', () => {
     acceptBranchInvitation.mockRejectedValue(err)
     await request(app)
       .post('/api/public/invitations/branch/accept')
-      .send({ token: 'tok', full_name: 'Alex', password: 'password123' })
+      .send({ token: 'tok', full_name: 'Alex', password: 'password123', legalAcceptance })
       .expect(410)
   })
 })

@@ -6,14 +6,14 @@ Stabilized the `@supplify/api` Vitest suite so the full API Vitest suite complet
 
 ## Development workflow (locked)
 
-| When                       | Command                                                        |
-| -------------------------- | -------------------------------------------------------------- |
-| Before PR / agent “done”   | `pnpm test:api`                                                |
-| While editing API tests    | `pnpm test:api:watch`                                          |
-| Billing/subscription smoke | `pnpm test:billing`                                            |
-| RBAC regression            | `pnpm test:rbac`                                               |
-| API + web unit tests       | `pnpm test:all`                                                |
-| CI (GitHub Actions)        | `.github/workflows/ci.yml` → `pnpm test:api` + `pnpm test:web` |
+| When                       | Command                                            |
+| -------------------------- | -------------------------------------------------- |
+| Before PR / agent “done”   | `pnpm test:api`                                    |
+| While editing API tests    | `pnpm test:api:watch`                              |
+| Billing/subscription smoke | `pnpm test:billing`                                |
+| RBAC regression            | `pnpm test:rbac`                                   |
+| API + web unit tests       | `pnpm test:all`                                    |
+| CI (local / your runner)   | `pnpm test:ci` → `pnpm test:api` + `pnpm test:web` |
 
 **Do not** use `pnpm test` or `pnpm --filter @supplify/api test` for final verification — those run Vitest in **watch** mode.
 

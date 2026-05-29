@@ -34,7 +34,7 @@
 
 ## Run in CI
 
-**Unit tests (Vitest):** GitHub Actions workflow `.github/workflows/ci.yml` runs `pnpm test:api` and `pnpm test:web` on push/PR. See [docs/qa/QA_AUTOMATION_GUIDE.md](../docs/qa/QA_AUTOMATION_GUIDE.md).
+**Unit tests (Vitest):** Run locally with `pnpm test:ci` (`pnpm test:api` + `pnpm test:web`). See [docs/qa/QA_AUTOMATION_GUIDE.md](../docs/qa/QA_AUTOMATION_GUIDE.md).
 
 **E2E (Playwright):** separate from unit CI. Set `CI=1`, `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_API_URL` (and optionally `E2E_*` credentials), then:
 

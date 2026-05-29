@@ -96,7 +96,7 @@ Secrets live in `deploy/env/.env.*` on the server. Re-deploy after `git pull`:
 cd /opt/supplify && git pull origin prod && sudo ./deploy/scripts/deploy-prod.sh
 ```
 
-For **AWS CDK** (ECS, RDS, CloudFront), see `infra/README.md`.
+For **Railway** hosting, see [DEPLOYMENT_RAILWAY.md](../DEPLOYMENT_RAILWAY.md). AWS CDK was removed from this repo.
 
 ## Files
 

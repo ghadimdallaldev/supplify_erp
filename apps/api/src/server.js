@@ -77,7 +77,8 @@ import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { expireOldBranchInvitations } from './lib/branch-invitations.js'
 import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
-import { ensureObjectStorageBuckets, checkObjectStorageHealth } from './lib/object-storage.js'
+import path from 'node:path'
+import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
 import { pool, closePool } from './lib/db.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
 import {
@@ -103,15 +104,16 @@ if (config.NODE_ENV !== 'test') {
   }
 
   try {
-    const bucketResults = await ensureObjectStorageBuckets()
-    logger.info('Object storage buckets ready', {
-      buckets: bucketResults.map((r) => r.bucket),
+    const storageResults = await ensureStorageReady()
+    logger.info('Storage ready', {
+      driver: config.STORAGE_DRIVER,
+      results: storageResults,
     })
   } catch (error) {
-    logger.error('Object storage bucket setup failed — uploads may not work', {
+    logger.error('Storage setup failed — uploads may not work', {
       error: error.message,
-      endpoint: config.S3_ENDPOINT,
-      bucket: config.S3_BUCKET,
+      driver: config.STORAGE_DRIVER,
+      bucket: config.STORAGE_BUCKET,
     })
   }
 }
@@ -266,9 +268,14 @@ app.use((req, res, next) => {
   return csrfProtection(req, res, next)
 })
 
+if (config.STORAGE_DRIVER === 'local') {
+  const uploadsDir = path.resolve(config.STORAGE_LOCAL_PATH)
+  app.use('/uploads', express.static(uploadsDir))
+}
+
 // Health check endpoint
 app.get('/health', async (req, res) => {
-  const storage = await checkObjectStorageHealth()
+  const storage = await checkStorageHealth()
   const ok = storage.ok
   const payload = {
     ok,
@@ -423,10 +430,12 @@ process.on('SIGINT', () => {
   })
 })
 
-server.listen(PORT, () => {
+const HOST = process.env.HOST || '0.0.0.0'
+server.listen(PORT, HOST, () => {
   stopMemoryMonitor = startMemoryMonitor()
   logger.info({
-    msg: `Server started on port ${PORT}`,
+    msg: `Server started on ${HOST}:${PORT}`,
+    host: HOST,
     port: PORT,
     env: config.NODE_ENV,
     webOrigin: config.WEB_ORIGIN,

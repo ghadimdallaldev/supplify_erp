@@ -25,13 +25,13 @@ See **[docs/BRANCHING.md](docs/BRANCHING.md)** for promote workflow.
 
 Full guide: **[docs/README.md](docs/README.md)**
 
-| Topic                 | Doc                                                                      |
-| --------------------- | ------------------------------------------------------------------------ |
-| **Feature catalog**   | [docs/product/features.md](docs/product/features.md)                     |
-| Local Docker workflow | [docs/README.md](docs/README.md)                                         |
-| Database migrations   | [docs/guides/database-migrations.md](docs/guides/database-migrations.md) |
-| Admin feature toggles | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md)   |
-| Production deploy     | [deploy/README.md](deploy/README.md)                                     |
+| Topic                 | Doc                                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| **Feature catalog**   | [docs/product/features.md](docs/product/features.md)                                               |
+| Local Docker workflow | [docs/README.md](docs/README.md)                                                                   |
+| Database migrations   | [docs/guides/database-migrations.md](docs/guides/database-migrations.md)                           |
+| Admin feature toggles | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md)                             |
+| Production deploy     | [DEPLOYMENT_RAILWAY.md](DEPLOYMENT_RAILWAY.md) · [deploy/README.md](deploy/README.md) (Docker/EC2) |
 
 ## Scripts
 
@@ -52,18 +52,18 @@ pnpm db:migrate   # SQL migrations
 
 Copy `apps/api/.env.example` to `apps/api/.env` for app secrets (Twilio, VAPID, etc.). **Local Postgres/Redis/Keycloak** credentials and ports live in `docker/.env` (created from `docker/.env.example` on first `pnpm local:infra` or `pnpm dev`). Native dev syncs `apps/api/.env.docker-sync` automatically — do not hand-edit that file.
 
-| Key                                  | Purpose                                  |
-| ------------------------------------ | ---------------------------------------- |
-| `docker/.env` `POSTGRES_*`           | Local PostgreSQL (source of truth)       |
-| `DATABASE_URL` in `apps/api/.env`    | Optional override (remote DB, CI)        |
-| `REDIS_URL`                          | Cache (permissions, feature flags)       |
-| `WEB_ORIGIN` / `WEB_ORIGINS`         | Allowed browser origins (CORS)           |
-| `SESSION_SECRET`                     | Express session signing                  |
-| `KEYCLOAK_*`                         | OIDC realm, client, admin API            |
-| `S3_*`                               | Object storage for uploads               |
-| `VAPID_*`                            | Web Push                                 |
-| `TWILIO_*` / `SENDGRID_*` / `SMTP_*` | Messaging                                |
-| `E2E_SECRET`                         | Enables `/api/e2e` test helpers when set |
+| Key                                  | Purpose                                     |
+| ------------------------------------ | ------------------------------------------- |
+| `docker/.env` `POSTGRES_*`           | Local PostgreSQL (source of truth)          |
+| `DATABASE_URL` in `apps/api/.env`    | Optional override (remote DB, CI)           |
+| `REDIS_URL`                          | Cache (permissions, feature flags)          |
+| `WEB_ORIGIN` / `WEB_ORIGINS`         | Allowed browser origins (CORS)              |
+| `SESSION_SECRET`                     | Express session signing                     |
+| `KEYCLOAK_*`                         | OIDC realm, client, admin API               |
+| `STORAGE_*`                          | Object storage (`local` or `s3`-compatible) |
+| `VAPID_*`                            | Web Push                                    |
+| `TWILIO_*` / `SENDGRID_*` / `SMTP_*` | Messaging                                   |
+| `E2E_SECRET`                         | Enables `/api/e2e` test helpers when set    |
 
 See `apps/api/src/config/env.js` for the full list with defaults.
 
