@@ -44,6 +44,11 @@ export function csrfProtection(req, res, next) {
     return next()
   }
 
+  // Local storage direct PUT uses HMAC upload token (no session cookie)
+  if (req.path.startsWith('/api/files/upload/')) {
+    return next()
+  }
+
   // Cookie-based JSON API: require non-simple custom header + trusted origin
   if (req.path.startsWith('/api/')) {
     if (config.NODE_ENV === 'test') {

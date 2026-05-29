@@ -23,10 +23,7 @@ echo "Backup created: $file"
 
 "$(dirname "$0")/rotate-backups.sh"
 
-if [[ -n "${BACKUP_S3_BUCKET:-}" ]]; then
-  require aws
-  key="${BACKUP_S3_PREFIX:-$PROJECT_NAME}/$(basename "$file")"
-  echo "Uploading to s3://${BACKUP_S3_BUCKET}/${key}"
-  aws s3 cp "$file" "s3://${BACKUP_S3_BUCKET}/${key}"
-  echo "Upload complete."
+if [[ -n "${BACKUP_REMOTE_URL:-}" ]]; then
+  echo "BACKUP_REMOTE_URL is set — copy $file to your remote backup target (Railway volume, rsync, etc.)."
+  echo "AWS S3 upload was removed; configure your own off-site backup workflow."
 fi
