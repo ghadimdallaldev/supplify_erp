@@ -18,6 +18,8 @@ import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { RolePermissionChecklist } from './RolePermissionChecklist'
+import { TableScroll } from './ui/table-scroll'
+import { EmptyState } from './ui/empty-state'
 import { labelForPermission } from '../lib/permissionLabels'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import {
@@ -205,8 +207,8 @@ export function TeamRolesPanel({
         ) : (
           <>
             {advancedRolesEnabled && roleUsers.length > 0 && (
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full text-sm">
+              <TableScroll aria-label="Team members and roles">
+                <table className="w-full min-w-[320px] text-sm">
                   <thead className="bg-[var(--brand-ultra)] text-left">
                     <tr>
                       <th className="p-3 font-medium">User</th>
@@ -244,7 +246,7 @@ export function TeamRolesPanel({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             )}
 
             {teamMembers.length === 0 && !(advancedRolesEnabled && roleUsers.length > 0) ? (
@@ -303,17 +305,17 @@ export function TeamRolesPanel({
         </TabsContent>
         <TabsContent value="roles" className="mt-4 space-y-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                  <Users className="h-5 w-5 shrink-0 text-[var(--brand-mid)]" />
                   Roles
                 </CardTitle>
                 <CardDescription>
                   System roles are locked; create custom roles as needed.
                 </CardDescription>
               </div>
-              <Button onClick={openCreateRole}>
+              <Button onClick={openCreateRole} className="w-full shrink-0 sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 New Role
               </Button>
@@ -324,15 +326,29 @@ export function TeamRolesPanel({
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
                   Loading roles…
                 </div>
+              ) : roles.length === 0 ? (
+                <EmptyState
+                  title="No roles yet"
+                  description="Create a custom role to tailor access for your team."
+                  action={
+                    <Button onClick={openCreateRole}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      New role
+                    </Button>
+                  }
+                />
               ) : (
                 <div className="space-y-2">
                   {roles.map((role) => {
                     const expanded = expandedRoleId === role.id
                     return (
-                      <div key={role.id} className="border rounded-lg">
+                      <div
+                        key={role.id}
+                        className="overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--surface)]"
+                      >
                         <button
                           type="button"
-                          className="w-full flex items-center gap-3 p-4 text-left hover:bg-[var(--brand-ultra)]"
+                          className="w-full flex items-center gap-3 p-4 text-left transition-colors hover:bg-[var(--brand-ultra)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30"
                           onClick={() => setExpandedRoleId(expanded ? null : role.id)}
                         >
                           {expanded ? (
@@ -421,11 +437,17 @@ export function TeamRolesPanel({
               />
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRoleDialog(null)}>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setRoleDialog(null)}
+            >
               Cancel
             </Button>
-            <Button onClick={saveRole}>Save</Button>
+            <Button className="w-full sm:w-auto" onClick={saveRole}>
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

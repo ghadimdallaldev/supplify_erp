@@ -21,11 +21,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <App />
         </ErrorBoundary>
         <Toaster
-          position="top-right"
+          position="top-center"
+          containerClassName="!top-[max(0.75rem,env(safe-area-inset-top))] sm:!top-4"
           toastOptions={{
             duration: 4000,
+            className: 'text-sm',
             style: {
-              maxWidth: 420,
+              maxWidth: 'min(420px, calc(100vw - 1.5rem))',
+              borderRadius: '0.75rem',
+              border: '1px solid var(--app-border)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
             },
           }}
         />

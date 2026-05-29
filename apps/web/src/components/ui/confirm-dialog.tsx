@@ -40,10 +40,11 @@ export function ConfirmDialog({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         {children}
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter>
           <Button
             type="button"
             variant="outline"
+            className="w-full sm:w-auto"
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
@@ -52,6 +53,7 @@ export function ConfirmDialog({
           <Button
             type="button"
             variant={variant === 'destructive' ? 'destructive' : 'default'}
+            className="w-full sm:w-auto"
             onClick={() => void onConfirm()}
             disabled={loading}
           >

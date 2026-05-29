@@ -142,6 +142,84 @@ describe('Tenant roles routes', () => {
     expect(res.body.data.role.name).toBe('Custom')
   })
 
+  it('POST / rejects removed or invalid permission keys', async () => {
+    const res = await request(app)
+      .post('/api/roles')
+      .send({ name: 'Bad Perms', permissions: ['approvals_budgets', 'ORDERS_VIEW'] })
+      .expect(400)
+    expect(res.body.error.message).toMatch(/Invalid permissions/)
+    expect(res.body.error.message).toContain('approvals_budgets')
+  })
+
+  it('PATCH / updates custom role permissions in DB', async () => {
+    db.query.mockImplementation((sql) => {
+      const text = String(sql)
+      if (text.includes('FROM tenant_roles WHERE id')) {
+        return {
+          rows: [
+            {
+              id: 'r-custom',
+              name: 'Custom',
+              is_system: false,
+              tenant_id: 'tenant-1',
+              tenant_type: 'RESTAURANT',
+            },
+          ],
+        }
+      }
+      if (text.includes('DELETE FROM tenant_role_permissions')) {
+        return { rows: [] }
+      }
+      if (text.includes('INSERT INTO tenant_role_permissions')) {
+        return { rows: [] }
+      }
+      if (text.includes('FROM tenant_user_roles WHERE role_id')) {
+        return { rows: [{ user_id: 'u-assign' }] }
+      }
+      if (text.includes('FROM tenant_roles tr WHERE tr.id')) {
+        return {
+          rows: [
+            {
+              id: 'r-custom',
+              name: 'Custom',
+              is_system: false,
+              permissions: ['ORDERS_VIEW', 'INVOICES_VIEW'],
+            },
+          ],
+        }
+      }
+      return { rows: [] }
+    })
+    const res = await request(app)
+      .patch('/api/roles/r-custom')
+      .send({ permissions: ['ORDERS_VIEW', 'INVOICES_VIEW'] })
+      .expect(200)
+    expect(res.body.data.role.permissions).toContain('INVOICES_VIEW')
+    const deleteCalls = db.query.mock.calls.filter((c) =>
+      String(c[0]).includes('DELETE FROM tenant_role_permissions')
+    )
+    expect(deleteCalls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('PATCH / blocks system role permission changes', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'r-owner',
+          name: 'Owner',
+          is_system: true,
+          tenant_id: 'tenant-1',
+          tenant_type: 'RESTAURANT',
+        },
+      ],
+    })
+    const res = await request(app)
+      .patch('/api/roles/r-owner')
+      .send({ permissions: ['ORDERS_VIEW'] })
+      .expect(400)
+    expect(res.body.error.message).toMatch(/cannot be modified/)
+  })
+
   it('DELETE system role is rejected', async () => {
     db.query.mockResolvedValueOnce({
       rows: [

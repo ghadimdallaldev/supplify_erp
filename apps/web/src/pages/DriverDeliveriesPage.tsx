@@ -4,6 +4,8 @@ import { RequirePermission } from '../components/RequirePermission'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import { Skeleton } from '../components/ui/skeleton'
+import { EmptyState } from '../components/ui/empty-state'
 import {
   useGetDriverActiveRouteQuery,
   useGetSupplierDeliveryBoardQuery,
@@ -107,9 +109,11 @@ export function DriverDeliveriesPage() {
         </div>
 
         {isLoading && (
-          <p className="text-sm text-[var(--text-muted)]" data-testid="driver-deliveries-loading">
-            Loading assignments…
-          </p>
+          <div className="space-y-3" data-testid="driver-deliveries-loading" aria-busy="true">
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <Skeleton className="h-28 w-full rounded-xl" />
+          </div>
         )}
         {isError && (
           <Card data-testid="driver-deliveries-error">
@@ -119,11 +123,13 @@ export function DriverDeliveriesPage() {
           </Card>
         )}
         {!isLoading && !isError && orders.length === 0 && !activeRoute && (
-          <Card data-testid="driver-deliveries-empty">
-            <CardContent className="pt-4 text-sm text-[var(--text-muted)]">
-              No deliveries assigned to you right now.
-            </CardContent>
-          </Card>
+          <div data-testid="driver-deliveries-empty">
+            <EmptyState
+              title="No deliveries assigned"
+              description="When dispatch assigns orders to you, they will appear here."
+              icon={<Package className="h-6 w-6" aria-hidden />}
+            />
+          </div>
         )}
 
         {routeLoading && (
