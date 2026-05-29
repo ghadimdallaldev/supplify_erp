@@ -1,76 +1,15 @@
-# Supplify
+# Supplify (Pre-production branch)
 
-Restaurant & F&B supplier marketplace — monorepo (`apps/api`, `apps/web`).
-
-## Quick start
-
-```cmd
-pnpm setup
-pnpm dev
-```
-
-Open **http://localhost:5173** (native dev) or use full Docker below.
-
-## Branches
-
-| Branch    | Use                                 |
-| --------- | ----------------------------------- |
-| `dev`     | Development (docs, tests, seeds)    |
-| `preprod` | Pre-production deploy (pruned tree) |
-| `prod`    | Production deploy (pruned tree)     |
-
-See **[docs/BRANCHING.md](docs/BRANCHING.md)** for promote workflow.
-
-## Documentation
-
-Full guide: **[docs/README.md](docs/README.md)**
-
-| Topic                 | Doc                                                                      |
-| --------------------- | ------------------------------------------------------------------------ |
-| **Feature catalog**   | [docs/product/features.md](docs/product/features.md)                     |
-| Local Docker workflow | [docs/README.md](docs/README.md)                                         |
-| Database migrations   | [docs/guides/database-migrations.md](docs/guides/database-migrations.md) |
-| Admin feature toggles | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md)   |
-| Production deploy     | [deploy/README.md](deploy/README.md)                                     |
-
-## Scripts
+Deploy-only branch ΓÇö **do not develop here**. On `dev`: `node scripts/promote-release.mjs --tier preprod`, then after UAT `--tier prod` (prod merges **preprod**, not dev).
 
 ```bash
-pnpm install
-pnpm dev          # native API + web (infra via Docker)
-pnpm build        # production build (web TypeScript + Vite)
-pnpm test:api     # API unit tests (vitest run, non-watch — use before PR)
-pnpm test:web     # web unit tests (vitest run)
-pnpm test:all     # API + web unit tests (same as test:ci)
-pnpm test:ci      # alias for test:all
-pnpm db:migrate   # SQL migrations
+node scripts/promote-release.mjs --tier preprod
 ```
 
-**Testing:** Full guide in [docs/qa/QA_AUTOMATION_GUIDE.md](docs/qa/QA_AUTOMATION_GUIDE.md). API mock patterns: [docs/API_TEST_SUITE_STABILIZATION.md](docs/API_TEST_SUITE_STABILIZATION.md). Use `pnpm test:api:watch` only while developing; use `pnpm test:api` for final verification (not `pnpm test`, which watches).
+## Deploy (EC2 Docker)
 
-## Environment variables (keys only)
+```bash
+sudo ./deploy/scripts/deploy-preprod.sh
+```
 
-Copy `apps/api/.env.example` to `apps/api/.env` for app secrets (Twilio, VAPID, etc.). **Local Postgres/Redis/Keycloak** credentials and ports live in `docker/.env` (created from `docker/.env.example` on first `pnpm local:infra` or `pnpm dev`). Native dev syncs `apps/api/.env.docker-sync` automatically — do not hand-edit that file.
-
-| Key                                  | Purpose                                  |
-| ------------------------------------ | ---------------------------------------- |
-| `docker/.env` `POSTGRES_*`           | Local PostgreSQL (source of truth)       |
-| `DATABASE_URL` in `apps/api/.env`    | Optional override (remote DB, CI)        |
-| `REDIS_URL`                          | Cache (permissions, feature flags)       |
-| `WEB_ORIGIN` / `WEB_ORIGINS`         | Allowed browser origins (CORS)           |
-| `SESSION_SECRET`                     | Express session signing                  |
-| `KEYCLOAK_*`                         | OIDC realm, client, admin API            |
-| `S3_*`                               | Object storage for uploads               |
-| `VAPID_*`                            | Web Push                                 |
-| `TWILIO_*` / `SENDGRID_*` / `SMTP_*` | Messaging                                |
-| `E2E_SECRET`                         | Enables `/api/e2e` test helpers when set |
-
-See `apps/api/src/config/env.js` for the full list with defaults.
-
-## API reference
-
-Route groups: **[docs/api/README.md](docs/api/README.md)**
-
-## License
-
-MIT
+Migrations run automatically during deploy. Branching guide: see `docs/BRANCHING.md` on the `dev` branch.
