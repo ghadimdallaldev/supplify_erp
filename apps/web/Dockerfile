@@ -38,12 +38,18 @@ RUN pnpm build:docker
 # Production image with nginx
 FROM nginx:alpine AS runner
 
+RUN apk add --no-cache gettext
+
 # Copy built files
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+# Railway routes traffic to $PORT — template is rendered at container start
+COPY apps/web/nginx.conf.template /etc/nginx/conf.d/default.conf.template
+COPY apps/web/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+ENV PORT=80
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
