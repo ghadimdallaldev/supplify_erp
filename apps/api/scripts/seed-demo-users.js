@@ -12,7 +12,7 @@
  */
 import 'dotenv/config'
 
-const KEYCLOAK_BASE_URL = process.env.KEYCLOAK_BASE_URL || 'http://localhost:8080'
+const KEYCLOAK_BASE_URL = process.env.KEYCLOAK_BASE_URL || 'http://localhost:8180'
 const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM || 'Supplify'
 const ADMIN_USERNAME = process.env.KEYCLOAK_ADMIN_USERNAME || 'admin'
 const ADMIN_PASSWORD = process.env.KEYCLOAK_ADMIN_PASSWORD || 'admin'

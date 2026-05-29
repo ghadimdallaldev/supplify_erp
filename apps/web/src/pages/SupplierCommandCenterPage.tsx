@@ -27,6 +27,8 @@ import {
   type ReminderDraft,
 } from '../components/supplier/ReorderReminderReviewDialog'
 import { RequirePermission } from '../components/RequirePermission'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
 
 const QUICK_ACTIONS = [
   { label: 'Deliveries', href: '/app/fulfillment', icon: Truck, testId: 'qa-deliveries' },
@@ -130,11 +132,7 @@ export function SupplierCommandCenterPage() {
   if (isLoading) {
     return (
       <RequirePermission {...gateProps}>
-        <div
-          data-testid="supplier-command-center-page"
-          className="flex flex-col gap-4"
-          aria-busy="true"
-        >
+        <div data-testid="supplier-command-center-page" className="page-stack" aria-busy="true">
           <Skeleton className="h-9 w-72" />
           <Skeleton className="h-4 w-96 max-w-full" />
           <div className="dashboard-kpi-grid">
@@ -158,7 +156,7 @@ export function SupplierCommandCenterPage() {
       <RequirePermission {...gateProps}>
         <div
           data-testid="supplier-command-center-error"
-          className="text-center pt-12 px-4"
+          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-6 text-center"
           role="alert"
         >
           <AlertTriangle size={32} className="text-[var(--brand)] mx-auto mb-3" />
@@ -177,27 +175,32 @@ export function SupplierCommandCenterPage() {
 
   return (
     <RequirePermission {...gateProps}>
-      <div data-testid="supplier-command-center-page" className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-[22px] font-black m-0 text-[var(--text)]">Command Center</h1>
-            <p className="text-[13px] text-[var(--text-muted)] mt-1">
-              Today&apos;s priorities — action items, not just charts
-              {isFetching && !isLoading ? (
-                <span className="ml-2 text-[var(--brand)]">Refreshing…</span>
-              ) : null}
-            </p>
-          </div>
-          <Button variant="outline" size="sm" asChild data-testid="link-analytics-dashboard">
-            <Link to="/app/dashboard">
-              <BarChart3 className="h-4 w-4 mr-1.5" />
-              Analytics dashboard
-            </Link>
-          </Button>
-        </div>
+      <div data-testid="supplier-command-center-page" className="page-stack">
+        <PageHeader
+          title="Command Center"
+          description={
+            isFetching && !isLoading
+              ? "Today's priorities — action items, not just charts (Refreshing...)"
+              : "Today's priorities — action items, not just charts"
+          }
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              data-testid="link-analytics-dashboard"
+              className="w-full sm:w-auto"
+            >
+              <Link to="/app/dashboard">
+                <BarChart3 className="h-4 w-4 mr-1.5" />
+                Analytics dashboard
+              </Link>
+            </Button>
+          }
+        />
 
         <nav
-          className="flex flex-wrap gap-2"
+          className="action-bar rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-2.5"
           aria-label="Quick actions"
           data-testid="command-center-quick-actions"
         >
@@ -206,7 +209,7 @@ export function SupplierCommandCenterPage() {
               key={testId}
               to={href}
               data-testid={testId}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text)] no-underline hover:border-[var(--brand-light)]"
+              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--text)] no-underline transition-colors hover:border-[var(--brand-light)] hover:bg-[var(--brand-ultra)]"
             >
               <Icon size={14} className="text-[var(--brand)]" />
               {label}
@@ -245,15 +248,22 @@ export function SupplierCommandCenterPage() {
           />
         </div>
 
-        <section data-testid="todays-priorities">
-          <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2">
+        <section
+          data-testid="todays-priorities"
+          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
+        >
+          <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
             <ClipboardList size={16} />
             Today&apos;s priorities
           </h2>
           {(data?.todaysPriorities || []).length === 0 ? (
-            <EmptyBlock testId="priorities-empty">
-              No urgent items — you&apos;re caught up for now.
-            </EmptyBlock>
+            <div data-testid="priorities-empty">
+              <EmptyState
+                title="No urgent items"
+                description="You're caught up for now."
+                icon={<ClipboardList className="h-5 w-5" />}
+              />
+            </div>
           ) : (
             <ul className="list-none p-0 m-0 flex flex-col gap-2">
               {data!.todaysPriorities.map((item: { id: string; title: string; href: string }) => (
@@ -275,7 +285,7 @@ export function SupplierCommandCenterPage() {
         <div className="dashboard-content-grid">
           <PreviewCard title="Deliveries" testId="preview-deliveries" href="/app/fulfillment">
             {(previews?.deliveries || []).length === 0 ? (
-              <EmptyInline>No active deliveries in preview.</EmptyInline>
+              <EmptyInline>No active deliveries right now.</EmptyInline>
             ) : (
               previews!.deliveries.map(
                 (d: {
@@ -349,8 +359,12 @@ export function SupplierCommandCenterPage() {
           </PreviewCard>
         </div>
 
-        <section id="reorder" data-testid="reorder-opportunities">
-          <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2">
+        <section
+          id="reorder"
+          data-testid="reorder-opportunities"
+          className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
+        >
+          <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
             <Users size={16} />
             Reorder opportunities
             {(kpis?.customersDueReorder ?? 0) > 0 && (
@@ -360,9 +374,13 @@ export function SupplierCommandCenterPage() {
             )}
           </h2>
           {(previews?.reorderOpportunities || []).length === 0 ? (
-            <EmptyBlock testId="reorder-empty">
-              No restaurants are past their usual reorder window right now.
-            </EmptyBlock>
+            <div data-testid="reorder-empty">
+              <EmptyState
+                title="No reorder opportunities"
+                description="No restaurants are past their usual reorder window right now."
+                icon={<Users className="h-5 w-5" />}
+              />
+            </div>
           ) : (
             <div className="flex flex-col gap-2">
               {previews!.reorderOpportunities.map(
@@ -397,16 +415,17 @@ export function SupplierCommandCenterPage() {
                         </li>
                       )}
                     </ul>
-                    <div className="flex flex-wrap gap-2 mt-3">
+                    <div className="action-bar mt-3">
                       <Button
                         size="sm"
                         disabled={drafting}
                         data-testid={`reorder-draft-${c.restaurantId}`}
+                        className="w-full sm:w-auto"
                         onClick={() => handleDraftReminder(c.restaurantId)}
                       >
                         Review reminder
                       </Button>
-                      <Button size="sm" variant="outline" asChild>
+                      <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
                         <Link to={`/app/restaurants/${c.restaurantId}`}>View customer</Link>
                       </Button>
                     </div>
@@ -499,17 +518,6 @@ function PreviewCard({
       </div>
       {children}
     </div>
-  )
-}
-
-function EmptyBlock({ children, testId }: { children: ReactNode; testId: string }) {
-  return (
-    <p
-      data-testid={testId}
-      className="text-[13px] text-[var(--text-muted)] rounded-lg border border-dashed border-[var(--app-border)] px-3 py-4 m-0"
-    >
-      {children}
-    </p>
   )
 }
 

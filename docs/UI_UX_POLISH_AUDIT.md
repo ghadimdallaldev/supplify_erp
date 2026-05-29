@@ -8,12 +8,12 @@
 
 ## Executive summary
 
-| Area                      | Status                                                               |
-| ------------------------- | -------------------------------------------------------------------- |
-| Design system (shared UI) | **Improved** — dialogs, tabs, cards, empty states, tables, utilities |
-| Responsive (320–desktop)  | **Improved** — modals, action bars, tabs scroll, touch targets       |
-| High-impact screens       | **Polished** — roles editor, fulfillment header, driver deliveries   |
-| Full app sweep            | **Partial** — remaining pages listed below for pass 2                |
+| Area                      | Status                                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| Design system (shared UI) | **Improved** — dialogs, tabs, cards, empty states, tables, utilities                           |
+| Responsive (320–desktop)  | **Improved** — modals, action bars, tabs scroll, touch targets                                 |
+| High-impact screens       | **Polished** — roles editor, fulfillment, driver, command center, admin limits, public booking |
+| Full app sweep            | **Partial** — pass 3 done for reservations/receiving/disputes                                  |
 
 ---
 
@@ -21,21 +21,21 @@
 
 ### Restaurant (sampled + grep patterns)
 
-| Page                               | Audited |       Polished this pass        |
-| ---------------------------------- | :-----: | :-----------------------------: |
-| Dashboard                          |    ✓    | — (uses existing dashboard CSS) |
-| Suppliers marketplace              |    ✓    |                —                |
-| Cart / Orders / Order detail       |    ✓    |                —                |
-| Receiving / Disputes               |    ✓    |                —                |
-| Invoices / Quick lists / Inventory |    ✓    |                —                |
-| Reservations / Public booking      |    ✓    |                —                |
-| Settings / Subscription            |    ✓    |                —                |
+| Page                               | Audited |          Polished this pass          |
+| ---------------------------------- | :-----: | :----------------------------------: |
+| Dashboard                          |    ✓    |   — (uses existing dashboard CSS)    |
+| Suppliers marketplace              |    ✓    |                  —                   |
+| Cart / Orders / Order detail       |    ✓    |                  —                   |
+| Receiving / Disputes               |    ✓    |           **Yes** (pass 3)           |
+| Invoices / Quick lists / Inventory |    ✓    |                  —                   |
+| Reservations / Public booking      |    ✓    | **Yes** (portal pass 2; page pass 3) |
+| Settings / Subscription            |    ✓    |                  —                   |
 
 ### Supplier
 
 | Page                          | Audited |    Polished this pass    |
 | ----------------------------- | :-----: | :----------------------: |
-| Command center                |    ✓    |            —             |
+| Command center                |    ✓    |         **Yes**          |
 | Products / Import             |    ✓    |            —             |
 | Fulfillment & logistics       |    ✓    |         **Yes**          |
 | Driver deliveries             |    ✓    |         **Yes**          |
@@ -46,30 +46,33 @@
 
 | Page                                | Audited | Polished this pass |
 | ----------------------------------- | :-----: | :----------------: |
-| Overview / Tenants / Plans / Limits |    ✓    |         —          |
+| Overview / Tenants / Plans / Limits |    ✓    |  **Yes** (limits)  |
 | Features / Finance / Audit          |    ✓    |         —          |
 
 ### Public
 
 | Page                          | Audited | Polished this pass |
 | ----------------------------- | :-----: | :----------------: |
-| Public reservation / Waitlist |    ✓    |         —          |
+| Public reservation / Waitlist |    ✓    |      **Yes**       |
 
 ---
 
 ## 2. Issues found (before)
 
-| Category     | Issue                                                      |
-| ------------ | ---------------------------------------------------------- |
-| Modals       | Fixed height on small screens; footers cramped on mobile   |
-| Tabs         | Fulfillment grid cramped; overflow on 320px                |
-| Tables       | Team roles table could overflow without consistent wrapper |
-| Empty states | Plain dashed boxes; weak hierarchy                         |
-| Role editor  | Dense permission rows; small checkboxes on mobile          |
-| Driver page  | Text-only loading; plain empty card                        |
-| Toasts       | Top-right clipped on narrow phones                         |
-| Cards        | Heavy `p-6` on mobile                                      |
-| Actions      | Header buttons not full-width on mobile where needed       |
+| Category     | Issue                                                        |
+| ------------ | ------------------------------------------------------------ |
+| Modals       | Fixed height on small screens; footers cramped on mobile     |
+| Tabs         | Fulfillment grid cramped; overflow on 320px                  |
+| Tables       | Team roles table could overflow without consistent wrapper   |
+| Empty states | Plain dashed boxes; weak hierarchy                           |
+| Role editor  | Dense permission rows; small checkboxes on mobile            |
+| Driver page  | Text-only loading; plain empty card                          |
+| Toasts       | Top-right clipped on narrow phones                           |
+| Cards        | Heavy `p-6` on mobile                                        |
+| Actions      | Header buttons not full-width on mobile where needed         |
+| Public flow  | Booking split view lacked a clear summary and trust cues     |
+| Admin forms  | Limit/add-on controls felt dense for high-frequency edits    |
+| Command hub  | Priorities and quick actions needed stronger visual grouping |
 
 ---
 
@@ -91,12 +94,21 @@
 
 ## 4. Pages polished (this pass)
 
-| Page / area                 | Improvements                                                                        |
-| --------------------------- | ----------------------------------------------------------------------------------- |
-| **TeamRolesPanel**          | `TableScroll`, responsive card header, role list cards, empty state, dialog footers |
-| **RolePermissionChecklist** | Domain cards, touch-friendly rows, partial badge                                    |
-| **FulfillmentPage**         | `PageHeader`, warehouse filter styling, scrollable tabs                             |
-| **DriverDeliveriesPage**    | Skeleton loading, `EmptyState`, existing touch buttons retained                     |
+| Page / area                    | Improvements                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------- |
+| **TeamRolesPanel**             | `TableScroll`, responsive card header, role list cards, empty state, dialog footers     |
+| **RolePermissionChecklist**    | Domain cards, touch-friendly rows, partial badge                                        |
+| **FulfillmentPage**            | `PageHeader`, warehouse filter styling, scrollable tabs                                 |
+| **DriverDeliveriesPage**       | Skeleton loading, `EmptyState`, existing touch buttons retained                         |
+| **AdminLimitsTab**             | `PageHeader`, consistent selects, `TableScroll` tables, mobile-safe action buttons      |
+| **SupplierCommandCenter**      | `PageHeader`, grouped quick actions, stronger section cards, polished empty states      |
+| **PublicReservationPortal**    | Premium booking hero, sticky details card, improved slot UX, clearer booking summary    |
+| **UpgradeModal**               | Better card spacing and full-width mobile CTA controls                                  |
+| **ReservationsPage** (pass 3)  | `PageHeader`, `page-stack`, booking link wrap, waitlist `EmptyState`, board skeletons   |
+| **ReceivingPage** (pass 3)     | `page-stack`, scrollable tabs, history `EmptyState`/skeletons, responsive history cards |
+| **DisputesPage** (pass 3)      | Mobile dispute cards, `TableScroll` on md+, filter styling, dialog footers              |
+| **DisputeDetailPage** (pass 3) | Line items as mobile cards + `TableScroll` on md+                                       |
+| **DisputeListCards** (new)     | Reusable mobile card list for dispute rows                                              |
 
 ---
 
@@ -123,19 +135,17 @@
 
 ---
 
-## 7. Remaining ugly / high-effort screens (pass 2)
+## 7. Remaining ugly / high-effort screens
 
-| Priority | Screen                      | Notes                        |
-| -------- | --------------------------- | ---------------------------- |
-| P1       | Admin limits / add-ons      | Dense forms, UUID selectors  |
-| P1       | Supplier command center     | KPI density on mobile        |
-| P1       | Public booking flow         | Standalone polish pass       |
-| P2       | Reservation board           | Calendar + table hybrid      |
-| P2       | Product import wizard       | Stepper + error rows         |
-| P2       | Billing / Upgrade modal     | Trust copy + spacing         |
-| P2       | Disputes / Receiving mobile | Card layouts for tables      |
-| P3       | Reports / Analytics charts  | Legend overflow              |
-| P3       | Admin tenant detail tabs    | Tab scroll + section headers |
+| Priority | Screen                          | Notes                                                     |
+| -------- | ------------------------------- | --------------------------------------------------------- |
+| P1       | Reservation board (component)   | Calendar + table hybrid readability in `ReservationBoard` |
+| P1       | Product import wizard           | Stepper clarity + error affordances                       |
+| ~~P1~~   | ~~Receiving / disputes mobile~~ | **Done (pass 3)** — cards + scroll tables                 |
+| P2       | Payment modal                   | Stronger trust layout + failure states                    |
+| P2       | Reports / analytics charts      | Legend overflow + axis label truncation                   |
+| P2       | Admin tenant detail tabs        | Section hierarchy + sticky action rows                    |
+| P3       | Dashboard dense widgets         | Spacing rhythm consistency                                |
 
 ---
 
@@ -167,6 +177,25 @@
 - [ ] All five tabs reachable on 320px (scroll)
 - [ ] Warehouse filter full width on mobile
 
+### Admin limits
+
+- [ ] Select tenant and verify all override tables scroll cleanly on 320–390px
+- [ ] Add-on quantity +/- remains tappable without overlap on mobile
+- [ ] Plan and tenant override save buttons wrap without clipping
+
+### Supplier command center
+
+- [ ] Quick actions wrap cleanly with no clipped labels at 320px
+- [ ] Empty states for priorities/reorder render as polished cards
+- [ ] Reorder action buttons stack safely on mobile
+
+### Public booking
+
+- [ ] Hero and booking cards remain readable at 320px
+- [ ] Time slot buttons remain tappable (>=44px target)
+- [ ] Booking summary updates when slot/date/party size changes
+- [ ] Waitlist panel remains understandable when slots are full
+
 ---
 
 ## 9. Tests / build
@@ -177,7 +206,7 @@ cd apps/web && pnpm typecheck
 cd apps/web && pnpm build
 ```
 
-**2026-05-28 run:**
+**2026-05-29 run:**
 
 | Command                    | Result                       |
 | -------------------------- | ---------------------------- |
@@ -189,11 +218,11 @@ cd apps/web && pnpm build
 
 ## 10. Recommended next UI pass
 
-1. Adopt `PageHeader` + `page-stack` on top 10 traffic pages (Dashboard, Orders, Products, Settings).
-2. Replace raw `<table>` blocks with `TableScroll` + mobile card fallbacks where needed.
-3. Public booking: dedicated mobile-first layout (single column, sticky CTA).
-4. Admin: section labels + searchable selects instead of raw UUID fields.
-5. `UpgradeModal` / `PaymentModal`: spacing, trust badges, loading states.
+1. ~~Apply card-based mobile layouts to `Receiving`, `Disputes`, and `Reservations` dense rows.~~ (pass 3)
+2. Introduce compact chart legends and responsive axis labels in analytics/reporting pages.
+3. Polish `PaymentModal` with stronger trust framing and failure-state clarity.
+4. Standardize all admin tabs on `PageHeader`, `section-label`, and consistent action bars.
+5. Add visual regression snapshots for key breakpoints (320, 390, 768, desktop).
 
 ---
 
@@ -201,4 +230,4 @@ cd apps/web && pnpm build
 
 **New:** `apps/web/src/components/ui/table-scroll.tsx`, `docs/UI_UX_POLISH_AUDIT.md`
 
-**Updated:** `apps/web/src/index.css`, `main.tsx`, `ui/dialog.tsx`, `ui/tabs.tsx`, `ui/card.tsx`, `ui/button.tsx`, `ui/empty-state.tsx`, `ui/confirm-dialog.tsx`, `RolePermissionChecklist.jsx`, `TeamRolesPanel.jsx`, `FulfillmentPage.tsx`, `DriverDeliveriesPage.tsx`
+**Updated:** `apps/web/src/index.css`, `main.tsx`, `ui/dialog.tsx`, `ui/tabs.tsx`, `ui/card.tsx`, `ui/button.tsx`, `ui/empty-state.tsx`, `ui/confirm-dialog.tsx`, `RolePermissionChecklist.jsx`, `TeamRolesPanel.jsx`, `FulfillmentPage.tsx`, `DriverDeliveriesPage.tsx`, `components/admin/AdminLimitsTab.tsx`, `pages/SupplierCommandCenterPage.tsx`, `pages/PublicReservationPortal.tsx`, `components/UpgradeModal.tsx`, `pages/ReservationsPage.tsx`, `pages/ReceivingPage.tsx`, `pages/disputes/DisputesPage.tsx`, `pages/disputes/DisputeDetailPage.tsx`, `components/disputes/DisputeListCards.tsx`

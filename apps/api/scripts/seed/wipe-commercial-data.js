@@ -24,10 +24,10 @@ const WIPE_TABLES = [
   ['order_approvals', 'budget_allocations', 'budget_periods', 'approval_rules'],
   ['billing_payment', 'billing_invoice', 'billing_event', 'billing_payment_method'],
   ['subscription_change_log'],
+  ['restaurant_invitations', 'branch_invitations'],
   ['tenant_user_roles', 'tenant_role_permissions', 'tenant_roles'],
   ['user_role'],
   ['tenant_subscription_addon', 'tenant_limit_override', 'tenant_account_link'],
-  ['restaurant_invitations', 'branch_invitations'],
   [
     'restaurant_org_user_branch_access',
     'restaurant_org_user_roles',
@@ -130,25 +130,32 @@ async function clearOrgFkOnTenants(client) {
 export async function runCommercialWipe(client) {
   console.log('\n🗑️  Wiping restaurants, suppliers, and all commercial data...')
 
-  await clearOrgFkOnTenants(client)
-
-  for (const group of WIPE_TABLES) {
-    for (const table of group) {
-      await deleteFromTable(client, table)
-    }
-  }
-
+  await client.query('BEGIN')
   try {
-    await client.query('SAVEPOINT wipe_sp')
-    const res = await client.query(
-      `DELETE FROM app_user WHERE role IS DISTINCT FROM 'ADMIN' AND LOWER(email) NOT LIKE 'admin@%'`
-    )
-    await client.query('RELEASE SAVEPOINT wipe_sp')
-    if (res.rowCount > 0) console.log(`   Deleted ${res.rowCount} app_user rows (kept admin)`)
-  } catch (e) {
-    await client.query('ROLLBACK TO SAVEPOINT wipe_sp').catch(() => {})
-    if (e.code !== '42P01') throw e
-  }
+    await clearOrgFkOnTenants(client)
 
-  console.log('   Wipe complete.\n')
+    for (const group of WIPE_TABLES) {
+      for (const table of group) {
+        await deleteFromTable(client, table)
+      }
+    }
+
+    try {
+      await client.query('SAVEPOINT wipe_sp')
+      const res = await client.query(
+        `DELETE FROM app_user WHERE role IS DISTINCT FROM 'ADMIN' AND LOWER(email) NOT LIKE 'admin@%'`
+      )
+      await client.query('RELEASE SAVEPOINT wipe_sp')
+      if (res.rowCount > 0) console.log(`   Deleted ${res.rowCount} app_user rows (kept admin)`)
+    } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT wipe_sp').catch(() => {})
+      if (e.code !== '42P01') throw e
+    }
+
+    await client.query('COMMIT')
+    console.log('   Wipe complete.\n')
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw err
+  }
 }

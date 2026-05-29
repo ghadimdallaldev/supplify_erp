@@ -83,6 +83,8 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
       workspace.roleName ? ` · ${workspace.roleName}` : ''
     }`
   const showUpgrade = (!isPlatformAdmin || isImpersonating) && user?.role !== 'PENDING'
+  const isAdminPortalRoute =
+    isPlatformAdmin && !isImpersonating && location.pathname.startsWith('/app/admin')
   const hasUrgency = usagePressure.length > 0 || (blockedCountLast7d ?? 0) >= 1
   const settingsPlanTab = isEffectiveSupplier
     ? '/app/settings?tab=plan'
@@ -145,7 +147,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
-      {onOpenMobileNav && (
+      {onOpenMobileNav && !isAdminPortalRoute && (
         <button
           type="button"
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--app-border)] lg:hidden"

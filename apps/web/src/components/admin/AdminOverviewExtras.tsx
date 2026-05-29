@@ -49,9 +49,9 @@ export function AdminOverviewExtras({
   })
 
   const insights = dealInsights?.insights as Record<string, number> | undefined
-  const pendingDeals = pendingDealsData?.deals || []
-  const recentErrors = healthData?.recentApiErrors || []
-  const recentEvents = activityData?.events || []
+  const pendingDeals = Array.isArray(pendingDealsData?.deals) ? pendingDealsData.deals : []
+  const recentErrors = Array.isArray(healthData?.recentApiErrors) ? healthData.recentApiErrors : []
+  const recentEvents = Array.isArray(activityData?.events) ? activityData.events : []
 
   const attentionItems: AttentionItem[] = []
 
@@ -135,10 +135,13 @@ export function AdminOverviewExtras({
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="w-full space-y-5">
       <AdminRefreshBar lastUpdated={lastUpdated} onRefresh={onRefresh} refreshing={refreshing} />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div
+        className="relative z-0 grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        data-testid="admin-overview-panels"
+      >
         {/* Needs attention */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-2">
@@ -230,22 +233,21 @@ export function AdminOverviewExtras({
         </Card>
 
         {/* Quick actions */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="pb-2">
+        <Card className="lg:col-span-1 overflow-visible">
+          <CardHeader className="px-4 pb-2 pt-4 sm:px-6 sm:pt-6">
             <CardTitle className="text-sm font-semibold">Quick actions</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-2">
+          <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
               {quickActions.map(({ label, tab, icon: Icon }) => (
                 <Button
                   key={tab}
                   variant="outline"
-                  size="sm"
-                  className="h-auto py-2.5 justify-start text-xs font-medium"
+                  className="box-border h-auto min-h-11 w-full justify-start gap-3 whitespace-normal rounded-lg px-5 py-3.5 text-xs font-medium leading-snug"
                   onClick={() => onNavigateTab(tab)}
                 >
-                  <Icon className="h-3.5 w-3.5 mr-2 shrink-0" />
-                  {label}
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="min-w-0 text-left">{label}</span>
                 </Button>
               ))}
             </div>

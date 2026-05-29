@@ -44,6 +44,7 @@
     "seed:full": "node scripts/pnpm-run.mjs --filter @supplify/api seed:full",
     "seed:features": "node scripts/pnpm-run.mjs --filter @supplify/api seed:features",
     "seed:tier-catalog": "node apps/api/scripts/seed-tier-catalog.mjs",
+    "seed:tier-matrix": "node apps/api/scripts/seed-tier-matrix.mjs",
     "log:tier-limits": "node apps/api/scripts/log-tier-limits.mjs",
     "docs:diagrams:check": "node scripts/check-mermaid-diagrams.mjs",
     "seed:audit-backfill": "node apps/api/scripts/seed-audit-backfill.mjs",

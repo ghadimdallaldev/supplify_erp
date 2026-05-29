@@ -1,9 +1,12 @@
 /**
- * Wipe commercial data and seed 1 restaurant + 1 supplier per plan tier
+ * Wipe commercial data and seed restaurants + suppliers per plan tier
  * (Free / Silver / Gold / Platinum) with prod-like volume, Keycloak logins,
  * and tenant roles for Team assignment.
  *
  * Run: pnpm run seed:tier-catalog
+ *      pnpm run seed:tier-matrix   (10× resto + 10× supplier per tier)
+ *
+ * Env: TENANTS_PER_TIER (default 1) — use 10 for the full tier matrix
  */
 import 'dotenv/config'
 import { pool } from '../src/lib/db.js'
@@ -31,7 +34,19 @@ import {
 import { backfillAllCommercialAuditLogs } from './seed/audit-demo-backfill.js'
 
 const rng = createSeededRng(parseInt(process.env.SEED || '1337', 10))
+const TENANTS_PER_TIER = Math.max(
+  1,
+  Math.min(50, parseInt(process.env.TENANTS_PER_TIER || '1', 10))
+)
+const MULTI_TENANT = TENANTS_PER_TIER > 1
 const addressJson = JSON.stringify({ city: 'Dubai', country: 'UAE' })
+
+/** Scale per-tenant volume down when seeding many tenants per tier. */
+function volumeScale() {
+  if (TENANTS_PER_TIER >= 10) return { products: [10, 14], orders: 12, reservations: 12, tables: 6 }
+  if (TENANTS_PER_TIER >= 5) return { products: [12, 18], orders: 20, reservations: 18, tables: 6 }
+  return { products: [18, 28], orders: 45, reservations: 35, tables: 8 }
+}
 
 function uuid() {
   return crypto.randomUUID()
@@ -82,7 +97,7 @@ async function upsertAppUser(client, { email, displayName, appRole, keycloakSub 
 }
 
 async function assignNamedRole(client, userId, tenantId, tenantType, roleName, assignedBy = null) {
-  await ensureTenantSystemRoles(tenantId, tenantType)
+  await ensureTenantSystemRoles(tenantId, tenantType, client)
   const roleId = await getRoleIdByName(tenantId, tenantType, roleName)
   if (!roleId) throw new Error(`Role ${roleName} missing for ${tenantType} ${tenantId}`)
   await assignTenantUserRole({ userId, roleId, tenantId, tenantType, assignedBy })
@@ -147,8 +162,9 @@ async function seedSupplier(client, def, warehouseShape) {
     `${def.name} Catalog`,
   ])
 
+  const vol = volumeScale()
   const products = []
-  const productCount = intBetween(rng, 18, 28)
+  const productCount = intBetween(rng, vol.products[0], vol.products[1])
   for (let i = 1; i <= productCount; i++) {
     const productId = uuid()
     const sku = `${def.tier.toUpperCase()}-SKU-${String(i).padStart(3, '0')}`
@@ -209,7 +225,8 @@ async function seedRestaurant(client, def, branchShape, supplierProducts) {
     isMain: true,
   })
 
-  for (let t = 1; t <= 8; t++) {
+  const vol = volumeScale()
+  for (let t = 1; t <= vol.tables; t++) {
     await client.query(
       `INSERT INTO reservation_table (restaurant_id, branch_id, name, capacity, is_active)
        VALUES ($1, $2, $3, $4, true)`,
@@ -218,7 +235,7 @@ async function seedRestaurant(client, def, branchShape, supplierProducts) {
   }
 
   const today = todayStart()
-  for (let i = 0; i < 35; i++) {
+  for (let i = 0; i < vol.reservations; i++) {
     const scheduledAt = randomDateBetween(
       rng,
       addDays(new Date(today), -21),
@@ -250,7 +267,7 @@ async function seedRestaurant(client, def, branchShape, supplierProducts) {
 
   const orderStatuses = ['COMPLETED', 'COMPLETED', 'COMPLETED', 'SHIPPED', 'PROCESSING', 'PLACED']
   const ninetyDaysAgo = addDays(new Date(today), -90)
-  for (let o = 0; o < 45; o++) {
+  for (let o = 0; o < vol.orders; o++) {
     const orderId = uuid()
     const placedAt = randomDateBetween(rng, ninetyDaysAgo, today)
     const status = pick(rng, orderStatuses)
@@ -278,7 +295,7 @@ async function seedRestaurant(client, def, branchShape, supplierProducts) {
       orderId,
     ])
     if (status === 'COMPLETED' && supplierProducts[0]?.supplierId) {
-      const invNum = `INV-${def.tier.toUpperCase()}-${String(o).padStart(3, '0')}`
+      const invNum = `INV-${def.slug.toUpperCase().replace(/[^A-Z0-9]/g, '-')}-${String(o).padStart(3, '0')}`
       const { rows: invExists } = await client.query(`SELECT 1 FROM invoice WHERE order_id = $1`, [
         orderId,
       ])
@@ -345,6 +362,11 @@ async function ensureKeycloakAccounts(accounts) {
     })
     const existing = (await findRes.json())[0]
     let userId = existing?.id
+    const nameFromEmail = acc.email.split('@')[0].replace(/[._-]+/g, ' ')
+    const nameParts = nameFromEmail.split(/\s+/).filter(Boolean)
+    const firstName = nameParts[0] || acc.username
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'User'
+
     if (!existing) {
       const createRes = await fetch(`${base}/users`, {
         method: 'POST',
@@ -352,6 +374,8 @@ async function ensureKeycloakAccounts(accounts) {
         body: JSON.stringify({
           username: acc.username,
           email: acc.email,
+          firstName,
+          lastName,
           enabled: true,
           emailVerified: true,
           credentials: [{ type: 'password', value: SEED_PASSWORD, temporary: false }],
@@ -362,6 +386,13 @@ async function ensureKeycloakAccounts(accounts) {
       userId = createRes.headers.get('Location')?.split('/').pop()
     }
     if (userId) {
+      if (existing && (!existing.firstName?.trim() || !existing.lastName?.trim())) {
+        await fetch(`${base}/users/${userId}`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firstName, lastName }),
+        })
+      }
       await fetch(`${base}/users/${userId}/role-mappings/realm`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -388,31 +419,60 @@ export async function seedTierCatalog() {
     console.log('🔧 Patching plan features (missing keys from migrations)...')
     await applyPlanFeaturePatches(client)
 
-    console.log('📦 Seeding 1 restaurant + 1 supplier per tier (prod-like data)...\n')
+    const tenantLabel =
+      TENANTS_PER_TIER === 1
+        ? '1 restaurant + 1 supplier'
+        : `${TENANTS_PER_TIER} restaurants + ${TENANTS_PER_TIER} suppliers`
+    console.log(`📦 Seeding ${tenantLabel} per tier (prod-like data)...\n`)
 
     for (const tierMeta of TIERS) {
-      const sDef = supplierDef(tierMeta.tier, tierMeta.label)
-      const rDef = restaurantDef(tierMeta.tier, tierMeta.label)
-      console.log(`▶ ${tierMeta.label} tier`)
+      console.log(`▶ ${tierMeta.label} tier (${TENANTS_PER_TIER}× each)`)
+      const tierSuppliers = []
 
-      const supplier = await seedSupplier(client, sDef, warehouseShape)
-      const restaurant = await seedRestaurant(client, rDef, branchShape, supplier.products)
+      for (let i = 1; i <= TENANTS_PER_TIER; i++) {
+        const sDef = supplierDef(tierMeta.tier, tierMeta.label, i, { multi: MULTI_TENANT })
+        const supplier = await seedSupplier(client, sDef, warehouseShape)
+        tierSuppliers.push(supplier)
 
-      for (const email of supplier.users.emails) {
-        keycloakAccounts.push({
-          email,
-          username: email.split('@')[0].replace(/\./g, '-'),
-          realmRole: 'supplier',
-        })
-        loginLines.push(`  supplier ${tierMeta.label}: ${email}`)
+        for (const email of supplier.users.emails) {
+          keycloakAccounts.push({
+            email,
+            username: email.split('@')[0].replace(/\./g, '-'),
+            realmRole: 'supplier',
+          })
+        }
+        if (TENANTS_PER_TIER === 1) {
+          for (const email of supplier.users.emails) {
+            loginLines.push(`  supplier ${tierMeta.label}: ${email}`)
+          }
+        } else if (i === 1) {
+          loginLines.push(
+            `  supplier ${tierMeta.label}: ${supplier.users.emails[0]} … ${supplierDef(tierMeta.tier, tierMeta.label, TENANTS_PER_TIER, { multi: true }).ownerEmail}`
+          )
+        }
       }
-      for (const email of restaurant.users.emails) {
-        keycloakAccounts.push({
-          email,
-          username: email.split('@')[0].replace(/\./g, '-'),
-          realmRole: 'restaurant',
-        })
-        loginLines.push(`  restaurant ${tierMeta.label}: ${email}`)
+
+      for (let i = 1; i <= TENANTS_PER_TIER; i++) {
+        const rDef = restaurantDef(tierMeta.tier, tierMeta.label, i, { multi: MULTI_TENANT })
+        const supplierProducts = tierSuppliers[(i - 1) % tierSuppliers.length].products
+        const restaurant = await seedRestaurant(client, rDef, branchShape, supplierProducts)
+
+        for (const email of restaurant.users.emails) {
+          keycloakAccounts.push({
+            email,
+            username: email.split('@')[0].replace(/\./g, '-'),
+            realmRole: 'restaurant',
+          })
+        }
+        if (TENANTS_PER_TIER === 1) {
+          for (const email of restaurant.users.emails) {
+            loginLines.push(`  restaurant ${tierMeta.label}: ${email}`)
+          }
+        } else if (i === 1) {
+          loginLines.push(
+            `  restaurant ${tierMeta.label}: ${restaurant.users.emails[0]} … ${restaurantDef(tierMeta.tier, tierMeta.label, TENANTS_PER_TIER, { multi: true }).ownerEmail}`
+          )
+        }
       }
     }
 
@@ -433,7 +493,7 @@ Log in (password for all tier accounts: ${SEED_PASSWORD})
 
 ${loginLines.join('\n')}
 
-Then run: pnpm run seed:features  (disputes, deals, reports sample data)
+${TENANTS_PER_TIER > 1 ? 'Each tenant also has team logins (*-manager, *-purchaser / *-sales).\n' : ''}${TENANTS_PER_TIER === 1 ? 'Then run: pnpm run seed:features  (disputes, deals, reports sample data)\n' : ''}
 `)
 }
 

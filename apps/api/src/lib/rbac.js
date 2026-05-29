@@ -667,13 +667,36 @@ export function resolveTenantContext(req, res, next) {
  * Sets req.adminContext = { roles[], permissions[] }.
  * Use after requireAuth and requireRole(['ADMIN']) on admin routes.
  */
+async function ensureDefaultAdminRole(userId) {
+  try {
+    await query(
+      `
+      INSERT INTO user_role (user_id, role_id, tenant_id, tenant_type)
+      SELECT $1, r.id, NULL, 'ADMIN'
+      FROM role r
+      WHERE r.code = 'SUPER_ADMIN' AND r.tenant_type = 'ADMIN'
+      ON CONFLICT (user_id, role_id, tenant_id, tenant_type) DO NOTHING
+    `,
+      [userId]
+    )
+  } catch (err) {
+    if (err.code !== '42P01') {
+      logger.warn('ensureDefaultAdminRole failed', { error: err.message, userId })
+    }
+  }
+}
+
 export async function resolveAdminContext(req, res, next) {
   if (req.userData?.role !== 'ADMIN') {
     req.adminContext = null
     return next()
   }
   try {
-    const roles = await getRolesForUser(req.userData.id, null, 'ADMIN')
+    let roles = await getRolesForUser(req.userData.id, null, 'ADMIN')
+    if (roles.length === 0) {
+      await ensureDefaultAdminRole(req.userData.id)
+      roles = await getRolesForUser(req.userData.id, null, 'ADMIN')
+    }
     const permissions = await getPermissionsForUser(req.userData.id, null, 'ADMIN')
     req.adminContext = { roles, permissions }
     next()

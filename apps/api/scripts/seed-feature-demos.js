@@ -10,8 +10,24 @@ import { disconnectCache } from '../src/lib/cache.js'
 import { isMainModule } from './lib/is-main.mjs'
 const DEMO_ORDER_COMPLETED = '11111111-1111-4111-8111-111111111111'
 const FEATURE_SLUGS = {
-  restaurantGold: 'tier-restaurant-gold',
-  supplierGold: 'tier-supplier-gold',
+  restaurantGold: ['tier-restaurant-gold-01', 'tier-restaurant-gold'],
+  supplierGold: ['tier-supplier-gold-01', 'tier-supplier-gold'],
+}
+
+async function findTenantPair(restaurantSlugs, supplierSlugs) {
+  for (let i = 0; i < restaurantSlugs.length; i++) {
+    const rSlug = restaurantSlugs[i]
+    const sSlug = supplierSlugs[i] ?? supplierSlugs[0]
+    const { rows } = await query(
+      `SELECT r.id AS restaurant_id, s.id AS supplier_id
+       FROM restaurant r
+       JOIN supplier s ON s.slug = $2
+       WHERE r.slug = $1`,
+      [rSlug, sSlug]
+    )
+    if (rows[0]) return rows[0]
+  }
+  return null
 }
 
 async function ensureGoldPlan(tenantId, tenantType) {
@@ -56,18 +72,12 @@ async function ensureGoldPlan(tenantId, tenantType) {
 
 async function resolveTenantPairs() {
   const pairs = []
-  const { rows: gold } = await query(
-    `SELECT r.id AS restaurant_id, s.id AS supplier_id
-     FROM restaurant r
-     JOIN supplier s ON s.slug = $2
-     WHERE r.slug = $1`,
-    [FEATURE_SLUGS.restaurantGold, FEATURE_SLUGS.supplierGold]
-  )
-  if (gold[0]) {
+  const gold = await findTenantPair(FEATURE_SLUGS.restaurantGold, FEATURE_SLUGS.supplierGold)
+  if (gold) {
     pairs.push({
       label: 'Gold tier',
-      restaurantId: gold[0].restaurant_id,
-      supplierId: gold[0].supplier_id,
+      restaurantId: gold.restaurant_id,
+      supplierId: gold.supplier_id,
     })
   }
 

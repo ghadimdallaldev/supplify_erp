@@ -35,6 +35,7 @@
     "seed:full": "node scripts/seed-full.mjs",
     "seed:features": "node scripts/seed-feature-demos.js",
     "seed:tier-catalog": "node scripts/seed-tier-catalog.js",
+    "seed:tier-matrix": "node scripts/seed-tier-matrix.mjs",
     "log:tier-limits": "node scripts/log-tier-limits.mjs",
     "reduce-to-single-tenant": "node scripts/reduce-to-single-tenant.js",
     "db:wipe-commercial": "node scripts/wipe-commercial-only.js",

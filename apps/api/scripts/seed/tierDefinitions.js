@@ -8,33 +8,47 @@ export const TIERS = [
 export const SLUG_PREFIX = 'tier-'
 export const SEED_PASSWORD = process.env.SEED_ACCOUNTS_PASSWORD || 'Supplify1!'
 
-export function restaurantDef(tier, label) {
+/** Suffix for multi-tenant seeds: '' for single-tenant legacy, '-01'…'-10' when multi. */
+export function tenantIndexSuffix(index, multi) {
+  if (!multi && index === 1) return ''
+  return `-${String(index).padStart(2, '0')}`
+}
+
+export function restaurantDef(tier, label, index = 1, { multi = false } = {}) {
+  const ix = tenantIndexSuffix(index, multi)
   return {
-    slug: `${SLUG_PREFIX}restaurant-${tier}`,
-    name: `${label} Plate Restaurant`,
-    ownerEmail: `restaurant-${tier}@supplify.com`,
+    slug: `${SLUG_PREFIX}restaurant-${tier}${ix}`,
+    name: multi ? `${label} Plate #${index}` : `${label} Plate Restaurant`,
+    ownerEmail: multi
+      ? `restaurant-${tier}-${String(index).padStart(2, '0')}@supplify.com`
+      : `restaurant-${tier}@supplify.com`,
     tier,
+    index,
   }
 }
 
-export function supplierDef(tier, label) {
+export function supplierDef(tier, label, index = 1, { multi = false } = {}) {
+  const ix = tenantIndexSuffix(index, multi)
   return {
-    slug: `${SLUG_PREFIX}supplier-${tier}`,
-    name: `${label} Harvest Supplier`,
-    ownerEmail: `supplier-${tier}@supplify.com`,
+    slug: `${SLUG_PREFIX}supplier-${tier}${ix}`,
+    name: multi ? `${label} Harvest #${index}` : `${label} Harvest Supplier`,
+    ownerEmail: multi
+      ? `supplier-${tier}-${String(index).padStart(2, '0')}@supplify.com`
+      : `supplier-${tier}@supplify.com`,
     tier,
+    index,
   }
 }
 
 /** Extra logins per tenant for Team → assign role testing */
 export const RESTAURANT_TEAM_MEMBERS = [
-  { suffix: 'manager', roleName: 'Manager', lastName: 'Manager' },
+  { suffix: 'manager', roleName: 'Restaurant Manager', lastName: 'Manager' },
   { suffix: 'purchaser', roleName: 'Purchaser', lastName: 'Purchaser' },
 ]
 
 export const SUPPLIER_TEAM_MEMBERS = [
-  { suffix: 'manager', roleName: 'Manager', lastName: 'Manager' },
-  { suffix: 'sales', roleName: 'Sales Rep', lastName: 'Sales' },
+  { suffix: 'manager', roleName: 'Supplier Manager', lastName: 'Manager' },
+  { suffix: 'sales', roleName: 'Promotions Manager', lastName: 'Sales' },
 ]
 
 /**
