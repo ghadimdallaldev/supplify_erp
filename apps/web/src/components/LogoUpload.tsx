@@ -8,10 +8,22 @@ interface LogoUploadProps {
   onUpload: (logoUrl: string) => Promise<void>
   entityId: string
   entityName: string
-  getPresignedUrl: (params: { fileName: string; fileType: string; fileSize?: number }) => Promise<{ presignedUrl: string; fileKey: string; fileName: string; fileType: string }>
+  getPresignedUrl: (params: { fileName: string; fileType: string; fileSize?: number }) => Promise<{
+    presignedUrl: string
+    publicUrl?: string
+    fileKey: string
+    fileName: string
+    fileType: string
+  }>
 }
 
-export function LogoUpload({ currentLogo, onUpload, entityId: _entityId, entityName, getPresignedUrl }: LogoUploadProps) {
+export function LogoUpload({
+  currentLogo,
+  onUpload,
+  entityId: _entityId,
+  entityName,
+  getPresignedUrl,
+}: LogoUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(currentLogo || null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -43,7 +55,7 @@ export function LogoUpload({ currentLogo, onUpload, entityId: _entityId, entityN
     setIsUploading(true)
     try {
       // Get presigned URL
-      const { presignedUrl, fileKey } = await getPresignedUrl({
+      const { presignedUrl, publicUrl, fileKey } = await getPresignedUrl({
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
@@ -62,11 +74,10 @@ export function LogoUpload({ currentLogo, onUpload, entityId: _entityId, entityN
         throw new Error('Failed to upload image to storage')
       }
 
-      // Construct the file URL from S3 endpoint and file key
-      // The file URL should be: S3_ENDPOINT/S3_BUCKET/fileKey
-      const s3Endpoint = import.meta.env.VITE_S3_ENDPOINT || 'http://localhost:9000'
-      const s3Bucket = import.meta.env.VITE_S3_BUCKET || 'supplify'
-      const fileUrl = `${s3Endpoint}/${s3Bucket}/${fileKey}`
+      if (!publicUrl) {
+        throw new Error('Upload succeeded but no public URL was returned')
+      }
+      const fileUrl = publicUrl
 
       // Save logo URL to database
       await onUpload(fileUrl)
@@ -157,4 +168,3 @@ export function LogoUpload({ currentLogo, onUpload, entityId: _entityId, entityN
     </div>
   )
 }
-

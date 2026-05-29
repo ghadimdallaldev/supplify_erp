@@ -1,0 +1,173 @@
+import {
+  S3Client,
+  HeadBucketCommand,
+  CreateBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { logger } from '../../lib/logger.js'
+
+function createS3Client(cfg, endpoint) {
+  return new S3Client({
+    endpoint,
+    region: cfg.STORAGE_REGION || 'auto',
+    credentials: {
+      accessKeyId: cfg.STORAGE_ACCESS_KEY_ID,
+      secretAccessKey: cfg.STORAGE_SECRET_ACCESS_KEY,
+    },
+    forcePathStyle: true,
+  })
+}
+
+/**
+ * @param {import('../../config/env.js').config} cfg
+ */
+export function createS3CompatibleProvider(cfg) {
+  /** @type {S3Client | null} */
+  let internalClient = null
+  /** @type {S3Client | null} */
+  let presignClient = null
+
+  function getInternalClient() {
+    if (!internalClient) {
+      internalClient = createS3Client(cfg, cfg.STORAGE_ENDPOINT)
+    }
+    return internalClient
+  }
+
+  function getPresignClient() {
+    const presignEndpoint = cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT
+    if (presignEndpoint === cfg.STORAGE_ENDPOINT) {
+      return getInternalClient()
+    }
+    if (!presignClient) {
+      presignClient = createS3Client(cfg, presignEndpoint)
+    }
+    return presignClient
+  }
+
+  function getConfiguredBuckets() {
+    const raw = cfg.STORAGE_BUCKETS || cfg.STORAGE_BUCKET || 'supplify'
+    const names = raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const unique = [...new Set(names)]
+    if (!unique.includes(cfg.STORAGE_BUCKET)) {
+      unique.unshift(cfg.STORAGE_BUCKET)
+    }
+    return unique
+  }
+
+  function buildPublicUrl(fileKey) {
+    const base = String(cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT || '').replace(/\/$/, '')
+    const key = String(fileKey || '').replace(/^\/+/, '')
+    const bucket = cfg.STORAGE_BUCKET
+    return `${base}/${bucket}/${key}`
+  }
+
+  function publicReadPolicy(bucket) {
+    return JSON.stringify({
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Principal: { AWS: ['*'] },
+          Action: ['s3:GetObject'],
+          Resource: [`arn:aws:s3:::${bucket}/*`],
+        },
+      ],
+    })
+  }
+
+  async function ensureBucketExists(s3, bucket) {
+    try {
+      await s3.send(new HeadBucketCommand({ Bucket: bucket }))
+      return { bucket, created: false }
+    } catch (err) {
+      const status = err?.$metadata?.httpStatusCode
+      const missing = status === 404 || err?.name === 'NotFound' || err?.Code === 'NoSuchBucket'
+      if (!missing) throw err
+    }
+
+    await s3.send(new CreateBucketCommand({ Bucket: bucket }))
+    logger.info('Created object storage bucket', { bucket })
+
+    if (cfg.STORAGE_PUBLIC_READ !== false) {
+      try {
+        await s3.send(
+          new PutBucketPolicyCommand({
+            Bucket: bucket,
+            Policy: publicReadPolicy(bucket),
+          })
+        )
+      } catch (policyErr) {
+        logger.warn('Could not set public read policy on bucket', {
+          bucket,
+          message: policyErr?.message,
+        })
+      }
+    }
+
+    return { bucket, created: true }
+  }
+
+  return {
+    async ensureReady() {
+      const s3 = getInternalClient()
+      const buckets = getConfiguredBuckets()
+      const results = []
+      for (const bucket of buckets) {
+        results.push(await ensureBucketExists(s3, bucket))
+      }
+      return results
+    },
+
+    async checkHealth() {
+      const bucket = cfg.STORAGE_BUCKET
+      const s3 = getInternalClient()
+      try {
+        await s3.send(new HeadBucketCommand({ Bucket: bucket }))
+        return {
+          ok: true,
+          driver: 's3',
+          endpoint: cfg.STORAGE_ENDPOINT,
+          publicUrl: cfg.STORAGE_PUBLIC_URL,
+          bucket,
+          buckets: getConfiguredBuckets(),
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          driver: 's3',
+          endpoint: cfg.STORAGE_ENDPOINT,
+          publicUrl: cfg.STORAGE_PUBLIC_URL,
+          bucket,
+          buckets: getConfiguredBuckets(),
+          error: err?.message || 'Storage unavailable',
+        }
+      }
+    },
+
+    buildPublicUrl,
+
+    async createPresignedUpload({ fileKey, fileType, expiresIn = 300 }) {
+      const s3 = getPresignClient()
+      const command = new PutObjectCommand({
+        Bucket: cfg.STORAGE_BUCKET,
+        Key: fileKey,
+        ContentType: fileType,
+      })
+      const presignedUrl = await getSignedUrl(s3, command, { expiresIn })
+      const publicUrl = buildPublicUrl(fileKey)
+      return {
+        presignedUrl,
+        publicUrl,
+        fileKey,
+        bucket: cfg.STORAGE_BUCKET,
+        method: 'PUT',
+      }
+    },
+  }
+}
