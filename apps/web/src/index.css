@@ -287,4 +287,63 @@
       line-height: 1.5;
     }
   }
+
+  /* —— UI polish utilities (shared across pages) —— */
+  .page-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  @media (min-width: 640px) {
+    .page-stack {
+      gap: 1.5rem;
+    }
+  }
+
+  .table-scroll table {
+    min-width: 100%;
+    width: max-content;
+  }
+
+  @media (min-width: 768px) {
+    .table-scroll table {
+      width: 100%;
+    }
+  }
+
+  .tabs-scroll {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .tabs-scroll::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .action-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .section-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
 }

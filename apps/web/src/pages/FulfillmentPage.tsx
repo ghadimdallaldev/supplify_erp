@@ -13,6 +13,8 @@ import { FulfillmentRoutesTab } from '../components/fulfillment/FulfillmentRoute
 import { FulfillmentTrackingTab } from '../components/fulfillment/FulfillmentTrackingTab'
 import { FulfillmentExceptionsTab } from '../components/fulfillment/FulfillmentExceptionsTab'
 import { RequirePermission } from '../components/RequirePermission'
+import { PageHeader } from '../components/ui/page-header'
+import { Label } from '../components/ui/label'
 
 export function FulfillmentPage() {
   const [activeTab, setActiveTab] = useState('dispatch')
@@ -31,40 +33,35 @@ export function FulfillmentPage() {
 
   return (
     <RequirePermission permission="FULFILLMENT_VIEW" title="fulfillment">
-      <div className="space-y-6 p-4 sm:p-6 max-w-full overflow-x-hidden">
-        <div>
-          <h1 className="text-[21px] font-black text-[var(--text)]">Fulfillment & Logistics</h1>
-          <p className="text-[var(--text-muted)] mt-2">
-            Pick lists, driver dispatch, and delivery tracking.
-          </p>
-        </div>
+      <div className="page-stack max-w-full overflow-x-hidden p-0 sm:p-0">
+        <PageHeader
+          title="Fulfillment & logistics"
+          description="Pick lists, driver dispatch, routes, and delivery tracking."
+        />
 
         {multiWarehouseActive && warehouses.length > 0 && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-            <label
-              htmlFor="fulfillment-warehouse"
-              className="text-sm font-medium text-[var(--text)]"
-            >
-              Warehouse
-            </label>
-            <select
-              id="fulfillment-warehouse"
-              className="w-full sm:w-auto sm:min-w-[220px] rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-              value={selectedWarehouseId}
-              onChange={(e) => setSelectedWarehouseId(e.target.value)}
-            >
-              <option value="">All warehouses</option>
-              {warehouses.map((wh: { id: string; name: string }) => (
-                <option key={wh.id} value={wh.id}>
-                  {wh.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <Label htmlFor="fulfillment-warehouse">Warehouse filter</Label>
+              <select
+                id="fulfillment-warehouse"
+                className="mt-1.5 flex h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30"
+                value={selectedWarehouseId}
+                onChange={(e) => setSelectedWarehouseId(e.target.value)}
+              >
+                <option value="">All warehouses</option>
+                {warehouses.map((wh: { id: string; name: string }) => (
+                  <option key={wh.id} value={wh.id}>
+                    {wh.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5 h-auto">
+          <TabsList className="h-auto w-full gap-1 sm:flex sm:flex-wrap">
             <TabsTrigger value="dispatch" className="text-xs sm:text-sm">
               Driver Dispatch
             </TabsTrigger>
