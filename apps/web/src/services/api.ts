@@ -3297,6 +3297,51 @@ export const api = createApi({
       query: () => '/api/admin-dashboard/tenants/restaurants',
       providesTags: ['Admin'],
     }),
+    getAdminUsers: builder.query<
+      {
+        users: Array<{
+          id: string
+          email: string
+          display_name: string | null
+          role: string
+          created_at: string
+          tenant_roles: Array<{ tenantId?: string; tenantType?: string; roleName?: string }>
+        }>
+      },
+      {
+        search?: string
+        q?: string
+        tenantId?: string
+        tenantType?: 'RESTAURANT' | 'SUPPLIER'
+        limit?: number
+      }
+    >({
+      query: (params) => ({ url: '/api/admin-dashboard/users', params }),
+      providesTags: ['Admin'],
+    }),
+    resetAdminUserPassword: builder.mutation<
+      {
+        userId: string
+        email: string
+        displayName: string | null
+        role: string
+        temporaryPassword?: string
+        temporary: boolean
+      },
+      {
+        userId?: string
+        email?: string
+        password?: string
+        temporary?: boolean
+        generate?: boolean
+      }
+    >({
+      query: (body) => ({
+        url: '/api/admin-dashboard/users/reset-password',
+        method: 'POST',
+        body,
+      }),
+    }),
     getSupplierUsage: builder.query<{ usage: UsageMeter[] }, string>({
       query: (id) => `/api/admin-dashboard/tenants/suppliers/${id}/usage`,
       providesTags: ['Admin'],
@@ -3705,6 +3750,8 @@ export const {
   useGetAdminHealthQuery,
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
+  useGetAdminUsersQuery,
+  useResetAdminUserPasswordMutation,
   useGetSupplierUsageQuery,
   useGetRestaurantUsageQuery,
   useGetImpersonationStatusQuery,

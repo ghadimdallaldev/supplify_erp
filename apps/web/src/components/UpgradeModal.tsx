@@ -296,7 +296,7 @@ export function UpgradeModal() {
         if (!v) handleClose()
       }}
     >
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {type === 'limit' || (!isBrowseUpgrade && type === 'feature') ? (
@@ -399,7 +399,7 @@ export function UpgradeModal() {
                 return (
                   <div
                     key={plan.id ?? plan.code}
-                    className={`flex flex-col gap-2 rounded-lg border p-3 ${
+                    className={`flex flex-col gap-2 rounded-lg border p-3 sm:p-4 ${
                       isCurrent
                         ? 'border-[var(--brand-mid)] bg-[var(--brand-ultra)] ring-1 ring-[var(--brand-mid)]'
                         : isRecommended
@@ -440,7 +440,7 @@ export function UpgradeModal() {
                       pendingActivation && code === 'free' && canUpgrade ? (
                         <button
                           type="button"
-                          className="w-full cursor-pointer rounded-md py-1.5 text-xs font-semibold text-white"
+                          className="w-full cursor-pointer rounded-md py-2 text-xs font-semibold text-white"
                           style={{ background: 'var(--brand-mid)' }}
                           onClick={() => handleUpgrade(code)}
                         >
@@ -449,7 +449,7 @@ export function UpgradeModal() {
                       ) : (
                         <button
                           disabled
-                          className="w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-1.5 text-xs text-[var(--text-muted)]"
+                          className="w-full cursor-default rounded-md border border-[var(--app-border)] bg-[var(--bg)] py-2 text-xs text-[var(--text-muted)]"
                         >
                           Current plan
                         </button>
@@ -457,7 +457,7 @@ export function UpgradeModal() {
                     ) : !canUpgrade ? (
                       <button
                         disabled
-                        className="w-full cursor-default rounded-md border border-[var(--app-border)] py-1.5 text-xs text-[var(--text-muted)]"
+                        className="w-full cursor-default rounded-md border border-[var(--app-border)] py-2 text-xs text-[var(--text-muted)]"
                       >
                         Ask owner
                       </button>
@@ -624,12 +624,12 @@ export function UpgradeModal() {
           )}
 
           {/* Bottom actions */}
-          <div className="-mb-2 -mx-4 flex flex-wrap gap-2 border-t border-[var(--app-border)] bg-[var(--surface)] px-4 pb-2 pt-4 sticky bottom-0 sm:-mx-6 sm:px-6">
+          <div className="-mb-2 -mx-4 action-bar border-t border-[var(--app-border)] bg-[var(--surface)] px-4 pb-2 pt-4 sticky bottom-0 sm:-mx-6 sm:px-6">
             {canUpgrade && recommendedCode && recommendedCode !== currentCode && (
               <Button
                 type="button"
                 onClick={() => handleUpgrade()}
-                className="min-w-[10rem] flex-1"
+                className="w-full sm:w-auto sm:min-w-[10rem]"
               >
                 {onUpgradePage
                   ? `Request ${recommendedPlanName ?? 'upgrade'}`
@@ -642,12 +642,17 @@ export function UpgradeModal() {
                 <Button
                   type="button"
                   onClick={() => handleUpgrade()}
-                  className="min-w-[10rem] flex-1"
+                  className="w-full sm:w-auto sm:min-w-[10rem]"
                 >
                   {onUpgradePage ? 'Request plan upgrade' : 'View plans in settings'}
                 </Button>
               )}
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={handleClose}
+            >
               {isBrowseUpgrade ? 'Close' : 'Dismiss'}
             </Button>
           </div>

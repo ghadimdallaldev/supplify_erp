@@ -56,6 +56,7 @@ import {
 import { isLimitKeyApplicable } from '../lib/limit-resolution.js'
 import { buildAdminOverviewMetrics } from '../lib/admin-overview-metrics.js'
 import { buildAdminActivityFeed } from '../lib/admin-activity-feed.js'
+import { adminResetUserPassword, listAdminUsers } from '../services/admin-user-password.service.js'
 import { adminDashboardPermissionGuard, requireAnyPermission } from '../lib/route-permissions.js'
 import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
 
@@ -1784,6 +1785,120 @@ router.get('/impersonate', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get impersonation status' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// ========================================
+// USER PASSWORD MANAGEMENT
+// ========================================
+
+const adminResetPasswordSchema = z
+  .object({
+    userId: z.string().uuid().optional(),
+    email: z.string().email().optional(),
+    password: z.string().min(10).optional(),
+    temporary: z.boolean().optional(),
+    generate: z.boolean().optional(),
+  })
+  .refine((body) => Boolean(body.userId || body.email), {
+    message: 'userId or email is required',
+  })
+
+/**
+ * GET /api/admin-dashboard/users?search=&tenantId=&tenantType=
+ */
+router.get('/users', async (req, res) => {
+  try {
+    const tenantType = req.query.tenantType ? String(req.query.tenantType).toUpperCase() : undefined
+    if (tenantType && tenantType !== 'RESTAURANT' && tenantType !== 'SUPPLIER') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'tenantType must be RESTAURANT or SUPPLIER' },
+        requestId: req.requestId,
+      })
+    }
+    const users = await listAdminUsers({
+      search: req.query.search || req.query.q || '',
+      tenantId: req.query.tenantId ? String(req.query.tenantId) : undefined,
+      tenantType,
+      limit: req.query.limit,
+    })
+    res.json({
+      ok: true,
+      data: { users },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('List admin users error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list users' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+/**
+ * POST /api/admin-dashboard/users/reset-password
+ * Reset a tenant or staff user's Keycloak password (admin support).
+ */
+router.post('/users/reset-password', async (req, res) => {
+  try {
+    const body = adminResetPasswordSchema.parse(req.body)
+    const result = await adminResetUserPassword({
+      actorUserId: req.userData.id,
+      targetUserId: body.userId,
+      email: body.email,
+      password: body.password,
+      temporary: body.temporary ?? true,
+      generate: body.generate ?? !body.password,
+    })
+
+    await logAudit(
+      req,
+      'ADMIN_RESET_USER_PASSWORD',
+      `Reset password for ${result.email}`,
+      'USER',
+      result.userId,
+      null,
+      { temporary: result.temporary },
+      { target_email: result.email, target_role: result.role }
+    )
+
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid body', details: error.errors },
+        requestId: req.requestId,
+      })
+    }
+    const status = error.status || 500
+    if (status < 500) {
+      return res.status(status).json({
+        ok: false,
+        data: null,
+        error: { name: error.name || 'ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Admin reset password error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to reset password' },
       requestId: req.requestId,
     })
   }

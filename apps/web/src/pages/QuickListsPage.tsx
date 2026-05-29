@@ -596,41 +596,41 @@ export function QuickListsPage() {
 
         {/* Search and Filters */}
         {quickLists.length > 0 && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+          <Card className="overflow-visible">
+            <CardContent className="px-4 py-4 sm:px-6 sm:py-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-4">
+                <div className="relative min-w-0 w-full flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
                   <Input
                     placeholder="Search quick lists..."
                     value={listSearch}
                     onChange={(e) => setListSearch(e.target.value)}
-                    className="pl-10"
+                    className="h-11 w-full rounded-lg pl-10 pr-3"
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0">
                   <Button
                     variant={filterStatus === 'all' ? 'default' : 'outline'}
-                    size="sm"
+                    className="h-10 min-w-0 flex-1 whitespace-nowrap rounded-lg px-3 sm:flex-none"
                     onClick={() => setFilterStatus('all')}
                   >
-                    <Filter className="h-4 w-4 mr-1" />
+                    <Filter className="h-4 w-4 mr-1 shrink-0" />
                     All
                   </Button>
                   <Button
                     variant={filterStatus === 'scheduled' ? 'default' : 'outline'}
-                    size="sm"
+                    className="h-10 min-w-0 flex-1 whitespace-nowrap rounded-lg px-3 sm:flex-none"
                     onClick={() => setFilterStatus('scheduled')}
                   >
-                    <Clock className="h-4 w-4 mr-1" />
+                    <Clock className="h-4 w-4 mr-1 shrink-0" />
                     Scheduled
                   </Button>
                   <Button
                     variant={filterStatus === 'unscheduled' ? 'default' : 'outline'}
-                    size="sm"
+                    className="h-10 min-w-0 flex-1 whitespace-nowrap rounded-lg px-3 sm:flex-none"
                     onClick={() => setFilterStatus('unscheduled')}
                   >
-                    <Package className="h-4 w-4 mr-1" />
+                    <Package className="h-4 w-4 mr-1 shrink-0" />
                     Unscheduled
                   </Button>
                 </div>

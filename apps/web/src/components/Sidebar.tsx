@@ -97,12 +97,7 @@ export function Sidebar({
   })
   const { unreadCount: notificationUnreadCount } = useNotificationBadge()
 
-  const hasAdminNavAccess =
-    isPlatformAdmin &&
-    Array.isArray(user?.adminPermissions) &&
-    user.adminPermissions.length > 0 &&
-    (user.adminPermissions.includes('ADMIN_ACCESS') ||
-      user.adminPermissions.includes('ADMIN_TENANTS'))
+  const hasAdminNavAccess = isPlatformAdmin && !isImpersonating
   const isSupplier = isEffectiveSupplier
   const isRestaurant = isEffectiveRestaurant
   const impersonatingRestaurant = isImpersonating && isEffectiveRestaurant

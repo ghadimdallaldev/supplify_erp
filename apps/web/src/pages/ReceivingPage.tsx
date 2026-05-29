@@ -317,7 +317,7 @@ export function ReceivingPage() {
           upgradeUrl="/app/settings?tab=subscription"
         />
       ) : (
-        <div className="space-y-6 overflow-x-hidden" data-testid="receiving-page">
+        <div className="page-stack overflow-x-hidden" data-testid="receiving-page">
           <Card className="shadow-sm">
             <CardContent className="space-y-4 p-4 md:p-5">
               <PageHeader
@@ -326,7 +326,7 @@ export function ReceivingPage() {
               />
 
               <Tabs defaultValue="pending" className="space-y-4">
-                <TabsList className="h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
+                <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">
                   <TabsTrigger value="pending" className="flex items-center gap-2">
                     <PackageCheck className="h-4 w-4" />
                     Pending Orders
@@ -507,33 +507,32 @@ export function ReceivingPage() {
 
                 <TabsContent value="history" className="space-y-4">
                   {historyLoading ? (
-                    <div className="text-center py-8 text-[var(--text-muted)]">Loading...</div>
+                    <div className="space-y-2 py-4">
+                      <Skeleton className="h-20 w-full rounded-lg" />
+                      <Skeleton className="h-20 w-full rounded-lg" />
+                    </div>
                   ) : historyReports.length === 0 ? (
-                    <Card>
-                      <CardContent className="flex flex-col items-center justify-center py-12">
-                        <History className="h-16 w-16 text-[var(--text-muted)] mb-4" />
-                        <p className="text-lg font-semibold mb-2">No Receiving History</p>
-                        <p className="text-sm text-[var(--text-muted)]">
-                          Receiving reports will appear here
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <EmptyState
+                      title="No receiving history"
+                      description="Completed receiving reports will appear here."
+                      icon={<History className="h-10 w-10" aria-hidden />}
+                    />
                   ) : (
                     <div className="grid gap-4">
                       {historyReports.map((report: any) => (
                         <Card key={report.id}>
                           <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <CardTitle className="flex items-center gap-2">
-                                  {report.order_id?.slice(0, 8) || 'N/A'}
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <CardTitle className="flex flex-wrap items-center gap-2">
+                                  Order #{report.order_id?.slice(0, 8) || 'N/A'}
                                   <Badge variant="outline">{report.supplier_name}</Badge>
                                 </CardTitle>
                                 <p className="text-sm text-[var(--text-muted)] mt-1">
                                   Received: {new Date(report.received_at).toLocaleString()}
                                 </p>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
                                 {report.quality_score && (
                                   <div className="flex items-center gap-1">
                                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -796,6 +795,7 @@ function ReceivingDialog({
               <Button
                 type="button"
                 variant="outline"
+                className="min-h-[44px] w-full sm:w-auto"
                 data-testid="receiving-open-dispute"
                 onClick={() => onOpenDispute(formData)}
               >
