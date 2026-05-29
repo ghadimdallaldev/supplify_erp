@@ -1,6 +1,40 @@
 # Deploying Supplify on Railway
 
-This guide covers deploying the Supplify monorepo on [Railway](https://railway.app) using separate services for the API, web app, and PostgreSQL. **AWS CDK and GitHub Actions CI were removed** from this repository; use Railway (or your own runner) for production deploys.
+**Multi-environment guide (dev / preprod / prod):** [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](DEPLOYMENT_RAILWAY_ENVIRONMENTS.md)  
+**Variable reference:** [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) · [`.env.matrix.md`](.env.matrix.md)
+
+This page is a quick single-service overview. **AWS CDK and GitHub Actions CI were removed**; use Railway for deploys.
+
+## Monorepo (pnpm workspace)
+
+Supplify is a **shared monorepo**: `pnpm-lock.yaml` and `pnpm-workspace.yaml` live at the repo root. Both API and Web services must use the **full repository** as the build context.
+
+| Setting              | API                                     | Web                                                     |
+| -------------------- | --------------------------------------- | ------------------------------------------------------- |
+| **Root Directory**   | _(empty — repo root)_                   | _(empty — repo root)_                                   |
+| **Config file path** | `/apps/api/railway.json`                | `/apps/web/railway.json`                                |
+| **Builder**          | Dockerfile                              | Dockerfile                                              |
+| **Dockerfile path**  | `apps/api/Dockerfile`                   | `apps/web/Dockerfile`                                   |
+| **Build Command**    | _(empty — Dockerfile)_                  | _(empty — Dockerfile)_                                  |
+| **Start Command**    | `node apps/api/src/server.js`           | _(empty — Dockerfile entrypoint)_                       |
+| **Healthcheck Path** | `/health`                               | `/health`                                               |
+| **Public Port**      | Railway `PORT` (app listens on `$PORT`) | Railway `PORT` (nginx listens on `$PORT`, default `80`) |
+
+**Do not** set Root Directory to `apps/api` or `apps/web`. That narrows the build context and breaks `COPY package.json pnpm-lock.yaml pnpm-workspace.yaml` in the Dockerfiles.
+
+Inside Docker, installs and builds use pnpm filters (`--filter @supplify/api...`, `--filter @supplify/web build:docker`) so only the target app is built despite the repo-root context.
+
+### Railpack / Nixpacks (API only, optional)
+
+Prefer Docker for both services. Web production requires nginx (see `apps/web/Dockerfile`). If you must use Nixpacks/Railpack for API:
+
+| Setting         | Value                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root Directory  | _(empty)_                                                                                                                                                     |
+| Builder         | NIXPACKS or RAILPACK                                                                                                                                          |
+| Build Command   | `corepack enable && corepack prepare pnpm@8.15.9 --activate && pnpm install --frozen-lockfile --filter @supplify/api... && pnpm --filter @supplify/api build` |
+| Start Command   | `node apps/api/src/server.js`                                                                                                                                 |
+| Nixpacks config | `apps/api/nixpacks.toml`                                                                                                                                      |
 
 ## Architecture overview
 
@@ -16,15 +50,19 @@ This guide covers deploying the Supplify monorepo on [Railway](https://railway.a
 
 1. Create a new Railway project.
 2. Add a **PostgreSQL** database. Railway injects `DATABASE_URL` — reference it on the API service.
-3. Add a **service** for the API (root directory: repo root, Dockerfile: `apps/api/Dockerfile`, or use `apps/api/railway.json`).
-4. Add a **service** for the web (Dockerfile: `apps/web/Dockerfile`, build arg `VITE_API_URL`).
+3. Add a **service** for the API: Root Directory **empty**, config file `/apps/api/railway.json`, Dockerfile `apps/api/Dockerfile`.
+4. Add a **service** for the web: Root Directory **empty**, config file `/apps/web/railway.json`, Dockerfile `apps/web/Dockerfile`, build arg `VITE_API_URL`.
 
 ## 2. API service
 
 ### Build
 
+- **Root Directory:** _(empty — repository root)_
+- **Config file:** `/apps/api/railway.json`
 - **Dockerfile path:** `apps/api/Dockerfile` (build context: repository root)
-- **Start command:** `node apps/api/src/server.js` (default in Dockerfile)
+- **Build Command:** _(leave empty when using Dockerfile)_
+- **Start command:** `node apps/api/src/server.js` (Dockerfile `CMD`; Railway may mirror via `railway.json`)
+- **Public port:** Railway-injected `PORT` (API binds to `process.env.PORT`)
 
 ### Health check
 
@@ -87,6 +125,18 @@ pnpm db:migrate
 ```
 
 ## 3. Web service
+
+### Railway settings
+
+| Setting          | Value                                                                          |
+| ---------------- | ------------------------------------------------------------------------------ |
+| Root Directory   | _(empty — repository root)_                                                    |
+| Config file      | `/apps/web/railway.json`                                                       |
+| Dockerfile path  | `apps/web/Dockerfile`                                                          |
+| Build Command    | _(leave empty when using Dockerfile)_                                          |
+| Start Command    | _(leave empty — Dockerfile `ENTRYPOINT` runs `/docker-entrypoint.sh` → nginx)_ |
+| Healthcheck Path | `/health`                                                                      |
+| Public Port      | Railway-injected `PORT` (nginx listens on `$PORT`; Dockerfile default `80`)    |
 
 ### Build args (Docker)
 

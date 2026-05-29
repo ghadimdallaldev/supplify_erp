@@ -59,8 +59,7 @@ import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import { Link } from 'react-router-dom'
 import { SupplierReceivablesPanel } from '../components/supplier/SupplierReceivablesPanel'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { apiUrl } from '../lib/apiBase'
 
 export function InvoicesPage() {
   const [search, setSearch] = useState('')
@@ -652,12 +651,9 @@ export function InvoicesPage() {
                       if (!selectedInvoice?.id) return
                       setDownloadingPdfId(selectedInvoice.id)
                       try {
-                        const res = await fetch(
-                          `${API_URL}/api/invoices/${selectedInvoice.id}/pdf`,
-                          {
-                            credentials: 'include',
-                          }
-                        )
+                        const res = await fetch(apiUrl(`/api/invoices/${selectedInvoice.id}/pdf`), {
+                          credentials: 'include',
+                        })
                         if (!res.ok) throw new Error('Failed to download PDF')
                         const blob = await res.blob()
                         const url = URL.createObjectURL(blob)

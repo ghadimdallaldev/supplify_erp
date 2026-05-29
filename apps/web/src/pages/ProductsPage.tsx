@@ -27,6 +27,7 @@ import { useAppDispatch, useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import toast from 'react-hot-toast'
+import { apiUrl } from '../lib/apiBase'
 import {
   Dialog,
   DialogContent,
@@ -328,15 +329,12 @@ export function ProductsPage() {
       return
     }
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/supplier/products/import/error-report`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'Supplify' },
-          credentials: 'include',
-          body: JSON.stringify({ errors }),
-        }
-      )
+      const res = await fetch(apiUrl('/api/supplier/products/import/error-report'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'Supplify' },
+        credentials: 'include',
+        body: JSON.stringify({ errors }),
+      })
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

@@ -56,8 +56,7 @@ import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
 import { getOrderCancellationBanner, getOrderStatusLabel } from '../lib/orderStatusDisplay'
 import { formatOrderRef, isDisputeReplacementOrder } from '../lib/orderPlacement'
 import { pageHeaderRowClass } from '../components/ui/card-layout'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { apiUrl } from '../lib/apiBase'
 
 function formatAddressLines(address?: Record<string, string | undefined> | null): string[] {
   if (!address || typeof address !== 'object') return []
@@ -213,7 +212,7 @@ export function OrderDetailPage() {
 
   const fetchPackingSlipPdfBlob = async () => {
     if (!id) throw new Error('Missing order id')
-    const res = await fetch(`${API_URL}/api/orders/${id}/packing-slip/pdf`, {
+    const res = await fetch(apiUrl(`/api/orders/${id}/packing-slip/pdf`), {
       credentials: 'include',
     })
     if (!res.ok) throw new Error('Failed to fetch packing slip PDF')

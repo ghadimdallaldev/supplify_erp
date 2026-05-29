@@ -1,11 +1,16 @@
+import { DEV_API_ORIGIN, getApiBase, isDevEnv } from './env'
+
 /**
  * Socket.IO base URL.
- * In the browser without VITE_API_URL, use the page origin so dev traffic goes through
- * Vite's /socket.io proxy (same as /api). OAuth and explicit VITE_API_URL still target the API host.
+ * Dev without VITE_API_URL uses the page origin (Vite /socket.io proxy).
+ * Preprod/prod require VITE_API_URL (enforced via resolveApiBase in env.ts).
  */
 export function getSocketBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '')
-  if (configured) return configured
-  if (typeof window !== 'undefined') return window.location.origin
-  return 'http://localhost:4000'
+  const base = getApiBase()
+  if (base) return base
+  if (typeof window !== 'undefined' && isDevEnv()) {
+    return window.location.origin
+  }
+  if (isDevEnv()) return DEV_API_ORIGIN
+  return base
 }
