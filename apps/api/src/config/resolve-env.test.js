@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { envBool, resolveAppEnv, resolvePaymentsMode, resolveWebOrigins } from './resolve-env.js'
+import { resolveNativeDatabaseUrl } from './resolve-database-url.js'
 
 describe('resolve-env', () => {
   it('resolveAppEnv respects APP_ENV', () => {
@@ -25,5 +26,33 @@ describe('resolve-env', () => {
   it('envBool parses common truthy values', () => {
     expect(envBool('true', false)).toBe(true)
     expect(envBool('0', true)).toBe(false)
+  })
+})
+
+describe('resolveNativeDatabaseUrl', () => {
+  const railwayUrl = 'postgresql://user:pass@postgres.railway.internal:5432/railway'
+
+  it('returns DATABASE_URL unchanged in production', () => {
+    const prevNodeEnv = process.env.NODE_ENV
+    const prevDb = process.env.DATABASE_URL
+    const prevOverride = process.env.SUPPLIFY_DATABASE_URL
+    process.env.NODE_ENV = 'production'
+    delete process.env.SUPPLIFY_DATABASE_URL
+
+    expect(resolveNativeDatabaseUrl(railwayUrl)).toBe(railwayUrl)
+
+    process.env.NODE_ENV = prevNodeEnv
+    if (prevDb == null) delete process.env.DATABASE_URL
+    else process.env.DATABASE_URL = prevDb
+    if (prevOverride == null) delete process.env.SUPPLIFY_DATABASE_URL
+    else process.env.SUPPLIFY_DATABASE_URL = prevOverride
+  })
+
+  it('prefers SUPPLIFY_DATABASE_URL override', () => {
+    const prev = process.env.SUPPLIFY_DATABASE_URL
+    process.env.SUPPLIFY_DATABASE_URL = 'postgresql://override/db'
+    expect(resolveNativeDatabaseUrl(railwayUrl)).toBe('postgresql://override/db')
+    if (prev == null) delete process.env.SUPPLIFY_DATABASE_URL
+    else process.env.SUPPLIFY_DATABASE_URL = prev
   })
 })
