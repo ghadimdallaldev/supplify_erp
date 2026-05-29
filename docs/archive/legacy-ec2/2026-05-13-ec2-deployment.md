@@ -1,6 +1,8 @@
 # EC2 Single-Command Deployment Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Archived — legacy only.** Current deploy path: **Railway** ([DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md)).
+
+> **For agentic workers:** Historical plan only — do not treat as active deployment work unless explicitly reviving VM deploy.
 
 **Goal:** Three self-contained deploy scripts (`deploy-dev.sh`, `deploy-staging.sh`, `deploy-prod.sh`) that each bring up the full Supplify stack (postgres + redis + minio + keycloak + migrate + backend + frontend + nginx) on a fresh EC2 instance with one command.
 
@@ -12,24 +14,25 @@
 
 ## File Map
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `deploy/scripts/_common.sh` | CREATE | Docker install, swap creation, secret generation, health polling |
-| `deploy/env/.env.dev.example` | CREATE | Complete dev env template |
-| `deploy/env/.env.staging.example` | CREATE | Complete staging env template |
-| `deploy/env/.env.prod.example` | REPLACE | Complete prod env template (was missing many vars) |
-| `deploy/docker-compose.dev.yml` | REPLACE | Full stack (was missing redis/minio/keycloak/migrate) |
-| `deploy/docker-compose.staging.yml` | CREATE | Full stack for staging |
-| `deploy/docker-compose.prod.yml` | REPLACE | Full stack (was missing redis/minio/keycloak) |
-| `deploy/scripts/deploy-dev.sh` | CREATE | One-command dev deploy |
-| `deploy/scripts/deploy-staging.sh` | CREATE | One-command staging deploy |
-| `deploy/scripts/deploy-prod.sh` | CREATE | One-command prod deploy |
+| File                                | Action  | Purpose                                                          |
+| ----------------------------------- | ------- | ---------------------------------------------------------------- |
+| `deploy/scripts/_common.sh`         | CREATE  | Docker install, swap creation, secret generation, health polling |
+| `deploy/env/.env.dev.example`       | CREATE  | Complete dev env template                                        |
+| `deploy/env/.env.staging.example`   | CREATE  | Complete staging env template                                    |
+| `deploy/env/.env.prod.example`      | REPLACE | Complete prod env template (was missing many vars)               |
+| `deploy/docker-compose.dev.yml`     | REPLACE | Full stack (was missing redis/minio/keycloak/migrate)            |
+| `deploy/docker-compose.staging.yml` | CREATE  | Full stack for staging                                           |
+| `deploy/docker-compose.prod.yml`    | REPLACE | Full stack (was missing redis/minio/keycloak)                    |
+| `deploy/scripts/deploy-dev.sh`      | CREATE  | One-command dev deploy                                           |
+| `deploy/scripts/deploy-staging.sh`  | CREATE  | One-command staging deploy                                       |
+| `deploy/scripts/deploy-prod.sh`     | CREATE  | One-command prod deploy                                          |
 
 ---
 
 ## Task 1: Create `deploy/scripts/_common.sh`
 
 **Files:**
+
 - Create: `deploy/scripts/_common.sh`
 
 - [ ] **Step 1: Write the file**
@@ -134,6 +137,7 @@ git commit -m "feat(deploy): add _common.sh with Docker install, swap, and healt
 ## Task 2: Create env example files
 
 **Files:**
+
 - Create: `deploy/env/.env.dev.example`
 - Create: `deploy/env/.env.staging.example`
 - Replace: `deploy/env/.env.prod.example` (was `deploy/env/.env.example` — also create prod variant)
@@ -335,6 +339,7 @@ git commit -m "feat(deploy): add complete env example files for dev/staging/prod
 ## Task 3: Write `deploy/docker-compose.dev.yml` (replace existing)
 
 **Files:**
+
 - Replace: `deploy/docker-compose.dev.yml`
 
 The compose file path is `deploy/docker-compose.dev.yml`. Relative paths inside it resolve from the `deploy/` directory. So `../infra/db/init.sql` resolves to `infra/db/init.sql` in the repo root. The `env_file: ./env/.env.dev` resolves to `deploy/env/.env.dev`.
@@ -344,7 +349,7 @@ Important: inside multi-line `entrypoint` strings, use `$$VAR` and `$$(cmd)` —
 - [ ] **Step 1: Write the file**
 
 ```yaml
-version: "3.9"
+version: '3.9'
 
 name: supplify-dev
 
@@ -361,13 +366,17 @@ services:
       - supplify_dev_pgdata:/var/lib/postgresql/data
       - ../infra/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-supplify} -d ${POSTGRES_DB:-supplify} -h 127.0.0.1"]
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-supplify} -d ${POSTGRES_DB:-supplify} -h 127.0.0.1',
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_dev_net
 
@@ -375,7 +384,7 @@ services:
     image: redis:7-alpine
     container_name: supplify-dev-redis
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -392,12 +401,12 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
     volumes:
       - supplify_dev_minio:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9000/minio/health/live || exit 1"]
+      test: ['CMD-SHELL', 'curl -sf http://127.0.0.1:9000/minio/health/live || exit 1']
       interval: 10s
       timeout: 5s
       retries: 20
@@ -422,7 +431,7 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_dev_net
 
@@ -437,10 +446,10 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: ${POSTGRES_USER:-supplify}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
-      KC_HTTP_ENABLED: "true"
-      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: 'false'
+      KC_HOSTNAME_STRICT_HTTPS: 'false'
+      KC_HTTP_ENABLED: 'true'
+      KC_HEALTH_ENABLED: 'true'
     command:
       - start-dev
       - --import-realm
@@ -448,7 +457,7 @@ services:
       - supplify_dev_keycloak:/opt/keycloak/data
       - ../infra/keycloak/realm-export.json:/opt/keycloak/data/import/Supplify-realm.json:ro
     ports:
-      - "${KEYCLOAK_PORT:-8180}:8080"
+      - '${KEYCLOAK_PORT:-8180}:8080'
     depends_on:
       postgres:
         condition: service_healthy
@@ -503,7 +512,7 @@ services:
     depends_on:
       keycloak:
         condition: service_started
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_dev_net
 
@@ -533,7 +542,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_dev_net
 
@@ -568,16 +577,20 @@ services:
       migrate:
         condition: service_completed_successfully
     expose:
-      - "${BACKEND_PORT:-4000}"
+      - '${BACKEND_PORT:-4000}'
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${BACKEND_PORT:-4000}/health >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget -qO- http://127.0.0.1:${BACKEND_PORT:-4000}/health >/dev/null 2>&1 || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_dev_net
 
@@ -585,18 +598,18 @@ services:
     image: ${FRONTEND_IMAGE:-supplify-frontend:dev}
     container_name: supplify-dev-frontend
     expose:
-      - "80"
+      - '80'
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1']
       interval: 10s
       timeout: 5s
       retries: 12
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_dev_net
 
@@ -606,20 +619,20 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "${HTTP_PORT:-80}:80"
+      - '${HTTP_PORT:-80}:80'
     depends_on:
       backend:
         condition: service_healthy
       frontend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/nginx-health >/dev/null 2>&1 || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:80/nginx-health >/dev/null 2>&1 || exit 1']
       interval: 10s
       timeout: 5s
       retries: 12
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_dev_net
 
@@ -653,7 +666,7 @@ services:
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
     volumes:
       - ${BACKUP_DIR:-/opt/supplify/backups-dev}:/backups
-    entrypoint: ["/bin/sh", "-lc"]
+    entrypoint: ['/bin/sh', '-lc']
     command: >
       "apk add --no-cache bash tzdata aws-cli >/dev/null 2>&1 || true;
        echo 'Backup container ready. Use ./deploy/scripts/backup-now.sh to trigger.';
@@ -698,6 +711,7 @@ git commit -m "feat(deploy): rebuild docker-compose.dev.yml with full stack (red
 ## Task 4: Write `deploy/docker-compose.staging.yml` (new file)
 
 **Files:**
+
 - Create: `deploy/docker-compose.staging.yml`
 
 Identical structure to dev but with `staging` substituted throughout for all names, volumes, network, and env file path. NODE_ENV is `production`.
@@ -705,7 +719,7 @@ Identical structure to dev but with `staging` substituted throughout for all nam
 - [ ] **Step 1: Write the file**
 
 ```yaml
-version: "3.9"
+version: '3.9'
 
 name: supplify-staging
 
@@ -722,13 +736,17 @@ services:
       - supplify_staging_pgdata:/var/lib/postgresql/data
       - ../infra/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-supplify} -d ${POSTGRES_DB:-supplify} -h 127.0.0.1"]
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-supplify} -d ${POSTGRES_DB:-supplify} -h 127.0.0.1',
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_staging_net
 
@@ -736,7 +754,7 @@ services:
     image: redis:7-alpine
     container_name: supplify-staging-redis
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -753,12 +771,12 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
     volumes:
       - supplify_staging_minio:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9000/minio/health/live || exit 1"]
+      test: ['CMD-SHELL', 'curl -sf http://127.0.0.1:9000/minio/health/live || exit 1']
       interval: 10s
       timeout: 5s
       retries: 20
@@ -783,7 +801,7 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_staging_net
 
@@ -798,10 +816,10 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: ${POSTGRES_USER:-supplify}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
-      KC_HTTP_ENABLED: "true"
-      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: 'false'
+      KC_HOSTNAME_STRICT_HTTPS: 'false'
+      KC_HTTP_ENABLED: 'true'
+      KC_HEALTH_ENABLED: 'true'
     command:
       - start-dev
       - --import-realm
@@ -809,7 +827,7 @@ services:
       - supplify_staging_keycloak:/opt/keycloak/data
       - ../infra/keycloak/realm-export.json:/opt/keycloak/data/import/Supplify-realm.json:ro
     ports:
-      - "${KEYCLOAK_PORT:-8180}:8080"
+      - '${KEYCLOAK_PORT:-8180}:8080'
     depends_on:
       postgres:
         condition: service_healthy
@@ -864,7 +882,7 @@ services:
     depends_on:
       keycloak:
         condition: service_started
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_staging_net
 
@@ -894,7 +912,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_staging_net
 
@@ -929,16 +947,20 @@ services:
       migrate:
         condition: service_completed_successfully
     expose:
-      - "${BACKEND_PORT:-4000}"
+      - '${BACKEND_PORT:-4000}'
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${BACKEND_PORT:-4000}/health >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget -qO- http://127.0.0.1:${BACKEND_PORT:-4000}/health >/dev/null 2>&1 || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_staging_net
 
@@ -946,18 +968,18 @@ services:
     image: ${FRONTEND_IMAGE:-supplify-frontend:staging}
     container_name: supplify-staging-frontend
     expose:
-      - "80"
+      - '80'
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1']
       interval: 10s
       timeout: 5s
       retries: 12
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_staging_net
 
@@ -967,20 +989,20 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "${HTTP_PORT:-80}:80"
+      - '${HTTP_PORT:-80}:80'
     depends_on:
       backend:
         condition: service_healthy
       frontend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/nginx-health >/dev/null 2>&1 || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:80/nginx-health >/dev/null 2>&1 || exit 1']
       interval: 10s
       timeout: 5s
       retries: 12
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_staging_net
 
@@ -1014,7 +1036,7 @@ services:
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
     volumes:
       - ${BACKUP_DIR:-/opt/supplify/backups-staging}:/backups
-    entrypoint: ["/bin/sh", "-lc"]
+    entrypoint: ['/bin/sh', '-lc']
     command: >
       "apk add --no-cache bash tzdata aws-cli >/dev/null 2>&1 || true;
        echo 'Backup container ready. Use ./deploy/scripts/backup-now.sh to trigger.';
@@ -1055,6 +1077,7 @@ git commit -m "feat(deploy): add docker-compose.staging.yml with full stack"
 ## Task 5: Replace `deploy/docker-compose.prod.yml`
 
 **Files:**
+
 - Replace: `deploy/docker-compose.prod.yml`
 
 Same structure as staging but uses `prod` throughout (no suffix on volumes/network for prod), `POSTGRES_USER:-supplify` defaults, prod image tags, and backup dir `/opt/supplify/backups`.
@@ -1062,7 +1085,7 @@ Same structure as staging but uses `prod` throughout (no suffix on volumes/netwo
 - [ ] **Step 1: Write the file**
 
 ```yaml
-version: "3.9"
+version: '3.9'
 
 name: supplify
 
@@ -1079,13 +1102,17 @@ services:
       - supplify_pgdata:/var/lib/postgresql/data
       - ../infra/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-supplify} -d ${POSTGRES_DB:-supplify} -h 127.0.0.1"]
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-supplify} -d ${POSTGRES_DB:-supplify} -h 127.0.0.1',
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_net
 
@@ -1093,7 +1120,7 @@ services:
     image: redis:7-alpine
     container_name: supplify-redis
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -1110,12 +1137,12 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
     volumes:
       - supplify_minio:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9000/minio/health/live || exit 1"]
+      test: ['CMD-SHELL', 'curl -sf http://127.0.0.1:9000/minio/health/live || exit 1']
       interval: 10s
       timeout: 5s
       retries: 20
@@ -1140,7 +1167,7 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_net
 
@@ -1155,10 +1182,10 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: ${POSTGRES_USER:-supplify}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
-      KC_HTTP_ENABLED: "true"
-      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: 'false'
+      KC_HOSTNAME_STRICT_HTTPS: 'false'
+      KC_HTTP_ENABLED: 'true'
+      KC_HEALTH_ENABLED: 'true'
     command:
       - start-dev
       - --import-realm
@@ -1166,7 +1193,7 @@ services:
       - supplify_keycloak:/opt/keycloak/data
       - ../infra/keycloak/realm-export.json:/opt/keycloak/data/import/Supplify-realm.json:ro
     ports:
-      - "${KEYCLOAK_PORT:-8180}:8080"
+      - '${KEYCLOAK_PORT:-8180}:8080'
     depends_on:
       postgres:
         condition: service_healthy
@@ -1221,7 +1248,7 @@ services:
     depends_on:
       keycloak:
         condition: service_started
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_net
 
@@ -1251,7 +1278,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
     networks:
       - supplify_net
 
@@ -1286,16 +1313,20 @@ services:
       migrate:
         condition: service_completed_successfully
     expose:
-      - "${BACKEND_PORT:-4000}"
+      - '${BACKEND_PORT:-4000}'
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${BACKEND_PORT:-4000}/health >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget -qO- http://127.0.0.1:${BACKEND_PORT:-4000}/health >/dev/null 2>&1 || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_net
 
@@ -1303,18 +1334,18 @@ services:
     image: ${FRONTEND_IMAGE:-supplify-frontend:prod}
     container_name: supplify-frontend
     expose:
-      - "80"
+      - '80'
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1']
       interval: 10s
       timeout: 5s
       retries: 12
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_net
 
@@ -1324,20 +1355,20 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "${HTTP_PORT:-80}:80"
+      - '${HTTP_PORT:-80}:80'
     depends_on:
       backend:
         condition: service_healthy
       frontend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/nginx-health >/dev/null 2>&1 || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:80/nginx-health >/dev/null 2>&1 || exit 1']
       interval: 10s
       timeout: 5s
       retries: 12
     restart: unless-stopped
     labels:
-      - "autoheal=true"
+      - 'autoheal=true'
     networks:
       - supplify_net
 
@@ -1371,7 +1402,7 @@ services:
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
     volumes:
       - ${BACKUP_DIR:-/opt/supplify/backups}:/backups
-    entrypoint: ["/bin/sh", "-lc"]
+    entrypoint: ['/bin/sh', '-lc']
     command: >
       "apk add --no-cache bash tzdata aws-cli >/dev/null 2>&1 || true;
        echo 'Backup container ready. Use ./deploy/scripts/backup-now.sh to trigger.';
@@ -1412,6 +1443,7 @@ git commit -m "feat(deploy): rebuild docker-compose.prod.yml with full stack (re
 ## Task 6: Write `deploy/scripts/deploy-dev.sh`
 
 **Files:**
+
 - Create: `deploy/scripts/deploy-dev.sh`
 
 This is the complete one-command dev deploy. It sources `_common.sh` for shared helpers. All 6 phases run in sequence. Must be run as root or sudo on the EC2 instance after cloning the repo.
@@ -1587,6 +1619,7 @@ git commit -m "feat(deploy): add deploy-dev.sh — one-command dev EC2 deploy"
 ## Task 7: Write `deploy/scripts/deploy-staging.sh`
 
 **Files:**
+
 - Create: `deploy/scripts/deploy-staging.sh`
 
 Identical to `deploy-dev.sh` with `dev` → `staging` substituted throughout. Image tags use `:staging`. NODE_ENV is `production` (set in compose, not in the script).
@@ -1757,6 +1790,7 @@ git commit -m "feat(deploy): add deploy-staging.sh — one-command staging EC2 d
 ## Task 8: Write `deploy/scripts/deploy-prod.sh`
 
 **Files:**
+
 - Create: `deploy/scripts/deploy-prod.sh`
 
 Same as staging but uses `prod` image tags and container names (no suffix). Adds a mandatory pre-flight check that warns if PUBLIC_URL is still localhost.
@@ -1934,6 +1968,7 @@ git commit -m "feat(deploy): add deploy-prod.sh — one-command production EC2 d
 ## Task 9: Final wiring — permissions, full syntax validation, and push
 
 **Files:**
+
 - Modify: `deploy/scripts/deploy-dev.sh` (chmod)
 - Modify: `deploy/scripts/deploy-staging.sh` (chmod)
 - Modify: `deploy/scripts/deploy-prod.sh` (chmod)
@@ -1966,6 +2001,7 @@ done
 ```
 
 Expected output:
+
 ```
 Checking deploy/scripts/_common.sh ... OK
 Checking deploy/scripts/deploy-dev.sh ... OK
@@ -1991,6 +2027,7 @@ done
 ```
 
 Expected output:
+
 ```
 Validating docker-compose.dev.yml ... OK
 Validating docker-compose.staging.yml ... OK
@@ -2010,23 +2047,23 @@ git commit -m "feat(deploy): single-command EC2 deploy for dev/staging/prod — 
 
 ## Spec Coverage Checklist
 
-| Requirement | Task |
-|---|---|
-| One script per environment | Tasks 6, 7, 8 |
-| dev/staging/prod environments | Tasks 3, 4, 5, 6, 7, 8 |
-| Separate EC2 instances (standard ports) | All compose files — port 80, 8180, 9000 on all |
-| Full stack: postgres, redis, minio, keycloak | Tasks 3, 4, 5 |
-| DB init (keycloak DB + api_user role) | Tasks 3, 4, 5 — `infra/db/init.sql` mounted |
-| Keycloak realm import on first run | Tasks 3, 4, 5 — `--import-realm` + keycloak-init |
-| Keycloak redirect URIs updated to PUBLIC_URL | Tasks 3, 4, 5 — keycloak-init kcadm.sh update |
-| All 54 SQL migrations | Tasks 3, 4, 5 — run-migration.js |
-| Runtime migrators (0033–0037) | Tasks 3, 4, 5 — ensureStaffAppSchema + ensureReservationsSchema |
-| MinIO bucket creation | Tasks 3, 4, 5 — minio-init |
-| Auto-generated secrets on first run | Tasks 6, 7, 8 — gen_secret |
-| Auto-detect EC2 public IP | Tasks 6, 7, 8 — EC2 metadata URL |
-| Docker install if missing | Tasks 1, 6, 7, 8 — install_docker |
-| 4GB swap if low RAM | Tasks 1, 6, 7, 8 — ensure_swap |
-| Health polling before proceeding | Tasks 1, 6, 7, 8 — wait_healthy |
-| Idempotent re-runs | Compose `up -d` + init containers idempotent |
-| autoheal + backup sidecar | Tasks 3, 4, 5 |
-| Shared bootstrap helpers | Task 1 |
+| Requirement                                  | Task                                                            |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| One script per environment                   | Tasks 6, 7, 8                                                   |
+| dev/staging/prod environments                | Tasks 3, 4, 5, 6, 7, 8                                          |
+| Separate EC2 instances (standard ports)      | All compose files — port 80, 8180, 9000 on all                  |
+| Full stack: postgres, redis, minio, keycloak | Tasks 3, 4, 5                                                   |
+| DB init (keycloak DB + api_user role)        | Tasks 3, 4, 5 — `infra/db/init.sql` mounted                     |
+| Keycloak realm import on first run           | Tasks 3, 4, 5 — `--import-realm` + keycloak-init                |
+| Keycloak redirect URIs updated to PUBLIC_URL | Tasks 3, 4, 5 — keycloak-init kcadm.sh update                   |
+| All 54 SQL migrations                        | Tasks 3, 4, 5 — run-migration.js                                |
+| Runtime migrators (0033–0037)                | Tasks 3, 4, 5 — ensureStaffAppSchema + ensureReservationsSchema |
+| MinIO bucket creation                        | Tasks 3, 4, 5 — minio-init                                      |
+| Auto-generated secrets on first run          | Tasks 6, 7, 8 — gen_secret                                      |
+| Auto-detect EC2 public IP                    | Tasks 6, 7, 8 — EC2 metadata URL                                |
+| Docker install if missing                    | Tasks 1, 6, 7, 8 — install_docker                               |
+| 4GB swap if low RAM                          | Tasks 1, 6, 7, 8 — ensure_swap                                  |
+| Health polling before proceeding             | Tasks 1, 6, 7, 8 — wait_healthy                                 |
+| Idempotent re-runs                           | Compose `up -d` + init containers idempotent                    |
+| autoheal + backup sidecar                    | Tasks 3, 4, 5                                                   |
+| Shared bootstrap helpers                     | Task 1                                                          |

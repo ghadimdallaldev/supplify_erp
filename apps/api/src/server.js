@@ -5,7 +5,7 @@ import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
 import session from 'express-session'
-import { config } from './config/env.js'
+import { config, allowE2eRoutes } from './config/env.js'
 import { validateProductionConfig } from './lib/validate-config.js'
 import { logger } from './lib/logger.js'
 import { createSessionStore } from './lib/session-store.js'
@@ -87,9 +87,7 @@ import {
   startMemoryMonitor,
 } from './lib/memory-monitor.js'
 
-if (config.NODE_ENV === 'production') {
-  validateProductionConfig()
-}
+validateProductionConfig()
 
 if (config.NODE_ENV !== 'test') {
   try {
@@ -121,8 +119,9 @@ if (config.NODE_ENV !== 'test') {
 const app = express()
 const isProduction = config.NODE_ENV === 'production'
 
-// Trust proxy for rate limiting and IP detection
-app.set('trust proxy', 1)
+if (config.TRUST_PROXY) {
+  app.set('trust proxy', 1)
+}
 
 // Security middleware
 app.use(
@@ -160,66 +159,50 @@ app.use(
   })
 )
 
-// Rate limiting (stricter in production)
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 300 : 1000,
-  message: 'Too many requests from this IP, please try again later.',
+const rateLimitMessage = 'Too many requests from this IP, please try again later.'
+const rateOpts = {
+  windowMs: config.RATE_LIMIT_WINDOW_MS,
   standardHeaders: true,
   legacyHeaders: false,
-})
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 30 : 500,
-  message: 'Too many authentication attempts, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const staffLinkLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 10 : 100,
-  message: 'Too many staff portal link requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-// Stricter limits for sensitive endpoints (TODO: replace with Redis-backed limiter in production)
-const publicLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 60 : 200,
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-const chatSendLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300, // chat send per IP
-  message: 'Too many messages sent, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
+}
 const skipReadOnlyRequests = (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
 
-const ordersWriteLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 120 : 500,
-  message: 'Too many order requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: skipReadOnlyRequests,
-})
+function createLimiter(max, message, extra = {}) {
+  return rateLimit({ ...rateOpts, max, message, ...extra })
+}
 
-const promotionsWriteLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isProduction ? 80 : 400,
-  message: 'Too many promotion requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: skipReadOnlyRequests,
-})
+const noopLimiter = (_req, _res, next) => next()
+const limiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(config.RATE_LIMIT_MAX, rateLimitMessage)
+  : noopLimiter
+const authLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(
+      isProduction ? 30 : 500,
+      'Too many authentication attempts, please try again later.'
+    )
+  : noopLimiter
+const staffLinkLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(
+      isProduction ? 10 : 100,
+      'Too many staff portal link requests, please try again later.'
+    )
+  : noopLimiter
+const publicLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 60 : 200, rateLimitMessage)
+  : noopLimiter
+const chatSendLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(300, 'Too many messages sent, please try again later.')
+  : noopLimiter
+const ordersWriteLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 120 : 500, 'Too many order requests, please try again later.', {
+      skip: skipReadOnlyRequests,
+    })
+  : noopLimiter
+const promotionsWriteLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 80 : 400, 'Too many promotion requests, please try again later.', {
+      skip: skipReadOnlyRequests,
+    })
+  : noopLimiter
 
 app.use('/auth', authLimiter)
 app.use('/api/public', publicLimiter)
@@ -233,24 +216,30 @@ app.use(cookieParser())
 // Session configuration (PostgreSQL store for OAuth state across instances)
 const sessionStore = createSessionStore()
 
+const sessionCookie = {
+  secure: config.COOKIE_SECURE,
+  httpOnly: true,
+  maxAge: 24 * 60 * 60 * 1000,
+  sameSite: config.COOKIE_SAME_SITE,
+}
+if (config.COOKIE_DOMAIN) {
+  sessionCookie.domain = config.COOKIE_DOMAIN
+}
+
 app.use(
   session({
     store: sessionStore,
     secret: config.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: {
-      secure: isProduction,
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax', // Use 'lax' for development with localhost
-    },
+    cookie: sessionCookie,
   })
 )
 
-// Request context + one log line per HTTP request
 app.use(requestContext)
-app.use(requestLogger)
+if (config.ENABLE_REQUEST_LOGGING) {
+  app.use(requestLogger)
+}
 
 // Impersonation: read signed cookie and set req.impersonationContext when admin is "viewing as" a tenant
 app.use(impersonationContext)
@@ -273,19 +262,20 @@ if (config.STORAGE_DRIVER === 'local') {
   app.use('/uploads', express.static(uploadsDir))
 }
 
-// Health check endpoint
 app.get('/health', async (req, res) => {
   const storage = await checkStorageHealth()
   const ok = storage.ok
   const payload = {
-    ok,
-    status: ok ? 'healthy' : 'degraded',
-    timestamp: new Date().toISOString(),
-    storage,
-    requestId: req.requestId,
+    status: ok ? 'ok' : 'degraded',
+    service: 'supplify-api',
+    env: config.APP_ENV,
   }
 
   if (shouldExposeMemoryOnHealth()) {
+    payload.ok = ok
+    payload.timestamp = new Date().toISOString()
+    payload.storage = storage
+    payload.requestId = req.requestId
     payload.memory = getMemorySnapshot()
     payload.dbPool = {
       total: pool.totalCount,
@@ -297,6 +287,15 @@ app.get('/health', async (req, res) => {
   }
 
   res.status(ok ? 200 : 503).json(payload)
+})
+
+app.get('/ready', async (req, res) => {
+  try {
+    await pool.query('SELECT 1')
+    res.json({ status: 'ok', service: 'supplify-api', env: config.APP_ENV })
+  } catch {
+    res.status(503).json({ status: 'degraded', service: 'supplify-api', env: config.APP_ENV })
+  }
 })
 
 // API routes
@@ -341,7 +340,7 @@ app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
 app.use('/api/public', publicRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
-if (config.E2E_SECRET) {
+if (allowE2eRoutes()) {
   app.use('/api/e2e', e2eRoutes)
 }
 app.use('/api/branches', branchesRoutes)
@@ -438,7 +437,9 @@ server.listen(PORT, HOST, () => {
     host: HOST,
     port: PORT,
     env: config.NODE_ENV,
+    appEnv: config.APP_ENV,
     webOrigin: config.WEB_ORIGIN,
+    paymentsMode: config.PAYMENTS_MODE,
   })
 
   // Start scheduled orders cron job

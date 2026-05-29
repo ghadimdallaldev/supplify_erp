@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 describe('apiUrl', () => {
   it('returns relative path when API_BASE is empty', async () => {
+    vi.stubEnv('VITE_APP_ENV', 'dev')
     vi.stubEnv('VITE_API_URL', '')
+    vi.stubEnv('DEV', 'true')
     vi.resetModules()
     const { apiUrl } = await import('./apiBase')
     const params = new URLSearchParams({ period: '30' })

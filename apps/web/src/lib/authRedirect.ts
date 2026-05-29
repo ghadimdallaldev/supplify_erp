@@ -1,6 +1,5 @@
 import { apiUrl } from './apiBase'
-
-const DEV_API_ORIGIN = 'http://localhost:4000'
+import { DEV_API_ORIGIN } from './env'
 
 /**
  * URL that starts the OIDC flow (full-page navigation, never inside an iframe).

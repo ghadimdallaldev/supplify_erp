@@ -14,7 +14,9 @@ import { downloadCsv } from '../utils/csvExport'
 import { Loader2, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
+import { getApiBase } from '../lib/env'
+
+const API_URL = getApiBase()
 
 type ActivityLogTabProps = {
   canExport?: boolean

@@ -1,6 +1,7 @@
-/** API origin for fetch/RTK. Empty string uses Vite dev proxy (relative paths). */
-export const API_BASE =
-  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:4000')
+import { getApiBase } from './env'
+
+/** API origin for fetch/RTK. Re-exported from env (see resolveApiBase). */
+export const API_BASE = getApiBase()
 
 /** Build a request URL that works with a relative base in dev and an absolute base in prod. */
 export function apiUrl(path: string, searchParams?: URLSearchParams): string {

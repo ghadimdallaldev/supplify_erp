@@ -1,6 +1,9 @@
 # Deploying Supplify on Railway
 
-This guide covers deploying the Supplify monorepo on [Railway](https://railway.app) using separate services for the API, web app, and PostgreSQL. **AWS CDK and GitHub Actions CI were removed** from this repository; use Railway (or your own runner) for production deploys.
+**Multi-environment guide (dev / preprod / prod):** [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](DEPLOYMENT_RAILWAY_ENVIRONMENTS.md)  
+**Variable reference:** [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) · [`.env.matrix.md`](.env.matrix.md)
+
+This page is a quick single-service overview. **AWS CDK and GitHub Actions CI were removed**; use Railway for deploys.
 
 ## Architecture overview
 

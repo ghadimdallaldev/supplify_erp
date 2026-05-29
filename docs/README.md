@@ -14,7 +14,8 @@ Supplify docs are grouped by purpose. Start with **[Developer handbook](./guides
 | **[operations/](./operations/)**     | **Production readiness** (merged), launch polish, performance, observability, test coverage                                                                                             |
 | **[sales/](./sales/)**               | Positioning, pricing, enterprise checklist                                                                                                                                              |
 | **[blueprint/](./blueprint/)**       | Diagrams (Mermaid), workflows, UI sitemaps                                                                                                                                              |
-| **[superpowers/](./superpowers/)**   | Dated specs & plans (design sessions)                                                                                                                                                   |
+| **[superpowers/](./superpowers/)**   | Dated specs & plans (design sessions); EC2 deploy docs moved to [archive/legacy-ec2/](./archive/legacy-ec2/)                                                                            |
+| **[archive/](./archive/)**           | Legacy / superseded docs (e.g. EC2 deploy — not Railway)                                                                                                                                |
 | **[design/](./design/)**             | Static design artifacts (e.g. logo concepts HTML)                                                                                                                                       |
 
 ## Quick links

@@ -25,13 +25,14 @@ See **[docs/BRANCHING.md](docs/BRANCHING.md)** for promote workflow.
 
 Full guide: **[docs/README.md](docs/README.md)**
 
-| Topic                 | Doc                                                                                                |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| **Feature catalog**   | [docs/product/features.md](docs/product/features.md)                                               |
-| Local Docker workflow | [docs/README.md](docs/README.md)                                                                   |
-| Database migrations   | [docs/guides/database-migrations.md](docs/guides/database-migrations.md)                           |
-| Admin feature toggles | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md)                             |
-| Production deploy     | [DEPLOYMENT_RAILWAY.md](DEPLOYMENT_RAILWAY.md) · [deploy/README.md](deploy/README.md) (Docker/EC2) |
+| Topic                      | Doc                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Feature catalog**        | [docs/product/features.md](docs/product/features.md)                                                                            |
+| Local Docker workflow      | [docs/README.md](docs/README.md)                                                                                                |
+| Database migrations        | [docs/guides/database-migrations.md](docs/guides/database-migrations.md)                                                        |
+| Admin feature toggles      | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md)                                                          |
+| Railway (dev/preprod/prod) | [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) · [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) |
+| Production deploy (Docker) | [deploy/README.md](deploy/README.md)                                                                                            |
 
 ## Scripts
 
@@ -50,7 +51,7 @@ pnpm db:migrate   # SQL migrations
 
 ## Environment variables (keys only)
 
-Copy `apps/api/.env.example` to `apps/api/.env` for app secrets (Twilio, VAPID, etc.). **Local Postgres/Redis/Keycloak** credentials and ports live in `docker/.env` (created from `docker/.env.example` on first `pnpm local:infra` or `pnpm dev`). Native dev syncs `apps/api/.env.docker-sync` automatically — do not hand-edit that file.
+Copy env templates per target: `apps/api/.env.dev.example`, `.env.preprod.example`, `.env.prod.example` (and matching `apps/web/.env.*.example`). For local work, copy `apps/api/.env.dev.example` → `apps/api/.env`. **Local Postgres/Redis/Keycloak** live in `docker/.env`. Native dev syncs `apps/api/.env.docker-sync` automatically.
 
 | Key                                  | Purpose                                     |
 | ------------------------------------ | ------------------------------------------- |

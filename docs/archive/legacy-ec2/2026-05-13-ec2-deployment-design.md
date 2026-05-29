@@ -1,7 +1,9 @@
 # EC2 Single-Command Deployment — Design Spec
 
+> **Archived — legacy only.** Supplify production hosting uses **Railway** ([DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md)). This spec is not the current deploy path.
+
 **Date:** 2026-05-13  
-**Status:** Approved
+**Status:** Archived (superseded by Railway)
 
 ---
 
@@ -36,6 +38,7 @@ Each script is fully self-contained. It bootstraps Docker, sets up the env file,
 ### Shared bootstrap logic
 
 `deploy/scripts/_common.sh` — sourced by all three scripts. Contains only:
+
 - Docker + Compose install (idempotent)
 - Swap file creation (idempotent)
 - Secret generation helper (`gen_secret`)
@@ -71,24 +74,25 @@ Existing `deploy/ec2/bootstrap.sh` and `deploy/ec2/deploy.sh` are kept for refer
 
 Every compose file contains all of these services:
 
-| Service | Image | Purpose |
-|---|---|---|
-| postgres | postgres:16-alpine | Primary DB + Keycloak DB (via init.sql) |
-| redis | redis:7-alpine | Session store, cache |
-| minio | minio/minio:latest | S3-compatible object storage |
-| minio-init | minio/mc:latest | Creates `supplify` bucket on first run |
-| keycloak | quay.io/keycloak/keycloak:24.0 | Identity provider |
-| keycloak-init | quay.io/keycloak/keycloak:24.0 | Imports realm + fixes redirect URIs |
-| migrate | backend image | Runs all SQL migrations + runtime migrators |
-| backend | supplify-backend:{env} | API server |
-| frontend | supplify-frontend:{env} | Nginx serving React SPA |
-| nginx | nginx:alpine | Reverse proxy on port 80 |
-| autoheal | willfarrell/autoheal | Auto-restarts unhealthy containers |
-| backup | postgres:16-alpine | pg_dump sidecar |
+| Service       | Image                          | Purpose                                     |
+| ------------- | ------------------------------ | ------------------------------------------- |
+| postgres      | postgres:16-alpine             | Primary DB + Keycloak DB (via init.sql)     |
+| redis         | redis:7-alpine                 | Session store, cache                        |
+| minio         | minio/minio:latest             | S3-compatible object storage                |
+| minio-init    | minio/mc:latest                | Creates `supplify` bucket on first run      |
+| keycloak      | quay.io/keycloak/keycloak:24.0 | Identity provider                           |
+| keycloak-init | quay.io/keycloak/keycloak:24.0 | Imports realm + fixes redirect URIs         |
+| migrate       | backend image                  | Runs all SQL migrations + runtime migrators |
+| backend       | supplify-backend:{env}         | API server                                  |
+| frontend      | supplify-frontend:{env}        | Nginx serving React SPA                     |
+| nginx         | nginx:alpine                   | Reverse proxy on port 80                    |
+| autoheal      | willfarrell/autoheal           | Auto-restarts unhealthy containers          |
+| backup        | postgres:16-alpine             | pg_dump sidecar                             |
 
 ### Critical fix: DB init
 
 `postgres` mounts `infra/db/init.sql` as an init script in all compose files. This:
+
 - Creates the `keycloak` database (Keycloak won't start without it)
 - Creates the `api_user` role (SQL migrations reference it in GRANT statements)
 
@@ -101,12 +105,14 @@ This was missing from all existing deploy compose files and caused silent failur
 Each `deploy-{env}.sh` runs these phases in order:
 
 ### Phase 1 — Bootstrap (idempotent)
+
 - Install system packages via apt/dnf/yum
 - Install Docker + Compose plugin via `get.docker.com` (skipped if present)
 - Add current user to `docker` group
 - Create 4 GB swap if RAM < 8 GB (skipped if exists)
 
 ### Phase 2 — Environment setup
+
 - Look for `deploy/env/.env.{env}`
 - If missing: copy from `.env.{env}.example`, auto-generate secrets:
   - `POSTGRES_PASSWORD`, `SESSION_SECRET`, `MINIO_ROOT_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD` via `openssl rand -hex 32`
@@ -116,24 +122,29 @@ Each `deploy-{env}.sh` runs these phases in order:
 - Source the env file for subsequent steps
 
 ### Phase 3 — Build images
+
 - `docker build` backend: `apps/api/Dockerfile`
 - `docker build` frontend: `apps/web/Dockerfile` with `--build-arg VITE_API_URL VITE_KEYCLOAK_URL VITE_KEYCLOAK_REALM=Supplify`
 
 ### Phase 4 — Start infra
+
 - `docker compose up -d postgres redis minio keycloak`
 - Poll health checks: wait for postgres, redis, minio, keycloak to be healthy before proceeding
 
 ### Phase 5 — Init & migrate
+
 - `docker compose run --rm minio-init` — creates bucket (idempotent)
 - `docker compose run --rm keycloak-init` — imports realm if missing, patches `supplify-web` client redirect URIs to `PUBLIC_URL` via `kcadm.sh`
 - `docker compose run --rm migrate` — runs all 54 SQL migrations + `ensureStaffAppSchema()` + `ensureReservationsSchema()` from `migrator.js`
 
 ### Phase 6 — Start app
+
 - `docker compose up -d backend frontend nginx autoheal backup`
 - Tail logs for 15 seconds
 - Print app URL
 
 ### On re-run / update
+
 Script detects existing `.env` file, skips secret generation, rebuilds images, re-runs migrations (idempotent via `schema_migrations` table), restarts containers.
 
 ---
@@ -141,6 +152,7 @@ Script detects existing `.env` file, skips secret generation, rebuilds images, r
 ## Keycloak Realm Handling
 
 The `keycloak-init` container:
+
 1. Waits for Keycloak to be ready (polls `kcadm.sh config credentials`, up to 90s)
 2. Checks if `Supplify` realm exists
 3. If not: creates it from `infra/keycloak/realm-export.json`
@@ -169,15 +181,15 @@ This matches exactly what the root `docker-compose.yml` migrate service does. Al
 
 ## Environment Differences
 
-| | dev | staging | prod |
-|---|---|---|---|
-| Script | `deploy-dev.sh` | `deploy-staging.sh` | `deploy-prod.sh` |
-| Compose | `docker-compose.dev.yml` | `docker-compose.staging.yml` | `docker-compose.prod.yml` |
-| Env file | `.env.dev` | `.env.staging` | `.env.prod` |
-| `NODE_ENV` | development | production | production |
-| Image tags | `:dev` | `:staging` | `:prod` |
-| Compose project name | `supplify-dev` | `supplify-staging` | `supplify` |
-| Volume suffix | `_dev` | `_staging` | (none) |
+|                      | dev                      | staging                      | prod                      |
+| -------------------- | ------------------------ | ---------------------------- | ------------------------- |
+| Script               | `deploy-dev.sh`          | `deploy-staging.sh`          | `deploy-prod.sh`          |
+| Compose              | `docker-compose.dev.yml` | `docker-compose.staging.yml` | `docker-compose.prod.yml` |
+| Env file             | `.env.dev`               | `.env.staging`               | `.env.prod`               |
+| `NODE_ENV`           | development              | production                   | production                |
+| Image tags           | `:dev`                   | `:staging`                   | `:prod`                   |
+| Compose project name | `supplify-dev`           | `supplify-staging`           | `supplify`                |
+| Volume suffix        | `_dev`                   | `_staging`                   | (none)                    |
 
 ---
 

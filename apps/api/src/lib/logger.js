@@ -36,6 +36,10 @@ const SENSITIVE_KEYS = new Set(
     'api_key',
     'apikey',
     'redirect_uri',
+    'database_url',
+    'smtp_pass',
+    'payments_secret_key',
+    'payments_webhook_secret',
   ].map((k) => k.toLowerCase())
 )
 

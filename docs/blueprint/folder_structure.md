@@ -32,5 +32,6 @@ Supplify Core/
 │   ├── MONETIZATION_UX.md
 │   ├── OBSERVABILITY.md
 │   └── PERFORMANCE.md
-└── infra/                    # CDK (VPC, ECS, RDS, etc.)
+├── deploy/                   # Docker Compose + optional VM scripts (legacy)
+└── DEPLOYMENT_RAILWAY*.md    # Railway dev / preprod / prod (primary hosting)
 ```
