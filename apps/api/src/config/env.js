@@ -2,7 +2,7 @@ import dotenv from 'dotenv'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
-import { resolveNativeDatabaseUrl } from '../../../../scripts/lib/local-infra-urls.mjs'
+import { resolveNativeDatabaseUrl } from './resolve-database-url.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const apiEnvDir = path.resolve(__dirname, '../..')
