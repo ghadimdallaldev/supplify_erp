@@ -98,6 +98,21 @@ async function staffPortalSessionTableExists() {
 
 export async function ensureReservationsSchema() {
   try {
+    const { rows } = await query(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'restaurant'
+      ) AS has_restaurant
+    `)
+    if (!rows[0]?.has_restaurant) {
+      logger.warn(
+        'Skipping reservations schema checks — base schema not ready (run SQL migrations first)'
+      )
+      return
+    }
+
     if (await reservationsSchemaExists()) {
       logger.debug('Reservations schema already present, skipping migration 0033')
     } else {
@@ -165,6 +180,21 @@ async function orderCancellationColumnsExist() {
 
 export async function ensureOrderCancellationColumns() {
   try {
+    const { rows } = await query(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'customer_order'
+      ) AS has_orders
+    `)
+    if (!rows[0]?.has_orders) {
+      logger.warn(
+        'Skipping order cancellation columns — base schema not ready (run SQL migrations first)'
+      )
+      return
+    }
+
     if (await orderCancellationColumnsExist()) {
       logger.debug('Order cancellation columns already present, skipping migration 0108')
       return
@@ -181,6 +211,19 @@ export async function ensureOrderCancellationColumns() {
 
 export async function ensureStaffAppSchema() {
   try {
+    const { rows } = await query(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'restaurant'
+      ) AS has_restaurant
+    `)
+    if (!rows[0]?.has_restaurant) {
+      logger.warn('Skipping staff schema checks — base schema not ready (run SQL migrations first)')
+      return
+    }
+
     if (!(await staffBaseSchemaExists())) {
       logger.info('Applying staff app base schema migration (0034)')
       const baseSql = await readFile(STAFF_BASE_MIGRATION_PATH, 'utf8')
