@@ -12,16 +12,24 @@ if (config.REDIS_URL) {
     })
 
     redisClient.on('error', (error) => {
-      logger.warn('Redis connection error for calendar cache', { error: error.message })
+      const log = logger.warn ?? logger.info ?? logger.error
+      if (typeof log === 'function') {
+        log.call(logger, 'Redis connection error for calendar cache', { error: error.message })
+      }
     })
 
     redisClient.on('connect', () => {
-      logger.info('Redis connection established for calendar cache')
+      if (typeof logger.info === 'function') {
+        logger.info('Redis connection established for calendar cache')
+      }
     })
   } catch (error) {
-    logger.warn('Failed to initialize Redis client, falling back to in-memory cache', {
-      error: error.message,
-    })
+    const log = logger.warn ?? logger.info ?? logger.error
+    if (typeof log === 'function') {
+      log.call(logger, 'Failed to initialize Redis client, falling back to in-memory cache', {
+        error: error.message,
+      })
+    }
     redisClient = null
   }
 }

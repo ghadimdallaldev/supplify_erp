@@ -1,73 +1,102 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { executeScheduledOrders } from './scheduled-orders.service.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { executeScheduledOrders, computeNextExecutionDate } from './scheduled-orders.service.js'
+
+const clientQueryMock = vi.fn()
 
 vi.mock('../lib/db.js', () => ({
   query: vi.fn(),
-  withTransaction: vi.fn((handler) => handler({ query: vi.fn() })),
-}));
+  withTransaction: vi.fn(async (handler) =>
+    handler({ query: (...args) => clientQueryMock(...args) })
+  ),
+}))
 
 vi.mock('../lib/logger.js', () => ({
   logger: {
     info: vi.fn(),
     error: vi.fn(),
+    warn: vi.fn(),
     debug: vi.fn(),
   },
-}));
+}))
 
-describe('Scheduled Orders Service', () => {
+vi.mock('../lib/subscription.js', () => ({
+  evaluateScheduledOrderLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  incrementUsage: vi.fn(),
+}))
+
+vi.mock('./notification.service.js', () => ({
+  notifyScheduledOrderEvent: vi.fn(),
+}))
+
+function dueQuickList(overrides = {}) {
+  return {
+    id: 'ql-1',
+    restaurant_id: 'rest-1',
+    name: 'Weekly produce',
+    auto_create_order: false,
+    frequency: 'WEEKLY',
+    days_of_week: null,
+    ...overrides,
+  }
+}
+
+describe('computeNextExecutionDate', () => {
+  it('advances daily frequency by one UTC day', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T12:00:00Z'))
+    const next = computeNextExecutionDate({ frequency: 'DAILY' })
+    expect(next).toBe('2026-06-02')
+    vi.useRealTimers()
+  })
+})
+
+describe('executeScheduledOrders', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+    clientQueryMock.mockReset()
+  })
 
-  describe('executeScheduledOrders', () => {
-    it('should process scheduled orders', async () => {
-      const { query } = await import('../lib/db.js');
-      query
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'order-1',
-              restaurant_id: 'restaurant-1',
-              supplier_id: 'supplier-1',
-              scheduled_at: new Date(Date.now() - 1000), // Past date
-              status: 'SCHEDULED',
-            },
-          ],
-        })
-        .mockResolvedValueOnce({
-          rows: [{ id: 'order-1', status: 'PENDING' }],
-        });
+  it('returns zero when no lists are due', async () => {
+    clientQueryMock.mockResolvedValueOnce({ rows: [] })
 
-      await executeScheduledOrders();
+    const result = await executeScheduledOrders()
 
-      expect(query).toHaveBeenCalled();
-    });
+    expect(result).toEqual({ executed: 0, errors: 0, skipped: 0 })
+  })
 
-    it('should handle errors gracefully', async () => {
-      const { query } = await import('../lib/db.js');
-      query.mockRejectedValueOnce(new Error('Database error'));
+  it('skips lists that already have a ledger row for today', async () => {
+    const list = dueQuickList()
+    clientQueryMock
+      .mockResolvedValueOnce({ rows: [list] })
+      .mockResolvedValueOnce({ rows: [{ today_date: '2026-06-01' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1 })
 
-      // The function should catch errors and throw them (based on the implementation)
-      // But we can test that it handles the error by checking it doesn't crash the process
-      await expect(executeScheduledOrders()).rejects.toThrow('Database error');
-    });
+    const result = await executeScheduledOrders()
 
-    it('should skip orders not yet due', async () => {
-      const { query } = await import('../lib/db.js');
-      query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'order-1',
-            scheduled_at: new Date(Date.now() + 86400000), // Future date
-            status: 'SCHEDULED',
-          },
-        ],
-      });
+    expect(result.skipped).toBe(1)
+    expect(result.executed).toBe(0)
+  })
 
-      await executeScheduledOrders();
+  it('processes reminder lists and records ledger outcome', async () => {
+    const list = dueQuickList()
+    clientQueryMock
+      .mockResolvedValueOnce({ rows: [list] })
+      .mockResolvedValueOnce({ rows: [{ today_date: '2026-06-01' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ledger-1' }] })
+      .mockResolvedValueOnce({ rowCount: 1 })
+      .mockResolvedValueOnce({ rowCount: 1 })
 
-      // Should not process future orders
-      expect(query).toHaveBeenCalled();
-    });
-  });
-});
+    const { notifyScheduledOrderEvent } = await import('./notification.service.js')
+    const result = await executeScheduledOrders()
+
+    expect(result.executed).toBe(1)
+    expect(notifyScheduledOrderEvent).toHaveBeenCalledWith(list, 'REMINDER')
+  })
+
+  it('propagates database errors from the due-list query', async () => {
+    clientQueryMock.mockRejectedValueOnce(new Error('Database error'))
+
+    await expect(executeScheduledOrders()).rejects.toThrow('Database error')
+  })
+})

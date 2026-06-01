@@ -77,6 +77,7 @@ import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { expireOldBranchInvitations } from './lib/branch-invitations.js'
 import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
+import { runCronJob, CRON_JOBS } from './lib/cron-runner.js'
 import path from 'node:path'
 import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
 import { pool, closePool } from './lib/db.js'
@@ -460,22 +461,16 @@ server.listen(PORT, HOST, () => {
     logger.error('Startup schema tasks failed', { error: error.message })
   })
 
-  // Start scheduled orders cron job
-  // Run every 5 minutes to check for scheduled orders (for testing)
-  const CRON_INTERVAL = 5 * 60 * 1000 // 5 minutes in milliseconds
+  const scheduledOrdersIntervalMs = config.CRON_SCHEDULED_ORDERS_INTERVAL_MS
 
-  // Run immediately on startup
-  executeScheduledOrders().catch((err) => {
-    logger.error('Error in initial scheduled orders execution:', err)
-  })
-
-  trackInterval(() => {
-    executeScheduledOrders().catch((err) => {
+  const runScheduledOrdersCron = () =>
+    runCronJob(CRON_JOBS.SCHEDULED_ORDERS, () => executeScheduledOrders()).catch((err) => {
       logger.error('Error in scheduled orders execution:', err)
     })
-  }, CRON_INTERVAL)
 
-  logger.info('Scheduled orders cron job started (runs every 5 minutes for testing)')
+  runScheduledOrdersCron()
+  trackInterval(runScheduledOrdersCron, scheduledOrdersIntervalMs)
+  logger.info('Scheduled orders cron job started', { intervalMs: scheduledOrdersIntervalMs })
 
   if (config.NODE_ENV !== 'production') {
     import('./lib/keycloak-admin.js')
@@ -492,83 +487,68 @@ server.listen(PORT, HOST, () => {
       })
   }
 
-  checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed on startup:', err))
-  trackInterval(
-    () => {
-      checkOverdueInvoices().catch((err) => logger.error('Invoice overdue job failed:', err))
-    },
-    24 * 60 * 60 * 1000
-  )
-  logger.info('Invoice overdue job started (runs every 24h)')
+  const invoiceOverdueIntervalMs = 24 * 60 * 60 * 1000
+  const runInvoiceOverdueCron = () =>
+    runCronJob(CRON_JOBS.INVOICE_OVERDUE, () => checkOverdueInvoices()).catch((err) =>
+      logger.error('Invoice overdue job failed:', err)
+    )
+  runInvoiceOverdueCron()
+  trackInterval(runInvoiceOverdueCron, invoiceOverdueIntervalMs)
+  logger.info('Invoice overdue job started', { intervalMs: invoiceOverdueIntervalMs })
 
-  runSubscriptionBillingJob().catch((err) =>
-    logger.error('Subscription billing job failed on startup:', err)
-  )
-  trackInterval(
-    () => {
-      runSubscriptionBillingJob().catch((err) =>
-        logger.error('Subscription billing job failed:', err)
-      )
-    },
-    60 * 60 * 1000
-  )
-  logger.info('Subscription billing job started (runs every 1h)')
+  const billingIntervalMs = 60 * 60 * 1000
+  const runBillingCron = () =>
+    runCronJob(CRON_JOBS.SUBSCRIPTION_BILLING, () => runSubscriptionBillingJob()).catch((err) =>
+      logger.error('Subscription billing job failed:', err)
+    )
+  runBillingCron()
+  trackInterval(runBillingCron, billingIntervalMs)
+  logger.info('Subscription billing job started', { intervalMs: billingIntervalMs })
 
-  const WAITLIST_OFFER_INTERVAL = 15 * 60 * 1000
-  checkExpiredWaitlistOffers().catch((err) =>
-    logger.error('Waitlist expired-offers job failed on startup:', err)
-  )
-  trackInterval(() => {
-    checkExpiredWaitlistOffers().catch((err) =>
+  const waitlistIntervalMs = 15 * 60 * 1000
+  const runWaitlistCron = () =>
+    runCronJob(CRON_JOBS.WAITLIST_OFFERS, () => checkExpiredWaitlistOffers()).catch((err) =>
       logger.error('Waitlist expired-offers job failed:', err)
     )
-  }, WAITLIST_OFFER_INTERVAL)
-  logger.info('Waitlist expired-offers job started (runs every 15 minutes)')
+  runWaitlistCron()
+  trackInterval(runWaitlistCron, waitlistIntervalMs)
+  logger.info('Waitlist expired-offers job started', { intervalMs: waitlistIntervalMs })
 
-  runDeactivateExpiredPromotionsJob().catch((err) =>
-    logger.error('Promotions expiry job failed on startup:', err)
-  )
-  trackInterval(
-    () => {
-      runDeactivateExpiredPromotionsJob().catch((err) =>
-        logger.error('Promotions expiry job failed:', err)
-      )
-    },
-    30 * 60 * 1000
-  )
-  logger.info('Promotions expiry job started (runs every 30 min)')
-
-  const runInvitationExpiry = () =>
-    Promise.all([expireOldBranchInvitations(), expireOldRestaurantInvitations()]).catch((err) =>
-      logger.error('Invitation expiry job failed:', err)
+  const promotionsIntervalMs = 30 * 60 * 1000
+  const runPromotionsCron = () =>
+    runCronJob(CRON_JOBS.PROMOTIONS_EXPIRY, () => runDeactivateExpiredPromotionsJob()).catch(
+      (err) => logger.error('Promotions expiry job failed:', err)
     )
-  runInvitationExpiry()
-  trackInterval(runInvitationExpiry, 60 * 60 * 1000)
-  logger.info('Invitation expiry job started (runs every 1h)')
+  runPromotionsCron()
+  trackInterval(runPromotionsCron, promotionsIntervalMs)
+  logger.info('Promotions expiry job started', { intervalMs: promotionsIntervalMs })
 
-  runFreeSandboxExpiryJob().catch((err) =>
-    logger.error('Free sandbox expiry job failed on startup:', err)
-  )
-  trackInterval(
-    () => {
-      runFreeSandboxExpiryJob().catch((err) => logger.error('Free sandbox expiry job failed:', err))
-    },
-    60 * 60 * 1000
-  )
-  logger.info('Free sandbox expiry job started (runs every 1h)')
+  const invitationIntervalMs = 60 * 60 * 1000
+  const runInvitationExpiryCron = () =>
+    runCronJob(CRON_JOBS.INVITATION_EXPIRY, () =>
+      Promise.all([expireOldBranchInvitations(), expireOldRestaurantInvitations()])
+    ).catch((err) => logger.error('Invitation expiry job failed:', err))
+  runInvitationExpiryCron()
+  trackInterval(runInvitationExpiryCron, invitationIntervalMs)
+  logger.info('Invitation expiry job started', { intervalMs: invitationIntervalMs })
 
-  runFulfillmentExceptionChecks().catch((err) =>
-    logger.error('Fulfillment exceptions job failed on startup:', err)
-  )
-  trackInterval(
-    () => {
-      runFulfillmentExceptionChecks().catch((err) =>
-        logger.error('Fulfillment exceptions job failed:', err)
-      )
-    },
-    30 * 60 * 1000
-  )
-  logger.info('Fulfillment exceptions job started (runs every 30 min)')
+  const sandboxIntervalMs = 60 * 60 * 1000
+  const runSandboxCron = () =>
+    runCronJob(CRON_JOBS.FREE_SANDBOX_EXPIRY, () => runFreeSandboxExpiryJob()).catch((err) =>
+      logger.error('Free sandbox expiry job failed:', err)
+    )
+  runSandboxCron()
+  trackInterval(runSandboxCron, sandboxIntervalMs)
+  logger.info('Free sandbox expiry job started', { intervalMs: sandboxIntervalMs })
+
+  const fulfillmentIntervalMs = 30 * 60 * 1000
+  const runFulfillmentCron = () =>
+    runCronJob(CRON_JOBS.FULFILLMENT_EXCEPTIONS, () => runFulfillmentExceptionChecks()).catch(
+      (err) => logger.error('Fulfillment exceptions job failed:', err)
+    )
+  runFulfillmentCron()
+  trackInterval(runFulfillmentCron, fulfillmentIntervalMs)
+  logger.info('Fulfillment exceptions job started', { intervalMs: fulfillmentIntervalMs })
 })
 
 export default app

@@ -171,6 +171,11 @@ export const config = {
   MEMORY_WARN_RSS_MB: envInt(process.env.MEMORY_WARN_RSS_MB, 512),
   MEMORY_LOG_INTERVAL_MS: envInt(process.env.MEMORY_LOG_INTERVAL_MS, 5 * 60 * 1000),
   DATABASE_POOL_MAX: envInt(process.env.DATABASE_POOL_MAX, 20),
+  CRONS_ENABLED: envBool(process.env.CRONS_ENABLED, true),
+  CRON_SCHEDULED_ORDERS_INTERVAL_MS: envInt(
+    process.env.CRON_SCHEDULED_ORDERS_INTERVAL_MS,
+    isProductionNode ? 60 * 60 * 1000 : 5 * 60 * 1000
+  ),
 }
 
 if (!config.STORAGE_PUBLIC_URL) {

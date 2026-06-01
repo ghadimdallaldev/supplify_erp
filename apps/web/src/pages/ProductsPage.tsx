@@ -415,6 +415,9 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
     )
   }
 
+  const filterSelectClass =
+    'h-10 w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]'
+
   return (
     <RequirePermission anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']} title="products">
       <div className="space-y-6" data-testid="products-page">
@@ -461,24 +464,28 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
 
         <Card className="shadow-sm">
           <CardContent className="space-y-4 p-4 pt-6">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end">
+              <div className="min-w-0 sm:col-span-2 xl:col-span-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
                   <Input
                     placeholder="Search products..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10"
+                    className="h-10 pl-10"
                   />
                 </div>
               </div>
               {!isSupplier && (
-                <div className="w-56">
+                <div className="min-w-0 xl:col-span-2">
+                  <Label htmlFor="product-supplier-filter" className="sr-only">
+                    Supplier
+                  </Label>
                   <select
+                    id="product-supplier-filter"
                     value={supplierFilter}
                     onChange={(e) => setSupplierFilter(e.target.value)}
-                    className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
+                    className={filterSelectClass}
                   >
                     <option value="">All Suppliers</option>
                     {uniqueSuppliers.map((supplier) => (
@@ -489,27 +496,78 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                   </select>
                 </div>
               )}
-              <select
-                value={categoryId}
-                onChange={(e) => {
-                  setCategoryId(e.target.value)
-                  setCategory('') // Clear old category when using new one
-                }}
-                className="rounded-md border border-[var(--app-border-mid)] bg-[var(--surface)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-mid)]"
+              <div
+                className={`min-w-0 ${!isSupplier ? 'xl:col-span-2' : 'sm:col-span-1 xl:col-span-3'}`}
               >
-                <option value="">All Categories</option>
-                {categoriesData?.categories?.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                <Label htmlFor="product-category-filter" className="sr-only">
+                  Category
+                </Label>
+                <select
+                  id="product-category-filter"
+                  value={categoryId}
+                  onChange={(e) => {
+                    setCategoryId(e.target.value)
+                    setCategory('')
+                  }}
+                  className={filterSelectClass}
+                >
+                  <option value="">All Categories</option>
+                  {categoriesData?.categories?.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {!isSupplier && (
+                <div className="min-w-0 sm:col-span-2 xl:col-span-4">
+                  <Label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">
+                    Price range
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Min"
+                      aria-label="Minimum price"
+                      value={minPrice}
+                      onChange={(e) => setMinPrice(e.target.value)}
+                      min="0"
+                      step="0.01"
+                      className="h-10 w-full min-w-0 sm:max-w-[7.5rem]"
+                    />
+                    <span className="shrink-0 text-sm text-[var(--text-muted)]">–</span>
+                    <Input
+                      type="number"
+                      placeholder="Max"
+                      aria-label="Maximum price"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                      min="0"
+                      step="0.01"
+                      className="h-10 w-full min-w-0 sm:max-w-[7.5rem]"
+                    />
+                    {(minPrice || maxPrice) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 shrink-0 px-3"
+                        onClick={() => {
+                          setMinPrice('')
+                          setMaxPrice('')
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Tags Filter */}
             {!isSupplier && tagsData?.tags && tagsData.tags.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <Label className="text-sm font-medium">Filter by Tags:</Label>
+              <div className="flex flex-col gap-2 border-t border-[var(--app-border-mid)] pt-4">
+                <Label className="text-sm font-medium">Filter by tags</Label>
                 <div className="flex flex-wrap gap-2">
                   {tagsData.tags.map((tag) => (
                     <Badge
@@ -525,50 +583,6 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                       {tag}
                     </Badge>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* Price Range Filter */}
-            {!isSupplier && (
-              <div className="flex gap-4 items-end">
-                <div className="flex-1">
-                  <Label className="text-sm font-medium mb-2 block">Price Range:</Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <Input
-                        type="number"
-                        placeholder="Min Price"
-                        value={minPrice}
-                        onChange={(e) => setMinPrice(e.target.value)}
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                    <span className="self-center text-[var(--text-muted)]">-</span>
-                    <div className="flex-1">
-                      <Input
-                        type="number"
-                        placeholder="Max Price"
-                        value={maxPrice}
-                        onChange={(e) => setMaxPrice(e.target.value)}
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                    {(minPrice || maxPrice) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setMinPrice('')
-                          setMaxPrice('')
-                        }}
-                      >
-                        Clear
-                      </Button>
-                    )}
-                  </div>
                 </div>
               </div>
             )}
