@@ -26,6 +26,11 @@ vi.mock('../lib/impersonation.js', () => ({
 }))
 
 const mockGetEntitlements = vi.fn()
+const mockResolveActiveBillingSubscription = vi.fn()
+vi.mock('../lib/org-billing-tenant.js', () => ({
+  resolveOrgBillingTenantId: vi.fn(async (tenantId) => tenantId),
+  resolveActiveBillingSubscription: (...args) => mockResolveActiveBillingSubscription(...args),
+}))
 vi.mock('../lib/audit.js', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('../lib/billing/billing-service.js', () => ({
   unlockSubscriptionAccount: vi.fn().mockResolvedValue(undefined),
@@ -72,6 +77,17 @@ describe('Admin Dashboard Routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockResolveActiveBillingSubscription.mockImplementation(async (tenantId, tenantType) => ({
+      billingTenantId: tenantId,
+      usesOrgBilling: false,
+      subscription: {
+        id: 'sub-1',
+        tenant_id: tenantId,
+        tenant_type: tenantType,
+        plan_id: 'p-gold',
+        status: 'ACTIVE',
+      },
+    }))
     const db = await import('../lib/db.js')
     query = db.query
     app = express()
@@ -578,6 +594,79 @@ describe('Admin Dashboard Routes', () => {
         .expect(200)
 
       expect(res.body.ok).toBe(true)
+    })
+
+    it('applies plan change to org billing subscription when branch row was selected', async () => {
+      const planIdGold = 'a0000002-0001-4000-8000-000000000003'
+      query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-branch',
+              tenant_id: 'branch-1',
+              tenant_type: 'RESTAURANT',
+              plan_id: 'p-free',
+              status: 'ACTIVE',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-main',
+              tenant_id: 'main-1',
+              tenant_type: 'RESTAURANT',
+              plan_id: 'p-free',
+              status: 'ACTIVE',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ code: 'free' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: planIdGold,
+              name: 'Gold',
+              tenant_type: 'RESTAURANT',
+              limits: {},
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sub-main',
+              plan_id: planIdGold,
+              plan_name: 'Gold',
+              tenant_id: 'main-1',
+              tenant_type: 'RESTAURANT',
+            },
+          ],
+        })
+        .mockResolvedValue({ rows: [] })
+
+      mockResolveActiveBillingSubscription.mockResolvedValueOnce({
+        billingTenantId: 'main-1',
+        usesOrgBilling: true,
+        subscription: {
+          id: 'sub-main',
+          tenant_id: 'main-1',
+          tenant_type: 'RESTAURANT',
+          plan_id: 'p-free',
+          status: 'ACTIVE',
+        },
+      })
+
+      mockGetEntitlements.mockResolvedValueOnce({ usage: { orders_per_day: 1 } })
+
+      const res = await request(app)
+        .patch('/api/admin-dashboard/subscriptions/sub-branch')
+        .send({ planId: planIdGold })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.appliedViaOrgBilling).toBe(true)
+      expect(res.body.data.subscription.plan_id).toBe(planIdGold)
     })
   })
 

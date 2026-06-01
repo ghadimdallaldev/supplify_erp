@@ -23,7 +23,10 @@ import {
   checkLimit,
 } from '../lib/subscription.js'
 import { resolveEffectiveLimit } from '../lib/limit-resolution.js'
-import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
+import {
+  resolveOrgBillingTenantId,
+  resolveActiveBillingSubscription,
+} from '../lib/org-billing-tenant.js'
 import { clearActiveTenantCookie } from '../lib/tenant-switch.js'
 import {
   defaultAddonUnitPrice,
@@ -840,7 +843,32 @@ router.post('/subscriptions/:id/preview-change', async (req, res) => {
         requestId: req.requestId,
       })
     }
-    const sub = subRows[0]
+    const requestedSub = subRows[0]
+    const billing = await resolveActiveBillingSubscription(
+      requestedSub.tenant_id,
+      requestedSub.tenant_type
+    )
+    if (!billing.subscription) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'No active subscription on the billing tenant for this organization.',
+        },
+        requestId: req.requestId,
+      })
+    }
+    const sub =
+      billing.subscription.id === requestedSub.id
+        ? requestedSub
+        : await query(
+            `SELECT s.*, sp.limits as current_limits, sp.features as current_features
+             FROM subscription s
+             JOIN subscription_plan sp ON sp.id = s.plan_id
+             WHERE s.id = $1`,
+            [billing.subscription.id]
+          ).then((r) => r.rows[0])
     const tenantId = sub.tenant_id
     const tenantType = sub.tenant_type
 
@@ -965,7 +993,46 @@ router.patch('/subscriptions/:id', async (req, res) => {
       return
     }
 
-    const existing = existingSubs[0]
+    let existing = existingSubs[0]
+    let subscriptionId = id
+    let appliedViaOrgBilling = false
+
+    if (updateData.planId) {
+      const billing = await resolveActiveBillingSubscription(
+        existing.tenant_id,
+        existing.tenant_type
+      )
+      if (!billing.subscription) {
+        res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'No active subscription on the billing tenant for this organization.',
+          },
+          requestId: req.requestId,
+        })
+        return
+      }
+      if (billing.subscription.id !== existing.id) {
+        const { rows: billingFull } = await query('SELECT * FROM subscription WHERE id = $1', [
+          billing.subscription.id,
+        ])
+        if (billingFull.length === 0) {
+          res.status(404).json({
+            ok: false,
+            data: null,
+            error: { name: 'NOT_FOUND', message: 'Billing subscription not found' },
+            requestId: req.requestId,
+          })
+          return
+        }
+        existing = billingFull[0]
+        subscriptionId = billing.subscription.id
+        appliedViaOrgBilling = billing.usesOrgBilling
+      }
+    }
+
     let existingPlanCode = null
     if (existing.plan_id) {
       const { rows: oldPlan } = await query('SELECT code FROM subscription_plan WHERE id = $1', [
@@ -1084,7 +1151,20 @@ router.patch('/subscriptions/:id', async (req, res) => {
       values.push(updateData.cancelReason)
     }
 
-    values.push(id)
+    values.push(subscriptionId)
+
+    if (updates.length === 0) {
+      res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'No subscription fields to update (provide planId and/or status)',
+        },
+        requestId: req.requestId,
+      })
+      return
+    }
 
     const {
       rows: [updated],
@@ -1102,7 +1182,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
       existing.lock_reason === 'pending_activation' &&
       (updateData.planId || updateData.status === 'ACTIVE')
     ) {
-      await unlockSubscriptionAccount(id, {
+      await unlockSubscriptionAccount(subscriptionId, {
         unlockedBy: 'admin',
         adminUserId: req.userData.id,
       })
@@ -1116,7 +1196,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
           VALUES ($1, $2, $3, $4, $5)
         `,
           [
-            id,
+            subscriptionId,
             existing.plan_id,
             updateData.planId,
             req.userData.id,
@@ -1129,7 +1209,7 @@ router.patch('/subscriptions/:id', async (req, res) => {
       recordConversionEvent(existing.tenant_id, existing.tenant_type, 'UPGRADE_SUCCESS', {
         from_plan_id: existing.plan_id,
         to_plan_id: updateData.planId,
-        subscription_id: id,
+        subscription_id: subscriptionId,
       }).catch(() => {})
     }
 
@@ -1190,7 +1270,11 @@ router.patch('/subscriptions/:id', async (req, res) => {
     }
     res.json({
       ok: true,
-      data: { subscription: updated },
+      data: {
+        subscription: updated,
+        appliedViaOrgBilling,
+        billingTenantId: existing.tenant_id,
+      },
       error: null,
       requestId: req.requestId,
     })
@@ -1908,6 +1992,27 @@ router.post('/users/reset-password', async (req, res) => {
 // TENANT MANAGEMENT
 // ========================================
 
+/** Align admin tenant rows with the subscription row used for entitlements (org main branch). */
+async function attachBillingSubscriptionFields(rows, tenantType) {
+  await Promise.all(
+    rows.map(async (row) => {
+      const billing = await resolveActiveBillingSubscription(row.id, tenantType)
+      if (!billing.subscription) return
+      row.subscription_id = billing.subscription.id
+      row.uses_org_billing = billing.usesOrgBilling
+      row.billing_tenant_id = billing.billingTenantId
+      row.subscription_status = billing.subscription.status
+      row.plan_name = billing.subscription.plan_name
+      if (billing.subscription.plan_id) {
+        const { rows: planRows } = await query('SELECT code FROM subscription_plan WHERE id = $1', [
+          billing.subscription.plan_id,
+        ])
+        row.plan_code = planRows[0]?.code ?? row.plan_code
+      }
+    })
+  )
+}
+
 // Get suppliers with detailed info
 router.get('/tenants/suppliers', async (req, res) => {
   try {
@@ -1929,6 +2034,8 @@ router.get('/tenants/suppliers', async (req, res) => {
       LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
       ORDER BY s.name
     `)
+
+    await attachBillingSubscriptionFields(suppliers, 'SUPPLIER')
 
     res.json({
       ok: true,
@@ -1964,6 +2071,8 @@ router.get('/tenants/restaurants', async (req, res) => {
       LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
       ORDER BY r.name
     `)
+
+    await attachBillingSubscriptionFields(restaurants, 'RESTAURANT')
 
     res.json({
       ok: true,

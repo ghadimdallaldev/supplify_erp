@@ -26,3 +26,28 @@ export async function resolveOrgBillingTenantId(tenantId, tenantType) {
   )
   return fallback[0]?.id || tenantId
 }
+
+/**
+ * Active subscription row used for plan/features/limits (org main branch when applicable).
+ * @param {string} tenantId
+ * @param {'RESTAURANT' | 'SUPPLIER'} tenantType
+ * @returns {Promise<{ billingTenantId: string; usesOrgBilling: boolean; subscription: object | null }>}
+ */
+export async function resolveActiveBillingSubscription(tenantId, tenantType) {
+  const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+  const { rows } = await query(
+    `SELECT s.*
+     FROM subscription s
+     WHERE s.tenant_id = $1
+       AND s.tenant_type = $2
+       AND s.status IN ('TRIALING', 'ACTIVE')
+     ORDER BY s.created_at DESC
+     LIMIT 1`,
+    [billingTenantId, tenantType]
+  )
+  return {
+    billingTenantId,
+    usesOrgBilling: billingTenantId !== tenantId,
+    subscription: rows[0] || null,
+  }
+}
