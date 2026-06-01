@@ -131,8 +131,9 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 
 ## J. Keycloak per environment
 
-- Separate realm per env: `supplify-dev`, `supplify-preprod`, `supplify-prod`
-- Import `deploy/keycloak/realm-export.json` on first Keycloak start (adjust realm name per env)
+- Separate realm per env: **`Supplify`** (dev), **`supplify-preprod`**, **`supplify-prod`**
+- Import the matching file from `deploy/keycloak/` (see `deploy/keycloak/README.md`)
+- Redirect / post-logout URIs: `deploy/railway/{development,preprod,production}/KEYCLOAK_CLIENT.md`
 - `KEYCLOAK_URL` = server-side URL; `KEYCLOAK_PUBLIC_URL` = browser URL
 
 ## K. Storage per environment

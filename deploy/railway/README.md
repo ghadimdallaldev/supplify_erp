@@ -6,12 +6,13 @@ Non-secret configuration for Railway lives here. On deploy, the API and web Dock
 
 ## Layout
 
-| Path                              | Used by                                      |
-| --------------------------------- | -------------------------------------------- |
-| `development/api.env`             | API service at runtime                       |
-| `development/web.env`             | Web service at Docker build (Vite)           |
-| `development/keycloak.env`        | Keycloak service (manual / Raw Editor)       |
-| `development/secrets.env.example` | All three — copy to Railway for secrets only |
+| Environment     | API            | Web build             | Keycloak URIs + realm import                       |
+| --------------- | -------------- | --------------------- | -------------------------------------------------- |
+| **development** | `development/` | `development/web.env` | `KEYCLOAK_CLIENT.md` + `realm-export.json`         |
+| **preprod**     | `preprod/`     | `preprod/web.env`     | `KEYCLOAK_CLIENT.md` + `realm-export.preprod.json` |
+| **production**  | `production/`  | `production/web.env`  | `KEYCLOAK_CLIENT.md` + `realm-export.prod.json`    |
+
+Each folder: `api.env`, `web.env`, `secrets.env.example`, `keycloak.env`.
 
 ## One-time Railway setup
 
@@ -26,15 +27,17 @@ Non-secret configuration for Railway lives here. On deploy, the API and web Dock
 
 Edit `development/*.env` in this repo, push, and redeploy. Dashboard variables with the same name still win over these files.
 
-## Other environments
+## Preprod / production
 
-Add `preprod/` and `production/` folders (copy `development/`) and set Railway service variable:
+Set on each Railway service (or name the Railway environment `preprod` / `prod`):
 
 ```env
 RAILWAY_DEPLOY_ENV=preprod
 ```
 
-Web Docker build: pass build arg `RAILWAY_DEPLOY_ENV=preprod` in Railway.
+Web Docker build: Railway variable or build arg `RAILWAY_DEPLOY_ENV=preprod` or `production`.
+
+See `deploy/keycloak/README.md` for realm imports and redirect URI lists.
 
 ## Disable file loading (local Docker)
 

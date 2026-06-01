@@ -1,0 +1,57 @@
+{
+  "realm": "supplify-preprod",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "clients": [
+    {
+      "clientId": "supplify-api",
+      "enabled": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "changeme",
+      "redirectUris": [
+        "https://supplify-api-preprod.up.railway.app/auth/callback",
+        "https://supplify-api-preprod.up.railway.app/*"
+      ],
+      "webOrigins": ["https://supplify-web-preprod.up.railway.app", "+"],
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "https://supplify-api-preprod.up.railway.app/auth/register?continue=1##https://supplify-api-preprod.up.railway.app/auth/register##https://supplify-api-preprod.up.railway.app/*##https://supplify-web-preprod.up.railway.app/login##https://supplify-web-preprod.up.railway.app/*"
+      },
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    },
+    {
+      "clientId": "supplify-web",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": [
+        "https://supplify-api-preprod.up.railway.app/auth/callback",
+        "https://supplify-api-preprod.up.railway.app/*"
+      ],
+      "webOrigins": ["https://supplify-web-preprod.up.railway.app", "+"],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://supplify-web-preprod.up.railway.app/login##https://supplify-web-preprod.up.railway.app/*##https://supplify-api-preprod.up.railway.app/*"
+      },
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "admin", "description": "Administrator role" },
+      { "name": "supplier", "description": "Supplier role" },
+      { "name": "restaurant", "description": "Restaurant role" },
+      { "name": "staff_portal", "description": "Operational staff portal (no admin app access)" }
+    ]
+  }
+}
