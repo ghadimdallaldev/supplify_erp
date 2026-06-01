@@ -1,4 +1,5 @@
 import { verifyToken, refreshAccessToken } from './auth.js'
+import { config } from '../config/env.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
@@ -37,36 +38,34 @@ export function extractRefreshTokenFromCookie(req) {
   return req.cookies.refresh_token
 }
 
-// Set auth cookies
+function authCookieOptions(maxAge) {
+  const opts = {
+    httpOnly: true,
+    secure: config.COOKIE_SECURE,
+    sameSite: config.COOKIE_SAME_SITE,
+    path: '/',
+    maxAge,
+  }
+  if (config.COOKIE_DOMAIN) {
+    opts.domain = config.COOKIE_DOMAIN
+  }
+  return opts
+}
+
+// Set auth cookies (use COOKIE_SAME_SITE=none on Railway when web and API are different hosts)
 export function setAuthCookies(res, accessToken, refreshToken) {
-  const isProduction = process.env.NODE_ENV === 'production'
-
-  // In development, use 'lax' for sameSite (works with http://localhost)
-  const sameSite = 'lax'
-
-  // Access token cookie (short-lived)
-  res.cookie('access_token', accessToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite,
-    path: '/',
-    maxAge: 60 * 60 * 1000, // 1 hour (increased from 5 minutes)
-  })
-
-  // Refresh token cookie (longer-lived)
-  res.cookie('refresh_token', refreshToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite,
-    path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  })
+  res.cookie('access_token', accessToken, authCookieOptions(60 * 60 * 1000))
+  res.cookie('refresh_token', refreshToken, authCookieOptions(7 * 24 * 60 * 60 * 1000))
 }
 
 // Clear auth cookies (same path/sameSite as setAuthCookies so browser actually removes them)
 export function clearAuthCookies(res) {
-  const isProduction = process.env.NODE_ENV === 'production'
-  const opts = { path: '/', sameSite: 'lax', ...(isProduction && { secure: true }) }
+  const opts = {
+    path: '/',
+    sameSite: config.COOKIE_SAME_SITE,
+    secure: config.COOKIE_SECURE,
+    ...(config.COOKIE_DOMAIN ? { domain: config.COOKIE_DOMAIN } : {}),
+  }
   res.clearCookie('access_token', opts)
   res.clearCookie('refresh_token', opts)
 }

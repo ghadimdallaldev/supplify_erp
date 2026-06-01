@@ -3,6 +3,10 @@
 **Do not duplicate** `api.env` / `web.env` in the dashboard unless overriding a single value.
 **Never set `PORT`** in the dashboard.
 
+## Cross-origin cookies (Railway)
+
+Web (`supplify-web-…`) and API (`supplify-api-…`) are **different hosts**. Auth cookies need `COOKIE_SAME_SITE=none` and `COOKIE_SECURE=true` (set in `development/api.env` from git). Do not override to `lax` in the dashboard.
+
 ## API service — keep only these in Raw Editor
 
 ```env
