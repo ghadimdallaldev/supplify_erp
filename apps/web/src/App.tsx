@@ -96,6 +96,11 @@ const PublicReservationConfirmation = lazy(() =>
 const PublicReservationManage = lazy(() =>
   import('./pages/PublicReservationManage').then((m) => ({ default: m.PublicReservationManage }))
 )
+const PublicReservationWaitlistOffer = lazy(() =>
+  import('./pages/PublicReservationWaitlistOffer').then((m) => ({
+    default: m.PublicReservationWaitlistOffer,
+  }))
+)
 const StaffSelfServiceLogin = lazy(() =>
   import('./pages/StaffSelfServiceLogin').then((m) => ({ default: m.StaffSelfServiceLogin }))
 )
@@ -167,6 +172,22 @@ const router = createBrowserRouter([
     element: (
       <LazyPage>
         <PublicReservationConfirmation />
+      </LazyPage>
+    ),
+  },
+  {
+    path: '/reserve/waitlist/:token/accept',
+    element: (
+      <LazyPage>
+        <PublicReservationWaitlistOffer action="accept" />
+      </LazyPage>
+    ),
+  },
+  {
+    path: '/reserve/waitlist/:token/decline',
+    element: (
+      <LazyPage>
+        <PublicReservationWaitlistOffer action="decline" />
       </LazyPage>
     ),
   },

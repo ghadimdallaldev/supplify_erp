@@ -83,6 +83,7 @@ import { useAppDispatch } from '../hooks/redux'
 import { ActivityLogTab } from '../components/ActivityLogTab'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { usePermissions } from '../hooks/usePermissions'
+import { isTenantOwner } from '../lib/tenantRoles'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { normalizeAddress } from '../lib/address'
 import { useGetMyReviewsQuery } from '../services/api'
@@ -205,7 +206,7 @@ export function RestaurantOnboardingPage() {
 
   const [activeTab, setActiveTab] = useState('profile')
   const { can } = usePermissions()
-  const isOwner = user?.tenantRoles?.includes('RESTAURANT_OWNER') || can('SETTINGS_MANAGE')
+  const isOwner = isTenantOwner(user) || can('SETTINGS_MANAGE')
   const push = usePushNotifications()
   const { data: myReviewsData } = useGetMyReviewsQuery({ limit: 20 })
 

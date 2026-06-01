@@ -116,8 +116,11 @@ function validateProdRules(issues) {
 
 /**
  * Fail fast when hosted env (preprod/prod) or NODE_ENV=production uses unsafe settings.
+ * APP_ENV=dev is skipped (Railway dev images still use NODE_ENV=production from Docker).
  */
 export function validateProductionConfig() {
+  if (config.APP_ENV === 'dev') return
+
   const hosted = config.APP_ENV === 'preprod' || config.APP_ENV === 'prod'
   if (config.NODE_ENV !== 'production' && !hosted) return
 

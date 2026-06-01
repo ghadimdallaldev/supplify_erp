@@ -1,0 +1,51 @@
+{
+  "realm": "supplify-prod",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "clients": [
+    {
+      "clientId": "supplify-api",
+      "enabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "REPLACE_BEFORE_IMPORT",
+      "redirectUris": ["https://api.yourdomain.com/auth/callback", "https://api.yourdomain.com/*"],
+      "webOrigins": ["https://app.yourdomain.com"],
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "https://api.yourdomain.com/auth/register?continue=1##https://api.yourdomain.com/auth/register##https://api.yourdomain.com/*##https://app.yourdomain.com/login##https://app.yourdomain.com/*"
+      },
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    },
+    {
+      "clientId": "supplify-web",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": ["https://api.yourdomain.com/auth/callback", "https://api.yourdomain.com/*"],
+      "webOrigins": ["https://app.yourdomain.com"],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://app.yourdomain.com/login##https://app.yourdomain.com/*##https://api.yourdomain.com/*"
+      },
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "admin", "description": "Administrator role" },
+      { "name": "supplier", "description": "Supplier role" },
+      { "name": "restaurant", "description": "Restaurant role" },
+      { "name": "staff_portal", "description": "Operational staff portal (no admin app access)" }
+    ]
+  }
+}

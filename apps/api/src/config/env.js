@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
+import { loadRailwayApiEnvDefaults } from './load-railway-env.js'
 import { resolveNativeDatabaseUrl } from './resolve-database-url.js'
 import {
   envBool,
@@ -14,6 +15,8 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const apiEnvDir = path.resolve(__dirname, '../..')
+const repoRoot = path.resolve(apiEnvDir, '../..')
+loadRailwayApiEnvDefaults(repoRoot)
 dotenv.config({ path: path.join(apiEnvDir, '.env') })
 const dockerSyncPath = path.join(apiEnvDir, '.env.docker-sync')
 if (existsSync(dockerSyncPath)) {

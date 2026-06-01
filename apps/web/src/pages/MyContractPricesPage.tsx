@@ -7,7 +7,9 @@ import { useGetMyContractPricingQuery, useGetSuppliersQuery } from '../services/
 import { RequirePermission } from '../components/RequirePermission'
 import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { formatPrice } from '../utils/format'
-import { Loader2, Search } from 'lucide-react'
+import { getApiErrorMessage } from '../lib/apiError'
+import { Button } from '../components/ui/button'
+import { Loader2, Search, AlertCircle } from 'lucide-react'
 
 export function MyContractPricesPage() {
   const [search, setSearch] = useState('')
@@ -21,11 +23,16 @@ export function MyContractPricesPage() {
     [search, supplierFilter]
   )
 
-  const { data, isLoading } = useGetMyContractPricingQuery(queryParams)
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetMyContractPricingQuery(
+    queryParams,
+    { refetchOnMountOrArgChange: true }
+  )
   const { data: suppliersData } = useGetSuppliersQuery({ limit: 200, offset: 0 })
 
   const pricing = data?.pricing ?? []
+  const summary = data?.summary ?? []
   const suppliers = suppliersData?.suppliers ?? []
+  const showInitialLoad = isLoading && pricing.length === 0
 
   return (
     <RequirePermission permission="CATALOG_VIEW">
@@ -74,15 +81,44 @@ export function MyContractPricesPage() {
           </CardContent>
         </Card>
 
+        {summary.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {summary.map((row) => (
+              <Card key={String(row.supplier_id ?? row.supplier_name)}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{String(row.supplier_name)}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {Number(row.product_count ?? 0)} product
+                    {Number(row.product_count ?? 0) === 1 ? '' : 's'} with your negotiated price
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : null}
+
         <Card>
           <CardContent className="p-0">
-            {isLoading ? (
+            {isError ? (
+              <div className="flex flex-col items-center gap-3 py-12 text-center px-4">
+                <AlertCircle className="h-8 w-8 text-[var(--red)]" />
+                <p className="text-sm text-[var(--text-muted)] max-w-md">
+                  {getApiErrorMessage(error, 'Unable to load your contract prices.')}
+                </p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  Try again
+                </Button>
+              </div>
+            ) : showInitialLoad ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-[var(--brand)]" />
               </div>
             ) : pricing.length === 0 ? (
               <p className="text-center py-12 text-[var(--text-muted)]">
-                No active contract prices from your suppliers.
+                No active contract prices from your suppliers. Ask your suppliers to set contract
+                pricing for your account, or browse the catalog for standard prices.
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -145,6 +181,11 @@ export function MyContractPricesPage() {
                 </table>
               </div>
             )}
+            {isFetching && !showInitialLoad && pricing.length > 0 ? (
+              <p className="text-center text-xs text-[var(--text-muted)] py-2 border-t border-[var(--app-border)]">
+                Updating…
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>

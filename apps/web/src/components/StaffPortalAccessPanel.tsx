@@ -2,6 +2,7 @@ import { toast } from 'react-hot-toast'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import type { StaffMember } from '../types'
+import { getApiErrorMessage } from '../lib/apiError'
 import {
   useCreateStaffPortalAccountMutation,
   useSendStaffPortalInviteMutation,
@@ -45,8 +46,8 @@ export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessP
       } else {
         toast.success('Portal account is ready')
       }
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to create portal account')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to create portal account'))
     }
   }
 
@@ -54,8 +55,8 @@ export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessP
     try {
       await sendInvite(member.id).unwrap()
       toast.success('Invite email sent')
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to send invite')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to send invite'))
     }
   }
 
@@ -64,8 +65,8 @@ export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessP
       const result = await fetchLoginLink(member.id).unwrap()
       await navigator.clipboard.writeText(result.loginUrl)
       toast.success('Staff login link copied')
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to copy login link')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to copy login link'))
     }
   }
 
@@ -78,8 +79,8 @@ export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessP
       } else {
         toast.success('Portal access reset')
       }
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to reset access')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to reset access'))
     }
   }
 
@@ -87,8 +88,8 @@ export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessP
     try {
       await disableAccess(member.id).unwrap()
       toast.success('Staff portal access disabled')
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to disable access')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to disable access'))
     }
   }
 
@@ -122,20 +123,29 @@ export function StaffPortalAccessPanel({ member, canManage }: StaffPortalAccessP
             {creating ? 'Creating…' : 'Create portal account'}
           </Button>
         ) : null}
-        {status === 'active' ? (
+        {status === 'invited' || status === 'active' ? (
           <>
             <Button size="sm" variant="outline" disabled={inviting} onClick={handleInvite}>
-              {inviting ? 'Sending…' : 'Send login invite'}
+              {inviting ? 'Sending…' : status === 'invited' ? 'Resend invite' : 'Send login invite'}
             </Button>
             <Button size="sm" variant="outline" disabled={copying} onClick={handleCopyLink}>
               {copying ? 'Copying…' : 'Copy login link'}
             </Button>
-            <Button size="sm" variant="outline" disabled={resetting} onClick={handleReset}>
-              {resetting ? 'Resetting…' : 'Reset access'}
-            </Button>
-            <Button size="sm" variant="destructive" disabled={disabling} onClick={handleDisable}>
-              {disabling ? 'Disabling…' : 'Disable access'}
-            </Button>
+            {status === 'active' ? (
+              <>
+                <Button size="sm" variant="outline" disabled={resetting} onClick={handleReset}>
+                  {resetting ? 'Resetting…' : 'Reset access'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={disabling}
+                  onClick={handleDisable}
+                >
+                  {disabling ? 'Disabling…' : 'Disable access'}
+                </Button>
+              </>
+            ) : null}
           </>
         ) : null}
       </div>

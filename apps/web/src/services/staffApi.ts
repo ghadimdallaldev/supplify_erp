@@ -15,6 +15,7 @@ import type {
   StaffPerformanceNote,
   StaffPayrollExport,
 } from '../types'
+import { normalizeListResponse } from '../lib/apiError'
 
 interface CreateStaffMemberInput {
   firstName: string
@@ -152,6 +153,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/members',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffMember>(response),
       providesTags: (result) =>
         result
           ? [
@@ -190,6 +192,7 @@ export const staffApi = api.injectEndpoints({
           endDate,
         },
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffShift>(response),
       providesTags: (result) =>
         result
           ? [
@@ -235,6 +238,7 @@ export const staffApi = api.injectEndpoints({
           endDate,
         },
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffTimeEntry>(response),
       providesTags: (result) =>
         result
           ? [
@@ -263,6 +267,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/pto',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffPtoRequest>(response),
       providesTags: (result) =>
         result
           ? [
@@ -297,6 +302,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/availability',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffAvailability>(response),
       providesTags: [{ type: 'StaffAvailability', id: 'LIST' }],
     }),
     setStaffAvailability: build.mutation<StaffAvailability, SetAvailabilityInput>({
@@ -311,6 +317,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/swaps',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffShiftSwap>(response),
       providesTags: (result) =>
         result
           ? [
@@ -346,6 +353,7 @@ export const staffApi = api.injectEndpoints({
         url: '/api/staff/announcements',
         params,
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffAnnouncement>(response),
       providesTags: (result) =>
         result
           ? [
@@ -377,6 +385,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/documents',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffDocument>(response),
       providesTags: (result) =>
         result
           ? [
@@ -397,6 +406,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/incidents',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffIncident>(response),
       providesTags: (result) =>
         result
           ? [
@@ -417,6 +427,8 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/performance-notes',
       }),
+      transformResponse: (response: unknown) =>
+        normalizeListResponse<StaffPerformanceNote>(response),
       providesTags: (result) =>
         result
           ? [
@@ -437,6 +449,7 @@ export const staffApi = api.injectEndpoints({
       query: () => ({
         url: '/api/staff/payroll',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffPayrollExport>(response),
       providesTags: (result) =>
         result
           ? [

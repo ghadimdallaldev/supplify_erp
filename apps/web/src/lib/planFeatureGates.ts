@@ -1,21 +1,19 @@
 import type { Entitlements } from '../types'
-import { featureEnabled } from './planLimits'
-
-type FeatureMap = Entitlements['features'] | Record<string, unknown> | undefined
-
-/** Plan includes a subscription feature key. */
-export function hasPlanFeature(features: FeatureMap, key: string): boolean {
-  return featureEnabled(features?.[key as keyof typeof features])
-}
+import { isEntitlementFeatureEnabled } from './planLimits'
 
 /**
  * Cross-tenant Reports hub (/app/reports) — not charts embedded in other modules.
  */
 export function canUseGlobalReports(entitlements?: Entitlements | null): boolean {
-  return hasPlanFeature(entitlements?.features, 'reports')
+  return isEntitlementFeatureEnabled(entitlements, 'reports')
 }
 
 /** Restaurant finance module (invoices list, overdue, invoice analytics on finance/dashboard). */
 export function canUseFinanceInvoices(entitlements?: Entitlements | null): boolean {
-  return hasPlanFeature(entitlements?.features, 'finance_invoices')
+  return isEntitlementFeatureEnabled(entitlements, 'finance_invoices')
+}
+
+/** Restaurant supplier deals browse/redeem (features + planFeatures). */
+export function canUseSupplierDeals(entitlements?: Entitlements | null): boolean {
+  return isEntitlementFeatureEnabled(entitlements, 'supplier_deals')
 }

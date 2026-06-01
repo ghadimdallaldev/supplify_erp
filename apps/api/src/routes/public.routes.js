@@ -24,6 +24,7 @@ import {
   acceptWaitlistOffer,
   declineWaitlistOffer,
   assignWaitlistPosition,
+  handleReservationCancelled,
 } from '../services/waitlistPromotion.js'
 import {
   getRestaurantSlotAvailability,
@@ -185,32 +186,6 @@ router.get('/restaurants/:idOrSlug', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'PUBLIC_RESTAURANT_ERROR', message: 'Unable to load restaurant' },
-      requestId: req.requestId,
-    })
-  }
-})
-
-router.get('/restaurants', async (req, res) => {
-  try {
-    const { rows } = await query(
-      `
-        SELECT id, slug, name, created_at
-        FROM restaurant
-        ORDER BY name ASC
-      `
-    )
-    res.json({
-      ok: true,
-      data: rows,
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Public restaurants fetch failed', { error: error.message })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'PUBLIC_RESTAURANTS_ERROR', message: 'Unable to load restaurants' },
       requestId: req.requestId,
     })
   }
@@ -512,7 +487,7 @@ router.post('/reservations/waitlist/:token/accept', async (req, res) => {
       })
     }
 
-    const { reservation, waitlist } = await acceptWaitlistOffer(token)
+    const { reservation, waitlist, manageToken, manageUrl } = await acceptWaitlistOffer(token)
 
     try {
       await notifyReservationCreated(reservation)
@@ -532,8 +507,11 @@ router.post('/reservations/waitlist/:token/accept', async (req, res) => {
           status: reservation.status,
           scheduledAt: reservation.scheduled_at,
           partySize: reservation.party_size,
+          publicToken: reservation.public_token,
         },
         waitlist: { id: waitlist.id, status: waitlist.status, offerStatus: waitlist.offer_status },
+        manageToken,
+        manageUrl,
       },
       error: null,
       requestId: req.requestId,
@@ -541,7 +519,11 @@ router.post('/reservations/waitlist/:token/accept', async (req, res) => {
   } catch (error) {
     logger.error('Waitlist offer accept failed', { error: error.message })
     const status =
-      error.message.includes('not found') || error.message.includes('expired') ? 410 : 400
+      error.statusCode === 409
+        ? 409
+        : error.message.includes('not found') || error.message.includes('expired')
+          ? 410
+          : 400
     res.status(status).json({
       ok: false,
       data: null,
@@ -978,21 +960,35 @@ router.post('/reservations/manage/cancel', async (req, res) => {
     const { rows } = await query(
       `
         UPDATE reservation
-        SET status = 'CANCELLED', updated_at = now()
+        SET status = 'CANCELLED',
+            updated_at = now(),
+            cancelled_at = now(),
+            cancellation_reason = 'Guest cancelled'
         WHERE id = $1
         RETURNING *
       `,
       [reservation.id]
     )
 
-    void notifyReservationStaffEvent(rows[0], 'cancelled').catch((err) =>
+    const cancelled = rows[0]
+
+    try {
+      await handleReservationCancelled(cancelled, { cancellationReason: 'Guest cancelled' })
+    } catch (promotionError) {
+      logger.warn('Waitlist auto-promotion failed after guest cancellation', {
+        error: promotionError.message,
+        reservationId: cancelled.id,
+      })
+    }
+
+    void notifyReservationStaffEvent(cancelled, 'cancelled').catch((err) =>
       logger.warn('Reservation cancel notification failed', { error: err.message })
     )
 
     res.json({
       ok: true,
       data: {
-        reservation: rows[0],
+        reservation: cancelled,
       },
       error: null,
       requestId: req.requestId,

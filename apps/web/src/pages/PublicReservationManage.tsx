@@ -12,8 +12,6 @@ import {
   useGetPublicReservationAvailabilityQuery,
   useReschedulePublicReservationMutation,
   useCancelPublicReservationMutation,
-  useAcceptWaitlistOfferMutation,
-  useDeclineWaitlistOfferMutation,
 } from '../services/api'
 
 function formatDateTime(iso: string) {
@@ -26,7 +24,6 @@ export function PublicReservationManage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = params.token ?? ''
-  const waitlistToken = searchParams.get('waitlistOffer') || searchParams.get('waitlist')
   const waitlistAccepted = searchParams.get('waitlistAccepted') === 'true'
 
   const { data, isLoading, refetch } = useGetPublicReservationDetailsQuery(token, { skip: !token })
@@ -34,16 +31,12 @@ export function PublicReservationManage() {
 
   const [rescheduleDate, setRescheduleDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [rescheduleSlot, setRescheduleSlot] = useState('')
-  const [notes, setNotes] = useState(reservation?.notes ?? '')
 
   useEffect(() => {
     if (reservation?.scheduled_at) {
       setRescheduleDate(new Date(reservation.scheduled_at).toISOString().slice(0, 10))
     }
-    if (reservation?.notes != null) {
-      setNotes(reservation.notes)
-    }
-  }, [reservation?.scheduled_at, reservation?.notes])
+  }, [reservation?.scheduled_at])
 
   const partySize = reservation?.party_size ?? 2
   const { data: availability } = useGetPublicReservationAvailabilityQuery(
@@ -59,8 +52,6 @@ export function PublicReservationManage() {
   const [rescheduleReservation, { isLoading: rescheduling }] =
     useReschedulePublicReservationMutation()
   const [cancelReservation, { isLoading: cancelling }] = useCancelPublicReservationMutation()
-  const [acceptWaitlistOffer, { isLoading: acceptingOffer }] = useAcceptWaitlistOfferMutation()
-  const [declineWaitlistOffer, { isLoading: decliningOffer }] = useDeclineWaitlistOfferMutation()
 
   const slots = useMemo(() => availability?.slots ?? [], [availability?.slots])
 
@@ -109,7 +100,6 @@ export function PublicReservationManage() {
     try {
       await rescheduleReservation({ token, scheduledAt: rescheduleSlot }).unwrap()
       toast.success('Reservation rescheduled')
-      setNotes('')
       setRescheduleSlot('')
       refetch()
     } catch (error: unknown) {
@@ -135,63 +125,6 @@ export function PublicReservationManage() {
         error?.data?.message || error?.data?.error?.message || 'Unable to cancel reservation'
       )
     }
-  }
-
-  if (waitlistToken && !reservation) {
-    return (
-      <div className="min-h-screen bg-slate-900/90 py-12 px-4 flex items-center justify-center">
-        <Card className="w-full max-w-md bg-white/95 text-[var(--text)] shadow-xl">
-          <CardHeader>
-            <CardTitle>Table available</CardTitle>
-            <CardDescription>
-              A table has opened up for your party. Accept within 2 hours to confirm your
-              reservation.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {waitlistAccepted ? (
-              <p className="text-sm text-[var(--mint)] font-medium">
-                Your table is confirmed. Check your email for reservation details.
-              </p>
-            ) : (
-              <>
-                <Button
-                  className="w-full"
-                  disabled={acceptingOffer}
-                  onClick={async () => {
-                    try {
-                      await acceptWaitlistOffer(waitlistToken).unwrap()
-                      toast.success('Table confirmed!')
-                      navigate(`/reserve/manage/${waitlistToken}?waitlistAccepted=true`)
-                    } catch (e: unknown) {
-                      const err = e as { data?: { error?: { message?: string } } }
-                      toast.error(err?.data?.error?.message || 'Could not accept offer')
-                    }
-                  }}
-                >
-                  {acceptingOffer ? 'Confirming…' : 'Accept table'}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  disabled={decliningOffer}
-                  onClick={async () => {
-                    try {
-                      await declineWaitlistOffer(waitlistToken).unwrap()
-                      toast.success('Offer declined')
-                    } catch {
-                      toast.error('Could not decline offer')
-                    }
-                  }}
-                >
-                  Decline
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   return (
@@ -229,9 +162,10 @@ export function PublicReservationManage() {
             <div>
               <Label>Special notes</Label>
               <Textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional"
+                readOnly
+                value={reservation.notes ?? ''}
+                placeholder="None"
+                className="resize-none bg-[var(--surface-muted)]"
               />
             </div>
             <div className="flex flex-col gap-2">

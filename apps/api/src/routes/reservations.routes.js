@@ -101,6 +101,10 @@ const analyticsQuerySchema = z.object({
   branchId: z.string().uuid().optional(),
 })
 
+const guestIntelQuerySchema = z.object({
+  branchId: z.string().uuid().optional(),
+})
+
 async function fetchTables(restaurantId, branchId) {
   const params = [restaurantId]
   let branchFilter = ''
@@ -160,15 +164,23 @@ router.get('/board', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
     const tables = await fetchTables(restaurantId, params.branchId)
     const reservations = await fetchReservations(restaurantId, params.branchId, day)
 
+    const waitlistParams = [restaurantId]
+    let waitlistBranchFilter = ''
+    if (params.branchId) {
+      waitlistParams.push(params.branchId)
+      waitlistBranchFilter = 'AND (branch_id = $2 OR branch_id IS NULL)'
+    }
+
     const waitlist = await query(
       `
           SELECT *
           FROM reservation_waitlist
           WHERE restaurant_id = $1
             AND status IN ('WAITING','NOTIFIED')
+            ${waitlistBranchFilter}
           ORDER BY position ASC NULLS LAST, requested_at ASC
         `,
-      [restaurantId]
+      waitlistParams
     )
 
     res.json({
@@ -391,6 +403,13 @@ async function calculateAvailability(restaurantId, branchId, scheduledAt, durati
     .filter((t) => t.is_active)
     .reduce((sum, table) => sum + Number(table.capacity || 0), 0)
 
+  const overlapParams = [restaurantId, scheduledAt, durationMinutes]
+  let overlapBranchFilter = ''
+  if (branchId) {
+    overlapParams.push(branchId)
+    overlapBranchFilter = 'AND (branch_id = $4 OR branch_id IS NULL)'
+  }
+
   const overlap = await client.query(
     `
       SELECT party_size, duration_minutes
@@ -399,8 +418,9 @@ async function calculateAvailability(restaurantId, branchId, scheduledAt, durati
         AND status IN ('PENDING','CONFIRMED','SEATED')
         AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[]') &&
             tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[]')
+        ${overlapBranchFilter}
     `,
-    [restaurantId, scheduledAt, durationMinutes]
+    overlapParams
   )
 
   const reservedSeats = overlap.rows.reduce((sum, row) => sum + Number(row.party_size || 0), 0)
@@ -439,6 +459,13 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
           .filter((table) => table.is_active)
           .sort((a, b) => Number(a.capacity) - Number(b.capacity))
 
+        const conflictParams = [restaurantId, scheduledAt.toISOString(), payload.durationMinutes]
+        let conflictBranchFilter = ''
+        if (payload.branchId) {
+          conflictParams.push(payload.branchId)
+          conflictBranchFilter = 'AND (branch_id = $4 OR branch_id IS NULL)'
+        }
+
         const { rows: conflictRows } = await client.query(
           `
               SELECT unnest(tables) as table_id
@@ -447,8 +474,9 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
                 AND status IN ('PENDING','CONFIRMED','SEATED')
                 AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[]') &&
                     tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[]')
+                ${conflictBranchFilter}
             `,
-          [restaurantId, scheduledAt.toISOString(), payload.durationMinutes]
+          conflictParams
         )
         const conflictingTableIds = new Set(conflictRows.map((row) => row.table_id))
         let seatsAccumulated = 0
@@ -565,7 +593,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
 
     res.status(201).json({
       ok: true,
-      data: { reservation },
+      data: { reservation: mapReservationRow(reservation) },
       error: null,
       requestId: req.requestId,
     })
@@ -718,7 +746,7 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
 
     res.json({
       ok: true,
-      data: { reservation },
+      data: { reservation: mapReservationRow(reservation) },
       error: null,
       requestId: req.requestId,
     })
@@ -732,18 +760,31 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
   }
 })
 
+const waitlistQuerySchema = z.object({
+  branchId: z.string().uuid().optional(),
+})
+
 router.get('/waitlist', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
+    const params = waitlistQuerySchema.parse(req.query)
     const restaurantId = await requireRestaurantId(req)
+    const waitlistParams = [restaurantId]
+    let waitlistBranchFilter = ''
+    if (params.branchId) {
+      waitlistParams.push(params.branchId)
+      waitlistBranchFilter = 'AND (branch_id = $2 OR branch_id IS NULL)'
+    }
+
     const { rows } = await query(
       `
         SELECT *
         FROM reservation_waitlist
         WHERE restaurant_id = $1
           AND status IN ('WAITING', 'NOTIFIED')
+          ${waitlistBranchFilter}
         ORDER BY position ASC NULLS LAST, requested_at ASC
       `,
-      [restaurantId]
+      waitlistParams
     )
 
     res.json({
@@ -797,7 +838,7 @@ router.get(
   requireRole(['RESTAURANT', 'ADMIN']),
   async (req, res) => {
     try {
-      const branchId = req.query.branchId
+      const { branchId } = guestIntelQuerySchema.parse(req.query)
       const restaurantId = await requireRestaurantId(req)
 
       const params = [restaurantId]
@@ -907,14 +948,22 @@ router.get('/analytics', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) 
         : [restaurantId, start.toISOString()]
     )
 
+    const waitlistStatsParams = [restaurantId]
+    let waitlistStatsBranchFilter = ''
+    if (params.branchId) {
+      waitlistStatsParams.push(params.branchId)
+      waitlistStatsBranchFilter = 'AND (branch_id = $2 OR branch_id IS NULL)'
+    }
+
     const { rows: waitlistRows } = await query(
       `
           SELECT status, COUNT(*) AS total
           FROM reservation_waitlist
           WHERE restaurant_id = $1
+            ${waitlistStatsBranchFilter}
           GROUP BY status
         `,
-      [restaurantId]
+      waitlistStatsParams
     )
 
     res.json({

@@ -119,7 +119,7 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 2. Per environment, add Postgres plugin → reference `DATABASE_URL` on API service.
 3. Deploy API: Root Directory **empty**, config `/apps/api/railway.json`, Dockerfile `apps/api/Dockerfile`, health check `/health`.
 4. Deploy Web: Root Directory **empty**, config `/apps/web/railway.json`, Dockerfile `apps/web/Dockerfile`, build args from `apps/web/.env.<env>.example`.
-5. Copy variables from `.env.<env>.example` into Railway (no real secrets in git).
+5. Commit defaults live in `deploy/railway/<environment>/` (API + web load on deploy). Paste secrets from `deploy/railway/development/secrets.env.example` into each service’s Railway Raw Editor once (`DATABASE_URL`, session keys, Keycloak secret).
 6. Run migrations manually: `pnpm db:migrate` with that environment’s `DATABASE_URL`.
 7. Verify `GET /health` and `GET /ready` on API; open web app and sign in via Keycloak.
 
@@ -131,8 +131,9 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 
 ## J. Keycloak per environment
 
-- Separate realm per env: `supplify-dev`, `supplify-preprod`, `supplify-prod`
-- Import `deploy/keycloak/realm-export.json` on first Keycloak start (adjust realm name per env)
+- Separate realm per env: **`Supplify`** (dev), **`supplify-preprod`**, **`supplify-prod`**
+- Import the matching file from `deploy/keycloak/` (see `deploy/keycloak/README.md`)
+- Redirect / post-logout URIs: `deploy/railway/{development,preprod,production}/KEYCLOAK_CLIENT.md`
 - `KEYCLOAK_URL` = server-side URL; `KEYCLOAK_PUBLIC_URL` = browser URL
 
 ## K. Storage per environment

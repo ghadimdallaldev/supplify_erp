@@ -31,6 +31,8 @@ import {
   useSubmitStaffSelfSwapMutation,
 } from '../services/api'
 import type { StaffPortalDashboard, StaffTimeEntry } from '../types'
+import { getApiErrorMessage } from '../lib/apiError'
+import { AlertCircle } from 'lucide-react'
 
 const PTO_TYPES = [
   { value: 'VACATION', label: 'Vacation' },
@@ -68,16 +70,22 @@ export function StaffSelfServiceDashboard() {
   const {
     data: magicData,
     isLoading: magicLoading,
+    isError: magicError,
+    error: magicErrorDetail,
     refetch: refetchMagic,
   } = useGetStaffPortalDashboardQuery({ token }, { skip: !magicLinkMode })
   const {
     data: accountData,
     isLoading: accountLoading,
+    isError: accountError,
+    error: accountErrorDetail,
     refetch: refetchAccount,
   } = useGetStaffSelfDashboardQuery(undefined, { skip: !accountMode })
 
   const data = magicLinkMode ? magicData : accountData
   const isLoading = magicLinkMode ? magicLoading : accountLoading
+  const loadError = magicLinkMode ? magicError : accountError
+  const loadErrorDetail = magicLinkMode ? magicErrorDetail : accountErrorDetail
   const refetch = magicLinkMode ? refetchMagic : refetchAccount
 
   const { data: magicTimeEntries = [], refetch: refetchMagicTime } =
@@ -152,10 +160,8 @@ export function StaffSelfServiceDashboard() {
       toast.success('Time-off request submitted')
       setPtoForm((prev) => ({ ...prev, reason: '' }))
       refetch()
-    } catch (error: any) {
-      toast.error(
-        error?.data?.message || error?.data?.error?.message || 'Unable to submit PTO request'
-      )
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to submit PTO request'))
     }
   }
 
@@ -180,10 +186,8 @@ export function StaffSelfServiceDashboard() {
       toast.success('Shift swap request sent')
       setSwapForm((prev) => ({ ...prev, reason: '' }))
       refetch()
-    } catch (error: any) {
-      toast.error(
-        error?.data?.message || error?.data?.error?.message || 'Unable to submit shift swap request'
-      )
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to submit shift swap request'))
     }
   }
 
@@ -198,8 +202,8 @@ export function StaffSelfServiceDashboard() {
       }
       toast.success('Clocked in')
       refetchTimeEntries()
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to clock in')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to clock in'))
     }
   }
   const handleClockOut = async () => {
@@ -212,13 +216,29 @@ export function StaffSelfServiceDashboard() {
       }
       toast.success('Clocked out')
       refetchTimeEntries()
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || 'Unable to clock out')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to clock out'))
     }
   }
 
   if (!magicLinkMode && !accountMode && !isLoading) {
     return null
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-slate-900/90 px-4 py-12">
+        <div className="mx-auto flex max-w-lg flex-col items-center gap-4 text-center text-white">
+          <AlertCircle className="h-10 w-10 text-[var(--red)]" />
+          <p className="text-sm text-slate-300">
+            {getApiErrorMessage(loadErrorDetail, 'Unable to load your staff dashboard.')}
+          </p>
+          <Button variant="outline" onClick={() => refetch()}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading || !data) {

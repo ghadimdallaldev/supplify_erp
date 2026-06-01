@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Card, CardContent } from '../../components/ui/card'
 import { Label } from '../../components/ui/label'
+import { Button } from '../../components/ui/button'
+import { EmptyState } from '../../components/ui/empty-state'
 import { DealCard } from '../../components/deals/DealCard'
 import { useGetActivePromotionsQuery, useGetEntitlementsQuery } from '../../services/api'
 import { getDealRedeemGate } from '../../lib/planLimits'
 import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, Store } from 'lucide-react'
 import { useAppSelector } from '../../hooks/redux'
 import { RequirePermission } from '../../components/RequirePermission'
 
@@ -131,13 +133,17 @@ export function DealsPage() {
         ) : null}
 
         {isLoading ? (
-          <Loader2 className="h-6 w-6 animate-spin" />
+          <div className="flex justify-center py-16" aria-busy="true">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--brand-mid)]" />
+          </div>
         ) : promotions.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center text-sm text-[var(--text-muted)]">
-              No deals available right now. Follow suppliers or check back for sponsored promotions.
-            </CardContent>
-          </Card>
+          <DealsEmptyState
+            supplierFilter={supplierFilter}
+            supplierName={suppliers.find(([id]) => id === supplierFilter)?.[1]}
+            expiringSoon={expiringSoon}
+            onClearSupplier={() => setSupplierFilter('')}
+            onClearExpiringSoon={() => setExpiringSoon(false)}
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {promotions.map((p) => (
@@ -171,5 +177,67 @@ function MotionDealsHeader() {
         Deals from suppliers you follow, plus sponsored offers from new suppliers
       </p>
     </div>
+  )
+}
+
+function DealsEmptyState({
+  supplierFilter,
+  supplierName,
+  expiringSoon,
+  onClearSupplier,
+  onClearExpiringSoon,
+}: {
+  supplierFilter: string
+  supplierName?: string
+  expiringSoon: boolean
+  onClearSupplier: () => void
+  onClearExpiringSoon: () => void
+}) {
+  if (supplierFilter) {
+    return (
+      <EmptyState
+        title={supplierName ? `No deals from ${supplierName}` : 'No deals for this supplier'}
+        description="They may not have active promotions right now. Browse your full feed or pick another supplier."
+        icon={<Store className="h-6 w-6" aria-hidden />}
+        action={
+          <Button type="button" variant="outline" size="sm" onClick={onClearSupplier}>
+            Show all suppliers
+          </Button>
+        }
+      />
+    )
+  }
+
+  if (expiringSoon) {
+    return (
+      <EmptyState
+        title="No deals expiring in the next 7 days"
+        description="Turn off “Expiring within 7 days” to see everything in your feed, or check back as promotions go live."
+        icon={<Sparkles className="h-6 w-6" aria-hidden />}
+        action={
+          <Button type="button" variant="outline" size="sm" onClick={onClearExpiringSoon}>
+            Show all deals
+          </Button>
+        }
+      />
+    )
+  }
+
+  return (
+    <EmptyState
+      title="No deals in your feed yet"
+      description="Follow suppliers you order from to unlock their promotions. Sponsored offers from new suppliers will show up here when available."
+      icon={<Sparkles className="h-6 w-6" aria-hidden />}
+      action={
+        <Button
+          size="sm"
+          asChild
+          className="text-white"
+          style={{ background: 'var(--brand)', borderColor: 'var(--brand)' }}
+        >
+          <Link to="/app/suppliers">Browse suppliers</Link>
+        </Button>
+      }
+    />
   )
 }
