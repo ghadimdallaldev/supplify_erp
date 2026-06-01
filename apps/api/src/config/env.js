@@ -12,6 +12,7 @@ import {
   resolvePaymentsMode,
   resolveWebOrigins,
 } from './resolve-env.js'
+import { resolveRedisUrl } from './resolve-redis-url.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const apiEnvDir = path.resolve(__dirname, '../..')
@@ -151,7 +152,7 @@ export const config = {
     (process.env.RAILWAY_PUBLIC_DOMAIN
       ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
       : `http://localhost:${process.env.PORT || 4000}`),
-  REDIS_URL: process.env.REDIS_URL || '',
+  REDIS_URL: resolveRedisUrl(),
   E2E_SECRET: process.env.E2E_SECRET || '',
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',

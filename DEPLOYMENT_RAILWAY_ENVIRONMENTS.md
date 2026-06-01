@@ -169,6 +169,8 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 
    Replace `redis-dev` with the **exact** Redis service name shown in the Railway sidebar. Railway injects `REDIS_URL` on the Redis service; the reference copies it into the API.
 
+   **Do not use `REDIS_PUBLIC_URL`** on the API service. Railway shows an egress warning when `REDIS_URL` references `${{Redis.REDIS_PUBLIC_URL}}` or `*.proxy.rlwy.net` — that path is for **local machines** connecting into the project, not API ↔ Redis in the same environment. The API uses private networking (`redis.railway.internal`) via `REDIS_URL` and ioredis `family: 0` (dual-stack DNS).
+
 5. **Redeploy** the API service (variable changes require a new deploy).
 6. Confirm:
 
@@ -186,12 +188,14 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 
 ### Troubleshooting
 
-| Symptom                               | Fix                                                                              |
-| ------------------------------------- | -------------------------------------------------------------------------------- |
-| `redis.connected: false` on `/health` | Set `REDIS_URL` on API; check service name in `${{...}}` reference; redeploy     |
-| Chat works sometimes, not always      | Multiple API replicas without Redis — add Redis or scale API to 1 instance       |
-| `ECONNREFUSED` in API logs            | Wrong URL (use Railway reference, not `localhost`)                               |
-| Works locally, not on Railway         | Add Redis plugin in that Railway environment; do not reuse dev Redis URL in prod |
+| Symptom                               | Fix                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------ |
+| Railway egress warning on Redis       | Change API `REDIS_URL` to `${{redis-xxx.REDIS_URL}}`; remove `REDIS_PUBLIC_URL` refs |
+| `redis.connected: false` on `/health` | Set `REDIS_URL` on API; check service name in `${{...}}` reference; redeploy         |
+| `ENOTFOUND redis.railway.internal`    | Keep private `REDIS_URL`; redeploy API (app sets ioredis `family: 0`)                |
+| Chat works sometimes, not always      | Multiple API replicas without Redis — add Redis or scale API to 1 instance           |
+| `ECONNREFUSED` in API logs            | Wrong URL (use Railway reference, not `localhost`)                                   |
+| Works locally, not on Railway         | Add Redis plugin in that Railway environment; do not reuse dev Redis URL in prod     |
 
 ## J. Postgres per environment
 
