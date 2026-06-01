@@ -29,7 +29,7 @@ import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { useCartActions } from '../hooks/useCartActions'
 import { formatPlanBlockNudgeMessage, getLimitLabel } from '../lib/planComparison'
 import { isAtEntitlementLimit, shouldShowEntitlementLimit } from '../lib/planLimits'
-import { getLayoutSocket, releaseLayoutSocket } from '../lib/layoutSocket'
+import { getAppSocket, releaseAppSocket } from '../lib/appSocket'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { shouldLoadBillingStatus, shouldRedirectToActivate } from '../lib/billingActivationRedirect'
 import { LimitExceededBanner } from './LimitExceededBanner'
@@ -96,11 +96,11 @@ export function Layout() {
 
   useEffect(() => {
     if (!user?.id) {
-      releaseLayoutSocket()
+      releaseAppSocket()
       return
     }
 
-    const socket = getLayoutSocket(user.id)
+    const socket = getAppSocket(user.id)
 
     const onEntitlementsRefresh = (payload: {
       reason?: string
