@@ -11,9 +11,66 @@ import {
   buildObjectPublicUrl,
   getStorageDriver,
   getStorageProvider,
+  getObjectStream,
 } from '../services/storage/storage.service.js'
 
 const router = express.Router()
+
+/** Serve uploaded objects when buckets are private (Railway, R2 without public URL). */
+router.get('/object', async (req, res) => {
+  try {
+    const rawKey = req.query.key
+    if (!rawKey || typeof rawKey !== 'string') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'key query parameter is required' },
+        requestId: req.requestId,
+      })
+    }
+    const key = rawKey.replace(/^\/+/, '')
+    if (key.includes('..') || !key.startsWith('uploads/')) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'Invalid file key' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { body, contentType, contentLength } = await getObjectStream(key)
+    if (contentType) res.setHeader('Content-Type', contentType)
+    if (contentLength != null) res.setHeader('Content-Length', String(contentLength))
+    res.setHeader('Cache-Control', 'public, max-age=86400')
+
+    if (body && typeof body.pipe === 'function') {
+      body.pipe(res)
+      return
+    }
+    if (Buffer.isBuffer(body)) {
+      return res.send(body)
+    }
+    if (body instanceof Uint8Array) {
+      return res.send(Buffer.from(body))
+    }
+    return res.status(404).end()
+  } catch (error) {
+    const notFound =
+      error?.name === 'NoSuchKey' ||
+      error?.Code === 'NoSuchKey' ||
+      error?.name === 'UPLOAD_KEY_INVALID'
+    logger.warn('File object serve error', { message: error?.message })
+    return res.status(notFound ? 404 : 500).json({
+      ok: false,
+      data: null,
+      error: {
+        name: notFound ? 'NOT_FOUND' : 'INTERNAL_ERROR',
+        message: notFound ? 'File not found' : 'Failed to load file',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
 
 // Local storage: complete PUT upload using signed token from /presign
 router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async (req, res) => {

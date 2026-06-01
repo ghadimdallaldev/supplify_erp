@@ -4,11 +4,13 @@ import {
   CreateBucketCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { logger } from '../../lib/logger.js'
 
 function createS3Client(cfg, endpoint) {
+  const forcePathStyle = cfg.STORAGE_S3_FORCE_PATH_STYLE !== false
   return new S3Client({
     endpoint,
     region: cfg.STORAGE_REGION || 'auto',
@@ -16,7 +18,7 @@ function createS3Client(cfg, endpoint) {
       accessKeyId: cfg.STORAGE_ACCESS_KEY_ID,
       secretAccessKey: cfg.STORAGE_SECRET_ACCESS_KEY,
     },
-    forcePathStyle: true,
+    forcePathStyle,
   })
 }
 
@@ -37,7 +39,11 @@ export function createS3CompatibleProvider(cfg) {
   }
 
   function getPresignClient() {
-    const presignEndpoint = cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT
+    // Private buckets (e.g. Railway): presign against the S3 API endpoint, not the browser proxy base.
+    const presignEndpoint =
+      cfg.STORAGE_PUBLIC_READ === false
+        ? cfg.STORAGE_ENDPOINT
+        : cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT
     if (presignEndpoint === cfg.STORAGE_ENDPOINT) {
       return getInternalClient()
     }
@@ -61,8 +67,12 @@ export function createS3CompatibleProvider(cfg) {
   }
 
   function buildPublicUrl(fileKey) {
-    const base = String(cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT || '').replace(/\/$/, '')
     const key = String(fileKey || '').replace(/^\/+/, '')
+    if (cfg.STORAGE_PUBLIC_READ === false) {
+      const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
+      return `${apiBase}/api/files/object?key=${encodeURIComponent(key)}`
+    }
+    const base = String(cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT || '').replace(/\/$/, '')
     const bucket = cfg.STORAGE_BUCKET
     return `${base}/${bucket}/${key}`
   }
@@ -167,6 +177,25 @@ export function createS3CompatibleProvider(cfg) {
         fileKey,
         bucket: cfg.STORAGE_BUCKET,
         method: 'PUT',
+      }
+    },
+
+    async getObjectStream(fileKey) {
+      const key = String(fileKey || '').replace(/^\/+/, '')
+      if (!key || key.includes('..')) {
+        throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
+      }
+      const s3 = getInternalClient()
+      const response = await s3.send(
+        new GetObjectCommand({
+          Bucket: cfg.STORAGE_BUCKET,
+          Key: key,
+        })
+      )
+      return {
+        body: response.Body,
+        contentType: response.ContentType || 'application/octet-stream',
+        contentLength: response.ContentLength,
       }
     },
   }

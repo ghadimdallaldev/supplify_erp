@@ -36,20 +36,33 @@ export function assertUploadKeyOwnedByUser(fileKey, userId) {
 }
 
 /**
- * Chat attachments must reference the caller's upload prefix on configured object storage.
+ * Resolve object key from a stored public URL (direct bucket URL or API proxy).
  */
-export function assertChatAttachmentUrl(fileUrl, userId) {
+export function resolveUploadKeyFromPublicUrl(fileUrl) {
   if (!fileUrl || typeof fileUrl !== 'string') {
     throw new Error('Invalid attachment URL')
   }
-  let pathname
+  let parsed
   try {
-    pathname = new URL(fileUrl).pathname.replace(/^\/+/, '')
+    parsed = new URL(fileUrl)
   } catch {
     throw new Error('Invalid attachment URL')
   }
-  const bucket = process.env.STORAGE_BUCKET || process.env.S3_BUCKET || ''
+  if (parsed.pathname.replace(/\/+$/, '').endsWith('/api/files/object')) {
+    const key = parsed.searchParams.get('key')
+    if (!key) throw new Error('Invalid attachment URL')
+    return key.replace(/^\/+/, '')
+  }
+  const pathname = parsed.pathname.replace(/^\/+/, '')
+  const bucket = process.env.STORAGE_BUCKET || process.env.S3_BUCKET || process.env.BUCKET || ''
   const bucketPrefix = bucket ? `${bucket}/` : ''
-  const key = pathname.startsWith(bucketPrefix) ? pathname.slice(bucketPrefix.length) : pathname
+  return pathname.startsWith(bucketPrefix) ? pathname.slice(bucketPrefix.length) : pathname
+}
+
+/**
+ * Chat attachments must reference the caller's upload prefix on configured object storage.
+ */
+export function assertChatAttachmentUrl(fileUrl, userId) {
+  const key = resolveUploadKeyFromPublicUrl(fileUrl)
   return assertUploadKeyOwnedByUser(key, userId)
 }
