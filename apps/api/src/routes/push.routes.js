@@ -25,17 +25,19 @@ const unsubscribeSchema = z.object({
 router.get('/vapid-public-key', (req, res) => {
   const publicKey = getVapidPublicKey()
   if (!publicKey) {
-    return res.status(503).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'SERVICE_UNAVAILABLE',
-        message: 'Web push is not configured on this server',
-      },
+    return res.json({
+      ok: true,
+      data: { publicKey: null, enabled: false },
+      error: null,
       requestId: req.requestId,
     })
   }
-  res.json({ ok: true, data: { publicKey }, error: null, requestId: req.requestId })
+  res.json({
+    ok: true,
+    data: { publicKey, enabled: true },
+    error: null,
+    requestId: req.requestId,
+  })
 })
 
 const pushFeatureGate = requireFeature(

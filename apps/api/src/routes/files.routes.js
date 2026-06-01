@@ -4,6 +4,15 @@ import { filesUploadGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
+
+function setObjectCorsHeaders(req, res) {
+  const origin = req.headers.origin
+  if (origin && config.WEB_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+  }
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+}
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
 import { sanitizeUploadFileName, assertUploadKeyOwnedByUser } from '../lib/sanitize-upload.js'
 import {
@@ -18,6 +27,7 @@ const router = express.Router()
 
 /** Serve uploaded objects when buckets are private (Railway, R2 without public URL). */
 router.get('/object', async (req, res) => {
+  setObjectCorsHeaders(req, res)
   try {
     const rawKey = req.query.key
     if (!rawKey || typeof rawKey !== 'string') {
@@ -72,22 +82,23 @@ router.get('/object', async (req, res) => {
   }
 })
 
-// Local storage: complete PUT upload using signed token from /presign
+// Complete PUT upload using signed token from /presign (local disk or private S3 via API)
 router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async (req, res) => {
-  if (getStorageDriver() !== 'local') {
-    return res.status(404).json({
-      ok: false,
-      data: null,
-      error: { name: 'NOT_FOUND', message: 'Direct upload not available for this storage driver' },
-      requestId: req.requestId,
-    })
-  }
+  setObjectCorsHeaders(req, res)
   try {
     const contentType = req.headers['content-type'] || 'application/octet-stream'
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
     const provider = getStorageProvider()
     if (!provider.completeUpload) {
-      throw new Error('Storage provider does not support direct upload')
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Direct upload not available for this storage driver',
+        },
+        requestId: req.requestId,
+      })
     }
     await provider.completeUpload(req.params.token, body, contentType)
     res.status(204).end()
