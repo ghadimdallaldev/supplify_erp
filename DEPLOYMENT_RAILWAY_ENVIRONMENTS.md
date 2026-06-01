@@ -46,6 +46,7 @@ Repo paths: API = `apps/api/`, Web = `apps/web/`. Env templates: `apps/api/.env.
 | API                 | `supplify-api-dev`      |
 | Web                 | `supplify-web-dev`      |
 | Postgres            | `supplify-postgres-dev` |
+| Redis (recommended) | `redis-dev`             |
 | Keycloak (optional) | `keycloak-dev`          |
 
 ### preprod
@@ -55,6 +56,7 @@ Repo paths: API = `apps/api/`, Web = `apps/web/`. Env templates: `apps/api/.env.
 | API                 | `supplify-api-preprod`      |
 | Web                 | `supplify-web-preprod`      |
 | Postgres            | `supplify-postgres-preprod` |
+| Redis (recommended) | `redis-preprod`             |
 | Keycloak (optional) | `keycloak-preprod`          |
 
 ### prod
@@ -64,6 +66,7 @@ Repo paths: API = `apps/api/`, Web = `apps/web/`. Env templates: `apps/api/.env.
 | API                 | `supplify-api-prod`      |
 | Web                 | `supplify-web-prod`      |
 | Postgres            | `supplify-postgres-prod` |
+| Redis (recommended) | `redis-prod`             |
 | Keycloak (optional) | `keycloak-prod`          |
 
 Config files: `apps/api/railway.json`, `apps/web/railway.json` (no secrets inside).
@@ -101,6 +104,7 @@ See `apps/api/.env.<env>.example` and [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VAR
 | `STORAGE_DRIVER`                      | `local`             | `s3`               | `s3`            |
 | `PAYMENTS_MODE`                       | `mock`              | `test`             | `live`          |
 | `ENABLE_DEBUG_ROUTES`                 | `true`              | `false`            | `false`         |
+| `REDIS_URL`                           | recommended         | recommended        | recommended     |
 
 ## G. Required frontend variables (summary)
 
@@ -117,26 +121,92 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 
 1. Create Railway project with environments: **dev**, **preprod**, **prod**.
 2. Per environment, add Postgres plugin → reference `DATABASE_URL` on API service.
-3. Deploy API: Root Directory **empty**, config `/apps/api/railway.json`, Dockerfile `apps/api/Dockerfile`, health check `/health`.
-4. Deploy Web: Root Directory **empty**, config `/apps/web/railway.json`, Dockerfile `apps/web/Dockerfile`, build args from `apps/web/.env.<env>.example`.
-5. Commit defaults live in `deploy/railway/<environment>/` (API + web load on deploy). Paste secrets from `deploy/railway/development/secrets.env.example` into each service’s Railway Raw Editor once (`DATABASE_URL`, session keys, Keycloak secret).
-6. Run migrations manually: `pnpm db:migrate` with that environment’s `DATABASE_URL`.
-7. Verify `GET /health` and `GET /ready` on API; open web app and sign in via Keycloak.
+3. Per environment, add **Redis** (see [§ I. Redis](#i-redis-cache--socketio)) → reference `REDIS_URL` on the API service.
+4. Deploy API: Root Directory **empty**, config `/apps/api/railway.json`, Dockerfile `apps/api/Dockerfile`, health check `/health`.
+5. Deploy Web: Root Directory **empty**, config `/apps/web/railway.json`, Dockerfile `apps/web/Dockerfile`, build args from `apps/web/.env.<env>.example`.
+6. Commit defaults live in `deploy/railway/<environment>/` (API + web load on deploy). Paste secrets from `deploy/railway/<environment>/secrets.env.example` into each service’s Railway Raw Editor once (`DATABASE_URL`, `REDIS_URL`, session keys, Keycloak secret).
+7. Run migrations manually: `pnpm db:migrate` with that environment’s `DATABASE_URL`.
+8. Verify `GET /health` and `GET /ready` on API (`redis.connected` should be `true` when Redis is wired); open web app and sign in via Keycloak.
 
-## I. Postgres per environment
+## I. Redis (cache + Socket.IO)
+
+Redis is **optional** — the API starts without it and uses an in-memory cache fallback. You should still run Redis in Railway (and locally) for:
+
+| Feature                                    | Without `REDIS_URL`                | With `REDIS_URL`                  |
+| ------------------------------------------ | ---------------------------------- | --------------------------------- |
+| Permission / calendar cache                | In-memory per API process          | Shared across replicas            |
+| Socket.IO chat + `notification_new` toasts | Works on **one** API instance only | Works across **all** API replicas |
+| `GET /health`                              | `redis.connected: false`           | `redis.connected: true`           |
+
+### Local development
+
+**Docker stack** (`pnpm dev:docker` or root `docker-compose.yml`): Redis is already defined as service `redis`. The API gets `REDIS_URL=redis://redis:6379` automatically.
+
+**Native API** (`pnpm dev` with infra containers):
+
+```bash
+pnpm local:infra   # starts postgres, redis, minio, keycloak
+```
+
+In `apps/api/.env` (or `.env.local`):
+
+```env
+REDIS_URL=redis://localhost:6379
+```
+
+Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
+
+### Railway (per environment: dev, preprod, prod)
+
+1. Open your Railway project → select the environment (e.g. **development**).
+2. Click **+ New** → **Database** → **Add Redis** (or **Redis** template).
+3. Name the service (e.g. `redis-dev`) — one Redis **per environment**, not shared across dev/preprod/prod.
+4. Open your **API** service → **Variables** → **Add variable** (or Raw Editor):
+
+   ```env
+   REDIS_URL=${{redis-dev.REDIS_URL}}
+   ```
+
+   Replace `redis-dev` with the **exact** Redis service name shown in the Railway sidebar. Railway injects `REDIS_URL` on the Redis service; the reference copies it into the API.
+
+5. **Redeploy** the API service (variable changes require a new deploy).
+6. Confirm:
+
+   ```text
+   GET https://<your-api-host>/health
+   ```
+
+   Response should include `"redis": { "connected": true }`.
+
+**Notes:**
+
+- Only the **API** service needs `REDIS_URL`. Web does not connect to Redis.
+- If you scale API to multiple replicas, Redis is **required** for reliable real-time chat and notification sockets.
+- If Redis is down at startup, the adapter logs a warning and Socket.IO still runs on a single instance; cache falls back to memory.
+
+### Troubleshooting
+
+| Symptom                               | Fix                                                                              |
+| ------------------------------------- | -------------------------------------------------------------------------------- |
+| `redis.connected: false` on `/health` | Set `REDIS_URL` on API; check service name in `${{...}}` reference; redeploy     |
+| Chat works sometimes, not always      | Multiple API replicas without Redis — add Redis or scale API to 1 instance       |
+| `ECONNREFUSED` in API logs            | Wrong URL (use Railway reference, not `localhost`)                               |
+| Works locally, not on Railway         | Add Redis plugin in that Railway environment; do not reuse dev Redis URL in prod |
+
+## J. Postgres per environment
 
 - One Railway Postgres **per environment** — never point dev/preprod at prod.
 - Set `DATABASE_SSL=true` on preprod and prod.
 - Backups: use Railway Postgres backups / logical dumps for prod (see go-live checklist).
 
-## J. Keycloak per environment
+## K. Keycloak per environment
 
 - Separate realm per env: **`Supplify`** (dev), **`supplify-preprod`**, **`supplify-prod`**
 - Import the matching file from `deploy/keycloak/` (see `deploy/keycloak/README.md`)
 - Redirect / post-logout URIs: `deploy/railway/{development,preprod,production}/KEYCLOAK_CLIENT.md`
 - `KEYCLOAK_URL` = server-side URL; `KEYCLOAK_PUBLIC_URL` = browser URL
 
-## K. Storage per environment
+## L. Storage per environment
 
 | env     | Driver  | Notes                                                     |
 | ------- | ------- | --------------------------------------------------------- |
@@ -144,7 +214,7 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 | preprod | `s3`    | R2/MinIO; separate bucket                                 |
 | prod    | `s3`    | Required; `STORAGE_DRIVER=local` fails startup validation |
 
-## L. Payment mode per environment
+## M. Payment mode per environment
 
 | Mode   | env     | Behavior                                               |
 | ------ | ------- | ------------------------------------------------------ |
@@ -154,14 +224,21 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 
 API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 
-## M. CORS and security
+## N. CORS and security
 
 - Origins from `CORS_ORIGIN`, `WEB_ORIGINS`, `WEB_ORIGIN`, `PUBLIC_FRONTEND_URL` (no `*`)
 - Credentials enabled — wildcard CORS is rejected in preprod/prod validation
 - `COOKIE_SECURE=true` on preprod/prod
 - Rate limiting: `RATE_LIMIT_ENABLED=true` on preprod/prod
 
-## N. Production go-live checklist
+### Real-time (Socket.IO, chat, notification toasts)
+
+- **Web build:** set `VITE_API_URL` to the public API URL (same host used for REST). Socket.IO connects to that origin with `withCredentials: true` (session cookies).
+- **API:** `WEB_ORIGINS` (or `CORS_ORIGIN` / `PUBLIC_FRONTEND_URL`) must list every frontend origin that opens the app; missing origins cause socket handshake or CORS failures.
+- **Multi-replica:** set `REDIS_URL` on the API service so Socket.IO uses the Redis adapter (`@socket.io/redis-adapter`). Without Redis, events only reach clients connected to the same API instance.
+- **Local dev:** Vite proxies `/socket.io` to the API when `VITE_API_URL` is unset; cookies stay on `localhost:5173`.
+
+## O. Production go-live checklist
 
 - [ ] `APP_ENV=prod`, `DATABASE_URL` = prod Postgres only
 - [ ] `CORS_ORIGIN` = prod frontend URL only
@@ -173,23 +250,25 @@ API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 - [ ] `PAYMENTS_MODE=live` only when provider ready; `PAYMENTS_WEBHOOK_SECRET` set
 - [ ] `STORAGE_DRIVER=s3`, production bucket
 - [ ] Keycloak prod realm/client only
+- [ ] `REDIS_URL` set on API (Redis plugin per environment); `/health` shows `redis.connected: true`
 - [ ] `GET /health` returns `{ status, service, env }` without secrets
 - [ ] Frontend build with prod `VITE_*` vars
 - [ ] Migrations applied; admin created securely
 - [ ] Backups and rollback plan documented
 
-## O. Rollback notes
+## P. Rollback notes
 
 - Railway: redeploy previous deployment from Railway dashboard or pin image digest
 - Database: restore from backup before re-running migrations
 - Keep previous env var set exported before major changes
 
-## P. Common mistakes
+## Q. Common mistakes
 
 - Reusing prod `DATABASE_URL` in dev/preprod
 - `PAYMENTS_MODE=mock` on preprod/prod (startup fails)
 - Forgetting to set `CORS_ORIGIN` on Railway (browser blocked)
 - Building web without `VITE_API_URL` (calls localhost)
+- No `REDIS_URL` on API while running 2+ replicas (chat/notifications only work on one instance)
 - Root Directory set to `apps/web` or `apps/api` (breaks monorepo lockfile COPY)
 - `STORAGE_DRIVER=local` on prod (validation fails)
 - Committing `.env` files with real secrets
