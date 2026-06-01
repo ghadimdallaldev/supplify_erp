@@ -136,6 +136,17 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [plansTenantFilter, setPlansTenantFilter] = useState<'RESTAURANT' | 'SUPPLIER' | undefined>(
     undefined
   )
+  const [changePlanModal, setChangePlanModal] = useState<{
+    open: boolean
+    subId: string
+    tenantType: 'RESTAURANT' | 'SUPPLIER'
+    tenantName: string
+    targetPlanId: string
+  } | null>(null)
+
+  const shouldLoadAdminPlans =
+    ['plans', 'subscriptions', 'tenants'].includes(selectedTab) || Boolean(changePlanModal?.open)
+
   const {
     data: overview,
     isLoading: overviewLoading,
@@ -162,8 +173,12 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     { skip: selectedTab !== 'overview' }
   )
   const { data: plansData, isLoading: plansLoading } = useGetAdminPlansQuery(
-    plansTenantFilter ? { tenant_type: plansTenantFilter } : {},
-    { skip: selectedTab !== 'plans' }
+    selectedTab === 'plans' && plansTenantFilter ? { tenant_type: plansTenantFilter } : {},
+    { skip: !shouldLoadAdminPlans }
+  )
+  const { data: changePlanPlansData, isLoading: changePlanPlansLoading } = useGetAdminPlansQuery(
+    { tenant_type: changePlanModal?.tenantType ?? 'RESTAURANT' },
+    { skip: !changePlanModal?.open }
   )
   const { data: subscriptionsData, isLoading: subscriptionsLoading } =
     useGetAdminSubscriptionsQuery(
@@ -171,9 +186,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
       { skip: !['subscriptions', 'plans', 'usage'].includes(selectedTab) }
     )
 
-  // Deduplicate plans by (code, tenant_type), exclude enterprise
-  const plans =
-    plansData?.plans?.filter(
+  const dedupeAdminPlans = (raw: SubscriptionPlan[] | undefined) =>
+    raw?.filter(
       (p, i, arr) =>
         (p.code || '').toLowerCase() !== 'enterprise' &&
         arr.findIndex(
@@ -181,6 +195,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             x.code === p.code && (x.tenant_type || 'RESTAURANT') === (p.tenant_type || 'RESTAURANT')
         ) === i
     ) ?? []
+
+  const plans = dedupeAdminPlans(plansData?.plans)
+  const changePlanPlanOptions = dedupeAdminPlans(changePlanPlansData?.plans).filter(
+    (p) => (p.tenant_type || 'RESTAURANT') === changePlanModal?.tenantType
+  )
   const subscriptions =
     subscriptionsData?.subscriptions?.filter(
       (s, i, arr) =>
@@ -305,13 +324,6 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
   const [unlockSubscription, { isLoading: isUnlocking }] = useUnlockAdminSubscriptionMutation()
   const [extendFreeTrial, { isLoading: isExtendingTrial }] = useExtendAdminFreeTrialMutation()
 
-  const [changePlanModal, setChangePlanModal] = useState<{
-    open: boolean
-    subId: string
-    tenantType: 'RESTAURANT' | 'SUPPLIER'
-    tenantName: string
-    targetPlanId: string
-  } | null>(null)
   const [changePlanPreview, setChangePlanPreview] = useState<{
     willExceed: Array<{ limitKey: string; usage: number; limit: number }>
     featureDiff: { enabled: string[]; disabled: string[] }
@@ -459,14 +471,31 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
   const applyPlanChange = async () => {
     if (!changePlanModal?.targetPlanId) return
+    const selectedPlan = changePlanPlanOptions.find((p) => p.id === changePlanModal.targetPlanId)
     try {
-      await updateSubscription({
+      const result = await updateSubscription({
         id: changePlanModal.subId,
-        data: { planId: changePlanModal.targetPlanId, allowExceedance: changePlanForce },
+        data: {
+          planId: changePlanModal.targetPlanId,
+          allowExceedance: changePlanForce,
+          ...(changePlanForce
+            ? { force: true, reason: 'Admin plan change (usage exceeds target limits)' }
+            : {}),
+        },
       }).unwrap()
-      toast.success('Plan updated')
+      const planLabel =
+        selectedPlan?.name ||
+        result.subscription?.plan_name ||
+        result.subscription?.plan_code ||
+        'selected plan'
+      toast.success(
+        result.appliedViaOrgBilling
+          ? `Plan updated to ${planLabel} (applied to organization billing subscription)`
+          : `Plan updated to ${planLabel}`
+      )
       setChangePlanModal(null)
       setChangePlanPreview(null)
+      setChangePlanForce(false)
     } catch (err: unknown) {
       const e = err as {
         data?: { error?: { name?: string; message?: string; details?: { willExceed?: unknown[] } } }
@@ -3315,21 +3344,28 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                 <div>
                   <Label>Target plan</Label>
                   <select
-                    className="w-full rounded-md border border-[var(--app-border-mid)] px-3 py-2 mt-1"
+                    className="w-full rounded-md border border-[var(--app-border-mid)] bg-[var(--app-surface)] px-3 py-2 mt-1 text-[var(--text-primary)]"
                     value={changePlanModal.targetPlanId}
+                    disabled={changePlanPlansLoading}
                     onChange={(e) =>
                       setChangePlanModal((m) => m && { ...m, targetPlanId: e.target.value })
                     }
                   >
-                    <option value="">Select plan</option>
-                    {plans
-                      .filter((p) => p.tenant_type === changePlanModal.tenantType)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.code})
-                        </option>
-                      ))}
+                    <option value="">
+                      {changePlanPlansLoading ? 'Loading plans…' : 'Select plan'}
+                    </option>
+                    {changePlanPlanOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.code})
+                      </option>
+                    ))}
                   </select>
+                  {!changePlanPlansLoading && changePlanPlanOptions.length === 0 && (
+                    <p className="mt-1 text-sm text-amber-600">
+                      No plans found for {changePlanModal.tenantType.toLowerCase()} tenants. Create
+                      one on the Plans tab.
+                    </p>
+                  )}
                 </div>
                 <Button
                   size="sm"

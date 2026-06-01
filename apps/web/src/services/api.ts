@@ -3221,12 +3221,27 @@ export const api = createApi({
       }),
       providesTags: ['Admin'],
     }),
-    updateAdminSubscription: builder.mutation<Subscription, { id: string; data: any }>({
+    updateAdminSubscription: builder.mutation<
+      {
+        subscription: Subscription
+        appliedViaOrgBilling?: boolean
+        billingTenantId?: string
+      },
+      { id: string; data: any }
+    >({
       query: ({ id, data }) => ({
         url: `/api/admin-dashboard/subscriptions/${id}`,
         method: 'PATCH',
         body: data,
       }),
+      transformResponse: (raw: { subscription?: Subscription } & Subscription) =>
+        raw?.subscription
+          ? {
+              subscription: raw.subscription,
+              appliedViaOrgBilling: raw.appliedViaOrgBilling,
+              billingTenantId: raw.billingTenantId,
+            }
+          : { subscription: raw as Subscription },
       invalidatesTags: ['Admin'],
     }),
     previewSubscriptionPlanChange: builder.mutation<
