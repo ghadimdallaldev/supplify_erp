@@ -396,8 +396,10 @@ function trackInterval(fn, ms) {
   return timer
 }
 
-// Initialize Socket.IO
-initializeSocket(server)
+// Initialize Socket.IO (Redis adapter when REDIS_URL is set)
+void initializeSocket(server).catch((err) => {
+  logger.error({ msg: 'Socket.IO initialization failed', error: err?.message })
+})
 
 let shuttingDown = false
 async function gracefulShutdown(signal) {

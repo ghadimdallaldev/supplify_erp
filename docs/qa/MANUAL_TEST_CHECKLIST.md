@@ -409,16 +409,18 @@ Ref: [features/admin-impersonation.md](../features/admin-impersonation.md) · [I
 
 ## 4.10 WebSocket connectivity
 
-| ID    | Steps                                                                         | Expected                                                                                     | Pass? |
-| ----- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----- |
-| WS-01 | Log in as restaurant; open browser DevTools → Network → WS                    | Socket.IO connection established; no repeated reconnects                                     |       |
-| WS-02 | Send a chat message                                                           | Message appears in real-time on recipient's screen without page refresh                      |       |
-| WS-03 | Type in chat input on one session                                             | Typing indicator visible on other session                                                    |       |
-| WS-04 | Recipient's typing indicator shows correct user name (not a random socket ID) | Username shown, not a UUID/connection ID                                                     |       |
-| WS-05 | Mark message as read on one session                                           | Read receipt updates on sender's session in real-time                                        |       |
-| WS-06 | Admin changes a tenant's plan                                                 | Logged-in tenant receives `entitlements_refresh` event (toast or silent refetch) within ~30s |       |
-| WS-07 | Network briefly disconnected (DevTools → throttle offline then back)          | Socket reconnects; no duplicate messages; connection restored                                |       |
-| WS-08 | Log out                                                                       | WebSocket disconnected cleanly; no 401 errors in console                                     |       |
+| ID    | Steps                                                                                        | Expected                                                                                     | Pass? |
+| ----- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----- |
+| WS-01 | Log in as restaurant; open browser DevTools → Network → WS                                   | Socket.IO connection established; no repeated reconnects                                     |       |
+| WS-02 | Send a chat message                                                                          | Message appears in real-time on recipient's screen without page refresh                      |       |
+| WS-03 | Type in chat input on one session                                                            | Typing indicator visible on other session                                                    |       |
+| WS-04 | Recipient's typing indicator shows for other party only (not self; not socket connection ID) | "typing…" indicator; no spurious self-typing                                                 |       |
+| WS-05 | `notification_new` over Socket.IO (user on dashboard)                                        | Toast + sound within ~1s of server event; no 12s poll delay                                  |       |
+| WS-06 | Multi-tab same user                                                                          | Single shared socket; duplicate toasts deduped by notification id                            |       |
+| WS-05 | Mark message as read on one session                                                          | Read receipt updates on sender's session in real-time                                        |       |
+| WS-06 | Admin changes a tenant's plan                                                                | Logged-in tenant receives `entitlements_refresh` event (toast or silent refetch) within ~30s |       |
+| WS-07 | Network briefly disconnected (DevTools → throttle offline then back)                         | Socket reconnects; no duplicate messages; connection restored                                |       |
+| WS-08 | Log out                                                                                      | WebSocket disconnected cleanly; no 401 errors in console                                     |       |
 
 ---
 
@@ -580,14 +582,17 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.12 Chat (`/app/chat`) — requires `chat` feature
 
-| ID     | Steps                                  | Expected                                | Pass? |
-| ------ | -------------------------------------- | --------------------------------------- | ----- |
-| RST-61 | Free account → navigate to `/app/chat` | 403 or paywall                          |       |
-| RST-62 | Silver+ → Conversation list            | Suppliers/restaurants shown             |       |
-| RST-63 | Send message                           | Delivered; appears in thread            |       |
-| RST-64 | Receive message (second browser/user)  | Real-time or refresh shows message      |       |
-| RST-65 | Unread state / read receipts           | Updates correctly                       |       |
-| RST-66 | Typing indicator                       | Shows other user's name (not socket ID) |       |
+| ID     | Steps                                  | Expected                                                                    | Pass? |
+| ------ | -------------------------------------- | --------------------------------------------------------------------------- | ----- |
+| RST-61 | Free account → navigate to `/app/chat` | 403 or paywall                                                              |       |
+| RST-62 | Silver+ → Conversation list            | Suppliers/restaurants shown                                                 |       |
+| RST-63 | Send message                           | Delivered; appears in thread                                                |       |
+| RST-64 | Receive message (second browser/user)  | Message appears in thread within ~1s without manual refresh (Socket.IO)     |       |
+| RST-65 | Unread state / read receipts           | Updates correctly                                                           |       |
+| RST-66 | Typing indicator                       | "typing…" for other party only (not your own); not a socket connection ID   |       |
+| RST-67 | Notification toast (other page)        | New order/message notification toast within ~1s; bell count updates         |       |
+| RST-68 | Socket reconnect                       | Brief API restart: client shows Reconnecting then Live; messages still flow |       |
+| RST-69 | Mobile chat layout                     | List full-width; open thread with back; composer usable with keyboard       |       |
 
 ## 6.14 Deals & promotions (`/app/deals`) — requires `supplier_deals` feature
 

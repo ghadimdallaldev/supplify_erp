@@ -5,6 +5,7 @@ import { buildWhatsAppUrl } from '../lib/whatsapp.js'
 import { getEntitlements, isFeatureEnabled } from '../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from './whatsapp.service.js'
 import { sendWebPushToUser, isPushConfigured } from './push.service.js'
+import { emitNotificationNew } from '../lib/socket.js'
 
 /**
  * Notification Service — email via Twilio SendGrid or SMTP; WhatsApp via Twilio (with wa.me fallback in metadata).
@@ -522,6 +523,10 @@ export async function sendNotification({
       notificationCategory,
       channels: results,
     })
+
+    if (channels.inApp) {
+      emitNotificationNew({ ...notification, user_id: userId })
+    }
 
     return notification
   } catch (error) {

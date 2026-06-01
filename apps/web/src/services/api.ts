@@ -1075,6 +1075,7 @@ export const api = createApi({
           ...rest,
           created_at: new Date().toISOString(),
           isOptimistic: true,
+          sender_type: undefined,
         }
         const patchResult = dispatch(
           api.util.updateQueryData('getMessages', { conversationId }, (draft: any) => {
@@ -1083,7 +1084,20 @@ export const api = createApi({
           })
         )
         try {
-          await queryFulfilled
+          const { data } = await queryFulfilled
+          const serverMessage = data?.message
+          if (serverMessage?.id) {
+            dispatch(
+              api.util.updateQueryData('getMessages', { conversationId }, (draft: any) => {
+                if (!draft?.messages) return
+                const withoutTemp = (draft.messages as { id?: string }[]).filter(
+                  (m) => m.id !== tempId
+                )
+                const exists = withoutTemp.some((m) => m.id === serverMessage.id)
+                draft.messages = exists ? withoutTemp : [...withoutTemp, serverMessage]
+              })
+            )
+          }
         } catch {
           patchResult.undo()
         }

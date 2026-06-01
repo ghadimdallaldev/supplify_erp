@@ -66,6 +66,9 @@ importers:
       '@sendgrid/mail':
         specifier: ^8.1.4
         version: 8.1.6
+      '@socket.io/redis-adapter':
+        specifier: ^8.3.0
+        version: 8.3.0(socket.io-adapter@2.5.5)
       ajv:
         specifier: ^8.12.0
         version: 8.17.1
@@ -3510,6 +3513,20 @@ packages:
 
   /@socket.io/component-emitter@3.1.2:
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
+    dev: false
+
+  /@socket.io/redis-adapter@8.3.0(socket.io-adapter@2.5.5):
+    resolution: {integrity: sha512-ly0cra+48hDmChxmIpnESKrc94LjRL80TEmZVscuQ/WWkRP81nNj8W8cCGMqbI4L6NCuAaPRSzZF1a9GlAxxnA==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      socket.io-adapter: ^2.5.4
+    dependencies:
+      debug: 4.3.7
+      notepack.io: 3.0.1
+      socket.io-adapter: 2.5.5
+      uid2: 1.0.0
+    transitivePeerDependencies:
+      - supports-color
     dev: false
 
   /@standard-schema/spec@1.0.0:
@@ -7398,6 +7415,10 @@ packages:
     engines: {node: '>=14.16'}
     dev: true
 
+  /notepack.io@3.0.1:
+    resolution: {integrity: sha512-TKC/8zH5pXIAMVQio2TvVDTtPRX+DJPHDqjRbxogtFiByHyzKmy96RA0JtCQJ+WouyyL4A10xomQzgbUT+1jCg==}
+    dev: false
+
   /npm-run-path@4.0.1:
     resolution: {integrity: sha512-S48WzZW777zhNIrn7gxOlISNAqi9ZC/uQFnRdbeIHhZhCA6UqpkOT8T1G7BvfdgP4Er8gF4sUbaS0i7QvIfCWw==}
     engines: {node: '>=8'}
@@ -9651,6 +9672,11 @@ packages:
     engines: {node: '>= 0.8'}
     dependencies:
       random-bytes: 1.0.0
+    dev: false
+
+  /uid2@1.0.0:
+    resolution: {integrity: sha512-+I6aJUv63YAcY9n4mQreLUt0d4lvwkkopDNmpomkAUz0fAkEMV9pRWxN0EjhW1YfRhcuyHg2v3mwddCDW1+LFQ==}
+    engines: {node: '>= 4.0.0'}
     dev: false
 
   /undici-types@6.21.0:

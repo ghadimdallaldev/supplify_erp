@@ -25,6 +25,10 @@ vi.mock('./whatsapp.service.js', () => ({
   sendWhatsAppMessage: vi.fn().mockResolvedValue({ sent: false, reason: 'NOT_CONFIGURED' }),
 }))
 
+vi.mock('../lib/socket.js', () => ({
+  emitNotificationNew: vi.fn(),
+}))
+
 describe('Notification Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -41,6 +45,7 @@ describe('Notification Service', () => {
   describe('sendNotification', () => {
     it('creates a notification and sends email when enabled', async () => {
       const { sendMail } = await import('./mailer.service.js')
+      const { emitNotificationNew } = await import('../lib/socket.js')
       const { getEntitlements } = await import('../lib/subscription.js')
       getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_and_email' } })
 
@@ -72,6 +77,7 @@ describe('Notification Service', () => {
           subject: 'New Order Received',
         })
       )
+      expect(emitNotificationNew).toHaveBeenCalled()
     })
 
     it('skips notification when preference is disabled', async () => {
