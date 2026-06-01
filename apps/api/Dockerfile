@@ -29,7 +29,6 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=4000
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 supplify
@@ -42,6 +41,7 @@ COPY --from=builder --chown=supplify:nodejs /app/apps/api/db/migrations ./apps/a
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/migrate.js ./apps/api/scripts/migrate.js
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/run-migration.js ./apps/api/scripts/run-migration.js
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/lib ./apps/api/scripts/lib
+COPY --from=builder --chown=supplify:nodejs /app/deploy/railway ./deploy/railway
 
 # Writable local upload root (STORAGE_DRIVER=local). Mount a Railway volume here for persistence.
 RUN mkdir -p /app/uploads && chown supplify:nodejs /app/uploads
@@ -50,4 +50,5 @@ USER supplify
 
 EXPOSE 4000
 
+# Listen on Railway-injected PORT at runtime (see deploy/railway/development/api.env)
 CMD ["node", "apps/api/src/server.js"]

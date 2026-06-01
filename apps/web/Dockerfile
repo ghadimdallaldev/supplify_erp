@@ -25,12 +25,16 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 
-ARG VITE_API_URL=http://localhost:4000
-ARG VITE_KEYCLOAK_URL=http://localhost:8080
-ARG VITE_KEYCLOAK_REALM=Supplify
-ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
-ENV VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM
+# Railway: Vite vars from deploy/railway/<env>/web.env (override with Docker build args if set)
+ARG RAILWAY_DEPLOY_ENV=development
+RUN cp "deploy/railway/${RAILWAY_DEPLOY_ENV}/web.env" apps/web/.env.production
+
+ARG VITE_API_URL=
+ARG VITE_KEYCLOAK_URL=
+ARG VITE_KEYCLOAK_REALM=
+RUN if [ -n "$VITE_API_URL" ]; then echo "VITE_API_URL=$VITE_API_URL" >> apps/web/.env.production; fi && \
+    if [ -n "$VITE_KEYCLOAK_URL" ]; then echo "VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL" >> apps/web/.env.production; fi && \
+    if [ -n "$VITE_KEYCLOAK_REALM" ]; then echo "VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM" >> apps/web/.env.production; fi
 
 # Build web only (skip tsc in container — typecheck runs in CI)
 RUN pnpm --filter @supplify/web build:docker
