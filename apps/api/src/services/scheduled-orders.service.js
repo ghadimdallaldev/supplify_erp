@@ -1,120 +1,170 @@
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { normalizeDaysOfWeek } from '../lib/quick-list-schedule.js'
 import { evaluateScheduledOrderLimit, incrementUsage } from '../lib/subscription.js'
 import { notifyScheduledOrderEvent } from './notification.service.js'
 
+const DUE_LISTS_BATCH_SIZE = 50
+
+const DUE_LISTS_SQL = `
+  SELECT ql.*, r.id AS restaurant_id
+  FROM quick_list ql
+  JOIN restaurant r ON r.id = ql.restaurant_id
+  WHERE ql.is_scheduled = true
+    AND ql.status = 'ACTIVE'
+    AND ql.next_execution_date <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
+    AND (
+      ql.next_execution_date < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
+      OR (
+        ql.next_execution_date = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
+        AND (
+          ql.preferred_time IS NULL
+          OR ql.preferred_time <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::time
+        )
+      )
+    )
+  ORDER BY ql.next_execution_date ASC, ql.preferred_time ASC NULLS LAST, ql.created_at ASC
+  LIMIT $1
+  FOR UPDATE OF ql SKIP LOCKED
+`
+
 /**
- * Execute scheduled quick lists and create orders if auto_create_order is true
+ * Execute scheduled quick lists and create orders if auto_create_order is true.
+ * Uses UTC for due-date matching, row locks, and a per-list daily execution ledger.
  */
 export async function executeScheduledOrders() {
   try {
-    logger.info('Checking for scheduled orders to execute...')
-
-    const today = new Date()
-    // Use local date, not UTC date, to match database DATE comparison
-    const year = today.getFullYear()
-    const month = String(today.getMonth() + 1).padStart(2, '0')
-    const day = String(today.getDate()).padStart(2, '0')
-    const todayDate = `${year}-${month}-${day}` // YYYY-MM-DD in local timezone
-    // Format time as HH:MM:SS for PostgreSQL TIME comparison
-    const hours = String(today.getHours()).padStart(2, '0')
-    const minutes = String(today.getMinutes()).padStart(2, '0')
-    const seconds = String(today.getSeconds()).padStart(2, '0')
-    const currentTime = `${hours}:${minutes}:${seconds}` // HH:MM:SS in local timezone
-
-    logger.info(
-      `Server time: ${todayDate} ${currentTime} (Local timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone})`
-    )
-
-    // Find all active scheduled quick lists ready to execute
-    // If next_execution_date is in the past, execute immediately (ignore preferred_time)
-    // If next_execution_date is today, check if preferred_time has passed
-    const { rows: scheduledLists } = await query(
-      `
-      SELECT ql.*, r.id as restaurant_id
-      FROM quick_list ql
-      JOIN restaurant r ON r.id = ql.restaurant_id
-      WHERE ql.is_scheduled = true
-        AND ql.status = 'ACTIVE'
-        AND ql.next_execution_date <= $1
-        AND (
-          -- If execution date is in the past, execute regardless of time
-          ql.next_execution_date < $1
-          -- Or if execution date is today, check if preferred time has passed (or is null)
-          OR (ql.next_execution_date = $1 AND (
-            ql.preferred_time IS NULL 
-            OR ql.preferred_time::time <= $2::time
-          ))
-        )
-      ORDER BY ql.next_execution_date ASC, ql.preferred_time ASC, ql.created_at ASC
-    `,
-      [todayDate, currentTime]
-    )
-
-    logger.debug('Scheduled orders check', {
-      todayDate,
-      currentTime,
-      readyCount: scheduledLists.length,
-    })
-
-    if (scheduledLists.length === 0) {
-      logger.info('No scheduled orders to execute today')
-      return { executed: 0, errors: 0 }
-    }
-
-    logger.info('Executing scheduled lists', { count: scheduledLists.length })
+    logger.info('Checking for scheduled orders to execute (UTC)...')
 
     let executed = 0
     let errors = 0
+    let skipped = 0
 
-    for (const quickList of scheduledLists) {
-      try {
-        // Check if we should create order or just send reminder
-        if (quickList.auto_create_order) {
-          await createOrderFromQuickList(quickList)
-          try {
-            await notifyScheduledOrderEvent(quickList, 'EXECUTED')
-          } catch (notifyError) {
-            logger.warn('Failed to send scheduled order execution notification', {
-              error: notifyError.message,
-              quickListId: quickList.id,
-            })
+    for (;;) {
+      const batchResult = await withTransaction(async (client) => {
+        const { rows: scheduledLists } = await client.query(DUE_LISTS_SQL, [DUE_LISTS_BATCH_SIZE])
+        if (scheduledLists.length === 0) {
+          return { done: true, executed: 0, errors: 0, skipped: 0 }
+        }
+
+        const {
+          rows: [{ today_date: executionDate }],
+        } = await client.query(`SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date AS today_date`)
+
+        let batchExecuted = 0
+        let batchErrors = 0
+        let batchSkipped = 0
+        const postCommitNotifications = []
+
+        for (const quickList of scheduledLists) {
+          const nextExecutionDate = computeNextExecutionDate(quickList)
+
+          const { rows: ledgerRows } = await client.query(
+            `
+            INSERT INTO quick_list_execution (
+              quick_list_id, restaurant_id, execution_date, outcome
+            ) VALUES ($1, $2, $3, 'skipped')
+            ON CONFLICT (quick_list_id, execution_date) DO NOTHING
+            RETURNING id
+          `,
+            [quickList.id, quickList.restaurant_id, executionDate]
+          )
+
+          if (ledgerRows.length === 0) {
+            batchSkipped++
+            await client.query(
+              `
+              UPDATE quick_list
+              SET next_execution_date = $1,
+                  last_execution_date = $2,
+                  updated_at = now()
+              WHERE id = $3
+            `,
+              [nextExecutionDate, executionDate, quickList.id]
+            )
+            continue
           }
-        } else {
+
+          const ledgerId = ledgerRows[0].id
+
+          await client.query(
+            `
+            UPDATE quick_list
+            SET next_execution_date = $1,
+                last_execution_date = $2,
+                updated_at = now()
+            WHERE id = $3
+          `,
+            [nextExecutionDate, executionDate, quickList.id]
+          )
+
+          let outcome = 'reminder'
+          let errorMessage = null
+
           try {
-            await notifyScheduledOrderEvent(quickList, 'REMINDER')
-          } catch (notifyError) {
-            logger.warn('Failed to send scheduled order reminder', {
-              error: notifyError.message,
-              quickListId: quickList.id,
+            if (quickList.auto_create_order) {
+              await createOrderFromQuickList(quickList, client)
+              outcome = 'executed'
+            }
+            batchExecuted++
+          } catch (error) {
+            outcome = 'failed'
+            errorMessage = error.message
+            batchErrors++
+            logger.error(`Failed to execute scheduled quick list ${quickList.id}:`, error)
+          }
+
+          await client.query(
+            `
+            UPDATE quick_list_execution
+            SET outcome = $1, error_message = $2
+            WHERE id = $3
+          `,
+            [outcome, errorMessage, ledgerId]
+          )
+
+          if (outcome === 'executed' || outcome === 'reminder') {
+            postCommitNotifications.push({
+              quickList,
+              notifyType: outcome === 'executed' ? 'EXECUTED' : 'REMINDER',
             })
           }
         }
 
-        // Update next execution date
-        await updateNextExecutionDate(quickList)
+        return {
+          done: scheduledLists.length < DUE_LISTS_BATCH_SIZE,
+          executed: batchExecuted,
+          errors: batchErrors,
+          skipped: batchSkipped,
+          postCommitNotifications,
+        }
+      })
 
-        // Update last execution date
-        await query(
-          `
-          UPDATE quick_list
-          SET last_execution_date = $1, updated_at = now()
-          WHERE id = $2
-        `,
-          [todayDate, quickList.id]
-        )
+      executed += batchResult.executed
+      errors += batchResult.errors
+      skipped += batchResult.skipped
 
-        executed++
-        logger.info(`✓ Executed scheduled quick list: ${quickList.name} (${quickList.id})`)
-      } catch (error) {
-        errors++
-        logger.error(`✗ Failed to execute scheduled quick list ${quickList.id}:`, error)
+      for (const { quickList, notifyType } of batchResult.postCommitNotifications ?? []) {
+        try {
+          await notifyScheduledOrderEvent(quickList, notifyType)
+        } catch (notifyError) {
+          logger.warn('Failed to send scheduled order notification', {
+            error: notifyError.message,
+            quickListId: quickList.id,
+          })
+        }
       }
+
+      if (batchResult.done) break
     }
 
-    logger.info(`Scheduled orders execution completed: ${executed} executed, ${errors} errors`)
-    return { executed, errors }
+    if (executed === 0 && errors === 0 && skipped === 0) {
+      logger.info('No scheduled orders to execute today')
+    } else {
+      logger.info('Scheduled orders execution completed', { executed, errors, skipped })
+    }
+
+    return { executed, errors, skipped }
   } catch (error) {
     logger.error('Error executing scheduled orders:', error)
     throw error
@@ -122,11 +172,12 @@ export async function executeScheduledOrders() {
 }
 
 /**
- * Create order from quick list items
+ * Create order from quick list items (within an open transaction when client is passed).
  */
-async function createOrderFromQuickList(quickList) {
-  // Get quick list items
-  const { rows: items } = await query(
+async function createOrderFromQuickList(quickList, client) {
+  const q = client ? client.query.bind(client) : query
+
+  const { rows: items } = await q(
     `
     SELECT qli.*, p.name as product_name, p.sku
     FROM quick_list_item qli
@@ -164,7 +215,6 @@ async function createOrderFromQuickList(quickList) {
     })
   }
 
-  // Group items by supplier
   const supplierGroups = new Map()
   for (const item of items) {
     if (!supplierGroups.has(item.supplier_id)) {
@@ -173,14 +223,12 @@ async function createOrderFromQuickList(quickList) {
     supplierGroups.get(item.supplier_id).push(item)
   }
 
-  // Create orders (one per supplier)
   const createdOrders = []
 
   for (const [supplierId, supplierItems] of supplierGroups) {
-    // Get current prices for all products
     const productIds = supplierItems.map((item) => item.product_id)
 
-    const { rows: products } = await query(
+    const { rows: products } = await q(
       `
       SELECT p.*, pr.amount as current_price, pr.currency
       FROM product p
@@ -193,7 +241,6 @@ async function createOrderFromQuickList(quickList) {
 
     const priceMap = new Map(products.map((p) => [p.id, p]))
 
-    // Calculate order total
     let totalAmount = 0
     const orderItems = []
 
@@ -223,10 +270,9 @@ async function createOrderFromQuickList(quickList) {
       continue
     }
 
-    // Create order - customer_order doesn't have supplier_id, it's in order_item
     const {
       rows: [order],
-    } = await query(
+    } = await q(
       `
       INSERT INTO customer_order (
         restaurant_id, status, total_amount, placed_at, placement_source
@@ -236,9 +282,8 @@ async function createOrderFromQuickList(quickList) {
       [restaurantId, totalAmount]
     )
 
-    // Create order items
     for (const item of orderItems) {
-      await query(
+      await q(
         `
         INSERT INTO order_item (
           order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
@@ -255,8 +300,7 @@ async function createOrderFromQuickList(quickList) {
         ]
       )
 
-      // Update inventory
-      await query(
+      await q(
         `
         UPDATE inventory 
         SET available_qty = available_qty - $1, updated_at = now()
@@ -285,27 +329,30 @@ async function createOrderFromQuickList(quickList) {
 }
 
 /**
- * Update next execution date based on frequency
+ * Compute next execution date based on frequency (UTC calendar dates).
  */
-async function updateNextExecutionDate(quickList) {
+export function computeNextExecutionDate(quickList) {
   const today = new Date()
+  const utcToday = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+  )
+  let cursor = new Date(utcToday)
   let nextExecutionDate
 
   switch (quickList.frequency) {
     case 'DAILY': {
-      today.setDate(today.getDate() + 1)
-      nextExecutionDate = today.toISOString().split('T')[0]
+      cursor.setUTCDate(cursor.getUTCDate() + 1)
+      nextExecutionDate = formatUtcDate(cursor)
       break
     }
 
     case 'WEEKLY': {
-      today.setDate(today.getDate() + 7)
-      nextExecutionDate = today.toISOString().split('T')[0]
+      cursor.setUTCDate(cursor.getUTCDate() + 7)
+      nextExecutionDate = formatUtcDate(cursor)
       break
     }
 
     case 'WEEKLY_3X': {
-      // Find the next scheduled day
       const dayNames = [
         'SUNDAY',
         'MONDAY',
@@ -315,55 +362,50 @@ async function updateNextExecutionDate(quickList) {
         'FRIDAY',
         'SATURDAY',
       ]
-      const currentDay = today.getDay()
+      const currentDay = cursor.getUTCDay()
       const scheduledDays = normalizeDaysOfWeek(quickList.days_of_week) || []
 
-      // Find the next scheduled day within the next 7 days
       for (let i = 1; i <= 7; i++) {
         const nextDay = (currentDay + i) % 7
         const nextDayName = dayNames[nextDay]
         if (scheduledDays.includes(nextDayName)) {
-          today.setDate(today.getDate() + i)
-          nextExecutionDate = today.toISOString().split('T')[0]
+          cursor.setUTCDate(cursor.getUTCDate() + i)
+          nextExecutionDate = formatUtcDate(cursor)
           break
         }
       }
 
-      // If no day found, default to next week
       if (!nextExecutionDate) {
-        today.setDate(today.getDate() + 7)
-        nextExecutionDate = today.toISOString().split('T')[0]
+        cursor.setUTCDate(cursor.getUTCDate() + 7)
+        nextExecutionDate = formatUtcDate(cursor)
       }
       break
     }
 
     case 'BIWEEKLY': {
-      today.setDate(today.getDate() + 14)
-      nextExecutionDate = today.toISOString().split('T')[0]
+      cursor.setUTCDate(cursor.getUTCDate() + 14)
+      nextExecutionDate = formatUtcDate(cursor)
       break
     }
 
     case 'MONTHLY': {
-      today.setMonth(today.getMonth() + 1)
-      nextExecutionDate = today.toISOString().split('T')[0]
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+      nextExecutionDate = formatUtcDate(cursor)
       break
     }
 
     default: {
-      // Default to next week if frequency is unknown
-      today.setDate(today.getDate() + 7)
-      nextExecutionDate = today.toISOString().split('T')[0]
+      cursor.setUTCDate(cursor.getUTCDate() + 7)
+      nextExecutionDate = formatUtcDate(cursor)
     }
   }
 
-  await query(
-    `
-    UPDATE quick_list
-    SET next_execution_date = $1, updated_at = now()
-    WHERE id = $2
-  `,
-    [nextExecutionDate, quickList.id]
-  )
-
   return nextExecutionDate
+}
+
+function formatUtcDate(date) {
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(date.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }

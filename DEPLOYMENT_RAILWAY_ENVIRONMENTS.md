@@ -194,4 +194,4 @@ API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 - `STORAGE_DRIVER=local` on prod (validation fails)
 - Committing `.env` files with real secrets
 
-See also: [DEPLOYMENT_RAILWAY.md](DEPLOYMENT_RAILWAY.md) (single-env overview), [.env.matrix.md](.env.matrix.md).
+See also: [DEPLOYMENT_RAILWAY.md](DEPLOYMENT_RAILWAY.md) (single-env overview), [.env.matrix.md](.env.matrix.md), [docs/operations/CRON_JOBS.md](docs/operations/CRON_JOBS.md) (in-process scheduled jobs and env vars).
