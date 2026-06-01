@@ -43,6 +43,10 @@ export function createLocalStorageProvider(cfg) {
 
     buildPublicUrl(fileKey) {
       const key = String(fileKey || '').replace(/^\/+/, '')
+      if (cfg.STORAGE_PUBLIC_READ === false) {
+        const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
+        return `${apiBase}/api/files/object?key=${encodeURIComponent(key)}`
+      }
       return `${publicBase}/${key}`
     },
 
@@ -88,6 +92,20 @@ export function createLocalStorageProvider(cfg) {
       await fs.writeFile(dest, body)
       logger.info('Local storage upload complete', { fileKey: safeKey, bytes: body.length })
       return { fileKey: safeKey }
+    },
+
+    async getObjectStream(fileKey) {
+      const safeKey = String(fileKey || '').replace(/^\/+/, '')
+      if (!safeKey || safeKey.includes('..')) {
+        throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
+      }
+      const dest = path.join(rootDir, safeKey)
+      const data = await fs.readFile(dest)
+      return {
+        body: data,
+        contentType: 'application/octet-stream',
+        contentLength: data.length,
+      }
     },
   }
 }
