@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import {
   useGetQuickListsQuery,
   useCreateQuickListMutation,
@@ -16,7 +16,6 @@ import {
   CardStatusBadges,
   cardActionBtnClass,
   cardShellClass,
-  pageHeaderRowClass,
 } from '../components/ui/card-layout'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -63,7 +62,59 @@ import {
   getQuickListScheduleGate,
 } from '../lib/planLimits'
 import { LimitExceededBanner } from '../components/LimitExceededBanner'
+import { EmptyState } from '../components/ui/empty-state'
+import { PageHeader } from '../components/ui/page-header'
 import { formatDaysOfWeekLabel, parseDaysOfWeek } from '../utils/parseDaysOfWeek'
+import { cn } from '../lib/utils'
+
+function QuickListStatCard({
+  label,
+  value,
+  hint,
+  icon,
+  iconWrapClassName,
+  active,
+  onClick,
+}: {
+  label: string
+  value: number | string
+  hint?: string
+  icon: ReactNode
+  iconWrapClassName: string
+  active?: boolean
+  onClick?: () => void
+}) {
+  const Comp = onClick ? 'button' : 'div'
+  return (
+    <Comp
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-start justify-between gap-3 rounded-xl border bg-[var(--surface)] p-4 text-left shadow-sm transition',
+        'border-[var(--app-border-mid)]',
+        onClick &&
+          'hover:border-[var(--brand-mid)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]',
+        active && 'border-[var(--brand-mid)] ring-2 ring-[var(--brand-pale)]'
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+          {label}
+        </p>
+        <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--text)]">{value}</p>
+        {hint && <p className="mt-1 text-xs text-[var(--text-muted)] line-clamp-2">{hint}</p>}
+      </div>
+      <div
+        className={cn(
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+          iconWrapClassName
+        )}
+      >
+        {icon}
+      </div>
+    </Comp>
+  )
+}
 
 export function QuickListsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -366,11 +417,20 @@ export function QuickListsPage() {
   // Calculate statistics (coerce item_count to number - API may return it as string from PostgreSQL COUNT)
   const stats = useMemo(() => {
     const lists = data?.quickLists || []
+    const scheduledActive = lists.filter((l: any) => l.is_scheduled && l.status === 'ACTIVE')
+    const nextScheduled = scheduledActive
+      .filter((l: any) => l.next_execution_date)
+      .sort((a: any, b: any) =>
+        String(a.next_execution_date).localeCompare(String(b.next_execution_date))
+      )[0]
+
     return {
       total: lists.length,
-      scheduled: lists.filter((l: any) => l.is_scheduled && l.status === 'ACTIVE').length,
+      scheduled: scheduledActive.length,
       active: lists.filter((l: any) => l.status === 'ACTIVE').length,
       totalItems: lists.reduce((sum: number, l: any) => sum + Number(l.item_count ?? 0), 0),
+      nextScheduledName: nextScheduled?.name as string | undefined,
+      nextScheduledDate: nextScheduled?.next_execution_date as string | undefined,
     }
   }, [data?.quickLists])
 
@@ -499,7 +559,7 @@ export function QuickListsPage() {
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="quick lists">
-      <div className="space-y-6 p-6" data-testid="quick-lists-page">
+      <div className="space-y-5" data-testid="quick-lists-page">
         {!quickListCreateGate.canUse && quickListCreateGate.limit != null && (
           <LimitExceededBanner
             limitKey="quick_lists"
@@ -528,158 +588,199 @@ export function QuickListsPage() {
               upgradeUrl="/app/settings?tab=subscription"
             />
           )}
-        <div className={pageHeaderRowClass}>
-          <div className="min-w-0">
-            <h1 className="text-[21px] font-black text-[var(--text)]">Quick Lists</h1>
-            <p className="text-[var(--text-muted)] mt-2">
-              Create lists for recurring orders and save time
-            </p>
-          </div>
-          <Button
-            className="shrink-0 whitespace-normal"
-            onClick={() => setShowCreateDialog(true)}
-            disabled={!quickListCreateGate.canUse}
-            title={quickListCreateGate.message || undefined}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create List
-          </Button>
+        <PageHeader
+          title="Quick Lists"
+          description="Save product sets and automate recurring orders on a schedule."
+          actions={
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              disabled={!quickListCreateGate.canUse}
+              title={quickListCreateGate.message || undefined}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create List
+            </Button>
+          }
+        />
+
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+          <QuickListStatCard
+            label="Total lists"
+            value={stats.total}
+            hint={
+              quickListCreateGate.limit != null
+                ? `${quickListCreateGate.current ?? stats.total} / ${quickListCreateGate.limit} on plan`
+                : undefined
+            }
+            icon={<Package className="h-5 w-5 text-[var(--brand-mid)]" />}
+            iconWrapClassName="bg-[var(--brand-pale)]"
+            active={filterStatus === 'all' && stats.total > 0}
+            onClick={stats.total > 0 ? () => setFilterStatus('all') : undefined}
+          />
+          <QuickListStatCard
+            label="Scheduled"
+            value={stats.scheduled}
+            hint={
+              stats.nextScheduledName && stats.nextScheduledDate
+                ? `Next: ${stats.nextScheduledName} · ${stats.nextScheduledDate}`
+                : quickListSchedulingEnabled && scheduledQuickListGate.limit != null
+                  ? `${scheduledQuickListGate.current ?? stats.scheduled} / ${scheduledQuickListGate.limit} slots`
+                  : 'Auto-order on a cadence'
+            }
+            icon={<Clock className="h-5 w-5 text-[var(--mint)]" />}
+            iconWrapClassName="bg-[var(--mint)]/15"
+            active={filterStatus === 'scheduled'}
+            onClick={stats.total > 0 ? () => setFilterStatus('scheduled') : undefined}
+          />
+          <QuickListStatCard
+            label="Active"
+            value={stats.active}
+            hint="Lists ready to use or run"
+            icon={<CheckCircle className="h-5 w-5 text-[var(--brand-mid)]" />}
+            iconWrapClassName="bg-[var(--brand-pale)]"
+          />
+          <QuickListStatCard
+            label="Total items"
+            value={stats.totalItems}
+            hint={
+              quickListItemGate.limit != null
+                ? `Up to ${quickListItemGate.limit} items per list`
+                : 'Products across all lists'
+            }
+            icon={<TrendingUp className="h-5 w-5 text-[var(--amber-mid)]" />}
+            iconWrapClassName="bg-[var(--amber-pale)]"
+          />
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Lists</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.total}</p>
-                </div>
-                <Package className="h-8 w-8 text-[var(--brand-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Scheduled</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.scheduled}</p>
-                </div>
-                <Clock className="h-8 w-8 text-[var(--mint)]" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Active</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.active}</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-[var(--brand-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">Total Items</p>
-                  <p className="text-2xl font-bold text-[var(--text)]">{stats.totalItems}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-[var(--amber-mid)]" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search and Filters */}
         {quickLists.length > 0 && (
-          <Card className="overflow-visible">
-            <CardContent className="px-4 py-4 sm:px-6 sm:py-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-4">
-                <div className="relative min-w-0 w-full flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-                  <Input
-                    placeholder="Search quick lists..."
-                    value={listSearch}
-                    onChange={(e) => setListSearch(e.target.value)}
-                    className="h-11 w-full rounded-lg pl-10 pr-3"
-                  />
-                </div>
-                <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0">
-                  <Button
-                    variant={filterStatus === 'all' ? 'default' : 'outline'}
-                    className="h-10 min-w-0 flex-1 whitespace-nowrap rounded-lg px-3 sm:flex-none"
-                    onClick={() => setFilterStatus('all')}
-                  >
-                    <Filter className="h-4 w-4 mr-1 shrink-0" />
-                    All
-                  </Button>
-                  <Button
-                    variant={filterStatus === 'scheduled' ? 'default' : 'outline'}
-                    className="h-10 min-w-0 flex-1 whitespace-nowrap rounded-lg px-3 sm:flex-none"
-                    onClick={() => setFilterStatus('scheduled')}
-                  >
-                    <Clock className="h-4 w-4 mr-1 shrink-0" />
-                    Scheduled
-                  </Button>
-                  <Button
-                    variant={filterStatus === 'unscheduled' ? 'default' : 'outline'}
-                    className="h-10 min-w-0 flex-1 whitespace-nowrap rounded-lg px-3 sm:flex-none"
-                    onClick={() => setFilterStatus('unscheduled')}
-                  >
-                    <Package className="h-4 w-4 mr-1 shrink-0" />
-                    Unscheduled
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col gap-3 rounded-xl border border-[var(--app-border-mid)] bg-[var(--surface)] p-3 shadow-sm sm:flex-row sm:items-center sm:p-4">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                aria-hidden
+              />
+              <Input
+                placeholder="Search by name or description…"
+                value={listSearch}
+                onChange={(e) => setListSearch(e.target.value)}
+                className="h-10 w-full rounded-lg border-[var(--app-border-mid)] pl-10"
+                aria-label="Search quick lists"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 sm:shrink-0">
+              <Button
+                variant={filterStatus === 'all' ? 'default' : 'outline'}
+                size="sm"
+                className="h-10 rounded-lg"
+                onClick={() => setFilterStatus('all')}
+              >
+                <Filter className="h-4 w-4 mr-1.5" />
+                All
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+                  {stats.total}
+                </Badge>
+              </Button>
+              <Button
+                variant={filterStatus === 'scheduled' ? 'default' : 'outline'}
+                size="sm"
+                className="h-10 rounded-lg"
+                onClick={() => setFilterStatus('scheduled')}
+              >
+                <Clock className="h-4 w-4 mr-1.5" />
+                Scheduled
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+                  {stats.scheduled}
+                </Badge>
+              </Button>
+              <Button
+                variant={filterStatus === 'unscheduled' ? 'default' : 'outline'}
+                size="sm"
+                className="h-10 rounded-lg"
+                onClick={() => setFilterStatus('unscheduled')}
+              >
+                <Package className="h-4 w-4 mr-1.5" />
+                Manual
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+                  {stats.total - stats.scheduled}
+                </Badge>
+              </Button>
+            </div>
+          </div>
         )}
 
-        {/* Quick Lists Grid */}
         {quickLists.length === 0 ? (
-          <Card>
-            <CardContent className="pt-12 pb-12">
-              <div className="text-center">
-                <List className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-[var(--text)] mb-2">
-                  No quick lists yet
-                </h3>
-                <p className="text-[var(--text-muted)] mb-6">
-                  Create your first quick list to save products for recurring orders
-                </p>
-                <Button onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Quick List
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : filteredLists.length === 0 ? (
-          <Card>
-            <CardContent className="pt-12 pb-12">
-              <div className="text-center">
-                <Search className="h-16 w-16 text-[var(--text-muted)] mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-[var(--text)] mb-2">No lists found</h3>
-                <p className="text-[var(--text-muted)] mb-6">
-                  Try adjusting your search or filter criteria
-                </p>
+          <div className="space-y-4">
+            <EmptyState
+              title="No quick lists yet"
+              description="Build a list once, reorder in one click, or let Supplify place orders on your schedule."
+              icon={<List className="h-6 w-6" aria-hidden />}
+              action={
                 <Button
-                  variant="outline"
-                  onClick={() => {
-                    setListSearch('')
-                    setFilterStatus('all')
-                  }}
+                  onClick={() => setShowCreateDialog(true)}
+                  disabled={!quickListCreateGate.canUse}
                 >
-                  <X className="h-4 w-4 mr-2" />
-                  Clear Filters
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create your first list
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
+              }
+            />
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                {
+                  step: '1',
+                  title: 'Create a list',
+                  body: 'Name it and add products from your catalog.',
+                  icon: Package,
+                },
+                {
+                  step: '2',
+                  title: 'Set a schedule',
+                  body: quickListSchedulingEnabled
+                    ? 'Choose daily, weekly, or custom days with optional auto-order.'
+                    : 'Upgrade your plan to enable scheduled automation.',
+                  icon: Calendar,
+                },
+                {
+                  step: '3',
+                  title: 'Reorder faster',
+                  body: 'Send the whole list to cart or let orders run automatically.',
+                  icon: Zap,
+                },
+              ].map(({ step, title, body, icon: Icon }) => (
+                <div
+                  key={step}
+                  className="rounded-xl border border-[var(--app-border-mid)] bg-[var(--surface)] p-4 shadow-sm"
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--brand-pale)] text-xs font-bold text-[var(--brand-mid)]">
+                      {step}
+                    </span>
+                    <Icon className="h-4 w-4 text-[var(--brand-mid)]" aria-hidden />
+                    <span className="text-sm font-semibold text-[var(--text)]">{title}</span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-[var(--text-muted)]">{body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : filteredLists.length === 0 ? (
+          <EmptyState
+            title="No lists match your filters"
+            description="Try a different search term or show all lists."
+            icon={<Search className="h-6 w-6" aria-hidden />}
+            action={
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setListSearch('')
+                  setFilterStatus('all')
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear filters
+              </Button>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredLists.map((list: any) => (
