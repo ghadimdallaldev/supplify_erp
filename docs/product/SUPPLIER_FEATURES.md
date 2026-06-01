@@ -1060,7 +1060,7 @@ Settings → Configure
 4. 🔄 PDF Export (packing slip JSON returned, PDF generation planned)
 5. 🔄 Email Notifications (SendGrid integration ready, requires API keys)
 6. 🔄 SMS Notifications (Twilio integration ready, requires API keys)
-7. 🔄 Real-time Order Updates (WebSocket planned)
+7. ✅ **Real-time order/chat updates** (Socket.IO — chat messages, typing, read receipts, `notification_new` toasts)
 
 ### Key Implementation Highlights:
 

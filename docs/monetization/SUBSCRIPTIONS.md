@@ -2,7 +2,7 @@
 
 Plans are split by **tenant type**: each of Free, Silver, Gold, and Platinum exists as separate rows for **RESTAURANT** and **SUPPLIER** (`subscription_plan.code`). Limit keys are normalized per tenant type.
 
-**Canonical source (live DB):** migrations `0116_rename_bronze_to_silver.sql`, `0117_silver_tier_limits_features.sql`, `0119_gold_tier_limits_features.sql`, `0120_platinum_tier_limits_features.sql`. Verify anytime with `pnpm run log:tier-limits`.
+**Canonical source (live DB):** migrations `0116_rename_bronze_to_silver.sql`, `0117_silver_tier_limits_features.sql`, `0119_gold_tier_limits_features.sql`, `0120_platinum_tier_limits_features.sql`, `0131_free_trial_deal_redemptions.sql`. Verify anytime with `pnpm run log:tier-limits`.
 
 **Platinum catalog-only strings:** Several Platinum feature values are marketing/catalog until implemented — see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md).
 
@@ -143,7 +143,7 @@ Top self-serve tier: most operational meters **unlimited** (`-1`), but **branche
 | Gold     |        2 |    15 |        100 |        30 | 3,000 |       500 |         30 |   10 GB |
 | Platinum |        3 |     ∞ |          ∞ |         ∞ |     ∞ |         ∞ |          ∞ |   30 GB |
 
-**Also (restaurant):** quick_lists **50**, quick_list_items **500**, scheduled_quick_lists **15**, deal_redemptions_per_day **50** on Gold — see Gold table above and [PLANS.md](./PLANS.md).
+**Also (restaurant):** `deal_redemptions_per_day` **1** on Free (migration `0131`), **10** on Silver, **50** on Gold; quick_lists **50**, quick_list_items **500**, scheduled_quick_lists **15** on Gold — see [PLANS.md](./PLANS.md).
 
 **Branches** = org-wide active location accounts (main + linked). **Add-ons** (Gold/Platinum only): see [FINAL_TIER_MATRIX.md](./FINAL_TIER_MATRIX.md) §5b. Effective limit = included + add-ons + overrides. Hard cap: **6 branches** → Enterprise.
 

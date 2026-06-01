@@ -161,17 +161,17 @@ The app is a **multi-tenant ERP/marketplace** with three primary logged-in perso
 
 ### 5.3 Chat & collaboration
 
-| Feature                        | Web route    | API                                                                                                            |
-| ------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------- |
-| Conversations list             | `/app/chat`  | `GET /api/chat/conversations`                                                                                  |
-| Messages (REST)                | Chat         | `GET/POST .../messages`                                                                                        |
-| Real-time messages (Socket.IO) | Chat         | `send_message`, `new_message` events                                                                           |
-| Shared Socket.IO client        | Chat, Layout | `getChatSocket` / `getLayoutSocket` + `getSocketBaseUrl()` (one connection per user; avoids Strict Mode churn) |
-| Read receipts                  | Chat         | PATCH read endpoints                                                                                           |
-| Message replies                | Chat         | `replyTo` on messages                                                                                          |
-| Attachments in chat            | Chat         | Files + chat                                                                                                   |
-| Delete conversation            | Chat         | `DELETE .../conversations/:id`                                                                                 |
-| Admin-started conversations    | —            | Admin chat endpoints                                                                                           |
+| Feature                        | Web route    | API                                                                                                          |
+| ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------ |
+| Conversations list             | `/app/chat`  | `GET /api/chat/conversations`                                                                                |
+| Messages (REST)                | Chat         | `GET/POST .../messages`                                                                                      |
+| Real-time messages (Socket.IO) | Chat         | `send_message`, `new_message`, `typing`, read receipts; `notification_new`, `entitlements_refresh` on layout |
+| Shared Socket.IO client        | Chat, Layout | `getAppSocket()` + `getSocketBaseUrl()` (one connection per user; Redis adapter when `REDIS_URL` set)        |
+| Read receipts                  | Chat         | PATCH read endpoints                                                                                         |
+| Message replies                | Chat         | `replyTo` on messages                                                                                        |
+| Attachments in chat            | Chat         | Files + chat                                                                                                 |
+| Delete conversation            | Chat         | `DELETE .../conversations/:id`                                                                               |
+| Admin-started conversations    | —            | Admin chat endpoints                                                                                         |
 
 ### 5.4 Inventory & receiving
 
@@ -350,24 +350,24 @@ Also available via API (not always separate pages):
 
 ## 8. Cross-cutting platform services
 
-| Service                       | Description                                                                                  |
-| ----------------------------- | -------------------------------------------------------------------------------------------- |
-| **File storage**              | S3/MinIO presigned uploads; product images; attachments; storage quota metering              |
-| **Notifications**             | In-app log, email (SendGrid/SMTP), WhatsApp (Twilio), Web Push (VAPID); user preferences     |
-| **Web Push (PWA)**            | `usePushNotifications`, service worker `static/sw.js`, `/api/push/*` (opt-in `push_enabled`) |
-| **Realtime**                  | Socket.IO for chat + layout events (cookie JWT auth; shared client per user)                 |
-| **Audit logging**             | Admin actions, impersonation, plan changes                                                   |
-| **Conversion events**         | Upgrade funnel analytics (view plans, blocked limits, etc.)                                  |
-| **System events**             | API error observability                                                                      |
-| **Redis**                     | Order calendar cache                                                                         |
-| **Rate limiting**             | Global, auth, public, staff-link, chat-send limiters                                         |
-| **Plan enforcement**          | `requireFeature()`, `checkLimit()`, usage meters                                             |
-| **Billing access middleware** | Locked tenants → billing/subscription routes only                                            |
-| **Monetization UI**           | Upgrade modals, limit banners, pay-overdue modal                                             |
-| **Impersonation banner**      | Sticky “Impersonating …” + exit; `useImpersonation` drives tenant UI                         |
-| **Branch context**            | Active branch cookie/header for multi-site ops                                               |
-| **i18n-ready product data**   | Product `name_ar`, `description_ar` fields                                                   |
-| **Demo data & seeds**         | Extensive seed scripts for dev/demo                                                          |
+| Service                       | Description                                                                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **File storage**              | S3/MinIO presigned uploads; product images; attachments; storage quota metering                                  |
+| **Notifications**             | In-app log, email (SendGrid/SMTP), WhatsApp (Twilio), Web Push (VAPID); user preferences                         |
+| **Web Push (PWA)**            | `usePushNotifications`, service worker `static/sw.js`, `/api/push/*` (opt-in `push_enabled`)                     |
+| **Realtime**                  | Socket.IO for chat + layout events (cookie JWT auth; `getAppSocket()`; optional Redis adapter for multi-replica) |
+| **Audit logging**             | Admin actions, impersonation, plan changes                                                                       |
+| **Conversion events**         | Upgrade funnel analytics (view plans, blocked limits, etc.)                                                      |
+| **System events**             | API error observability                                                                                          |
+| **Redis**                     | Order calendar cache                                                                                             |
+| **Rate limiting**             | Global, auth, public, staff-link, chat-send limiters                                                             |
+| **Plan enforcement**          | `requireFeature()`, `checkLimit()`, usage meters                                                                 |
+| **Billing access middleware** | Locked tenants → billing/subscription routes only                                                                |
+| **Monetization UI**           | Upgrade modals, limit banners, pay-overdue modal                                                                 |
+| **Impersonation banner**      | Sticky “Impersonating …” + exit; `useImpersonation` drives tenant UI                                             |
+| **Branch context**            | Active branch cookie/header for multi-site ops                                                                   |
+| **i18n-ready product data**   | Product `name_ar`, `description_ar` fields                                                                       |
+| **Demo data & seeds**         | Extensive seed scripts for dev/demo                                                                              |
 
 ---
 

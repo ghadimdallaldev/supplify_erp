@@ -16,6 +16,7 @@ Previously many events only notified the single `contact_email` user; team membe
 | Channel  | When                                                                                                             |
 | -------- | ---------------------------------------------------------------------------------------------------------------- |
 | In-app   | `notification_log` + header bell; foreground **toast** + optional **browser** banner via `useNotificationAlerts` |
+| Realtime | Socket.IO `notification_new` and `entitlements_refresh` on shared app socket (sub-second foreground alerts)      |
 | Email    | Plan tier + `email_enabled` + per-category `notify_*` toggle                                                     |
 | WhatsApp | Tier + toggle; often a `wa.me` link in metadata                                                                  |
 | Web Push | `push_enabled` + VAPID; see [push-notifications.md](./push-notifications.md)                                     |

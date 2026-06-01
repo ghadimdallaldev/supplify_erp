@@ -4,21 +4,22 @@ Restaurant front-of-house: floor plan, day board, table assignment, public booki
 
 ## Web routes
 
-| Route                        | Purpose                                      |
-| ---------------------------- | -------------------------------------------- |
-| `/app/reservations`          | Board, table builder, analytics, assignments |
-| `/reserve`, `/reserve/:slug` | Guest booking portal                         |
-| `/reserve/manage/:token`     | Guest cancel / reschedule                    |
-| `/reserve/confirmation`      | Post-booking confirmation                    |
+| Route                                                                 | Purpose                                                                       |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `/app/reservations`                                                   | Board, table builder, analytics, assignments (branch-aware when multi-branch) |
+| `/reserve`, `/reserve/:slug`                                          | Guest booking portal                                                          |
+| `/reserve/manage/:token`                                              | Guest cancel / reschedule                                                     |
+| `/reserve/waitlist/:token/accept`, `/reserve/waitlist/:token/decline` | Guest waitlist table offer response                                           |
+| `/reserve/confirmation`                                               | Post-booking confirmation                                                     |
 
 ## API (high level)
 
-| Area          | Endpoints                                                                                |
-| ------------- | ---------------------------------------------------------------------------------------- |
-| Board / CRUD  | `GET/POST/PATCH /api/reservations`, `PATCH /api/reservations/:id/tables`                 |
-| Availability  | Shared `reservation-availability.js`; public `GET /api/public/reservations/availability` |
-| Public manage | `POST /api/public/reservations/manage/cancel`, `.../reschedule`                          |
-| Waitlist      | See [waitlist-auto-promotion.md](./waitlist-auto-promotion.md)                           |
+| Area          | Endpoints                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| Board / CRUD  | `GET/POST/PATCH /api/reservations`, `PATCH /api/reservations/:id/tables`                                 |
+| Availability  | Shared `reservation-availability.js`; public `GET /api/public/reservations/availability`                 |
+| Public manage | `POST /api/public/reservations/manage/cancel`, `.../reschedule` (parity with staff cancel notifications) |
+| Waitlist      | See [waitlist-auto-promotion.md](./waitlist-auto-promotion.md)                                           |
 
 Migration `0103_reservation_availability_indexes.sql` supports slot/overlap queries.
 
@@ -50,4 +51,9 @@ Foreground alerts: `useNotificationAlerts` in `Layout` (toast ~10s, sound, brows
 
 - [waitlist-auto-promotion.md](./waitlist-auto-promotion.md)
 - [features.md](../product/features.md) — Reservations section
-- [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) — Part 5 (public), §6.8 (RST-35+)
+- [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) — Part 5 (PUB-\*), §6.8 (RST-35+, RST-42a–c), waitlist offers (PUB-14–16)
+
+## Tests
+
+- API: `reservations.routes.test.js`, `public.routes.test.js`, `reservation-availability.test.js`, `waitlistPromotion.test.js`
+- Web: `ReservationsPage.test.tsx`, `PublicReservationWaitlistOffer.test.tsx`, `reservation-tables.test.ts`

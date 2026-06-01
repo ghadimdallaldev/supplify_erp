@@ -22,12 +22,13 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | `/login`                                                                        | Public                                                |
 | `/register/complete`                                                            | Pending / needs setup                                 |
 | `/reserve`, `/reserve/:slug`, `/reserve/confirmation`, `/reserve/manage/:token` | Guest                                                 |
+| `/reserve/waitlist/:token/accept`, `/reserve/waitlist/:token/decline`           | Guest (waitlist table offer)                          |
 | `/staff`, `/staff/login`, `/staff/dashboard`                                    | Staff portal (operational staff; not `/app`)          |
 | `/app/dashboard`, `/`                                                           | Restaurant / Supplier / Admin (impersonating)         |
 | `/app/activate`                                                                 | Locked tenant billing activation                      |
 | `/app/orders`, `/app/orders/:id`                                                | Restaurant & Supplier                                 |
 | `/app/products`, `/app/products/:id`                                            | Both (supplier edits catalog)                         |
-| `/app/cart`, `/app/quick-lists`                                                 | Restaurant                                            |
+| `/app/cart`, `/app/quick-lists`, `/app/deals`                                   | Restaurant                                            |
 | `/app/restaurant-inventory`                                                     | Restaurant (`INVENTORY_VIEW`)                         |
 | `/app/receiving`                                                                | Restaurant                                            |
 | `/app/reservations`                                                             | Restaurant (`RESERVATIONS_VIEW`)                      |
@@ -194,28 +195,28 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 
 ## 3.1 Restaurant feature gates
 
-| ID       | Feature key            | Free account                                                          | Silver account                     | Gold account                | Pass? |
-| -------- | ---------------------- | --------------------------------------------------------------------- | ---------------------------------- | --------------------------- | ----- |
-| GATE-R01 | `chat`                 | `/app/chat` → 403/paywall                                             | Loads                              | Loads                       |       |
-| GATE-R02 | `quick_lists`          | `/app/quick-lists` → 403/paywall                                      | Loads                              | Loads                       |       |
-| GATE-R03 | `receiving_quality`    | `/app/receiving` → 403/paywall                                        | Loads                              | Loads                       |       |
-| GATE-R04 | `finance_invoices`     | `/app/invoices` → 403/paywall                                         | Loads                              | Loads                       |       |
-| GATE-R05 | `inventory_management` | `/app/restaurant-inventory` → 403/paywall                             | Loads                              | Loads                       |       |
-| GATE-R06 | `order_calendar`       | Dashboard calendar widget → paywall; `GET /api/orders/calendar` → 403 | 200 + calendar data                | 200 + calendar data         |       |
-| GATE-R07 | `disputes_returns`     | `GET /api/disputes` → 403                                             | 200                                | 200                         |       |
-| GATE-R08 | `advanced_roles`       | Settings → Team: no role management UI                                | Hidden/locked (Gold+)              | Available                   |       |
-| GATE-R09 | `reports`              | `GET /api/reports` → 403                                              | 200 (`basic_kpis`)                 | 200                         |       |
-| GATE-R10 | `smart_reorder`        | Reorder suggestions API → 403                                         | 403 (Gold+)                        | 200 or available            |       |
-| GATE-R11 | `waste_tracking`       | Inventory → Waste tab; waste analytics                                | Manual entry only (`manual_entry`) | Analytics dashboard (Gold+) |       |
-| GATE-R12 | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                               | Hidden/locked (Gold+)              | Visible and loads           |       |
-| GATE-R13 | `order_amendments`     | Order amendment API → 403                                             | 200                                | 200                         |       |
-| GATE-R14 | `push_notifications`   | Push endpoint → 403                                                   | 200 (if VAPID configured)          | 200                         |       |
-| GATE-R15 | `supplier_reviews`     | Reviews API → 403                                                     | 200                                | 200                         |       |
-| GATE-R16 | `custom_branding`      | Settings branding section → hidden or locked                          | Locked (Gold+)                     | Branding upload available   |       |
-| GATE-R17 | `multi_branch`         | Settings → Branches: cannot add 2nd branch                            | 1 branch max (cannot add 2nd)      | Up to 3 branches            |       |
-| GATE-R18 | `feature_flags_access` | Tenant flag override API → 403                                        | 403 (Gold+)                        | 200 (if UI exposed)         |       |
-| GATE-R19 | `supplier_deals`       | `/app/deals` → 403/paywall; `GET /api/promotions/active` → 403        | Loads                              | Loads                       |       |
-| GATE-R20 | `waitlist_auto_promo`  | Cancel reservation → no auto-offer to waitlist                        | No auto-offer (Gold+)              | Auto-offer on cancel        |       |
+| ID       | Feature key            | Free account                                                          | Silver account                     | Gold account                 | Pass? |
+| -------- | ---------------------- | --------------------------------------------------------------------- | ---------------------------------- | ---------------------------- | ----- |
+| GATE-R01 | `chat`                 | `/app/chat` → 403/paywall                                             | Loads                              | Loads                        |       |
+| GATE-R02 | `quick_lists`          | `/app/quick-lists` → 403/paywall                                      | Loads                              | Loads                        |       |
+| GATE-R03 | `receiving_quality`    | `/app/receiving` → 403/paywall                                        | Loads                              | Loads                        |       |
+| GATE-R04 | `finance_invoices`     | `/app/invoices` → 403/paywall                                         | Loads                              | Loads                        |       |
+| GATE-R05 | `inventory_management` | `/app/restaurant-inventory` → 403/paywall                             | Loads                              | Loads                        |       |
+| GATE-R06 | `order_calendar`       | Dashboard calendar widget → paywall; `GET /api/orders/calendar` → 403 | 200 + calendar data                | 200 + calendar data          |       |
+| GATE-R07 | `disputes_returns`     | `GET /api/disputes` → 403                                             | 200                                | 200                          |       |
+| GATE-R08 | `advanced_roles`       | Settings → Team: no role management UI                                | Hidden/locked (Gold+)              | Available                    |       |
+| GATE-R09 | `reports`              | `GET /api/reports` → 403                                              | 200 (`basic_kpis`)                 | 200                          |       |
+| GATE-R10 | `smart_reorder`        | Reorder suggestions API → 403                                         | 403 (Gold+)                        | 200 or available             |       |
+| GATE-R11 | `waste_tracking`       | Inventory → Waste tab; waste analytics                                | Manual entry only (`manual_entry`) | Analytics dashboard (Gold+)  |       |
+| GATE-R12 | `tenant_audit_log`     | Settings → Activity tab → hidden or 403                               | Hidden/locked (Gold+)              | Visible and loads            |       |
+| GATE-R13 | `order_amendments`     | Order amendment API → 403                                             | 200                                | 200                          |       |
+| GATE-R14 | `push_notifications`   | Push endpoint → 403                                                   | 200 (if VAPID configured)          | 200                          |       |
+| GATE-R15 | `supplier_reviews`     | Reviews API → 403                                                     | 200                                | 200                          |       |
+| GATE-R16 | `custom_branding`      | Settings branding section → hidden or locked                          | Locked (Gold+)                     | Branding upload available    |       |
+| GATE-R17 | `multi_branch`         | Settings → Branches: cannot add 2nd branch                            | 1 branch max (cannot add 2nd)      | Up to 3 branches             |       |
+| GATE-R18 | `feature_flags_access` | Tenant flag override API → 403                                        | 403 (Gold+)                        | 200 (if UI exposed)          |       |
+| GATE-R19 | `supplier_deals`       | `/app/deals` loads (sandbox); **1 redemption/day** cap                | Loads; 10/day cap                  | Loads; 50/day cap            |       |
+| GATE-R20 | `waitlist_auto_promo`  | Cancel reservation → no auto-offer to waitlist                        | No auto-offer                      | Auto-offer on cancel (Gold+) |       |
 
 ## 3.2 Supplier feature gates
 
@@ -417,10 +418,10 @@ Ref: [features/admin-impersonation.md](../features/admin-impersonation.md) · [I
 | WS-04 | Recipient's typing indicator shows for other party only (not self; not socket connection ID) | "typing…" indicator; no spurious self-typing                                                 |       |
 | WS-05 | `notification_new` over Socket.IO (user on dashboard)                                        | Toast + sound within ~1s of server event; no 12s poll delay                                  |       |
 | WS-06 | Multi-tab same user                                                                          | Single shared socket; duplicate toasts deduped by notification id                            |       |
-| WS-05 | Mark message as read on one session                                                          | Read receipt updates on sender's session in real-time                                        |       |
-| WS-06 | Admin changes a tenant's plan                                                                | Logged-in tenant receives `entitlements_refresh` event (toast or silent refetch) within ~30s |       |
-| WS-07 | Network briefly disconnected (DevTools → throttle offline then back)                         | Socket reconnects; no duplicate messages; connection restored                                |       |
-| WS-08 | Log out                                                                                      | WebSocket disconnected cleanly; no 401 errors in console                                     |       |
+| WS-07 | Mark message as read on one session                                                          | Read receipt updates on sender's session in real-time                                        |       |
+| WS-08 | Admin changes a tenant's plan                                                                | Logged-in tenant receives `entitlements_refresh` event (toast or silent refetch) within ~30s |       |
+| WS-09 | Network briefly disconnected (DevTools → throttle offline then back)                         | Socket reconnects; no duplicate messages; connection restored                                |       |
+| WS-10 | Log out                                                                                      | WebSocket disconnected cleanly; no 401 errors in console                                     |       |
 
 ---
 
@@ -428,14 +429,17 @@ Ref: [features/admin-impersonation.md](../features/admin-impersonation.md) · [I
 
 ## 5.1 Guest reservation portal
 
-| ID     | Steps                                           | Expected                                                                  | Pass? |
-| ------ | ----------------------------------------------- | ------------------------------------------------------------------------- | ----- |
-| PUB-01 | Open `/reserve` or `/reserve/{restaurant-slug}` | Booking UI loads; restaurant name shown                                   |       |
-| PUB-02 | Complete booking (party size, date, time)       | Confirmation page `/reserve/confirmation`                                 |       |
-| PUB-03 | Copy manage link from confirmation email/UI     | `/reserve/manage/:token` loads reservation                                |       |
-| PUB-04 | Cancel reservation via manage link              | Status cancelled; reflected on restaurant board; restaurant team notified |       |
-| PUB-05 | Reschedule via manage link                      | New slot saved; restaurant team notified                                  |       |
-| PUB-06 | Invalid/expired token                           | Friendly error; no crash                                                  |       |
+| ID     | Steps                                                                                            | Expected                                                                  | Pass? |
+| ------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | ----- |
+| PUB-01 | Open `/reserve` or `/reserve/{restaurant-slug}`                                                  | Booking UI loads; restaurant name shown                                   |       |
+| PUB-02 | Complete booking (party size, date, time)                                                        | Confirmation page `/reserve/confirmation`                                 |       |
+| PUB-03 | Copy manage link from confirmation email/UI                                                      | `/reserve/manage/:token` loads reservation                                |       |
+| PUB-04 | Cancel reservation via manage link                                                               | Status cancelled; reflected on restaurant board; restaurant team notified |       |
+| PUB-05 | Reschedule via manage link                                                                       | New slot saved; restaurant team notified                                  |       |
+| PUB-06 | Invalid/expired token                                                                            | Friendly error; no crash                                                  |       |
+| PUB-14 | Gold+ restaurant: cancel seated reservation → waitlist guest with matching party size gets offer | Guest receives accept/decline link; board shows offer pending             |       |
+| PUB-15 | Open `/reserve/waitlist/:token/accept` from offer email/UI                                       | Confirmation UI; reservation `CONFIRMED`; waitlist entry accepted         |       |
+| PUB-16 | Open `/reserve/waitlist/:token/decline`                                                          | Offer declined; next guest can be offered on expiry/manual promote        |       |
 
 ## 5.2 Staff self-service portal
 
@@ -474,6 +478,8 @@ Hidden without RBAC permission or feature gate.
 | ID      | Steps                                                        | Expected                                                                 | Pass? |
 | ------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ | ----- |
 | RST-07  | Orders list tabs: All, New, Processing, Shipped, Completed   | Correct filtering                                                        |       |
+| RST-07a | Orders list **search** (order #, supplier name, SKU text)    | Server-side search narrows list; clearing search restores full list      |       |
+| RST-07b | Orders **inbox filters** (status + date range if shown)      | Combined filters match API; empty state when no matches                  |       |
 | RST-08  | Open order detail                                            | Details, Items tabs load                                                 |       |
 | RST-09  | Place order from cart (see 6.4)                              | New order appears in list                                                |       |
 | RST-10  | Cancel order (if permitted)                                  | Status cancelled; supplier notified                                      |       |
@@ -500,13 +506,14 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.5 Quick lists (`/app/quick-lists`) — requires `quick_lists` feature
 
-| ID     | Steps                                         | Expected                       | Pass? |
-| ------ | --------------------------------------------- | ------------------------------ | ----- |
-| RST-19 | Free account → navigate to `/app/quick-lists` | 403 or paywall; not accessible |       |
-| RST-20 | Silver+ account → create quick list           | Saved with name                |       |
-| RST-21 | Add/remove SKUs                               | Persists                       |       |
-| RST-22 | Order from quick list                         | Creates order with lines       |       |
-| RST-23 | Scheduled quick list (if UI filter)           | Scheduled vs unscheduled views |       |
+| ID      | Steps                                         | Expected                                           | Pass? |
+| ------- | --------------------------------------------- | -------------------------------------------------- | ----- |
+| RST-19  | Free account → navigate to `/app/quick-lists` | 403 or paywall; not accessible                     |       |
+| RST-20  | Silver+ account → create quick list           | Saved with name                                    |       |
+| RST-21  | Add/remove SKUs                               | Persists                                           |       |
+| RST-22  | Order from quick list                         | Creates order with lines                           |       |
+| RST-23  | Scheduled quick list (if UI filter)           | Scheduled vs unscheduled views                     |       |
+| RST-23a | Quick lists page **stat cards** + empty state | Summary counts load; empty state CTA when no lists |       |
 
 ## 6.6 Restaurant inventory (`/app/restaurant-inventory`) — requires `inventory_management` feature
 
@@ -534,18 +541,21 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.8 Reservations (`/app/reservations`)
 
-| ID      | Steps                                | Expected                                                  | Pass? |
-| ------- | ------------------------------------ | --------------------------------------------------------- | ----- |
-| RST-35  | Reservation board for selected date  | Tables + reservations + waitlist                          |       |
-| RST-36  | Create reservation (drawer)          | Appears on board                                          |       |
-| RST-37  | Seat / confirm / cancel from board   | Status transitions                                        |       |
-| RST-37a | **Assign table** from board dropdown | Table shows guest on floor plan until completed/cancelled |       |
-| RST-37b | Guest **reschedule** via manage link | Board date/slot updates; staff notification               |       |
-| RST-38  | **Table builder**                    | Add/edit floor plan tables                                |       |
-| RST-39  | Analytics panel (day/week/month)     | Metrics load                                              |       |
-| RST-40  | Guest intelligence panel             | Guest stats load                                          |       |
-| RST-41  | Copy public **booking link**         | Link works in incognito (`/reserve/...`)                  |       |
-| RST-42  | User without `RESERVATIONS_VIEW`     | Nav hidden                                                |       |
+| ID      | Steps                                                        | Expected                                                         | Pass? |
+| ------- | ------------------------------------------------------------ | ---------------------------------------------------------------- | ----- |
+| RST-35  | Reservation board for selected date                          | Tables + reservations + waitlist                                 |       |
+| RST-36  | Create reservation (drawer)                                  | Appears on board                                                 |       |
+| RST-37  | Seat / confirm / cancel from board                           | Status transitions                                               |       |
+| RST-37a | **Assign table** from board dropdown                         | Table shows guest on floor plan until completed/cancelled        |       |
+| RST-37b | Guest **reschedule** via manage link                         | Board date/slot updates; staff notification                      |       |
+| RST-38  | **Table builder**                                            | Add/edit floor plan tables                                       |       |
+| RST-39  | Analytics panel (day/week/month)                             | Metrics load                                                     |       |
+| RST-40  | Guest intelligence panel                                     | Guest stats load                                                 |       |
+| RST-41  | Copy public **booking link**                                 | Link works in incognito (`/reserve/...`)                         |       |
+| RST-42  | User without `RESERVATIONS_VIEW`                             | Nav hidden                                                       |       |
+| RST-42a | Multi-branch restaurant: switch branch on reservations board | Board data scoped to selected branch; waitlist matches branch    |       |
+| RST-42b | Guest cancel via manage link (public API parity)             | Same outcome as staff cancel; capacity freed; notifications sent |       |
+| RST-42c | Over-capacity slot attempt (public book or staff create)     | Friendly validation; no double-book beyond capacity guard        |       |
 
 ## 6.9 Staff HR (`/app/staff`)
 
@@ -562,11 +572,12 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.10 Suppliers directory (`/app/suppliers`, `/app/suppliers/:id`)
 
-| ID     | Steps                                              | Expected                                   | Pass? |
-| ------ | -------------------------------------------------- | ------------------------------------------ | ----- |
-| RST-51 | List suppliers                                     | Search/filter                              |       |
-| RST-52 | Supplier detail                                    | Catalog preview, follow/block if available |       |
-| RST-53 | Start chat from supplier (requires `chat` feature) | Opens conversation if Silver+              |       |
+| ID      | Steps                                              | Expected                                                       | Pass? |
+| ------- | -------------------------------------------------- | -------------------------------------------------------------- | ----- |
+| RST-51  | List suppliers                                     | Search/filter                                                  |       |
+| RST-51a | Suppliers page **stat cards** + empty state        | Followed/active supplier counts; helpful empty state when none |       |
+| RST-52  | Supplier detail                                    | Catalog preview, follow/block if available                     |       |
+| RST-53  | Start chat from supplier (requires `chat` feature) | Opens conversation if Silver+                                  |       |
 
 ## 6.11 Invoices (`/app/invoices`) — requires `finance_invoices` feature
 
@@ -596,33 +607,35 @@ Hidden without RBAC permission or feature gate.
 
 ## 6.14 Deals & promotions (`/app/deals`) — requires `supplier_deals` feature
 
-| ID     | Steps                             | Expected                                                        | Pass? |
-| ------ | --------------------------------- | --------------------------------------------------------------- | ----- |
-| RST-74 | Free account → `/app/deals`       | 403 or paywall                                                  |       |
-| RST-75 | Silver+ → Deals feed loads        | Cards from followed suppliers; sort/filter works                |       |
-| RST-76 | Sponsored deal visible            | Badge "Sponsored" on boosted deal from non-followed supplier    |       |
-| RST-77 | **Order now** CTA                 | Navigates to products; place order; discount on order detail    |       |
-| RST-78 | **Use coupon** CTA                | Coupon copied; apply at cart checkout; discount applied         |       |
-| RST-79 | **Message supplier** CTA          | Chat opens with prefilled deal interest message                 |       |
-| RST-80 | **View products** CTA             | Supplier catalog filtered; eligible products highlighted        |       |
-| RST-81 | Order detail shows promotion name | `GET /api/orders/:id` returns `appliedPromotion` with deal name |       |
+| ID     | Steps                                                      | Expected                                                                          | Pass? |
+| ------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------- | ----- |
+| RST-74 | Free Trial → `/app/deals`                                  | Deals feed loads (sandbox `supplier_deals`); **1 redemption/day** cap (RST-82/83) |       |
+| RST-75 | Silver+ → Deals feed loads                                 | Cards from followed suppliers; sort/filter works                                  |       |
+| RST-76 | Sponsored deal visible                                     | Badge "Sponsored" on boosted deal from non-followed supplier                      |       |
+| RST-77 | **Order now** CTA                                          | Navigates to products; place order; discount on order detail                      |       |
+| RST-78 | **Use coupon** CTA                                         | Coupon copied; apply at cart checkout; discount applied                           |       |
+| RST-79 | **Message supplier** CTA                                   | Chat opens with prefilled deal interest message                                   |       |
+| RST-80 | **View products** CTA                                      | Supplier catalog filtered; eligible products highlighted                          |       |
+| RST-81 | Order detail shows promotion name                          | `GET /api/orders/:id` returns `appliedPromotion` with deal name                   |       |
+| RST-82 | Free Trial restaurant: redeem deal at checkout (1st today) | Discount applies; usage meter increments                                          |       |
+| RST-83 | Free Trial restaurant: second deal redemption same day     | Blocked with limit message (`deal_redemptions_per_day` = 1)                       |       |
 
 ## 6.15 Settings & onboarding (`/app/settings`, `/app/onboarding`)
 
 | ID     | Steps                                         | Expected                                                             | Pass? |
 | ------ | --------------------------------------------- | -------------------------------------------------------------------- | ----- |
-| RST-67 | Tab: Profile — edit name, address, logo       | Saves via API                                                        |       |
-| RST-68 | Tab: Team — invite users, assign tenant roles | RBAC roles applied                                                   |       |
-| RST-69 | Tab: Branches — add/switch linked accounts    | Respects plan branch limit                                           |       |
-| RST-70 | Tab: Subscription — plan, usage, billing CTA  | Matches entitlements                                                 |       |
-| RST-71 | Tab: Notifications                            | Same as UX-10                                                        |       |
-| RST-72 | Tab: Activity (Gold+, `tenant_audit_log`)     | Rows show after live actions; Free account sees tab hidden or locked |       |
-| RST-73 | Tab: Activity — Action / Resource dropdowns   | Human-readable labels; filter narrows list                           |       |
-| RST-74 | Tab: Activity — Clear filters / date range    | Full day included on **To** date                                     |       |
-| RST-75 | Custom branding (Gold+)                       | Logo/colors; preview                                                 |       |
-| RST-76 | `/app/onboarding`                             | Same flows as settings (duplicate entry)                             |       |
+| RST-84 | Tab: Profile — edit name, address, logo       | Saves via API                                                        |       |
+| RST-85 | Tab: Team — invite users, assign tenant roles | RBAC roles applied                                                   |       |
+| RST-86 | Tab: Branches — add/switch linked accounts    | Respects plan branch limit                                           |       |
+| RST-87 | Tab: Subscription — plan, usage, billing CTA  | Matches entitlements                                                 |       |
+| RST-88 | Tab: Notifications                            | Same as UX-10                                                        |       |
+| RST-89 | Tab: Activity (Gold+, `tenant_audit_log`)     | Rows show after live actions; Free account sees tab hidden or locked |       |
+| RST-90 | Tab: Activity — Action / Resource dropdowns   | Human-readable labels; filter narrows list                           |       |
+| RST-91 | Tab: Activity — Clear filters / date range    | Full day included on **To** date                                     |       |
+| RST-92 | Custom branding (Gold+)                       | Logo/colors; preview                                                 |       |
+| RST-93 | `/app/onboarding`                             | Same flows as settings (duplicate entry)                             |       |
 
-## 6.14 Restaurant RBAC spot checks
+## 6.16 Restaurant RBAC spot checks
 
 | ID      | Steps                                                                  | Expected                                      | Pass? |
 | ------- | ---------------------------------------------------------------------- | --------------------------------------------- | ----- |
@@ -962,22 +975,25 @@ Hidden without RBAC permission or feature gate.
 | API-18 | `POST /api/feature-flags/global` (non-admin)                                | 403                                                                    |       |
 | API-19 | `GET /api/subscriptions/entitlements/current` — call 3× in quick succession | All return same data (cache hit); response time < 100ms on 2nd and 3rd |       |
 | API-20 | `GET /api/promotions/active` (Silver+ restaurant)                           | 200 + deals array                                                      |       |
-| API-21 | `GET /api/promotions/active` (Free restaurant)                              | 403 `FEATURE_DISABLED`                                                 |       |
+| API-21 | `GET /api/promotions/active` (Free Trial restaurant)                        | 200 + deals array (sandbox); 2nd redemption same day → limit error     |       |
 | API-22 | `GET /api/promotions/admin/pending` (admin)                                 | 200 + pending deals                                                    |       |
 | API-23 | `GET /api/orders/:id` after deal-applied order                              | 200 + `appliedPromotion` on order object                               |       |
 | API-24 | `POST /api/orders` with `promotionId` + `couponCode`                        | Discount applied; `promotion_usages` recorded                          |       |
+| API-25 | `GET /api/orders?search=...` (restaurant/supplier)                          | Filtered list matches search term                                      |       |
+| API-26 | `GET /api/orders?status=...`                                                | Status inbox filter applied server-side                                |       |
 
 ---
 
 # Part 11 — Automated tests (CI parity)
 
-| ID    | Command                                                                             | Expected                                                 | Pass? |
-| ----- | ----------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- |
-| CI-01 | `pnpm --filter @supplify/api test:run`                                              | All API unit tests pass                                  |       |
-| CI-02 | `pnpm --filter @supplify/web test:run`                                              | All web unit tests pass                                  |       |
-| CI-03 | `pnpm test:ci` (root)                                                               | Both packages green                                      |       |
-| CI-04 | `pnpm run e2e:playwright` (if configured)                                           | E2E suite pass                                           |       |
-| CI-05 | Deals/promotions unit + API gates (see `docs/features/promotions-deals.md` § Tests) | Vitest + `tests/api/promotions-deals-gates.spec.ts` pass |       |
+| ID    | Command                                                                                               | Expected                                                 | Pass? |
+| ----- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- |
+| CI-01 | `pnpm test:api`                                                                                       | 131 files / ~770 API tests pass                          |       |
+| CI-02 | `pnpm test:web`                                                                                       | 59 files / ~202 web tests pass                           |       |
+| CI-03 | `pnpm test:ci` (root)                                                                                 | Both packages green                                      |       |
+| CI-04 | `pnpm run e2e:playwright` (if configured)                                                             | E2E suite pass                                           |       |
+| CI-05 | Deals/promotions unit + API gates (see `docs/features/promotions-deals.md` § Tests)                   | Vitest + `tests/api/promotions-deals-gates.spec.ts` pass |       |
+| CI-06 | Realtime/socket subset: `socket.test.js`, `useChatRealtime.test.ts`, `useNotificationAlerts.test.tsx` | Pass                                                     |       |
 
 ---
 

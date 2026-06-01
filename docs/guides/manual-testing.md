@@ -56,16 +56,16 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 ## 4. Restaurant — cart & orders
 
 - [ ] **Cart** — lines, quantity, place order.
-- [ ] **Orders** — list, filters, **order detail** actions.
+- [ ] **Orders** — list, **server-side search**, inbox filters, **order detail** actions.
 - [ ] **Supplier decline** — as supplier, decline a `PLACED` order with a reason; as restaurant, confirm status **Declined by supplier** and reason on list + detail (see [order-decline.md](../features/order-decline.md)).
 
 ---
 
 ## 5. Restaurant — quick lists, suppliers, reservations
 
-- [ ] **Quick lists** — CRUD, add to cart/order.
-- [ ] **Suppliers** — list, detail, follow/request if present.
-- [ ] **Reservations** — board, create, status flow, waitlist, analytics, booking link, table builder, **table assignment**, guest cancel/reschedule → staff notification (see [reservations-foh.md](../features/reservations-foh.md)).
+- [ ] **Quick lists** — CRUD, stat cards/empty state, add to cart/order.
+- [ ] **Suppliers** — list (stat cards), detail, follow/request if present.
+- [ ] **Reservations** — board (branch-aware when multi-branch), create, status flow, waitlist offer accept/decline (`/reserve/waitlist/:token/...`), analytics, booking link, table builder, **table assignment**, guest cancel/reschedule → staff notification (see [reservations-foh.md](../features/reservations-foh.md)).
 
 ---
 
@@ -75,7 +75,9 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 - [ ] **Restaurant inventory** — levels, adjustments.
 - [ ] **Receiving** — pending/history, submit report.
 - [ ] **Invoices** — list, detail, payment recording.
-- [ ] **Chat** — threads, send, attachments if present.
+- [ ] **Deals** — Silver+ feed; Free Trial **1 redemption/day** cap (see RST-82/83 in checklist).
+- [ ] **Chat** — threads, send, **real-time delivery** (second browser), typing indicator, attachments if present.
+- [ ] **Notifications** — bell + Socket.IO toast on new order/message (see §4.10 WS-\* in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md)).
 
 ---
 

@@ -94,3 +94,9 @@ Per tenant (e.g. Gold restaurant), owner plus team suffix accounts share passwor
 Supplier tier seed uses `-sales` instead of purchaser. Each account is a separate Keycloak user and `app_user` row with its named role pre-assigned.
 
 - **Component:** `RolePermissionChecklist.jsx` — grouped permission toggles.
+
+## Tests
+
+- API: `tenant-roles.routes.test.js`, `rbac-guards.test.js`, `rbac-full-app.test.js`
+- Web: `TeamRolesPanel.test.jsx`, `RolePermissionChecklist.test.jsx`, `tenantRoles.test.ts`, `permissionLabels.test.ts`
+- Manual: GATE-R08, RBAC-R\* in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md)

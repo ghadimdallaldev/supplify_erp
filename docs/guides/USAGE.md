@@ -41,7 +41,7 @@ Usage counters update automatically when:
 - Creating a branch or warehouse
 - Placing or receiving an order
 - Sending a chat message
-- Uploading a file (via `POST /api/files/presign` — bytes counted in MB, rounded up)
+- Uploading a file (via `POST /api/files/presign` — bytes counted in MB, rounded up; storage layout in [STORAGE_UPLOADS.md](../operations/STORAGE_UPLOADS.md))
 - Creating a product
 - Exporting data
 - Setting up a webhook

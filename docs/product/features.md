@@ -70,18 +70,18 @@ RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) furth
 | Quick lists          | `/app/quick-lists`               | `/api/quick-lists`     | Saved order templates; scheduled re-order               |
 | Scheduled orders     | —                                | cron in `server.js`    | Runs every 5 min in dev                                 |
 
-**Verify:** Restaurant → Cart → place order → Orders list shows new order. Supplier → Decline with reason → Restaurant sees **Declined by supplier**. Tests: `orders.routes.test.js`, `orderStatusDisplay.test.ts`, `orders.calendar.routes.test.js`, `scheduled-orders.service.test.js`.
+**Verify:** Restaurant → Cart → place order → Orders list shows new order. Supplier → Decline with reason → Restaurant sees **Declined by supplier**. Orders list supports **server-side search** and status inbox filters. Tests: `orders.routes.test.js` (search/status filters), `orderStatusDisplay.test.ts`, `orders.calendar.routes.test.js`, `scheduled-orders.service.test.js`.
 
 ## Chat & realtime
 
-| Feature   | Web route   | API prefix         | Notes                                                                                                                    |
-| --------- | ----------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Chat UI   | `/app/chat` | `/api/chat`        | Conversations, messages, attachments                                                                                     |
-| Socket.IO | —           | same origin as API | `getChatSocket` / `getLayoutSocket` + `getSocketBaseUrl()` (shared connection per user; `VITE_API_URL` or window origin) |
+| Feature   | Web route   | API prefix         | Notes                                                                                                                      |
+| --------- | ----------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Chat UI   | `/app/chat` | `/api/chat`        | Conversations, messages, attachments; refactored thread/list/composer components                                           |
+| Socket.IO | —           | same origin as API | `getAppSocket()` + `useChatRealtime` / `useNotificationAlerts`; Redis adapter when `REDIS_URL` set (multi-replica Railway) |
 
 Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admin-feature-flags.md)).
 
-**Verify:** Restaurant opens chat from supplier detail; messages persist after refresh. Tests: `chat.routes.test.js`, web `useSocket.test.ts`.
+**Verify:** Restaurant opens chat from supplier detail; messages persist after refresh; recipient sees message within ~1s without reload. Tests: `chat.routes.test.js`, `socket.test.js`, `socket-auth.test.js`, web `useChatRealtime.test.ts`, `useNotificationAlerts.test.tsx`.
 
 ## Reports, disputes, promotions & reviews
 
@@ -255,20 +255,20 @@ node apps/api/scripts/migrate.js
 
 ## Manual smoke checklist
 
-| Check          | Command / action                       | Expected                                                   |
-| -------------- | -------------------------------------- | ---------------------------------------------------------- |
-| API up         | `GET /health`                          | `{ "ok": true, "status": "healthy" }`                      |
-| DB migrated    | `node apps/api/scripts/migrate.js`     | All migrations skipped or applied; no errors               |
-| Public API     | `GET /api/public/restaurants`          | `200` JSON envelope                                        |
-| Web dev server | Open Vite URL in browser               | Login page or app shell                                    |
-| Auth           | Log in as each demo role               | Correct sidebar for role                                   |
-| Chat           | Send message restaurant ↔ supplier    | Message appears; socket connected                          |
-| Order          | Place order from cart                  | Appears in Orders + supplier Fulfillment                   |
-| Order decline  | Supplier declines with reason          | Restaurant: label + reason + notification                  |
-| Notifications  | New order (second team user logged in) | Bell + toast for non-owner team member                     |
-| Reservations   | Restaurant board + `/reserve`          | Booking created; table assign; guest cancel notifies staff |
-| Staff          | `/app/staff` + `/staff/login`          | Roster + portal controls; staff login works                |
-| Admin flags    | `/app/admin` → Features                | List loads; toggle inherits/on/off                         |
+| Check          | Command / action                       | Expected                                                                                        |
+| -------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| API up         | `GET /health`                          | `{ "ok": true, "status": "healthy" }`                                                           |
+| DB migrated    | `node apps/api/scripts/migrate.js`     | All migrations skipped or applied; no errors                                                    |
+| Public API     | `GET /api/public/restaurants`          | `200` JSON envelope                                                                             |
+| Web dev server | Open Vite URL in browser               | Login page or app shell                                                                         |
+| Auth           | Log in as each demo role               | Correct sidebar for role                                                                        |
+| Chat           | Send message restaurant ↔ supplier    | Message appears in real-time on recipient (~1s); single Socket.IO connection in DevTools WS tab |
+| Order          | Place order from cart                  | Appears in Orders + supplier Fulfillment                                                        |
+| Order decline  | Supplier declines with reason          | Restaurant: label + reason + notification                                                       |
+| Notifications  | New order (second team user logged in) | Bell + toast for non-owner team member                                                          |
+| Reservations   | Restaurant board + `/reserve`          | Booking created; table assign; guest cancel notifies staff                                      |
+| Staff          | `/app/staff` + `/staff/login`          | Roster + portal controls; staff login works                                                     |
+| Admin flags    | `/app/admin` → Features                | List loads; toggle inherits/on/off                                                              |
 
 ## E2E (optional)
 

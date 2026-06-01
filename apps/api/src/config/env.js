@@ -98,21 +98,53 @@ export const config = {
     process.env.S3_PUBLIC_URL ||
     (process.env.STORAGE_DRIVER === 'local' || !process.env.S3_ENDPOINT ? '' : ''),
   STORAGE_ENDPOINT:
-    process.env.STORAGE_ENDPOINT || process.env.S3_ENDPOINT || 'http://localhost:9000',
-  STORAGE_BUCKET: process.env.STORAGE_BUCKET || process.env.S3_BUCKET || 'supplify',
+    process.env.STORAGE_ENDPOINT ||
+    process.env.S3_ENDPOINT ||
+    process.env.ENDPOINT ||
+    process.env.AWS_ENDPOINT_URL ||
+    'http://localhost:9000',
+  STORAGE_BUCKET:
+    process.env.STORAGE_BUCKET ||
+    process.env.S3_BUCKET ||
+    process.env.BUCKET ||
+    process.env.AWS_S3_BUCKET_NAME ||
+    'supplify',
   STORAGE_BUCKETS: process.env.STORAGE_BUCKETS || process.env.S3_BUCKETS || '',
-  STORAGE_REGION: process.env.STORAGE_REGION || process.env.S3_REGION || 'auto',
+  STORAGE_REGION:
+    process.env.STORAGE_REGION ||
+    process.env.S3_REGION ||
+    process.env.REGION ||
+    process.env.AWS_DEFAULT_REGION ||
+    'auto',
   STORAGE_ACCESS_KEY_ID:
     process.env.STORAGE_ACCESS_KEY_ID ||
     process.env.STORAGE_ACCESS_KEY ||
     process.env.S3_ACCESS_KEY ||
+    process.env.ACCESS_KEY_ID ||
+    process.env.AWS_ACCESS_KEY_ID ||
     'minioadmin',
   STORAGE_SECRET_ACCESS_KEY:
-    process.env.STORAGE_SECRET_ACCESS_KEY || process.env.S3_SECRET_KEY || 'minioadmin',
+    process.env.STORAGE_SECRET_ACCESS_KEY ||
+    process.env.S3_SECRET_KEY ||
+    process.env.SECRET_ACCESS_KEY ||
+    process.env.AWS_SECRET_ACCESS_KEY ||
+    'minioadmin',
   STORAGE_PUBLIC_READ:
     process.env.STORAGE_PUBLIC_READ != null
       ? process.env.STORAGE_PUBLIC_READ !== 'false'
-      : process.env.S3_PUBLIC_READ !== 'false',
+      : process.env.S3_PUBLIC_READ != null
+        ? process.env.S3_PUBLIC_READ !== 'false'
+        : true,
+  STORAGE_S3_FORCE_PATH_STYLE: envBool(
+    process.env.STORAGE_S3_FORCE_PATH_STYLE,
+    !/storage\.railway\.app|storageapi\.dev/i.test(
+      process.env.STORAGE_ENDPOINT ||
+        process.env.S3_ENDPOINT ||
+        process.env.ENDPOINT ||
+        process.env.AWS_ENDPOINT_URL ||
+        ''
+    )
+  ),
   API_PUBLIC_URL:
     process.env.API_PUBLIC_URL ||
     process.env.PUBLIC_API_URL ||

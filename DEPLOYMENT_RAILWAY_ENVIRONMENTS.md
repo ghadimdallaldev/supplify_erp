@@ -208,11 +208,15 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 
 ## L. Storage per environment
 
-| env     | Driver  | Notes                                                     |
-| ------- | ------- | --------------------------------------------------------- |
-| dev     | `local` | `/uploads` on disk; ephemeral on Railway without volume   |
-| preprod | `s3`    | R2/MinIO; separate bucket                                 |
-| prod    | `s3`    | Required; `STORAGE_DRIVER=local` fails startup validation |
+Full upload pipeline (presign, keys, local vs S3): [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md).
+
+| env     | Driver | Notes                                                                     |
+| ------- | ------ | ------------------------------------------------------------------------- |
+| dev     | `s3`   | Railway **Bucket** (see secrets.env.example); `STORAGE_PUBLIC_READ=false` |
+| preprod | `s3`   | R2/MinIO; separate bucket                                                 |
+| prod    | `s3`   | Required; `STORAGE_DRIVER=local` fails startup validation                 |
+
+**Railway dev storage:** add a **Bucket** service per environment and wire credentials to the API (variable references). Files persist in the bucket; the API serves reads via `/api/files/object` when the bucket is private.
 
 ## M. Payment mode per environment
 

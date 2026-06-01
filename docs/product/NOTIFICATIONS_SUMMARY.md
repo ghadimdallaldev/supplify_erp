@@ -2,12 +2,12 @@
 
 ## Delivery channels
 
-| Channel      | Implementation                                                                | Notes                                                                                                            |
-| ------------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Email**    | Twilio SendGrid API (preferred) or [nodemailer](https://nodemailer.com/) SMTP | `SENDGRID_API_KEY` or `SMTP_*` on the API                                                                        |
-| **WhatsApp** | Twilio Programmable Messaging (+ `wa.me` fallback in metadata)                | Outbound when configured; in-app “Open in WhatsApp” when link present                                            |
-| **In-app**   | `notification_log` table                                                      | Bell icon; **toast + sound** via `useNotificationAlerts` (~10s); optional browser banner when permitted          |
-| **Push**     | Web Push (VAPID) via `web-push`                                               | Opt-in (`push_enabled`); requires `VAPID_*` env — see [push-notifications.md](../features/push-notifications.md) |
+| Channel      | Implementation                                                                | Notes                                                                                                                                      |
+| ------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Email**    | Twilio SendGrid API (preferred) or [nodemailer](https://nodemailer.com/) SMTP | `SENDGRID_API_KEY` or `SMTP_*` on the API                                                                                                  |
+| **WhatsApp** | Twilio Programmable Messaging (+ `wa.me` fallback in metadata)                | Outbound when configured; in-app “Open in WhatsApp” when link present                                                                      |
+| **In-app**   | `notification_log` table                                                      | Bell icon; **toast + sound** via `useNotificationAlerts` (~10s); **Socket.IO `notification_new`** for sub-second delivery when tab is open |
+| **Push**     | Web Push (VAPID) via `web-push`                                               | Opt-in (`push_enabled`); requires `VAPID_*` env — see [push-notifications.md](../features/push-notifications.md)                           |
 
 ### SMTP environment variables
 
@@ -110,6 +110,8 @@ Category enabled? → if no, skip
     ↓
 Insert notification_log (in-app)
     ↓
+Emit Socket.IO notification_new (foreground realtime)
+    ↓
 Email via nodemailer (if emailEnabled + email)
 WhatsApp link in metadata (if whatsappEnabled + phone)
     ↓
@@ -124,6 +126,8 @@ Update log with delivery results
 
 - `apps/api/src/services/notification.service.test.js`
 - `apps/api/src/lib/whatsapp.test.js`
+- `apps/api/src/lib/socket.test.js`, `socket-auth.test.js`
+- `apps/web/src/hooks/useNotificationAlerts.test.tsx`, `useChatRealtime.test.ts`
 
 **Manual**
 
@@ -134,5 +138,5 @@ Update log with delivery results
 
 ---
 
-**Last updated:** May 2026  
-**Version:** 2.1.0 (tenant fan-out, foreground alerts, supplier decline notifications)
+**Last updated:** June 2026  
+**Version:** 2.2.0 (Socket.IO realtime alerts, unified app socket, multi-replica Redis adapter)

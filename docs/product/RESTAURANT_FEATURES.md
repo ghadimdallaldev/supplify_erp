@@ -1002,8 +1002,8 @@ Display History:
 1. 🔄 Supplier Discovery (needs follow/block functionality)
 2. 🔄 Multi-Branch Support (schema exists, UI planned)
 3. 🔄 PDF Export for invoices (planned)
-4. 🔄 Email Notifications (planned)
-5. 🔄 Real-time Chat (WebSocket planned)
+4. 🔄 Email Notifications (SMTP/SendGrid when configured — log-only in dev without env)
+5. ✅ **Real-time Chat & notifications** (Socket.IO via unified `getAppSocket()`; Redis adapter for multi-replica deploys)
 
 ---
 

@@ -16,11 +16,11 @@ Suppliers create **deals** (stored in `promotions`) — percentage/fixed discoun
 
 ## Plan limits (not boost pricing)
 
-| Tenant         | Meter                      | Silver (0117)                  | Notes                                                                           |
-| -------------- | -------------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
-| **Supplier**   | `promotions`               | 3 active deals                 | `requireFeature('promotions')` on supplier routes                               |
-| **Restaurant** | `deal_redemptions_per_day` | 10/day (Silver), 50/day (Gold) | `supplier_deals` feature; **`promotions` limit key is n/a** on restaurant plans |
-| **Free Trial** | (varies)                   | Low caps in free seeds         | See [SUBSCRIPTIONS.md](../monetization/SUBSCRIPTIONS.md)                        |
+| Tenant         | Meter                      | Silver (0117)                                                         | Notes                                                                                 |
+| -------------- | -------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Supplier**   | `promotions`               | 3 active deals                                                        | `requireFeature('promotions')` on supplier routes                                     |
+| **Restaurant** | `deal_redemptions_per_day` | **1/day** Free (migration `0131`), **10/day** Silver, **50/day** Gold | `supplier_deals` feature; **`promotions` limit key is n/a** on restaurant plans       |
+| **Free Trial** | `deal_redemptions_per_day` | **1/day** on Free restaurant plans (evaluation cap)                   | Migration `0131_free_trial_deal_redemptions.sql`; `fillMissingFreeTierLimits` default |
 
 Deal **boost** checkout uses separate `promotion_pricing_config` — not counted against the plan `promotions` cap unless product rules say otherwise.
 
@@ -162,7 +162,7 @@ Automated coverage maps to `docs/qa/MANUAL_TEST_CHECKLIST.md` IDs below.
 | `apps/api/src/routes/promotions.supplier-security.test.js` | Supplier cannot access other tenants' deals                                                                    |
 | `apps/api/src/routes/feature-gates.routes.test.js`         | `promotions` / `supplier_deals` — Free 403; Silver supplier 200 (GATE-S13); Silver restaurant deals (GATE-R19) |
 | `apps/api/src/routes/orders.routes.test.js`                | `appliedPromotion` on order detail (RST-81, API-23)                                                            |
-| `apps/api/src/lib/limit-resolution.test.js`                | Free-tier `promotions` limit default for suppliers                                                             |
+| `apps/api/src/lib/limit-resolution.test.js`                | Free-tier `deal_redemptions_per_day` = 1 (migration `0131`); supplier `promotions` default                     |
 
 ### Web unit (Vitest)
 
@@ -182,5 +182,6 @@ Automated coverage maps to `docs/qa/MANUAL_TEST_CHECKLIST.md` IDs below.
 ### Manual-only (no automated parity yet)
 
 - RST-74–RST-80: Full deals feed CTAs and sponsored UI (E2E not implemented)
+- RST-82–RST-83: Free Trial **1/day** deal redemption cap (manual + `limit-resolution.test.js`)
 - SUP-52–SUP-58: Supplier create/boost/analytics UI (E2E not implemented)
 - API-24: `POST /api/orders` with `promotionId` + `couponCode` (integration)

@@ -4,17 +4,17 @@ How to run automated checks in the Supplify monorepo: API unit tests (Vitest), w
 
 ## Quick commands (monorepo root)
 
-| Command               | Mode                   | What it runs                                  |
-| --------------------- | ---------------------- | --------------------------------------------- |
-| `pnpm test:api`       | **Run once** (CI-safe) | Full API Vitest suite (`apps/api`, 117 files) |
-| `pnpm test:api:watch` | Watch                  | API tests while developing                    |
-| `pnpm test:web`       | Run once               | Full web Vitest suite                         |
-| `pnpm test:web:watch` | Watch                  | Web tests while developing                    |
-| `pnpm test:all`       | Run once               | API + web (`pnpm test:ci`)                    |
-| `pnpm test:billing`   | Run once               | Billing/subscription/plan subset (API)        |
-| `pnpm test:rbac`      | Run once               | API + web RBAC-focused files                  |
-| `pnpm test:ci`        | Run once               | Same as `test:all` (used by `pnpm qa`)        |
-| `pnpm qa`             | Run once               | lint + typecheck + `test:ci` + build          |
+| Command               | Mode                   | What it runs                                              |
+| --------------------- | ---------------------- | --------------------------------------------------------- |
+| `pnpm test:api`       | **Run once** (CI-safe) | Full API Vitest suite (`apps/api`, 131 files, ~770 tests) |
+| `pnpm test:api:watch` | Watch                  | API tests while developing                                |
+| `pnpm test:web`       | Run once               | Full web Vitest suite                                     |
+| `pnpm test:web:watch` | Watch                  | Web tests while developing                                |
+| `pnpm test:all`       | Run once               | API + web (`pnpm test:ci`)                                |
+| `pnpm test:billing`   | Run once               | Billing/subscription/plan subset (API)                    |
+| `pnpm test:rbac`      | Run once               | API + web RBAC-focused files                              |
+| `pnpm test:ci`        | Run once               | Same as `test:all` (used by `pnpm qa`)                    |
+| `pnpm qa`             | Run once               | lint + typecheck + `test:ci` + build                      |
 
 ### Final verification (PR / Cursor / CI)
 

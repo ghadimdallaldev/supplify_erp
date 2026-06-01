@@ -37,3 +37,15 @@ export async function createPresignedUpload(options) {
 export function buildObjectPublicUrl(fileKey) {
   return getStorageProvider().buildPublicUrl(fileKey)
 }
+
+/**
+ * Stream a stored object (S3 or local). Used for private buckets (e.g. Railway).
+ * @param {string} fileKey
+ */
+export async function getObjectStream(fileKey) {
+  const provider = getStorageProvider()
+  if (typeof provider.getObjectStream !== 'function') {
+    throw new Error('Storage provider does not support getObjectStream')
+  }
+  return provider.getObjectStream(fileKey)
+}
