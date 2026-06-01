@@ -104,3 +104,18 @@ describe('validateProductionConfig prod safety', () => {
     expect(() => validateProductionConfig()).toThrow(/SEED_DEMO_DATA/)
   })
 })
+
+describe('validateProductionConfig dev (Railway)', () => {
+  it('skips strict checks when APP_ENV=dev even if NODE_ENV=production', async () => {
+    Object.assign(mockConfig, {
+      APP_ENV: 'dev',
+      NODE_ENV: 'production',
+      KEYCLOAK_CLIENT_SECRET: 'changeme',
+      SESSION_SECRET: 'short',
+      SENDGRID_API_KEY: '',
+      SMTP_HOST: '',
+    })
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).not.toThrow()
+  })
+})
