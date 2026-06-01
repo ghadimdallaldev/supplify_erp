@@ -6,6 +6,8 @@ import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
 import session from 'express-session'
 import { config, allowE2eRoutes } from './config/env.js'
+import { isRailwayRuntime } from './config/load-railway-env.js'
+import { isLikelyPublicRedisUrl } from './config/resolve-redis-url.js'
 import { validateProductionConfig } from './lib/validate-config.js'
 import { logger } from './lib/logger.js'
 import { createSessionStore } from './lib/session-store.js'
@@ -89,6 +91,13 @@ import {
 } from './lib/memory-monitor.js'
 
 validateProductionConfig()
+
+if (config.REDIS_URL && isLikelyPublicRedisUrl(config.REDIS_URL)) {
+  logger.warn({
+    msg: 'REDIS_URL uses a public Railway Redis proxy (egress fees). Set REDIS_URL=${{your-redis-service.REDIS_URL}} on the API service — not REDIS_PUBLIC_URL.',
+    railway: isRailwayRuntime(),
+  })
+}
 
 /** Run after HTTP listen so Railway health checks get a response during slow DB work. */
 async function runStartupSchemaTasks() {

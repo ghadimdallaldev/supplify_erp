@@ -1,15 +1,13 @@
 import Redis from 'ioredis'
 import { config } from '../config/env.js'
+import { redisIoredisOptions } from '../config/resolve-redis-url.js'
 import { logger } from './logger.js'
 
 let redisClient = null
 
 if (config.REDIS_URL) {
   try {
-    redisClient = new Redis(config.REDIS_URL, {
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    })
+    redisClient = new Redis(config.REDIS_URL, redisIoredisOptions({ maxRetriesPerRequest: 1 }))
 
     redisClient.on('error', (error) => {
       const log = logger.warn ?? logger.info ?? logger.error

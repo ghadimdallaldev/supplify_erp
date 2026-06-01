@@ -1,6 +1,7 @@
 import { createAdapter } from '@socket.io/redis-adapter'
 import Redis from 'ioredis'
 import { config } from '../config/env.js'
+import { redisIoredisOptions } from '../config/resolve-redis-url.js'
 import { logger } from './logger.js'
 
 /**
@@ -13,10 +14,10 @@ export async function attachSocketRedisAdapter(io) {
     return false
   }
   try {
-    const pubClient = new Redis(config.REDIS_URL, {
-      maxRetriesPerRequest: null,
-      enableOfflineQueue: false,
-    })
+    const pubClient = new Redis(
+      config.REDIS_URL,
+      redisIoredisOptions({ maxRetriesPerRequest: null })
+    )
     const subClient = pubClient.duplicate()
     io.adapter(createAdapter(pubClient, subClient))
     logger.info('Socket.IO Redis adapter attached')
