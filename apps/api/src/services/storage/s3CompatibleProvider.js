@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { logger } from '../../lib/logger.js'
+import { createUploadToken, verifyUploadToken } from './upload-token.js'
 
 function createS3Client(cfg, endpoint) {
   const forcePathStyle = cfg.STORAGE_S3_FORCE_PATH_STYLE !== false
@@ -162,7 +163,32 @@ export function createS3CompatibleProvider(cfg) {
 
     buildPublicUrl,
 
-    async createPresignedUpload({ fileKey, fileType, expiresIn = 300 }) {
+    async createPresignedUpload({ fileKey, fileType, expiresIn = 300, userId }) {
+      const publicUrl = buildPublicUrl(fileKey)
+
+      // Private buckets (Railway): browser uploads via API to avoid storage endpoint CORS.
+      if (cfg.STORAGE_PUBLIC_READ === false) {
+        if (!userId) {
+          throw new Error('userId is required for upload tokens')
+        }
+        const expiresAt = Date.now() + expiresIn * 1000
+        const token = createUploadToken({
+          secret: cfg.SESSION_SECRET,
+          fileKey,
+          contentType: fileType,
+          expiresAt,
+          userId,
+        })
+        const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
+        return {
+          presignedUrl: `${apiBase}/api/files/upload/${token}`,
+          publicUrl,
+          fileKey,
+          bucket: cfg.STORAGE_BUCKET,
+          method: 'PUT',
+        }
+      }
+
       const s3 = getPresignClient()
       const command = new PutObjectCommand({
         Bucket: cfg.STORAGE_BUCKET,
@@ -170,7 +196,6 @@ export function createS3CompatibleProvider(cfg) {
         ContentType: fileType,
       })
       const presignedUrl = await getSignedUrl(s3, command, { expiresIn })
-      const publicUrl = buildPublicUrl(fileKey)
       return {
         presignedUrl,
         publicUrl,
@@ -178,6 +203,34 @@ export function createS3CompatibleProvider(cfg) {
         bucket: cfg.STORAGE_BUCKET,
         method: 'PUT',
       }
+    },
+
+    async completeUpload(token, body, contentType) {
+      const payload = verifyUploadToken(cfg.SESSION_SECRET, token)
+      if (!payload) {
+        throw Object.assign(new Error('Invalid or expired upload token'), {
+          name: 'UPLOAD_TOKEN_INVALID',
+        })
+      }
+      if (payload.contentType !== contentType) {
+        throw Object.assign(new Error('Content-Type mismatch'), { name: 'UPLOAD_CONTENT_TYPE' })
+      }
+      const safeKey = String(payload.fileKey).replace(/^\/+/, '')
+      if (safeKey.includes('..')) {
+        throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
+      }
+
+      const s3 = getInternalClient()
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: cfg.STORAGE_BUCKET,
+          Key: safeKey,
+          Body: body,
+          ContentType: contentType,
+        })
+      )
+      logger.info('S3 storage upload complete', { fileKey: safeKey, bytes: body.length })
+      return { fileKey: safeKey }
     },
 
     async getObjectStream(fileKey) {
