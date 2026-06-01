@@ -174,6 +174,9 @@ const orderUpdateSchema = z.object({
 const orderListSchema = z.object({
   status: z.string().optional(),
   supplier: z.string().uuid().optional(),
+  q: z.string().max(200).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
   limit: z
     .string()
     .transform((val) => Math.min(Math.max(parseInt(val, 10) || 20, 1), 100))
@@ -598,6 +601,43 @@ router.get('/', async (req, res) => {
     if (params.status) {
       whereConditions.push(`o.status = $${paramIndex}`)
       queryParams.push(params.status)
+      paramIndex++
+    }
+
+    if (params.from) {
+      const fromDate = new Date(params.from)
+      if (!Number.isNaN(fromDate.getTime())) {
+        whereConditions.push(`COALESCE(o.placed_at, o.created_at) >= $${paramIndex}`)
+        queryParams.push(fromDate.toISOString())
+        paramIndex++
+      }
+    }
+
+    if (params.to) {
+      const toDate = new Date(params.to)
+      if (!Number.isNaN(toDate.getTime())) {
+        toDate.setHours(23, 59, 59, 999)
+        whereConditions.push(`COALESCE(o.placed_at, o.created_at) <= $${paramIndex}`)
+        queryParams.push(toDate.toISOString())
+        paramIndex++
+      }
+    }
+
+    if (params.q?.trim()) {
+      const term = `%${params.q.trim()}%`
+      whereConditions.push(`(
+        o.id::text ILIKE $${paramIndex}
+        OR r.name ILIKE $${paramIndex}
+        OR EXISTS (
+          SELECT 1
+          FROM order_item oi_q
+          JOIN product p_q ON p_q.id = oi_q.product_id
+          JOIN supplier s_q ON s_q.id = p_q.supplier_id
+          WHERE oi_q.order_id = o.id
+            AND s_q.name ILIKE $${paramIndex}
+        )
+      )`)
+      queryParams.push(term)
       paramIndex++
     }
 

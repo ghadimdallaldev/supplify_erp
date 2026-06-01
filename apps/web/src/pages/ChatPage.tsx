@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { useAppSelector } from '../hooks/redux'
+import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import {
   MessageSquare,
@@ -48,6 +49,8 @@ import { getChatSocket, releaseChatSocket } from '../lib/chatSocket'
 
 export function ChatPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const { can, canAny } = usePermissions()
+  const canSendMessages = canAny('CHAT_SEND', 'CHAT_MANAGE')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
@@ -1159,124 +1162,135 @@ export function ChatPage() {
 
                   {/* Message Input */}
                   <div className="border-t p-4 bg-gradient-to-t from-background to-background/95">
-                    {/* Emoji Picker */}
-                    {showEmojiPicker && (
-                      <div className="emoji-picker-container mb-3 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-[var(--app-border)] dark:border-[var(--app-border-mid)]">
-                        <div className="grid grid-cols-8 gap-1">
-                          {commonEmojis.map((emoji, index) => (
-                            <button
-                              key={index}
-                              onClick={() => insertEmoji(emoji)}
-                              className="text-2xl hover:scale-125 transition-transform p-1 rounded hover:bg-[var(--brand-ultra)]"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {!canSendMessages ? (
+                      <p className="text-sm text-[var(--text-muted)] text-center py-2">
+                        You have view-only access to chat. Contact an account admin to send
+                        messages.
+                      </p>
+                    ) : (
+                      <>
+                        {/* Emoji Picker */}
+                        {showEmojiPicker && (
+                          <div className="emoji-picker-container mb-3 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-[var(--app-border)] dark:border-[var(--app-border-mid)]">
+                            <div className="grid grid-cols-8 gap-1">
+                              {commonEmojis.map((emoji, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => insertEmoji(emoji)}
+                                  className="text-2xl hover:scale-125 transition-transform p-1 rounded hover:bg-[var(--brand-ultra)]"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
-                    <div className="flex gap-2 items-end">
-                      <div className="flex gap-1">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          multiple
-                          accept="image/*,application/pdf,.doc,.docx"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="h-9 w-9 p-0"
-                          title="Attach file"
-                        >
-                          <Paperclip className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                          className="h-9 w-9 p-0"
-                          title="Add emoji"
-                        >
-                          <Smile className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowOrderPicker(!showOrderPicker)}
-                          className="h-9 w-9 p-0"
-                          title="Attach order"
-                          disabled={!ordersData?.orders?.length}
-                        >
-                          <ShoppingCart className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <Input
-                        ref={inputRef}
-                        value={message}
-                        onChange={(e) => {
-                          setMessage(e.target.value)
-                          handleTyping()
-                        }}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey && !isSendingMessage) {
-                            e.preventDefault()
-                            handleSendMessage()
-                          }
-                        }}
-                        placeholder={
-                          replyingTo
-                            ? `Reply to ${replyingTo.sender_type === user?.role?.toUpperCase() ? 'yourself' : 'message'}...`
-                            : 'Type a message...'
-                        }
-                        className="flex-1 min-h-[36px]"
-                        disabled={isSendingMessage || isUploadingFile}
-                      />
-                      <Button
-                        onClick={handleSendMessage}
-                        disabled={
-                          (!message.trim() && selectedFiles.length === 0 && !selectedOrder) ||
-                          isSendingMessage ||
-                          isUploadingFile
-                        }
-                        className="h-9 px-4 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] hover:opacity-90 text-white shadow-md"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Order Picker */}
-                    {showOrderPicker && ordersData?.orders && (
-                      <div className="order-picker-container mt-2 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-[var(--app-border)] dark:border-[var(--app-border-mid)]">
-                        <div className="text-xs font-medium mb-2 text-[var(--text-muted)]">
-                          Select an order to share:
-                        </div>
-                        <div className="space-y-1">
-                          {ordersData.orders.slice(0, 5).map((order: any) => (
-                            <button
-                              key={order.id}
-                              onClick={() => {
-                                setSelectedOrder(order)
-                                setShowOrderPicker(false)
-                              }}
-                              className="w-full text-left p-2 rounded hover:bg-[var(--brand-ultra)] transition-colors text-sm"
+                        <div className="flex gap-2 items-end">
+                          <div className="flex gap-1">
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              multiple
+                              accept="image/*,application/pdf,.doc,.docx"
+                              onChange={handleFileSelect}
+                              className="hidden"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="h-9 w-9 p-0"
+                              title="Attach file"
                             >
-                              <div className="font-medium">Order #{order.id.slice(0, 8)}</div>
-                              <div className="text-xs text-[var(--text-muted)]">
-                                {order.total_amount ? formatPrice(order.total_amount) : 'No amount'}{' '}
-                                • {order.status}
-                              </div>
-                            </button>
-                          ))}
+                              <Paperclip className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                              className="h-9 w-9 p-0"
+                              title="Add emoji"
+                            >
+                              <Smile className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowOrderPicker(!showOrderPicker)}
+                              className="h-9 w-9 p-0"
+                              title="Attach order"
+                              disabled={!ordersData?.orders?.length}
+                            >
+                              <ShoppingCart className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <Input
+                            ref={inputRef}
+                            value={message}
+                            onChange={(e) => {
+                              setMessage(e.target.value)
+                              handleTyping()
+                            }}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey && !isSendingMessage) {
+                                e.preventDefault()
+                                handleSendMessage()
+                              }
+                            }}
+                            placeholder={
+                              replyingTo
+                                ? `Reply to ${replyingTo.sender_type === user?.role?.toUpperCase() ? 'yourself' : 'message'}...`
+                                : 'Type a message...'
+                            }
+                            className="flex-1 min-h-[36px]"
+                            disabled={isSendingMessage || isUploadingFile}
+                          />
+                          <Button
+                            onClick={handleSendMessage}
+                            disabled={
+                              (!message.trim() && selectedFiles.length === 0 && !selectedOrder) ||
+                              isSendingMessage ||
+                              isUploadingFile
+                            }
+                            className="h-9 px-4 bg-gradient-to-r from-[var(--brand)] to-[var(--brand-mid)] hover:opacity-90 text-white shadow-md"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </div>
+
+                        {/* Order Picker */}
+                        {showOrderPicker && ordersData?.orders && (
+                          <div className="order-picker-container mt-2 p-3 bg-background border rounded-lg shadow-xl max-h-48 overflow-y-auto border-[var(--app-border)] dark:border-[var(--app-border-mid)]">
+                            <div className="text-xs font-medium mb-2 text-[var(--text-muted)]">
+                              Select an order to share:
+                            </div>
+                            <div className="space-y-1">
+                              {ordersData.orders.slice(0, 5).map((order: any) => (
+                                <button
+                                  key={order.id}
+                                  onClick={() => {
+                                    setSelectedOrder(order)
+                                    setShowOrderPicker(false)
+                                  }}
+                                  className="w-full text-left p-2 rounded hover:bg-[var(--brand-ultra)] transition-colors text-sm"
+                                >
+                                  <div className="font-medium">Order #{order.id.slice(0, 8)}</div>
+                                  <div className="text-xs text-[var(--text-muted)]">
+                                    {order.total_amount
+                                      ? formatPrice(order.total_amount)
+                                      : 'No amount'}{' '}
+                                    • {order.status}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </CardContent>

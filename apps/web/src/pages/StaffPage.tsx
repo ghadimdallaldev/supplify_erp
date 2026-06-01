@@ -51,6 +51,8 @@ import { usePermissions } from '../hooks/usePermissions'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { StaffPortalAccessPanel } from '../components/StaffPortalAccessPanel'
+import { getApiErrorMessage } from '../lib/apiError'
+import { AlertCircle } from 'lucide-react'
 
 interface StaffFormState {
   firstName: string
@@ -187,7 +189,13 @@ export function StaffPage() {
     breakMinutes: '',
   })
 
-  const { data: staffMembers = [], isLoading: staffLoading } = useGetStaffMembersQuery()
+  const {
+    data: staffMembers = [],
+    isLoading: staffLoading,
+    isError: staffLoadError,
+    error: staffLoadErrorDetail,
+    refetch: refetchStaffMembers,
+  } = useGetStaffMembersQuery()
 
   const today = new Date()
   const scheduleStart = clampToISODate(today)
@@ -302,13 +310,8 @@ export function StaffPage() {
       toast.success('Staff member added')
       setIsAddStaffOpen(false)
       resetStaffForm()
-    } catch (error: any) {
-      const apiMessage =
-        error?.data?.error?.message ||
-        error?.error ||
-        (typeof error?.message === 'string' ? error.message : null) ||
-        'Unable to create staff member'
-      toast.error(apiMessage)
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to create staff member'))
     }
   }
 
@@ -339,13 +342,8 @@ export function StaffPage() {
       toast.success('Shift scheduled')
       setIsAddShiftOpen(false)
       resetShiftForm()
-    } catch (error: any) {
-      const apiMessage =
-        error?.data?.error?.message ||
-        error?.error ||
-        (typeof error?.message === 'string' ? error.message : null) ||
-        'Unable to schedule shift'
-      toast.error(apiMessage)
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to schedule shift'))
     }
   }
 
@@ -356,8 +354,8 @@ export function StaffPage() {
         method: 'web',
       }).unwrap()
       toast.success(`${staff.displayName} checked in`)
-    } catch (error) {
-      toast.error('Unable to check in')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to check in'))
     }
   }
 
@@ -368,8 +366,8 @@ export function StaffPage() {
         method: 'web',
       }).unwrap()
       toast.success(`${staff.displayName} checked out`)
-    } catch (error) {
-      toast.error('Unable to check out')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to check out'))
     }
   }
 
@@ -446,8 +444,8 @@ export function StaffPage() {
       }).unwrap()
       toast.success('Availability recorded')
       setAvailabilityForm({ staffId: '', weekday: '0', start: '', end: '', notes: '' })
-    } catch {
-      toast.error('Unable to save availability')
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Unable to save availability'))
     }
   }
 
@@ -880,7 +878,20 @@ export function StaffPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {staffLoading ? (
+                  {staffLoadError ? (
+                    <div className="flex flex-col items-center gap-3 py-8 text-center">
+                      <AlertCircle className="h-8 w-8 text-[var(--red)]" />
+                      <p className="text-sm text-[var(--text-muted)] max-w-md">
+                        {getApiErrorMessage(
+                          staffLoadErrorDetail,
+                          'Unable to load staff directory.'
+                        )}
+                      </p>
+                      <Button variant="outline" size="sm" onClick={() => refetchStaffMembers()}>
+                        Try again
+                      </Button>
+                    </div>
+                  ) : staffLoading ? (
                     <p className="text-sm text-[var(--text-muted)]">Loading staff…</p>
                   ) : staffMembers.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-[var(--app-border-mid)] bg-[var(--brand-ultra)] p-6 text-center text-sm text-[var(--text-muted)]">

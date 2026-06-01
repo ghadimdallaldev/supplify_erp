@@ -1,9 +1,13 @@
 import express from 'express'
-import { requireAuth, requireRole } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requireAnyPermission,
+} from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { getUserOrgMembership } from '../lib/supplier-org.js'
 import {
   assertSupplierInOrg,
   createBranchInvitation,
@@ -21,9 +25,9 @@ const multiBranchFeature = requireFeature(
   () => 'SUPPLIER'
 )
 
-async function requireOrgOwnerContext(req, res, next) {
+async function resolveOrgContextFromTenant(req, res, next) {
   if (req.userData?.role === 'ADMIN') {
-    const orgId = req.query.organization_id
+    const orgId = req.query.organization_id || req.body?.organization_id
     if (orgId) {
       const { rows } = await query(
         `SELECT id FROM supplier WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
@@ -32,31 +36,40 @@ async function requireOrgOwnerContext(req, res, next) {
       req.orgContext = {
         organizationId: orgId,
         primarySupplierId: rows[0]?.id || null,
-        isOrgOwner: true,
       }
     }
     return next()
   }
 
-  const membership = await getUserOrgMembership(req.userData.id)
-  if (!membership || membership.role_name !== 'Org Owner') {
+  const tenantId = req.tenantContext?.tenantId
+  if (!tenantId) {
     return res.status(403).json({
       ok: false,
       data: null,
-      error: { name: 'FORBIDDEN', message: 'Org Owner role required' },
+      error: { name: 'FORBIDDEN', message: 'Supplier context required' },
+      requestId: req.requestId,
+    })
+  }
+
+  const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [tenantId])
+  const organizationId = rows[0]?.organization_id
+  if (!organizationId) {
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: { name: 'FORBIDDEN', message: 'Organization context required for branch invitations' },
       requestId: req.requestId,
     })
   }
 
   const { rows: mainRows } = await query(
     `SELECT id FROM supplier WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
-    [membership.organization_id]
+    [organizationId]
   )
 
   req.orgContext = {
-    organizationId: membership.organization_id,
+    organizationId,
     primarySupplierId: mainRows[0]?.id || null,
-    isOrgOwner: true,
   }
   next()
 }
@@ -64,7 +77,9 @@ async function requireOrgOwnerContext(req, res, next) {
 router.use(
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
-  requireOrgOwnerContext,
+  resolveTenantContext,
+  requireAnyPermission('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE'),
+  resolveOrgContextFromTenant,
   multiBranchFeature
 )
 

@@ -3,6 +3,14 @@ import {
   normalizeAdminPlanUpdateResult,
   type AdminPlanUpdateResult,
 } from '../lib/adminPlanSaveFeedback'
+import { normalizeListResponse } from '../lib/apiError'
+import {
+  normalizeContractPricingList,
+  normalizeContractPricingRecord,
+  normalizeMyContractPricing,
+  normalizeResolvedContractPrices,
+} from '../lib/contractPricingResponse'
+import { normalizeReportResponse } from '../lib/reportResponse'
 import type { LegalAcceptancePayload } from '../lib/legalDocuments'
 import type {
   User,
@@ -1985,12 +1993,6 @@ export const api = createApi({
     }),
 
     // Public reservation portal
-    getPublicRestaurants: builder.query<PublicRestaurant[], void>({
-      query: () => ({
-        url: '/api/public/restaurants',
-        credentials: 'omit',
-      }),
-    }),
     getPublicRestaurant: builder.query<PublicRestaurant, string>({
       query: (idOrSlug) => ({
         url: `/api/public/restaurants/${encodeURIComponent(idOrSlug)}`,
@@ -2134,6 +2136,7 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
+      invalidatesTags: ['StaffPto'],
     }),
     submitStaffPortalSwap: builder.mutation<
       StaffShiftSwap,
@@ -2150,6 +2153,7 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
+      invalidatesTags: ['StaffSwap'],
     }),
     getStaffPortalTimeEntries: builder.query<StaffTimeEntry[], { token: string }>({
       query: ({ token }) => ({
@@ -2157,6 +2161,7 @@ export const api = createApi({
         params: { token },
         credentials: 'omit',
       }),
+      transformResponse: (response: unknown) => normalizeListResponse<StaffTimeEntry>(response),
     }),
     staffPortalCheckIn: builder.mutation<StaffTimeEntry, { token: string; note?: string }>({
       query: (body) => ({
@@ -2165,6 +2170,7 @@ export const api = createApi({
         body,
         credentials: 'omit',
       }),
+      invalidatesTags: ['StaffTimeEntry'],
     }),
     staffPortalCheckOut: builder.mutation<StaffTimeEntry, { token: string; id: string }>({
       query: ({ token, id }) => ({
@@ -2173,6 +2179,7 @@ export const api = createApi({
         body: { token },
         credentials: 'omit',
       }),
+      invalidatesTags: ['StaffTimeEntry'],
     }),
     getStaffSelfDashboard: builder.query<StaffPortalDashboard, void>({
       query: () => ({
@@ -2189,6 +2196,7 @@ export const api = createApi({
     }),
     getStaffSelfTimeEntries: builder.query<StaffTimeEntry[], void>({
       query: () => '/api/staff/self/time-entries',
+      transformResponse: (response: unknown) => normalizeListResponse<StaffTimeEntry>(response),
       providesTags: ['StaffTimeEntry'],
     }),
     staffSelfCheckIn: builder.mutation<StaffTimeEntry, { note?: string }>({
@@ -2197,7 +2205,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['StaffTimeEntry'],
+      invalidatesTags: ['StaffTimeEntry', 'StaffMember', 'StaffShift'],
     }),
     staffSelfCheckOut: builder.mutation<StaffTimeEntry, { id: string }>({
       query: ({ id }) => ({
@@ -2222,6 +2230,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['StaffPto', 'StaffMember', 'StaffShift'],
     }),
     submitStaffSelfSwap: builder.mutation<
       StaffShiftSwap,
@@ -2236,6 +2245,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['StaffSwap', 'StaffMember', 'StaffShift'],
     }),
 
     // Reports
@@ -2247,6 +2257,7 @@ export const api = createApi({
         url: `/api/reports/restaurant/${path}`,
         params: { from, to, branch_id: branchId, granularity },
       }),
+      transformResponse: (response: unknown) => normalizeReportResponse(response),
       providesTags: ['Reports'],
     }),
     getSupplierReport: builder.query<
@@ -2257,6 +2268,7 @@ export const api = createApi({
         url: `/api/reports/supplier/${path}`,
         params: { from, to, granularity },
       }),
+      transformResponse: (response: unknown) => normalizeReportResponse(response),
       providesTags: ['Reports'],
     }),
 
@@ -2416,9 +2428,7 @@ export const api = createApi({
         params,
       }),
       providesTags: ['ContractPricing'],
-      transformResponse: (response: { data?: { pricing?: Array<Record<string, unknown>> } }) => ({
-        pricing: response?.data?.pricing ?? [],
-      }),
+      transformResponse: (response: unknown) => normalizeContractPricingList(response),
     }),
     getMyContractPricing: builder.query<
       {
@@ -2432,15 +2442,7 @@ export const api = createApi({
         params,
       }),
       providesTags: ['ContractPricing'],
-      transformResponse: (response: {
-        data?: {
-          pricing?: Array<Record<string, unknown>>
-          summary?: Array<Record<string, unknown>>
-        }
-      }) => ({
-        pricing: response?.data?.pricing ?? [],
-        summary: response?.data?.summary ?? [],
-      }),
+      transformResponse: (response: unknown) => normalizeMyContractPricing(response),
     }),
     createContractPricing: builder.mutation<
       { pricing: Record<string, unknown> },
@@ -2463,6 +2465,7 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['ContractPricing', 'Product'],
+      transformResponse: (response: unknown) => normalizeContractPricingRecord(response),
     }),
     updateContractPricing: builder.mutation<
       { pricing: Record<string, unknown> },
@@ -2486,6 +2489,7 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['ContractPricing', 'Product'],
+      transformResponse: (response: unknown) => normalizeContractPricingRecord(response),
     }),
     deactivateContractPricing: builder.mutation<{ pricing: Record<string, unknown> }, string>({
       query: (id) => ({
@@ -2493,6 +2497,7 @@ export const api = createApi({
         method: 'DELETE',
       }),
       invalidatesTags: ['ContractPricing', 'Product'],
+      transformResponse: (response: unknown) => normalizeContractPricingRecord(response),
     }),
     resolveContractPrices: builder.mutation<
       {
@@ -2515,17 +2520,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      transformResponse: (response: { data?: { items?: Array<Record<string, unknown>> } }) => ({
-        items: (response?.data?.items ?? []) as Array<{
-          productId: string
-          supplierId: string
-          quantity: number
-          unitPrice: number
-          source: string
-          defaultPrice: number | null
-          contractPriceId: string | null
-        }>,
-      }),
+      transformResponse: (response: unknown) => normalizeResolvedContractPrices(response),
     }),
     messageFromDeal: builder.mutation<
       {
@@ -2936,7 +2931,12 @@ export const api = createApi({
     }),
 
     acceptWaitlistOffer: builder.mutation<
-      { reservation: Record<string, unknown>; waitlist: Record<string, unknown> },
+      {
+        reservation: Record<string, unknown>
+        waitlist: Record<string, unknown>
+        manageToken?: string
+        manageUrl?: string
+      },
       string
     >({
       query: (token) => ({
@@ -3625,7 +3625,6 @@ export const {
   useAssignTenantUserRoleMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
-  useGetPublicRestaurantsQuery,
   useGetPublicRestaurantQuery,
   useGetPublicReservationAvailabilityQuery,
   useLazyGetPublicReservationAvailabilityQuery,

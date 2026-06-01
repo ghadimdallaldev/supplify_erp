@@ -89,7 +89,10 @@ import {
 
 validateProductionConfig()
 
-if (config.NODE_ENV !== 'test') {
+/** Run after HTTP listen so Railway health checks get a response during slow DB work. */
+async function runStartupSchemaTasks() {
+  if (config.NODE_ENV === 'test') return
+
   try {
     const hasBaseSchema = await baseSchemaExists()
     if (config.RUN_MIGRATIONS_ON_START || !hasBaseSchema) {
@@ -104,7 +107,7 @@ if (config.NODE_ENV !== 'test') {
     await ensureStaffAppSchema()
     await ensureOrderCancellationColumns()
   } catch (error) {
-    logger.error('Aborting server startup due to database migration failure', {
+    logger.error('Database migration failed after listen — shutting down', {
       error: error.message,
     })
     process.exit(1)
@@ -445,10 +448,15 @@ server.listen(PORT, HOST, () => {
     msg: `Server started on ${HOST}:${PORT}`,
     host: HOST,
     port: PORT,
+    railwayPort: process.env.PORT ?? null,
     env: config.NODE_ENV,
     appEnv: config.APP_ENV,
     webOrigin: config.WEB_ORIGIN,
     paymentsMode: config.PAYMENTS_MODE,
+  })
+
+  runStartupSchemaTasks().catch((error) => {
+    logger.error('Startup schema tasks failed', { error: error.message })
   })
 
   // Start scheduled orders cron job

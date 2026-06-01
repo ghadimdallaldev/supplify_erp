@@ -29,6 +29,13 @@ export { normalizePlanCode, formatPlanDisplayName } from './plan-codes.js'
 
 export { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS, discoverLimitKeys }
 
+/** Plan limits with Free-tier fallbacks applied before enforcement. */
+function getEnforcementPlanLimits(subscription, tenantType) {
+  const limits = { ...(subscription.limits || {}) }
+  fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
+  return limits
+}
+
 /** Cache TTL for subscription data (seconds). Short enough to absorb burst traffic while staying fresh. */
 const SUBSCRIPTION_CACHE_TTL = 30
 
@@ -227,12 +234,13 @@ export async function checkLimit(tenantId, tenantType, meterType) {
 
     // Resolve limit: tenant override > plan override > plan default (increase-only)
     const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+    const planLimits = getEnforcementPlanLimits(subscription, tenantType)
     const resolved = await resolveEffectiveLimit({
       tenantId: billingTenantId,
       tenantType,
       limitKey: meterType,
       planId: subscription.plan_id,
-      planLimits: subscription.limits || {},
+      planLimits,
     })
     const limit = resolved.effectiveLimit
     const isUnlimited = resolved.isUnlimited
@@ -392,13 +400,14 @@ export async function checkLimit(tenantId, tenantType, meterType) {
     }
   } catch (error) {
     logger.error('Check limit error:', error)
-    // On error, return safe defaults that don't block users
+    // Fail closed for countable meters — do not treat DB errors as unlimited
     return {
       current: 0,
-      limit: null,
-      isUnlimited: true,
-      isOverLimit: false,
-      effectiveLimit: null,
+      limit: 0,
+      isUnlimited: false,
+      isOverLimit: true,
+      effectiveLimit: 0,
+      resolutionError: true,
     }
   }
 }
@@ -483,13 +492,14 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
   if (!subscription) {
     return { allowed: false, current: 0, limit: 0 }
   }
-  let limit = subscription.limits?.[meterType]
+  const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+  const planLimits = getEnforcementPlanLimits(subscription, tenantType)
   const resolved = await resolveEffectiveLimit({
-    tenantId,
+    tenantId: billingTenantId,
     tenantType,
     limitKey: meterType,
     planId: subscription.plan_id,
-    planLimits: subscription.limits || {},
+    planLimits,
   })
   if (resolved.isUnlimited) {
     const res = await withTransaction(async (client) => {
@@ -510,8 +520,7 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
     })
     return res
   }
-  limit = resolved.effectiveLimit
-  const effectiveLimit = limit
+  const effectiveLimit = resolved.effectiveLimit
 
   return withTransaction(async (client) => {
     await client.query(
@@ -554,10 +563,19 @@ export async function checkAndIncrementUsage(tenantId, tenantType, meterType, in
  */
 export async function incrementUsage(tenantId, tenantType, meterType, increment = 1) {
   try {
-    // Get subscription to fetch limit value
     const subscription = await getTenantSubscription(tenantId, tenantType)
-    const limitValue = subscription?.limits?.[meterType]
-    const effectiveLimit = limitValue === -1 ? null : limitValue ? parseInt(limitValue) : null
+    if (!subscription) return
+
+    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+    const planLimits = getEnforcementPlanLimits(subscription, tenantType)
+    const resolved = await resolveEffectiveLimit({
+      tenantId: billingTenantId,
+      tenantType,
+      limitKey: meterType,
+      planId: subscription.plan_id,
+      planLimits,
+    })
+    const effectiveLimit = resolved.isUnlimited ? null : resolved.effectiveLimit
 
     await query(
       `

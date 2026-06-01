@@ -38,7 +38,7 @@ import {
 } from '../components/ui/dialog'
 import { formatPrice, formatNumber } from '../utils/format'
 import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
-import { featureEnabled } from '../lib/planLimits'
+import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
 import { RequirePermission } from '../components/RequirePermission'
 
@@ -107,9 +107,7 @@ export function ProductsPage() {
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !isRestaurant,
   })
-  const supplierDealsEnabled = featureEnabled(
-    entitlementsData?.entitlements?.features?.supplier_deals
-  )
+  const supplierDealsEnabled = canUseSupplierDeals(entitlementsData?.entitlements)
   const { data: activeDealsData } = useGetActivePromotionsQuery(undefined, {
     skip: !isRestaurant || !supplierDealsEnabled,
   })

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { getApiErrorMessage } from '../lib/apiError'
 import {
   useGetReservationBoardQuery,
   useGetReservationAnalyticsQuery,
@@ -6,7 +7,11 @@ import {
   useGetReservationWaitlistQuery,
   useManuallyPromoteWaitlistMutation,
 } from '../services/reservationsApi'
-import { useGetEntitlementsQuery, useGetRestaurantMeQuery } from '../services/api'
+import {
+  useGetBranchesQuery,
+  useGetEntitlementsQuery,
+  useGetRestaurantMeQuery,
+} from '../services/api'
 import { featureEnabled } from '../lib/planLimits'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -29,18 +34,41 @@ import { Skeleton } from '../components/ui/skeleton'
 export function ReservationsPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [range, setRange] = useState<'day' | 'week' | 'month'>('week')
+  const [branchId, setBranchId] = useState('')
+
+  const boardQueryArgs = useMemo(
+    () => ({
+      date: selectedDate,
+      ...(branchId ? { branchId } : {}),
+    }),
+    [selectedDate, branchId]
+  )
 
   const {
     data: boardData,
     isLoading: boardLoading,
+    isError: boardError,
+    error: boardQueryError,
     refetch,
-  } = useGetReservationBoardQuery(
-    { date: selectedDate },
-    { pollingInterval: 30_000, refetchOnFocus: true, refetchOnReconnect: true }
-  )
-  const { data: analytics, refetch: refetchAnalytics } = useGetReservationAnalyticsQuery({ range })
-  const { data: guestIntel, isLoading: guestIntelLoading } = useGetGuestIntelligenceQuery({})
-  const { data: waitlistData, refetch: refetchWaitlist } = useGetReservationWaitlistQuery()
+  } = useGetReservationBoardQuery(boardQueryArgs, {
+    pollingInterval: 30_000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  })
+  const { data: analytics, refetch: refetchAnalytics } = useGetReservationAnalyticsQuery({
+    range,
+    ...(branchId ? { branchId } : {}),
+  })
+  const { data: guestIntel, isLoading: guestIntelLoading } = useGetGuestIntelligenceQuery({
+    ...(branchId ? { branchId } : {}),
+  })
+  const {
+    data: waitlistData,
+    isLoading: waitlistLoading,
+    refetch: refetchWaitlist,
+  } = useGetReservationWaitlistQuery(branchId ? { branchId } : undefined)
+  const { data: branchesData } = useGetBranchesQuery()
+  const branches = branchesData?.branches ?? branchesData?.accounts ?? []
   const [promoteWaitlist, { isLoading: promoting }] = useManuallyPromoteWaitlistMutation()
   const { data: restaurantMe } = useGetRestaurantMeQuery()
   const { data: entitlementsData } = useGetEntitlementsQuery()
@@ -53,9 +81,9 @@ export function ReservationsPage() {
     if (!restaurant?.id) return null
     const base = typeof window !== 'undefined' ? window.location.origin : ''
     const segment = restaurant.slug || restaurant.id
-    const branchQuery = ''
+    const branchQuery = branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''
     return `${base}/reserve/${segment}${branchQuery}`
-  }, [restaurantMe?.restaurant])
+  }, [restaurantMe?.restaurant, branchId])
 
   const tables = boardData?.tables ?? []
   const reservations = boardData?.reservations ?? []
@@ -124,6 +152,21 @@ export function ReservationsPage() {
                   Today
                 </Button>
               </div>
+              {branches.length > 1 ? (
+                <select
+                  className="h-10 min-w-[140px] rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 text-sm shadow-sm"
+                  value={branchId}
+                  onChange={(event) => setBranchId(event.target.value)}
+                  aria-label="Branch"
+                >
+                  <option value="">All branches</option>
+                  {branches.map((branch: { id: string; name: string }) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <ReservationCreateDrawer
                 tables={tables}
                 onCreated={() => {
@@ -162,6 +205,19 @@ export function ReservationsPage() {
               >
                 <Copy className="mr-2 h-4 w-4" />
                 Copy link
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {boardError ? (
+          <Card className="border border-red-200 bg-red-50">
+            <CardContent className="flex flex-col gap-3 py-6 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-red-900">
+                {getApiErrorMessage(boardQueryError, 'Could not load the reservation board.')}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
               </Button>
             </CardContent>
           </Card>
@@ -229,7 +285,12 @@ export function ReservationsPage() {
             )}
           </CardHeader>
           <CardContent>
-            {(waitlistData?.waitlist || []).length === 0 ? (
+            {waitlistLoading ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-[var(--text-muted)]">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Loading waitlist…
+              </div>
+            ) : (waitlistData?.waitlist || []).length === 0 ? (
               <EmptyState
                 title="Waitlist is empty"
                 description="Guests waiting for a table will appear here."
@@ -296,12 +357,13 @@ export function ReservationsPage() {
             <Skeleton className="h-48 w-full rounded-xl" />
             <Skeleton className="h-32 w-full rounded-xl" />
           </div>
-        ) : (
+        ) : boardError ? null : (
           <ReservationBoard
             reservations={reservations}
             tables={tables}
             waitlist={waitlist}
             boardDate={selectedDate}
+            branchId={branchId || undefined}
           />
         )}
 

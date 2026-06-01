@@ -20,6 +20,7 @@ import { Check, Lock, Minus, TrendingUp } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useEffect, useRef } from 'react'
 import { useImpersonation } from '../hooks/useImpersonation'
+import { usePermissions } from '../hooks/usePermissions'
 import {
   getLimitKeys,
   getFeatureKeys,
@@ -97,7 +98,8 @@ export function UpgradeModal() {
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { open, openRevision, type, payload } = useAppSelector((state) => state.monetization)
   const user = useAppSelector((state) => state.auth.user)
-  const canUpgrade = user?.tenantPermissions?.includes('SUBSCRIPTIONS_MANAGE') ?? true
+  const { can } = usePermissions()
+  const canUpgrade = user ? can('SUBSCRIPTIONS_MANAGE') : false
   const { shouldLoadTenantEntitlements } = useImpersonation()
 
   const blocked =

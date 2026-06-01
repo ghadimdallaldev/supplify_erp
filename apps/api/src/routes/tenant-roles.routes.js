@@ -5,7 +5,7 @@ import {
   requireRole,
   resolveTenantContext,
   requirePermission,
-  getRequestTenant,
+  requireAnyPermission,
 } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
@@ -396,97 +396,101 @@ router.get('/users', requirePermission('SETTINGS_VIEW'), async (req, res) => {
 })
 
 /** POST /api/roles/users/:userId/assign */
-router.post('/users/:userId/assign', requirePermission('SETTINGS_MANAGE'), async (req, res) => {
-  try {
-    const { tenantId, tenantType } = assertTenantAccess(req)
-    const body = assignRoleSchema.parse(req.body)
-    const {
-      role_id: roleId,
-      driver_id: driverId,
-      create_driver_profile: createDriverProfile,
-    } = body
-    const targetUserId = req.params.userId
+router.post(
+  '/users/:userId/assign',
+  requireAnyPermission('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE'),
+  async (req, res) => {
+    try {
+      const { tenantId, tenantType } = assertTenantAccess(req)
+      const body = assignRoleSchema.parse(req.body)
+      const {
+        role_id: roleId,
+        driver_id: driverId,
+        create_driver_profile: createDriverProfile,
+      } = body
+      const targetUserId = req.params.userId
 
-    const scope = await resolveWorkspaceScope(tenantId, tenantType)
-    const role = await assertCanAssignRole({
-      requesterId: req.userData.id,
-      requesterIsPlatformAdmin: req.userData.role === 'ADMIN',
-      requesterPermissions: req.tenantContext?.permissions || [],
-      targetUserId,
-      roleId,
-      tenantId,
-      tenantType,
-      organizationId: scope.organizationId,
-    })
-
-    await assignTenantUserRole({
-      userId: targetUserId,
-      roleId,
-      tenantId,
-      tenantType,
-      assignedBy: req.userData.id,
-    })
-    await invalidateUserPermissionCache(targetUserId, tenantId, tenantType)
-
-    let driverLink = null
-    if (tenantType === 'SUPPLIER') {
-      driverLink = await syncDriverLinkForRoleAssignment({
-        userId: targetUserId,
-        supplierId: tenantId,
-        roleName: role.name,
-        driverId: driverId ?? undefined,
-        createDriverProfile: createDriverProfile ?? true,
+      const scope = await resolveWorkspaceScope(tenantId, tenantType)
+      const role = await assertCanAssignRole({
+        requesterId: req.userData.id,
+        requesterIsPlatformAdmin: req.userData.role === 'ADMIN',
+        requesterPermissions: req.tenantContext?.permissions || [],
+        targetUserId,
+        roleId,
+        tenantId,
+        tenantType,
+        organizationId: scope.organizationId,
       })
-    }
 
-    res.json({
-      ok: true,
-      data: {
+      await assignTenantUserRole({
         userId: targetUserId,
         roleId,
-        roleName: role.name,
-        driverId: driverLink?.id ?? null,
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'VALIDATION_ERROR', message: 'Invalid request body' },
-        requestId: req.requestId,
+        tenantId,
+        tenantType,
+        assignedBy: req.userData.id,
       })
-    }
-    if (error instanceof ForbiddenError) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: { name: 'FORBIDDEN', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-    if (error instanceof ValidationError || error instanceof NotFoundError) {
-      return res.status(error instanceof NotFoundError ? 404 : 400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: error instanceof NotFoundError ? 'NOT_FOUND' : 'VALIDATION_ERROR',
-          message: error.message,
+      await invalidateUserPermissionCache(targetUserId, tenantId, tenantType)
+
+      let driverLink = null
+      if (tenantType === 'SUPPLIER') {
+        driverLink = await syncDriverLinkForRoleAssignment({
+          userId: targetUserId,
+          supplierId: tenantId,
+          roleName: role.name,
+          driverId: driverId ?? undefined,
+          createDriverProfile: createDriverProfile ?? true,
+        })
+      }
+
+      res.json({
+        ok: true,
+        data: {
+          userId: targetUserId,
+          roleId,
+          roleName: role.name,
+          driverId: driverLink?.id ?? null,
         },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Invalid request body' },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ForbiddenError) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
+        return res.status(error instanceof NotFoundError ? 404 : 400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: error instanceof NotFoundError ? 'NOT_FOUND' : 'VALIDATION_ERROR',
+            message: error.message,
+          },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('Assign tenant role error', { error: error.message })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to assign role' },
         requestId: req.requestId,
       })
     }
-    logger.error('Assign tenant role error', { error: error.message })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to assign role' },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 /** GET /api/roles/:id/permissions */
 router.get('/:id/permissions', requirePermission('SETTINGS_VIEW'), async (req, res) => {
