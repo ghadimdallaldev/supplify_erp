@@ -9,7 +9,7 @@ Supplify does **not** store uploaded file bytes in PostgreSQL. The database keep
 | Filesystem or object store | Image/PDF bytes                                              |
 | PostgreSQL                 | `publicUrl`, `file_key`, `file_url`, `file_size_bytes`, etc. |
 
-**Single pipeline:** `POST /api/files/presign` → browser `PUT` to presigned URL → feature API saves the reference.
+**Single pipeline:** `POST /api/files/presign` → browser `PUT` (presigned S3 URL or API upload token) → feature API saves the reference.
 
 Implementation: [`apps/api/src/services/storage/storage.service.js`](../../apps/api/src/services/storage/storage.service.js), routes in [`apps/api/src/routes/files.routes.js`](../../apps/api/src/routes/files.routes.js).
 
@@ -80,7 +80,9 @@ Typical for **Railway dev** ([`deploy/railway/development/api.env`](../../deploy
 
 **Railway Buckets:** Use variable references `ENDPOINT`, `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION` (also mapped to `STORAGE_*` in [`env.js`](../../apps/api/src/config/env.js)). Set `STORAGE_PUBLIC_READ=false`. Virtual-hosted URLs are used automatically (`STORAGE_S3_FORCE_PATH_STYLE=false` for `storage.railway.app` / `storageapi.dev` endpoints).
 
-**Writes:** Browser PUTs directly to AWS presigned URL (bytes do not pass through the API body).
+**Writes (public bucket):** Browser PUTs directly to the S3 presigned URL.
+
+**Writes (private bucket, e.g. Railway):** Presign returns `PUT {API_PUBLIC_URL}/api/files/upload/:token`; the API verifies the token and `PutObject`s to the bucket (avoids storage-endpoint CORS). Same token flow as the local driver.
 
 **Local Docker:** Root `docker-compose.yml` sets `S3_ENDPOINT=http://minio:9000`; API auto-selects `s3` when an endpoint is set. Run `pnpm storage:ensure-buckets` from the API package to create buckets.
 

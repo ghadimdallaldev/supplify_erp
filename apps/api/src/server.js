@@ -150,6 +150,8 @@ app.use(
     hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
     frameguard: { action: 'deny' },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    // Allow web app on another Railway host to load /api/files/object images
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 )
 
