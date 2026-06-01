@@ -157,6 +157,12 @@ describe('limit-resolution', () => {
     expect(limits.deal_redemptions_per_day).toBe(2)
   })
 
+  it('defaults Free Trial to 1 deal redemption per day when missing', () => {
+    const limits = {}
+    fillMissingFreeTierLimits(limits, 'RESTAURANT', 'free')
+    expect(limits.deal_redemptions_per_day).toBe(1)
+  })
+
   it('does not include supplier promotions meter on restaurant catalog', () => {
     expect(RESTAURANT_LIMIT_KEYS).not.toContain('promotions')
     expect(SUPPLIER_LIMIT_KEYS).toContain('promotions')

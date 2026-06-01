@@ -79,7 +79,7 @@ export const FREE_TIER_LIMIT_PATCHES = {
     quick_list_items: 1,
     scheduled_quick_lists: 1,
     scheduled_order_grace_per_day: 1,
-    deal_redemptions_per_day: 0,
+    deal_redemptions_per_day: 1,
   },
   SUPPLIER: {
     branches: 1,
