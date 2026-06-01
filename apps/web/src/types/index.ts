@@ -270,6 +270,9 @@ export interface DeliveryRouteDetail extends Omit<DeliveryRouteSummary, 'stops'>
 export interface OrderFilters {
   status?: string
   supplier?: string
+  q?: string
+  from?: string
+  to?: string
   limit?: number
   offset?: number
 }

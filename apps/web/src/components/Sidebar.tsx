@@ -36,7 +36,7 @@ import {
 } from 'lucide-react'
 import { featureEnabled, getOrderUsageBadge, isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { countActiveDisputes } from '../lib/disputeHelpers'
-import { canUseGlobalReports } from '../lib/planFeatureGates'
+import { canUseGlobalReports, canUseSupplierDeals } from '../lib/planFeatureGates'
 import { formatPlanDisplayName } from '../lib/planComparison'
 
 type NavItem = {
@@ -108,9 +108,7 @@ export function Sidebar({
   const planLabel = entitlementsData?.entitlements?.plan?.name ?? ''
   const planCode = (entitlementsData?.entitlements?.plan?.code ?? 'free').toLowerCase()
   const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
-  const supplierDealsEnabled = featureEnabled(
-    entitlementsData?.entitlements?.features?.supplier_deals
-  )
+  const supplierDealsEnabled = canUseSupplierDeals(entitlementsData?.entitlements)
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
     'disputes_returns'

@@ -1,6 +1,12 @@
 import express from 'express'
 import { z, ZodError } from 'zod'
-import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  requirePermission,
+  getRestaurantIdForRequest,
+} from '../lib/rbac.js'
 import { requireStaffPortalAuth, requirePlatformAppAccess } from '../lib/staff-portal-auth.js'
 import { staffMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
@@ -189,6 +195,9 @@ const createPayrollExportSchema = z.object({
 })
 
 async function resolveRestaurantId(req) {
+  const fromTenant = await getRestaurantIdForRequest(req)
+  if (fromTenant) return fromTenant
+
   const role = req.userData?.role
 
   if (role === 'ADMIN') {
@@ -308,6 +317,7 @@ function mapTimeEntryRow(row) {
     staffId: row.staff_id,
     clockInAt: row.clock_in_at,
     clockOutAt: row.clock_out_at,
+    clockInMethod: row.clock_in_method,
     clockOutMethod: row.clock_out_method,
     breakMinutes: row.break_minutes != null ? Number(row.break_minutes) : null,
     note: row.note,
@@ -1766,14 +1776,24 @@ router.post(
           restaurantId,
           payload.staffId,
           payload.weekday,
-          payload.availability,
+          JSON.stringify(payload.availability),
           payload.notes ?? null,
         ]
       )
 
+      const row = rows[0]
       res.status(201).json({
         ok: true,
-        data: rows[0],
+        data: {
+          id: row.id,
+          restaurantId: row.restaurant_id,
+          staffId: row.staff_id,
+          weekday: row.weekday,
+          availability: row.availability,
+          notes: row.notes,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
         error: null,
         requestId: req.requestId,
       })

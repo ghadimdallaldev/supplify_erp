@@ -125,4 +125,18 @@ describe('org.routes', () => {
     const res = await request(app).delete('/api/org/branches/supplier-main').expect(403)
     expect(res.body.error.name).toBe('MAIN_BRANCH')
   })
+
+  it('POST /users/:userId/role returns 403 for non Org Owner', async () => {
+    supplierOrg.getUserOrgMembership.mockResolvedValueOnce({
+      organization_id: 'org-1',
+      organization_name: 'Test Org',
+      role_name: 'Org Manager',
+    })
+    const res = await request(app)
+      .post('/api/org/users/user-2/role')
+      .send({ roleName: 'Org Viewer' })
+      .expect(403)
+    expect(res.body.error.message).toMatch(/Org Owner/)
+    expect(supplierOrg.assignOrgUserRole).not.toHaveBeenCalled()
+  })
 })

@@ -15,7 +15,8 @@ import { useAppSelector } from '../../hooks/redux'
 import { RequirePermission } from '../../components/RequirePermission'
 import { canUseGlobalReports } from '../../lib/planFeatureGates'
 import { downloadCsv, reportRowsToCsv } from '../../utils/csvExport'
-import { Loader2, Download } from 'lucide-react'
+import { reportErrorMessage } from '../../lib/reportResponse'
+import { Loader2, Download, AlertCircle } from 'lucide-react'
 import {
   ResponsiveContainer,
   LineChart,
@@ -154,8 +155,12 @@ function ReportPanel({
     { path: def.path, from, to, granularity },
     { skip: isRestaurant, refetchOnMountOrArgChange: true }
   )
-  const { data, isLoading, isFetching } = isRestaurant ? restaurantQuery : supplierQuery
-  const rows = (data?.data as Array<Record<string, unknown>>) || []
+  const { data, isLoading, isFetching, isError, error, refetch } = isRestaurant
+    ? restaurantQuery
+    : supplierQuery
+  const rows = data?.data ?? []
+  const showInitialLoad = isLoading && !data
+  const showRefreshing = isFetching && !isLoading && rows.length > 0
 
   const chartData = useMemo(
     () =>
@@ -177,22 +182,44 @@ function ReportPanel({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{def.label}</CardTitle>
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={!rows.length}>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardTitle className="flex items-center gap-2">
+          {def.label}
+          {showRefreshing ? (
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--text-muted)]" />
+          ) : null}
+        </CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportCsv}
+          disabled={!rows.length || showInitialLoad}
+        >
           <Download className="h-4 w-4 mr-1" />
           CSV
         </Button>
       </CardHeader>
       <CardContent>
-        {isLoading || isFetching ? (
-          <Loader2 className="h-6 w-6 animate-spin" />
+        {showInitialLoad ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--text-muted)]" />
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <AlertCircle className="h-8 w-8 text-[var(--red)]" />
+            <p className="text-sm text-[var(--text-muted)] max-w-md">{reportErrorMessage(error)}</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Try again
+            </Button>
+          </div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">No data for this period.</p>
+          <p className="text-sm text-[var(--text-muted)] py-8 text-center">
+            No data for this period. Try widening the date range or placing orders in this window.
+          </p>
         ) : (
           <div className="space-y-4">
-            <div style={{ width: '100%', height: 280 }}>
-              <ResponsiveContainer>
+            <div className="w-full min-h-[280px]" style={{ height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
                 {def.chart === 'line' ? (
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />

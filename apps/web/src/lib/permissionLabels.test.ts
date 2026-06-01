@@ -21,4 +21,9 @@ describe('permissionLabels', () => {
   it('restaurant domains omit supplier-only driver deliveries', () => {
     expect(RESTAURANT_PERMISSION_DOMAINS['Driver deliveries']).toBeUndefined()
   })
+
+  it('labels platform admin permissions', () => {
+    expect(labelForPermission('ADMIN_FINANCE')).toBe('View financial overview')
+    expect(labelForPermission('ADMIN_GROWTH')).toBe('Manage features & growth')
+  })
 })

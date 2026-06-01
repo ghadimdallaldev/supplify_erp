@@ -133,7 +133,8 @@ const SUPPLIER_NOTIFICATION_FIELDS: Array<{
 export function SupplierSettingsPage() {
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
-  const { can } = usePermissions()
+  const { can, canAny } = usePermissions()
+  const canWriteWarehouses = canAny('WAREHOUSES_EDIT', 'WAREHOUSES_MANAGE')
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState('profile')
   const {
@@ -596,9 +597,11 @@ export function SupplierSettingsPage() {
             <TabsTrigger value="business" className="flex-1 min-w-[5.5rem] sm:flex-none">
               Business
             </TabsTrigger>
-            <TabsTrigger value="warehouses" className="flex-1 min-w-[5.5rem] sm:flex-none">
-              Warehouses
-            </TabsTrigger>
+            {can('WAREHOUSES_VIEW') && (
+              <TabsTrigger value="warehouses" className="flex-1 min-w-[5.5rem] sm:flex-none">
+                Warehouses
+              </TabsTrigger>
+            )}
             <TabsTrigger value="delivery" className="flex-1 min-w-[5.5rem] sm:flex-none">
               Delivery Zones
             </TabsTrigger>
@@ -1055,105 +1058,111 @@ export function SupplierSettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="warehouses" className="space-y-4">
-            {!warehousesEnabled ? (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-[var(--text-muted)] mb-3">
-                    Warehouse management requires Silver or higher. Free accounts do not include
-                    warehouse locations; any legacy default warehouse from older data is not usable
-                    until you upgrade.
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      openBrowseUpgrade(dispatch, {
-                        currentPlan: entitlements?.plan?.name ?? null,
-                        upgradeUrl: '/app/settings?tab=plan',
-                      })
-                    }
-                  >
-                    View plans
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
+          {can('WAREHOUSES_VIEW') && (
+            <TabsContent value="warehouses" className="space-y-4">
+              {!warehousesEnabled ? (
                 <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <Warehouse className="h-5 w-5" />
-                          Warehouses
-                        </CardTitle>
-                        <CardDescription>Manage your warehouse locations</CardDescription>
-                      </div>
-                      <Button
-                        disabled={!canAddWarehouse}
-                        onClick={() => {
-                          if (!canAddWarehouse) {
-                            openBrowseUpgrade(dispatch, {
-                              currentPlan: entitlements?.plan?.name ?? null,
-                              upgradeUrl: '/app/settings?tab=plan',
-                            })
-                            return
-                          }
-                          setShowAddWarehouse(true)
-                        }}
-                      >
-                        <Warehouse className="h-4 w-4 mr-2" />
-                        Add Warehouse
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {!canAddWarehouse && (
-                      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        {formatWarehouseGateMessage(warehouseGate)}
-                      </div>
-                    )}
-                    <div className="space-y-3">
-                      {(warehousesData?.warehouses ?? []).length === 0 ? (
-                        <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
-                          <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
-                          <p className="text-[var(--text-muted)]">No warehouses yet</p>
-                          <p className="text-sm text-[var(--text-muted)] mt-1">
-                            Add a warehouse to manage multiple locations
-                          </p>
-                        </div>
-                      ) : (
-                        (warehousesData?.warehouses ?? []).map((wh: any) => (
-                          <div
-                            key={wh.id}
-                            className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-semibold">{wh.name}</h4>
-                                  {wh.code && <Badge variant="outline">{wh.code}</Badge>}
-                                  {(wh.is_default || wh.is_main) && (
-                                    <Badge variant="secondary">Default</Badge>
-                                  )}
-                                </div>
-                                {formatAddressLine(wh.address) && (
-                                  <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                                    <MapPin className="h-4 w-4" />
-                                    <span>{formatAddressLine(wh.address)}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-[var(--text-muted)] mb-3">
+                      Warehouse management requires Silver or higher. Free accounts do not include
+                      warehouse locations; any legacy default warehouse from older data is not
+                      usable until you upgrade.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        openBrowseUpgrade(dispatch, {
+                          currentPlan: entitlements?.plan?.name ?? null,
+                          upgradeUrl: '/app/settings?tab=plan',
+                        })
+                      }
+                    >
+                      View plans
+                    </Button>
                   </CardContent>
                 </Card>
-              </>
-            )}
-          </TabsContent>
+              ) : (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <Warehouse className="h-5 w-5" />
+                            Warehouses
+                          </CardTitle>
+                          <CardDescription>Manage your warehouse locations</CardDescription>
+                        </div>
+                        <Button
+                          disabled={!canAddWarehouse || !canWriteWarehouses}
+                          onClick={() => {
+                            if (!canWriteWarehouses) {
+                              toast.error('You do not have permission to manage warehouses')
+                              return
+                            }
+                            if (!canAddWarehouse) {
+                              openBrowseUpgrade(dispatch, {
+                                currentPlan: entitlements?.plan?.name ?? null,
+                                upgradeUrl: '/app/settings?tab=plan',
+                              })
+                              return
+                            }
+                            setShowAddWarehouse(true)
+                          }}
+                        >
+                          <Warehouse className="h-4 w-4 mr-2" />
+                          Add Warehouse
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {!canAddWarehouse && (
+                        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                          {formatWarehouseGateMessage(warehouseGate)}
+                        </div>
+                      )}
+                      <div className="space-y-3">
+                        {(warehousesData?.warehouses ?? []).length === 0 ? (
+                          <div className="text-center py-12 border-2 border-dashed border-[var(--app-border-mid)] rounded-lg">
+                            <Warehouse className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-2" />
+                            <p className="text-[var(--text-muted)]">No warehouses yet</p>
+                            <p className="text-sm text-[var(--text-muted)] mt-1">
+                              Add a warehouse to manage multiple locations
+                            </p>
+                          </div>
+                        ) : (
+                          (warehousesData?.warehouses ?? []).map((wh: any) => (
+                            <div
+                              key={wh.id}
+                              className="border rounded-lg p-4 hover:bg-[var(--brand-ultra)] transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-semibold">{wh.name}</h4>
+                                    {wh.code && <Badge variant="outline">{wh.code}</Badge>}
+                                    {(wh.is_default || wh.is_main) && (
+                                      <Badge variant="secondary">Default</Badge>
+                                    )}
+                                  </div>
+                                  {formatAddressLine(wh.address) && (
+                                    <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                                      <MapPin className="h-4 w-4" />
+                                      <span>{formatAddressLine(wh.address)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+          )}
 
           <TabsContent value="plan" className="space-y-4">
             <SubscriptionInfo />

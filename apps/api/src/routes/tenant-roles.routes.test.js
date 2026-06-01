@@ -40,6 +40,13 @@ vi.mock('../lib/rbac.js', () => ({
     }
     next()
   },
+  requireAnyPermission:
+    (...keys) =>
+    (req, res, next) => {
+      const perms = req.tenantContext?.permissions || []
+      if (keys.some((key) => perms.includes(key))) return next()
+      return res.status(403).json({ ok: false, error: { name: 'FORBIDDEN' } })
+    },
   getRequestTenant: vi.fn(),
 }))
 
@@ -284,6 +291,37 @@ describe('Tenant roles routes', () => {
       .expect(200)
     expect(assignTenantUserRole).toHaveBeenCalled()
     expect(res.body.data.roleName).toBe('Manager')
+  })
+
+  it('POST assign allows STAFF_INVITE without SETTINGS_MANAGE', async () => {
+    const viewerRoleId = 'a0000001-0001-4000-8000-000000000097'
+    assertCanAssignRole.mockResolvedValueOnce({
+      id: viewerRoleId,
+      name: 'Viewer',
+      tenant_id: 'tenant-1',
+      tenant_type: 'RESTAURANT',
+    })
+    const inviteOnlyApp = express()
+    inviteOnlyApp.use(express.json())
+    inviteOnlyApp.use((req, res, next) => {
+      req.requestId = 'test-request-id'
+      req.userData = { id: 'inviter-user', role: 'RESTAURANT', email: 'inv@example.com' }
+      req.tenantContext = {
+        tenantId: 'tenant-1',
+        tenantType: 'RESTAURANT',
+        permissions: ['STAFF_VIEW', 'STAFF_INVITE', 'ORDERS_VIEW'],
+      }
+      next()
+    })
+    inviteOnlyApp.use('/api/roles', tenantRolesRoutes)
+    const { errorHandler } = await import('../middlewares/errorHandler.js')
+    inviteOnlyApp.use(errorHandler)
+
+    const res = await request(inviteOnlyApp)
+      .post('/api/roles/users/a0000001-0001-4000-8000-000000000088/assign')
+      .send({ role_id: viewerRoleId })
+      .expect(200)
+    expect(res.body.data.roleName).toBe('Viewer')
   })
 })
 

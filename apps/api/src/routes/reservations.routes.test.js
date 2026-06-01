@@ -38,6 +38,13 @@ vi.mock('../services/notification.service.js', () => ({
   notifyReservationCreated: vi.fn().mockResolvedValue(null),
   notifyReservationWaitlist: vi.fn().mockResolvedValue(null),
   notifyGuestReservationConfirmation: vi.fn().mockResolvedValue({ email: true, whatsapp: false }),
+  notifyReservationStaffEvent: vi.fn().mockResolvedValue(null),
+}))
+
+vi.mock('../services/waitlistPromotion.js', () => ({
+  handleReservationCancelled: vi.fn().mockResolvedValue(null),
+  manuallyPromoteWaitlistEntry: vi.fn(),
+  assignWaitlistPosition: vi.fn(),
 }))
 
 describe('reservations.routes', () => {
@@ -94,6 +101,52 @@ describe('reservations.routes', () => {
     expect(response.status).toBe(201)
 
     expect(response.body.data.reservation.status).toBe('CONFIRMED')
+    expect(Array.isArray(response.body.data.reservation.tables)).toBe(true)
+    expect(response.body.data.reservation.tables).toEqual(['t1'])
+  })
+
+  it('returns normalized tables on status update', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'res-1',
+          status: 'SEATED',
+          tables: '{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}',
+          party_size: 2,
+        },
+      ],
+    })
+
+    const response = await request(app)
+      .patch('/api/reservations/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+      .send({ status: 'SEATED' })
+      .expect(200)
+
+    expect(response.body.data.reservation.tables).toEqual(['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'])
+  })
+
+  it('rejects invalid branchId on guest intelligence', async () => {
+    const response = await request(app)
+      .get('/api/reservations/guest-intelligence')
+      .query({ branchId: 'not-a-uuid' })
+      .expect(400)
+
+    expect(response.body.ok).toBe(false)
+  })
+
+  it('filters board waitlist by branchId', async () => {
+    const branchId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await request(app).get('/api/reservations/board').query({ branchId }).expect(200)
+
+    const waitlistCall = queryMock.mock.calls.find((call) =>
+      String(call[0]).includes('reservation_waitlist')
+    )
+    expect(waitlistCall?.[0]).toContain('branch_id')
   })
 
   it('returns guest intelligence summary', async () => {

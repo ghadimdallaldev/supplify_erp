@@ -137,7 +137,7 @@ export async function resolveAllFeaturesForTenant(tenantId, tenantType, planFeat
 }
 
 /** Used by requireFeature middleware (via subscription.js). */
-const FEATURE_ALIASES = {
+export const FEATURE_ALIASES = {
   fulfillment: 'fulfillment_tools',
   driver_management: 'fulfillment_tools',
 }

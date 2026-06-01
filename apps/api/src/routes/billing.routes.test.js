@@ -54,7 +54,7 @@ vi.mock('../lib/impersonation.js', () => ({
 }))
 
 vi.mock('../lib/logger.js', () => ({
-  logger: { error: vi.fn(), info: vi.fn() },
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
 
 describe('billing.routes', () => {

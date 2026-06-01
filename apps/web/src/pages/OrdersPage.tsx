@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   useGetOrdersQuery,
   useUpdateOrderMutation,
@@ -41,7 +41,12 @@ import {
   Plus,
   AlertCircle,
   Scale,
+  ChevronDown,
 } from 'lucide-react'
+
+/** Shared height/padding so filter controls align and text does not touch borders. */
+const ordersFilterControlClass =
+  'h-10 min-h-10 w-full rounded-lg border border-[var(--app-border-mid)] bg-[var(--surface)] text-sm text-[var(--text)] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30 focus-visible:border-[var(--brand-mid)]'
 import { Link } from 'react-router-dom'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -56,6 +61,10 @@ import { isDisputeReplacementOrder } from '../lib/orderPlacement'
 export function OrdersPage() {
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
   const [showManualOrderDialog, setShowManualOrderDialog] = useState(false)
   const [showProductSelection, setShowProductSelection] = useState(false)
@@ -80,9 +89,17 @@ export function OrdersPage() {
   const canCreateOrders = can('ORDERS_CREATE') || canManageOrders
   const canDeclineOrder = canManageOrders
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
   const { data, isLoading, error, refetch } = useGetOrdersQuery(
     {
       status: status || undefined,
+      q: debouncedSearch || undefined,
+      from: dateFrom || undefined,
+      to: dateTo || undefined,
       limit: 100,
       offset: 0,
     },
@@ -296,24 +313,36 @@ export function OrdersPage() {
     }
   }
 
-  // Filter orders based on search and status
-  const filteredOrders = data?.orders.filter((order: any) => {
-    const matchesSearch =
-      search === '' ||
-      order.id.toLowerCase().includes(search.toLowerCase()) ||
-      order.restaurant_name?.toLowerCase().includes(search.toLowerCase())
+  const hasAdvancedFilters = Boolean(dateFrom || dateTo)
 
-    const matchesStatus =
-      activeTab === 'all' ||
-      (activeTab === 'new' && order.status === 'PLACED') ||
-      (activeTab === 'processing' &&
-        ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)) ||
-      (activeTab === 'shipped' && order.status === 'SHIPPED') ||
-      (activeTab === 'completed' &&
-        ['RECEIVED_FULL', 'RECEIVED_WITH_DISPUTE', 'INVOICED', 'COMPLETED'].includes(order.status))
+  // Tab buckets apply only when status dropdown is "All Statuses" (server handles explicit status).
+  const filteredOrders = useMemo(() => {
+    return (data?.orders ?? []).filter((order: any) => {
+      if (status) return true
+      if (activeTab === 'all') return true
+      if (activeTab === 'new') return order.status === 'PLACED'
+      if (activeTab === 'processing') {
+        return ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)
+      }
+      if (activeTab === 'shipped') return order.status === 'SHIPPED'
+      if (activeTab === 'completed') {
+        return ['RECEIVED_FULL', 'RECEIVED_WITH_DISPUTE', 'INVOICED', 'COMPLETED'].includes(
+          order.status
+        )
+      }
+      return true
+    })
+  }, [data?.orders, status, activeTab])
 
-    return matchesSearch && matchesStatus
-  })
+  const clearAllFilters = () => {
+    setSearch('')
+    setDebouncedSearch('')
+    setStatus('')
+    setDateFrom('')
+    setDateTo('')
+    setActiveTab('all')
+    setMoreFiltersOpen(false)
+  }
 
   if (isLoading) {
     return (
@@ -325,10 +354,11 @@ export function OrdersPage() {
           </div>
         </div>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex gap-4">
-              <Skeleton className="h-10 flex-1" />
-              <Skeleton className="h-10 w-32" />
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Skeleton className="h-10 flex-1 rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg sm:w-48" />
+              <Skeleton className="h-10 w-full rounded-lg sm:w-36" />
             </div>
           </CardContent>
         </Card>
@@ -389,52 +419,170 @@ export function OrdersPage() {
 
         {/* Filters and Search */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-4">
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                  aria-hidden
+                />
                 <Input
-                  placeholder="Search by order ID or restaurant..."
+                  placeholder={
+                    isSupplier
+                      ? 'Search by order ID or restaurant…'
+                      : 'Search by order ID, restaurant, or supplier…'
+                  }
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
+                  className={`${ordersFilterControlClass} pl-11 pr-4`}
+                  aria-label="Search orders"
                 />
               </div>
-              <div className="flex gap-2">
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="px-3 py-2 border border-[var(--app-border-mid)] rounded-md"
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 shrink-0">
+                <div className="relative w-full sm:w-[12.5rem]">
+                  <select
+                    value={status}
+                    onChange={(e) => {
+                      setStatus(e.target.value)
+                      if (e.target.value) setActiveTab('all')
+                    }}
+                    className={`${ordersFilterControlClass} appearance-none pl-3.5 pr-10`}
+                    aria-label="Filter by order status"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="PLACED">Placed</option>
+                    <option value="ACKNOWLEDGED">Acknowledged</option>
+                    <option value="PROCESSING">Processing</option>
+                    <option value="SHIPPED">Shipped</option>
+                    <option value="DELIVERED">Delivered</option>
+                    <option value="RECEIVED_PARTIAL">Received (Partial)</option>
+                    <option value="RECEIVED_FULL">Received (Full)</option>
+                    <option value="INVOICED">Invoiced</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                  <ChevronDown
+                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                    aria-hidden
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 shrink-0 gap-2 px-4 whitespace-nowrap"
+                  onClick={() => setMoreFiltersOpen(true)}
+                  aria-expanded={moreFiltersOpen}
                 >
-                  <option value="">All Statuses</option>
-                  <option value="PLACED">Placed</option>
-                  <option value="ACKNOWLEDGED">Acknowledged</option>
-                  <option value="PROCESSING">Processing</option>
-                  <option value="SHIPPED">Shipped</option>
-                  <option value="DELIVERED">Delivered</option>
-                  <option value="RECEIVED_PARTIAL">Received (Partial)</option>
-                  <option value="RECEIVED_FULL">Received (Full)</option>
-                  <option value="INVOICED">Invoiced</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-                <Button variant="outline">
-                  <Filter className="h-4 w-4 mr-2" />
+                  <Filter className="h-4 w-4" />
                   More Filters
+                  {hasAdvancedFilters ? (
+                    <Badge variant="secondary" className="ml-0.5 px-2 py-0 text-xs font-medium">
+                      On
+                    </Badge>
+                  ) : null}
                 </Button>
               </div>
             </div>
+            {(debouncedSearch || status || hasAdvancedFilters) && (
+              <div className="mt-4 border-t border-[var(--app-border)] pt-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="mr-1 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                    Active filters
+                  </span>
+                  {debouncedSearch ? (
+                    <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                      Search: {debouncedSearch}
+                    </Badge>
+                  ) : null}
+                  {status ? (
+                    <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                      Status: {status}
+                    </Badge>
+                  ) : null}
+                  {dateFrom ? (
+                    <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                      From: {dateFrom}
+                    </Badge>
+                  ) : null}
+                  {dateTo ? (
+                    <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                      To: {dateTo}
+                    </Badge>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={clearAllFilters}
+                  >
+                    Clear all
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
+        <Dialog open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>More filters</DialogTitle>
+              <DialogDescription>
+                Narrow orders by placed date. Search and status filters apply from the toolbar.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="orders-date-from">Placed from</Label>
+                <Input
+                  id="orders-date-from"
+                  type="date"
+                  className="mt-1"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="orders-date-to">Placed to</Label>
+                <Input
+                  id="orders-date-to"
+                  type="date"
+                  className="mt-1"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={clearAllFilters}>
+                Clear all
+              </Button>
+              <Button type="button" onClick={() => setMoreFiltersOpen(false)}>
+                Apply
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Order Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="all">All Orders</TabsTrigger>
-            <TabsTrigger value="new">New (Needs Action)</TabsTrigger>
-            <TabsTrigger value="processing">Processing</TabsTrigger>
-            <TabsTrigger value="shipped">Shipped</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1.5">
+            <TabsTrigger value="all" className="px-3 py-2">
+              All Orders
+            </TabsTrigger>
+            <TabsTrigger value="new" className="px-3 py-2">
+              New (Needs Action)
+            </TabsTrigger>
+            <TabsTrigger value="processing" className="px-3 py-2">
+              Processing
+            </TabsTrigger>
+            <TabsTrigger value="shipped" className="px-3 py-2">
+              Shipped
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="px-3 py-2">
+              Completed
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
@@ -445,7 +593,7 @@ export function OrdersPage() {
                   className="hover:shadow-md transition-shadow"
                   data-testid={`order-row-${order.id}`}
                 >
-                  <CardHeader>
+                  <CardHeader className="pb-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
@@ -650,20 +798,25 @@ export function OrdersPage() {
             {(!filteredOrders || filteredOrders.length === 0) && (
               <EmptyState
                 title={
-                  search || status || activeTab !== 'all'
+                  debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
                     ? 'No orders match your filters'
                     : 'No orders yet'
                 }
                 description={
-                  search || status || activeTab !== 'all'
-                    ? 'Try adjusting search or status filters.'
+                  debouncedSearch || status || hasAdvancedFilters || activeTab !== 'all'
+                    ? 'Try adjusting search, status, or date filters.'
                     : !isSupplier
                       ? 'Create your first order to get started.'
                       : 'Orders from restaurants will appear here.'
                 }
                 icon={<ShoppingCart className="h-10 w-10" aria-hidden />}
                 action={
-                  !isSupplier && canCreateOrders && !search && !status && activeTab === 'all' ? (
+                  !isSupplier &&
+                  canCreateOrders &&
+                  !debouncedSearch &&
+                  !status &&
+                  !hasAdvancedFilters &&
+                  activeTab === 'all' ? (
                     <Button asChild>
                       <Link to="/app/cart">
                         <Plus className="h-4 w-4 mr-2" />

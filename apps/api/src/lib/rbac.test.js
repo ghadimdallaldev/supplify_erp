@@ -24,7 +24,14 @@ vi.mock('./logger.js', () => ({
     info: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
+    warn: vi.fn(),
   },
+}))
+
+vi.mock('./cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
 }))
 
 const mockGetRolesForUser = vi.fn()

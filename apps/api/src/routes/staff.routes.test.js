@@ -17,6 +17,7 @@ vi.mock('../lib/rbac.js', () => ({
   requireRole: () => (req, res, next) => next(),
   resolveTenantContext: (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
+  getRestaurantIdForRequest: vi.fn().mockResolvedValue('rest-1'),
 }))
 
 vi.mock('../lib/tenant.js', () => ({

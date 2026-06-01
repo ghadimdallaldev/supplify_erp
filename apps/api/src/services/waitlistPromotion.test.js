@@ -4,9 +4,22 @@ import {
   handleReservationCancelled,
   checkExpiredWaitlistOffers,
   buildWaitlistOfferUrls,
+  buildReservationManageUrl,
   acceptWaitlistOffer,
   declineWaitlistOffer,
 } from './waitlistPromotion.js'
+
+const getRestaurantSlotAvailabilityMock = vi.fn()
+const assertSlotBookableMock = vi.fn()
+
+vi.mock('../lib/reservation-availability.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    getRestaurantSlotAvailability: (...args) => getRestaurantSlotAvailabilityMock(...args),
+    assertSlotBookable: (...args) => assertSlotBookableMock(...args),
+  }
+})
 
 const queryMock = vi.fn()
 const withTransactionMock = vi.fn((handler) =>
@@ -45,6 +58,10 @@ describe('waitlistPromotion', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     isFeatureEnabledMock.mockResolvedValue(true)
+    getRestaurantSlotAvailabilityMock.mockResolvedValue({
+      slots: [{ startTime: new Date().toISOString(), isAvailable: true }],
+    })
+    assertSlotBookableMock.mockImplementation(() => true)
   })
 
   describe('buildWaitlistOfferUrls', () => {
@@ -52,6 +69,12 @@ describe('waitlistPromotion', () => {
       const urls = buildWaitlistOfferUrls('abc-123')
       expect(urls.acceptUrl).toContain('/reserve/waitlist/abc-123/accept')
       expect(urls.declineUrl).toContain('/reserve/waitlist/abc-123/decline')
+    })
+  })
+
+  describe('buildReservationManageUrl', () => {
+    it('builds manage URL from public token', () => {
+      expect(buildReservationManageUrl('pub-tok')).toContain('/reserve/manage/pub-tok')
     })
   })
 
@@ -192,6 +215,71 @@ describe('waitlistPromotion', () => {
       })
 
       await expect(acceptWaitlistOffer('bad-token')).rejects.toThrow(/no longer active/)
+    })
+
+    it('rejects when slot is no longer bookable', async () => {
+      queryMock.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'wl-full',
+            offer_status: 'offered',
+            offer_expires_at: new Date(Date.now() + 3600000).toISOString(),
+            restaurant_id: 'rest-1',
+            party_size: 4,
+            preferred_time: new Date().toISOString(),
+            customer_name: 'Pat',
+          },
+        ],
+      })
+      queryMock.mockResolvedValueOnce({ rows: [{ operating_hours: {} }] })
+      const slotError = new Error(
+        'Sorry, this time slot was just booked. Please choose another time.'
+      )
+      slotError.statusCode = 409
+      assertSlotBookableMock.mockImplementationOnce(() => {
+        throw slotError
+      })
+
+      await expect(acceptWaitlistOffer('tok-full')).rejects.toThrow(/just booked/)
+      expect(assertSlotBookableMock).toHaveBeenCalled()
+    })
+
+    it('returns manageUrl after successful accept', async () => {
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'wl-ok',
+              offer_status: 'offered',
+              offer_expires_at: new Date(Date.now() + 3600000).toISOString(),
+              restaurant_id: 'rest-1',
+              party_size: 2,
+              preferred_time: new Date().toISOString(),
+              customer_name: 'Alex',
+              customer_phone: null,
+              customer_email: null,
+              branch_id: null,
+              notes: null,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ operating_hours: {} }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'res-new',
+              public_token: 'manage-tok-1',
+              status: 'CONFIRMED',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'wl-ok', status: 'SEATED', offer_status: 'accepted' }],
+        })
+
+      const result = await acceptWaitlistOffer('tok-ok')
+      expect(result.manageToken).toBe('manage-tok-1')
+      expect(result.manageUrl).toContain('/reserve/manage/manage-tok-1')
     })
   })
 

@@ -168,6 +168,44 @@ describe('restaurant-pricing routes', () => {
     expect(res.status).toBe(403)
   })
 
+  it('returns my-pricing for restaurant tenant', async () => {
+    const { getRestaurantIdForRequest, requireAuth } = await import('../lib/rbac.js')
+    getRestaurantIdForRequest.mockResolvedValue('restaurant-1')
+    requireAuth.mockImplementationOnce(async (req, res, next) => {
+      req.userData = { id: 'user-restaurant', email: 'cafe@example.com', role: 'RESTAURANT' }
+      next()
+    })
+
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'rp-1',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'restaurant-1',
+          product_id: 'product-1',
+          price: '7.50',
+          is_active: true,
+          product_name: 'Tomatoes',
+          product_sku: 'TOM-1',
+          supplier_name: 'Fresh Farms',
+          catalog_price: '10.00',
+          contract_start_date: null,
+          contract_end_date: null,
+          agreement_type: 'CUSTOM',
+          min_order_quantity: null,
+        },
+      ],
+    })
+
+    const res = await request(app).get('/api/restaurant-pricing/my-pricing')
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+    expect(res.body.data.pricing).toHaveLength(1)
+    expect(res.body.data.pricing[0].price).toBe(7.5)
+    expect(res.body.data.summary).toHaveLength(1)
+    expect(res.body.data.summary[0].supplier_name).toBe('Fresh Farms')
+  })
+
   it('deactivates contract price scoped to supplier', async () => {
     query.mockResolvedValueOnce({
       rows: [{ id: 'rp-1', supplier_id: 'supplier-1', is_active: false }],

@@ -145,6 +145,34 @@ describe('Orders Routes', () => {
       expect(response.body.data.orders).toHaveLength(1)
     })
 
+    it('should filter orders by search query', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'order-abc-12345678',
+              restaurant_id: 'restaurant-1',
+              status: 'PLACED',
+              total_amount: 50,
+              created_at: new Date(),
+              placed_at: new Date(),
+              restaurant_name: 'Cafe Roma',
+              restaurant_slug: 'cafe-roma',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ total: '1' }] })
+
+      const response = await request(app).get('/api/orders?q=Cafe').expect(200)
+
+      expect(response.body.ok).toBe(true)
+      expect(response.body.data.orders).toHaveLength(1)
+      const listSql = db.query.mock.calls[0][0]
+      expect(listSql).toContain('ILIKE')
+      expect(listSql).toContain('r.name')
+    })
+
     it('should filter orders by status', async () => {
       // getRequestTenant is mocked, so no restaurant lookup; mock orders query (empty) and count
       db.query

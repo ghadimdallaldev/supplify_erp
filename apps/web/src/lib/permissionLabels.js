@@ -43,6 +43,11 @@ export const PERMISSION_LABELS = {
   DRIVER_DELIVERIES_VIEW: 'View assigned deliveries',
   DRIVER_DELIVERIES_MANAGE: 'Update delivery status & proof',
   ADMIN_ACCESS: 'Platform admin access',
+  ADMIN_TENANTS: 'Manage tenants',
+  ADMIN_SUPPORT: 'Manage platform users',
+  ADMIN_PLANS: 'Manage plans & subscriptions',
+  ADMIN_FINANCE: 'View financial overview',
+  ADMIN_GROWTH: 'Manage features & growth',
 }
 
 export const PERMISSION_DOMAINS = {

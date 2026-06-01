@@ -139,6 +139,63 @@ describe('Subscription lib', () => {
       expect(result.current).toBe(3)
       expect(result.limit).toBe(10)
     })
+
+    it('applies Free-tier limit patches when plan JSON omits keys (not unlimited)', async () => {
+      const { checkLimit } = await import('./subscription.js')
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [subscriptionIdRow({ plan_id: 'p-free' })] },
+          fullSub: {
+            rows: [
+              subscriptionRow({
+                tenant_id: 'rest-1',
+                tenant_type: 'RESTAURANT',
+                plan_id: 'p-free',
+                plan_code: 'free',
+                limits: {},
+              }),
+            ],
+          },
+          usage: { rows: [{ current_value: 0 }] },
+        })
+      )
+
+      const result = await checkLimit('rest-1', 'RESTAURANT', 'orders_per_day')
+
+      expect(result.isUnlimited).toBe(false)
+      expect(result.limit).toBe(3)
+    })
+
+    it('fails closed when limit resolution throws', async () => {
+      const { checkLimit } = await import('./subscription.js')
+      let calls = 0
+      mockQuery.mockImplementation((sql) => {
+        calls += 1
+        if (calls <= 2) {
+          return createSubscriptionQueryRouter({
+            subId: { rows: [subscriptionIdRow({ plan_id: 'p1' })] },
+            fullSub: {
+              rows: [
+                subscriptionRow({
+                  tenant_id: 'tenant-1',
+                  tenant_type: 'SUPPLIER',
+                  plan_id: 'p1',
+                  limits: { chats_per_day: 10 },
+                }),
+              ],
+            },
+          })(sql)
+        }
+        return Promise.reject(new Error('db down'))
+      })
+
+      const result = await checkLimit('tenant-1', 'SUPPLIER', 'chats_per_day')
+
+      expect(result.resolutionError).toBe(true)
+      expect(result.isUnlimited).toBe(false)
+      expect(result.isOverLimit).toBe(true)
+      expect(result.limit).toBe(0)
+    })
   })
 
   describe('recommendPlan', () => {
