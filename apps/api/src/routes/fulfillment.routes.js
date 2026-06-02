@@ -367,6 +367,13 @@ function mapDispatchOrder(row) {
   }
 }
 
+const DISPATCH_BUCKET_LIMIT = 500
+
+function parseDispatchQuery(query = {}) {
+  const days = Math.min(Math.max(parseInt(String(query.days ?? 14), 10) || 14, 1), 90)
+  return { days }
+}
+
 router.get('/dispatch', async (req, res) => {
   try {
     const supplierId = await resolveSupplierId(req)
@@ -379,8 +386,12 @@ router.get('/dispatch', async (req, res) => {
       })
     }
 
+    const { days } = parseDispatchQuery(req.query)
     const whFilter = await warehouseFilterClause(req, supplierId, 2)
     const params = [supplierId, ...whFilter.params]
+    const dateParamIndex = params.length + 1
+    params.push(days)
+    const placedSinceClause = `AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($${dateParamIndex}::int * INTERVAL '1 day')`
 
     const baseSelect = `
       SELECT DISTINCT ON (o.id)
@@ -422,8 +433,13 @@ router.get('/dispatch', async (req, res) => {
         LIMIT 1
       ) ar ON true
       WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED')
+        ${placedSinceClause}
         ${whFilter.clause}
     `
+
+    const bucketLimit = DISPATCH_BUCKET_LIMIT
+    const limitParamIndex = params.length + 1
+    const limitParams = [...params, bucketLimit]
 
     const [
       { rows: unassigned },
@@ -435,29 +451,40 @@ router.get('/dispatch', async (req, res) => {
         `${baseSelect}
            AND (da.id IS NULL OR da.status IN ('failed'))
            AND o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
-           ORDER BY o.id, o.created_at DESC`,
-        params
+           ORDER BY o.id, o.created_at DESC
+           LIMIT $${limitParamIndex}`,
+        limitParams
       ),
       query(
         `${baseSelect}
            AND da.status IN ('assigned', 'rescheduled')
-           ORDER BY o.id, da.assigned_at DESC`,
-        params
+           ORDER BY o.id, da.assigned_at DESC
+           LIMIT $${limitParamIndex}`,
+        limitParams
       ),
       query(
         `${baseSelect}
            AND da.status IN ('picked_up', 'out_for_delivery')
-           ORDER BY o.id, da.updated_at DESC`,
-        params
+           ORDER BY o.id, da.updated_at DESC
+           LIMIT $${limitParamIndex}`,
+        limitParams
       ),
       query(
         `${baseSelect}
            AND da.status = 'delivered'
            AND da.delivered_at >= date_trunc('day', now())
-           ORDER BY o.id, da.delivered_at DESC`,
-        params
+           ORDER BY o.id, da.delivered_at DESC
+           LIMIT $${limitParamIndex}`,
+        limitParams
       ),
     ])
+
+    const truncated = {
+      pending: unassigned.length >= bucketLimit,
+      assigned: assigned.length >= bucketLimit,
+      out_for_delivery: outForDelivery.length >= bucketLimit,
+      delivered_today: deliveredToday.length >= bucketLimit,
+    }
 
     res.json({
       ok: true,
@@ -466,6 +493,9 @@ router.get('/dispatch', async (req, res) => {
         assigned: assigned.map(mapDispatchOrder),
         out_for_delivery: outForDelivery.map(mapDispatchOrder),
         delivered_today: deliveredToday.map(mapDispatchOrder),
+        windowDays: days,
+        bucketLimit,
+        truncated,
         stats: {
           pending: unassigned.length,
           assigned: assigned.length,

@@ -87,11 +87,11 @@ router.get(
         [restaurantId, RECEIVABLE_ORDER_STATUSES]
       )
 
-      // For each order, fetch its items
-      const ordersWithItems = await Promise.all(
-        orders.map(async (order) => {
-          const { rows: items } = await query(
-            `
+      const orderIds = orders.map((o) => o.id)
+      let itemsByOrderId = new Map()
+      if (orderIds.length > 0) {
+        const { rows: allItems } = await query(
+          `
           SELECT 
             oi.*,
             p.name as product_name,
@@ -99,22 +99,27 @@ router.get(
             p.unit
           FROM order_item oi
           JOIN product p ON p.id = oi.product_id
-          WHERE oi.order_id = $1
+          WHERE oi.order_id = ANY($1::uuid[])
         `,
-            [order.id]
-          )
+          [orderIds]
+        )
+        itemsByOrderId = allItems.reduce((map, item) => {
+          const list = map.get(item.order_id) ?? []
+          list.push({
+            ...item,
+            ordered_quantity: parseFloat(item.quantity),
+            received_quantity: 0,
+            quality_status: 'PENDING',
+          })
+          map.set(item.order_id, list)
+          return map
+        }, new Map())
+      }
 
-          return {
-            ...order,
-            items: items.map((item) => ({
-              ...item,
-              ordered_quantity: parseFloat(item.quantity),
-              received_quantity: 0,
-              quality_status: 'PENDING',
-            })),
-          }
-        })
-      )
+      const ordersWithItems = orders.map((order) => ({
+        ...order,
+        items: itemsByOrderId.get(order.id) ?? [],
+      }))
 
       res.json({
         ok: true,

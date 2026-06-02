@@ -3234,14 +3234,18 @@ export const api = createApi({
         method: 'PATCH',
         body: data,
       }),
-      transformResponse: (raw: { subscription?: Subscription } & Subscription) =>
+      transformResponse: (raw: {
+        subscription?: Subscription
+        appliedViaOrgBilling?: boolean
+        billingTenantId?: string
+      }) =>
         raw?.subscription
           ? {
               subscription: raw.subscription,
               appliedViaOrgBilling: raw.appliedViaOrgBilling,
               billingTenantId: raw.billingTenantId,
             }
-          : { subscription: raw as Subscription },
+          : { subscription: raw as unknown as Subscription },
       invalidatesTags: ['Admin'],
     }),
     previewSubscriptionPlanChange: builder.mutation<
@@ -3320,12 +3324,26 @@ export const api = createApi({
       query: () => '/api/admin-dashboard/financial-overview',
       providesTags: ['Admin'],
     }),
-    getAdminSuppliers: builder.query<{ suppliers: any[] }, void>({
-      query: () => '/api/admin-dashboard/tenants/suppliers',
+    getAdminSuppliers: builder.query<
+      { suppliers: any[]; total?: number; limit?: number; offset?: number },
+      { limit?: number; offset?: number } | void
+    >({
+      query: (args) => {
+        const limit = args?.limit ?? 100
+        const offset = args?.offset ?? 0
+        return `/api/admin-dashboard/tenants/suppliers?limit=${limit}&offset=${offset}`
+      },
       providesTags: ['Admin'],
     }),
-    getAdminRestaurants: builder.query<{ restaurants: any[] }, void>({
-      query: () => '/api/admin-dashboard/tenants/restaurants',
+    getAdminRestaurants: builder.query<
+      { restaurants: any[]; total?: number; limit?: number; offset?: number },
+      { limit?: number; offset?: number } | void
+    >({
+      query: (args) => {
+        const limit = args?.limit ?? 100
+        const offset = args?.offset ?? 0
+        return `/api/admin-dashboard/tenants/restaurants?limit=${limit}&offset=${offset}`
+      },
       providesTags: ['Admin'],
     }),
     getAdminUsers: builder.query<

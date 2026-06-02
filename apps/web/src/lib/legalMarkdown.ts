@@ -32,13 +32,19 @@ export function legalMarkdownToHtml(markdown: string): string {
     }
   }
 
+  const safeHref = (href: string) => {
+    const trimmed = href.trim()
+    if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed
+    return '#'
+  }
+
   const inline = (text: string) =>
     text
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(
-        /\[(.+?)\]\((.+?)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-      )
+      .replace(/\[(.+?)\]\((.+?)\)/g, (_match, label, href) => {
+        const url = safeHref(href)
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
+      })
 
   for (const raw of lines) {
     const line = raw.trimEnd()
