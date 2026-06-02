@@ -3,24 +3,48 @@ import {
   useGetAdminModelComparisonMetricsQuery,
   useGetAdminSystemInfoQuery,
 } from '../../services/api'
-import { Loader2 } from 'lucide-react'
+import { getSupplifyModelVersion } from '../../config/supplifyModel'
+import { Loader2, AlertTriangle } from 'lucide-react'
 
 export function AdminModelComparisonPanel() {
   const { data: systemInfo } = useGetAdminSystemInfoQuery()
   const { data, isLoading, error } = useGetAdminModelComparisonMetricsQuery()
 
   const m = data?.metrics
+  const webModel = getSupplifyModelVersion()
+  const apiModel = systemInfo?.supplifyModelVersion
+  const modelMismatch = Boolean(apiModel && apiModel !== webModel)
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Supplify model comparison</CardTitle>
         <CardDescription>
-          Aggregate counters for evaluating V2 (supplier-first) vs V1. Active deploy model:{' '}
+          Aggregate counters for evaluating V2 (supplier-first) vs V1. API model:{' '}
           <strong>{systemInfo?.supplifyModelLabel ?? '—'}</strong>
+          {apiModel ? (
+            <>
+              {' '}
+              · Web build:{' '}
+              <strong>{webModel === 'v2' ? 'V2 (Supplier-first)' : 'V1 (Marketplace)'}</strong>
+            </>
+          ) : null}
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {modelMismatch ? (
+          <div
+            role="alert"
+            className="mb-4 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+            <p>
+              Model version mismatch: API is <strong>{apiModel}</strong> but this web build is{' '}
+              <strong>{webModel}</strong>. Set <code>SUPPLIFY_MODEL_VERSION</code> and{' '}
+              <code>VITE_SUPPLIFY_MODEL_VERSION</code> to the same value and redeploy both services.
+            </p>
+          </div>
+        ) : null}
         {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
         ) : error ? (

@@ -6,7 +6,7 @@ vi.mock('../config/supplifyModel.js', () => ({
 
 vi.mock('../lib/restaurant-workspace.js', () => ({
   getRestaurantWorkspaceMode: vi.fn(),
-  hasActiveSupplierRestaurantLink: vi.fn(),
+  hasActiveSupplierRestaurantLink: vi.fn().mockResolvedValue(false),
   WORKSPACE_MODE_BUYER_ONLY: 'buyer_only',
 }))
 
@@ -47,6 +47,30 @@ describe('restaurantWorkspaceAccess', () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         error: expect.objectContaining({ name: 'BUYER_WORKSPACE_LIMIT' }),
+      })
+    )
+  })
+
+  it('requireBuyerSupplierCatalogAccess blocks unlinked supplier on V2 buyer', async () => {
+    isSupplifyV2.mockReturnValue(true)
+    getRestaurantWorkspaceMode.mockResolvedValue('buyer_only')
+    const { hasActiveSupplierRestaurantLink } = await import('../lib/restaurant-workspace.js')
+    vi.mocked(hasActiveSupplierRestaurantLink).mockResolvedValue(false)
+
+    const { requireBuyerSupplierCatalogAccess } = await import('./restaurantWorkspaceAccess.js')
+    const mw = requireBuyerSupplierCatalogAccess()
+    const next = vi.fn()
+    const req = {
+      tenantContext: { tenantId: 'r1', tenantType: 'RESTAURANT' },
+      query: { supplier: 'supplier-x' },
+      requestId: 'req-2',
+    }
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() }
+    await mw(req, res, next)
+    expect(res.status).toHaveBeenCalledWith(403)
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.objectContaining({ name: 'SUPPLIER_NOT_LINKED' }),
       })
     )
   })

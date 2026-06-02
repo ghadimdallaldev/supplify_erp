@@ -42,6 +42,19 @@ VITE_SUPPLIFY_MODEL_VERSION=v2
 
 Restart the API after changing. Rebuild or restart the Vite dev server for web.
 
+## API vs web version mismatch
+
+The API reads `SUPPLIFY_MODEL_VERSION` at **runtime**. The web reads `VITE_SUPPLIFY_MODEL_VERSION` at **build time**. They must match in every environment.
+
+| API | Web | What happens                                                                                                                                                                    |
+| --- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1  | v1  | Normal V1 (intended production default).                                                                                                                                        |
+| v2  | v2  | Full V2 experiment (intended).                                                                                                                                                  |
+| v2  | v1  | **Broken UX:** API enforces buyer-only guards and serves V2 invites, but the web hides Supplier Store panels, shows V1 copy, and may not send `type=sr` invite flows correctly. |
+| v1  | v2  | **Broken UX:** Web shows V2 copy and Supplier Store UI, but API returns `v2Required` / 403 on invites and does not apply buyer-only billing or link rules.                      |
+
+**Do not deploy mismatched pairs.** Admin → Overview shows a warning when the API model (from `system-info`) differs from the web build flag.
+
 ## What changes in V2
 
 | Area                         | V2 behavior                                                                              |

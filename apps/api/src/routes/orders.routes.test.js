@@ -75,6 +75,10 @@ vi.mock('../services/supplier-inventory.service.js', () => ({
   restoreSupplierStockForOrder: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../lib/restaurant-workspace.js', () => ({
+  assertBuyerCanOrderFromSuppliers: vi.fn().mockResolvedValue(undefined),
+}))
+
 // Import routes after mocks
 import { ordersRoutes } from './orders.routes.js'
 
@@ -303,18 +307,22 @@ describe('Orders Routes', () => {
       const rbac = await import('../lib/rbac.js')
       vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
 
-      // Mock: product query (for each item), checkLimit, then transaction queries
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: productId,
-            supplier_id: supplierId,
-            sku: 'SKU001',
-            current_price: 10.05,
-            currency: 'USD',
-          },
-        ], // Product query for first item
-      })
+      // Mock: supplier ids for buyer link guard, then product batch query
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ supplier_id: supplierId }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: productId,
+              supplier_id: supplierId,
+              sku: 'SKU001',
+              current_price: 10.05,
+              currency: 'USD',
+            },
+          ],
+        })
 
       const { resolveProductPricesBatch } = await import(
         '../services/resolve-product-price.service.js'
