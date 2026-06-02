@@ -12,6 +12,7 @@ import { staffMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getRestaurantIdByEmail } from '../lib/tenant.js'
+import { requireFullRestaurantWorkspace } from '../middlewares/restaurantWorkspaceAccess.js'
 import { assertPresignedFileUrl } from '../lib/sanitize-upload.js'
 import { notifyStaffPtoRequest, notifyStaffSwapRequest } from '../services/notification.service.js'
 import {
@@ -797,6 +798,7 @@ router.use(
   requirePlatformAppAccess,
   resolveTenantContext,
   requirePermission('STAFF_VIEW'),
+  requireFullRestaurantWorkspace(),
   staffMutationGuard
 )
 

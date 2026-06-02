@@ -19,6 +19,7 @@ import {
   isLegalAcceptanceComplete,
 } from '../components/legal/LegalAcceptancePanel'
 import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
+import { useSupplifyModel } from '../hooks/useSupplifyModel'
 
 type AccountType = 'RESTAURANT' | 'SUPPLIER'
 
@@ -32,6 +33,7 @@ function isUnauthorized(error: unknown): boolean {
 }
 
 export function RegisterCompletePage() {
+  const { isV2, config } = useSupplifyModel()
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const {
@@ -164,8 +166,17 @@ export function RegisterCompletePage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Set up your organization</CardTitle>
           <CardDescription>
-            Your Keycloak account is ready. Tell us how you will use Supplify.
+            {isV2
+              ? ((config.positioning as { description?: string })?.description ??
+                'Your account is ready. Suppliers run private B2B stores; restaurants join via invite or full workspace signup.')
+              : 'Your Keycloak account is ready. Tell us how you will use Supplify.'}
           </CardDescription>
+          {isV2 && accountType === 'RESTAURANT' && (
+            <p className="text-xs text-[var(--text-muted)] text-center mt-2">
+              Invited by a supplier? Use their invite link instead — you get a free buyer account to
+              order from their store.
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">

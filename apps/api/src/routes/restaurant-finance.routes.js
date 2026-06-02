@@ -13,8 +13,11 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
+import { requireFullRestaurantWorkspaceUnlessReadOnly } from '../middlewares/restaurantWorkspaceAccess.js'
 
 const router = express.Router()
+
+router.use(requireFullRestaurantWorkspaceUnlessReadOnly())
 
 const financeInvoicesGate = requireFeature(
   'finance_invoices',

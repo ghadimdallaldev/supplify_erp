@@ -8,8 +8,11 @@ import { activateFreePlanFromPlans } from '../lib/activateFreePlan'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { useSupplifyModel } from '../hooks/useSupplifyModel'
+import { getV2RestaurantUpgradeSubtitle } from '../lib/planComparison'
 
 export function AccountActivationPage() {
+  const { isV2 } = useSupplifyModel()
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
@@ -49,8 +52,9 @@ export function AccountActivationPage() {
           </div>
           <CardTitle className="text-2xl">Activate your account</CardTitle>
           <CardDescription>
-            Your {tenantLabel} workspace was created but is not active yet. Start on the free plan,
-            upgrade to a paid tier, or ask a Supplify administrator to activate you manually.
+            {isV2 && user?.role === 'RESTAURANT'
+              ? `${getV2RestaurantUpgradeSubtitle()} Or start on the buyer-free path if you were supplier-invited.`
+              : `Your ${tenantLabel} workspace was created but is not active yet. Start on the free plan, upgrade to a paid tier, or ask a Supplify administrator to activate you manually.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

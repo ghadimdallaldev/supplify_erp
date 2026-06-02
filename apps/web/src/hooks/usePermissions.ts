@@ -5,6 +5,7 @@
  */
 import { useAppSelector } from './redux'
 import { useImpersonation } from './useImpersonation'
+import { useEntitlements } from './useEntitlements'
 
 /** Used when an ADMIN user has no RBAC roles yet (e.g. after a partial seed). */
 const ADMIN_FALLBACK_PERMISSIONS = [
@@ -36,6 +37,8 @@ function adminPermissionsForUser(
 export function usePermissions() {
   const { user } = useAppSelector((state) => state.auth)
   const { isImpersonating } = useImpersonation()
+  const { entitlements } = useEntitlements()
+  const isBuyerOnlyWorkspace = Boolean(entitlements?.isBuyerOnlyWorkspace)
 
   const can = (permissionKey: string): boolean => {
     if (!user) return false
@@ -74,5 +77,5 @@ export function usePermissions() {
     )
   }
 
-  return { can, canAny, isViewOnly, isWorkspaceViewer }
+  return { can, canAny, isViewOnly, isWorkspaceViewer, isBuyerOnlyWorkspace }
 }

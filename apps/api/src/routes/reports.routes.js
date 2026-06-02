@@ -7,8 +7,11 @@ import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { parseReportQuery } from '../services/reports.service.js'
 import * as reports from '../services/reports.service.js'
+import { requireFullRestaurantWorkspace } from '../middlewares/restaurantWorkspaceAccess.js'
 
 const router = express.Router()
+
+router.use(requireFullRestaurantWorkspace())
 
 const reportsFeature = requireFeature(
   'reports',

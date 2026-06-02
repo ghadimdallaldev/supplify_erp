@@ -24,6 +24,7 @@ import {
 } from '../lib/restaurant-org.js'
 import { createActiveTenantToken, getActiveTenantCookieName } from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
+import { requireFullRestaurantWorkspace } from '../middlewares/restaurantWorkspaceAccess.js'
 
 const router = express.Router()
 
@@ -137,7 +138,8 @@ router.use(
   requireRole(['RESTAURANT', 'ADMIN']),
   resolveTenantContext,
   requireRestaurantOrgContext,
-  orgStructureGuard
+  orgStructureGuard,
+  requireFullRestaurantWorkspace()
 )
 
 router.get('/', async (req, res) => {

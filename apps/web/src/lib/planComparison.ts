@@ -1,3 +1,5 @@
+import { isSupplifyV2 } from '../config/supplifyModel'
+
 /**
  * Canonical limit and feature keys per tenant type for upgrade modal comparison table.
  * Keep in sync with API subscription limits/features; top 6–10 each for display.
@@ -153,6 +155,29 @@ export function getPlanSubtitle(planCode: string | null | undefined): string {
   if (!planCode) return ''
   const key = normalizePlanCode(planCode).replace(/\s/g, '')
   return PLAN_SUBTITLES[key] ?? ''
+}
+
+/** V2 supplier-first positioning labels (copy only; does not change tier matrix). */
+export const V2_SUPPLIER_PLAN_POSITIONING = [
+  'Invited restaurants',
+  'Products / SKUs',
+  'Orders per month',
+  'Team users',
+  'Promotions & deals',
+  'Analytics & insights',
+  'Invoice & payment tracking',
+  'Reorder intelligence',
+  'Branches & warehouses',
+] as const
+
+export function getV2SupplierPlanPositioningHint(): string {
+  if (!isSupplifyV2()) return ''
+  return 'Plans scale with your private B2B store: invited restaurants, catalog size, orders, and growth tools.'
+}
+
+export function getV2RestaurantUpgradeSubtitle(): string {
+  if (!isSupplifyV2()) return ''
+  return 'Upgrade to a full restaurant workspace for multi-supplier ops, staff, reservations, and analytics.'
 }
 
 export function getLimitKeys(tenantType: 'RESTAURANT' | 'SUPPLIER'): readonly string[] {

@@ -44,6 +44,7 @@ import {
   restoreSupplierStockForOrder,
 } from '../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../lib/route-permissions.js'
+import { assertBuyerCanOrderFromSuppliers } from '../lib/restaurant-workspace.js'
 
 const router = express.Router()
 
@@ -1137,11 +1138,32 @@ router.post(
         })
       }
 
+      const productIds = [...new Set(orderData.items.map((item) => item.productId))]
+      const { rows: supplierRows } = await query(
+        `SELECT DISTINCT supplier_id FROM product WHERE id = ANY($1::uuid[])`,
+        [productIds]
+      )
+      try {
+        await assertBuyerCanOrderFromSuppliers(
+          restaurantId,
+          supplierRows.map((r) => r.supplier_id)
+        )
+      } catch (linkErr) {
+        if (linkErr.code === 'SUPPLIER_NOT_LINKED') {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: { name: linkErr.name, message: linkErr.message },
+            requestId: req.requestId,
+          })
+        }
+        throw linkErr
+      }
+
       // Group items by supplier - split into separate orders per supplier
       const orderStatus = orderData.status || 'PLACED'
 
       // Batch-fetch all products and current prices (avoids N+1)
-      const productIds = [...new Set(orderData.items.map((item) => item.productId))]
       const { rows: products } = await query(
         `
       SELECT p.*, pr.amount as current_price, pr.currency

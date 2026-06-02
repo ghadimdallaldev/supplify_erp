@@ -50,3 +50,25 @@ export async function getLinkedSupplierIdsForRestaurant(restaurantId) {
   )
   return rows.map((r) => r.supplier_id)
 }
+
+/**
+ * V2 buyer-only: ensure restaurant may order from every supplier in the set.
+ * @param {string} restaurantId
+ * @param {string[]} supplierIds
+ */
+export async function assertBuyerCanOrderFromSuppliers(restaurantId, supplierIds) {
+  if (!isSupplifyV2()) return
+  const mode = await getRestaurantWorkspaceMode(restaurantId)
+  if (mode !== WORKSPACE_MODE_BUYER_ONLY) return
+
+  const unique = [...new Set((supplierIds || []).filter(Boolean))]
+  for (const supplierId of unique) {
+    const linked = await hasActiveSupplierRestaurantLink(restaurantId, supplierId)
+    if (!linked) {
+      const err = new Error('You can only order from suppliers that invited your restaurant.')
+      err.code = 'SUPPLIER_NOT_LINKED'
+      err.name = 'SUPPLIER_NOT_LINKED'
+      throw err
+    }
+  }
+}

@@ -29,6 +29,8 @@ import {
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { EmptyState } from '../components/ui/empty-state'
+import { SupplierStorePanel } from '../components/supplier/SupplierStorePanel'
+import { useGetSupplierMeQuery } from '../services/api'
 
 const QUICK_ACTIONS = [
   { label: 'Deliveries', href: '/app/fulfillment', icon: Truck, testId: 'qa-deliveries' },
@@ -88,6 +90,7 @@ function formatOrderDate(iso: string | undefined) {
 }
 
 export function SupplierCommandCenterPage() {
+  const { data: supplierMe } = useGetSupplierMeQuery()
   const { data, isLoading, isError, error, refetch, isFetching } =
     useGetSupplierCommandCenterQuery()
   const [createDraft, { isLoading: drafting }] = useCreateReorderReminderDraftMutation()
@@ -198,6 +201,8 @@ export function SupplierCommandCenterPage() {
             </Button>
           }
         />
+
+        {supplierMe?.supplier?.id && <SupplierStorePanel supplierId={supplierMe.supplier.id} />}
 
         <nav
           className="action-bar rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-2.5"

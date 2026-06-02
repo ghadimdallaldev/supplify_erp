@@ -45,6 +45,8 @@ import type { LucideIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAppSelector } from '../hooks/redux'
 import { formatCurrency } from '../utils/format'
+import { useSupplifyModel } from '../hooks/useSupplifyModel'
+import { BuyerUpgradeBanner } from '../components/BuyerUpgradeBanner'
 import { SubscriptionInfo } from '../components/SubscriptionInfo'
 import { LogoUpload } from '../components/LogoUpload'
 import {
@@ -185,6 +187,7 @@ const CATEGORY_FIELDS: PreferenceField[] = [
 ]
 
 export function RestaurantOnboardingPage() {
+  const { isV2 } = useSupplifyModel()
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const [searchParams] = useSearchParams()
@@ -468,9 +471,13 @@ export function RestaurantOnboardingPage() {
       <div>
         <h1 className="text-[21px] font-black text-[var(--text)]">Account Setup</h1>
         <p className="text-[var(--text-muted)] mt-2">
-          Complete your business profile and preferences
+          {entitlements?.isBuyerOnlyWorkspace && isV2
+            ? 'Free buyer account — order from invited suppliers. Upgrade for full operations.'
+            : 'Complete your business profile and preferences'}
         </p>
       </div>
+
+      {entitlements?.isBuyerOnlyWorkspace && <BuyerUpgradeBanner />}
 
       {/* Statistics Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

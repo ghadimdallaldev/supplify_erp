@@ -72,30 +72,34 @@ See [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md) for
 | `SEED_DEMO_DATA` | API | dev | `true` | Never true in prod |
 | `E2E_SECRET` | API | dev only | secret | With `ENABLE_DEBUG_ROUTES` |
 | `REDIS_URL` | API | optional | `redis://...` | Cache |
+| `SUPPLIFY_MODEL_VERSION` | API | optional | `v1` / `v2` | Business model experiment; default `v1`. See [SUPPLIFY_MODEL_VERSIONING.md](SUPPLIFY_MODEL_VERSIONING.md) |
 
 Legacy aliases still supported: `S3_*` → `STORAGE_*`, `API_PUBLIC_URL` = `PUBLIC_API_URL`.
 
 ## Frontend (Web / Vite)
 
-| Variable                    | Used by | Required in   | Example              | Notes               |
-| --------------------------- | ------- | ------------- | -------------------- | ------------------- |
-| `VITE_APP_ENV`              | Web     | all           | `dev`                | Build-time          |
-| `VITE_API_URL`              | Web     | preprod, prod | `https://api...`     | Empty = dev proxy   |
-| `VITE_PUBLIC_FRONTEND_URL`  | Web     | optional      | `https://app...`     |                     |
-| `VITE_AUTH_PROVIDER`        | Web     | optional      | `keycloak`           |                     |
-| `VITE_KEYCLOAK_URL`         | Web     | all           | URL                  |                     |
-| `VITE_KEYCLOAK_REALM`       | Web     | all           | `supplify-dev`       | Match API realm     |
-| `VITE_KEYCLOAK_CLIENT_ID`   | Web     | all           | `supplify-web`       |                     |
-| `VITE_PAYMENTS_MODE`        | Web     | all           | `mock`/`test`/`live` | UI gating           |
-| `VITE_PAYMENTS_PUBLIC_KEY`  | Web     | live          | pk\_...              | Provider public key |
-| `VITE_SENTRY_DSN`           | Web     | optional      | URL                  |                     |
-| `VITE_SENTRY_ENVIRONMENT`   | Web     | optional      | `dev`                |                     |
-| `VITE_ENABLE_DEBUG_UI`      | Web     | dev           | `true`               | Debug panels        |
-| `VITE_ENABLE_DEMO_BANNERS`  | Web     | dev/preprod   | `true`               |                     |
-| `VITE_ENABLE_MOCK_PAYMENTS` | Web     | dev           | `true`               |                     |
-| `VITE_ENABLE_TEST_DATA`     | Web     | dev           | `true`               |                     |
+| Variable                      | Used by | Required in   | Example              | Notes                                    |
+| ----------------------------- | ------- | ------------- | -------------------- | ---------------------------------------- |
+| `VITE_APP_ENV`                | Web     | all           | `dev`                | Build-time                               |
+| `VITE_API_URL`                | Web     | preprod, prod | `https://api...`     | Empty = dev proxy                        |
+| `VITE_PUBLIC_FRONTEND_URL`    | Web     | optional      | `https://app...`     |                                          |
+| `VITE_AUTH_PROVIDER`          | Web     | optional      | `keycloak`           |                                          |
+| `VITE_KEYCLOAK_URL`           | Web     | all           | URL                  |                                          |
+| `VITE_KEYCLOAK_REALM`         | Web     | all           | `supplify-dev`       | Match API realm                          |
+| `VITE_KEYCLOAK_CLIENT_ID`     | Web     | all           | `supplify-web`       |                                          |
+| `VITE_PAYMENTS_MODE`          | Web     | all           | `mock`/`test`/`live` | UI gating                                |
+| `VITE_PAYMENTS_PUBLIC_KEY`    | Web     | live          | pk\_...              | Provider public key                      |
+| `VITE_SENTRY_DSN`             | Web     | optional      | URL                  |                                          |
+| `VITE_SENTRY_ENVIRONMENT`     | Web     | optional      | `dev`                |                                          |
+| `VITE_ENABLE_DEBUG_UI`        | Web     | dev           | `true`               | Debug panels                             |
+| `VITE_ENABLE_DEMO_BANNERS`    | Web     | dev/preprod   | `true`               |                                          |
+| `VITE_ENABLE_MOCK_PAYMENTS`   | Web     | dev           | `true`               |                                          |
+| `VITE_ENABLE_TEST_DATA`       | Web     | dev           | `true`               |                                          |
+| `VITE_SUPPLIFY_MODEL_VERSION` | Web     | optional      | `v1` / `v2`          | Must match API; build-time. Default `v1` |
 
-Access in code: `apps/web/src/lib/env.ts`.
+Access in code: `apps/web/src/lib/env.ts`. See [SUPPLIFY_MODEL_VERSIONING.md](SUPPLIFY_MODEL_VERSIONING.md).
+
+Deploy templates: `deploy/railway/<env>/api.env` and `web.env` include commented examples for V2 experiments.
 
 ## Health endpoints
 

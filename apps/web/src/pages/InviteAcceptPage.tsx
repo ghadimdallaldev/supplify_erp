@@ -207,8 +207,14 @@ export function InviteAcceptPage() {
             />
           ) : (
             <>
-              <p className="text-sm text-[var(--text-muted)]">
-                You&apos;re logged in as {sessionUser.displayName || sessionUser.email}. {headline}.
+              <p className="text-sm text-[var(--text-muted)]">{headline}</p>
+              {isSupplierRestaurant && isV2 && (
+                <p className="text-sm text-[var(--text-muted)] mt-2">
+                  {restaurantCopy.buyerInviteBody}
+                </p>
+              )}
+              <p className="text-sm text-[var(--text-muted)] mt-2">
+                You&apos;re logged in as {sessionUser.displayName || sessionUser.email}.
               </p>
               <LegalAcceptancePanel
                 variant="invite"
@@ -244,7 +250,10 @@ export function InviteAcceptPage() {
     <PageShell>
       <Card>
         <h1 className="text-xl font-semibold">Welcome to Supplify</h1>
-        <p className="text-sm text-[var(--text-muted)]">{headline}.</p>
+        <p className="text-sm text-[var(--text-muted)]">{headline}</p>
+        {isSupplierRestaurant && isV2 && (
+          <p className="text-sm text-[var(--text-muted)]">{restaurantCopy.buyerInviteBody}</p>
+        )}
         <form className="space-y-3" onSubmit={(e) => handleCreateAccount(e)}>
           <label className="block text-sm">
             Full name

@@ -24,6 +24,7 @@ import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
+import { requireBuyerSupplierCatalogAccess } from '../middlewares/restaurantWorkspaceAccess.js'
 
 const router = express.Router()
 
@@ -33,7 +34,9 @@ router.use(requireAuth, resolveTenantContext, resolveAdminContext)
 
 router.use((req, res, next) => {
   const method = req.method.toUpperCase()
-  if (method === 'GET' || method === 'HEAD') return catalogReadAccess(req, res, next)
+  if (method === 'GET' || method === 'HEAD') {
+    return requireBuyerSupplierCatalogAccess()(req, res, () => catalogReadAccess(req, res, next))
+  }
   if (method === 'DELETE') return requirePermission('CATALOG_MANAGE')(req, res, next)
   return requireAnyPermission('CATALOG_EDIT', 'CATALOG_MANAGE')(req, res, next)
 })

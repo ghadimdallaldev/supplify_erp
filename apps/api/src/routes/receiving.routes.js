@@ -12,8 +12,11 @@ import { logger } from '../lib/logger.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { requireFeature } from '../lib/subscription.js'
 import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
+import { requireFullRestaurantWorkspace } from '../middlewares/restaurantWorkspaceAccess.js'
 
 const router = express.Router()
+
+router.use(requireFullRestaurantWorkspace())
 
 const receivingQualityGate = requireFeature(
   'receiving_quality',

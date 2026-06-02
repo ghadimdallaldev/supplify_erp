@@ -36,6 +36,7 @@ import {
   shouldShowEntitlementLimit,
 } from '../lib/planLimits'
 import { getLimitLabel as getPlanLimitLabel } from '../lib/planComparison'
+import { BuyerUpgradeBanner } from './BuyerUpgradeBanner'
 
 /** Usage rows shown first in settings (supplier vs restaurant). */
 const LIMIT_DISPLAY_ORDER: Record<string, string[]> = {
@@ -76,6 +77,7 @@ export function SubscriptionInfo() {
   const { data: recommendation } = useGetRecommendationQuery({})
 
   const e = data?.entitlements ?? null
+  const isBuyerOnly = Boolean(e?.isBuyerOnlyWorkspace)
   const externallyDisabled = useMemo(() => (e ? getExternallyDisabledFeatures(e) : []), [e])
   const planTierDisabled = useMemo(() => (e ? getPlanTierDisabledFeatures(e) : []), [e])
 
@@ -189,6 +191,7 @@ export function SubscriptionInfo() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {isBuyerOnly && <BuyerUpgradeBanner />}
         {/* Plan Info */}
         <div className="border rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">

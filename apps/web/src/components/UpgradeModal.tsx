@@ -31,7 +31,10 @@ import {
   PLAN_TIER_ORDER,
   normalizePlanCode,
   formatPlanDisplayName,
+  getV2SupplierPlanPositioningHint,
+  getV2RestaurantUpgradeSubtitle,
 } from '../lib/planComparison'
+import { useSupplifyModel } from '../hooks/useSupplifyModel'
 
 const PLAN_PRICE_FALLBACK: Record<string, string> = {
   free: '$0 trial',
@@ -92,6 +95,7 @@ function isOnUpgradeDestination(path: string, search: string, target: string): b
 }
 
 export function UpgradeModal() {
+  const { isV2 } = useSupplifyModel()
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const location = useLocation()
@@ -316,8 +320,13 @@ export function UpgradeModal() {
             {type === 'limit'
               ? `You've reached your ${LIMIT_KEY_LABELS[(payload as any).limitKey] ?? 'plan'} limit. Upgrade to continue.`
               : isBrowseUpgrade
-                ? 'Compare plans and upgrade or downgrade at any time.'
-                : 'This feature requires a higher plan tier.'}
+                ? isV2
+                  ? getV2SupplierPlanPositioningHint() ||
+                    'Compare plans and upgrade or downgrade at any time.'
+                  : 'Compare plans and upgrade or downgrade at any time.'
+                : isV2
+                  ? getV2RestaurantUpgradeSubtitle() || 'This feature requires a higher plan tier.'
+                  : 'This feature requires a higher plan tier.'}
           </DialogDescription>
         </DialogHeader>
 

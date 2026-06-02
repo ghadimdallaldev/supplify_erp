@@ -53,6 +53,16 @@ Restart the API after changing. Rebuild or restart the Vite dev server for web.
 | Entitlements API             | Adds `workspaceMode`, `supplifyModelVersion`, `isBuyerOnlyWorkspace`                     |
 | Upgrade                      | `POST /api/restaurants/workspace/upgrade-workspace` → `full` + free plan activation path |
 
+### API workspace guards (V2 buyer-only)
+
+When `isSupplifyV2()` and `workspace_mode = buyer_only`, these enforce full workspace or supplier link:
+
+- `requireFullRestaurantWorkspace()` — reservations, tenant roles (staff), reports, receiving, restaurant org, staff routes, restaurant finance (mutations)
+- `requireFullRestaurantWorkspaceUnlessReadOnly()` — restaurant finance GET allowed
+- `requireBuyerSupplierCatalogAccess` — product catalog for linked supplier only
+- `assertBuyerCanOrderFromSuppliers` — order create must target linked suppliers
+- Supplier list filtered to linked suppliers only
+
 ## What stays paid
 
 - **Suppliers:** all existing subscription tiers (Silver/Gold/Platinum, etc.).

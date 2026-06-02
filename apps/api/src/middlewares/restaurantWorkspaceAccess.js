@@ -2,6 +2,7 @@ import { isSupplifyV2 } from '../config/supplifyModel.js'
 import {
   getRestaurantWorkspaceMode,
   hasActiveSupplierRestaurantLink,
+  WORKSPACE_MODE_BUYER_ONLY,
 } from '../lib/restaurant-workspace.js'
 import { getRequestTenant } from '../lib/rbac.js'
 
@@ -11,7 +12,60 @@ export function buildBuyerWorkspaceUpgradePayload() {
     message:
       'This feature requires a full restaurant workspace. Upgrade to manage staff, reservations, analytics, and multi-supplier operations.',
     upgradeRequired: true,
-    workspaceMode: 'buyer_only',
+    workspaceMode: WORKSPACE_MODE_BUYER_ONLY,
+  }
+}
+
+/**
+ * V2 buyer-only: catalog list/detail must target a linked supplier.
+ */
+export function requireBuyerSupplierCatalogAccess() {
+  return async (req, res, next) => {
+    if (!isSupplifyV2()) return next()
+    try {
+      const tenant = req.tenantContext || (await getRequestTenant(req))
+      if (!tenant || tenant.tenantType !== 'RESTAURANT') return next()
+
+      const mode = await getRestaurantWorkspaceMode(tenant.tenantId)
+      if (mode !== WORKSPACE_MODE_BUYER_ONLY) return next()
+
+      const supplierId = req.query?.supplier
+      if (!supplierId || typeof supplierId !== 'string') {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'BUYER_CATALOG_SCOPE',
+            message: 'Select an invited supplier store to browse products.',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const linked = await hasActiveSupplierRestaurantLink(tenant.tenantId, supplierId)
+      if (!linked) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'SUPPLIER_NOT_LINKED',
+            message: 'You can only browse catalogs from suppliers that invited your restaurant.',
+          },
+          requestId: req.requestId,
+        })
+      }
+      return next()
+    } catch (err) {
+      return next(err)
+    }
+  }
+}
+
+/** Block non-GET restaurant-finance mutations for buyer-only workspaces. */
+export function requireFullRestaurantWorkspaceUnlessReadOnly() {
+  return (req, res, next) => {
+    if (req.method === 'GET' || req.method === 'HEAD') return next()
+    return requireFullRestaurantWorkspace()(req, res, next)
   }
 }
 
@@ -26,7 +80,7 @@ export function requireFullRestaurantWorkspace() {
       if (!tenant || tenant.tenantType !== 'RESTAURANT') return next()
 
       const mode = await getRestaurantWorkspaceMode(tenant.tenantId)
-      if (mode !== 'buyer_only') return next()
+      if (mode !== WORKSPACE_MODE_BUYER_ONLY) return next()
 
       return res.status(403).json({
         ok: false,
@@ -51,7 +105,7 @@ export function requireSupplierRestaurantLink(getSupplierId) {
       if (!tenant || tenant.tenantType !== 'RESTAURANT') return next()
 
       const mode = await getRestaurantWorkspaceMode(tenant.tenantId)
-      if (mode !== 'buyer_only') return next()
+      if (mode !== WORKSPACE_MODE_BUYER_ONLY) return next()
 
       const supplierId =
         typeof getSupplierId === 'function'
