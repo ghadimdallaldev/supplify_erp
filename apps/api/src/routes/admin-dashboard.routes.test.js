@@ -738,6 +738,27 @@ describe('Admin Dashboard Routes', () => {
     })
   })
 
+  describe('GET /tenants/suppliers', () => {
+    it('returns paginated suppliers with total', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [{ total: 120 }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: 's1', name: 'Supplier One', product_count: 3, warehouse_count: 1 }],
+        })
+        .mockResolvedValue({ rows: [{ code: 'gold' }] })
+
+      const res = await request(app)
+        .get('/api/admin-dashboard/tenants/suppliers?limit=50&offset=0')
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.suppliers).toHaveLength(1)
+      expect(res.body.data.total).toBe(120)
+      expect(res.body.data.limit).toBe(50)
+      expect(res.body.data.offset).toBe(0)
+    })
+  })
+
   describe('GET /activity', () => {
     it('returns composed activity feed with expected shape', async () => {
       mockBuildAdminActivityFeed.mockResolvedValueOnce({
@@ -770,7 +791,26 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.data.events[0].event_type).toBe('order_placed')
       expect(res.body.data.total).toBe(1)
       expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: '30', offset: 0 })
+        expect.objectContaining({ limit: '30', offset: 0, days: undefined })
+      )
+    })
+
+    it('passes days window to activity feed builder', async () => {
+      mockBuildAdminActivityFeed.mockResolvedValueOnce({
+        events: [],
+        total: 0,
+        limit: 30,
+        offset: 0,
+        days: 7,
+        sources: [],
+        failedSources: [],
+        partial: false,
+      })
+
+      await request(app).get('/api/admin-dashboard/activity?days=7').expect(200)
+
+      expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ days: '7' })
       )
     })
   })

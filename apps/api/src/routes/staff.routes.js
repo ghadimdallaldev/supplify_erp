@@ -12,6 +12,7 @@ import { staffMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getRestaurantIdByEmail } from '../lib/tenant.js'
+import { assertPresignedFileUrl } from '../lib/sanitize-upload.js'
 import { notifyStaffPtoRequest, notifyStaffSwapRequest } from '../services/notification.service.js'
 import {
   fetchStaffPortalDashboard,
@@ -2222,6 +2223,20 @@ router.post('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
         error: {
           name: 'DOCUMENT_CREATE_ERROR',
           message: 'Staff member does not belong to this restaurant',
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    try {
+      assertPresignedFileUrl(payload.fileUrl, req.userData.id)
+    } catch (err) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: err?.message || 'Invalid file URL',
         },
         requestId: req.requestId,
       })

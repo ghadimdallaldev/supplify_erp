@@ -143,6 +143,25 @@ describe('Fulfillment routes — delivery route planning', () => {
     })
   })
 
+  it('GET /dispatch applies day window and bucket limit in SQL', async () => {
+    const { query } = await import('../lib/db.js')
+    query.mockImplementation(async (sql) => {
+      if (sql.includes('FROM customer_order o')) {
+        return { rows: [] }
+      }
+      return { rows: [{ id: 'supplier-1' }] }
+    })
+
+    const res = await request(app).get('/api/fulfillment/dispatch?days=7').expect(200)
+
+    expect(res.body.ok).toBe(true)
+    expect(res.body.data.windowDays).toBe(7)
+    expect(res.body.data.bucketLimit).toBe(500)
+    const sqlCalls = query.mock.calls.map((c) => c[0])
+    expect(sqlCalls.some((sql) => sql.includes("INTERVAL '1 day'"))).toBe(true)
+    expect(sqlCalls.some((sql) => sql.includes('LIMIT'))).toBe(true)
+  })
+
   it('GET /routes lists only scoped routes for driver-only users', async () => {
     listDeliveryRoutesMock.mockResolvedValueOnce([])
 

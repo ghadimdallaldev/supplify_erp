@@ -1,6 +1,31 @@
 import path from 'node:path'
 
 const MAX_FILENAME_LENGTH = 200
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+/** MIME type to allowed file extensions (lowercase, with dot). */
+const MIME_TO_EXTENSIONS = {
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+  'image/webp': ['.webp'],
+  'application/pdf': ['.pdf'],
+}
+
+/**
+ * Reject obvious MIME/extension mismatches (e.g. .exe declared as image/jpeg).
+ */
+export function assertFileExtensionMatchesMime(fileName, mimeType) {
+  const allowed = MIME_TO_EXTENSIONS[mimeType]
+  if (!allowed) {
+    throw new Error('File type not allowed')
+  }
+  const ext = path.extname(String(fileName || '')).toLowerCase()
+  if (!ext || !allowed.includes(ext)) {
+    throw new Error('File extension does not match content type')
+  }
+}
+
+export { MAX_UPLOAD_BYTES }
 
 /**
  * Strip path segments and unsafe characters from user-supplied file names.
@@ -65,4 +90,9 @@ export function resolveUploadKeyFromPublicUrl(fileUrl) {
 export function assertChatAttachmentUrl(fileUrl, userId) {
   const key = resolveUploadKeyFromPublicUrl(fileUrl)
   return assertUploadKeyOwnedByUser(key, userId)
+}
+
+/** Alias for staff documents and other presigned file references. */
+export function assertPresignedFileUrl(fileUrl, userId) {
+  return assertChatAttachmentUrl(fileUrl, userId)
 }

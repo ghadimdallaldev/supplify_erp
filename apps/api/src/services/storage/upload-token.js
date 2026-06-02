@@ -11,9 +11,13 @@ function signPayload(secret, payloadB64) {
  * @param {string} params.contentType
  * @param {number} params.expiresAt Unix ms
  * @param {string} params.userId
+ * @param {number} [params.maxBytes]
  */
-export function createUploadToken({ secret, fileKey, contentType, expiresAt, userId }) {
+export function createUploadToken({ secret, fileKey, contentType, expiresAt, userId, maxBytes }) {
   const payload = { fileKey, contentType, expiresAt, userId }
+  if (maxBytes != null && Number.isFinite(maxBytes) && maxBytes > 0) {
+    payload.maxBytes = Math.floor(maxBytes)
+  }
   const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
   const sig = signPayload(secret, payloadB64)
   return `${payloadB64}.${sig}`
@@ -43,5 +47,8 @@ export function verifyUploadToken(secret, token) {
   }
   if (!payload?.fileKey || !payload?.contentType || !payload?.userId) return null
   if (typeof payload.expiresAt !== 'number' || Date.now() > payload.expiresAt) return null
+  if (payload.maxBytes != null && (!Number.isFinite(payload.maxBytes) || payload.maxBytes <= 0)) {
+    return null
+  }
   return payload
 }
