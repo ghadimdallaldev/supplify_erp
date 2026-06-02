@@ -5,6 +5,7 @@ import { Badge } from '../components/ui/badge'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -1112,6 +1113,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle>Create Plan</DialogTitle>
+                      <DialogDescription>
+                        Add a subscription plan for restaurants or suppliers.
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div>
@@ -1325,6 +1329,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Edit Plan</DialogTitle>
+                  <DialogDescription>
+                    Update pricing, trial days, and visibility for this plan.
+                  </DialogDescription>
                 </DialogHeader>
                 {editPlanModal?.plan && (
                   <div className="space-y-4 py-4">
@@ -3339,6 +3346,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Change plan — {changePlanModal.tenantName}</DialogTitle>
+                <DialogDescription>
+                  Select a target plan and preview limits or feature changes before applying.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div>
