@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createUploadToken, verifyUploadToken } from './upload-token.js'
 import { logger } from '../../lib/logger.js'
+import { MAX_UPLOAD_BYTES } from '../../lib/sanitize-upload.js'
 
 /**
  * @param {import('../../config/env.js').config} cfg
@@ -50,10 +51,14 @@ export function createLocalStorageProvider(cfg) {
       return `${publicBase}/${key}`
     },
 
-    async createPresignedUpload({ fileKey, fileType, expiresIn = 300, userId }) {
+    async createPresignedUpload({ fileKey, fileType, expiresIn = 300, userId, fileSize }) {
       if (!userId) {
         throw new Error('userId is required for local upload tokens')
       }
+      const maxBytes =
+        fileSize != null && Number(fileSize) > 0
+          ? Math.min(Math.floor(Number(fileSize)), MAX_UPLOAD_BYTES)
+          : MAX_UPLOAD_BYTES
       const expiresAt = Date.now() + expiresIn * 1000
       const token = createUploadToken({
         secret: cfg.SESSION_SECRET,
@@ -61,6 +66,7 @@ export function createLocalStorageProvider(cfg) {
         contentType: fileType,
         expiresAt,
         userId,
+        maxBytes,
       })
       const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
       const presignedUrl = `${apiBase}/api/files/upload/${token}`
@@ -83,6 +89,12 @@ export function createLocalStorageProvider(cfg) {
       if (payload.contentType !== contentType) {
         throw Object.assign(new Error('Content-Type mismatch'), { name: 'UPLOAD_CONTENT_TYPE' })
       }
+      const bodyLen = Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body || '')
+      const maxAllowed = payload.maxBytes ?? MAX_UPLOAD_BYTES
+      if (bodyLen > maxAllowed) {
+        throw Object.assign(new Error('Upload exceeds allowed size'), { name: 'UPLOAD_TOO_LARGE' })
+      }
+      // TODO: integrate async malware scanning (e.g. ClamAV) before marking upload complete.
       const safeKey = String(payload.fileKey).replace(/^\/+/, '')
       if (safeKey.includes('..')) {
         throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })

@@ -118,6 +118,11 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
       ? 'tenants'
       : initialTab || 'overview'
   const [selectedTab, setSelectedTab] = useState(defaultTab)
+  const TENANT_PAGE_SIZE = 50
+  const [supplierListOffset, setSupplierListOffset] = useState(0)
+  const [restaurantListOffset, setRestaurantListOffset] = useState(0)
+  const [accumulatedSuppliers, setAccumulatedSuppliers] = useState<any[]>([])
+  const [accumulatedRestaurants, setAccumulatedRestaurants] = useState<any[]>([])
 
   // Sync selected tab when route changes (e.g. sidebar: Admin Dashboard → Supplier Admin)
   useEffect(() => {
@@ -264,16 +269,49 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     data: suppliersData,
     isLoading: suppliersLoading,
     error: suppliersError,
-  } = useGetAdminSuppliersQuery(undefined, {
-    skip: !['tenants', 'features', 'usage'].includes(selectedTab),
-  })
+  } = useGetAdminSuppliersQuery(
+    { limit: TENANT_PAGE_SIZE, offset: supplierListOffset },
+    {
+      skip: !['tenants', 'features', 'usage'].includes(selectedTab),
+    }
+  )
   const {
     data: restaurantsData,
     isLoading: restaurantsLoading,
     error: restaurantsError,
-  } = useGetAdminRestaurantsQuery(undefined, {
-    skip: !['tenants', 'features', 'usage'].includes(selectedTab),
-  })
+  } = useGetAdminRestaurantsQuery(
+    { limit: TENANT_PAGE_SIZE, offset: restaurantListOffset },
+    {
+      skip: !['tenants', 'features', 'usage'].includes(selectedTab),
+    }
+  )
+
+  useEffect(() => {
+    if (!suppliersData?.suppliers) return
+    setAccumulatedSuppliers((prev) => {
+      if (supplierListOffset === 0) return suppliersData.suppliers
+      const ids = new Set(prev.map((s) => s.id))
+      return [...prev, ...suppliersData.suppliers.filter((s: { id: string }) => !ids.has(s.id))]
+    })
+  }, [suppliersData, supplierListOffset])
+
+  useEffect(() => {
+    if (!restaurantsData?.restaurants) return
+    setAccumulatedRestaurants((prev) => {
+      if (restaurantListOffset === 0) return restaurantsData.restaurants
+      const ids = new Set(prev.map((r) => r.id))
+      return [...prev, ...restaurantsData.restaurants.filter((r: { id: string }) => !ids.has(r.id))]
+    })
+  }, [restaurantsData, restaurantListOffset])
+
+  const suppliersForUi = accumulatedSuppliers.length
+    ? accumulatedSuppliers
+    : suppliersData?.suppliers
+  const restaurantsForUi = accumulatedRestaurants.length
+    ? accumulatedRestaurants
+    : restaurantsData?.restaurants
+  const suppliersTotal = suppliersData?.total ?? suppliersForUi?.length ?? 0
+  const restaurantsTotal = restaurantsData?.total ?? restaurantsForUi?.length ?? 0
 
   const [createPlan] = useCreateAdminPlanMutation()
   const [updatePlan] = useUpdateAdminPlanMutation()
@@ -2054,7 +2092,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               const showRestaurantsOnly = initialTab === 'restaurants'
               const q = tenantSearch.trim().toLowerCase()
               const filteredSuppliers =
-                suppliersData?.suppliers?.filter((s: { name?: string; contact_email?: string }) => {
+                suppliersForUi?.filter((s: { name?: string; contact_email?: string }) => {
                   if (!q) return true
                   return (
                     (s.name || '').toLowerCase().includes(q) ||
@@ -2062,15 +2100,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   )
                 }) ?? []
               const filteredRestaurants =
-                restaurantsData?.restaurants?.filter(
-                  (r: { name?: string; contact_email?: string }) => {
-                    if (!q) return true
-                    return (
-                      (r.name || '').toLowerCase().includes(q) ||
-                      (r.contact_email || '').toLowerCase().includes(q)
-                    )
-                  }
-                ) ?? []
+                restaurantsForUi?.filter((r: { name?: string; contact_email?: string }) => {
+                  if (!q) return true
+                  return (
+                    (r.name || '').toLowerCase().includes(q) ||
+                    (r.contact_email || '').toLowerCase().includes(q)
+                  )
+                }) ?? []
 
               return (
                 <div className="space-y-6">
@@ -2081,6 +2117,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <h3 className="text-xl font-bold text-[var(--text)]">Suppliers</h3>
                         <p className="text-sm text-[var(--text-muted)]">
                           Manage supplier tenants and subscriptions
+                          {suppliersTotal > 0
+                            ? ` (${suppliersForUi?.length ?? 0} of ${suppliersTotal} loaded)`
+                            : ''}
                         </p>
                       </CardHeader>
                       <CardContent>
@@ -2254,6 +2293,17 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                             </table>
                           </div>
                         )}
+                        {!suppliersLoading && (suppliersForUi?.length ?? 0) < suppliersTotal && (
+                          <div className="mt-4 flex justify-center">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setSupplierListOffset((o) => o + TENANT_PAGE_SIZE)}
+                            >
+                              Load more suppliers
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   )}
@@ -2265,6 +2315,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         <h3 className="text-xl font-bold text-[var(--text)]">Restaurants</h3>
                         <p className="text-sm text-[var(--text-muted)]">
                           Manage restaurant tenants and subscriptions
+                          {restaurantsTotal > 0
+                            ? ` (${restaurantsForUi?.length ?? 0} of ${restaurantsTotal} loaded)`
+                            : ''}
                         </p>
                       </CardHeader>
                       <CardContent>
@@ -2434,6 +2487,18 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                             </table>
                           </div>
                         )}
+                        {!restaurantsLoading &&
+                          (restaurantsForUi?.length ?? 0) < restaurantsTotal && (
+                            <div className="mt-4 flex justify-center">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setRestaurantListOffset((o) => o + TENANT_PAGE_SIZE)}
+                              >
+                                Load more restaurants
+                              </Button>
+                            </div>
+                          )}
                       </CardContent>
                     </Card>
                   )}

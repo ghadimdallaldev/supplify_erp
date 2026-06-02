@@ -14,7 +14,12 @@ function setObjectCorsHeaders(req, res) {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
 }
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
-import { sanitizeUploadFileName, assertUploadKeyOwnedByUser } from '../lib/sanitize-upload.js'
+import {
+  sanitizeUploadFileName,
+  assertUploadKeyOwnedByUser,
+  assertFileExtensionMatchesMime,
+  MAX_UPLOAD_BYTES,
+} from '../lib/sanitize-upload.js'
 import {
   createPresignedUpload,
   buildObjectPublicUrl,
@@ -106,7 +111,8 @@ router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), async 
     const invalid =
       error?.name === 'UPLOAD_TOKEN_INVALID' ||
       error?.name === 'UPLOAD_CONTENT_TYPE' ||
-      error?.name === 'UPLOAD_KEY_INVALID'
+      error?.name === 'UPLOAD_KEY_INVALID' ||
+      error?.name === 'UPLOAD_TOO_LARGE'
     res.status(invalid ? 400 : 500).json({
       ok: false,
       data: null,
@@ -172,19 +178,31 @@ router.post(
       let safeFileName
       try {
         safeFileName = sanitizeUploadFileName(fileName)
-      } catch {
+        assertFileExtensionMatchesMime(safeFileName, fileType)
+      } catch (err) {
         return res.status(400).json({
           ok: false,
           data: null,
           error: {
             name: 'VALIDATION_ERROR',
-            message: 'Invalid file name',
+            message: err?.message || 'Invalid file name',
           },
           requestId: req.requestId,
         })
       }
 
       const sizeBytes = fileSize ? Number(fileSize) : 0
+      if (sizeBytes > MAX_UPLOAD_BYTES) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'File size too large (max 10MB)',
+          },
+          requestId: req.requestId,
+        })
+      }
       const storageMeter = await meterStorageFromRequest(req, sizeBytes)
       if (!storageMeter.ok) {
         return res.status(storageMeter.status).json({
@@ -198,6 +216,7 @@ router.post(
       const fileKey = `uploads/${req.userData.id}/${Date.now()}-${safeFileName}`
       const { presignedUrl, publicUrl, bucket } = await createPresignedUpload({
         fileKey,
+        fileSize: sizeBytes > 0 ? sizeBytes : MAX_UPLOAD_BYTES,
         fileType,
         userId: req.userData.id,
       })

@@ -7,6 +7,7 @@ import { logger } from '../lib/logger.js'
 import { ZodError } from 'zod'
 import { config } from '../config/env.js'
 import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
+import { parseAdminListPagination } from '../lib/admin-list-pagination.js'
 import {
   createImpersonationToken,
   verifyImpersonationToken,
@@ -2016,30 +2017,49 @@ async function attachBillingSubscriptionFields(rows, tenantType) {
 // Get suppliers with detailed info
 router.get('/tenants/suppliers', async (req, res) => {
   try {
-    const { rows: suppliers } = await query(`
+    const { limit, offset } = parseAdminListPagination(req.query)
+    const { rows: countRows } = await query(`SELECT COUNT(*)::int AS total FROM supplier`)
+    const total = countRows[0]?.total ?? 0
+
+    const { rows: suppliers } = await query(
+      `
       SELECT 
         s.*,
         sub.status as subscription_status,
         sub.plan_name,
-        (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) as plan_code,
+        sp.code as plan_code,
         sub.id as subscription_id,
-        (SELECT COUNT(*) FROM product WHERE supplier_id = s.id) as product_count,
-        (SELECT COUNT(*) FROM warehouse WHERE supplier_id = s.id AND is_active = true) as warehouse_count,
-        (SELECT COALESCE(SUM(oi.line_total), 0)
-         FROM order_item oi
-         JOIN customer_order o ON o.id = oi.order_id
-         WHERE oi.supplier_id = s.id AND ${deliveredOrderStatusInSql('o.status')}
-        )::numeric(12,2) as total_revenue
+        COALESCE(pc.product_count, 0)::int as product_count,
+        COALESCE(wc.warehouse_count, 0)::int as warehouse_count,
+        COALESCE(rev.total_revenue, 0)::numeric(12,2) as total_revenue
       FROM supplier s
       LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
+      LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
+      LEFT JOIN (
+        SELECT supplier_id, COUNT(*)::int AS product_count FROM product GROUP BY supplier_id
+      ) pc ON pc.supplier_id = s.id
+      LEFT JOIN (
+        SELECT supplier_id, COUNT(*)::int AS warehouse_count
+        FROM warehouse WHERE is_active = true GROUP BY supplier_id
+      ) wc ON wc.supplier_id = s.id
+      LEFT JOIN (
+        SELECT oi.supplier_id, COALESCE(SUM(oi.line_total), 0) AS total_revenue
+        FROM order_item oi
+        JOIN customer_order o ON o.id = oi.order_id
+        WHERE ${deliveredOrderStatusInSql('o.status')}
+        GROUP BY oi.supplier_id
+      ) rev ON rev.supplier_id = s.id
       ORDER BY s.name
-    `)
+      LIMIT $1 OFFSET $2
+    `,
+      [limit, offset]
+    )
 
     await attachBillingSubscriptionFields(suppliers, 'SUPPLIER')
 
     res.json({
       ok: true,
-      data: { suppliers },
+      data: { suppliers, total, limit, offset },
       error: null,
       requestId: req.requestId,
     })
@@ -2057,26 +2077,44 @@ router.get('/tenants/suppliers', async (req, res) => {
 // Get restaurants with detailed info
 router.get('/tenants/restaurants', async (req, res) => {
   try {
-    const { rows: restaurants } = await query(`
+    const { limit, offset } = parseAdminListPagination(req.query)
+    const { rows: countRows } = await query(`SELECT COUNT(*)::int AS total FROM restaurant`)
+    const total = countRows[0]?.total ?? 0
+
+    const { rows: restaurants } = await query(
+      `
       SELECT 
         r.*,
         sub.status as subscription_status,
         sub.plan_name,
-        (SELECT sp.code FROM subscription_plan sp WHERE sp.id = sub.plan_id LIMIT 1) as plan_code,
+        sp.code as plan_code,
         sub.id as subscription_id,
-        (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as order_count,
-        (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND ${deliveredOrderStatusInSql()}) as total_spent,
-        (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id AND placed_at >= NOW() - INTERVAL '30 days') as orders_last_30d
+        COALESCE(oc.order_count, 0)::int as order_count,
+        COALESCE(oc.total_spent, 0)::numeric(12,2) as total_spent,
+        COALESCE(oc.orders_last_30d, 0)::int as orders_last_30d
       FROM restaurant r
       LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
+      LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
+      LEFT JOIN (
+        SELECT
+          restaurant_id,
+          COUNT(*)::int AS order_count,
+          COALESCE(SUM(total_amount) FILTER (WHERE ${deliveredOrderStatusInSql()}), 0) AS total_spent,
+          COUNT(*) FILTER (WHERE placed_at >= NOW() - INTERVAL '30 days')::int AS orders_last_30d
+        FROM customer_order
+        GROUP BY restaurant_id
+      ) oc ON oc.restaurant_id = r.id
       ORDER BY r.name
-    `)
+      LIMIT $1 OFFSET $2
+    `,
+      [limit, offset]
+    )
 
     await attachBillingSubscriptionFields(restaurants, 'RESTAURANT')
 
     res.json({
       ok: true,
-      data: { restaurants },
+      data: { restaurants, total, limit, offset },
       error: null,
       requestId: req.requestId,
     })
@@ -3473,8 +3511,8 @@ router.delete('/tenants/:tenantType/:id/feature-overrides/:featureKey', async (r
  */
 router.get('/activity', async (req, res) => {
   try {
-    const { limit = 50, offset = 0, type } = req.query
-    const data = await buildAdminActivityFeed({ limit, offset, type })
+    const { limit = 50, offset = 0, type, days } = req.query
+    const data = await buildAdminActivityFeed({ limit, offset, type, days })
     res.json({
       ok: true,
       data,

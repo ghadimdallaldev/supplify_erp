@@ -9,6 +9,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { logger } from '../../lib/logger.js'
 import { createUploadToken, verifyUploadToken } from './upload-token.js'
+import { MAX_UPLOAD_BYTES } from '../../lib/sanitize-upload.js'
 
 function createS3Client(cfg, endpoint) {
   const forcePathStyle = cfg.STORAGE_S3_FORCE_PATH_STYLE !== false
@@ -163,8 +164,12 @@ export function createS3CompatibleProvider(cfg) {
 
     buildPublicUrl,
 
-    async createPresignedUpload({ fileKey, fileType, expiresIn = 300, userId }) {
+    async createPresignedUpload({ fileKey, fileType, expiresIn = 300, userId, fileSize }) {
       const publicUrl = buildPublicUrl(fileKey)
+      const maxBytes =
+        fileSize != null && Number(fileSize) > 0
+          ? Math.min(Math.floor(Number(fileSize)), MAX_UPLOAD_BYTES)
+          : MAX_UPLOAD_BYTES
 
       // Private buckets (Railway): browser uploads via API to avoid storage endpoint CORS.
       if (cfg.STORAGE_PUBLIC_READ === false) {
@@ -178,6 +183,7 @@ export function createS3CompatibleProvider(cfg) {
           contentType: fileType,
           expiresAt,
           userId,
+          maxBytes,
         })
         const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
         return {
@@ -190,12 +196,21 @@ export function createS3CompatibleProvider(cfg) {
       }
 
       const s3 = getPresignClient()
-      const command = new PutObjectCommand({
+      const putParams = {
         Bucket: cfg.STORAGE_BUCKET,
         Key: fileKey,
         ContentType: fileType,
-      })
-      const presignedUrl = await getSignedUrl(s3, command, { expiresIn })
+      }
+      if (fileSize != null && Number(fileSize) > 0) {
+        putParams.ContentLength = Math.min(Math.floor(Number(fileSize)), MAX_UPLOAD_BYTES)
+      }
+      const command = new PutObjectCommand(putParams)
+      const presignOptions = { expiresIn }
+      if (putParams.ContentLength != null) {
+        presignOptions.signableHeaders = new Set(['content-type', 'content-length'])
+        presignOptions.unhoistableHeaders = new Set(['content-length'])
+      }
+      const presignedUrl = await getSignedUrl(s3, command, presignOptions)
       return {
         presignedUrl,
         publicUrl,
@@ -215,6 +230,12 @@ export function createS3CompatibleProvider(cfg) {
       if (payload.contentType !== contentType) {
         throw Object.assign(new Error('Content-Type mismatch'), { name: 'UPLOAD_CONTENT_TYPE' })
       }
+      const bodyLen = Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body || '')
+      const maxAllowed = payload.maxBytes ?? MAX_UPLOAD_BYTES
+      if (bodyLen > maxAllowed) {
+        throw Object.assign(new Error('Upload exceeds allowed size'), { name: 'UPLOAD_TOO_LARGE' })
+      }
+      // TODO: integrate async malware scanning (e.g. ClamAV) before marking upload complete.
       const safeKey = String(payload.fileKey).replace(/^\/+/, '')
       if (safeKey.includes('..')) {
         throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
