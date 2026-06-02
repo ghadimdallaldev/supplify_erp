@@ -3128,9 +3128,77 @@ export const api = createApi({
       query: () => '/api/admin-dashboard/overview',
       providesTags: ['Admin'],
     }),
+    getAdminSystemInfo: builder.query<
+      { supplifyModelVersion: string; supplifyModelLabel: string },
+      void
+    >({
+      query: () => '/api/admin-dashboard/system-info',
+      providesTags: ['Admin'],
+    }),
+    getAdminModelComparisonMetrics: builder.query<
+      {
+        metrics: {
+          supplifyModelVersion: string
+          v2FeaturesEnabled: boolean
+          supplierInvitesSent: number
+          supplierInvitesAccepted: number
+          inviteAcceptanceRate: number
+          buyerOnlyRestaurants: number
+          restaurantWorkspaceUpgrades: number
+          buyerToPaidConversionRate: number
+          restaurantsWithPaidPlanAfterUpgrade: number
+          supplierStoreOrders: number
+          generatedAt: string
+        }
+      },
+      void
+    >({
+      query: () => '/api/admin-dashboard/model-comparison-metrics',
+      providesTags: ['Admin'],
+    }),
     getAdminPlatformSettings: builder.query<{ freeSandboxDays: number }, void>({
       query: () => '/api/admin-dashboard/platform-settings',
       providesTags: ['Admin'],
+    }),
+    getSupplierRestaurantInvitations: builder.query<
+      {
+        invitations: Array<{
+          id: string
+          invited_email: string
+          invited_name?: string
+          restaurant_name?: string
+          status: string
+          expires_at: string
+          created_at: string
+          accepted_at?: string
+        }>
+        v2Required?: boolean
+      },
+      void
+    >({
+      query: () => '/api/supplier/restaurant-invitations',
+      providesTags: ['Supplier'],
+    }),
+    createSupplierRestaurantInvitation: builder.mutation<
+      { invitation: unknown; invite_url: string; expires_at: string },
+      { invited_email: string; invited_name?: string; restaurant_name?: string }
+    >({
+      query: (body) => ({
+        url: '/api/supplier/restaurant-invitations',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
+    upgradeRestaurantWorkspace: builder.mutation<
+      { workspaceMode: string; upgraded?: boolean; alreadyFull?: boolean; message?: string },
+      void
+    >({
+      query: () => ({
+        url: '/api/restaurants/workspace/upgrade-workspace',
+        method: 'POST',
+      }),
+      invalidatesTags: ['Subscription', 'Restaurant'],
     }),
     updateAdminPlatformSettings: builder.mutation<
       { freeSandboxDays: number },
@@ -3781,7 +3849,12 @@ export const {
   useAcceptWaitlistOfferMutation,
   useDeclineWaitlistOfferMutation,
   useGetAdminOverviewQuery,
+  useGetAdminSystemInfoQuery,
+  useGetAdminModelComparisonMetricsQuery,
   useGetAdminPlatformSettingsQuery,
+  useGetSupplierRestaurantInvitationsQuery,
+  useCreateSupplierRestaurantInvitationMutation,
+  useUpgradeRestaurantWorkspaceMutation,
   useUpdateAdminPlatformSettingsMutation,
   useGetAdminConversionStatsQuery,
   useGetAdminPlansQuery,

@@ -81,6 +81,7 @@ import { AdminLimitsTab } from '../components/admin/AdminLimitsTab'
 import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
 import { AdminPortalNav } from '../components/admin/AdminPortalNav'
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
+import { AdminModelComparisonPanel } from '../components/admin/AdminModelComparisonPanel'
 import { AdminUsersTab } from '../components/admin/AdminUsersTab'
 import {
   AdminResetPasswordDialog,
@@ -643,6 +644,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
               </Card>
             ) : (
               <>
+                <AdminModelComparisonPanel />
                 <AdminOverviewExtras
                   overview={overview}
                   onNavigateTab={setSelectedTab}

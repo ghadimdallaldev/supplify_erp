@@ -209,6 +209,8 @@ export const config = {
     process.env.CRON_SCHEDULED_ORDERS_INTERVAL_MS,
     isProductionNode ? 60 * 60 * 1000 : 5 * 60 * 1000
   ),
+  /** Business model experiment: v1 (default) | v2 (supplier-first) */
+  SUPPLIFY_MODEL_VERSION: (process.env.SUPPLIFY_MODEL_VERSION || 'v1').trim().toLowerCase(),
 }
 
 if (!config.STORAGE_PUBLIC_URL) {

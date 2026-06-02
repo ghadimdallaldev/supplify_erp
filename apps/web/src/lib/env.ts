@@ -28,6 +28,10 @@ export const enableMockPayments = import.meta.env.VITE_ENABLE_MOCK_PAYMENTS === 
 
 export const enableTestData = import.meta.env.VITE_ENABLE_TEST_DATA === 'true'
 
+/** Business model experiment: v1 (default) | v2 (supplier-first) */
+export const supplifyModelVersion =
+  (import.meta.env.VITE_SUPPLIFY_MODEL_VERSION ?? 'v1').trim().toLowerCase() === 'v2' ? 'v2' : 'v1'
+
 /** Dev-only fallback when Vite proxy is used (no VITE_API_URL). */
 export const DEV_API_ORIGIN = 'http://localhost:4000'
 

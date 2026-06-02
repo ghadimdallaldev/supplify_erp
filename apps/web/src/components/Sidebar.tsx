@@ -107,7 +107,18 @@ export function Sidebar({
   const unreadCount = notificationUnreadCount
   const planLabel = entitlementsData?.entitlements?.plan?.name ?? ''
   const planCode = (entitlementsData?.entitlements?.plan?.code ?? 'free').toLowerCase()
+  const isBuyerOnlyWorkspace = Boolean(entitlementsData?.entitlements?.isBuyerOnlyWorkspace)
   const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
+  const buyerNavHidden = new Set([
+    '/app/reservations',
+    '/app/receiving',
+    '/app/reports',
+    '/app/staff',
+    '/app/restaurant-inventory',
+    '/app/command-center',
+  ])
+  const filterBuyerNav = (items: NavItem[]) =>
+    isBuyerOnlyWorkspace ? items.filter((i) => !buyerNavHidden.has(i.href)) : items
   const supplierDealsEnabled = canUseSupplierDeals(entitlementsData?.entitlements)
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
@@ -184,7 +195,8 @@ export function Sidebar({
         permission: 'RECEIVING_VIEW',
         testId: 'nav-receiving',
       },
-    ].filter((item) => navItemAllowed(item, can, canAny))
+    ]
+    const opsFiltered = filterBuyerNav(ops).filter((item) => navItemAllowed(item, can, canAny))
 
     const intel: NavItem[] = [
       {
@@ -242,7 +254,8 @@ export function Sidebar({
         permission: 'CHAT_VIEW',
         testId: 'nav-chat',
       },
-    ].filter((item) => navItemAllowed(item, can, canAny))
+    ]
+    const intelFiltered = filterBuyerNav(intel).filter((item) => navItemAllowed(item, can, canAny))
 
     const acct: NavItem[] = [
       {
@@ -266,7 +279,8 @@ export function Sidebar({
         permission: 'SETTINGS_VIEW',
         testId: 'nav-settings',
       },
-    ].filter((item) => navItemAllowed(item, can, canAny))
+    ]
+    const acctFiltered = filterBuyerNav(acct).filter((item) => navItemAllowed(item, can, canAny))
 
     sections = [
       {
@@ -281,9 +295,9 @@ export function Sidebar({
           },
         ].filter((item) => navItemAllowed(item, can, canAny)),
       },
-      { label: 'OPERATIONS', items: ops },
-      ...(intel.length ? [{ label: 'INTELLIGENCE', items: intel }] : []),
-      { label: 'ACCOUNT', items: acct },
+      { label: 'OPERATIONS', items: opsFiltered },
+      ...(intelFiltered.length ? [{ label: 'INTELLIGENCE', items: intelFiltered }] : []),
+      { label: 'ACCOUNT', items: acctFiltered },
     ]
   } else if (hasAdminNavAccess && !isImpersonating) {
     sections = [

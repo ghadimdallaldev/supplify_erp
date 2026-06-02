@@ -22,8 +22,11 @@ import { resolveWorkspaceScope } from '../lib/workspace-membership.js'
 import { assertCanAssignRole, assertCanGrantPermissions } from '../lib/rbac-guards.js'
 import { MAIN_ADMIN_ROLE_NAME } from '../lib/workspace-membership.js'
 import { syncDriverLinkForRoleAssignment } from '../lib/driver-user-link.js'
+import { requireFullRestaurantWorkspace } from '../middlewares/restaurantWorkspaceAccess.js'
 
 const router = express.Router()
+
+router.use(requireFullRestaurantWorkspace())
 
 const advancedRolesFeature = requireFeature(
   'advanced_roles',

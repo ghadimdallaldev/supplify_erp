@@ -5,12 +5,14 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import {
   useGetAdminPlatformSettingsQuery,
+  useGetAdminSystemInfoQuery,
   useUpdateAdminPlatformSettingsMutation,
 } from '../../services/api'
 import toast from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
 
 export function AdminPlatformSettingsPanel() {
+  const { data: systemInfo } = useGetAdminSystemInfoQuery()
   const { data, isLoading } = useGetAdminPlatformSettingsQuery()
   const [updateSettings, { isLoading: saving }] = useUpdateAdminPlatformSettingsMutation()
   const [days, setDays] = useState('7')
@@ -39,38 +41,49 @@ export function AdminPlatformSettingsPanel() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Free Trial length</CardTitle>
-        <CardDescription>
-          Free Trial workspaces auto-lock after this many days unless the tenant upgrades to a paid
-          plan. This is not a forever-free tier.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 max-w-sm">
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
-        ) : (
-          <>
-            <div>
-              <Label htmlFor="freeSandboxDays">Trial length (days)</Label>
-              <Input
-                id="freeSandboxDays"
-                type="number"
-                min={3}
-                max={7}
-                value={days}
-                onChange={(e) => setDays(e.target.value)}
-                className="mt-1"
-              />
-              <p className="text-xs text-[var(--text-muted)] mt-1">Allowed range: 3–7 days</p>
-            </div>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Supplify business model</CardTitle>
+          <CardDescription>
+            Set via deploy environment (read-only). Current:{' '}
+            <strong>{systemInfo?.supplifyModelLabel ?? '—'}</strong>
+          </CardDescription>
+        </CardHeader>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Free Trial length</CardTitle>
+          <CardDescription>
+            Free Trial workspaces auto-lock after this many days unless the tenant upgrades to a
+            paid plan. This is not a forever-free tier.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 max-w-sm">
+          {isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
+          ) : (
+            <>
+              <div>
+                <Label htmlFor="freeSandboxDays">Trial length (days)</Label>
+                <Input
+                  id="freeSandboxDays"
+                  type="number"
+                  min={3}
+                  max={7}
+                  value={days}
+                  onChange={(e) => setDays(e.target.value)}
+                  className="mt-1"
+                />
+                <p className="text-xs text-[var(--text-muted)] mt-1">Allowed range: 3–7 days</p>
+              </div>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

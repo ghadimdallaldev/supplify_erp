@@ -39,6 +39,7 @@ const DASHBOARD_GRID_GAP = 20
 const DASHBOARD_CALENDAR_EXTRA_GAP = 12
 import { CalendarView } from '../components/CalendarView'
 import { formatCurrency } from '../utils/format'
+import { BuyerUpgradeBanner } from '../components/BuyerUpgradeBanner'
 
 // ─── Tiny helpers ────────────────────────────────────────────────────────────
 
@@ -514,42 +515,47 @@ export function DashboardPage() {
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
-      {/* Post-onboarding CTAs */}
-      {isRestaurant && (stats?.totalOrders ?? 0) === 0 && (
-        <div
-          style={{
-            background: 'var(--brand-pale)',
-            border: '1px solid var(--brand-light)',
-            borderRadius: 12,
-            padding: '14px 16px',
-            gap: 12,
-          }}
-          className="dashboard-split-row"
-        >
-          <div className="min-w-0">
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-              You&apos;re all set
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Create your first order to start receiving from suppliers.
-            </div>
-          </div>
-          <Button
-            asChild
-            style={{
-              background: 'var(--brand)',
-              borderColor: 'var(--brand)',
-              color: '#fff',
-              flexShrink: 0,
-            }}
-          >
-            <Link to="/app/cart">
-              <ShoppingCart style={{ width: 14, height: 14, marginRight: 6 }} />
-              Create first order
-            </Link>
-          </Button>
-        </div>
+      {isRestaurant && entitlementsData?.entitlements?.isBuyerOnlyWorkspace && (
+        <BuyerUpgradeBanner />
       )}
+      {/* Post-onboarding CTAs */}
+      {isRestaurant &&
+        !entitlementsData?.entitlements?.isBuyerOnlyWorkspace &&
+        (stats?.totalOrders ?? 0) === 0 && (
+          <div
+            style={{
+              background: 'var(--brand-pale)',
+              border: '1px solid var(--brand-light)',
+              borderRadius: 12,
+              padding: '14px 16px',
+              gap: 12,
+            }}
+            className="dashboard-split-row"
+          >
+            <div className="min-w-0">
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                You&apos;re all set
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                Create your first order to start receiving from suppliers.
+              </div>
+            </div>
+            <Button
+              asChild
+              style={{
+                background: 'var(--brand)',
+                borderColor: 'var(--brand)',
+                color: '#fff',
+                flexShrink: 0,
+              }}
+            >
+              <Link to="/app/cart">
+                <ShoppingCart style={{ width: 14, height: 14, marginRight: 6 }} />
+                Create first order
+              </Link>
+            </Button>
+          </div>
+        )}
       {isSupplier && (stats?.totalProducts ?? 0) === 0 && (
         <div
           style={{

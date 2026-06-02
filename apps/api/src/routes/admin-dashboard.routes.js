@@ -59,6 +59,8 @@ import {
 } from '../lib/plan-admin-validation.js'
 import { isLimitKeyApplicable } from '../lib/limit-resolution.js'
 import { buildAdminOverviewMetrics } from '../lib/admin-overview-metrics.js'
+import { getSupplifyModelVersion } from '../config/supplifyModel.js'
+import { buildSupplifyModelComparisonMetrics } from '../lib/supplify-model-metrics.js'
 import { buildAdminActivityFeed } from '../lib/admin-activity-feed.js'
 import { adminResetUserPassword, listAdminUsers } from '../services/admin-user-password.service.js'
 import { adminDashboardPermissionGuard, requireAnyPermission } from '../lib/route-permissions.js'
@@ -158,6 +160,49 @@ router.get('/overview', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'INTERNAL_ERROR', message: 'Failed to get admin overview' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/system-info', async (req, res) => {
+  try {
+    const version = getSupplifyModelVersion()
+    res.json({
+      ok: true,
+      data: {
+        supplifyModelVersion: version,
+        supplifyModelLabel: version === 'v2' ? 'V2 (Supplier-first)' : 'V1 (Marketplace)',
+      },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('GET system-info error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get system info' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/model-comparison-metrics', async (req, res) => {
+  try {
+    const metrics = await buildSupplifyModelComparisonMetrics()
+    res.json({
+      ok: true,
+      data: { metrics },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('GET model-comparison-metrics error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get model comparison metrics' },
       requestId: req.requestId,
     })
   }

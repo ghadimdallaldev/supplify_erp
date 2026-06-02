@@ -65,6 +65,8 @@ import { ActivityLogTab } from '../components/ActivityLogTab'
 import { DriversSettingsPanel } from '../components/fulfillment/DriversSettingsPanel'
 import { TeamRolesPanel } from '../components/TeamRolesPanel'
 import { BranchInvitationsPanel } from '../components/org/BranchInvitationsPanel'
+import { SupplierStorePanel } from '../components/supplier/SupplierStorePanel'
+import { useSupplifyModel } from '../hooks/useSupplifyModel'
 import { usePermissions } from '../hooks/usePermissions'
 import {
   useGetSupplierMeQuery,
@@ -131,6 +133,7 @@ const SUPPLIER_NOTIFICATION_FIELDS: Array<{
 ]
 
 export function SupplierSettingsPage() {
+  const { isV2, config } = useSupplifyModel()
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
   const { can, canAny } = usePermissions()
@@ -513,8 +516,15 @@ export function SupplierSettingsPage() {
       <div className="space-y-6 p-6">
         <div>
           <h1 className="text-[21px] font-black text-[var(--text)]">Supplier Settings</h1>
-          <p className="text-[var(--text-muted)] mt-2">Manage your business profile and settings</p>
+          <p className="text-[var(--text-muted)] mt-2">
+            {isV2
+              ? ((config.positioning as { tagline?: string })?.tagline ??
+                'Supplier-first B2B ordering and growth platform')
+              : 'Manage your business profile and settings'}
+          </p>
         </div>
+
+        {supplier?.id && <SupplierStorePanel supplierId={supplier.id} />}
 
         {/* Statistics Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

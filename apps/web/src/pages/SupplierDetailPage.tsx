@@ -51,8 +51,10 @@ import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatPrice } from '../utils/format'
 import { CardAddressBlock, pageHeaderRowClass } from '../components/ui/card-layout'
+import { useSupplifyModel } from '../hooks/useSupplifyModel'
 
 export function SupplierDetailPage() {
+  const { isV2, config } = useSupplifyModel()
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
@@ -179,7 +181,12 @@ export function SupplierDetailPage() {
           </div>
           <div>
             <h1 className="text-[21px] font-black text-[var(--text)]">{supplier.name}</h1>
-            <p className="text-[var(--text-muted)] mt-1">{supplier.slug}</p>
+            <p className="text-[var(--text-muted)] mt-1">
+              {isRestaurant && isV2
+                ? ((config.supplier as { storeSubtitle?: string })?.storeSubtitle ??
+                  'Private B2B Store')
+                : supplier.slug}
+            </p>
             {ratingSummary?.avg_rating != null && Number(ratingSummary.avg_rating) > 0 ? (
               <p className="flex items-center gap-1 text-sm text-amber-600 mt-1">
                 {Array.from({ length: 5 }).map((_, i) => (

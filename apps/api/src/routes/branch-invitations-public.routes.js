@@ -12,6 +12,10 @@ import {
   acceptRestaurantBranchInvitation,
   getRestaurantInvitationByToken,
 } from '../lib/restaurant-invitations.js'
+import {
+  acceptSupplierRestaurantInvitation,
+  getSupplierRestaurantInvitationByToken,
+} from '../lib/supplier-restaurant-invitations.js'
 import { evaluateInvitationState, normalizeInviteType } from '../services/invitationTokens.js'
 import { createActiveTenantToken, getActiveTenantCookieName } from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
@@ -47,6 +51,29 @@ router.get('/', async (req, res) => {
     if (type === 'supplier_branch') {
       const invitation = await getInvitationByToken(token)
       const state = evaluateInvitationPublicState(invitation)
+      return res.json({ ok: true, data: state, error: null, requestId: req.requestId })
+    }
+
+    if (type === 'supplier_restaurant') {
+      const invitation = await getSupplierRestaurantInvitationByToken(token)
+      const state = evaluateInvitationState(invitation)
+      if (state.valid) {
+        return res.json({
+          ok: true,
+          data: {
+            valid: true,
+            supplier_name: invitation?.supplier_name,
+            org_name: invitation?.supplier_name,
+            restaurant_name: invitation?.restaurant_name || invitation?.invited_name,
+            invited_name: invitation?.invited_name,
+            invited_email: invitation?.invited_email,
+            expires_at: state.expires_at,
+            invitation_type: 'supplier_restaurant',
+          },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
       return res.json({ ok: true, data: state, error: null, requestId: req.requestId })
     }
 
@@ -183,6 +210,77 @@ router.post('/accept', optionalAuth, async (req, res) => {
         existingUserId,
         existingUserEmail,
         ...acceptMeta,
+      })
+    }
+
+    if (type === 'supplier_restaurant') {
+      let srResult
+      try {
+        srResult = await acceptSupplierRestaurantInvitation({
+          token,
+          fullName,
+          email: acceptEmail,
+          password,
+          phone: req.body?.phone,
+          existingUserId,
+          existingUserEmail,
+        })
+      } catch (error) {
+        const status = invitationAcceptErrorStatus(error)
+        return res.status(status).json({
+          ok: false,
+          data: null,
+          error: {
+            name: invitationAcceptErrorName(error),
+            message: error.message,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const { rows: nameRows } = await query(`SELECT name FROM restaurant WHERE id = $1`, [
+        srResult.restaurantId,
+      ])
+      const tenantName = nameRows[0]?.name || 'Restaurant'
+
+      const tenantToken = await createActiveTenantToken({
+        userId: srResult.userId,
+        tenantId: srResult.restaurantId,
+        tenantType: 'RESTAURANT',
+        tenantName,
+      })
+
+      res.cookie(getActiveTenantCookieName(), tenantToken, {
+        httpOnly: true,
+        secure: config.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: '/',
+      })
+
+      const login = await completeInviteAcceptSession(res, { result: srResult, fullName, req })
+      try {
+        await recordInviteLegalAcceptances({
+          userId: srResult.userId,
+          acceptedDocuments: legalAcceptance.acceptedDocuments,
+          electronicSignatureAttestation: legalAcceptance.electronicSignatureAttestation,
+          packVersion: legalAcceptance.packVersion,
+          ipAddress: acceptMeta.ipAddress,
+          userAgent: acceptMeta.userAgent,
+        })
+      } catch (legalErr) {
+        logger.warn('Invite legal acceptance not recorded', { error: legalErr.message })
+      }
+      return res.json({
+        ok: true,
+        data: {
+          user: login.user,
+          activeRestaurantId: srResult.restaurantId,
+          needsManualLogin: login.needsManualLogin || undefined,
+          loginMessage: login.loginMessage,
+        },
+        error: null,
+        requestId: req.requestId,
       })
     }
 

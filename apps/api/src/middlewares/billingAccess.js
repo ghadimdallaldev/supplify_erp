@@ -3,8 +3,27 @@ import { getBillingStatus, buildAccountLockedError } from '../lib/billing/billin
 import { LOCK_REASON_FREE_SANDBOX_EXPIRED } from '../lib/billing/constants.js'
 import { isImpersonating } from '../lib/impersonation.js'
 import { logger } from '../lib/logger.js'
+import { isSupplifyV2 } from '../config/supplifyModel.js'
+import {
+  getRestaurantWorkspaceMode,
+  WORKSPACE_MODE_BUYER_ONLY,
+} from '../lib/restaurant-workspace.js'
 
 const ALLOW_PREFIXES = ['/api/billing', '/api/register', '/auth', '/health', '/api/public']
+
+/** V2 buyer-only: allow ordering and linked-supplier flows without paid subscription lock */
+const BUYER_ONLY_WRITE_PREFIXES = [
+  '/api/orders',
+  '/api/products',
+  '/api/prices',
+  '/api/chat',
+  '/api/quick-lists',
+  '/api/restaurant-finance',
+  '/api/invoices',
+  '/api/payments',
+  '/api/notifications',
+  '/api/restaurants/workspace',
+]
 
 const ALLOW_GET_PATHS = new Set([
   '/api/subscriptions/entitlements',
@@ -41,6 +60,15 @@ export async function billingAccessMiddleware(req, res, next) {
 
     const billing = await getBillingStatus(tenant.tenantId, tenant.tenantType)
     if (!billing.access.isLocked) return next()
+
+    if (
+      isSupplifyV2() &&
+      tenant.tenantType === 'RESTAURANT' &&
+      (await getRestaurantWorkspaceMode(tenant.tenantId)) === WORKSPACE_MODE_BUYER_ONLY
+    ) {
+      if (req.method === 'GET') return next()
+      if (BUYER_ONLY_WRITE_PREFIXES.some((p) => path.startsWith(p))) return next()
+    }
 
     if (req.method === 'GET' && isFreeTrialExpiredLock(billing.access)) return next()
 

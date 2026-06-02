@@ -79,6 +79,9 @@ import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { expireOldBranchInvitations } from './lib/branch-invitations.js'
 import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
+import { expireOldSupplierRestaurantInvitations } from './lib/supplier-restaurant-invitations.js'
+import supplierRestaurantInvitationsRoutes from './routes/supplier-restaurant-invitations.routes.js'
+import restaurantWorkspaceRoutes from './routes/restaurant-workspace.routes.js'
 import { runCronJob, CRON_JOBS } from './lib/cron-runner.js'
 import path from 'node:path'
 import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
@@ -373,6 +376,8 @@ app.use('/api/org', orgRoutes)
 app.use('/api/org/invitations', branchInvitationsRoutes)
 app.use('/api/restaurant-org', restaurantOrgRoutes)
 app.use('/api/restaurants/invitations', restaurantInvitationsRoutes)
+app.use('/api/restaurants/workspace', restaurantWorkspaceRoutes)
+app.use('/api/supplier/restaurant-invitations', supplierRestaurantInvitationsRoutes)
 app.use('/api/public/invitations', branchInvitationsPublicRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
@@ -539,7 +544,11 @@ server.listen(PORT, HOST, () => {
   const invitationIntervalMs = 60 * 60 * 1000
   const runInvitationExpiryCron = () =>
     runCronJob(CRON_JOBS.INVITATION_EXPIRY, () =>
-      Promise.all([expireOldBranchInvitations(), expireOldRestaurantInvitations()])
+      Promise.all([
+        expireOldBranchInvitations(),
+        expireOldRestaurantInvitations(),
+        expireOldSupplierRestaurantInvitations(),
+      ])
     ).catch((err) => logger.error('Invitation expiry job failed:', err))
   runInvitationExpiryCron()
   trackInterval(runInvitationExpiryCron, invitationIntervalMs)

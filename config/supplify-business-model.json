@@ -1,0 +1,91 @@
+{
+  "v1": {
+    "positioning": {
+      "tagline": "Restaurant & supplier marketplace",
+      "description": "Connect restaurants with suppliers for B2B ordering and operations."
+    },
+    "supplier": {
+      "storeTitle": "Supplier catalog",
+      "storeSubtitle": "Your products and ordering profile",
+      "inviteRestaurantsCta": "Invite team members",
+      "shareStoreLabel": "Catalog link"
+    },
+    "restaurant": {
+      "buyerInviteHeadline": "You were invited to join a restaurant team",
+      "buyerInviteBody": "Accept the invitation to access your restaurant workspace.",
+      "upgradeHeadline": "Upgrade your plan",
+      "upgradeBody": "Unlock more suppliers, branches, and operational features."
+    }
+  },
+  "v2": {
+    "positioning": {
+      "tagline": "Supplier-first B2B ordering and growth platform",
+      "description": "Suppliers run a private B2B store; restaurants join free as buyers when invited."
+    },
+    "supplier": {
+      "storeTitle": "Supplier Store",
+      "storeSubtitle": "Private B2B Store — invite restaurants to order from your catalog",
+      "inviteRestaurantsCta": "Invite Restaurants",
+      "shareStoreLabel": "Ordering Link",
+      "valueProps": [
+        "Create your private B2B ordering store",
+        "Invite restaurants to order from your catalog",
+        "Reduce WhatsApp ordering chaos",
+        "Track orders, invoices, late payments, and reorder activity"
+      ],
+      "planPositioning": [
+        "Invited restaurants",
+        "Products / SKUs",
+        "Orders per month",
+        "Team users",
+        "Promotions & deals",
+        "Analytics & insights",
+        "Invoice & payment tracking",
+        "Reorder intelligence",
+        "Branches & warehouses"
+      ]
+    },
+    "restaurant": {
+      "buyerInviteHeadline": "You were invited by a supplier",
+      "buyerInviteBody": "You can order from this supplier for free. Upgrade to a full restaurant workspace to manage all suppliers, staff, reservations, analytics, and operations.",
+      "upgradeHeadline": "Upgrade to a full restaurant workspace",
+      "upgradeBody": "Get multi-supplier command center, staff management, reservations, analytics, finance reports, approvals, and branch controls.",
+      "freeBuyerBullets": [
+        "Browse and order from invited supplier stores",
+        "Reorder from invited suppliers",
+        "View order history",
+        "View invoices and payment status",
+        "Receive supplier promotions and deals"
+      ],
+      "premiumBlocked": [
+        "staff_management",
+        "reservations",
+        "advanced_analytics",
+        "multi_supplier_command_center",
+        "internal_purchasing_approvals",
+        "advanced_finance_reports",
+        "multi_branch_advanced",
+        "advanced_receiving_disputes"
+      ]
+    }
+  },
+  "buyerOnlyBlockedFeatures": [
+    "reports",
+    "multi_branch",
+    "advanced_roles",
+    "reservations",
+    "waste_tracking",
+    "receiving_quality",
+    "supplier_deals",
+    "smart_reorder",
+    "order_calendar"
+  ],
+  "buyerOnlyBlockedPermissions": [
+    "STAFF_MANAGE",
+    "STAFF_INVITE",
+    "RESERVATIONS_CREATE",
+    "RESERVATIONS_MANAGE",
+    "SETTINGS_MANAGE",
+    "SUBSCRIPTIONS_MANAGE"
+  ]
+}

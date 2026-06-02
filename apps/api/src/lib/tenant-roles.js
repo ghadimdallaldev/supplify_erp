@@ -17,6 +17,7 @@ export const RESERVED_SYSTEM_ROLE_NAMES = Object.freeze([
   'Restaurant Manager',
   'Supplier Manager',
   'Purchaser',
+  'Restaurant Buyer',
   'Receiving Staff',
   'Accountant',
   'FOH Staff',

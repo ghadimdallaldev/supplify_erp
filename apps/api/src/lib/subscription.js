@@ -18,6 +18,12 @@ import { countActiveBranchLocations, countActiveWarehouses } from './plan-enforc
 import { getWarehouseSupplierColumn } from './warehouse-helpers.js'
 import { resolveOrgBillingTenantId } from './org-billing-tenant.js'
 import {
+  applyBuyerOnlyFeatureOverlay,
+  getSupplifyModelVersion,
+  isSupplifyV2,
+} from '../config/supplifyModel.js'
+import { getRestaurantWorkspaceMode } from './restaurant-workspace.js'
+import {
   addonKeyForLimitKey,
   computeEffectiveWithAddons,
   ENTERPRISE_BRANCH_THRESHOLD,
@@ -791,11 +797,19 @@ export async function getEntitlements(tenantId, tenantType) {
     }
   }
 
-  const { features, featureSources } = await resolveAllFeaturesForTenant(
+  let { features, featureSources } = await resolveAllFeaturesForTenant(
     billingTenantId,
     tenantType,
     subscription.features
   )
+
+  let workspaceMode = 'full'
+  if (tenantType === 'RESTAURANT') {
+    workspaceMode = await getRestaurantWorkspaceMode(tenantId)
+    if (isSupplifyV2() && workspaceMode === 'buyer_only') {
+      features = applyBuyerOnlyFeatureOverlay(features, workspaceMode)
+    }
+  }
 
   fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
   fillMissingFreeTierLimits(limitsBeforeAddons, tenantType, subscription.plan_code)
@@ -923,6 +937,9 @@ export async function getEntitlements(tenantId, tenantType) {
               : null,
           }
         : null,
+    workspaceMode,
+    supplifyModelVersion: getSupplifyModelVersion(),
+    isBuyerOnlyWorkspace: isSupplifyV2() && workspaceMode === 'buyer_only',
   }
 }
 

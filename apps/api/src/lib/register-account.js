@@ -25,7 +25,7 @@ export function slugifyName(name) {
   return base || 'organization'
 }
 
-async function uniqueSlug(client, table, baseSlug) {
+export async function uniqueSlug(client, table, baseSlug) {
   let slug = baseSlug
   let n = 0
   while (n < 100) {

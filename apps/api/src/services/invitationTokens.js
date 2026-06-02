@@ -3,7 +3,7 @@ import { config } from '../config/env.js'
 
 export const INVITE_TTL_DAYS = 7
 
-/** @typedef {'supplier_branch' | 'restaurant_member' | 'restaurant_branch'} InviteType */
+/** @typedef {'supplier_branch' | 'restaurant_member' | 'restaurant_branch' | 'supplier_restaurant'} InviteType */
 
 const INVITE_TYPE_ALIASES = {
   sb: 'supplier_branch',
@@ -12,6 +12,8 @@ const INVITE_TYPE_ALIASES = {
   restaurant_member: 'restaurant_member',
   rb: 'restaurant_branch',
   restaurant_branch: 'restaurant_branch',
+  sr: 'supplier_restaurant',
+  supplier_restaurant: 'supplier_restaurant',
 }
 
 export function normalizeInviteType(type) {
@@ -39,7 +41,9 @@ export function buildInviteUrl(token, type) {
       ? 'rm'
       : normalized === 'restaurant_branch'
         ? 'rb'
-        : 'sb'
+        : normalized === 'supplier_restaurant'
+          ? 'sr'
+          : 'sb'
   return `${base}/invite?token=${encodeURIComponent(token)}&type=${typeParam}`
 }
 

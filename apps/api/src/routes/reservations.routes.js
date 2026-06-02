@@ -24,8 +24,11 @@ import {
 } from '../lib/reservation-booking-hours.js'
 import { readBookingMeta } from '../lib/reservation-availability.js'
 import { getLocalDayBounds, parseBoardDateParam } from '../lib/reservation-board-date.js'
+import { requireFullRestaurantWorkspace } from '../middlewares/restaurantWorkspaceAccess.js'
 
 const router = express.Router()
+
+router.use(requireFullRestaurantWorkspace())
 
 /** pg uuid[] may arrive as a JS array or a "{uuid,...}" string depending on driver/settings. */
 function normalizeUuidArray(value) {

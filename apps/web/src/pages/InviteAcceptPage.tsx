@@ -23,8 +23,10 @@ import {
   isLegalAcceptanceComplete,
 } from '../components/legal/LegalAcceptancePanel'
 import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
+import { useSupplifyModel } from '../hooks/useSupplifyModel'
 
 export function InviteAcceptPage() {
+  const { isV2, config } = useSupplifyModel()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
   const type = normalizeInviteTypeParam(searchParams.get('type'))
@@ -54,6 +56,7 @@ export function InviteAcceptPage() {
   const orgLabel = invite?.org_name
   const isRestaurantMember = type === 'rm'
   const isRestaurantBranch = type === 'rb'
+  const isSupplierRestaurant = type === 'sr'
   const loginHref = `/login?${searchParams.toString()}`
   const invitePath = `/invite?${searchParams.toString()}`
 
@@ -112,11 +115,20 @@ export function InviteAcceptPage() {
     )
   }
 
-  const headline = isRestaurantMember
-    ? `You've been invited to join ${branchLabel} as ${invite.role_name}`
-    : isRestaurantBranch
-      ? `You've been invited to manage ${branchLabel}${orgLabel ? ` — ${orgLabel}` : ''}`
-      : `You've been invited to join ${branchLabel}${orgLabel ? ` (${orgLabel})` : ''} as ${invite.role_name}`
+  const restaurantCopy = config.restaurant as {
+    buyerInviteHeadline?: string
+    buyerInviteBody?: string
+  }
+  const headline = isSupplierRestaurant
+    ? isV2
+      ? (restaurantCopy.buyerInviteHeadline ??
+        `You were invited by ${orgLabel || invite?.supplier_name || 'a supplier'}`)
+      : `You've been invited by ${orgLabel || 'a supplier'}`
+    : isRestaurantMember
+      ? `You've been invited to join ${branchLabel} as ${invite.role_name}`
+      : isRestaurantBranch
+        ? `You've been invited to manage ${branchLabel}${orgLabel ? ` — ${orgLabel}` : ''}`
+        : `You've been invited to join ${branchLabel}${orgLabel ? ` (${orgLabel})` : ''} as ${invite.role_name}`
 
   const handleAcceptLoggedIn = async () => {
     setError(null)

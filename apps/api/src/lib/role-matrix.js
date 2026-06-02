@@ -68,6 +68,23 @@ export const RESTAURANT_SYSTEM_ROLES = [
     ],
   },
   {
+    name: 'Restaurant Buyer',
+    legacyNames: ['Restaurant Buyer', 'Buyer', 'buyer_only'],
+    description:
+      'V2 buyer-only: order from invited supplier stores; no staff, reservations, or full workspace ops',
+    permissions: [
+      P.ORDERS_VIEW,
+      P.ORDERS_CREATE,
+      P.ORDERS_EDIT,
+      P.CATALOG_VIEW,
+      P.INVOICES_VIEW,
+      P.CHAT_VIEW,
+      P.CHAT_SEND,
+      P.SETTINGS_VIEW,
+      P.SUBSCRIPTIONS_VIEW,
+    ],
+  },
+  {
     name: 'Receiving Staff',
     legacyNames: ['Inventory Clerk'],
     description: 'Receive deliveries and open receiving disputes; cannot create orders or billing',

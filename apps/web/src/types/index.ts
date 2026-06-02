@@ -1053,6 +1053,9 @@ export interface Entitlements {
   usage: Record<string, number>
   usageWindowMeta?: Record<string, { date?: string }>
   freeSandbox?: { expiresAt: string | null } | null
+  workspaceMode?: 'full' | 'buyer_only'
+  supplifyModelVersion?: 'v1' | 'v2'
+  isBuyerOnlyWorkspace?: boolean
 }
 
 export interface AdminFeatureFlag {

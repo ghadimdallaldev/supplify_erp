@@ -120,6 +120,21 @@ router.get('/', optionalAuth, async (req, res) => {
         if (restaurantId) {
           patchRequestLogTenant(req, restaurantId, 'RESTAURANT')
 
+          const { isSupplifyV2 } = await import('../config/supplifyModel.js')
+          const { isBuyerOnlyRestaurant, getLinkedSupplierIdsForRestaurant } = await import(
+            '../lib/restaurant-workspace.js'
+          )
+          if (isSupplifyV2() && (await isBuyerOnlyRestaurant(restaurantId))) {
+            const linkedIds = await getLinkedSupplierIdsForRestaurant(restaurantId)
+            if (linkedIds.length === 0) {
+              whereConditions.push('1 = 0')
+            } else {
+              whereConditions.push(`s.id = ANY($${paramIndex}::uuid[])`)
+              queryParams.push(linkedIds)
+              paramIndex++
+            }
+          }
+
           // Exclude blocklisted suppliers
           whereConditions.push(`
             NOT EXISTS (
