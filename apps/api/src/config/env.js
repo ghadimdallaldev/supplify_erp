@@ -221,6 +221,8 @@ export const config = {
   MEMORY_WARN_RSS_MB: envInt(process.env.MEMORY_WARN_RSS_MB, 512),
   MEMORY_LOG_INTERVAL_MS: envInt(process.env.MEMORY_LOG_INTERVAL_MS, 5 * 60 * 1000),
   DATABASE_POOL_MAX: envInt(process.env.DATABASE_POOL_MAX, 20),
+  /** Log structured slow-request breakdown when total pipeline exceeds this (ms). */
+  SLOW_REQUEST_MS: envInt(process.env.SLOW_REQUEST_MS, 800),
   CRONS_ENABLED: envBool(process.env.CRONS_ENABLED, true),
   CRON_SCHEDULED_ORDERS_INTERVAL_MS: envInt(
     process.env.CRON_SCHEDULED_ORDERS_INTERVAL_MS,

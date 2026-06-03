@@ -650,7 +650,13 @@ router.get('/', async (req, res) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
-    const sql = `
+    const needsItemJoin =
+      tenant?.tenantType === 'SUPPLIER' ||
+      (params.supplier && req.userData.role === 'ADMIN' && !tenant) ||
+      Boolean(params.q?.trim())
+
+    const sql = needsItemJoin
+      ? `
       SELECT DISTINCT
         o.*,
         r.name as restaurant_name,
@@ -659,6 +665,17 @@ router.get('/', async (req, res) => {
       JOIN restaurant r ON r.id = o.restaurant_id
       LEFT JOIN order_item oi ON oi.order_id = o.id
       LEFT JOIN product p ON p.id = oi.product_id
+      ${whereClause}
+      ORDER BY o.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+      : `
+      SELECT
+        o.*,
+        r.name as restaurant_name,
+        r.slug as restaurant_slug
+      FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
       ${whereClause}
       ORDER BY o.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -712,12 +729,18 @@ router.get('/', async (req, res) => {
       items: itemsByOrder[order.id] || [],
     }))
 
-    // Get total count for pagination
-    const countSql = `
+    const countSql = needsItemJoin
+      ? `
       SELECT COUNT(DISTINCT o.id) as total
       FROM customer_order o
       LEFT JOIN order_item oi ON oi.order_id = o.id
       LEFT JOIN product p ON p.id = oi.product_id
+      ${whereClause}
+    `
+      : `
+      SELECT COUNT(*)::int as total
+      FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
       ${whereClause}
     `
 

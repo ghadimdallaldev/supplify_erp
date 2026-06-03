@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { getCache, setCache, deleteCache } from '../lib/cache.js'
 import { logger } from '../lib/logger.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
 import { getEntitlements, isFeatureEnabled } from '../lib/subscription.js'
@@ -210,10 +211,24 @@ function mapPreferencesRow(row) {
   return Object.fromEntries(entries)
 }
 
+const NOTIFICATION_PREFS_CACHE_TTL = 60
+
+function notificationPrefsCacheKey(userId, userType) {
+  return `prefs:${userId}:${userType}`
+}
+
+export async function invalidateNotificationPreferencesCache(userId, userType) {
+  await deleteCache(notificationPrefsCacheKey(userId, userType)).catch(() => {})
+}
+
 /**
  * Ensure notification preferences row exists for a user
  */
 export async function ensureNotificationPreferences(userId, userType) {
+  const cacheKey = notificationPrefsCacheKey(userId, userType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null) return cached
+
   const { rows } = await query(
     `
       SELECT *
@@ -224,6 +239,7 @@ export async function ensureNotificationPreferences(userId, userType) {
   )
 
   if (rows.length) {
+    await setCache(cacheKey, rows[0], NOTIFICATION_PREFS_CACHE_TTL).catch(() => {})
     return rows[0]
   }
 
@@ -238,6 +254,7 @@ export async function ensureNotificationPreferences(userId, userType) {
     [userId, userType]
   )
 
+  await setCache(cacheKey, inserted[0], NOTIFICATION_PREFS_CACHE_TTL).catch(() => {})
   return inserted[0]
 }
 
