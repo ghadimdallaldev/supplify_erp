@@ -612,16 +612,25 @@ export function resolveTenantContext(req, res, next) {
           requestId: req.requestId,
         })
       }
-      await ensurePrimaryContactOwnerRole(
-        req.userData.id,
-        req.userData.email,
-        tenant.tenantId,
-        tenant.tenantType
-      )
 
-      await ensureTenantSystemRoles(tenant.tenantId, tenant.tenantType).catch(() => {})
-
+      // Fetch roles first so we can skip "ensure" setup queries on the hot path.
+      // ensurePrimaryContactOwnerRole and ensureTenantSystemRoles are idempotent setup
+      // helpers that write to the DB; running them on every request is expensive. We
+      // only need them when the user has no roles yet (first login / new tenant).
       let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+
+      if (roles.length === 0) {
+        // Cold path: user has no roles — run setup helpers then re-fetch.
+        await ensurePrimaryContactOwnerRole(
+          req.userData.id,
+          req.userData.email,
+          tenant.tenantId,
+          tenant.tenantType
+        )
+        await ensureTenantSystemRoles(tenant.tenantId, tenant.tenantType).catch(() => {})
+        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+      }
+
       let permissions = await getPermissionsForUser(
         req.userData.id,
         tenant.tenantId,

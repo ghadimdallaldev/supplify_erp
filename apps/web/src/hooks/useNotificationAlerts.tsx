@@ -16,7 +16,7 @@ import { registerServiceWorker } from '../lib/registerServiceWorker'
 import { getAppSocket } from '../lib/appSocket'
 
 const POLL_CONNECTED_MS = 60_000
-const POLL_DISCONNECTED_MS = 12_000
+const POLL_DISCONNECTED_MS = 30_000
 const PERMISSION_PROMPT_KEY = 'supplify_notif_permission_asked'
 
 function showNotificationToast(notification: NotificationLike, onNavigate: (path: string) => void) {
@@ -107,7 +107,8 @@ export function useNotificationAlerts() {
     {
       skip: !user,
       pollingInterval: pollMs,
-      refetchOnFocus: true,
+      skipPollingIfUnfocused: true,
+      refetchOnFocus: false,
       refetchOnReconnect: true,
     }
   )

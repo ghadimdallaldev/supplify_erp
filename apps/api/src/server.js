@@ -55,6 +55,7 @@ import { billingRoutes } from './routes/billing.routes.js'
 import { ensureOrderCancellationColumns } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
+import { e2eRoutes } from './routes/e2e.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
 import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
@@ -134,6 +135,23 @@ const isProduction = config.NODE_ENV === 'production'
 if (config.TRUST_PROXY) {
   app.set('trust proxy', 1)
 }
+
+// Diagnostic timing middleware — registered first so it measures the full pipeline cost.
+// Emits: [PERF] METHOD /path → Xms
+app.use((req, res, next) => {
+  const startNs = process.hrtime.bigint()
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startNs) / 1_000_000
+    logger.info(`[PERF] ${req.method} ${req.path} → ${durationMs.toFixed(1)}ms`, {
+      event: 'request.perf',
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      durationMs: Math.round(durationMs),
+    })
+  })
+  next()
+})
 
 // Security middleware
 app.use(
