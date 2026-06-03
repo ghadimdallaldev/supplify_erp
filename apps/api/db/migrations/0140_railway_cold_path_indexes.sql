@@ -18,8 +18,9 @@ CREATE INDEX IF NOT EXISTS idx_staff_document_restaurant_uploaded
 CREATE INDEX IF NOT EXISTS idx_customer_order_restaurant_placed
   ON customer_order (restaurant_id, placed_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_customer_order_supplier_placed
-  ON customer_order (supplier_id, placed_at DESC);
+-- supplier_id is on order_item, not customer_order (see 0001_init.sql)
+CREATE INDEX IF NOT EXISTS idx_order_item_supplier_order
+  ON order_item (supplier_id, order_id);
 
 CREATE INDEX IF NOT EXISTS idx_disputes_restaurant_created
   ON disputes (restaurant_id, created_at DESC);
