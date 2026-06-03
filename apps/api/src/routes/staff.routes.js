@@ -2203,6 +2203,7 @@ router.get('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asyn
           JOIN staff_member m ON m.id = d.staff_id
           WHERE d.restaurant_id = $1
           ORDER BY d.uploaded_at DESC
+          LIMIT 100
         `,
       [restaurantId]
     )

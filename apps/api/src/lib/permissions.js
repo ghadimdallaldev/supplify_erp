@@ -12,19 +12,26 @@ import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
 export { PERMISSION_KEYS }
 
 const PERMISSION_CACHE_TTL_SECONDS = 300
+const ROLES_CACHE_TTL_SECONDS = 120
 
 export function permissionCacheKey(userId, tenantId, tenantType) {
   return `perms:${userId}:${tenantId}:${tenantType}`
+}
+
+export function rolesCacheKey(userId, tenantId, tenantType) {
+  return `roles:${userId}:${tenantId ?? 'null'}:${tenantType}`
 }
 
 export async function invalidateUserPermissionCache(userId, tenantId, tenantType) {
   if (!userId || tenantType === 'ADMIN') {
     if (tenantType === 'ADMIN') {
       await deleteCache(permissionCacheKey(userId, null, 'ADMIN'))
+      await deleteCache(rolesCacheKey(userId, null, 'ADMIN'))
     }
     return
   }
   await deleteCache(permissionCacheKey(userId, tenantId, tenantType))
+  await deleteCache(rolesCacheKey(userId, tenantId, tenantType))
 }
 
 async function getLegacyRolesForUser(userId, tenantId, tenantType) {
@@ -89,14 +96,38 @@ function mergeUniquePermissions(...lists) {
 
 /**
  * Get role codes for a user in a tenant context.
+ * @param {import('express').Request} [req] Optional request for per-request memoization.
  */
-export async function getRolesForUser(userId, tenantId, tenantType) {
+export async function getRolesForUser(userId, tenantId, tenantType, req = null) {
+  const memoKey = `${userId}:${tenantId}:${tenantType}`
+  if (req?._rolesMemoKey === memoKey && Array.isArray(req._rolesMemo)) {
+    return req._rolesMemo
+  }
   try {
+    const cacheKey = rolesCacheKey(userId, tenantId, tenantType)
+    const cached = await getCache(cacheKey)
+    if (Array.isArray(cached)) {
+      if (req) {
+        req._rolesMemoKey = memoKey
+        req._rolesMemo = cached
+      }
+      return cached
+    }
+
+    let roles
     if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
       const named = await getTenantNamedRoleCodes(userId, tenantId, tenantType)
-      if (named.length > 0) return named
+      roles = named.length > 0 ? named : await getLegacyRolesForUser(userId, tenantId, tenantType)
+    } else {
+      roles = await getLegacyRolesForUser(userId, tenantId, tenantType)
     }
-    return await getLegacyRolesForUser(userId, tenantId, tenantType)
+
+    await setCache(cacheKey, roles, ROLES_CACHE_TTL_SECONDS).catch(() => {})
+    if (req) {
+      req._rolesMemoKey = memoKey
+      req._rolesMemo = roles
+    }
+    return roles
   } catch (err) {
     if (err.code === '42P01') return []
     logger.error('getRolesForUser error', { error: err.message })

@@ -60,7 +60,9 @@ export function Layout() {
       import('../pages/InventoryPage')
       import('../pages/disputes/DisputesPage')
       import('../pages/reports/ReportsPage')
-    }, 2000)
+      import('../pages/ProductsPage')
+      import('../pages/ReservationsPage')
+    }, 500)
     return () => clearTimeout(t)
   }, [])
 

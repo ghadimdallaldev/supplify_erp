@@ -98,7 +98,13 @@ export async function getUserBySub(sub, req = null) {
       return cached === 'null' ? null : cached
     }
 
+    const lookupStart = req?._perf ? process.hrtime.bigint() : null
     const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub], req)
+    if (lookupStart != null && req?._perf) {
+      req._perf.stages.userLookup = Math.round(
+        Number(process.hrtime.bigint() - lookupStart) / 1_000_000
+      )
+    }
     const user = result.rows[0] || null
     await setCache(cacheKey, user ?? 'null', USER_BY_SUB_CACHE_TTL).catch(() => {})
     return user
@@ -713,7 +719,7 @@ export function resolveTenantContext(req, res, next) {
       // ensurePrimaryContactOwnerRole and ensureTenantSystemRoles are idempotent setup
       // helpers that write to the DB; running them on every request is expensive. We
       // only need them when the user has no roles yet (first login / new tenant).
-      let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+      let roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
 
       if (roles.length === 0) {
         // Cold path: user has no roles — run setup helpers then re-fetch.
@@ -724,7 +730,7 @@ export function resolveTenantContext(req, res, next) {
           tenant.tenantType
         )
         await ensureTenantSystemRoles(tenant.tenantId, tenant.tenantType).catch(() => {})
-        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+        roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
       }
 
       let permissions = await getPermissionsForUser(
@@ -760,7 +766,7 @@ export function resolveTenantContext(req, res, next) {
         )
         if (isPrimary) {
           await assignDefaultRoleForTenant(req.userData.id, tenant.tenantId, tenant.tenantType)
-          roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType)
+          roles = await getRolesForUser(req.userData.id, tenant.tenantId, tenant.tenantType, req)
           permissions = await getPermissionsForUser(
             req.userData.id,
             tenant.tenantId,

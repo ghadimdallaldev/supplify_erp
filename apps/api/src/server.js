@@ -80,7 +80,7 @@ import { expireOldRestaurantInvitations } from './lib/restaurant-invitations.js'
 import { runCronJob, CRON_JOBS } from './lib/cron-runner.js'
 import path from 'node:path'
 import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
-import { pool, closePool } from './lib/db.js'
+import { pool, closePool, warmupPool, startPoolKeepalive, stopPoolKeepalive } from './lib/db.js'
 import { requestTimingMiddleware } from './middlewares/request-timing.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
 import { runFullStartupMigrations } from './lib/startup-migrations.js'
@@ -416,6 +416,7 @@ async function gracefulShutdown(signal) {
     clearInterval(timer)
   }
   stopMemoryMonitor()
+  stopPoolKeepalive()
 
   await new Promise((resolve) => {
     server.close(() => resolve())
@@ -463,6 +464,12 @@ server.listen(PORT, HOST, () => {
     webOrigin: config.WEB_ORIGIN,
     paymentsMode: config.PAYMENTS_MODE,
   })
+
+  warmupPool()
+    .then(() => startPoolKeepalive())
+    .catch((error) => {
+      logger.warn('Database pool warmup failed', { error: error.message })
+    })
 
   runStartupSchemaTasks().catch((error) => {
     logger.error('Startup schema tasks failed', { error: error.message })
