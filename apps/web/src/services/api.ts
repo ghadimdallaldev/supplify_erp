@@ -3419,13 +3419,72 @@ export const api = createApi({
       {
         jobFailures: any[] | null
         webhookFailures: any[] | null
-        emailFailures: any[] | null
+        emailFailures: Array<{
+          id: string
+          tenantId?: string
+          eventType: string
+          status: string
+          recipientRedacted: string
+          errorMessage?: string
+          createdAt: string
+        }> | null
         recentApiErrors: any[]
         dbPool: { total: number; idle: number; waiting: number } | null
       },
       void
     >({
       query: () => '/api/admin-dashboard/health',
+      providesTags: ['Admin'],
+    }),
+    getAdminOperationalSummary: builder.query<{ summary: Record<string, unknown> }, void>({
+      query: () => '/api/admin-dashboard/operational-summary',
+      providesTags: ['Admin'],
+    }),
+    getAdminEmailDeliveryLogs: builder.query<
+      { logs: any[]; total: number; limit: number; offset: number },
+      {
+        limit?: number
+        offset?: number
+        tenantId?: string
+        status?: string
+        eventType?: string
+        since?: string
+      }
+    >({
+      query: (params) => ({ url: '/api/admin-dashboard/operational/email-logs', params }),
+      providesTags: ['Admin'],
+    }),
+    getAdminFulfillmentIssues: builder.query<
+      { issues: any[]; total: number; limit: number; offset: number },
+      { limit?: number; offset?: number; supplierId?: string; restaurantId?: string }
+    >({
+      query: (params) => ({
+        url: '/api/admin-dashboard/operational/fulfillment-issues',
+        params,
+      }),
+      providesTags: ['Admin'],
+    }),
+    getAdminActiveDeliveries: builder.query<{ deliveries: any[] }, { limit?: number } | void>({
+      query: (params) => ({
+        url: '/api/admin-dashboard/operational/active-deliveries',
+        params: params ?? {},
+      }),
+      providesTags: ['Admin'],
+    }),
+    getAdminTenantOperationalSnapshot: builder.query<
+      { snapshot: Record<string, unknown> },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string }
+    >({
+      query: ({ tenantType, tenantId }) =>
+        `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/operational-snapshot`,
+      providesTags: ['Admin'],
+    }),
+    getAdminTenantEntitlements: builder.query<
+      { entitlements: Record<string, unknown>; effectiveFeatures: Record<string, unknown> },
+      { tenantType: 'RESTAURANT' | 'SUPPLIER'; tenantId: string }
+    >({
+      query: ({ tenantType, tenantId }) =>
+        `/api/admin-dashboard/tenants/${tenantType}/${tenantId}/entitlements`,
       providesTags: ['Admin'],
     }),
     getAdminFinancialOverview: builder.query<
@@ -3929,6 +3988,12 @@ export const {
   useGetAdminAuditLogsQuery,
   useGetAdminActivityQuery,
   useGetAdminHealthQuery,
+  useGetAdminOperationalSummaryQuery,
+  useGetAdminEmailDeliveryLogsQuery,
+  useGetAdminFulfillmentIssuesQuery,
+  useGetAdminActiveDeliveriesQuery,
+  useGetAdminTenantOperationalSnapshotQuery,
+  useGetAdminTenantEntitlementsQuery,
   useGetAdminSuppliersQuery,
   useGetAdminRestaurantsQuery,
   useGetAdminUsersQuery,

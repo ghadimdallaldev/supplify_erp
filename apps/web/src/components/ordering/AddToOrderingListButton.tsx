@@ -4,8 +4,8 @@ import {
   useGetQuickListsQuery,
   useAddItemToQuickListMutation,
   useCreateQuickListMutation,
-} from '../services/api'
-import { Button } from './ui/button'
+} from '../../services/api'
+import { Button } from '../ui/button'
 import toast from 'react-hot-toast'
 
 type Props = {

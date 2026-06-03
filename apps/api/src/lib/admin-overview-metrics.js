@@ -1,6 +1,7 @@
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { config } from '../config/env.js'
+import { buildAdminOperationalOverviewCounters } from './admin-operational-metrics.js'
 
 const PAID_PLAN_EXCLUDE = `LOWER(sp.code) NOT IN ('free', 'enterprise')`
 
@@ -246,6 +247,7 @@ export async function buildAdminOverviewMetrics() {
       pendingDealPayments: parseInt(pendingPaymentDealStatsRows[0]?.count, 10) || 0,
       overdueInvoices: parseInt(overdueInvoiceStatsRows[0]?.count, 10) || 0,
     },
+    operational: await buildAdminOperationalOverviewCounters(),
     activity: {
       ordersLast24h: parseInt(orderRow.today, 10) || 0,
       chatsLast24h: parseInt(chatStatsRows[0]?.count, 10) || 0,
