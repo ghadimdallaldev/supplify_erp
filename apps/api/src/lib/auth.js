@@ -10,6 +10,30 @@ let keycloakConfig = null
 /** @type {Promise<object> | null} */
 let keycloakConfigInflight = null
 
+/** @type {Map<string, ReturnType<typeof createRemoteJWKSet>>} */
+const jwksByUri = new Map()
+
+/** Reuse JWKS fetcher per realm — avoid Keycloak /certs round-trip on every API request. */
+function getRemoteJwks(jwksUri) {
+  const uri = String(jwksUri || '').trim()
+  if (!uri) {
+    throw new Error('Missing jwks_uri in Keycloak configuration')
+  }
+  let jwks = jwksByUri.get(uri)
+  if (!jwks) {
+    jwks = createRemoteJWKSet(new URL(uri))
+    jwksByUri.set(uri, jwks)
+  }
+  return jwks
+}
+
+/** @internal Test helper */
+export function resetAuthRuntimeCachesForTests() {
+  keycloakConfig = null
+  keycloakConfigInflight = null
+  jwksByUri.clear()
+}
+
 // Get Keycloak configuration values
 function getKeycloakValues() {
   return {
@@ -183,7 +207,7 @@ export async function verifyToken(token) {
 
     // Use issuer from token so we match Keycloak's exact format (with or without trailing slash)
     const verifyIssuer = payload.iss || config.issuer
-    const JWKS = createRemoteJWKSet(new URL(config.jwks_uri))
+    const JWKS = getRemoteJwks(config.jwks_uri)
 
     // Accept API or Web client (Keycloak may set aud/azp for either depending on flow)
     const acceptableAudiences = [KEYCLOAK_CLIENT_ID, 'supplify-web']
