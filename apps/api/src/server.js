@@ -52,11 +52,7 @@ import { runSubscriptionBillingJob } from './jobs/subscription-billing.job.js'
 import { checkExpiredWaitlistOffers } from './services/waitlistPromotion.js'
 import { billingAccessMiddleware } from './middlewares/billingAccess.js'
 import { billingRoutes } from './routes/billing.routes.js'
-import {
-  ensureReservationsSchema,
-  ensureStaffAppSchema,
-  ensureOrderCancellationColumns,
-} from './lib/migrator.js'
+import { ensureOrderCancellationColumns } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { e2eRoutes } from './routes/e2e.routes.js'
@@ -87,7 +83,7 @@ import path from 'node:path'
 import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
 import { pool, closePool } from './lib/db.js'
 import { disconnectCache, isRedisConnected } from './lib/cache.js'
-import { baseSchemaExists, runAllSqlMigrations } from './lib/sql-migrator.js'
+import { runFullStartupMigrations } from './lib/startup-migrations.js'
 import {
   getMemorySnapshot,
   shouldExposeMemoryOnHealth,
@@ -109,17 +105,7 @@ async function runStartupSchemaTasks() {
   if (config.NODE_ENV === 'test') return
 
   try {
-    const hasBaseSchema = await baseSchemaExists()
-    if (config.RUN_MIGRATIONS_ON_START || !hasBaseSchema) {
-      logger.info('Running SQL migrations on startup', {
-        runMigrationsOnStart: config.RUN_MIGRATIONS_ON_START,
-        baseSchemaExists: hasBaseSchema,
-      })
-      await runAllSqlMigrations()
-    }
-
-    await ensureReservationsSchema()
-    await ensureStaffAppSchema()
+    await runFullStartupMigrations()
     await ensureOrderCancellationColumns()
   } catch (error) {
     logger.error('Database migration failed after listen — shutting down', {
