@@ -62,6 +62,9 @@ import {
   Calendar,
   Store,
   ListOrdered,
+  Mail,
+  MapPin,
+  Stethoscope,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { notifyAdminPlanSaveError, notifyAdminPlanSaveSuccess } from '../lib/adminPlanSaveFeedback'
@@ -82,6 +85,9 @@ import { AdminOverviewExtras } from '../components/admin/AdminOverviewExtras'
 import { AdminPortalNav } from '../components/admin/AdminPortalNav'
 import { AdminPlatformSettingsPanel } from '../components/admin/AdminPlatformSettingsPanel'
 import { AdminUsersTab } from '../components/admin/AdminUsersTab'
+import { AdminOperationsPanel } from '../components/admin/AdminOperationsPanel'
+import { AdminTenantDiagnosticsDrawer } from '../components/admin/AdminTenantDiagnosticsDrawer'
+import type { AdminTenantType } from '../lib/adminTenantSearch'
 import {
   AdminResetPasswordDialog,
   type AdminResetPasswordTarget,
@@ -109,6 +115,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     deals: can('ADMIN_GROWTH'),
     limits: can('ADMIN_PLANS'),
     health: can('ADMIN_ACCESS'),
+    operations: can('ADMIN_ACCESS'),
     audit: can('ADMIN_ACCESS'),
   }
 
@@ -161,13 +168,21 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
     refetch: refetchOverview,
     isFetching: overviewFetching,
   } = useGetAdminOverviewQuery(undefined, {
-    skip: selectedTab !== 'overview' && selectedTab !== 'health',
+    skip: selectedTab !== 'overview' && selectedTab !== 'health' && selectedTab !== 'operations',
   })
   const [overviewLastUpdated, setOverviewLastUpdated] = useState<Date | null>(null)
   const [tenantSearch, setTenantSearch] = useState('')
   const [passwordResetTarget, setPasswordResetTarget] = useState<AdminResetPasswordTarget | null>(
     null
   )
+  const [operationsSubTab, setOperationsSubTab] = useState<
+    'summary' | 'email' | 'inventory' | 'fulfillment' | 'gps'
+  >('summary')
+  const [tenantDiag, setTenantDiag] = useState<{
+    id: string
+    tenantType: AdminTenantType
+    name: string
+  } | null>(null)
 
   useEffect(() => {
     if (overview && !overviewLoading) {
@@ -602,6 +617,9 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                   {canAdminTab.features && <TabsTrigger value="features">Features</TabsTrigger>}
                   {canAdminTab.deals && <TabsTrigger value="deals">Deals</TabsTrigger>}
                   {canAdminTab.limits && <TabsTrigger value="limits">Limits</TabsTrigger>}
+                  {canAdminTab.operations && (
+                    <TabsTrigger value="operations">Operations</TabsTrigger>
+                  )}
                   {canAdminTab.health && <TabsTrigger value="health">Health</TabsTrigger>}
                   {canAdminTab.audit && <TabsTrigger value="audit">Audit</TabsTrigger>}
                 </>
@@ -844,6 +862,75 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                         {overview?.orders?.total ?? 0}
                       </p>
                       <p className="text-xs text-[var(--text-muted)] mt-2">All time (non-draft)</p>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Operational health (links to Operations tab) */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">
+                    Operational health
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card
+                      className="p-5 cursor-pointer hover:border-[var(--brand-mid)] transition-colors"
+                      onClick={() => {
+                        setOperationsSubTab('email')
+                        setSelectedTab('operations')
+                      }}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <Mail className="h-4 w-4 text-[var(--brand)]" />
+                        <span className="text-sm text-[var(--text-muted)]">Email failed (24h)</span>
+                      </div>
+                      <p className="text-2xl font-black">
+                        {overview?.operational?.emailFailed24h ?? 0}
+                      </p>
+                    </Card>
+                    <Card
+                      className="p-5 cursor-pointer hover:border-[var(--brand-mid)] transition-colors"
+                      onClick={() => {
+                        setOperationsSubTab('fulfillment')
+                        setSelectedTab('operations')
+                      }}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <Package className="h-4 w-4 text-[var(--brand)]" />
+                        <span className="text-sm text-[var(--text-muted)]">Fulfillment issues</span>
+                      </div>
+                      <p className="text-2xl font-black">
+                        {overview?.operational?.openFulfillmentIssues ?? 0}
+                      </p>
+                    </Card>
+                    <Card
+                      className="p-5 cursor-pointer hover:border-[var(--brand-mid)] transition-colors"
+                      onClick={() => {
+                        setOperationsSubTab('gps')
+                        setSelectedTab('operations')
+                      }}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <MapPin className="h-4 w-4 text-[var(--brand)]" />
+                        <span className="text-sm text-[var(--text-muted)]">Stale GPS</span>
+                      </div>
+                      <p className="text-2xl font-black">
+                        {overview?.operational?.staleGpsDeliveries ?? 0}
+                      </p>
+                    </Card>
+                    <Card
+                      className="p-5 cursor-pointer hover:border-[var(--brand-mid)] transition-colors"
+                      onClick={() => {
+                        setOperationsSubTab('inventory')
+                        setSelectedTab('operations')
+                      }}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <AlertCircle className="h-4 w-4 text-[var(--brand)]" />
+                        <span className="text-sm text-[var(--text-muted)]">Expired lots</span>
+                      </div>
+                      <p className="text-2xl font-black">
+                        {overview?.operational?.expiredInventoryLots ?? 0}
+                      </p>
                     </Card>
                   </div>
                 </div>
@@ -1636,6 +1723,13 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
             )}
           </TabsContent>
 
+          <TabsContent value="operations" className="space-y-5">
+            <AdminOperationsPanel
+              initialSubTab={operationsSubTab}
+              onNavigateDeals={() => setSelectedTab('deals')}
+            />
+          </TabsContent>
+
           <TabsContent value="health" className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
@@ -1799,6 +1893,38 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                       </span>
                     )}
                   </div>
+                  {healthData?.emailFailures?.length ? (
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold text-[var(--text)] mb-2">
+                        Email failures (24h)
+                      </p>
+                      <div className="rounded-lg overflow-hidden border border-[var(--app-border)]">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr style={{ background: 'var(--surface-mid)' }}>
+                              <th className="text-left px-3 py-2">Event</th>
+                              <th className="text-left px-3 py-2">Recipient</th>
+                              <th className="text-left px-3 py-2">Error</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--app-border)]">
+                            {healthData.emailFailures.map((e: any, i: number) => (
+                              <tr key={e.id || i}>
+                                <td className="px-3 py-2">{e.eventType}</td>
+                                <td className="px-3 py-2 font-mono">{e.recipientRedacted}</td>
+                                <td className="px-3 py-2 truncate max-w-[200px]">
+                                  {e.errorMessage || '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] mt-2">
+                        Job and webhook failure collectors are not configured yet.
+                      </p>
+                    </div>
+                  ) : null}
                   {!healthData?.recentApiErrors?.length ? (
                     <p className="text-sm text-[var(--text-muted)]">
                       {healthData
@@ -2214,6 +2340,21 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                         <Button
                                           size="sm"
                                           variant="outline"
+                                          title="Operational diagnostics"
+                                          onClick={() =>
+                                            setTenantDiag({
+                                              id: supplier.id,
+                                              tenantType: 'SUPPLIER',
+                                              name: supplier.name,
+                                            })
+                                          }
+                                        >
+                                          <Stethoscope className="h-4 w-4 mr-1" />
+                                          Diagnostics
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
                                           title="View as this supplier"
                                           onClick={() =>
                                             handleStartImpersonation(
@@ -2403,6 +2544,21 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
                                     </td>
                                     <td className="py-3 px-4">
                                       <div className="flex flex-wrap gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          title="Operational diagnostics"
+                                          onClick={() =>
+                                            setTenantDiag({
+                                              id: restaurant.id,
+                                              tenantType: 'RESTAURANT',
+                                              name: restaurant.name,
+                                            })
+                                          }
+                                        >
+                                          <Stethoscope className="h-4 w-4 mr-1" />
+                                          Diagnostics
+                                        </Button>
                                         <Button
                                           size="sm"
                                           variant="outline"
@@ -3519,6 +3675,23 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
           onOpenChange={(open) => !open && setPasswordResetTarget(null)}
           target={passwordResetTarget}
         />
+        {tenantDiag && (
+          <AdminTenantDiagnosticsDrawer
+            open={Boolean(tenantDiag)}
+            onOpenChange={(open) => !open && setTenantDiag(null)}
+            tenantId={tenantDiag.id}
+            tenantType={tenantDiag.tenantType}
+            tenantName={tenantDiag.name}
+            onNavigateLimits={() => {
+              setTenantDiag(null)
+              setSelectedTab('limits')
+            }}
+            onNavigateFeatures={() => {
+              setTenantDiag(null)
+              setSelectedTab('features')
+            }}
+          />
+        )}
       </div>
     </div>
   )

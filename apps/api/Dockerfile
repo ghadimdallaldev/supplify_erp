@@ -38,9 +38,8 @@ COPY --from=builder --chown=supplify:nodejs /app/apps/api/node_modules ./apps/ap
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/src ./apps/api/src
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/db/migrations ./apps/api/db/migrations
-COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/migrate.js ./apps/api/scripts/migrate.js
-COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/run-migration.js ./apps/api/scripts/run-migration.js
-COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/lib ./apps/api/scripts/lib
+# Full scripts tree: migrate.js, role/org backfills, and Railway shell one-offs (run-migration.js)
+COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts ./apps/api/scripts
 # Railway runtime defaults (api.env per env) + in-process cron config (CRONS_ENABLED, CRON_*)
 COPY --from=builder --chown=supplify:nodejs /app/deploy/railway ./deploy/railway
 

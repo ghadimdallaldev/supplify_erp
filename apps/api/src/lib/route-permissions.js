@@ -97,6 +97,7 @@ export function resolveAdminDashboardPermission(path) {
   ) {
     return P.ADMIN_PLANS
   }
+  if (p.startsWith('/operational')) return P.ADMIN_ACCESS
   if (p.startsWith('/tenants')) return P.ADMIN_TENANTS
   if (p.startsWith('/users')) return P.ADMIN_SUPPORT
   if (p.startsWith('/impersonate')) return P.ADMIN_SUPPORT
