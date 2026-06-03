@@ -52,7 +52,8 @@ export function ReservationsPage() {
     refetch,
   } = useGetReservationBoardQuery(boardQueryArgs, {
     pollingInterval: 30_000,
-    refetchOnFocus: true,
+    skipPollingIfUnfocused: true,
+    refetchOnFocus: false,
     refetchOnReconnect: true,
   })
   const { data: analytics, refetch: refetchAnalytics } = useGetReservationAnalyticsQuery({

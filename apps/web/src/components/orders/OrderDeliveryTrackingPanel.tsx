@@ -19,6 +19,7 @@ export function OrderDeliveryTrackingPanel({ orderId, pollIntervalMs = 30_000 }:
   const [pollMs, setPollMs] = useState(pollIntervalMs)
   const { data, isLoading, isError } = useGetOrderTrackingQuery(orderId, {
     pollingInterval: pollMs,
+    skipPollingIfUnfocused: true,
     skip: !orderId,
   })
 

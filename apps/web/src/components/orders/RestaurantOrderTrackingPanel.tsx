@@ -34,6 +34,7 @@ export function RestaurantOrderTrackingPanel({ orderId, orderStatus }: Props) {
   } = useGetOrderTrackingQuery(orderId, {
     skip: !orderId,
     pollingInterval: pollMs,
+    skipPollingIfUnfocused: true,
   })
 
   const data = isRestaurantOrderTracking(rawData) ? rawData : undefined

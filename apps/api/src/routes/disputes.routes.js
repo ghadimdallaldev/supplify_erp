@@ -90,6 +90,8 @@ router.get(
       const supplierId = await requireSupplierId(req)
       const disputes = await listIncomingDisputesForSupplier(supplierId, {
         status: req.query.status,
+        limit: req.query.limit,
+        offset: req.query.offset,
       })
       res.json({ ok: true, data: { disputes }, error: null, requestId: req.requestId })
     } catch (err) {
@@ -136,6 +138,8 @@ router.get(
       const restaurantId = await requireRestaurantId(req)
       const disputes = await listDisputesForRestaurant(restaurantId, {
         status: req.query.status,
+        limit: req.query.limit,
+        offset: req.query.offset,
       })
       res.json({ ok: true, data: { disputes }, error: null, requestId: req.requestId })
     } catch (err) {
