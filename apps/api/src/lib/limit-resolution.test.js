@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import {
   resolveEffectiveLimit,
+  resolveAllEffectiveLimits,
   discoverLimitKeys,
   fillMissingFreeTierLimits,
   formatPlanLimitDisplay,
@@ -96,6 +97,34 @@ describe('limit-resolution', () => {
     })
 
     expect(result.effectiveLimit).toBe(3)
+  })
+
+  it('resolveAllEffectiveLimits batches plan and tenant overrides', async () => {
+    vi.mocked(query)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            limit_type: 'chats_per_day',
+            override_value: 15,
+            is_active: true,
+            expiration_date: null,
+            id: 'po-1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const all = await resolveAllEffectiveLimits({
+      tenantId: 'tenant-1',
+      tenantType: 'SUPPLIER',
+      limitKeys: ['chats_per_day', 'promotions'],
+      planId: 'plan-1',
+      planLimits: { chats_per_day: 10, promotions: 1 },
+    })
+
+    expect(all.chats_per_day.effectiveLimit).toBe(15)
+    expect(all.promotions.effectiveLimit).toBe(1)
+    expect(vi.mocked(query)).toHaveBeenCalledTimes(2)
   })
 
   it('override cannot reduce below plan default', async () => {

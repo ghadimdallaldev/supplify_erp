@@ -280,3 +280,36 @@ Added `manualChunks` to group `@radix-ui`, `lucide-react`, `react-router`, `@red
 ### Tests
 
 Targeted vitest: request-timing, rbac, permissions, billing, products routes, notifications — run in CI after merge.
+
+---
+
+## Phase 5: Entitlements endpoint (2026-06-03)
+
+**HAR:** Most APIs ~1.1–1.7s after Phase 4; outlier `/api/subscriptions/entitlements` ~6.6s.
+
+### Root cause
+
+`getEntitlements` ran **~26+ sequential DB queries**: one `resolveEffectiveLimit` call per limit key (plan + tenant override each), then usage snapshot queries (open conversations not fully parallelized), features, and addons. Route could call `getEntitlements` twice on cache miss.
+
+### Fixes applied
+
+| Area        | Change                                                                                                                       |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Limits      | `resolveAllEffectiveLimits()` — two batched queries (`ANY(limit_keys)`) instead of N×2                                       |
+| Parallelism | Limits, features, addons, and usage run in one `Promise.all` inside `getEntitlements`                                        |
+| Cache       | Full entitlements payload cached 90s per `tenantId:tenantType` (Redis); invalidated with subscription + feature-flag updates |
+| Org billing | `resolveOrgBillingTenantId` cached 120s                                                                                      |
+| Usage       | Restaurant `open_conversations` count moved into usage `Promise.all`                                                         |
+| Frontend    | RTK `refetchOnMountOrArgChange: false` on `getEntitlements` (5 min `keepUnusedDataFor` unchanged)                            |
+
+### Expected latency
+
+| Request                                              | Target                     |
+| ---------------------------------------------------- | -------------------------- |
+| `/api/subscriptions/entitlements` (cold, Redis miss) | 400–900ms                  |
+| Same (cache hit)                                     | 50–200ms                   |
+| Other typical GETs                                   | Continue toward &lt; 800ms |
+
+### Tests
+
+`limit-resolution.test.js` (batch limits), `subscription.test.js` (getEntitlements overrides), `subscriptions.routes.test.js`.
