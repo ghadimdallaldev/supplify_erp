@@ -83,7 +83,9 @@ export function csrfProtection(req, res, next) {
     return next()
   }
 
-  // Session-backed non-API routes: issue CSRF token in session
+  // Session-backed non-API routes: issue CSRF token in session.
+  // Guard: session is scoped to /auth in server.js; non-API routes outside /auth won't have it.
+  if (!req.session) return next()
   if (!req.session.csrfToken) {
     req.session.csrfToken = randomBytes(32).toString('hex')
   }

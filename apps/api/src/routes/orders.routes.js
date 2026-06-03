@@ -683,16 +683,36 @@ router.get('/', async (req, res) => {
 
     queryParams.push(params.limit, params.offset)
 
-    const { rows } = await query(sql, queryParams)
+    const countSql = needsItemJoin
+      ? `
+      SELECT COUNT(DISTINCT o.id) as total
+      FROM customer_order o
+      LEFT JOIN order_item oi ON oi.order_id = o.id
+      LEFT JOIN product p ON p.id = oi.product_id
+      ${whereClause}
+    `
+      : `
+      SELECT COUNT(*)::int as total
+      FROM customer_order o
+      JOIN restaurant r ON r.id = o.restaurant_id
+      ${whereClause}
+    `
+    const countParams = queryParams.slice(0, -2) // Remove limit and offset
 
-    // Get items for each order
+    // Main list and count are independent — run in parallel.
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query(sql, queryParams),
+      query(countSql, countParams),
+    ])
+
+    // Fetch items for all orders in a single batch query.
     const orderIds = rows.map((order) => order.id)
     let items = []
     if (orderIds.length > 0) {
       try {
         const { rows: itemsRows } = await query(
           `
-          SELECT 
+          SELECT
             oi.*,
             p.name as product_name,
             p.sku as product_sku
@@ -728,24 +748,6 @@ router.get('/', async (req, res) => {
       ...order,
       items: itemsByOrder[order.id] || [],
     }))
-
-    const countSql = needsItemJoin
-      ? `
-      SELECT COUNT(DISTINCT o.id) as total
-      FROM customer_order o
-      LEFT JOIN order_item oi ON oi.order_id = o.id
-      LEFT JOIN product p ON p.id = oi.product_id
-      ${whereClause}
-    `
-      : `
-      SELECT COUNT(*)::int as total
-      FROM customer_order o
-      JOIN restaurant r ON r.id = o.restaurant_id
-      ${whereClause}
-    `
-
-    const countParams = queryParams.slice(0, -2) // Remove limit and offset
-    const { rows: countRows } = await query(countSql, countParams)
 
     res.json({
       ok: true,
@@ -1029,50 +1031,71 @@ router.get('/:id', requireAuth, async (req, res, next) => {
       }
     }
 
-    // Get order items
-    const { rows: items } = await query(
-      `
-      SELECT 
-        oi.*,
-        p.name as product_name,
-        p.sku as product_sku,
-        s.name as supplier_name,
-        s.slug as supplier_slug,
-        pick.location_code
-      FROM order_item oi
-      JOIN product p ON p.id = oi.product_id
-      JOIN supplier s ON s.id = oi.supplier_id
-      LEFT JOIN LATERAL (
-        SELECT pli.location_code
-        FROM pick_list pl
-        JOIN pick_list_item pli ON pli.pick_list_id = pl.id
-        WHERE pl.order_id = oi.order_id
-          AND pli.product_id = oi.product_id
-        ORDER BY pl.created_at DESC
-        LIMIT 1
-      ) pick ON true
-      WHERE oi.order_id = $1
-      ORDER BY s.name, p.name
-    `,
-      [id]
-    )
-
-    const warehouseAssignments = await loadOrderWarehouseAssignments(id)
-
-    const { rows: promotionRows } = await query(
-      `
-      SELECT
-        pu.promotion_id,
-        pu.discount_applied,
-        p.name AS promotion_name,
-        p.type AS promotion_type
-      FROM promotion_usages pu
-      JOIN promotions p ON p.id = pu.promotion_id
-      WHERE pu.order_id = $1
-      LIMIT 1
+    // Fetch all order detail sub-queries in parallel — none depend on each other.
+    const [
+      { rows: items },
+      warehouseAssignments,
+      { rows: promotionRows },
+      { rows: replacementOrders },
+      { rows: disputeRows },
+    ] = await Promise.all([
+      query(
+        `
+        SELECT
+          oi.*,
+          p.name as product_name,
+          p.sku as product_sku,
+          s.name as supplier_name,
+          s.slug as supplier_slug,
+          pick.location_code
+        FROM order_item oi
+        JOIN product p ON p.id = oi.product_id
+        JOIN supplier s ON s.id = oi.supplier_id
+        LEFT JOIN LATERAL (
+          SELECT pli.location_code
+          FROM pick_list pl
+          JOIN pick_list_item pli ON pli.pick_list_id = pl.id
+          WHERE pl.order_id = oi.order_id
+            AND pli.product_id = oi.product_id
+          ORDER BY pl.created_at DESC
+          LIMIT 1
+        ) pick ON true
+        WHERE oi.order_id = $1
+        ORDER BY s.name, p.name
       `,
-      [id]
-    )
+        [id]
+      ),
+      loadOrderWarehouseAssignments(id),
+      query(
+        `
+        SELECT
+          pu.promotion_id,
+          pu.discount_applied,
+          p.name AS promotion_name,
+          p.type AS promotion_type
+        FROM promotion_usages pu
+        JOIN promotions p ON p.id = pu.promotion_id
+        WHERE pu.order_id = $1
+        LIMIT 1
+        `,
+        [id]
+      ),
+      query(
+        `
+        SELECT id, status, placement_source, source_order_id, source_dispute_id, created_at, total_amount
+        FROM customer_order
+        WHERE source_order_id = $1
+        ORDER BY created_at ASC
+        `,
+        [id]
+      ),
+      order.source_dispute_id
+        ? query(`SELECT id, status, resolution_type, order_id FROM disputes WHERE id = $1`, [
+            order.source_dispute_id,
+          ])
+        : Promise.resolve({ rows: [] }),
+    ])
+
     const promotionUsage = promotionRows[0]
     const appliedPromotion = promotionUsage
       ? {
@@ -1083,24 +1106,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
         }
       : null
 
-    const { rows: replacementOrders } = await query(
-      `
-      SELECT id, status, placement_source, source_order_id, source_dispute_id, created_at, total_amount
-      FROM customer_order
-      WHERE source_order_id = $1
-      ORDER BY created_at ASC
-      `,
-      [id]
-    )
-
-    let sourceDispute = null
-    if (order.source_dispute_id) {
-      const { rows: disputeRows } = await query(
-        `SELECT id, status, resolution_type, order_id FROM disputes WHERE id = $1`,
-        [order.source_dispute_id]
-      )
-      sourceDispute = disputeRows[0] || null
-    }
+    const sourceDispute = disputeRows[0] || null
 
     res.json({
       ok: true,
