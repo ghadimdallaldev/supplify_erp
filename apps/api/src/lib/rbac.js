@@ -425,8 +425,19 @@ export async function assignDefaultRoleForTenant(userId, tenantId, tenantType) {
  * @returns {Promise<{ tenantId: string, tenantType: string, tenantName: string } | null>}
  */
 export async function getRequestTenant(req) {
-  if (!req.userData) return null
-  if (req.userData.role === 'PENDING') return null
+  if (req._requestTenantResolved) {
+    return req._requestTenantCache ?? null
+  }
+  req._requestTenantResolved = true
+
+  const finish = (tenant) => {
+    req._requestTenantCache = tenant ?? null
+    return req._requestTenantCache
+  }
+
+  if (!req.userData) return finish(null)
+  if (req.userData.role === 'PENDING') return finish(null)
+
   const effective = getEffectiveTenant(req)
   const activeFromCookie = await getActiveTenantFromRequest(req)
   if (effective && activeFromCookie) {
@@ -436,9 +447,9 @@ export async function getRequestTenant(req) {
       activeFromCookie.tenantId,
       activeFromCookie.tenantType
     )
-    if (branchOk) return activeFromCookie
+    if (branchOk) return finish(activeFromCookie)
   }
-  if (effective) return effective
+  if (effective) return finish(effective)
 
   const branchHeader = req.headers['x-branch-id']
   if (branchHeader && req.userData?.role === 'SUPPLIER') {
@@ -452,12 +463,16 @@ export async function getRequestTenant(req) {
     if (allowed) {
       const { rows } = await query(`SELECT id, name FROM supplier WHERE id = $1`, [branchHeader])
       if (rows.length) {
-        return { tenantId: rows[0].id, tenantType: 'SUPPLIER', tenantName: rows[0].name || '' }
+        return finish({
+          tenantId: rows[0].id,
+          tenantType: 'SUPPLIER',
+          tenantName: rows[0].name || '',
+        })
       }
     }
   }
 
-  if (activeFromCookie) return activeFromCookie
+  if (activeFromCookie) return finish(activeFromCookie)
 
   if (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER') {
     const assignment = await getTenantAssignmentForUser(req.userData.id, req.userData.role)
@@ -469,30 +484,38 @@ export async function getRequestTenant(req) {
         assignment.tenantType
       )
       if (allowed) {
-        return {
+        return finish({
           tenantId: assignment.tenantId,
           tenantType: assignment.tenantType,
           tenantName: assignment.tenantName || '',
-        }
+        })
       }
     }
   }
 
   const email = (req.userData.email || '').trim().toLowerCase()
-  if (!email) return null
+  if (!email) return finish(null)
   if (req.userData.role === 'SUPPLIER') {
     const primary = await getPrimaryTenantForUser(email, 'SUPPLIER')
     if (primary) {
-      return { tenantId: primary.id, tenantType: 'SUPPLIER', tenantName: primary.name || '' }
+      return finish({
+        tenantId: primary.id,
+        tenantType: 'SUPPLIER',
+        tenantName: primary.name || '',
+      })
     }
   }
   if (req.userData.role === 'RESTAURANT') {
     const primary = await getPrimaryTenantForUser(email, 'RESTAURANT')
     if (primary) {
-      return { tenantId: primary.id, tenantType: 'RESTAURANT', tenantName: primary.name || '' }
+      return finish({
+        tenantId: primary.id,
+        tenantType: 'RESTAURANT',
+        tenantName: primary.name || '',
+      })
     }
   }
-  return null
+  return finish(null)
 }
 
 /**
@@ -646,6 +669,10 @@ export function resolveTenantContext(req, res, next) {
         tenantName: tenant.tenantName || '',
         roles,
         permissions,
+      }
+      if (!req.subscription) {
+        const { getTenantSubscription } = await import('./subscription.js')
+        req.subscription = await getTenantSubscription(tenant.tenantId, tenant.tenantType)
       }
       syncRequestLogContext(req)
       next()
