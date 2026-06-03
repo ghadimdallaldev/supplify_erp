@@ -9,6 +9,21 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   publicDir: path.resolve(rootDir, 'static'),
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Group vendor libs into shared chunks to reduce per-route request count
+        manualChunks: (id) => {
+          if (!id.includes('node_modules')) return
+          if (id.includes('@radix-ui') || id.includes('lucide-react')) return 'ui-vendor'
+          if (id.includes('react-router') || id.includes('@remix-run')) return 'router-vendor'
+          if (id.includes('@reduxjs') || id.includes('react-redux')) return 'redux-vendor'
+          if (id.includes('@tanstack')) return 'query-vendor'
+          return 'vendor'
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(rootDir, 'src'),
