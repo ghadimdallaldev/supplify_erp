@@ -56,6 +56,21 @@ Web Docker build: Railway variable or build arg `RAILWAY_DEPLOY_ENV=preprod` or 
 
 See `deploy/keycloak/README.md` for realm imports and redirect URI lists.
 
+## Performance / idle warmth (API)
+
+Committed in each `api.env` (non-secret). **`REDIS_URL` must be set in `secrets.env.example`** or caches fall back to in-process memory only.
+
+| Variable                        | Typical value                   | Notes                                 |
+| ------------------------------- | ------------------------------- | ------------------------------------- |
+| `DATABASE_POOL_MAX`             | `20`                            | Shared pool size                      |
+| `DATABASE_POOL_IDLE_TIMEOUT_MS` | `600000`                        | Keep clients 10 min (was 30s)         |
+| `SLOW_REQUEST_MS`               | `800`                           | Slow-request log threshold            |
+| `IDLE_PERF_LOG_MS`              | `500` (dev/preprod), `0` (prod) | Optional perf samples with cache hits |
+| `DB_KEEPALIVE_ENABLED`          | `true`                          | `SELECT 1` interval on Railway        |
+| `DB_KEEPALIVE_INTERVAL_SECONDS` | `60`                            | Do not set below 10                   |
+
+Legacy: `DB_POOL_KEEPALIVE_MS` (ms) overrides interval if ≥ 10000.
+
 ## Disable file loading (local Docker)
 
 ```env

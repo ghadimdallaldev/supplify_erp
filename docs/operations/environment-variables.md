@@ -80,7 +80,14 @@ See [../features/email-system.md](../features/email-system.md) for templates, de
 | `ALLOW_DB_RESET` | API | dev | `true` | Never true in prod |
 | `SEED_DEMO_DATA` | API | dev | `true` | Never true in prod |
 | `E2E_SECRET` | API | dev only | secret | With `ENABLE_DEBUG_ROUTES` |
-| `REDIS_URL` | API | optional | `redis://...` | Cache |
+| `REDIS_URL` | API | recommended | `redis://...` | Shared cache (permissions, subscription, entitlements); required on multi-replica Railway |
+| `DATABASE_POOL_MAX` | API | optional | `20` | Max Postgres pool connections |
+| `DATABASE_POOL_IDLE_TIMEOUT_MS` | API | optional | `600000` | Close idle pool clients after 10 min (not 30s) |
+| `SLOW_REQUEST_MS` | API | optional | `800` | Log `http.request.slow_breakdown` above this (ms) |
+| `IDLE_PERF_LOG_MS` | API | optional | `0` | Log `http.request.perf_sample` above this (ms); use `500` to debug idle |
+| `DB_KEEPALIVE_ENABLED` | API | optional | `true` (prod Railway) | Periodic `SELECT 1` to keep pool warm |
+| `DB_KEEPALIVE_INTERVAL_SECONDS` | API | optional | `60` | Keepalive interval when enabled (≥ 10) |
+| `DB_POOL_KEEPALIVE_MS` | API | optional | `0` | Legacy: interval in ms if ≥ 10000, overrides seconds |
 | `CRONS_ENABLED` | API | optional | `true` | In-process scheduled jobs; set `false` on read-only replicas |
 | `CRON_SCHEDULED_ORDERS_INTERVAL_MS` | API | optional | `300000` (dev), `3600000` (prod) | Quick list auto-order poll interval |
 | `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS` | API | optional | `86400000` (24 h) | Inventory expiry + reorder cadence reminder job |

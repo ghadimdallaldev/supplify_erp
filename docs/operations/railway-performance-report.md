@@ -347,13 +347,19 @@ Targeted vitest: request-timing, rbac, permissions, billing, products routes, no
 
 ### Railway env (recommended)
 
+Committed defaults live in `deploy/railway/<environment>/api.env` (development, preprod, production). Paste `REDIS_URL` from `secrets.env.example` in the dashboard.
+
 ```env
+REDIS_URL=${{redis-xxx.REDIS_URL}}
+DATABASE_POOL_MAX=20
+DATABASE_POOL_IDLE_TIMEOUT_MS=600000
 DB_KEEPALIVE_ENABLED=true
 DB_KEEPALIVE_INTERVAL_SECONDS=60
-DATABASE_POOL_IDLE_TIMEOUT_MS=600000
+SLOW_REQUEST_MS=800
 IDLE_PERF_LOG_MS=500
-REDIS_URL=${{Redis.REDIS_URL}}
 ```
+
+Docker local: `docker-compose.yml` and `deploy/env/.env.*.example` include the same keys (`DB_KEEPALIVE_ENABLED=false` locally by default).
 
 Min **1 API replica** (no scale-to-zero); API + Postgres **same region**; private `DATABASE_URL`.
 
