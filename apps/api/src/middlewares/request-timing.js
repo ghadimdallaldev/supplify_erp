@@ -12,17 +12,20 @@ export function requestTimingMiddleware(req, res, next) {
     t0: process.hrtime.bigint(),
     stages: {},
     cacheHits: {},
+    queryMsTotal: 0,
+    queryCount: 0,
     poolWaitRecorded: false,
+    handlerStartNs: null,
   }
 
   res.on('finish', () => {
-    const totalMs = elapsedMs(req, 'total', req._perf.t0)
+    const totalMs = elapsedMs(req._perf.t0)
     mark(req, 'total', totalMs)
 
     if (totalMs <= SLOW_REQUEST_MS) return
 
     const path = req.originalUrl?.split('?')[0] || req.path
-    const stages = { ...req._perf.stages }
+    const breakdown = buildSlowBreakdown(req, totalMs)
     logger.warn({
       event: 'http.request.slow_breakdown',
       msg: `Slow request: ${req.method} ${path} ${totalMs}ms`,
@@ -30,7 +33,7 @@ export function requestTimingMiddleware(req, res, next) {
       path,
       status: res.statusCode,
       durationMs: totalMs,
-      stages,
+      ...breakdown,
       cacheHits: req._perf.cacheHits,
       dbPool: {
         total: pool.totalCount,
@@ -46,8 +49,47 @@ export function requestTimingMiddleware(req, res, next) {
 }
 
 /**
- * Record stage duration in ms. Pass startNs from process.hrtime.bigint() or omit for incremental mark.
+ * Map internal stage keys to HAR-friendly field names for slow-request logs.
  */
+export function buildSlowBreakdown(req, totalMs) {
+  const s = req._perf?.stages ?? {}
+  const authMs = s.auth ?? 0
+  const tenantMs = s.tenant ?? 0
+  const billingMs = s.billing ?? 0
+  const tenantCtxMs = s.tenantContext ?? 0
+  const featureMs = s.feature ?? 0
+  const handlerMs = s.handler ?? 0
+
+  const rbacMs = Math.max(0, tenantCtxMs - billingMs)
+  const subscriptionMs = billingMs
+  const middlewareMs = authMs + tenantMs + tenantCtxMs + featureMs
+  const queryMs = req._perf?.queryMsTotal ?? 0
+  const serializationMs = Math.max(0, totalMs - middlewareMs - handlerMs - queryMs)
+
+  return {
+    authMs,
+    userLookupMs: s.userLookup ?? authMs,
+    tenantLookupMs: tenantMs,
+    restaurantSupplierLookupMs: s.restaurantSupplier ?? 0,
+    rbacMs,
+    subscriptionMs,
+    featureFlagMs: featureMs,
+    dbCheckoutMs: s.poolWaiting ?? s.dbCheckout ?? 0,
+    handlerMs,
+    queryMs,
+    serializationMs,
+    totalMs: Math.round(totalMs),
+    queryCount: req._perf?.queryCount ?? 0,
+    stages: { ...s },
+  }
+}
+
+export function recordQueryMs(req, durationMs) {
+  if (!req?._perf) return
+  req._perf.queryMsTotal = (req._perf.queryMsTotal || 0) + durationMs
+  req._perf.queryCount = (req._perf.queryCount || 0) + 1
+}
+
 export function mark(req, stage, durationMs) {
   if (!req?._perf) return
   if (typeof durationMs === 'number') {
@@ -56,7 +98,7 @@ export function mark(req, stage, durationMs) {
   }
   const start = req._perf[`_start_${stage}`]
   if (start != null) {
-    req._perf.stages[stage] = Math.round(elapsedMs(req, stage, start))
+    req._perf.stages[stage] = Math.round(elapsedMs(start))
     delete req._perf[`_start_${stage}`]
   }
 }
@@ -76,9 +118,10 @@ export function recordPoolWaitIfNeeded(req) {
   if (pool.waitingCount > 0) {
     req._perf.poolWaitRecorded = true
     req._perf.stages.poolWaiting = pool.waitingCount
+    req._perf.stages.dbCheckout = pool.waitingCount
   }
 }
 
-function elapsedMs(_req, _stage, startNs) {
+function elapsedMs(startNs) {
   return Number(process.hrtime.bigint() - startNs) / 1_000_000
 }

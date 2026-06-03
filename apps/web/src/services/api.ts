@@ -337,10 +337,12 @@ export const api = createApi({
     >({
       query: () => '/api/products/categories',
       providesTags: ['Product'],
+      keepUnusedDataFor: 120,
     }),
     getProductTags: builder.query<{ tags: string[] }, void>({
       query: () => '/api/products/tags',
       providesTags: ['Product'],
+      keepUnusedDataFor: 120,
     }),
     getProduct: builder.query<Product, string>({
       query: (id) => `/api/products/${id}`,

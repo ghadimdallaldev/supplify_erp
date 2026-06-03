@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { prefetchRouteChunk } from '../lib/routeChunkPrefetch'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
@@ -519,6 +520,8 @@ export function Sidebar({
                   key={item.name}
                   to={item.href}
                   aria-current={isActive ? 'page' : undefined}
+                  onMouseEnter={() => prefetchRouteChunk(item.href)}
+                  onFocus={() => prefetchRouteChunk(item.href)}
                   onClick={() => onMobileClose?.()}
                   data-testid={item.testId || `nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
                   style={{

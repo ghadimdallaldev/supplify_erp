@@ -223,6 +223,8 @@ export const config = {
   DATABASE_POOL_MAX: envInt(process.env.DATABASE_POOL_MAX, 20),
   /** Log structured slow-request breakdown when total pipeline exceeds this (ms). */
   SLOW_REQUEST_MS: envInt(process.env.SLOW_REQUEST_MS, 800),
+  /** Periodic SELECT 1 to keep pooled connections alive on Railway (0 = disabled). */
+  DB_POOL_KEEPALIVE_MS: envInt(process.env.DB_POOL_KEEPALIVE_MS, 4 * 60 * 1000),
   CRONS_ENABLED: envBool(process.env.CRONS_ENABLED, true),
   CRON_SCHEDULED_ORDERS_INTERVAL_MS: envInt(
     process.env.CRON_SCHEDULED_ORDERS_INTERVAL_MS,

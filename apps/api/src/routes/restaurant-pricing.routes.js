@@ -196,8 +196,10 @@ router.get(
         ) pr ON true
         WHERE ${conditions.join(' AND ')}
         ORDER BY s.name, p.name
+        LIMIT 500
         `,
-        params
+        params,
+        req
       )
 
       const pricing = rows.map(mapPricingRow)
