@@ -8,7 +8,9 @@ import {
   RESTAURANT_LIMIT_KEYS,
   SUPPLIER_LIMIT_KEYS,
   resolveEffectiveLimit,
+  resolveAllEffectiveLimits,
   discoverLimitKeys,
+  limitKeysForTenantType,
   fillMissingFreeTierLimits,
   stripHiddenEntitlementLimits,
   HIDDEN_ENTITLEMENT_LIMIT_KEYS,
@@ -39,10 +41,20 @@ function getEnforcementPlanLimits(subscription, tenantType) {
 
 /** Cache TTL for subscription data (seconds). Short enough to absorb burst traffic while staying fresh. */
 const SUBSCRIPTION_CACHE_TTL = 30
+/** Full entitlements payload (plan, limits, features, usage) — hot path on every app shell load. */
+const ENTITLEMENTS_CACHE_TTL = 90
 
 /** Build a consistent cache key for a tenant subscription. */
 function subscriptionCacheKey(tenantId, tenantType) {
   return 'sub:' + tenantType + ':' + tenantId
+}
+
+function entitlementsCacheKey(tenantId, tenantType) {
+  return `ent:${tenantType}:${tenantId}`
+}
+
+export async function invalidateEntitlementsCache(tenantId, tenantType) {
+  await deleteCache(entitlementsCacheKey(tenantId, tenantType)).catch(() => {})
 }
 
 /**
@@ -186,6 +198,7 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
  */
 export async function invalidateTenantSubscriptionCache(tenantId, tenantType) {
   await deleteCache(subscriptionCacheKey(tenantId, tenantType)).catch(() => {})
+  await invalidateEntitlementsCache(tenantId, tenantType)
 }
 
 /**
@@ -635,6 +648,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
       scheduledQuickLists,
       meterRows,
       branchCount,
+      openConvRows,
     ] = await Promise.all([
       query(
         `SELECT COUNT(DISTINCT product_id) as c FROM restaurant_inventory WHERE restaurant_id = $1`,
@@ -666,6 +680,16 @@ async function getUsageSnapshot(tenantId, tenantType) {
         [tenantId]
       ),
       countActiveBranchLocations(tenantId, 'RESTAURANT'),
+      query(
+        `
+      SELECT COUNT(DISTINCT c.id) AS c
+      FROM conversation c
+      LEFT JOIN conversation_participant cp
+        ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
+      WHERE c.restaurant_id = $1 AND (cp.id IS NULL OR cp.is_archived = false)
+      `,
+        [tenantId]
+      ),
     ])
     usage.restaurant_inventory_skus = parseInt(inv.rows[0]?.c || 0)
     usage.orders_per_day = parseInt(orders.rows[0]?.c || 0)
@@ -676,17 +700,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
     usage.quick_lists = parseInt(quickLists.rows[0]?.c || 0)
     usage.quick_list_items = parseInt(quickListItems.rows[0]?.c || 0)
     usage.scheduled_quick_lists = parseInt(scheduledQuickLists.rows[0]?.c || 0)
-    const { rows: openConvRows } = await query(
-      `
-      SELECT COUNT(DISTINCT c.id) AS c
-      FROM conversation c
-      LEFT JOIN conversation_participant cp
-        ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
-      WHERE c.restaurant_id = $1 AND (cp.id IS NULL OR cp.is_archived = false)
-      `,
-      [tenantId]
-    )
-    usage.open_conversations = parseInt(openConvRows[0]?.c || 0, 10)
+    usage.open_conversations = parseInt(openConvRows.rows[0]?.c || 0, 10)
     meterRows.rows.forEach((r) => {
       if (keys.includes(r.meter_type)) usage[r.meter_type] = parseInt(r.current_value || 0)
     })
@@ -742,14 +756,17 @@ async function getUsageSnapshot(tenantId, tenantType) {
  * @returns {Promise<Object|null>} Entitlements object or null if no subscription
  */
 export async function getEntitlements(tenantId, tenantType) {
+  const cacheKey = entitlementsCacheKey(tenantId, tenantType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null) return cached
+
   const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
   const subscription = await getTenantSubscription(billingTenantId, tenantType, {
     skipOrgBilling: true,
   })
   if (!subscription) return null
 
-  const limitKeys =
-    tenantType === 'RESTAURANT' ? [...RESTAURANT_LIMIT_KEYS] : [...SUPPLIER_LIMIT_KEYS]
+  const limitKeys = limitKeysForTenantType(tenantType)
   const baseLimits = {}
   limitKeys.forEach((k) => {
     const v = subscription.limits?.[k]
@@ -759,14 +776,23 @@ export async function getEntitlements(tenantId, tenantType) {
   const limits = { ...baseLimits }
   const limitsBeforeAddons = { ...baseLimits }
   const overrides = []
-  for (const k of limitKeys) {
-    const resolved = await resolveEffectiveLimit({
+
+  const [resolvedByKey, { features, featureSources }, activeAddons, usage] = await Promise.all([
+    resolveAllEffectiveLimits({
       tenantId: billingTenantId,
       tenantType,
-      limitKey: k,
+      limitKeys,
       planId: subscription.plan_id,
       planLimits: subscription.limits || {},
-    })
+    }),
+    resolveAllFeaturesForTenant(billingTenantId, tenantType, subscription.features),
+    getActiveTenantAddons(billingTenantId, tenantType),
+    getUsageSnapshot(tenantId, tenantType),
+  ])
+
+  for (const k of limitKeys) {
+    const resolved = resolvedByKey[k]
+    if (!resolved) continue
     limits[k] = resolved.effectiveLimit
     limitsBeforeAddons[k] = resolved.effectiveLimit
     if (resolved.tenantOverride) {
@@ -792,16 +818,8 @@ export async function getEntitlements(tenantId, tenantType) {
     }
   }
 
-  const { features, featureSources } = await resolveAllFeaturesForTenant(
-    billingTenantId,
-    tenantType,
-    subscription.features
-  )
-
   fillMissingFreeTierLimits(limits, tenantType, subscription.plan_code)
   fillMissingFreeTierLimits(limitsBeforeAddons, tenantType, subscription.plan_code)
-
-  const activeAddons = await getActiveTenantAddons(billingTenantId, tenantType)
   const addonBoosts = { branches: 0, warehouses: 0 }
   for (const a of activeAddons) {
     const qty = parseInt(a.quantity, 10) || 0
@@ -820,7 +838,6 @@ export async function getEntitlements(tenantId, tenantType) {
     }
   }
 
-  const usage = await getUsageSnapshot(tenantId, tenantType)
   if (tenantType === 'SUPPLIER') {
     const warehouseLimit = limits.warehouses
     if (warehouseLimit === 0) {
@@ -871,7 +888,7 @@ export async function getEntitlements(tenantId, tenantType) {
       usageWindowMeta[k] = { date: new Date().toISOString().slice(0, 10) }
   })
 
-  return {
+  const payload = {
     tenantType,
     tenantId,
     billingTenantId,
@@ -925,6 +942,9 @@ export async function getEntitlements(tenantId, tenantType) {
           }
         : null,
   }
+
+  await setCache(cacheKey, payload, ENTITLEMENTS_CACHE_TTL).catch(() => {})
+  return payload
 }
 
 /**

@@ -351,12 +351,12 @@ export async function clearTenantFeatureOverride(tenantId, tenantType, featureKe
 export async function invalidateFeatureFlagCache(tenantId, tenantType, featureKey) {
   const tasks = []
   if (tenantId && tenantType) {
-    // Invalidate the bulk "all features" cache for this tenant
     tasks.push(deleteCache(`ff:all:${tenantId}:${tenantType}`))
     if (featureKey) {
-      // Invalidate the per-feature cache entry
       tasks.push(deleteCache(`ff:${tenantId}:${tenantType}:${featureKey}`))
     }
+    const { invalidateEntitlementsCache } = await import('./subscription.js')
+    tasks.push(invalidateEntitlementsCache(tenantId, tenantType))
   }
   await Promise.all(tasks).catch(() => {})
 }
