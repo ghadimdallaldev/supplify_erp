@@ -128,15 +128,11 @@ export function computeBillingAccessState(subscription) {
 }
 
 export async function getBillingStatus(tenantId, tenantType) {
-  const subscription = await getSubscriptionForBilling(tenantId, tenantType)
-  const access = computeBillingAccessState(subscription)
-
-  let paymentMethods = []
-  let openInvoices = []
-  let defaultPaymentMethod = null
-
+  // Subscription (cached), payment methods, and open invoices are all independent — fetch in parallel.
+  let subscription, paymentMethods, openInvoices, defaultPaymentMethod
   try {
-    const [pmRes, invRes] = await Promise.all([
+    const [sub, pmRes, invRes] = await Promise.all([
+      getSubscriptionForBilling(tenantId, tenantType),
       query(
         `SELECT id, provider, type, brand, last4, exp_month, exp_year, bank_name, is_default, status, created_at
          FROM billing_payment_method
@@ -152,12 +148,19 @@ export async function getBillingStatus(tenantId, tenantType) {
         [tenantId, tenantType]
       ),
     ])
+    subscription = sub
     paymentMethods = pmRes.rows
     openInvoices = invRes.rows
     defaultPaymentMethod = paymentMethods.find((p) => p.is_default) || paymentMethods[0] || null
   } catch (e) {
     if (e.code !== '42P01') throw e
+    subscription = await getSubscriptionForBilling(tenantId, tenantType)
+    paymentMethods = []
+    openInvoices = []
+    defaultPaymentMethod = null
   }
+
+  const access = computeBillingAccessState(subscription)
 
   const amountDue = openInvoices.reduce((sum, inv) => sum + Number(inv.amount || 0), 0)
 
