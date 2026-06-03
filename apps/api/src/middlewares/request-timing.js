@@ -12,6 +12,7 @@ export function requestTimingMiddleware(req, res, next) {
     t0: process.hrtime.bigint(),
     stages: {},
     cacheHits: {},
+    cacheMisses: {},
     queryMsTotal: 0,
     queryCount: 0,
     poolWaitRecorded: false,
@@ -22,19 +23,16 @@ export function requestTimingMiddleware(req, res, next) {
     const totalMs = elapsedMs(req._perf.t0)
     mark(req, 'total', totalMs)
 
-    if (totalMs <= SLOW_REQUEST_MS) return
-
     const path = req.originalUrl?.split('?')[0] || req.path
     const breakdown = buildSlowBreakdown(req, totalMs)
-    logger.warn({
-      event: 'http.request.slow_breakdown',
-      msg: `Slow request: ${req.method} ${path} ${totalMs}ms`,
+    const perfPayload = {
       method: req.method,
       path,
       status: res.statusCode,
       durationMs: totalMs,
       ...breakdown,
       cacheHits: req._perf.cacheHits,
+      cacheMisses: req._perf.cacheMisses,
       dbPool: {
         total: pool.totalCount,
         idle: pool.idleCount,
@@ -42,6 +40,23 @@ export function requestTimingMiddleware(req, res, next) {
         max: pool.options.max,
       },
       requestId: req.requestId,
+    }
+
+    const idleSampleMs = config.IDLE_PERF_LOG_MS
+    if (idleSampleMs > 0 && totalMs >= idleSampleMs && totalMs <= SLOW_REQUEST_MS) {
+      logger.info({
+        event: 'http.request.perf_sample',
+        msg: `Perf sample: ${req.method} ${path} ${totalMs}ms`,
+        ...perfPayload,
+      })
+    }
+
+    if (totalMs <= SLOW_REQUEST_MS) return
+
+    logger.warn({
+      event: 'http.request.slow_breakdown',
+      msg: `Slow request: ${req.method} ${path} ${totalMs}ms`,
+      ...perfPayload,
     })
   })
 
@@ -75,6 +90,7 @@ export function buildSlowBreakdown(req, totalMs) {
     subscriptionMs,
     featureFlagMs: featureMs,
     dbCheckoutMs: s.poolWaiting ?? s.dbCheckout ?? 0,
+    dbConnectMs: s.dbConnectMs ?? 0,
     handlerMs,
     queryMs,
     serializationMs,
@@ -111,6 +127,11 @@ export function startStage(req, stage) {
 export function noteCacheHit(req, key) {
   if (!req?._perf) return
   req._perf.cacheHits[key] = true
+}
+
+export function noteCacheMiss(req, key) {
+  if (!req?._perf) return
+  req._perf.cacheMisses[key] = true
 }
 
 export function recordPoolWaitIfNeeded(req) {

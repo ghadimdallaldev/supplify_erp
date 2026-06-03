@@ -34,8 +34,8 @@ import {
 } from './tenant-roles.js'
 import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
 
-const TENANT_REQ_CACHE_TTL = 60 // seconds
-const USER_BY_SUB_CACHE_TTL = 120 // seconds
+const TENANT_REQ_CACHE_TTL = 180 // seconds
+const USER_BY_SUB_CACHE_TTL = 300 // seconds
 
 function userBySubCacheKey(sub) {
   return `user:sub:${sub}`
