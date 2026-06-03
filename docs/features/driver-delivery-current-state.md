@@ -49,8 +49,8 @@ Dispatch, delivery board, route detail, command center, and `GET /api/orders/:id
 
 ### Restaurant order tracking (implemented)
 
-- Sanitized `GET /api/orders/:id/tracking` via [`restaurant-tracking-payload.js`](apps/api/src/lib/restaurant-tracking-payload.js)
-- [`RestaurantOrderTrackingPanel`](apps/web/src/components/orders/RestaurantOrderTrackingPanel.tsx) on restaurant order detail
+- Sanitized `GET /api/orders/:id/tracking` via [`restaurant-tracking-payload.js`](../../apps/api/src/lib/restaurant-tracking-payload.js)
+- [`RestaurantOrderTrackingPanel`](../../apps/web/src/components/orders/RestaurantOrderTrackingPanel.tsx) on restaurant order detail
 - Shared map + labels; 30s poll during active delivery; **Receive order** links to receiving (no auto-receive from GPS)
 
 ### Privacy
@@ -74,9 +74,9 @@ Dispatch, delivery board, route detail, command center, and `GET /api/orders/:id
 
 ## Canonical delivery service
 
-**File:** [`apps/api/src/services/driver-fulfillment.service.js`](apps/api/src/services/driver-fulfillment.service.js)
+**File:** [`driver-fulfillment.service.js`](../../apps/api/src/services/driver-fulfillment.service.js)
 
-**Legacy shim:** [`apps/api/src/lib/driver-delivery.js`](apps/api/src/lib/driver-delivery.js) delegates to the service.
+**Legacy shim:** [`driver-delivery.js`](../../apps/api/src/lib/driver-delivery.js) delegates to the service.
 
 **Assignment statuses:** `assigned` → `picked_up` → `out_for_delivery` → `delivered` | `failed` | `rescheduled` | `reassigned`
 

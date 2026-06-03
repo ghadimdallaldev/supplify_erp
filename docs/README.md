@@ -11,6 +11,7 @@ Supplify docs are grouped by purpose. Start with **[Developer handbook](./guides
 | **[qa/](./qa/)**                     | **[QA automation guide](./qa/QA_AUTOMATION_GUIDE.md)**, manual checklists, [Free Trial audit](./qa/FREE_TRIAL_BEHAVIOR_AUDIT.md), [RBAC hardening QA](./qa/RBAC_HARDENING_QA_REPORT.md) |
 | **[admin/](./admin/)**               | Admin UI, dashboard status, feature flags, setup notes                                                                                                                                  |
 | **[monetization/](./monetization/)** | Subscriptions, plans, enterprise, monetization UX, role roadmap                                                                                                                         |
+| **[deployment/](./deployment/)**     | Railway hosting (dev / preprod / prod), environment variables, env matrix                                                                                                               |
 | **[operations/](./operations/)**     | **Production readiness** (merged), launch polish, performance, observability, test coverage                                                                                             |
 | **[sales/](./sales/)**               | Positioning, pricing, enterprise checklist                                                                                                                                              |
 | **[blueprint/](./blueprint/)**       | Diagrams (Mermaid), workflows, UI sitemaps                                                                                                                                              |
@@ -28,8 +29,9 @@ Supplify docs are grouped by purpose. Start with **[Developer handbook](./guides
 - [QA automation (Vitest scripts & CI)](./qa/QA_AUTOMATION_GUIDE.md) · [API test stabilization](./API_TEST_SUITE_STABILIZATION.md)
 - [Manual testing checklist](./guides/manual-testing.md) · [Full QA regression](./qa/MANUAL_TEST_CHECKLIST.md) · [Free Trial expiry](./features/free-trial-expiry.md)
 - [Feature specs index](./features/README.md) · [Order decline](./features/order-decline.md) · [Notifications delivery](./features/notifications-delivery.md)
-- [Production readiness](./operations/production-readiness.md) — status + findings + fix plan
+- [Production readiness](./operations/production-readiness.md) — status + findings + fix plan · [2026 audit](./operations/production-readiness-audit.md)
 - [Database migrations](./guides/database-migrations.md)
 - [RBAC audit report](./architecture/RBAC_AUDIT_REPORT.md) · [RBAC QA checklist](./qa/RBAC_HARDENING_QA_REPORT.md)
 - [Subscriptions & limits](./monetization/SUBSCRIPTIONS.md)
+- [Railway deployment](./deployment/railway-environments.md) · [Environment variables](./deployment/environment-variables.md)
 - [Deploy](../deploy/README.md) · [Tests](../tests/README.md)

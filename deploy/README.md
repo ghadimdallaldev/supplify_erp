@@ -1,6 +1,6 @@
 # Supplify deployment
 
-**Primary hosting:** [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) (dev / preprod / prod on Railway).
+**Primary hosting:** [railway-environments.md](../docs/deployment/railway-environments.md) (dev / preprod / prod on Railway).
 
 **Release branches (`preprod`, `prod`)** contain runtime code only — promote from `dev` with `pnpm promote:preprod` or `pnpm promote:prod` (see `docs/BRANCHING.md`).
 
@@ -106,7 +106,7 @@ Secrets live in `deploy/env/.env.*` on the server. Re-deploy after `git pull`:
 cd /opt/supplify && git pull origin prod && sudo ./deploy/scripts/deploy-prod.sh
 ```
 
-For **Railway** hosting, see [DEPLOYMENT_RAILWAY.md](../DEPLOYMENT_RAILWAY.md). AWS CDK was removed from this repo.
+For **Railway** hosting, see [railway.md](../docs/deployment/railway.md). AWS CDK was removed from this repo.
 
 ## Files
 

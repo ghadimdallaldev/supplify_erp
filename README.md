@@ -25,14 +25,14 @@ See **[docs/BRANCHING.md](docs/BRANCHING.md)** for promote workflow.
 
 Full guide: **[docs/README.md](docs/README.md)**
 
-| Topic                      | Doc                                                                                                                             |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Feature catalog**        | [docs/product/features.md](docs/product/features.md)                                                                            |
-| Local Docker workflow      | [docs/README.md](docs/README.md)                                                                                                |
-| Database migrations        | [docs/guides/database-migrations.md](docs/guides/database-migrations.md)                                                        |
-| Admin feature toggles      | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md)                                                          |
-| Railway (dev/preprod/prod) | [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) · [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) |
-| Production deploy (Docker) | [deploy/README.md](deploy/README.md)                                                                                            |
+| Topic                      | Doc                                                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Feature catalog**        | [docs/product/features.md](docs/product/features.md)                                                                                                                      |
+| Local Docker workflow      | [docs/README.md](docs/README.md)                                                                                                                                          |
+| Database migrations        | [docs/guides/database-migrations.md](docs/guides/database-migrations.md)                                                                                                  |
+| Admin feature toggles      | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md)                                                                                                    |
+| Railway (dev/preprod/prod) | [docs/deployment/railway-environments.md](docs/deployment/railway-environments.md) · [docs/deployment/environment-variables.md](docs/deployment/environment-variables.md) |
+| Production deploy (Docker) | [deploy/README.md](deploy/README.md)                                                                                                                                      |
 
 ## Scripts
 

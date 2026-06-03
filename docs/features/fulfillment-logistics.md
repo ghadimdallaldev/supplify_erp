@@ -83,7 +83,7 @@ Disabled restaurant tracking returns `trackingEnabled: false` and `reason: resta
 | `VITE_MAP_PROVIDER`                  | `google` | Map provider hint                                                                                        |
 | `GPS_LOCATION_RETENTION_DAYS`        | `90`     | Daily cron deletes old rows from `driver_location_ping` (see [CRON_JOBS.md](../operations/CRON_JOBS.md)) |
 
-Full list: [ENVIRONMENT_VARIABLES.md](../../ENVIRONMENT_VARIABLES.md) · templates in `apps/api/.env.example`.
+Full list: [environment-variables.md](../deployment/environment-variables.md) · templates in `apps/api/.env.example`. Implementation state: [driver-delivery-current-state.md](./driver-delivery-current-state.md).
 
 **Known limits:** latest ping only; no ETA; 30s HTTP polling (no WebSocket map); client-reported coordinates (no GPS attestation); server enforces assignment scope, `recordedAt` skew window, and per-order rate limit aligned with `GPS_UPDATE_INTERVAL_SECONDS`.
 

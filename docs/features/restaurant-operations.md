@@ -144,7 +144,7 @@ After pushing to Railway (API + web redeploy from `deploy/railway/<env>/`):
 
 4. **Redis** — recommended on API (`REDIS_URL`) so notifications and chat work across replicas.
 
-See [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) and [docs/operations/CRON_JOBS.md](docs/operations/CRON_JOBS.md).
+See [../deployment/railway-environments.md](../deployment/railway-environments.md) and [../operations/CRON_JOBS.md](../operations/CRON_JOBS.md).
 
 ---
 

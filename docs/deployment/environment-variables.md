@@ -47,7 +47,7 @@ Set secrets only in Railway — never commit real values.
 | `STORAGE_S3_FORCE_PATH_STYLE`                                                | API     | s3             | `true`/`false`               | Auto `false` for Railway endpoints; `true` for MinIO      |
 | Railway `ENDPOINT`, `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION` | API     | bucket service | —                            | Auto-map to `STORAGE_*` when unset                        |
 
-See [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md) for where file bytes are stored, the presign → PUT flow, and Railway volume / R2 setup.
+See [../operations/STORAGE_UPLOADS.md](../operations/STORAGE_UPLOADS.md) for where file bytes are stored, the presign → PUT flow, and Railway volume / R2 setup.
 
 | `EMAIL_ENABLED` | API | all | `true`/`false` | Master switch (default `true`) |
 | `EMAIL_LOG_ONLY` | API | dev | `true`/`false` | Log only, no network send (Railway dev default) |
@@ -60,7 +60,7 @@ See [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md) for
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | API | preprod, prod | — | Primary transport (Resend recommended); `SMTP_PASS` only in Railway secrets |
 | `MAILPIT_SMTP_PORT` / `MAILPIT_UI_PORT` | Docker local | dev | `1025` / `8025` | Mailpit fake SMTP in root `docker-compose.yml`; UI at http://localhost:8025 |
 
-See [docs/features/email-system.md](docs/features/email-system.md) for templates, dedup, and coverage matrix.
+See [../features/email-system.md](../features/email-system.md) for templates, dedup, and coverage matrix.
 | `PAYMENTS_MODE` | API | all | `mock`/`test`/`live` | **mock blocked in preprod/prod** |
 | `BILLING_GATEWAY` | API | optional | `stub` | Overrides mode mapping |
 | `PAYMENTS_PROVIDER` | API | live | `stripe` | Future provider id |
@@ -85,7 +85,7 @@ See [docs/features/email-system.md](docs/features/email-system.md) for templates
 | `CRON_SCHEDULED_ORDERS_INTERVAL_MS` | API | optional | `300000` (dev), `3600000` (prod) | Quick list auto-order poll interval |
 | `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS` | API | optional | `86400000` (24 h) | Inventory expiry + reorder cadence reminder job |
 
-See [docs/operations/CRON_JOBS.md](docs/operations/CRON_JOBS.md) for the full job inventory.
+See [../operations/CRON_JOBS.md](../operations/CRON_JOBS.md) for the full job inventory.
 
 ### Delivery GPS / live tracking (API)
 
@@ -104,7 +104,7 @@ See [docs/operations/CRON_JOBS.md](docs/operations/CRON_JOBS.md) for the full jo
 | `GOOGLE_MAPS_API_KEY`                | API     | —        | Optional server map key                    |
 | `MAPBOX_ACCESS_TOKEN`                | API     | —        | Optional Mapbox                            |
 
-Spec: [docs/features/fulfillment-logistics.md](docs/features/fulfillment-logistics.md).
+Spec: [../features/fulfillment-logistics.md](../features/fulfillment-logistics.md).
 
 Legacy aliases still supported: `S3_*` → `STORAGE_*`, `API_PUBLIC_URL` = `PUBLIC_API_URL`.
 

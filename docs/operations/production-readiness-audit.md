@@ -3,22 +3,22 @@
 **Date started:** 2026-06-02  
 **Scope:** Database performance, API/code performance, UI responsiveness, security, uploads, auth/RBAC, error handling, logging, maintainability, testing, deployment readiness.
 
-**Related prior audits:** [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md), [docs/PERFORMANCE_AUDIT.md](docs/PERFORMANCE_AUDIT.md), [docs/RBAC_FULL_APP_AUDIT.md](docs/RBAC_FULL_APP_AUDIT.md), [docs/UI_UX_POLISH_AUDIT.md](docs/UI_UX_POLISH_AUDIT.md), [docs/operations/production-readiness.md](docs/operations/production-readiness.md).
+**Related prior audits:** [../SECURITY_AUDIT.md](../SECURITY_AUDIT.md), [../PERFORMANCE_AUDIT.md](../PERFORMANCE_AUDIT.md), [../RBAC_FULL_APP_AUDIT.md](../RBAC_FULL_APP_AUDIT.md), [../UI_UX_POLISH_AUDIT.md](../UI_UX_POLISH_AUDIT.md), [production-readiness.md](./production-readiness.md).
 
 ---
 
 ## Summary of what was audited
 
-| Area            | Method                                                                                                          |
-| --------------- | --------------------------------------------------------------------------------------------------------------- |
-| Database        | Static review of hot routes, migrations, N+1 patterns, unbounded queries                                        |
-| API performance | Admin dashboard, fulfillment dispatch, reports, receiving                                                       |
-| Security / RBAC | Existing controls + upload paths, staff documents, presign pipeline                                             |
-| Uploads         | [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md), `files.routes.js`, S3/local providers |
-| UI              | High-traffic pages + admin tenant tables (partial prior polish)                                                 |
-| Tests           | `pnpm test:ci`, `pnpm test:rbac`, `pnpm build`, `pnpm lint`                                                     |
+| Area            | Method                                                                            |
+| --------------- | --------------------------------------------------------------------------------- |
+| Database        | Static review of hot routes, migrations, N+1 patterns, unbounded queries          |
+| API performance | Admin dashboard, fulfillment dispatch, reports, receiving                         |
+| Security / RBAC | Existing controls + upload paths, staff documents, presign pipeline               |
+| Uploads         | [STORAGE_UPLOADS.md](./STORAGE_UPLOADS.md), `files.routes.js`, S3/local providers |
+| UI              | High-traffic pages + admin tenant tables (partial prior polish)                   |
+| Tests           | `pnpm test:ci`, `pnpm test:rbac`, `pnpm build`, `pnpm lint`                       |
 
-Query layer uses parameterized SQL via [`apps/api/src/lib/db.js`](apps/api/src/lib/db.js) `query()` (not Sequelize / `console.safeQuery`).
+Query layer uses parameterized SQL via [`db.js`](../../apps/api/src/lib/db.js) `query()` (not Sequelize / `console.safeQuery`).
 
 ---
 
@@ -61,7 +61,7 @@ _See sections below; updated as implementation completes._
 
 ## Database optimizations
 
-- Migration [`0132_production_readiness_perf_indexes.sql`](apps/api/db/migrations/0132_production_readiness_perf_indexes.sql): `order_item(supplier_id, order_id)`, partial `customer_order(placed_at)`, `conversion_event` indexes.
+- Migration [`0132_production_readiness_perf_indexes.sql`](../../apps/api/db/migrations/0132_production_readiness_perf_indexes.sql): `order_item(supplier_id, order_id)`, partial `customer_order(placed_at)`, `conversion_event` indexes.
 - Admin tenant lists: JOIN aggregates instead of per-row correlated `COUNT` subqueries; `LIMIT`/`OFFSET` pagination.
 - Activity feed: time window (default 30 days, max 90) + per-branch fetch cap.
 - Receiving pending orders: single batch query for all order items.

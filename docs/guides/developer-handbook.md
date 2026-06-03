@@ -111,7 +111,7 @@ Subscription **plans** define default features; admins can override globally or 
 - [Feature catalog & verification](../product/features.md) — all product areas, routes, smoke checks
 - [Database migrations](./database-migrations.md) — running, troubleshooting, fresh DB
 - [Admin feature toggles](../admin/admin-feature-flags.md) — global and per-tenant flags
-- [Railway environments](../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) — dev / preprod / prod (primary)
+- [Railway environments](../deployment/railway-environments.md) — dev / preprod / prod (primary)
 - [Deploy](../deploy/README.md) — optional legacy Docker on a VM
 - [Tests](../tests/README.md) — unit and E2E
 
@@ -173,7 +173,7 @@ The API follows RESTful conventions with:
 
 ## CI/CD and deployment
 
-Hosted deploys use **Railway** (see [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md)). Run locally before pushing:
+Hosted deploys use **Railway** (see [railway-environments.md](../deployment/railway-environments.md)). Run locally before pushing:
 
 ```bash
 pnpm lint

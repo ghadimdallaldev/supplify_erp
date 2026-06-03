@@ -92,7 +92,7 @@ Docker builds use `pnpm --filter @supplify/api...` and `pnpm --filter @supplify/
 
 ## F. Required backend variables (summary)
 
-See `apps/api/.env.<env>.example` and [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md).
+See `apps/api/.env.<env>.example` and [environment-variables.md](./environment-variables.md).
 
 | Variable                              | dev                 | preprod            | prod             |
 | ------------------------------------- | ------------------- | ------------------ | ---------------- |
@@ -108,7 +108,7 @@ See `apps/api/.env.<env>.example` and [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VAR
 | `EMAIL_LOG_ONLY`                      | `true` (log only)   | `false`            | `false`          |
 | `SMTP_PASS`                           | dashboard secret    | dashboard secret   | dashboard secret |
 
-Non-secret email settings (`EMAIL_*`, `SMTP_HOST`, etc.) load from `deploy/railway/<env>/api.env` on deploy. Set **`SMTP_PASS`** once per API service in the Railway Raw Editor (see `secrets.env.example`). See [docs/features/email-system.md](docs/features/email-system.md).
+Non-secret email settings (`EMAIL_*`, `SMTP_HOST`, etc.) load from `deploy/railway/<env>/api.env` on deploy. Set **`SMTP_PASS`** once per API service in the Railway Raw Editor (see `secrets.env.example`). See [../features/email-system.md](../features/email-system.md).
 
 ## G. Required frontend variables (summary)
 
@@ -216,7 +216,7 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 
 ## L. Storage per environment
 
-Full upload pipeline (presign, keys, local vs S3): [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md).
+Full upload pipeline (presign, keys, local vs S3): [../operations/STORAGE_UPLOADS.md](../operations/STORAGE_UPLOADS.md).
 
 | env     | Driver | Notes                                                                     |
 | ------- | ------ | ------------------------------------------------------------------------- |
@@ -287,4 +287,4 @@ API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 - `STORAGE_DRIVER=local` on prod (validation fails)
 - Committing `.env` files with real secrets
 
-See also: [DEPLOYMENT_RAILWAY.md](DEPLOYMENT_RAILWAY.md) (single-env overview), [.env.matrix.md](.env.matrix.md), [docs/operations/CRON_JOBS.md](docs/operations/CRON_JOBS.md) (in-process scheduled jobs and env vars).
+See also: [railway.md](./railway.md) (single-env overview), [env-matrix.md](./env-matrix.md), [../operations/CRON_JOBS.md](../operations/CRON_JOBS.md) (in-process scheduled jobs and env vars).

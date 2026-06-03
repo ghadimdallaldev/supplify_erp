@@ -14,7 +14,7 @@ export function FulfillmentTrackingTab() {
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
   const { data, isLoading, isError, refetch } = useGetSupplierDeliveryBoardQuery(
     { status: 'out_for_delivery' },
-    { pollingInterval: 30_000 }
+    { pollingInterval: 30_000, skipPollingIfUnfocused: true }
   )
 
   const orders = data?.orders ?? []

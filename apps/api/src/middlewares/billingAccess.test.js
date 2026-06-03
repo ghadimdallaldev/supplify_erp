@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getRequestTenant = vi.fn()
 const getBillingStatus = vi.fn()
+const getSubscriptionForBilling = vi.fn()
+const computeBillingAccessState = vi.fn()
 const buildAccountLockedError = vi.fn()
 const isImpersonating = vi.fn()
 
@@ -11,6 +13,8 @@ vi.mock('../lib/rbac.js', () => ({
 
 vi.mock('../lib/billing/billing-service.js', () => ({
   getBillingStatus,
+  getSubscriptionForBilling,
+  computeBillingAccessState,
   buildAccountLockedError,
 }))
 
@@ -44,6 +48,8 @@ describe('billingAccessMiddleware', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     isImpersonating.mockReturnValue(false)
+    getSubscriptionForBilling.mockResolvedValue({ id: 'sub-1' })
+    computeBillingAccessState.mockReturnValue({ isLocked: false })
     buildAccountLockedError.mockReturnValue({
       name: 'ACCOUNT_LOCKED',
       message: 'locked',
@@ -98,6 +104,7 @@ describe('billingAccessMiddleware', () => {
   it('enforces billing lock when admin is impersonating a locked tenant', async () => {
     isImpersonating.mockReturnValue(true)
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
+    computeBillingAccessState.mockReturnValue({ isLocked: true, pendingActivation: true })
     getBillingStatus.mockResolvedValue({
       access: { isLocked: true, pendingActivation: true },
       amountDue: 0,
@@ -119,6 +126,7 @@ describe('billingAccessMiddleware', () => {
 
   it('returns 402 when tenant billing access is locked (non-trial)', async () => {
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
+    computeBillingAccessState.mockReturnValue({ isLocked: true, pendingActivation: true })
     getBillingStatus.mockResolvedValue({
       access: { isLocked: true, pendingActivation: true },
       amountDue: 0,
@@ -139,6 +147,11 @@ describe('billingAccessMiddleware', () => {
 
   it('allows GET when locked for expired Free Trial', async () => {
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
+    computeBillingAccessState.mockReturnValue({
+      isLocked: true,
+      freeSandboxExpired: true,
+      lockReason: 'free_sandbox_expired',
+    })
     getBillingStatus.mockResolvedValue({
       access: {
         isLocked: true,
@@ -160,6 +173,11 @@ describe('billingAccessMiddleware', () => {
 
   it('returns 402 on POST when locked for expired Free Trial', async () => {
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
+    computeBillingAccessState.mockReturnValue({
+      isLocked: true,
+      freeSandboxExpired: true,
+      lockReason: 'free_sandbox_expired',
+    })
     getBillingStatus.mockResolvedValue({
       access: {
         isLocked: true,
@@ -200,6 +218,11 @@ describe('billingAccessMiddleware', () => {
 
   it('blocks PATCH when locked for overdue payment', async () => {
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'SUPPLIER' })
+    computeBillingAccessState.mockReturnValue({
+      isLocked: true,
+      lockReason: 'payment_overdue',
+      pendingActivation: false,
+    })
     getBillingStatus.mockResolvedValue({
       access: { isLocked: true, lockReason: 'payment_overdue', pendingActivation: false },
       amountDue: 99,
@@ -219,7 +242,7 @@ describe('billingAccessMiddleware', () => {
 
   it('returns 503 when billing check throws', async () => {
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
-    getBillingStatus.mockRejectedValue(new Error('db down'))
+    getSubscriptionForBilling.mockRejectedValue(new Error('db down'))
     const next = vi.fn()
     const res = mockRes()
     const req = {
@@ -236,6 +259,7 @@ describe('billingAccessMiddleware', () => {
 
   it('calls next when tenant is not locked', async () => {
     getRequestTenant.mockResolvedValue({ tenantId: 't1', tenantType: 'RESTAURANT' })
+    computeBillingAccessState.mockReturnValue({ isLocked: false })
     getBillingStatus.mockResolvedValue({
       access: { isLocked: false },
       amountDue: 0,

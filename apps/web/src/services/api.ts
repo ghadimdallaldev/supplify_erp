@@ -265,7 +265,6 @@ export const api = createApi({
     getMe: builder.query<User, void>({
       query: () => '/auth/me',
       providesTags: ['User'],
-      // Cache for 5 minutes to reduce requests
       keepUnusedDataFor: 300,
     }),
     getInviteSession: builder.query<
@@ -843,6 +842,7 @@ export const api = createApi({
     getSupplierMe: builder.query<{ supplier: Supplier }, void>({
       query: () => '/api/suppliers/me',
       providesTags: ['Supplier'],
+      keepUnusedDataFor: 300,
     }),
     updateSupplier: builder.mutation<Supplier, { id: string; data: Partial<Supplier> }>({
       query: ({ id, data }) => ({
@@ -892,6 +892,7 @@ export const api = createApi({
     getRestaurantMe: builder.query<{ restaurant: Restaurant }, void>({
       query: () => '/api/restaurants/me',
       providesTags: ['Restaurant'],
+      keepUnusedDataFor: 300,
     }),
     updateRestaurant: builder.mutation<Restaurant, { id: string; data: Partial<Restaurant> }>({
       query: ({ id, data }) => ({
@@ -1292,7 +1293,10 @@ export const api = createApi({
     getPendingOrdersForReceiving: builder.query<any, void>({
       query: () => '/api/receiving/pending-orders',
       providesTags: ['Receiving'],
-      ...({ pollingInterval: 15000 } as { pollingInterval?: number }),
+      ...({
+        pollingInterval: 30000,
+        skipPollingIfUnfocused: true,
+      } as { pollingInterval?: number; skipPollingIfUnfocused?: boolean }),
     }),
     getReceivingHistory: builder.query<any, void>({
       query: () => '/api/receiving/history',
@@ -3096,6 +3100,7 @@ export const api = createApi({
     getCurrentSubscription: builder.query<{ subscription: Subscription }, void>({
       query: () => '/api/subscriptions/current',
       providesTags: ['Subscription'],
+      keepUnusedDataFor: 300,
     }),
     getEntitlements: builder.query<{ entitlements: Entitlements }, void>({
       query: () => '/api/subscriptions/entitlements',
@@ -3146,6 +3151,7 @@ export const api = createApi({
     getBillingStatus: builder.query<BillingStatus, void>({
       query: () => '/api/billing/status',
       providesTags: ['Billing', 'Subscription'],
+      keepUnusedDataFor: 300,
     }),
     getBillingPaymentMethods: builder.query<{ paymentMethods: BillingPaymentMethod[] }, void>({
       query: () => '/api/billing/payment-methods',

@@ -36,7 +36,7 @@ flowchart LR
 
 ## Storage backends
 
-Configured in [`apps/api/src/config/env.js`](../../apps/api/src/config/env.js). See also [ENVIRONMENT_VARIABLES.md](../../ENVIRONMENT_VARIABLES.md) and [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) (section Storage).
+Configured in [`apps/api/src/config/env.js`](../../apps/api/src/config/env.js). See also [environment-variables.md](../deployment/environment-variables.md) and [railway-environments.md](../deployment/railway-environments.md) (section Storage).
 
 ### Local (`STORAGE_DRIVER=local`)
 
@@ -166,6 +166,6 @@ Or use full Docker (`pnpm dev:docker`) for MinIO + `STORAGE_DRIVER=s3` automatic
 
 ## Related docs
 
-- [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) — env-specific storage table
-- [ENVIRONMENT_VARIABLES.md](../../ENVIRONMENT_VARIABLES.md) — variable reference
+- [railway-environments.md](../deployment/railway-environments.md) — env-specific storage table
+- [environment-variables.md](../deployment/environment-variables.md) — variable reference
 - [docs/guides/USAGE.md](../guides/USAGE.md) — storage_mb metering on presign

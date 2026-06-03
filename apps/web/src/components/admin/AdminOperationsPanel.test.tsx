@@ -62,6 +62,6 @@ describe('AdminOperationsPanel', () => {
     } as never)
 
     render(<AdminOperationsPanel />)
-    expect(screen.getByText('All clear')).toBeInTheDocument()
+    expect(screen.getByText('No warnings')).toBeInTheDocument()
   })
 })

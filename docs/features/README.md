@@ -18,6 +18,8 @@ Deep-dive docs per product area. The route map lives in [product/features.md](..
 | [receiving-delivered-flow.md](./receiving-delivered-flow.md)             | Restaurant receiving                                                  |
 | [supplier-reviews.md](./supplier-reviews.md)                             | Post-delivery reviews                                                 |
 | [fulfillment-logistics.md](./fulfillment-logistics.md)                   | Pick/pack/ship, driver dispatch, GPS tracking (supplier + restaurant) |
+| [driver-delivery-current-state.md](./driver-delivery-current-state.md)   | Driver assignments, POD, GPS pings (current implementation)           |
+| [restaurant-operations.md](./restaurant-operations.md)                   | Inventory expiry, shortages, smart reorder reminders                  |
 | [warehouse-fulfillment.md](./warehouse-fulfillment.md)                   | Multi-warehouse routing                                               |
 | [promotions-deals.md](./promotions-deals.md)                             | Deals and coupons                                                     |
 | [staff-portal-access.md](./staff-portal-access.md)                       | Staff self-service                                                    |

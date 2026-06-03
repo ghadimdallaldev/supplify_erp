@@ -194,12 +194,22 @@
 
 ---
 
+## Operations (2026-06-03)
+
+- **Component:** `AdminOperationsPanel` (inner tabs: Summary, Email, Inventory & reorder, Fulfillment, GPS & delivery)
+- **API:** `GET /operational-summary`, `/operational/email-logs`, `/operational/fulfillment-issues`, `/operational/active-deliveries`, `/tenants/:type/:id/operational-snapshot`
+- **Tenant diagnostics:** `AdminTenantDiagnosticsDrawer` from Tenants tab **Diagnostics** button or Operations tenant picker
+- **Overview:** `operational` counters on overview + Operational health card row
+- **Health:** `emailFailures` populated from `email_delivery_log` (24h, redacted)
+- **Docs:** `docs/features/admin-operations-visibility.md`
+
 ## Remaining gaps
 
 1. **Activity pagination:** Total count is length of merged in-memory window (not global DB count) — acceptable for admin feed; document if full pagination needed.
 2. **Usage tab:** Main dashboard uses tenant aggregates, not live `usage_meter` — link to per-tenant admin views for quota detail.
-3. **Health:** Job/webhook/email failure arrays always null until collectors exist.
+3. **Health:** Job/webhook failure collectors still not implemented (email failures are collected).
 4. **Audit:** Tenant `audit_logs` table not surfaced in Admin Audit tab (by design — admin actions only).
+5. **Subscriptions list:** Still unpaginated at platform scale.
 
 ---
 

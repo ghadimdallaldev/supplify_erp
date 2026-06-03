@@ -41,7 +41,7 @@ Each promote:
 3. Runs `scripts/prune-release-tree.mjs` (removes docs, tests, seeds, e2e, dev deploy files, etc.)
 4. Commits the pruned tree and pushes
 
-Deploy on the target host with `deploy/scripts/deploy-preprod.sh` / `deploy-prod.sh`, or use [DEPLOYMENT_RAILWAY.md](../DEPLOYMENT_RAILWAY.md) for Railway.
+Deploy on the target host with `deploy/scripts/deploy-preprod.sh` / `deploy-prod.sh`, or use [deployment/railway.md](./deployment/railway.md) for Railway.
 
 ## What the prune script removes (preprod & prod)
 
@@ -55,4 +55,4 @@ Deploy on the target host with `deploy/scripts/deploy-preprod.sh` / `deploy-prod
 
 ## Deployment
 
-Docker/EC2 assets live under `deploy/`. Railway guide: [DEPLOYMENT_RAILWAY.md](../DEPLOYMENT_RAILWAY.md).
+Docker/EC2 assets live under `deploy/`. Railway guide: [deployment/railway.md](./deployment/railway.md).

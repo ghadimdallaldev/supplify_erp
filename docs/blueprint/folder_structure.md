@@ -33,5 +33,5 @@ Supplify Core/
 │   ├── OBSERVABILITY.md
 │   └── PERFORMANCE.md
 ├── deploy/                   # Docker Compose + optional VM scripts (legacy)
-└── DEPLOYMENT_RAILWAY*.md    # Railway dev / preprod / prod (primary hosting)
+└── docs/deployment/          # Railway dev / preprod / prod (primary hosting)
 ```

@@ -1,6 +1,6 @@
 # EC2 Single-Command Deployment — Design Spec
 
-> **Archived — legacy only.** Supplify production hosting uses **Railway** ([DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md)). This spec is not the current deploy path.
+> **Archived — legacy only.** Supplify production hosting uses **Railway** ([railway-environments.md](../../deployment/railway-environments.md)). This spec is not the current deploy path.
 
 **Date:** 2026-05-13  
 **Status:** Archived (superseded by Railway)

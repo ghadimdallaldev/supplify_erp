@@ -1,7 +1,7 @@
 # Deploying Supplify on Railway
 
-**Multi-environment guide (dev / preprod / prod):** [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](DEPLOYMENT_RAILWAY_ENVIRONMENTS.md)  
-**Variable reference:** [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) · [`.env.matrix.md`](.env.matrix.md)
+**Multi-environment guide (dev / preprod / prod):** [railway-environments.md](./railway-environments.md)  
+**Variable reference:** [environment-variables.md](./environment-variables.md) · [env-matrix.md](./env-matrix.md)
 
 This page is a quick single-service overview. **AWS CDK and GitHub Actions CI were removed**; use Railway for deploys.
 
@@ -137,7 +137,7 @@ Non-secret email settings load from `deploy/railway/<env>/api.env` on deploy (`E
 | development    | `EMAIL_LOG_ONLY=true` (safe log-only)                      |
 | preprod / prod | `EMAIL_LOG_ONLY=false` — requires `SMTP_PASS` in dashboard |
 
-API startup validates: when `EMAIL_ENABLED=true` and `EMAIL_LOG_ONLY=false`, you must configure `SMTP_HOST`+`SMTP_PASS` or `SENDGRID_API_KEY`. Test with `pnpm --filter @supplify/api email:test`. See [docs/features/email-system.md](docs/features/email-system.md).
+API startup validates: when `EMAIL_ENABLED=true` and `EMAIL_LOG_ONLY=false`, you must configure `SMTP_HOST`+`SMTP_PASS` or `SENDGRID_API_KEY`. Test with `pnpm --filter @supplify/api email:test`. See [../features/email-system.md](../features/email-system.md).
 
 ## 3. Web service
 
