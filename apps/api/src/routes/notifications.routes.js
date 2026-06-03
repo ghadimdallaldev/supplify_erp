@@ -8,6 +8,7 @@ import { NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import {
   ensureNotificationPreferences,
+  invalidateNotificationPreferencesCache,
   getUserNotifications,
   getUserPreferences,
   sendNotification,
@@ -169,6 +170,7 @@ router.patch('/preferences', async (req, res) => {
       throw new NotFoundError('Notification preferences not found')
     }
 
+    await invalidateNotificationPreferencesCache(userId, userType)
     const prefs = await getUserPreferences(userId, userType)
 
     res.json({

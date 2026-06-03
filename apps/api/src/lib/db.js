@@ -2,6 +2,7 @@ import { Pool } from 'pg'
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import { summarizeQuery } from './log-helpers.js'
+import { recordPoolWaitIfNeeded } from '../middlewares/request-timing.js'
 
 // Create connection pool (hosted: DATABASE_SSL=true; rejectUnauthorized defaults false for Railway)
 // min:2 keeps two physical connections warm so Railway requests never wait for a cold TCP handshake.
@@ -51,8 +52,9 @@ export async function withTransaction(fn) {
 }
 
 // Query helper with logging (params never logged to avoid PII/tokens)
-export async function query(text, params = []) {
+export async function query(text, params = [], req = null) {
   const start = Date.now()
+  if (req?._perf) recordPoolWaitIfNeeded(req)
   try {
     const result = await pool.query(text, params)
     const duration = Date.now() - start

@@ -3,6 +3,7 @@ import { logger } from './logger.js'
 import { resolveAllFeaturesForTenant } from './feature-flags.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { getCache, setCache, deleteCache } from './cache.js'
+import { startStage, mark } from '../middlewares/request-timing.js'
 import {
   RESTAURANT_LIMIT_KEYS,
   SUPPLIER_LIMIT_KEYS,
@@ -1432,14 +1433,18 @@ export function requireWithinLimit(meterType, getTenantId, getTenantType) {
  */
 export function requireFeature(featureKey, getTenantId, getTenantType) {
   return async (req, res, next) => {
+    startStage(req, 'feature')
     try {
       const tenantId = getTenantId(req)
       const tenantType = getTenantType(req)
 
       let subscription = req.subscription
-      if (!subscription) {
-        subscription = await getTenantSubscription(tenantId, tenantType)
-        req.subscription = subscription
+      if (!subscription && tenantId && tenantType) {
+        const { resolveRequestSubscription } = await import('./request-subscription.js')
+        subscription = await resolveRequestSubscription(req, {
+          tenantId,
+          tenantType,
+        })
       }
 
       const { resolveOrgBillingTenantId } = await import('./org-billing-tenant.js')
@@ -1467,6 +1472,7 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
           () => {}
         )
         const recommendedPlans = await getRecommendedPlanNames(tenantType)
+        mark(req, 'feature')
         return res.status(403).json({
           ok: false,
           data: null,
@@ -1480,10 +1486,11 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
         })
       }
 
-      // Attach subscription so route handlers can reuse it without a second DB call
       req.subscription = subscription
+      mark(req, 'feature')
       next()
     } catch (error) {
+      mark(req, 'feature')
       logger.error('Check feature middleware error:', error)
       next(error)
     }

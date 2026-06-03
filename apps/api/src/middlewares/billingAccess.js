@@ -1,10 +1,11 @@
 import { getRequestTenant } from '../lib/rbac.js'
+import { resolveRequestBillingSubscription } from '../lib/request-subscription.js'
 import {
   getBillingStatus,
-  getSubscriptionForBilling,
   computeBillingAccessState,
   buildAccountLockedError,
 } from '../lib/billing/billing-service.js'
+import { startStage, mark } from './request-timing.js'
 import { LOCK_REASON_FREE_SANDBOX_EXPIRED } from '../lib/billing/constants.js'
 import { isImpersonating } from '../lib/impersonation.js'
 import { logger } from '../lib/logger.js'
@@ -44,19 +45,29 @@ export async function billingAccessMiddleware(req, res, next) {
   // Platform admins bypass locks for admin APIs; impersonation must respect tenant billing state.
   if (req.userData.role === 'ADMIN' && !isImpersonating(req)) return next()
 
+  startStage(req, 'billing')
   try {
     const tenant = await getRequestTenant(req)
-    if (!tenant) return next()
+    if (!tenant) {
+      mark(req, 'billing')
+      return next()
+    }
 
-    // Fast path: fetch only the subscription row (1 query). If not locked, continue immediately.
-    const subscription = await getSubscriptionForBilling(tenant.tenantId, tenant.tenantType)
+    const subscription = await resolveRequestBillingSubscription(req, tenant)
     const access = computeBillingAccessState(subscription)
-    if (!access.isLocked) return next()
+    if (!access.isLocked) {
+      mark(req, 'billing')
+      return next()
+    }
 
-    if (req.method === 'GET' && isFreeTrialExpiredLock(access)) return next()
+    if (req.method === 'GET' && isFreeTrialExpiredLock(access)) {
+      mark(req, 'billing')
+      return next()
+    }
 
     // Slow path (locked): fetch full billing status for the response payload.
     const billing = await getBillingStatus(tenant.tenantId, tenant.tenantType)
+    mark(req, 'billing')
     return res.status(402).json({
       ok: false,
       data: { billing: { access: billing.access, amountDue: billing.amountDue } },
@@ -64,6 +75,7 @@ export async function billingAccessMiddleware(req, res, next) {
       requestId: req.requestId,
     })
   } catch (error) {
+    mark(req, 'billing')
     if (error.code === '42P01') return next()
     logger.error('Billing access check failed', { error: error.message })
     return res.status(503).json({
