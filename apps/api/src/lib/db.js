@@ -4,11 +4,15 @@ import { logger } from './logger.js'
 import { summarizeQuery } from './log-helpers.js'
 
 // Create connection pool (hosted: DATABASE_SSL=true; rejectUnauthorized defaults false for Railway)
+// min:2 keeps two physical connections warm so Railway requests never wait for a cold TCP handshake.
+// allowExitOnIdle:false prevents the pool from draining to zero between request bursts.
 const poolConfig = {
   connectionString: config.DATABASE_URL,
   max: config.DATABASE_POOL_MAX,
+  min: 2,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: 5000,
+  allowExitOnIdle: false,
 }
 if (config.DATABASE_SSL) {
   poolConfig.ssl = { rejectUnauthorized: config.DATABASE_SSL_REJECT_UNAUTHORIZED }

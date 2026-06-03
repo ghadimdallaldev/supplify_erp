@@ -21,6 +21,7 @@ export function DeliveryTrackingDrawer({ orderId, open, onOpenChange }: Props) {
   const { data, isLoading, isError } = useGetOrderTrackingQuery(orderId ?? '', {
     skip: !orderId || !open,
     pollingInterval: pollMs,
+    skipPollingIfUnfocused: true,
   })
 
   useEffect(() => {

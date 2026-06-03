@@ -116,10 +116,12 @@ export function Sidebar({
   const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
     skip: !disputesEnabled || isSupplier || !user,
     pollingInterval: 30_000,
+    skipPollingIfUnfocused: true,
   })
   const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
     skip: !disputesEnabled || !isSupplier || !user,
     pollingInterval: 30_000,
+    skipPollingIfUnfocused: true,
   })
   const activeDisputeCount = countActiveDisputes(
     (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []

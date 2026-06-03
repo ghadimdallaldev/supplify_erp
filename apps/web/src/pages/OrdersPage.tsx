@@ -104,13 +104,11 @@ export function OrdersPage() {
       offset: 0,
     },
     {
-      // Refetch when component mounts or when query is invalidated
       refetchOnMountOrArgChange: true,
-      // Auto-refresh lightly: when window regains focus or reconnects
-      refetchOnFocus: true,
+      refetchOnFocus: false,
       refetchOnReconnect: true,
-      // Poll every 20s to catch status changes without user action
-      pollingInterval: 20000,
+      pollingInterval: 30_000,
+      skipPollingIfUnfocused: true,
     }
   )
 
@@ -122,10 +120,12 @@ export function OrdersPage() {
   const { data: restaurantDisputesData } = useGetDisputesQuery(undefined, {
     skip: isSupplier || !disputesEnabled,
     pollingInterval: 30_000,
+    skipPollingIfUnfocused: true,
   })
   const { data: supplierDisputesData } = useGetIncomingDisputesQuery(undefined, {
     skip: !isSupplier || !disputesEnabled,
     pollingInterval: 30_000,
+    skipPollingIfUnfocused: true,
   })
   const allDisputes =
     (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []
