@@ -38,6 +38,13 @@ export interface AdminOverview {
     pendingDealPayments?: number
     overdueInvoices?: number
   }
+  operational?: {
+    emailFailed24h?: number
+    emailSkipped24h?: number
+    openFulfillmentIssues?: number
+    staleGpsDeliveries?: number
+    expiredInventoryLots?: number
+  }
   activity?: {
     ordersLast24h?: number
     chatsLast24h?: number

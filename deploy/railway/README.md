@@ -6,11 +6,14 @@ Non-secret configuration for Railway lives here. On deploy, the API and web Dock
 
 ## Layout
 
-| Environment     | API            | Web build             | Keycloak URIs + realm import                       |
-| --------------- | -------------- | --------------------- | -------------------------------------------------- |
-| **development** | `development/` | `development/web.env` | `KEYCLOAK_CLIENT.md` + `realm-export.json`         |
-| **preprod**     | `preprod/`     | `preprod/web.env`     | `KEYCLOAK_CLIENT.md` + `realm-export.preprod.json` |
-| **production**  | `production/`  | `production/web.env`  | `KEYCLOAK_CLIENT.md` + `realm-export.prod.json`    |
+| Environment     | API            | Web build               | Keycloak (Dockerfile + `--import-realm`)               |
+| --------------- | -------------- | ----------------------- | ------------------------------------------------------ |
+| **development** | `development/` | `development/web.env`   | `development/keycloak/railway.json` → realm `Supplify` |
+| **preprod**     | `preprod/`     | `preprod/web.env`       | `preprod/keycloak/railway.json` → `supplify-preprod`   |
+| **staging**     | `staging/`     | _(use preprod web.env)_ | `staging/keycloak/railway.json` → `supplify-preprod`   |
+| **production**  | `production/`  | `production/web.env`    | `production/keycloak/railway.json` → `supplify-prod`   |
+
+Keycloak Railway setup (all envs): [`keycloak/RAILWAY_SETUP.md`](keycloak/RAILWAY_SETUP.md).
 
 Each folder: `api.env`, `web.env`, `secrets.env.example`, `keycloak.env`.
 
@@ -19,7 +22,7 @@ Each folder: `api.env`, `web.env`, `secrets.env.example`, `keycloak.env`.
 1. **API** service → Variables → Raw Editor → paste contents of `development/secrets.env.example` and fill `CHANGE_ME` values.
 2. Add reference: `DATABASE_URL=${{Postgres-dev.DATABASE_URL}}` (service name must match your Postgres plugin).
 3. **Web** service — no runtime vars required if you deploy from this repo (build uses `development/web.env`). Optionally set secrets if you add any later.
-4. **Keycloak** service → paste `development/keycloak.env` + secrets from `secrets.env.example` in Raw Editor.
+4. **Keycloak** service → config `deploy/railway/<env>/keycloak/railway.json` (auto-import realm; see `keycloak/RAILWAY_SETUP.md`); paste `<env>/keycloak.env` + Postgres `KC_DB_*` + `KEYCLOAK_ADMIN_PASSWORD` on **Keycloak and API**.
 5. Clear any dashboard **`PORT`** override on API (let Railway inject `PORT`).
 6. Push to git → redeploy all services.
 7. After deploy, run **`pnpm db:migrate`** against that environment’s Postgres (see [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) § H). Restaurant ops + GPS need migrations **0133–0137** applied once per environment.
