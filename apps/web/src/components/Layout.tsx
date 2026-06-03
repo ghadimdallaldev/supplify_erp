@@ -78,10 +78,20 @@ export function Layout() {
   const { isImpersonating, isPlatformAdmin, shouldLoadTenantEntitlements } = useImpersonation()
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, {
     skip: !shouldLoadTenantEntitlements,
+    refetchOnFocus: false,
+    refetchOnMountOrArgChange: false,
   })
   const { data: billingStatus } = useGetBillingStatusQuery(undefined, {
     skip: !shouldLoadBillingStatus(isPlatformAdmin, isImpersonating),
+    refetchOnFocus: false,
+    refetchOnMountOrArgChange: false,
   })
+
+  // Keep shell caches warm on the server (entitlements TTL) without refetching on tab focus.
+  useEffect(() => {
+    if (!shouldLoadTenantEntitlements) return
+    dispatch(api.endpoints.getEntitlements.initiate(undefined, { subscribe: false }))
+  }, [dispatch, shouldLoadTenantEntitlements])
   const [recordConversionEvent] = useRecordConversionEventMutation()
 
   useEffect(() => {
