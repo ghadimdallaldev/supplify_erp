@@ -25,7 +25,7 @@ Each folder: `api.env`, `web.env`, `secrets.env.example`, `keycloak.env`.
 4. **Keycloak** service → config `deploy/railway/<env>/keycloak/railway.json` (auto-import realm; see `keycloak/RAILWAY_SETUP.md`); paste `<env>/keycloak.env` + Postgres `KC_DB_*` + `KEYCLOAK_ADMIN_PASSWORD` on **Keycloak and API**.
 5. Clear any dashboard **`PORT`** override on API (let Railway inject `PORT`).
 6. Push to git → redeploy all services.
-7. After deploy, run **`pnpm db:migrate`** against that environment’s Postgres (see [railway-environments.md](../../docs/deployment/railway-environments.md) § H). Restaurant ops + GPS need migrations **0133–0137** applied once per environment.
+7. After deploy, run **`pnpm db:migrate`** against that environment’s Postgres (see [railway-environments.md](../../docs/operations/railway-environments.md) § H). Restaurant ops + GPS need migrations **0133–0137** applied once per environment.
 
 ## Email (Railway)
 
