@@ -3,6 +3,7 @@ import { config } from '../config/env.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
+import { getCache, setCache } from './cache.js'
 import {
   getEffectiveTenant,
   impersonationCanAccessBranch,
@@ -27,6 +28,8 @@ import {
   userHasOwnerRole,
 } from './tenant-roles.js'
 import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
+
+const TENANT_REQ_CACHE_TTL = 60 // seconds
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -421,6 +424,11 @@ export async function assignDefaultRoleForTenant(userId, tenantId, tenantType) {
  * Get the tenant (restaurant or supplier) for this request.
  * When admin is impersonating, returns the impersonated tenant.
  * Otherwise for RESTAURANT/SUPPLIER resolves by contact_email.
+ *
+ * Process-level caching (60s TTL, via getCache/setCache) is applied only on the common path
+ * where there is no impersonation, no active-tenant cookie, and no x-branch-id header.
+ * Impersonation and branch-switch paths always bypass the cache.
+ *
  * @param {import('express').Request} req
  * @returns {Promise<{ tenantId: string, tenantType: string, tenantName: string } | null>}
  */
@@ -473,6 +481,60 @@ export async function getRequestTenant(req) {
   }
 
   if (activeFromCookie) return finish(activeFromCookie)
+
+  // --- Process-level cache for the common path (no impersonation, no active-tenant cookie, no branch header) ---
+  const userId = req.userData.id
+  const tenantType = req.userData.role
+  if (
+    (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') &&
+    !branchHeader &&
+    !activeFromCookie &&
+    !effective
+  ) {
+    const processCacheKey = `tenant:req:${userId}:${tenantType}`
+    const cachedTenant = await getCache(processCacheKey)
+    if (cachedTenant !== null) {
+      return finish(cachedTenant === 'null' ? null : cachedTenant)
+    }
+
+    let resolved = null
+
+    const assignment = await getTenantAssignmentForUser(userId, tenantType)
+    if (assignment?.tenantId) {
+      const allowed = await userCanAccessTenant(
+        userId,
+        req.userData.email,
+        assignment.tenantId,
+        assignment.tenantType
+      )
+      if (allowed) {
+        resolved = {
+          tenantId: assignment.tenantId,
+          tenantType: assignment.tenantType,
+          tenantName: assignment.tenantName || '',
+        }
+      }
+    }
+
+    if (!resolved) {
+      const email = (req.userData.email || '').trim().toLowerCase()
+      if (email) {
+        const primary = await getPrimaryTenantForUser(email, tenantType)
+        if (primary) {
+          resolved = {
+            tenantId: primary.id,
+            tenantType,
+            tenantName: primary.name || '',
+          }
+        }
+      }
+    }
+
+    // Cache null as the sentinel string 'null' so a getCache miss (returns null) is distinguishable
+    await setCache(processCacheKey, resolved ?? 'null', TENANT_REQ_CACHE_TTL).catch(() => {})
+    return finish(resolved)
+  }
+  // --- End process-level cache ---
 
   if (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER') {
     const assignment = await getTenantAssignmentForUser(req.userData.id, req.userData.role)
