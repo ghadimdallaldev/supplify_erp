@@ -3,6 +3,7 @@ import { requireAuth, resolveTenantContext } from '../lib/rbac.js'
 import { notificationsMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { config } from '../config/env.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import {
@@ -288,10 +289,38 @@ router.post('/read-all', async (req, res) => {
   }
 })
 
-// Test notification endpoint (for admin/suppliers to test)
+// Test notification endpoint (dev/debug only)
 router.post('/test', async (req, res) => {
+  if (!config.ENABLE_DEBUG_ROUTES) {
+    return res.status(404).json({ ok: false, error: { name: 'NOT_FOUND', message: 'Not found' } })
+  }
   try {
-    const { title, message, notificationType = 'TEST', notificationCategory = 'test' } = req.body
+    const {
+      title,
+      message,
+      notificationType = 'TEST',
+      notificationCategory = 'test',
+      emailTo,
+    } = req.body
+
+    if (emailTo) {
+      const { sendTemplateEmail } = await import('../services/email/email.service.js')
+      const emailResult = await sendTemplateEmail({
+        to: emailTo,
+        template: 'auth.test',
+        subject: title || 'Supplify email test',
+        data: { message: message || 'Test email from Supplify' },
+        eventType: 'test',
+        eventKey: `test:${emailTo}:${Date.now()}`,
+        skipDedup: true,
+      })
+      return res.json({
+        ok: true,
+        data: { emailResult },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
 
     const notification = await sendNotification({
       userId: req.userData.id,

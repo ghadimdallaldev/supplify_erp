@@ -12,6 +12,20 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
+import {
+  listExpiryLots,
+  getExpirySummary,
+  createExpiryLot,
+  updateExpiryLot,
+  archiveExpiryLot,
+  getExpirySettings,
+  updateExpirySettings,
+  runExpiryReminderCheck,
+} from '../services/inventory-expiry.service.js'
+import {
+  listRestaurantReminders,
+  recomputeCadencePatterns,
+} from '../services/reorder-cadence.service.js'
 
 const router = express.Router()
 
@@ -952,6 +966,185 @@ router.get(
         },
         requestId: req.requestId,
       })
+    }
+  }
+)
+
+const expiryLotSchema = z.object({
+  itemName: z.string().min(1),
+  productId: z.string().uuid().optional().nullable(),
+  supplierId: z.string().uuid().optional().nullable(),
+  branchId: z.string().uuid().optional().nullable(),
+  orderId: z.string().uuid().optional().nullable(),
+  orderItemId: z.string().uuid().optional().nullable(),
+  productSku: z.string().optional().nullable(),
+  quantity: z.number().min(0).optional(),
+  unit: z.string().optional(),
+  batchLotNumber: z.string().optional().nullable(),
+  receivedDate: z.string().optional().nullable(),
+  expiryDate: z.string().min(1),
+  storageLocation: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
+
+router.get('/expiry', requireRole(['RESTAURANT', 'ADMIN']), async (req, res, next) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) throw new ValidationError('Restaurant not found')
+    const data = await listExpiryLots(restaurantId, {
+      status: req.query.status,
+      supplierId: req.query.supplier_id || req.query.supplierId,
+      storageLocation: req.query.storage_location || req.query.storageLocation,
+      categoryId: req.query.category_id || req.query.categoryId,
+    })
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/expiry/summary', requireRole(['RESTAURANT', 'ADMIN']), async (req, res, next) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) throw new ValidationError('Restaurant not found')
+    const summary = await getExpirySummary(restaurantId)
+    res.json({ ok: true, data: { summary }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/expiry/settings', requireRole(['RESTAURANT', 'ADMIN']), async (req, res, next) => {
+  try {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) throw new ValidationError('Restaurant not found')
+    const settings = await getExpirySettings(restaurantId)
+    res.json({ ok: true, data: { settings }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.patch(
+  '/expiry/settings',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const settings = await updateExpirySettings(restaurantId, {
+        expiringSoonDays: req.body.expiringSoonDays ?? req.body.expiring_soon_days,
+      })
+      res.json({ ok: true, data: { settings }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/expiry',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const body = expiryLotSchema.parse(req.body)
+      const lot = await createExpiryLot(restaurantId, body)
+      res.status(201).json({ ok: true, data: { lot }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.patch(
+  '/expiry/:lotId',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const lot = await updateExpiryLot(restaurantId, req.params.lotId, req.body)
+      res.json({ ok: true, data: { lot }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.delete(
+  '/expiry/:lotId',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const result = await archiveExpiryLot(restaurantId, req.params.lotId)
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/expiry/check-reminders',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const result = await runExpiryReminderCheck({ restaurantId })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/reorder-reminders',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const reminders = await listRestaurantReminders(restaurantId)
+      res.json({ ok: true, data: { reminders }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/reorder-cadence/recompute',
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVENTORY_MANAGE'),
+  requireFeature(
+    'smart_reorder',
+    (req) => req.tenantContext?.tenantId,
+    (req) => req.tenantContext?.tenantType
+  ),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const result = await recomputeCadencePatterns({ restaurantId })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
     }
   }
 )

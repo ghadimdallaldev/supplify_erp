@@ -156,6 +156,14 @@ function amendmentItems(amendment: AmendmentLike): unknown {
 
 type ReplacementOrderLike = Record<string, unknown>
 
+export type DeliveryAssignmentTimeline = {
+  status: string
+  driverName?: string | null
+  assignedAt?: string | null
+  pickedUpAt?: string | null
+  deliveredAt?: string | null
+}
+
 export interface BuildOrderTimelineInput {
   order: OrderLike
   viewerRole?: TimelineViewerRole
@@ -165,6 +173,66 @@ export interface BuildOrderTimelineInput {
   receivingReports?: ReceivingLike[]
   creditNotes?: CreditNoteLike[]
   replacementOrders?: ReplacementOrderLike[]
+  deliveryAssignment?: DeliveryAssignmentTimeline | null
+}
+
+const DRIVER_STATUS_RANK: Record<string, number> = {
+  assigned: 1,
+  picked_up: 2,
+  out_for_delivery: 3,
+  delivered: 4,
+  failed: 4,
+  rescheduled: 0,
+}
+
+function pushDriverDeliveryMilestones(
+  events: TimelineEvent[],
+  assignment: DeliveryAssignmentTimeline | null | undefined,
+  statusRank: number
+) {
+  if (!assignment?.status) return
+  const driverRank = DRIVER_STATUS_RANK[assignment.status] ?? 0
+  if (driverRank < 1) return
+
+  const driverLabel = assignment.driverName ? ` (${assignment.driverName})` : ''
+
+  const steps: Array<{ id: string; title: string; minRank: number; ts?: string | null }> = [
+    {
+      id: 'driver-assigned',
+      title: 'Driver assigned',
+      minRank: 1,
+      ts: assignment.assignedAt,
+    },
+    { id: 'driver-picked-up', title: 'Picked up', minRank: 2, ts: assignment.pickedUpAt },
+    {
+      id: 'driver-out-for-delivery',
+      title: 'Out for delivery',
+      minRank: 3,
+    },
+    {
+      id: 'driver-delivered',
+      title: 'Delivered by driver',
+      minRank: 4,
+      ts: assignment.deliveredAt,
+    },
+  ]
+
+  for (const step of steps) {
+    const done = driverRank >= step.minRank
+    events.push({
+      id: step.id,
+      title: step.title + driverLabel,
+      description: done
+        ? `Delivery milestone: ${step.title.toLowerCase()}.`
+        : `Pending: ${step.title.toLowerCase()}.`,
+      timestamp: done ? formatTs(step.ts ?? null) : null,
+      state: done
+        ? 'completed'
+        : driverRank + 1 === step.minRank && statusRank >= MILESTONE.SHIPPED
+          ? 'current'
+          : 'upcoming',
+    })
+  }
 }
 
 function pushCoreFulfillmentSteps(
@@ -230,6 +298,19 @@ function pushCoreFulfillmentSteps(
     timestamp: milestoneTimestamp(order, MILESTONE.SHIPPED, statusRank),
     state: stepState(statusRank, MILESTONE.SHIPPED),
   })
+}
+
+function pushCoreDeliveryCompletionSteps(
+  events: TimelineEvent[],
+  input: {
+    order: OrderLike
+    statusRank: number
+    supplierName: string
+    viewerRole: TimelineViewerRole
+  }
+) {
+  const { order, statusRank, supplierName, viewerRole } = input
+  const isSupplier = viewerRole === 'SUPPLIER'
 
   if (isSupplier) {
     events.push({
@@ -332,6 +413,7 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     receivingReports = [],
     creditNotes = [],
     replacementOrders = [],
+    deliveryAssignment = null,
   } = input
 
   const orderDisputes = disputes.filter((d) => disputeOrderId(d) === order.id)
@@ -373,6 +455,15 @@ export function buildOrderTimeline(input: BuildOrderTimelineInput): TimelineEven
     statusRank: effectiveRank,
     supplierName,
     restaurantName,
+    viewerRole,
+  })
+
+  pushDriverDeliveryMilestones(events, deliveryAssignment, effectiveRank)
+
+  pushCoreDeliveryCompletionSteps(events, {
+    order: { ...order, status: effectiveStatus },
+    statusRank: effectiveRank,
+    supplierName,
     viewerRole,
   })
 

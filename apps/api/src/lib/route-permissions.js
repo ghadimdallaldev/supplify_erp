@@ -71,6 +71,9 @@ export function ordersRouterMutationGuard(req, res, next) {
   if (method === 'POST' && /\/remind$/.test(path)) {
     return next()
   }
+  if (method === 'POST' && /\/location$/.test(path)) {
+    return next()
+  }
   if (method === 'POST') {
     return requireAnyPermission(P.ORDERS_CREATE, P.ORDERS_MANAGE)(req, res, next)
   }

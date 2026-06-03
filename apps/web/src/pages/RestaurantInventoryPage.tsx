@@ -41,6 +41,7 @@ import toast from 'react-hot-toast'
 import { formatNumber } from '../utils/format'
 import { featureEnabled } from '../lib/planLimits'
 import { RestaurantWastePanel } from '../components/inventory/RestaurantWastePanel'
+import { ExpiryInventoryTab } from '../components/inventory/ExpiryInventoryTab'
 import { RequirePermission } from '../components/RequirePermission'
 
 export function RestaurantInventoryPage() {
@@ -301,6 +302,7 @@ export function RestaurantInventoryPage() {
               <TabsTrigger value="waste">Waste & spoilage</TabsTrigger>
             ) : null}
             <TabsTrigger value="history">Movement History</TabsTrigger>
+            <TabsTrigger value="expiry">Expiry tracking</TabsTrigger>
             <TabsTrigger value="totals">Totals & Sources</TabsTrigger>
           </TabsList>
 
@@ -702,6 +704,10 @@ export function RestaurantInventoryPage() {
               />
             </TabsContent>
           ) : null}
+
+          <TabsContent value="expiry" className="space-y-6">
+            <ExpiryInventoryTab />
+          </TabsContent>
 
           <TabsContent value="history" className="space-y-6">
             <Card>

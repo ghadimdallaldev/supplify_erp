@@ -1,6 +1,8 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError, ForbiddenError } from '../middlewares/errorHandler.js'
 import { assertSupplierOwnsOrder, updateDeliveryStatus } from './driver-fulfillment.service.js'
+import { getLatestLocationsForDrivers } from './driver-location.service.js'
+import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
 
 const ACTIVE_ROUTE_STATUSES = ['PLANNED', 'IN_PROGRESS']
 const DELIVERABLE_ORDER_STATUSES = ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED']
@@ -226,9 +228,27 @@ export async function getDeliveryRoute(supplierId, routeId, { driverIdScope = nu
     throw new ForbiddenError('You can only view your own routes')
   }
   const stops = await loadRouteStops(routeId)
+  const locationMap = route.driver_id
+    ? await getLatestLocationsForDrivers([route.driver_id])
+    : new Map()
+  const locRow = route.driver_id ? locationMap.get(route.driver_id) : null
+
+  const enrichedStops = stops.map((stop) => ({
+    ...stop,
+    tracking: buildTrackingPayload({
+      orderId: stop.orderId,
+      locationRow: locRow,
+      allowDriverFallback: true,
+    }),
+  }))
+
   return {
-    ...mapRouteSummary(route, stops),
-    stops,
+    ...mapRouteSummary(route, enrichedStops),
+    stops: enrichedStops,
+    tracking: buildTrackingPayload({
+      locationRow: locRow,
+      allowDriverFallback: true,
+    }),
     startedAt: route.started_at,
     completedAt: route.completed_at,
   }

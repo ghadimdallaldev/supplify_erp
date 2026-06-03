@@ -157,7 +157,7 @@ export function Sidebar({
         testId: 'nav-my-prices',
       },
       {
-        name: 'Quick Lists',
+        name: 'Ordering Lists',
         href: '/app/quick-lists',
         icon: List,
         permission: 'ORDERS_VIEW',

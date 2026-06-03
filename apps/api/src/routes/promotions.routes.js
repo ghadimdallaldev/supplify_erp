@@ -549,6 +549,8 @@ router.post('/admin/:id/reject', ...adminDealGuards, async (req, res, next) => {
       target_id: req.params.id,
       payload_json: { rejectionReason: body.rejectionReason || null },
     })
+    const { notifyDealRejected } = await import('../services/notification.service.js')
+    notifyDealRejected(rows[0], { rejectionReason: body.rejectionReason || null }).catch(() => {})
     res.json({ ok: true, data: { deal: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
@@ -1010,6 +1012,13 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
       target_id: promotion.id,
       payload_json: { resource_type: 'deal', name: promotion.name },
     })
+    if (body.submitForReview) {
+      const { rows: supplierRows } = await query(`SELECT name FROM supplier WHERE id = $1`, [
+        supplierId,
+      ])
+      const { notifyDealSubmitted } = await import('../services/notification.service.js')
+      notifyDealSubmitted(finalPromotion, { supplierName: supplierRows[0]?.name }).catch(() => {})
+    }
     res.status(201).json({
       ok: true,
       data: { promotion: finalPromotion },

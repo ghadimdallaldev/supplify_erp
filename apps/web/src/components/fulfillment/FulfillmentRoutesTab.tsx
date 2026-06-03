@@ -7,6 +7,7 @@ import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
 import { useGetFulfillmentRouteQuery, useGetFulfillmentRoutesQuery } from '../../services/api'
 import { FulfillmentRouteDetailPanel } from './FulfillmentRouteDetailPanel'
+import { DeliveryTrackingDrawer } from './DeliveryTrackingDrawer'
 
 type Props = {
   warehouseId?: string
@@ -15,6 +16,7 @@ type Props = {
 export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
   const { data, isLoading, isError, refetch } = useGetFulfillmentRoutesQuery()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
 
   const {
     data: detailData,
@@ -147,8 +149,20 @@ export function FulfillmentRoutesTab({ warehouseId: _warehouseId }: Props) {
         </div>
       )}
       {selectedId && detailData?.route && !detailLoading && (
-        <FulfillmentRouteDetailPanel route={detailData.route} onClose={() => setSelectedId(null)} />
+        <FulfillmentRouteDetailPanel
+          route={detailData.route}
+          onClose={() => setSelectedId(null)}
+          onViewTracking={setTrackingOrderId}
+        />
       )}
+
+      <DeliveryTrackingDrawer
+        orderId={trackingOrderId}
+        open={!!trackingOrderId}
+        onOpenChange={(open) => {
+          if (!open) setTrackingOrderId(null)
+        }}
+      />
     </div>
   )
 }

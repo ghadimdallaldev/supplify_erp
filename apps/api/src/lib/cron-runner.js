@@ -12,6 +12,8 @@ export const CRON_JOBS = {
   INVITATION_EXPIRY: 'invitation_expiry',
   FREE_SANDBOX_EXPIRY: 'free_sandbox_expiry',
   FULFILLMENT_EXCEPTIONS: 'fulfillment_exceptions',
+  OPERATIONAL_REMINDERS: 'operational_reminders',
+  DRIVER_LOCATION_RETENTION: 'driver_location_retention',
 }
 
 const runningJobs = new Set()

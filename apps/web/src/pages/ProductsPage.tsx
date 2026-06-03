@@ -26,6 +26,7 @@ import { Package, Search, Plus, Upload, Download, TrendingUp, TrendingDown } fro
 import { useAppDispatch, useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
+import { AddToOrderingListButton } from '../components/ordering/AddToOrderingListButton'
 import toast from 'react-hot-toast'
 import { apiUrl } from '../lib/apiBase'
 import {
@@ -754,15 +755,25 @@ French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45`
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         {!isSupplier && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddToCart(product)}
-                            disabled={!product.available_qty || product.available_qty <= 0}
-                            data-testid={`product-add-to-cart-${product.id}`}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add to Cart
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleAddToCart(product)}
+                              disabled={!product.available_qty || product.available_qty <= 0}
+                              data-testid={`product-add-to-cart-${product.id}`}
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add to Cart
+                            </Button>
+                            {product.supplier_id && (
+                              <AddToOrderingListButton
+                                productId={product.id}
+                                supplierId={product.supplier_id}
+                                productName={product.name}
+                                defaultUnit={product.unit}
+                              />
+                            )}
+                          </>
                         )}
                         {isSupplier && (
                           <>

@@ -15,6 +15,7 @@ import {
   useGetIncomingDisputesQuery,
   useGetReceivingHistoryQuery,
   useGetCreditNotesQuery,
+  useGetOrderTrackingQuery,
 } from '../services/api'
 import { Link as RouterLink } from 'react-router-dom'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
@@ -51,7 +52,11 @@ import toast from 'react-hot-toast'
 import { formatPrice } from '../utils/format'
 import { buildOrderTimeline } from '../lib/orderTimeline'
 import { OrderOperationsTimeline } from '../components/orders/OrderOperationsTimeline'
+import { OrderDeliveryTrackingPanel } from '../components/orders/OrderDeliveryTrackingPanel'
+import { RestaurantOrderTrackingPanel } from '../components/orders/RestaurantOrderTrackingPanel'
+import { isRestaurantOrderTracking, isSupplierOrderTracking } from '../types'
 import { OrderSubstitutionPanel } from '../components/supplier/OrderSubstitutionPanel'
+import { SupplierFulfillmentIssuePanel } from '../components/supplier/SupplierFulfillmentIssuePanel'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
 import { getOrderCancellationBanner, getOrderStatusLabel } from '../lib/orderStatusDisplay'
 import { formatOrderRef, isDisputeReplacementOrder } from '../lib/orderPlacement'
@@ -109,6 +114,7 @@ export function OrderDetailPage() {
   }, [tabFromUrl])
 
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
+  const { data: orderTracking } = useGetOrderTrackingQuery(id!, { skip: !id })
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const amendmentsEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
@@ -342,6 +348,25 @@ export function OrderDetailPage() {
       ''
   )
 
+  const deliveryAssignmentForTimeline = (() => {
+    if (isRestaurantOrderTracking(orderTracking) && orderTracking.delivery) {
+      return {
+        status: orderTracking.delivery.status,
+        driverName: orderTracking.driver?.name ?? null,
+        assignedAt: orderTracking.delivery.assignedAt ?? null,
+        pickedUpAt: orderTracking.delivery.pickedUpAt ?? null,
+        deliveredAt: orderTracking.delivery.deliveredAt ?? null,
+      }
+    }
+    if (isSupplierOrderTracking(orderTracking) && orderTracking.assignment) {
+      return {
+        status: orderTracking.assignment.status,
+        driverName: orderTracking.assignment.driverName ?? null,
+      }
+    }
+    return null
+  })()
+
   const timelineEvents = buildOrderTimeline({
     order,
     viewerRole: isSupplier ? 'SUPPLIER' : 'RESTAURANT',
@@ -351,6 +376,7 @@ export function OrderDetailPage() {
     receivingReports: orderReceivingReports,
     creditNotes: creditNotesData?.creditNotes ?? [],
     replacementOrders: replacementOrders ?? [],
+    deliveryAssignment: deliveryAssignmentForTimeline,
   })
 
   return (
@@ -535,6 +561,13 @@ export function OrderDetailPage() {
           {/* Timeline Tab (default) */}
           <TabsContent value="timeline" className="space-y-4">
             {isSupplier && id && <OrderSubstitutionPanel orderId={id} />}
+            {isSupplier && id && order?.items?.length > 0 && (
+              <SupplierFulfillmentIssuePanel orderId={id} items={order.items} />
+            )}
+            {isSupplier && id && <OrderDeliveryTrackingPanel orderId={id} />}
+            {!isSupplier && id && (
+              <RestaurantOrderTrackingPanel orderId={id} orderStatus={order.status} />
+            )}
             <OrderOperationsTimeline
               events={timelineEvents}
               viewerRole={isSupplier ? 'SUPPLIER' : 'RESTAURANT'}

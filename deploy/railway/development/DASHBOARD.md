@@ -20,13 +20,27 @@ KEYCLOAK_ADMIN_PASSWORD=<Keycloak container admin password>
 Optional override only if needed:
 
 ```env
-SMTP_HOST=localhost
-SMTP_PORT=1025
+# Email defaults load from development/api.env (EMAIL_LOG_ONLY=true).
+# Set SMTP_PASS in secrets.env.example only when testing real SMTP sends.
 ```
 
 ## Web service
 
 Clear all `VITE_*` from the dashboard — the Docker build uses `development/web.env` from git.
+
+**Optional (map embed):** To show embedded Google Maps instead of “Open in Google Maps” only, add a **one-time** build override on the web service, then redeploy web:
+
+```env
+VITE_GOOGLE_MAPS_API_KEY=<your Google Maps JavaScript API key>
+```
+
+GPS tracking works without this key (fallback link still works).
+
+## After this deploy (GPS + restaurant ops)
+
+1. Run migrations **0133–0137** on dev Postgres (`pnpm db:migrate` with dev `DATABASE_URL`).
+2. Redeploy **API** and **Web** (API loads `development/api.env`; web rebuild picks `development/web.env`).
+3. No extra dashboard vars for GPS unless you enable map embed (above) or server-side `GOOGLE_MAPS_API_KEY` on API.
 
 ## Wrong values that break login (not 502)
 

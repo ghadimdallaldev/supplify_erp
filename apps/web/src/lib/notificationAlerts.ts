@@ -29,6 +29,7 @@ export function resolveNotificationUrl(notification: NotificationLike): string {
   if (type === 'INVOICE') return id ? `/app/invoices` : '/app/invoices'
   if (type === 'CONVERSATION' || type === 'CHAT' || type === 'MESSAGE') return '/app/chat'
   if (type === 'QUICK_LIST' && id) return '/app/quick-lists'
+  if (type === 'INVENTORY_EXPIRY') return '/app/inventory?tab=expiry'
   if (type === 'PRODUCT') return '/app/products'
   if (type === 'STAFF_PTO' || type === 'STAFF_SWAP') return '/app/staff'
   return '/app/notifications'

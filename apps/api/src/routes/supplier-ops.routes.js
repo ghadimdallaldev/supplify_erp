@@ -43,6 +43,13 @@ import {
   getOrderForAmendment,
   notifyAmendmentParty,
 } from '../services/order-amendments.service.js'
+import {
+  listFulfillmentIssues,
+  createShortageIssue,
+  createSubstitutionIssue,
+  openFulfillmentChat,
+} from '../services/order-fulfillment-issues.service.js'
+import { listSupplierAtRisk } from '../services/reorder-cadence.service.js'
 import { query } from '../lib/db.js'
 
 const router = express.Router()
@@ -431,6 +438,126 @@ router.post(
       if (!rows.length) throw new ValidationError('Amendment not found or not pending')
       await notifyAmendmentParty(order, rows[0], 'rejected')
       res.json({ ok: true, data: { amendment: rows[0] }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+const fulfillmentIssueBaseSchema = z.object({
+  orderItemId: z.string().uuid(),
+  shortageQuantity: z.number().optional(),
+  availableQuantity: z.number().optional(),
+  replacementProductId: z.string().uuid().optional(),
+  replacementQuantity: z.number().optional(),
+  replacementUnit: z.string().optional(),
+  message: z.string().optional(),
+})
+
+router.get(
+  '/orders/:orderId/fulfillment-issues',
+  requirePermission('ORDERS_VIEW'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const issues = await listFulfillmentIssues(req.params.orderId, supplierId)
+      res.json({ ok: true, data: { issues }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/orders/:orderId/fulfillment-issues/shortage',
+  requireAnyPermission('ORDERS_MANAGE', 'FULFILLMENT_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const body = fulfillmentIssueBaseSchema.parse(req.body)
+      const result = await createShortageIssue({
+        orderId: req.params.orderId,
+        supplierId,
+        orderItemId: body.orderItemId,
+        createdByUserId: req.userData.id,
+        shortageQuantity: body.shortageQuantity,
+        availableQuantity: body.availableQuantity,
+        replacementProductId: body.replacementProductId,
+        replacementQuantity: body.replacementQuantity,
+        replacementUnit: body.replacementUnit,
+        message: body.message,
+      })
+      res.status(201).json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/orders/:orderId/fulfillment-issues/substitution',
+  requireAnyPermission('ORDERS_MANAGE', 'FULFILLMENT_MANAGE'),
+  amendmentsGate,
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const body = fulfillmentIssueBaseSchema
+        .extend({
+          substituteProductId: z.string().uuid().optional(),
+        })
+        .parse(req.body)
+      const result = await createSubstitutionIssue({
+        orderId: req.params.orderId,
+        supplierId,
+        orderItemId: body.orderItemId,
+        createdByUserId: req.userData.id,
+        substituteProductId: body.substituteProductId || body.replacementProductId,
+        replacementQuantity: body.replacementQuantity,
+        replacementUnit: body.replacementUnit,
+        availableQuantity: body.availableQuantity,
+        message: body.message,
+      })
+      res.status(201).json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/orders/:orderId/fulfillment-issues/open-chat',
+  requireAnyPermission('ORDERS_MANAGE', 'FULFILLMENT_MANAGE', 'CHAT_SEND'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const body = z
+        .object({
+          orderItemId: z.string().uuid(),
+          message: z.string().optional(),
+        })
+        .parse(req.body)
+      const result = await openFulfillmentChat({
+        orderId: req.params.orderId,
+        supplierId,
+        orderItemId: body.orderItemId,
+        createdByUserId: req.userData.id,
+        message: body.message,
+      })
+      res.status(201).json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/reorder-cadence/at-risk',
+  requireAnyPermission('ORDERS_MANAGE', 'PROMOTIONS_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const atRisk = await listSupplierAtRisk(supplierId)
+      res.json({ ok: true, data: { atRisk }, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }

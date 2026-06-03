@@ -1,22 +1,58 @@
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { sendMail } from './mailer.service.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
 import { getEntitlements, isFeatureEnabled } from '../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from './whatsapp.service.js'
 import { sendWebPushToUser, isPushConfigured } from './push.service.js'
 import { emitNotificationNew } from '../lib/socket.js'
+import { sendTemplateEmail } from './email/email.service.js'
+import {
+  buildNotificationEventKey,
+  resolveNotificationTemplate,
+} from './email/template-resolver.js'
 
 /**
- * Notification Service — email via Twilio SendGrid or SMTP; WhatsApp via Twilio (with wa.me fallback in metadata).
+ * Notification Service — email via email.service (SMTP/SendGrid); WhatsApp via Twilio.
  */
 
 const emailService = {
-  async send(email, subject, html, text) {
+  async send({
+    email,
+    subject,
+    message,
+    notificationType,
+    notificationCategory,
+    referenceId,
+    referenceType,
+    metadata,
+    userId,
+    tenantId,
+  }) {
     if (!email) return false
     try {
-      await sendMail({ to: email, subject, text, html })
-      return true
+      const template = resolveNotificationTemplate(notificationCategory, notificationType)
+      const eventKey = buildNotificationEventKey({
+        notificationCategory,
+        referenceType,
+        referenceId,
+        userId,
+        tenantId,
+      })
+      const result = await sendTemplateEmail({
+        to: email,
+        template,
+        subject,
+        data: {
+          title: subject,
+          message,
+          ...(metadata && typeof metadata === 'object' ? metadata : {}),
+        },
+        tenantId,
+        eventType: notificationCategory || notificationType || 'notification',
+        eventKey,
+        entityId: referenceId,
+      })
+      return Boolean(result.sent || result.logOnly || result.preview)
     } catch (error) {
       logger.error('Email send failed', { error: error.message })
       return false
@@ -52,6 +88,9 @@ const DEFAULT_NOTIFICATION_PREFS = {
   notify_staff_announcement: true,
   notify_staff_document: true,
   notify_scheduled_order: true,
+  notify_inventory_expiring: true,
+  notify_reorder_cadence: true,
+  notify_billing: true,
 }
 
 const CATEGORY_PREF_MAP = {
@@ -70,6 +109,10 @@ const CATEGORY_PREF_MAP = {
   payment_received: 'notify_payment_received',
   low_stock: 'notify_low_stock',
   inventory_alerts: 'notify_low_stock',
+  inventory_expiring: 'notify_inventory_expiring',
+  inventory_expired: 'notify_inventory_expiring',
+  reorder_cadence_missed: 'notify_reorder_cadence',
+  order_fulfillment_issue: 'notify_order_new',
   out_of_stock: 'notify_out_of_stock',
   system_updates: 'notify_system_updates',
   promotions: 'notify_promotions',
@@ -89,6 +132,19 @@ const CATEGORY_PREF_MAP = {
   dispute_opened: 'notify_system_updates',
   dispute_resolved: 'notify_system_updates',
   dispute_rejected: 'notify_system_updates',
+  billing_trial_started: 'notify_billing',
+  billing_trial_ending: 'notify_billing',
+  billing_trial_expired: 'notify_billing',
+  billing_activated: 'notify_billing',
+  billing_renewed: 'notify_billing',
+  billing_payment_failed: 'notify_billing',
+  billing_cancelled: 'notify_billing',
+  billing_plan_changed: 'notify_billing',
+  billing_trial_extended: 'notify_billing',
+  billing_account_locked: 'notify_billing',
+  deal_submitted: 'notify_promotions',
+  deal_rejected: 'notify_promotions',
+  deal_expired: 'notify_promotions',
   test: 'notify_system_updates',
 }
 
@@ -451,7 +507,18 @@ export async function sendNotification({
 
     if (channels.email && contact?.email) {
       try {
-        results.email = await emailService.send(contact.email, title, null, message)
+        results.email = await emailService.send({
+          email: contact.email,
+          subject: title,
+          message,
+          notificationType,
+          notificationCategory,
+          referenceId,
+          referenceType,
+          metadata: metadataPayload,
+          userId,
+          tenantId,
+        })
       } catch (error) {
         logger.error('Email send failed', { error: error.message })
       }
@@ -636,8 +703,18 @@ export async function notifyGuestReservationConfirmation(reservation, restaurant
 
   if (customerEmail) {
     try {
-      await emailService.send(customerEmail, title, null, message)
-      results.email = true
+      const template = status === 'WAITLIST' ? 'reservation.waitlist' : 'reservation.confirmation'
+      const result = await sendTemplateEmail({
+        to: customerEmail,
+        template,
+        subject: title,
+        data: { title, message, tenantName: venue },
+        eventType: 'guest_reservation',
+        eventKey: `reservation:guest:${reservation.id}:${status}`,
+        entityId: reservation.id,
+        skipDedup: false,
+      })
+      results.email = Boolean(result.sent || result.logOnly || result.preview)
     } catch (error) {
       logger.error('Guest reservation email failed', { error: error.message })
     }
@@ -799,6 +876,67 @@ export async function notifyOrderStatusChange(order, status) {
     tenantType: 'RESTAURANT',
     ...payload,
   })
+}
+
+const DRIVER_MILESTONE_MESSAGES = {
+  driver_assigned: {
+    title: 'Driver assigned',
+    restaurant: (o) => `A driver has been assigned to your order #${o.id.slice(0, 8)}`,
+    supplier: (o) => `Driver assigned to order #${o.id.slice(0, 8)}`,
+  },
+  out_for_delivery: {
+    title: 'Out for delivery',
+    restaurant: (o) => `Your order #${o.id.slice(0, 8)} is out for delivery`,
+    supplier: (o) => `Order #${o.id.slice(0, 8)} is out for delivery`,
+  },
+  delivered: {
+    title: 'Delivery completed',
+    restaurant: (o) => `Your order #${o.id.slice(0, 8)} has been delivered`,
+    supplier: (o) => `Order #${o.id.slice(0, 8)} marked delivered`,
+  },
+  failed_delivery: {
+    title: 'Delivery failed',
+    restaurant: (o) => `Delivery failed for order #${o.id.slice(0, 8)}`,
+    supplier: (o) => `Delivery failed for order #${o.id.slice(0, 8)}`,
+  },
+}
+
+/** In-app notifications for driver delivery milestones (no email per ping). */
+export async function notifyDriverDeliveryMilestone({ order, supplierId, milestone, driverName }) {
+  const defs = DRIVER_MILESTONE_MESSAGES[milestone]
+  if (!defs || !order?.id) return null
+
+  const base = {
+    notificationType: 'ORDER',
+    notificationCategory: milestone,
+    referenceId: order.id,
+    referenceType: 'ORDER',
+    metadata: {
+      order_id: order.id,
+      milestone,
+      driver_name: driverName || null,
+    },
+  }
+
+  await notifyTenantUsers({
+    tenantId: order.restaurant_id,
+    tenantType: 'RESTAURANT',
+    title: defs.title,
+    message: defs.restaurant(order),
+    ...base,
+  })
+
+  if (supplierId) {
+    await notifyTenantUsers({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+      title: defs.title,
+      message: defs.supplier(order),
+      ...base,
+    })
+  }
+
+  return true
 }
 
 export async function notifyReservationCreated(reservation) {
@@ -1294,5 +1432,301 @@ export async function notifyDisputeResolved(dispute, outcome, { replacementOrder
   } catch (err) {
     logger.error('notifyDisputeResolved failed', { err: err.message })
     return null
+  }
+}
+
+async function listPlatformAdminUserIds(limit = 50) {
+  const { rows } = await query(
+    `
+    SELECT DISTINCT ur.user_id AS id
+    FROM user_role ur
+    JOIN role r ON r.id = ur.role_id
+    WHERE r.tenant_type = 'ADMIN'
+    LIMIT $1
+    `,
+    [limit]
+  )
+  return rows.map((r) => r.id)
+}
+
+async function notifyBillingEvent(tenantId, tenantType, category, title, message, metadata = {}) {
+  try {
+    const sent = await notifyTenantUsers({
+      tenantId,
+      tenantType,
+      notificationType: 'BILLING',
+      notificationCategory: category,
+      title,
+      message,
+      referenceType: 'SUBSCRIPTION',
+      referenceId: metadata.subscriptionId || null,
+      metadata: { ctaUrl: '/app/billing', ...metadata },
+    })
+    return sent
+  } catch (err) {
+    logger.error('Billing notification failed', { err: err.message, category, tenantId })
+    return []
+  }
+}
+
+export async function notifyBillingTrialStarted({ tenantId, tenantType, planName, trialEndsAt }) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_trial_started',
+    'Trial started',
+    `Your Supplify trial${planName ? ` (${planName})` : ''} has started.${trialEndsAt ? ` It ends on ${trialEndsAt}.` : ''}`,
+    { trialEndsAt }
+  )
+}
+
+export async function notifyBillingTrialEnding({ tenantId, tenantType, daysLeft, trialEndsAt }) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_trial_ending',
+    'Trial ending soon',
+    `Your Supplify trial ends in ${daysLeft} day(s)${trialEndsAt ? ` (${trialEndsAt})` : ''}. Add a payment method to keep full access.`,
+    { daysLeft, trialEndsAt }
+  )
+}
+
+export async function notifyBillingTrialExpired({ tenantId, tenantType }) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_trial_expired',
+    'Trial expired',
+    'Your Supplify trial has expired. Subscribe to restore write access.',
+    {}
+  )
+}
+
+export async function notifyBillingActivated({ tenantId, tenantType, planName }) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_activated',
+    'Subscription activated',
+    `Your Supplify subscription${planName ? ` (${planName})` : ''} is now active.`,
+    { planName }
+  )
+}
+
+export async function notifyBillingRenewed({ tenantId, tenantType, periodEnd }) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_renewed',
+    'Subscription renewed',
+    `Your subscription was renewed${periodEnd ? ` through ${periodEnd}.` : '.'}`,
+    { periodEnd }
+  )
+}
+
+export async function notifyBillingPaymentFailed({ tenantId, tenantType, reason }) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_payment_failed',
+    'Payment failed',
+    `We could not process your subscription payment.${reason ? ` ${reason}` : ''} Update your payment method to avoid interruption.`,
+    { reason }
+  )
+}
+
+export async function notifyBillingCancelled({ tenantId, tenantType }) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_cancelled',
+    'Subscription cancelled',
+    'Your Supplify subscription has been cancelled.',
+    {}
+  )
+}
+
+export async function notifyBillingAccountLocked({ tenantId, tenantType, reason }) {
+  return notifyBillingEvent(
+    tenantId,
+    tenantType,
+    'billing_account_locked',
+    'Account restricted',
+    `Write access is restricted${reason ? `: ${reason}` : ''}. Visit billing to restore access.`,
+    { reason }
+  )
+}
+
+export async function notifyDealRejected(deal, { rejectionReason } = {}) {
+  const supplierId = deal.supplier_id || deal.supplierId
+  if (!supplierId) return null
+  try {
+    return notifyTenantUsers({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+      notificationType: 'PROMOTION',
+      notificationCategory: 'deal_rejected',
+      title: 'Deal rejected',
+      message: `Your deal "${deal.name || deal.title || 'promotion'}" was not approved.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+      referenceId: deal.id,
+      referenceType: 'DEAL',
+      metadata: { rejectionReason },
+    })
+  } catch (err) {
+    logger.error('notifyDealRejected failed', { err: err.message, dealId: deal.id })
+    return null
+  }
+}
+
+export async function notifyDealSubmitted(deal, { supplierName } = {}) {
+  const supplierId = deal.supplier_id || deal.supplierId
+  const label = supplierName || 'A supplier'
+  try {
+    await notifyTenantUsers({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+      notificationType: 'PROMOTION',
+      notificationCategory: 'deal_submitted',
+      title: 'Deal submitted for review',
+      message: `Your deal "${deal.name || deal.title}" was submitted and is pending admin approval.`,
+      referenceId: deal.id,
+      referenceType: 'DEAL',
+    })
+    const adminIds = await listPlatformAdminUserIds(20)
+    for (const userId of adminIds) {
+      await sendNotification({
+        userId,
+        userType: 'ADMIN',
+        notificationType: 'PROMOTION',
+        notificationCategory: 'deal_submitted',
+        title: 'Deal requires approval',
+        message: `${label} submitted "${deal.name || deal.title}" for approval.`,
+        referenceId: deal.id,
+        referenceType: 'DEAL',
+        metadata: { ctaUrl: '/admin/promotions' },
+      }).catch(() => {})
+    }
+  } catch (err) {
+    logger.error('notifyDealSubmitted failed', { err: err.message, dealId: deal.id })
+  }
+}
+
+export async function notifyDealExpired(deal) {
+  const supplierId = deal.supplier_id || deal.supplierId
+  if (!supplierId) return null
+  try {
+    return notifyTenantUsers({
+      tenantId: supplierId,
+      tenantType: 'SUPPLIER',
+      notificationType: 'PROMOTION',
+      notificationCategory: 'deal_expired',
+      title: 'Deal expired',
+      message: `Your deal "${deal.name || deal.title || 'promotion'}" has expired.`,
+      referenceId: deal.id,
+      referenceType: 'DEAL',
+    })
+  } catch (err) {
+    logger.error('notifyDealExpired failed', { err: err.message, dealId: deal.id })
+    return null
+  }
+}
+
+export async function notifyStaffShiftEvent(
+  staffMemberId,
+  restaurantId,
+  { title, message, shiftId }
+) {
+  try {
+    const { rows } = await query(
+      `SELECT email, display_name, app_user_id FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+      [staffMemberId, restaurantId]
+    )
+    const staff = rows[0]
+    if (staff?.email) {
+      await sendTemplateEmail({
+        to: staff.email,
+        template: 'staff.shift',
+        subject: title,
+        data: { message, title, recipientName: staff.display_name, tenantName: null },
+        tenantId: restaurantId,
+        eventType: 'staff.shift',
+        eventKey: shiftId ? `staff:shift:${shiftId}:${staffMemberId}` : undefined,
+        entityId: shiftId,
+      })
+    }
+    if (staff?.app_user_id) {
+      return sendNotification({
+        userId: staff.app_user_id,
+        userType: 'RESTAURANT',
+        notificationType: 'STAFF',
+        notificationCategory: 'staff_clock',
+        title,
+        message,
+        referenceId: shiftId || null,
+        referenceType: 'STAFF_SHIFT',
+      })
+    }
+    return null
+  } catch (err) {
+    logger.error('notifyStaffShiftEvent failed', { err: err.message })
+    return null
+  }
+}
+
+export async function notifyStaffAnnouncement(restaurantId, { title, message, announcementId }) {
+  try {
+    return notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationType: 'STAFF',
+      notificationCategory: 'staff_announcement',
+      title: title || 'Team announcement',
+      message,
+      referenceId: announcementId || null,
+      referenceType: 'STAFF_ANNOUNCEMENT',
+    })
+  } catch (err) {
+    logger.error('notifyStaffAnnouncement failed', { err: err.message })
+    return null
+  }
+}
+
+export async function notifyStaffDocumentUploaded(restaurantId, { title, message, documentId }) {
+  try {
+    return notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationType: 'STAFF',
+      notificationCategory: 'staff_document',
+      title: title || 'New document',
+      message,
+      referenceId: documentId || null,
+      referenceType: 'STAFF_DOCUMENT',
+    })
+  } catch (err) {
+    logger.error('notifyStaffDocumentUploaded failed', { err: err.message })
+    return null
+  }
+}
+
+export async function notifyAdminNewTenant({ tenantId, tenantType, tenantName, contactEmail }) {
+  try {
+    const adminIds = await listPlatformAdminUserIds(50)
+    const message = `New ${tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'} "${tenantName}" registered${contactEmail ? ` (${contactEmail})` : ''}.`
+    for (const userId of adminIds) {
+      await sendNotification({
+        userId,
+        userType: 'ADMIN',
+        notificationType: 'SYSTEM',
+        notificationCategory: 'system_updates',
+        title: `New ${tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'} registered`,
+        message,
+        referenceId: tenantId,
+        referenceType: 'TENANT',
+        metadata: { tenantType, tenantName, ctaUrl: '/admin' },
+      }).catch(() => {})
+    }
+  } catch (err) {
+    logger.error('notifyAdminNewTenant failed', { err: err.message })
   }
 }
