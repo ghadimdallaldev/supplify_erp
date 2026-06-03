@@ -9,7 +9,7 @@ Supplify’s pricing is designed so that **Free** demonstrates the product witho
 - **Free is for setup and testing** — Low limits (e.g. 3 orders/day, 3 chats/day, 15 products, 1 supplier for restaurants; 0 warehouses, 15 products for suppliers) so users see value quickly but hit friction when they try to run operations on Free. This creates a clear “upgrade to get real work done” moment.
 - **Gold is the default serious plan** — Restaurants and suppliers running daily operations are expected to be on Gold (or higher). Gold unlocks multi-branch/multi-warehouse, reports, smart reorder, and higher limits so it’s the natural step after Free or Silver.
 - **Platinum is “never think about limits”** — For chains and large suppliers who don’t want to worry about caps. Very high or unlimited limits and the full feature set.
-- **Enterprise** — Custom limits, SLAs, and contracts; assigned only by admin. Not self-serve. See **docs/monetization/ENTERPRISE.md**.
+- **Enterprise** — Custom limits, SLAs, and contracts; assigned only by admin. Not self-serve. See **docs/product/enterprise.md**.
 
 ### How we surface upgrades
 

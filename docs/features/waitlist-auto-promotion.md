@@ -74,4 +74,4 @@ Offer links use `PUBLIC_RESERVATION_BASE_URL` or `WEB_ORIGIN`:
 - `apps/api/src/services/waitlistPromotion.test.js`
 - `apps/api/src/routes/reservations.routes.test.js`, `public.routes.test.js`
 - `apps/web/src/pages/PublicReservationWaitlistOffer.test.tsx`, `ReservationsPage.test.tsx`
-- Manual: **PUB-14 … PUB-16**, **RST-42a … RST-42c** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md)
+- Manual: **PUB-14 … PUB-16**, **RST-42a … RST-42c** in [regression-checklist.md](../qa/regression-checklist.md)

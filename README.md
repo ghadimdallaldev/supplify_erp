@@ -19,7 +19,7 @@ Open **http://localhost:5173** (native dev) or use full Docker below.
 | `preprod` | Pre-production deploy (pruned tree) |
 | `prod`    | Production deploy (pruned tree)     |
 
-See **[docs/BRANCHING.md](docs/BRANCHING.md)** for promote workflow.
+See **[docs/operations/branching.md](docs/operations/branching.md)** for promote workflow.
 
 ## Documentation
 
@@ -30,8 +30,8 @@ Full guide: **[docs/README.md](docs/README.md)**
 | **Feature catalog**        | [docs/product/features.md](docs/product/features.md)                                                                                                                      |
 | Local Docker workflow      | [docs/README.md](docs/README.md)                                                                                                                                          |
 | Database migrations        | [docs/guides/database-migrations.md](docs/guides/database-migrations.md)                                                                                                  |
-| Admin feature toggles      | [docs/admin/admin-feature-flags.md](docs/admin/admin-feature-flags.md)                                                                                                    |
-| Railway (dev/preprod/prod) | [docs/deployment/railway-environments.md](docs/deployment/railway-environments.md) · [docs/deployment/environment-variables.md](docs/deployment/environment-variables.md) |
+| Admin feature toggles      | [docs/admin/feature-flags.md](docs/admin/feature-flags.md)                                                                                                                |
+| Railway (dev/preprod/prod) | [docs/operations/railway-environments.md](docs/operations/railway-environments.md) · [docs/operations/environment-variables.md](docs/operations/environment-variables.md) |
 | Production deploy (Docker) | [deploy/README.md](deploy/README.md)                                                                                                                                      |
 
 ## Scripts
@@ -47,7 +47,7 @@ pnpm test:ci      # alias for test:all
 pnpm db:migrate   # SQL migrations
 ```
 
-**Testing:** Full guide in [docs/qa/QA_AUTOMATION_GUIDE.md](docs/qa/QA_AUTOMATION_GUIDE.md). API mock patterns: [docs/API_TEST_SUITE_STABILIZATION.md](docs/API_TEST_SUITE_STABILIZATION.md). Use `pnpm test:api:watch` only while developing; use `pnpm test:api` for final verification (not `pnpm test`, which watches).
+**Testing:** Full guide in [docs/qa/testing-guide.md](docs/qa/testing-guide.md). API mock patterns: [docs/API_TEST_SUITE_STABILIZATION.md](docs/API_TEST_SUITE_STABILIZATION.md). Use `pnpm test:api:watch` only while developing; use `pnpm test:api` for final verification (not `pnpm test`, which watches).
 
 ## Environment variables (keys only)
 
@@ -61,7 +61,7 @@ Copy env templates per target: `apps/api/.env.dev.example`, `.env.preprod.exampl
 | `WEB_ORIGIN` / `WEB_ORIGINS`         | Allowed browser origins (CORS)                                                                                            |
 | `SESSION_SECRET`                     | Express session signing                                                                                                   |
 | `KEYCLOAK_*`                         | OIDC realm, client, admin API                                                                                             |
-| `STORAGE_*`                          | Object storage (`local` or `s3`-compatible); see [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md) |
+| `STORAGE_*`                          | Object storage (`local` or `s3`-compatible); see [docs/operations/storage-uploads.md](docs/operations/storage-uploads.md) |
 | `VAPID_*`                            | Web Push                                                                                                                  |
 | `TWILIO_*` / `SENDGRID_*` / `SMTP_*` | Messaging                                                                                                                 |
 | `E2E_SECRET`                         | Enables `/api/e2e` test helpers when set                                                                                  |

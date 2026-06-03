@@ -2,7 +2,7 @@
 
 DB plan code **`free`** is marketed as **Free Trial** — a **time-limited evaluation sandbox**, not a forever-free production tier. During the trial, tenants keep **broad feature access** (`0112` Gold parity). After expiry, the workspace locks for **writes** but remains **readable**.
 
-**Related:** [tenant-registration-activation.md](./tenant-registration-activation.md) · [monetization/SUBSCRIPTIONS.md](../monetization/SUBSCRIPTIONS.md) · [qa/FREE_TRIAL_BEHAVIOR_AUDIT.md](../qa/FREE_TRIAL_BEHAVIOR_AUDIT.md)
+**Related:** [tenant-registration.md](./tenant-registration.md) · [monetization/SUBSCRIPTIONS.md](../product/subscriptions.md) · [qa/FREE_TRIAL_BEHAVIOR_AUDIT.md](../qa/FREE_TRIAL_BEHAVIOR_AUDIT.md)
 
 ## Product rules
 
@@ -79,15 +79,15 @@ sequenceDiagram
 
 ## Tests
 
-| Layer         | File                                                            |
-| ------------- | --------------------------------------------------------------- |
-| Unit (API)    | `apps/api/src/middlewares/billingAccess.test.js`                |
-| Unit (API)    | `apps/api/src/lib/billing/billing-service.test.js`              |
-| Unit (API)    | `apps/api/src/lib/platform-settings.test.js`                    |
-| Manual QA     | `docs/qa/MANUAL_TEST_CHECKLIST.md` — **§4.6 Free Trial expiry** |
-| Audit / risks | `docs/qa/FREE_TRIAL_BEHAVIOR_AUDIT.md`                          |
+| Layer         | File                                                           |
+| ------------- | -------------------------------------------------------------- |
+| Unit (API)    | `apps/api/src/middlewares/billingAccess.test.js`               |
+| Unit (API)    | `apps/api/src/lib/billing/billing-service.test.js`             |
+| Unit (API)    | `apps/api/src/lib/platform-settings.test.js`                   |
+| Manual QA     | `docs/qa/regression-checklist.md` — **§4.6 Free Trial expiry** |
+| Audit / risks | `docs/archive/audits/free-trial-behavior-audit.md`             |
 
 ## QA references
 
-- **BIL-FT-01 … BIL-FT-12** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md)
+- **BIL-FT-01 … BIL-FT-12** in [regression-checklist.md](../qa/regression-checklist.md)
 - SQL shortcut to simulate expiry in [FREE_TRIAL_BEHAVIOR_AUDIT.md](../qa/FREE_TRIAL_BEHAVIOR_AUDIT.md)

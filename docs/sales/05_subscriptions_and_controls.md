@@ -7,11 +7,11 @@ Every restaurant and supplier has a **subscription** with a **plan** (Free Trial
 ### Plan tiers (conceptual)
 
 - **Free Trial** (DB code `free`) — **Time-limited** evaluation sandbox (default **7 days**, admin **3–7**). Broad features during trial; after expiry, **read-only** access to existing data until upgrade or admin extension.
-- **Silver** — First paid tier ($49/mo). Single location, up to 3 users; core ordering, chat, quick lists, receiving photos, marketplace deals (restaurant redemptions capped per day; supplier up to 3 active promotions). **Not** included: smart reorder, advanced roles, driver management, waitlist auto-promotion. Details: [SUBSCRIPTIONS.md](../monetization/SUBSCRIPTIONS.md).
+- **Silver** — First paid tier ($49/mo). Single location, up to 3 users; core ordering, chat, quick lists, receiving photos, marketplace deals (restaurant redemptions capped per day; supplier up to 3 active promotions). **Not** included: smart reorder, advanced roles, driver management, waitlist auto-promotion. Details: [SUBSCRIPTIONS.md](../product/subscriptions.md).
 - **Gold** — The default plan for serious daily use. Multi-branch, more orders and products, analytics, and key features.
 - **Platinum** — For scale. Very high or unlimited limits and the full feature set so you don’t think about caps.
 
-Restaurant and supplier plans are aligned (same tier names, different limit sets: branches vs warehouses, etc.). See **docs/monetization/SUBSCRIPTIONS.md** and **docs/monetization/PLANS.md** for exact matrices.
+Restaurant and supplier plans are aligned (same tier names, different limit sets: branches vs warehouses, etc.). See **docs/product/subscriptions.md** and **docs/product/plans.md** for exact matrices.
 
 ### How subscription changes work
 

@@ -1,6 +1,6 @@
 # EC2 Single-Command Deployment Implementation Plan
 
-> **Archived — legacy only.** Current deploy path: **Railway** ([railway-environments.md](../../deployment/railway-environments.md)).
+> **Archived — legacy only.** Current deploy path: **Railway** ([railway-environments.md](../../operations/railway-environments.md)).
 
 > **For agentic workers:** Historical plan only — do not treat as active deployment work unless explicitly reviving VM deploy.
 

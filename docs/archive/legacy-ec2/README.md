@@ -4,7 +4,7 @@ These documents describe the **EC2 + Docker Compose** one-command deploy flow (`
 
 Supplify’s active deployment path is **Railway** (dev / preprod / prod). See:
 
-- [railway-environments.md](../../deployment/railway-environments.md)
+- [railway-environments.md](../../operations/railway-environments.md)
 - [deploy/README.md](../../../deploy/README.md) — Docker on a VM is optional/legacy
 
 Files in this folder:

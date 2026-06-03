@@ -51,7 +51,7 @@ Foreground alerts: `useNotificationAlerts` in `Layout` (toast ~10s, sound, brows
 
 - [waitlist-auto-promotion.md](./waitlist-auto-promotion.md)
 - [features.md](../product/features.md) — Reservations section
-- [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) — Part 5 (PUB-\*), §6.8 (RST-35+, RST-42a–c), waitlist offers (PUB-14–16)
+- [regression-checklist.md](../qa/regression-checklist.md) — Part 5 (PUB-\*), §6.8 (RST-35+, RST-42a–c), waitlist offers (PUB-14–16)
 
 ## Tests
 

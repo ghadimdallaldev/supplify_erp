@@ -29,7 +29,7 @@ After seed (`scripts\run-local.cmd seed` or `pnpm db:seed` + `pnpm seed:demo-use
 
 ## New tenant signup & activation
 
-Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` (Free tier without a card, or paid checkout). See [tenant-registration-activation.md](../features/tenant-registration-activation.md) and QA Part 1–2 in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md).
+Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` (Free tier without a card, or paid checkout). See [tenant-registration.md](../features/tenant-registration.md) and QA Part 1–2 in [regression-checklist.md](../qa/regression-checklist.md).
 
 ## Roles & navigation
 
@@ -101,12 +101,12 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 ## Fulfillment & supplier inventory
 
-| Feature                | Web route                      | API prefix                                                                   | Notes                                                                                                                  |
-| ---------------------- | ------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Fulfillment            | `/app/fulfillment`             | `/api/fulfillment/*`, `/api/orders/:id/tracking`, `/api/orders/:id/location` | Driver dispatch, routes, GPS tracking (supplier); see [fulfillment-logistics.md](../features/fulfillment-logistics.md) |
-| Order GPS (restaurant) | Order detail `/app/orders/:id` | `GET /api/orders/:id/tracking`                                               | `RestaurantOrderTrackingPanel`; sanitized payload; manual QA **GPS-R01–R10**                                           |
-| Supplier inventory     | `/app/inventory`               | `/api/inventory`                                                             | Stock levels, reservations                                                                                             |
-| Supplier settings      | `/app/supplier-settings`       | `/api/suppliers`                                                             | Onboarding / profile                                                                                                   |
+| Feature                | Web route                      | API prefix                                                                   | Notes                                                                                                                        |
+| ---------------------- | ------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Fulfillment            | `/app/fulfillment`             | `/api/fulfillment/*`, `/api/orders/:id/tracking`, `/api/orders/:id/location` | Driver dispatch, routes, GPS tracking (supplier); see [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md) |
+| Order GPS (restaurant) | Order detail `/app/orders/:id` | `GET /api/orders/:id/tracking`                                               | `RestaurantOrderTrackingPanel`; sanitized payload; manual QA **GPS-R01–R10**                                                 |
+| Supplier inventory     | `/app/inventory`               | `/api/inventory`                                                             | Stock levels, reservations                                                                                                   |
+| Supplier settings      | `/app/supplier-settings`       | `/api/suppliers`                                                             | Onboarding / profile                                                                                                         |
 
 **Verify:** Supplier login → Fulfillment → dispatch + **View tracking**; driver ping → Live badge. Restaurant → in-flight order detail → tracking panel. Tests: `delivery-tracking-payload.test.js`, `restaurant-tracking-payload.test.js`, `orders-driver-tracking.test.js`, `driver-location.service.test.js`; manual **GPS-S\***, **GPS-R\***, **DRV-GPS\***.
 
@@ -190,7 +190,7 @@ Tests: `subscriptions.routes.test.js`, `feature-flags.test.js`, `subscription.te
 | WhatsApp             | Settings → Notifications         | —                    | Twilio / `wa.me` link in metadata                                           |
 | Web Push (PWA)       | Settings (restaurant onboarding) | `/api/push`          | VAPID keys on API; `usePushNotifications` + `/sw.js`; opt-in `push_enabled` |
 
-See [NOTIFICATIONS_SUMMARY.md](./NOTIFICATIONS_SUMMARY.md), [notifications-delivery.md](../features/notifications-delivery.md), and [push-notifications.md](../features/push-notifications.md).
+See [notifications-summary.md](./notifications-summary.md) and [notifications-and-alerts.md](../features/notifications-and-alerts.md).
 
 Tests: `notification.service.test.js`, `push.service.test.js`, `orderStatusDisplay.test.ts`.
 

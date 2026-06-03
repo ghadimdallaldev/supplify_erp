@@ -22,7 +22,7 @@
 - **Critical E2E**: `e2e/suites/critical_e2e/` — `auth.spec.ts`, `rbac.spec.ts`, `orders.spec.ts`, `catalog.spec.ts`, `subscription-limits.spec.ts`
 - **Nightly**: `e2e/suites/nightly/nightly.spec.ts`
 - **API**: `api/admin-rbac.spec.ts`, `api/registration-activation.spec.ts`, `api/promotions-deals-gates.spec.ts`
-- **Free Trial expiry (unit)**: `apps/api/src/middlewares/billingAccess.test.js`, `apps/api/src/lib/billing/billing-service.test.js`, `apps/api/src/lib/platform-settings.test.js` — manual **BIL-FT-\*** in `docs/qa/MANUAL_TEST_CHECKLIST.md`
+- **Free Trial expiry (unit)**: `apps/api/src/middlewares/billingAccess.test.js`, `apps/api/src/lib/billing/billing-service.test.js`, `apps/api/src/lib/platform-settings.test.js` — manual **BIL-FT-\*** in [docs/qa/regression-checklist.md](../docs/qa/regression-checklist.md)
 - **Unit (deals/promotions)**: `apps/api/src/services/promotions.service.test.js`, `apps/api/src/services/deal-promotions.service.test.js`, `apps/api/src/services/deal-lifecycle.service.test.js`, `apps/api/src/routes/promotions.routes.test.js`, `apps/api/src/routes/feature-gates.routes.test.js`, `apps/web/src/lib/planLimits.test.ts`, `apps/web/src/lib/upgradeCopy.test.ts`
 - **Unit (RBAC/receiving/timeline)**: `workspace-membership.test.js`, `rbac-guards.test.js`, `tenant-roles.routes.test.js`, `receiving.routes.test.js`, `orderReceiving.test.ts`, `orderTimeline.test.ts`
 

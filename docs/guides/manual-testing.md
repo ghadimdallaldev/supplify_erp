@@ -25,10 +25,10 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 **Notes:**
 
 - **Numbers:** Currency and numeric values should come from the API and use shared formatters (`formatCurrency` / `formatPrice`).
-- **Tiers & features:** Enforced via `requireFeature`, `checkLimit`. Silver limits/features: migration `0117` · `pnpm run log:tier-limits`. Full gate matrix: [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) Part 3.
-- **Free Trial expiry:** [free-trial-expiry.md](../features/free-trial-expiry.md); full regression cases **BIL-FT-01 … BIL-FT-12** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md) §4.6.
-- **Impersonation:** [admin-impersonation.md](../features/admin-impersonation.md) — start from Tenants tab; full tenant nav; exit via sticky banner; QA **ADM-IMP-01 … ADM-IMP-10** in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md).
-- **Delivery GPS:** [fulfillment-logistics.md](../features/fulfillment-logistics.md) — restaurant **GPS-R01–R10** (§6.6.1), supplier **GPS-S01–S09** (§7.4.1), driver **DRV-GPS1–3** (§7.4.2); receiving flow [receiving-delivered-flow.md](../features/receiving-delivered-flow.md).
+- **Tiers & features:** Enforced via `requireFeature`, `checkLimit`. Silver limits/features: migration `0117` · `pnpm run log:tier-limits`. Full gate matrix: [regression-checklist.md](../qa/regression-checklist.md) Part 3.
+- **Free Trial expiry:** [free-trial-expiry.md](../features/free-trial-expiry.md); full regression cases **BIL-FT-01 … BIL-FT-12** in [regression-checklist.md](../qa/regression-checklist.md) §4.6.
+- **Impersonation:** [admin-impersonation.md](../features/admin-impersonation.md) — start from Tenants tab; full tenant nav; exit via sticky banner; QA **ADM-IMP-01 … ADM-IMP-10** in [regression-checklist.md](../qa/regression-checklist.md).
+- **Delivery GPS:** [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md) — restaurant **GPS-R01–R10** (§6.6.1), supplier **GPS-S01–S09** (§7.4.1), driver **DRV-GPS1–3** (§7.4.2); receiving flow [receiving.md](../features/receiving.md).
 
 ---
 
@@ -58,7 +58,7 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 
 - [ ] **Cart** — lines, quantity, place order.
 - [ ] **Orders** — list, **server-side search**, inbox filters, **order detail** actions.
-- [ ] **Order delivery tracking (restaurant)** — assigned driver → GPS states on timeline tab (`RestaurantOrderTrackingPanel`); **Receive order** when `DELIVERED`; see [fulfillment-logistics.md](../features/fulfillment-logistics.md) and checklist **GPS-R01–R10**.
+- [ ] **Order delivery tracking (restaurant)** — assigned driver → GPS states on timeline tab (`RestaurantOrderTrackingPanel`); **Receive order** when `DELIVERED`; see [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md) and checklist **GPS-R01–R10**.
 - [ ] **Supplier decline** — as supplier, decline a `PLACED` order with a reason; as restaurant, confirm status **Declined by supplier** and reason on list + detail (see [order-decline.md](../features/order-decline.md)).
 
 ---
@@ -75,11 +75,11 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 
 - [ ] **Staff** — team, schedule/time, PTO, swaps, docs/incidents, payroll tabs as applicable.
 - [ ] **Restaurant inventory** — levels, adjustments.
-- [ ] **Receiving** — pending/history, submit report; confirm driver **DELIVERED** (not `COMPLETED`) appears in pending list ([receiving-delivered-flow.md](../features/receiving-delivered-flow.md)).
+- [ ] **Receiving** — pending/history, submit report; confirm driver **DELIVERED** (not `COMPLETED`) appears in pending list ([receiving.md](../features/receiving.md)).
 - [ ] **Invoices** — list, detail, payment recording.
 - [ ] **Deals** — Silver+ feed; Free Trial **1 redemption/day** cap (see RST-82/83 in checklist).
 - [ ] **Chat** — threads, send, **real-time delivery** (second browser), typing indicator, attachments if present.
-- [ ] **Notifications** — bell + Socket.IO toast on new order/message (see §4.10 WS-\* in [MANUAL_TEST_CHECKLIST.md](../qa/MANUAL_TEST_CHECKLIST.md)).
+- [ ] **Notifications** — bell + Socket.IO toast on new order/message (see §4.10 WS-\* in [regression-checklist.md](../qa/regression-checklist.md)).
 
 ---
 

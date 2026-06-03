@@ -4,7 +4,7 @@ Canonical feature diagrams live under `docs/diagrams/`. Legacy blueprint diagram
 
 **Validate:** `pnpm run docs:diagrams:check`
 
-**Tier source of truth:** [FINAL_TIER_MATRIX.md](../monetization/FINAL_TIER_MATRIX.md)
+**Tier source of truth:** [FINAL_TIER_MATRIX.md](../product/tier-matrix.md)
 
 ---
 
@@ -22,7 +22,7 @@ Canonical feature diagrams live under `docs/diagrams/`. Legacy blueprint diagram
 | ------------------------------------------------------------------------------------ | ------------------------------------------------ | ------- | ----------------------------------------------------- |
 | [billing/free-trial-lifecycle.mmd](billing/free-trial-lifecycle.mmd)                 | Free Trial expiry, read-only lock, upgrade       | current | `docs/features/free-trial-expiry.md`                  |
 | [billing/subscription-tier-resolution.mmd](billing/subscription-tier-resolution.mmd) | Silver/Gold/Platinum entitlements, bronze→silver | current | `apps/api/src/lib/subscription.js`                    |
-| [billing/branch-addon-flow.mmd](billing/branch-addon-flow.mmd)                       | Branch limits, add-ons, 6-branch Enterprise cap  | current | `docs/BRANCHES_WAREHOUSES_AUDIT.md`                   |
+| [billing/branch-addon-flow.mmd](billing/branch-addon-flow.mmd)                       | Branch limits, add-ons, 6-branch Enterprise cap  | current | `docs/archive/audits/branches-warehouses-audit.md`    |
 | [billing/warehouse-addon-flow.mmd](billing/warehouse-addon-flow.mmd)                 | Supplier warehouse limits and add-ons            | current | `plan-enforcement.js`                                 |
 | [billing/conversion-funnel.mmd](billing/conversion-funnel.mmd)                       | conversion_event analytics                       | current | `docs/blueprint/workflows/conversion_funnel_flow.mmd` |
 
@@ -37,11 +37,11 @@ Canonical feature diagrams live under `docs/diagrams/`. Legacy blueprint diagram
 
 ## Restaurant
 
-| File                                                                                 | Covers                                           | Status  | Related                             |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------ | ------- | ----------------------------------- |
-| [restaurant/branch-creation-org-model.mmd](restaurant/branch-creation-org-model.mmd) | Org branches, legacy link, legacy `branch` table | current | `docs/BRANCHES_WAREHOUSES_AUDIT.md` |
-| [restaurant/cart-checkout-flow.mmd](restaurant/cart-checkout-flow.mmd)               | Cart → checkout → place order                    | current | `orders.routes.js`                  |
-| [restaurant/quick-lists-flow.mmd](restaurant/quick-lists-flow.mmd)                   | Quick lists, schedules, limits                   | current | `quick-lists.routes.js`             |
+| File                                                                                 | Covers                                           | Status  | Related                                            |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------ | ------- | -------------------------------------------------- |
+| [restaurant/branch-creation-org-model.mmd](restaurant/branch-creation-org-model.mmd) | Org branches, legacy link, legacy `branch` table | current | `docs/archive/audits/branches-warehouses-audit.md` |
+| [restaurant/cart-checkout-flow.mmd](restaurant/cart-checkout-flow.mmd)               | Cart → checkout → place order                    | current | `orders.routes.js`                                 |
+| [restaurant/quick-lists-flow.mmd](restaurant/quick-lists-flow.mmd)                   | Quick lists, schedules, limits                   | current | `quick-lists.routes.js`                            |
 
 ## Supplier
 

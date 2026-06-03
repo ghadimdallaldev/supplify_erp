@@ -6,7 +6,7 @@
 
 ## Run locally
 
-1. **Prereqs**: Node 18+, pnpm, Keycloak (see repo SETUP.md). Start app and API:
+1. **Prereqs**: Node 18+, pnpm, Keycloak (see [docs/guides/setup.md](../docs/guides/setup.md)). Start app and API:
    ```bash
    pnpm dev
    ```
@@ -34,7 +34,7 @@
 
 ## Run in CI
 
-**Unit tests (Vitest):** Run locally with `pnpm test:ci` (`pnpm test:api` + `pnpm test:web`). See [docs/qa/QA_AUTOMATION_GUIDE.md](../docs/qa/QA_AUTOMATION_GUIDE.md).
+**Unit tests (Vitest):** Run locally with `pnpm test:ci` (`pnpm test:api` + `pnpm test:web`). See [docs/qa/testing-guide.md](../docs/qa/testing-guide.md).
 
 **E2E (Playwright):** separate from unit CI. Set `CI=1`, `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_API_URL` (and optionally `E2E_*` credentials), then:
 
@@ -47,7 +47,7 @@ Artifacts: `playwright-report/` (HTML), `test-results/` (traces/screenshots on f
 ## Free Trial expiry
 
 - **Unit tests (API app):** `pnpm exec vitest run src/middlewares/billingAccess.test.js src/lib/billing/billing-service.test.js src/lib/platform-settings.test.js` from `apps/api`.
-- **Manual QA:** `docs/qa/MANUAL_TEST_CHECKLIST.md` §4.6 (**BIL-FT-01 … BIL-FT-12**); spec [docs/features/free-trial-expiry.md](../docs/features/free-trial-expiry.md).
+- **Manual QA:** [docs/qa/regression-checklist.md](../docs/qa/regression-checklist.md) §4.6 (**BIL-FT-01 … BIL-FT-12**); spec [docs/features/free-trial-expiry.md](../docs/features/free-trial-expiry.md).
 
 ## Add tests
 

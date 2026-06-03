@@ -1,5 +1,5 @@
 %% Warehouse monetization (supplier only — operational locations, not accounts)
-%% Status: current | Related: docs/monetization/FINAL_TIER_MATRIX.md
+%% Status: current | Related: docs/product/tier-matrix.md
 flowchart TD
   Supplier[Active supplier tenant] --> PlanLimit[warehouses limit\nFree: 0 | Silver: 1 | Gold: 3 | Platinum: 5]
   PlanLimit --> Addon[supplier_extra_warehouse add-on\nGold $19/mo | Platinum $25/mo per unit]

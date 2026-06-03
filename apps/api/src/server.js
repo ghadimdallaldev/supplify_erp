@@ -188,6 +188,7 @@ app.use(
       'X-Requested-With',
       'X-Branch-Id',
     ],
+    maxAge: 600, // browsers cache preflight for 10 minutes — eliminates repeated OPTIONS round-trips
   })
 )
 

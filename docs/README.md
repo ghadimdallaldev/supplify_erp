@@ -1,37 +1,45 @@
-# Documentation hub
+# Supplify documentation
 
-Supplify docs are grouped by purpose. Start with **[Developer handbook](./guides/developer-handbook.md)** for setup, scripts, and architecture overview.
+Restaurant & F&B supplier marketplace monorepo (`apps/api`, `apps/web`).
 
-| Folder                               | Contents                                                                                                                                                                                |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **[guides/](./guides/)**             | Setup, usage, DB migrations, prod-like seed, **manual testing**, long-form developer handbook                                                                                           |
-| **[product/](./product/)**           | Feature routes & verification, technical feature catalog, tenant capabilities, finance & notifications                                                                                  |
-| **[features/](./features/)**         | Per-feature specs (orders, reservations, notifications, disputes, …)                                                                                                                    |
-| **[architecture/](./architecture/)** | Security, hardening, tenancy, RBAC, [audit report](./architecture/RBAC_AUDIT_REPORT.md), [permission matrix](./architecture/RBAC_PERMISSION_MATRIX.md), admin audit                     |
-| **[qa/](./qa/)**                     | **[QA automation guide](./qa/QA_AUTOMATION_GUIDE.md)**, manual checklists, [Free Trial audit](./qa/FREE_TRIAL_BEHAVIOR_AUDIT.md), [RBAC hardening QA](./qa/RBAC_HARDENING_QA_REPORT.md) |
-| **[admin/](./admin/)**               | Admin UI, dashboard status, feature flags, setup notes                                                                                                                                  |
-| **[monetization/](./monetization/)** | Subscriptions, plans, enterprise, monetization UX, role roadmap                                                                                                                         |
-| **[deployment/](./deployment/)**     | Railway hosting (dev / preprod / prod), environment variables, env matrix                                                                                                               |
-| **[operations/](./operations/)**     | **Production readiness** (merged), launch polish, performance, observability, test coverage                                                                                             |
-| **[sales/](./sales/)**               | Positioning, pricing, enterprise checklist                                                                                                                                              |
-| **[blueprint/](./blueprint/)**       | Diagrams (Mermaid), workflows, UI sitemaps                                                                                                                                              |
-| **[superpowers/](./superpowers/)**   | Dated specs & plans (design sessions); EC2 deploy docs moved to [archive/legacy-ec2/](./archive/legacy-ec2/)                                                                            |
-| **[archive/](./archive/)**           | Legacy / superseded docs (e.g. EC2 deploy — not Railway)                                                                                                                                |
-| **[design/](./design/)**             | Static design artifacts (e.g. logo concepts HTML)                                                                                                                                       |
+**Policy:** Documentation lives on **`dev` only**. Release branches (`staging`, `preprod`, `prod`) contain runtime code — no `docs/`.
 
 ## Quick links
 
-- [Developer handbook](./guides/developer-handbook.md) — quick start, Docker, CI/CD, contributing
-- **[Complete feature catalog](./product/ALL_FEATURES.md)** — master list for MVP (routes, API, jobs, flags)
-- [Feature overview & routes](./product/features.md) — verification commands & smoke tests
-- [Feature catalog (technical)](./product/FEATURE_CATALOG.md) — keys, enforcement, surfaces
-- [Release branching](./BRANCHING.md) — `dev` → `preprod` → `prod` (prod never merges dev)
-- [QA automation (Vitest scripts & CI)](./qa/QA_AUTOMATION_GUIDE.md) · [API test stabilization](./API_TEST_SUITE_STABILIZATION.md)
-- [Manual testing checklist](./guides/manual-testing.md) · [Full QA regression](./qa/MANUAL_TEST_CHECKLIST.md) · [Free Trial expiry](./features/free-trial-expiry.md)
-- [Feature specs index](./features/README.md) · [Order decline](./features/order-decline.md) · [Notifications delivery](./features/notifications-delivery.md)
-- [Production readiness](./operations/production-readiness.md) — status + findings + fix plan · [2026 audit](./operations/production-readiness-audit.md)
-- [Database migrations](./guides/database-migrations.md)
-- [RBAC audit report](./architecture/RBAC_AUDIT_REPORT.md) · [RBAC QA checklist](./qa/RBAC_HARDENING_QA_REPORT.md)
-- [Subscriptions & limits](./monetization/SUBSCRIPTIONS.md)
-- [Railway deployment](./deployment/railway-environments.md) · [Environment variables](./deployment/environment-variables.md)
-- [Deploy](../deploy/README.md) · [Tests](../tests/README.md)
+| I want to…                    | Start here                                                                                                        |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Set up locally                | [guides/setup.md](./guides/setup.md) · [guides/developer-handbook.md](./guides/developer-handbook.md)             |
+| Understand the product        | [product/overview.md](./product/overview.md)                                                                      |
+| Plans & limits                | [product/plans-and-limits.md](./product/plans-and-limits.md)                                                      |
+| Feature behavior              | [features/README.md](./features/README.md)                                                                        |
+| Deploy to Railway             | [operations/deployment.md](./operations/deployment.md)                                                            |
+| Env variables                 | [operations/environment-variables.md](./operations/environment-variables.md)                                      |
+| Performance / Railway latency | [operations/railway-performance.md](./operations/railway-performance.md)                                          |
+| RBAC & security               | [security/rbac.md](./security/rbac.md) · [security/security-audit-report.md](./security/security-audit-report.md) |
+| Admin console                 | [admin/admin-operations-console.md](./admin/admin-operations-console.md)                                          |
+| Run tests / QA                | [qa/testing-guide.md](./qa/testing-guide.md) · [qa/regression-checklist.md](./qa/regression-checklist.md)         |
+| Release workflow              | [operations/branching.md](./operations/branching.md)                                                              |
+| Historical audits             | [archive/audits/](./archive/audits/)                                                                              |
+
+## Folder map
+
+```text
+docs/
+  README.md                 ← you are here
+  product/                  Product catalog, plans, monetization
+  features/                 Per-feature specs (ordering, GPS, deals, …)
+  architecture/             RBAC, tenancy, hardening, access control
+  operations/               Deploy, env, performance, cron, storage
+  security/                 RBAC index, security audits
+  admin/                    Admin guide, flags, operations console
+  qa/                       Testing guide, regression checklist
+  guides/                   Setup, handbook, migrations, seeding
+  api/                      API route index
+  diagrams/                 Canonical Mermaid diagrams
+  sales/                    Sales / enterprise narrative
+  archive/                  Historical audits, old plans, legacy EC2
+```
+
+## Repo root
+
+Only **`README.md`** belongs at the repository root. All other markdown goes under `docs/`.

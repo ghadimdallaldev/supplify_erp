@@ -50,6 +50,20 @@ export function Layout() {
 
   useNotificationAlerts()
 
+  // Prefetch the most-visited route chunks after auth so first navigation is instant.
+  // Runs once on mount with a 2 s delay to avoid competing with the initial page load.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      import('../pages/DashboardPage')
+      import('../pages/OrdersPage')
+      import('../pages/StaffPage')
+      import('../pages/InventoryPage')
+      import('../pages/disputes/DisputesPage')
+      import('../pages/reports/ReportsPage')
+    }, 2000)
+    return () => clearTimeout(t)
+  }, [])
+
   useEffect(() => {
     dispatch(refreshBlockedCount())
   }, [dispatch])
