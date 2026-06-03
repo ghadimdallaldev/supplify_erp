@@ -213,6 +213,8 @@ describe('RBAC Utilities', () => {
   describe('getUserBySub', () => {
     it('should return user by Keycloak sub', async () => {
       const { query } = await import('./db.js')
+      const { getCache, setCache } = await import('./cache.js')
+      vi.mocked(getCache).mockResolvedValueOnce(null)
       query.mockResolvedValueOnce({
         rows: [{ id: 'user-1', keycloak_sub: 'sub-123', email: 'test@example.com' }],
       })
@@ -221,13 +223,15 @@ describe('RBAC Utilities', () => {
 
       expect(user).toBeDefined()
       expect(user.email).toBe('test@example.com')
-      expect(query).toHaveBeenCalledWith('SELECT * FROM app_user WHERE keycloak_sub = $1', [
-        'sub-123',
-      ])
+      expect(query.mock.calls[0][0]).toBe('SELECT * FROM app_user WHERE keycloak_sub = $1')
+      expect(query.mock.calls[0][1]).toEqual(['sub-123'])
+      expect(setCache).toHaveBeenCalled()
     })
 
     it('should return null for non-existent user', async () => {
       const { query } = await import('./db.js')
+      const { getCache } = await import('./cache.js')
+      vi.mocked(getCache).mockResolvedValueOnce(null)
       query.mockResolvedValueOnce({
         rows: [],
       })
@@ -235,9 +239,21 @@ describe('RBAC Utilities', () => {
       const user = await getUserBySub('non-existent')
 
       expect(user).toBeNull()
-      expect(query).toHaveBeenCalledWith('SELECT * FROM app_user WHERE keycloak_sub = $1', [
-        'non-existent',
-      ])
+      expect(query).toHaveBeenCalledTimes(1)
+    })
+
+    it('uses cache without querying database', async () => {
+      const { query } = await import('./db.js')
+      const { getCache } = await import('./cache.js')
+      vi.mocked(getCache).mockResolvedValueOnce({
+        id: 'user-1',
+        keycloak_sub: 'sub-cached',
+        email: 'cached@example.com',
+      })
+
+      const user = await getUserBySub('sub-cached')
+      expect(user.email).toBe('cached@example.com')
+      expect(query).not.toHaveBeenCalled()
     })
   })
 

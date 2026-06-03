@@ -13,6 +13,12 @@ vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
 }))
 
+vi.mock('../lib/cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('./email/email.service.js', () => ({
   sendTemplateEmail: vi.fn().mockResolvedValue({ sent: true, provider: 'smtp' }),
 }))

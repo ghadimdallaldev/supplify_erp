@@ -3,7 +3,12 @@ import { config } from '../config/env.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
-import { getCache, setCache } from './cache.js'
+import { getCache, setCache, deleteCache } from './cache.js'
+import { startStage, mark, noteCacheHit } from '../middlewares/request-timing.js'
+import {
+  resolveRequestBillingSubscription,
+  resolveRequestSubscription,
+} from './request-subscription.js'
 import {
   getEffectiveTenant,
   impersonationCanAccessBranch,
@@ -30,6 +35,16 @@ import {
 import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
 
 const TENANT_REQ_CACHE_TTL = 60 // seconds
+const USER_BY_SUB_CACHE_TTL = 120 // seconds
+
+function userBySubCacheKey(sub) {
+  return `user:sub:${sub}`
+}
+
+export async function invalidateUserBySubCache(sub) {
+  if (!sub) return
+  await deleteCache(userBySubCacheKey(sub)).catch(() => {})
+}
 
 // Extract token from cookie
 export function extractTokenFromCookie(req) {
@@ -73,11 +88,20 @@ export function clearAuthCookies(res) {
   res.clearCookie('refresh_token', opts)
 }
 
-// Get user from database by Keycloak sub
-export async function getUserBySub(sub) {
+// Get user from database by Keycloak sub (short TTL cache — hot path on every authenticated request)
+export async function getUserBySub(sub, req = null) {
   try {
-    const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub])
-    return result.rows[0] || null
+    const cacheKey = userBySubCacheKey(sub)
+    const cached = await getCache(cacheKey)
+    if (cached !== null) {
+      if (req?._perf) noteCacheHit(req, 'userBySub')
+      return cached === 'null' ? null : cached
+    }
+
+    const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub], req)
+    const user = result.rows[0] || null
+    await setCache(cacheKey, user ?? 'null', USER_BY_SUB_CACHE_TTL).catch(() => {})
+    return user
   } catch (error) {
     logger.error('Error getting user by sub', { error: error.message })
     throw error
@@ -146,7 +170,9 @@ export async function upsertUser(userInfo, roles = []) {
     )
 
     logger.debug('User upserted', { userId: result.rows[0]?.id, role: result.rows[0]?.role })
-    return result.rows[0]
+    const row = result.rows[0]
+    if (sub) await invalidateUserBySubCache(sub)
+    return row
   } catch (error) {
     logger.error('Error upserting user', { error: error.message })
     throw error
@@ -155,6 +181,7 @@ export async function upsertUser(userInfo, roles = []) {
 
 // Authentication middleware
 export async function requireAuth(req, res, next) {
+  startStage(req, 'auth')
   try {
     const accessToken = extractTokenFromCookie(req)
 
@@ -177,8 +204,9 @@ export async function requireAuth(req, res, next) {
       req.userSub = payload.sub
 
       // Get user from database
-      const user = await getUserBySub(payload.sub)
+      const user = await getUserBySub(payload.sub, req)
       if (!user) {
+        mark(req, 'auth')
         return res.status(401).json({
           ok: false,
           data: null,
@@ -194,8 +222,10 @@ export async function requireAuth(req, res, next) {
       syncRequestLogContext(req)
       const staffPortalBlock = assertStaffPortalRouteAccess(req, user)
       if (staffPortalBlock) {
+        mark(req, 'auth')
         return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
       }
+      mark(req, 'auth')
       next()
     } catch (error) {
       logger.debug('Token verification failed, attempting refresh')
@@ -246,8 +276,9 @@ export async function requireAuth(req, res, next) {
       req.userSub = payload.sub
 
       // Get user from database
-      const user = await getUserBySub(payload.sub)
+      const user = await getUserBySub(payload.sub, req)
       if (!user) {
+        mark(req, 'auth')
         return res.status(401).json({
           ok: false,
           data: null,
@@ -263,11 +294,14 @@ export async function requireAuth(req, res, next) {
       syncRequestLogContext(req)
       const staffPortalBlock = assertStaffPortalRouteAccess(req, user)
       if (staffPortalBlock) {
+        mark(req, 'auth')
         return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
       }
+      mark(req, 'auth')
       next()
     }
   } catch (error) {
+    mark(req, 'auth')
     logger.error('Authentication error', { error: error.message })
     clearAuthCookies(res)
     return res.status(500).json({
@@ -433,6 +467,7 @@ export async function assignDefaultRoleForTenant(userId, tenantId, tenantType) {
  * @returns {Promise<{ tenantId: string, tenantType: string, tenantName: string } | null>}
  */
 export async function getRequestTenant(req) {
+  startStage(req, 'tenant')
   if (req._requestTenantResolved) {
     return req._requestTenantCache ?? null
   }
@@ -440,6 +475,7 @@ export async function getRequestTenant(req) {
 
   const finish = (tenant) => {
     req._requestTenantCache = tenant ?? null
+    mark(req, 'tenant')
     return req._requestTenantCache
   }
 
@@ -494,6 +530,7 @@ export async function getRequestTenant(req) {
     const processCacheKey = `tenant:req:${userId}:${tenantType}`
     const cachedTenant = await getCache(processCacheKey)
     if (cachedTenant !== null) {
+      noteCacheHit(req, 'requestTenant')
       return finish(cachedTenant === 'null' ? null : cachedTenant)
     }
 
@@ -649,21 +686,18 @@ export async function ensurePrimaryContactOwnerRole(userId, email, tenantId, ten
  * Use after requireAuth on restaurant/supplier routes.
  */
 export function resolveTenantContext(req, res, next) {
+  startStage(req, 'tenantContext')
   getRequestTenant(req)
     .then(async (tenant) => {
       if (!tenant) {
         req.tenantContext = null
+        mark(req, 'tenantContext')
         return next()
       }
-      const { rows: subRows } = await query(
-        `SELECT status FROM subscription WHERE tenant_id = $1 AND tenant_type = $2 ORDER BY created_at DESC LIMIT 1`,
-        [tenant.tenantId, tenant.tenantType]
-      )
-      if (
-        subRows.length > 0 &&
-        subRows[0].status === 'SUSPENDED' &&
-        req.userData.role !== 'ADMIN'
-      ) {
+
+      const billingSub = await resolveRequestBillingSubscription(req, tenant)
+      if (billingSub?.status === 'SUSPENDED' && req.userData.role !== 'ADMIN') {
+        mark(req, 'tenantContext')
         return res.status(403).json({
           ok: false,
           data: null,
@@ -741,14 +775,13 @@ export function resolveTenantContext(req, res, next) {
         roles,
         permissions,
       }
-      if (!req.subscription) {
-        const { getTenantSubscription } = await import('./subscription.js')
-        req.subscription = await getTenantSubscription(tenant.tenantId, tenant.tenantType)
-      }
+      await resolveRequestSubscription(req, tenant)
       syncRequestLogContext(req)
+      mark(req, 'tenantContext')
       next()
     })
     .catch((err) => {
+      mark(req, 'tenantContext')
       logger.error('resolveTenantContext error', { error: err.message })
       res.status(500).json({
         ok: false,

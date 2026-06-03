@@ -191,3 +191,46 @@ Added `manualChunks` to group `@radix-ui`, `lucide-react`, `react-router`, `@red
 5. **PgBouncer**: For very high concurrency, consider adding a Railway PgBouncer service in front of Postgres. The current `pg.Pool` approach is correct for moderate load.
 6. **Debug logging**: Confirm `LOG_SQL` is NOT set to `1` in production — it logs every query and adds I/O overhead.
 7. **`getPermissionsForUser` first-request cost**: 6 DB queries on first authenticated request per user/tenant, then cached 300s. If sub-500ms first-open is needed, consider warming the permission cache on login response.
+
+---
+
+## Phase 3: Server TTFB / middleware + handler SQL (2026-06-03)
+
+**Symptom:** Normal API calls still ~1.5–3s server wait on Railway after Phase 1–2.
+
+### Root causes
+
+1. **Stacked subscription DB lookups** — `billingAccessMiddleware`, `resolveTenantContext` suspension query, and `getTenantSubscription` could each hit Postgres on the same request.
+2. **`getUserBySub` on every authenticated request** — no short TTL cache.
+3. **Restaurant inventory list** — four identical correlated subqueries per SKU for 30-day usage averages.
+4. **Receiving pending orders** — `NOT EXISTS` + per-row subselect; no `LIMIT`.
+5. **No staged timing** — only total request duration logged; hard to see which layer consumed time.
+
+### Fixes applied
+
+| Area               | Change                                                                                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Timing             | [`request-timing.js`](../apps/api/src/middlewares/request-timing.js) — `event: http.request.slow_breakdown` when total &gt; `SLOW_REQUEST_MS` (default 800) |
+| Subscription       | [`request-subscription.js`](../apps/api/src/lib/request-subscription.js) — one `req.billingSubscription` + `req.subscription` per request                   |
+| Auth user          | `getUserBySub` cached 120s (`user:sub:{sub}`)                                                                                                               |
+| Notification prefs | `ensureNotificationPreferences` cached 60s; invalidate on PATCH                                                                                             |
+| Inventory GET `/`  | Single `usage` CTE instead of 4× correlated subqueries                                                                                                      |
+| Receiving pending  | `LEFT JOIN receiving_report` anti-join + default `LIMIT` 50                                                                                                 |
+| Orders list        | Skip `DISTINCT` + item joins when restaurant-only list (no search/supplier filter)                                                                          |
+| Indexes            | [`0139_railway_hot_path_indexes.sql`](../apps/api/db/migrations/0139_railway_hot_path_indexes.sql)                                                          |
+
+### Expected latency (warm Railway, Redis + migrations 0138–0139)
+
+| Request type                                            | Target     |
+| ------------------------------------------------------- | ---------- |
+| Typical authenticated GET (inventory, prefs, receiving) | 300–800ms  |
+| Heavy reports                                           | &lt; 1.5s  |
+| Middleware-only overhead (cache warm)                   | ~150–350ms |
+
+### Railway actions required
+
+1. Set `DATABASE_URL=${{Postgres.DATABASE_URL}}` (private).
+2. Add Redis; set `REDIS_URL=${{Redis.REDIS_URL}}` on API (not public proxy).
+3. Confirm migrations **0138** and **0139** applied (`RUN_MIGRATIONS_ON_START=true` or one-off `pnpm db:migrate`).
+4. Same region for API + Postgres; min 1 API replica; `NODE_ENV=production`, `DATABASE_SSL=true`.
+5. Watch logs for `http.request.slow_breakdown` after deploy to validate stage times.

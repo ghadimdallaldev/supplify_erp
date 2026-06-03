@@ -8,6 +8,7 @@ import {
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
+import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { requireFeature } from '../lib/subscription.js'
@@ -29,8 +30,12 @@ router.use(requireAuth, resolveTenantContext, receivingQualityGate)
 const RECEIVABLE_ORDER_STATUSES = ['DELIVERED', 'COMPLETED']
 
 async function resolveRestaurantId(req) {
+  if (req.tenantContext?.tenantType === 'RESTAURANT') {
+    return req.tenantContext.tenantId
+  }
   const tenantId = await getRestaurantIdForRequest(req)
   if (tenantId) return tenantId
+  if (req.userData?.role !== 'ADMIN') return null
   const { rows } = await query(
     `SELECT id FROM restaurant WHERE LOWER(TRIM(contact_email)) = LOWER(TRIM($1)) LIMIT 1`,
     [req.userData.email]
@@ -44,10 +49,12 @@ router.get(
   requireRole(['RESTAURANT', 'ADMIN']),
   requirePermission('RECEIVING_VIEW'),
   async (req, res) => {
+    startStage(req, 'handler')
     try {
       const restaurantId = await resolveRestaurantId(req)
 
       if (!restaurantId) {
+        mark(req, 'handler')
         return res.status(403).json({
           ok: false,
           data: null,
@@ -59,34 +66,29 @@ router.get(
         })
       }
 
-      // Orders supplier marked delivered (or legacy COMPLETED) without a receiving report yet
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100)
+
       const { rows: orders } = await query(
         `
       SELECT DISTINCT ON (o.id)
         o.*,
-        s.name as supplier_name,
-        s.contact_email as supplier_email,
-        COALESCE(
-          (SELECT COUNT(*) > 0 
-           FROM receiving_report 
-           WHERE order_id = o.id 
-             AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
-          ), 
-          false
-        ) as has_receiving_report
+        s.name AS supplier_name,
+        s.contact_email AS supplier_email,
+        (rr.id IS NOT NULL) AS has_receiving_report
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id
       JOIN supplier s ON s.id = oi.supplier_id
-      WHERE o.restaurant_id = $1 
+      LEFT JOIN receiving_report rr
+        ON rr.order_id = o.id
+        AND rr.status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
+      WHERE o.restaurant_id = $1
         AND o.status::text = ANY($2::text[])
-        AND NOT EXISTS (
-          SELECT 1 FROM receiving_report 
-          WHERE order_id = o.id 
-            AND status IN ('ACCEPTED', 'REJECTED', 'PARTIAL')
-        )
+        AND rr.id IS NULL
       ORDER BY o.id, o.created_at DESC
+      LIMIT $3
     `,
-        [restaurantId, RECEIVABLE_ORDER_STATUSES]
+        [restaurantId, RECEIVABLE_ORDER_STATUSES, limit],
+        req
       )
 
       const orderIds = orders.map((o) => o.id)
@@ -123,6 +125,7 @@ router.get(
         items: itemsByOrderId.get(order.id) ?? [],
       }))
 
+      mark(req, 'handler')
       res.json({
         ok: true,
         data: { orders: ordersWithItems },
@@ -130,6 +133,7 @@ router.get(
         requestId: req.requestId,
       })
     } catch (error) {
+      mark(req, 'handler')
       logger.error({
         message: 'Get pending orders for receiving error',
         error: error.message,

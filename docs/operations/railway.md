@@ -71,26 +71,28 @@ Prefer Docker for both services. Web production requires nginx (see `apps/web/Do
 
 ### Required environment variables
 
-| Variable                  | Example                           | Description                                                    |
-| ------------------------- | --------------------------------- | -------------------------------------------------------------- |
-| `NODE_ENV`                | `production`                      |                                                                |
-| `PORT`                    | _(Railway sets this)_             | API listen port                                                |
-| `DATABASE_URL`            | _(from Postgres plugin)_          | Railway Postgres connection string                             |
-| `DATABASE_SSL`            | `true`                            | Required for Railway Postgres                                  |
-| `WEB_ORIGIN`              | `https://your-web.up.railway.app` | Primary frontend URL                                           |
-| `WEB_ORIGINS`             | same as above                     | Comma-separated CORS origins                                   |
-| `SESSION_SECRET`          | _(32+ random hex)_                | `openssl rand -hex 32`                                         |
-| `KEYCLOAK_BASE_URL`       | `https://keycloak.example.com`    | Server-to-server Keycloak URL                                  |
-| `KEYCLOAK_PUBLIC_URL`     | same or public URL                | Browser OIDC redirects                                         |
-| `KEYCLOAK_REALM`          | `Supplify`                        |                                                                |
-| `KEYCLOAK_CLIENT_ID`      | `supplify-api`                    |                                                                |
-| `KEYCLOAK_CLIENT_SECRET`  | _(strong secret)_                 |                                                                |
-| `KEYCLOAK_ADMIN`          | `admin`                           | For invite user provisioning                                   |
-| `KEYCLOAK_ADMIN_PASSWORD` | _(strong)_                        |                                                                |
-| `STORAGE_DRIVER`          | `local`                           | `local` or `s3`                                                |
-| `STORAGE_LOCAL_PATH`      | `uploads`                         | Local disk root (ephemeral on Railway unless you add a volume) |
-| `STORAGE_PUBLIC_URL`      | `https://api.example.com/uploads` | Public URL for stored files                                    |
-| `API_PUBLIC_URL`          | `https://api.example.com`         | Used for local upload PUT URLs                                 |
+| Variable                  | Example                           | Description                                                                                                            |
+| ------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `production`                      |                                                                                                                        |
+| `PORT`                    | _(Railway sets this)_             | API listen port                                                                                                        |
+| `DATABASE_URL`            | `${{Postgres.DATABASE_URL}}`      | **Private** Postgres URL from the plugin (not the public proxy)                                                        |
+| `DATABASE_SSL`            | `true`                            | Required for Railway Postgres                                                                                          |
+| `REDIS_URL`               | `${{Redis.REDIS_URL}}`            | Optional but recommended — shared cache for permissions/tenant/subscription (use internal URL, not `REDIS_PUBLIC_URL`) |
+| `SLOW_REQUEST_MS`         | `800`                             | Log structured stage breakdown when a request exceeds this (ms)                                                        |
+| `WEB_ORIGIN`              | `https://your-web.up.railway.app` | Primary frontend URL                                                                                                   |
+| `WEB_ORIGINS`             | same as above                     | Comma-separated CORS origins                                                                                           |
+| `SESSION_SECRET`          | _(32+ random hex)_                | `openssl rand -hex 32`                                                                                                 |
+| `KEYCLOAK_BASE_URL`       | `https://keycloak.example.com`    | Server-to-server Keycloak URL                                                                                          |
+| `KEYCLOAK_PUBLIC_URL`     | same or public URL                | Browser OIDC redirects                                                                                                 |
+| `KEYCLOAK_REALM`          | `Supplify`                        |                                                                                                                        |
+| `KEYCLOAK_CLIENT_ID`      | `supplify-api`                    |                                                                                                                        |
+| `KEYCLOAK_CLIENT_SECRET`  | _(strong secret)_                 |                                                                                                                        |
+| `KEYCLOAK_ADMIN`          | `admin`                           | For invite user provisioning                                                                                           |
+| `KEYCLOAK_ADMIN_PASSWORD` | _(strong)_                        |                                                                                                                        |
+| `STORAGE_DRIVER`          | `local`                           | `local` or `s3`                                                                                                        |
+| `STORAGE_LOCAL_PATH`      | `uploads`                         | Local disk root (ephemeral on Railway unless you add a volume)                                                         |
+| `STORAGE_PUBLIC_URL`      | `https://api.example.com/uploads` | Public URL for stored files                                                                                            |
+| `API_PUBLIC_URL`          | `https://api.example.com`         | Used for local upload PUT URLs                                                                                         |
 
 ### Storage (MVP: local disk)
 
