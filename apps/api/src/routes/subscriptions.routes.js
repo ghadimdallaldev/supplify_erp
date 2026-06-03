@@ -49,8 +49,7 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
 
     let entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
     if (!entitlements) {
-      // Force ensure subscription and retry (handles migration not run or race)
-      const { getTenantSubscription } = await import('../lib/subscription.js')
+      // getTenantSubscription ensures Free row when missing; one retry avoids duplicate work
       await getTenantSubscription(tenant.tenantId, tenant.tenantType)
       entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
     }

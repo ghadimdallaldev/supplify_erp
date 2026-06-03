@@ -3107,7 +3107,8 @@ export const api = createApi({
     getEntitlements: builder.query<{ entitlements: Entitlements }, void>({
       query: () => '/api/subscriptions/entitlements',
       providesTags: ['Subscription'],
-      keepUnusedDataFor: 5 * 60, // Cache 5 min per session to avoid repeated calls
+      keepUnusedDataFor: 5 * 60,
+      refetchOnMountOrArgChange: false,
     }),
     getSubscriptionUsage: builder.query<UsageMeter & { meterType: string }, string>({
       query: (meterType) => `/api/subscriptions/usage/${meterType}`,
