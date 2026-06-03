@@ -1436,10 +1436,30 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
       const tenantId = getTenantId(req)
       const tenantType = getTenantType(req)
 
-      const [isEnabled, subscription] = await Promise.all([
-        isFeatureEnabled(tenantId, tenantType, featureKey),
-        getTenantSubscription(tenantId, tenantType),
-      ])
+      let subscription = req.subscription
+      if (!subscription) {
+        subscription = await getTenantSubscription(tenantId, tenantType)
+        req.subscription = subscription
+      }
+
+      const { resolveOrgBillingTenantId } = await import('./org-billing-tenant.js')
+      const { resolveFeatureEnabled, FEATURE_ALIASES } = await import('./feature-flags.js')
+      const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+      let featureResult = await resolveFeatureEnabled(
+        billingTenantId,
+        tenantType,
+        featureKey,
+        subscription?.features
+      )
+      if (!featureResult.enabled && FEATURE_ALIASES[featureKey]) {
+        featureResult = await resolveFeatureEnabled(
+          billingTenantId,
+          tenantType,
+          FEATURE_ALIASES[featureKey],
+          subscription?.features
+        )
+      }
+      const isEnabled = featureResult.enabled
 
       if (!isEnabled) {
         const { recordConversionEvent } = await import('./conversion-events.js')
