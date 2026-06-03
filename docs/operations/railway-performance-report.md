@@ -366,3 +366,44 @@ Min **1 API replica** (no scale-to-zero); API + Postgres **same region**; privat
 ### Tests
 
 `db.keepalive.test.js`, `request-timing.test.js`, `subscription.test.js`, `subscriptions.routes.test.js`.
+
+---
+
+## Phase 7: HTTP response compression (2026-06-03)
+
+**Symptom:** After Phases 1–6, server compute and DB time are well optimized, but list/report JSON payloads still cross Railway's public network to the browser **uncompressed**. Large responses (`/api/orders`, `/api/products`, `/api/reports`, entitlements) transfer at full size, inflating time-to-last-byte on every request — especially on slower client connections.
+
+### Root cause
+
+No `compression` middleware was mounted. Railway's edge does not gzip Node service responses automatically, so a ~90KB orders/products JSON list was sent as ~90KB over the wire.
+
+### Fix applied
+
+| Area        | Change                                                                                                                  |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `server.js` | `app.use(compression())` mounted immediately after the request-timing middleware, before all routes                     |
+| Dependency  | Added `compression` (canonical Express middleware) to `@supplify/api`                                                   |
+| Filtering   | Default `compressible` content-type filter — compresses JSON/text/SVG, **skips** images/PDF/already-compressed binaries |
+| Threshold   | Default 1KB — tiny responses are not compressed (avoids CPU overhead with no transfer benefit)                          |
+
+### Security & correctness review (zero business change)
+
+- **No BREACH exposure:** API CSRF defense is header-based (`x-requested-with: Supplify`); the CSRF token is never embedded in API JSON response bodies, so compressing them leaks nothing.
+- **No streaming/SSE in the app:** the only streamed responses are finite file downloads (`/api/files/object`); binary image types are auto-skipped by the `compressible` filter, and finite streams end cleanly (no long-poll stalling).
+- **Caching correctness:** middleware sets `Vary: Accept-Encoding` so shared caches/CDNs key compressed and uncompressed variants separately.
+
+### Measured effect
+
+Local functional test: a 500-item JSON list (~90KB uncompressed) compressed to **~3KB** on the wire with `Content-Encoding: gzip` and `Vary: Accept-Encoding` — a >95% transfer-size reduction on payload-heavy endpoints.
+
+### Expected latency
+
+| Request type                              | Before (transfer)         | After (transfer)            |
+| ----------------------------------------- | ------------------------- | --------------------------- |
+| Large list/report JSON (orders, products) | full payload over network | ~5–20% of original on wire  |
+| Small JSON (< 1KB)                        | unchanged                 | unchanged (below threshold) |
+| Images / PDFs                             | unchanged                 | unchanged (filter skips)    |
+
+### Tests
+
+Full `apps/api` vitest suite re-run after the change — 846 passing; the only failures are the documented pre-existing ones (`delivery-routes.service.test.js` requires a live DB, `auth.test.js` Keycloak mock, feature-flags), none of which import `server.js`.
