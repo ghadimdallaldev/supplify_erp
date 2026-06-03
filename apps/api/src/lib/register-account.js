@@ -11,7 +11,7 @@ import {
   resolveWorkspaceScope,
 } from './workspace-membership.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
-import { sendNotification } from '../services/notification.service.js'
+import { sendNotification, notifyAdminNewTenant } from '../services/notification.service.js'
 import { recordRegistrationLegalAcceptances } from './legal-acceptance.js'
 
 const KC_ROLE = { RESTAURANT: 'restaurant', SUPPLIER: 'supplier', ADMIN: 'admin' }
@@ -280,14 +280,24 @@ export async function completeTenantRegistration({
   try {
     await sendNotification({
       userId,
-      type: 'account.welcome',
+      userType: result.tenantType,
+      notificationType: 'SYSTEM',
+      notificationCategory: 'system_updates',
       title: 'Welcome to Supplify',
       message:
         result.tenantType === 'SUPPLIER'
           ? `Your supplier account "${name}" is ready.`
           : `Your restaurant account "${name}" is ready.`,
-      metadata: { tenantId: result.tenant.id, tenantType: result.tenantType },
+      referenceId: result.tenant.id,
+      referenceType: 'TENANT',
+      metadata: { tenantId: result.tenant.id, tenantType: result.tenantType, tenantName: name },
     })
+    notifyAdminNewTenant({
+      tenantId: result.tenant.id,
+      tenantType: result.tenantType,
+      tenantName: name,
+      contactEmail: normalizedEmail,
+    }).catch(() => {})
   } catch {
     // Non-blocking welcome notification
   }

@@ -20,6 +20,7 @@ import {
   keycloakRealmRoleForWorkspace,
   normalizeInvitationEmail,
 } from './invitation-accept.js'
+import { sendTeamInvitationEmail } from '../services/invitation-mail.service.js'
 
 export {
   generateInviteToken,
@@ -165,6 +166,20 @@ async function insertRestaurantInvitation({
     invitationType === 'branch_manager'
       ? buildRestaurantBranchInviteUrl(token)
       : buildRestaurantMemberInviteUrl(token)
+  if (invitedEmail) {
+    const { rows: restaurantRows } = await query(`SELECT name FROM restaurant WHERE id = $1`, [
+      restaurantId,
+    ])
+    sendTeamInvitationEmail({
+      to: invitedEmail,
+      inviteUrl: invite_url,
+      invitedName: invitedName,
+      tenantName: restaurantRows[0]?.name,
+      tenantType: 'RESTAURANT',
+      invitationId: invitation.id,
+      tenantId: restaurantId,
+    }).catch(() => {})
+  }
   return { invitation, invite_url, expires_at: expiresAt }
 }
 
@@ -256,6 +271,20 @@ export async function regenerateRestaurantInvitation(invitationId, scope) {
     invitation.invitation_type === 'branch_manager'
       ? buildRestaurantBranchInviteUrl(token)
       : buildRestaurantMemberInviteUrl(token)
+  if (invitation.invited_email) {
+    const { rows: restaurantRows } = await query(`SELECT name FROM restaurant WHERE id = $1`, [
+      invitation.restaurant_id,
+    ])
+    sendTeamInvitationEmail({
+      to: invitation.invited_email,
+      inviteUrl: invite_url,
+      invitedName: invitation.invited_name,
+      tenantName: restaurantRows[0]?.name,
+      tenantType: 'RESTAURANT',
+      invitationId: invitation.id,
+      tenantId: invitation.restaurant_id,
+    }).catch(() => {})
+  }
   return { invitation, invite_url, expires_at: expiresAt }
 }
 

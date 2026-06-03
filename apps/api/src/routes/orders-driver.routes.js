@@ -13,6 +13,7 @@ import {
   assertDriverAssignmentAccess,
   assertDriverStatusUpdate,
   isDriverOnlyPermissions,
+  requireLinkedDriver,
 } from '../lib/driver-rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { logger } from '../lib/logger.js'
@@ -24,7 +25,14 @@ import {
   confirmProofOfDelivery,
   getProofOfDelivery,
 } from '../services/driver-fulfillment.service.js'
-import { ValidationError } from '../middlewares/errorHandler.js'
+import {
+  recordDriverLocation,
+  getOrderTracking,
+  isGpsTrackingEnabled,
+} from '../services/driver-location.service.js'
+import { ValidationError, ForbiddenError, NotFoundError } from '../middlewares/errorHandler.js'
+import { hasPermission } from '../lib/permissions.js'
+import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
 
 const router = express.Router({ mergeParams: true })
 
@@ -60,6 +68,19 @@ const podSchema = z.object({
   notes: z.string().optional().nullable(),
   recipient_name: z.string().optional().nullable(),
   driver_assignment_id: z.string().uuid().optional().nullable(),
+  latitude: z.number().optional().nullable(),
+  longitude: z.number().optional().nullable(),
+})
+
+const locationSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number(),
+  accuracyMeters: z.number().optional().nullable(),
+  speedMps: z.number().optional().nullable(),
+  headingDegrees: z.number().optional().nullable(),
+  recordedAt: z.string().datetime().optional().nullable(),
+  route_id: z.string().uuid().optional().nullable(),
+  route_stop_id: z.string().uuid().optional().nullable(),
 })
 
 router.post(
@@ -272,6 +293,8 @@ router.post(
         recipientName: body.recipient_name,
         driverAssignmentId: body.driver_assignment_id,
         userId: req.userData?.id,
+        latitude: body.latitude,
+        longitude: body.longitude,
       })
       res.status(201).json({
         ok: true,
@@ -333,6 +356,189 @@ router.get(
     }
   }
 )
+
+router.post(
+  '/:id/location',
+  ...supplierFulfillmentGate,
+  requireAnyPermission('FULFILLMENT_MANAGE', 'DRIVER_DELIVERIES_MANAGE'),
+  async (req, res) => {
+    try {
+      if (!isGpsTrackingEnabled()) {
+        return res.json({
+          ok: true,
+          data: { trackingEnabled: false, stored: false, reason: 'gps_disabled' },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const body = locationSchema.parse(req.body)
+      const perms = req.tenantContext?.permissions ?? []
+      let driverId = null
+      if (isDriverOnlyPermissions(perms)) {
+        driverId = await requireLinkedDriver(req.userData.id, supplierId)
+        await assertDriverAssignmentAccess({
+          userId: req.userData.id,
+          supplierId,
+          orderId: req.params.id,
+          permissions: perms,
+        })
+      } else if (hasPermission(perms, P.FULFILLMENT_MANAGE)) {
+        const { getActiveDriverAssignment } = await import(
+          '../services/driver-fulfillment.service.js'
+        )
+        const assignment = await getActiveDriverAssignment(req.params.id)
+        driverId = assignment?.driver_id
+        if (!driverId) {
+          throw new ValidationError('No driver assigned to this order')
+        }
+      } else {
+        throw new ForbiddenError('Not allowed to update location')
+      }
+
+      const result = await recordDriverLocation({
+        supplierId,
+        orderId: req.params.id,
+        driverId,
+        latitude: body.latitude,
+        longitude: body.longitude,
+        accuracyMeters: body.accuracyMeters,
+        speedMps: body.speedMps,
+        headingDegrees: body.headingDegrees,
+        recordedAt: body.recordedAt,
+        routeId: body.route_id,
+        routeStopId: body.route_stop_id,
+      })
+      res.json({
+        ok: true,
+        data: result,
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof ValidationError || error.name === 'ZodError') {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: error.message || 'Invalid request',
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ForbiddenError) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('Record driver location error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to record location' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.get('/:id/tracking', requireAuth, resolveTenantContext, async (req, res) => {
+  try {
+    const tenant = await getRequestTenant(req)
+    const orderId = req.params.id
+    let tracking = null
+
+    if (tenant?.tenantType === 'RESTAURANT') {
+      tracking = await getOrderTracking({
+        orderId,
+        restaurantId: tenant.tenantId,
+      })
+    } else if (tenant?.tenantType === 'SUPPLIER' || req.userData?.role === 'ADMIN') {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const perms = req.tenantContext?.permissions ?? []
+      if (isDriverOnlyPermissions(perms)) {
+        await assertDriverAssignmentAccess({
+          userId: req.userData.id,
+          supplierId,
+          orderId,
+          permissions: perms,
+        })
+      } else if (
+        !hasPermission(perms, P.FULFILLMENT_VIEW) &&
+        !hasPermission(perms, P.DRIVER_DELIVERIES_VIEW) &&
+        req.userData?.role !== 'ADMIN'
+      ) {
+        throw new ForbiddenError('Missing permission to view tracking')
+      }
+      tracking = await getOrderTracking({
+        orderId,
+        supplierId,
+        exposeDriverPhone: hasPermission(perms, P.FULFILLMENT_MANAGE),
+      })
+    } else {
+      throw new ForbiddenError('Not allowed to view tracking')
+    }
+
+    res.json({
+      ok: true,
+      data: tracking,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    logger.error('Get order tracking error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to load tracking' },
+      requestId: req.requestId,
+    })
+  }
+})
 
 router.post(
   '/:id/proof-of-delivery/confirm',

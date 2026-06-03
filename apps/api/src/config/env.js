@@ -157,13 +157,30 @@ export const config = {
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
   TWILIO_WHATSAPP_FROM: process.env.TWILIO_WHATSAPP_FROM || '',
-  EMAIL_PROVIDER: process.env.EMAIL_PROVIDER || (process.env.SENDGRID_API_KEY ? 'sendgrid' : ''),
+  EMAIL_ENABLED: envBool(process.env.EMAIL_ENABLED, true),
+  EMAIL_LOG_ONLY: envBool(process.env.EMAIL_LOG_ONLY, false),
+  EMAIL_PROVIDER:
+    process.env.EMAIL_PROVIDER ||
+    (process.env.SENDGRID_API_KEY ? 'sendgrid' : process.env.SMTP_HOST ? 'smtp' : ''),
+  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || process.env.SENDGRID_FROM_NAME || 'Supplify',
+  EMAIL_FROM_ADDRESS:
+    process.env.EMAIL_FROM_ADDRESS ||
+    process.env.EMAIL_FROM ||
+    process.env.SENDGRID_FROM_EMAIL ||
+    process.env.SMTP_FROM ||
+    '',
+  EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO || '',
+  EMAIL_TEST_TO: process.env.EMAIL_TEST_TO || '',
   EMAIL_FROM: process.env.EMAIL_FROM || process.env.SENDGRID_FROM_EMAIL || '',
   EMAIL_API_KEY: process.env.EMAIL_API_KEY || process.env.SENDGRID_API_KEY || '',
   SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
   SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL || '',
   SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME || 'Supplify',
-  SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@supplify.local',
+  SMTP_FROM:
+    process.env.SMTP_FROM ||
+    process.env.EMAIL_FROM_ADDRESS ||
+    process.env.SMTP_USER ||
+    'noreply@supplify.local',
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: envInt(process.env.SMTP_PORT, 587),
   SMTP_USER: process.env.SMTP_USER || '',
@@ -209,6 +226,22 @@ export const config = {
     process.env.CRON_SCHEDULED_ORDERS_INTERVAL_MS,
     isProductionNode ? 60 * 60 * 1000 : 5 * 60 * 1000
   ),
+  CRON_OPERATIONAL_REMINDERS_INTERVAL_MS: envInt(
+    process.env.CRON_OPERATIONAL_REMINDERS_INTERVAL_MS,
+    24 * 60 * 60 * 1000
+  ),
+  GPS_TRACKING_ENABLED: envBool(process.env.GPS_TRACKING_ENABLED, true),
+  GPS_STALE_AFTER_SECONDS: envInt(process.env.GPS_STALE_AFTER_SECONDS, 300),
+  GPS_UPDATE_INTERVAL_SECONDS: envInt(process.env.GPS_UPDATE_INTERVAL_SECONDS, 15),
+  GPS_MIN_ACCURACY_METERS: envInt(process.env.GPS_MIN_ACCURACY_METERS, 100),
+  GPS_LOCATION_RETENTION_DAYS: envInt(process.env.GPS_LOCATION_RETENTION_DAYS, 90),
+  GPS_ALLOW_RESTAURANT_LIVE_TRACKING: envBool(process.env.GPS_ALLOW_RESTAURANT_LIVE_TRACKING, true),
+  GPS_RESTAURANT_SHOW_DRIVER_NAME: envBool(process.env.GPS_RESTAURANT_SHOW_DRIVER_NAME, true),
+  GPS_RESTAURANT_SHOW_DRIVER_PHONE: envBool(process.env.GPS_RESTAURANT_SHOW_DRIVER_PHONE, false),
+  GPS_ALLOW_DRIVER_BACKGROUND_HINT: envBool(process.env.GPS_ALLOW_DRIVER_BACKGROUND_HINT, true),
+  MAP_PROVIDER: process.env.MAP_PROVIDER || 'google',
+  GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
+  MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN || '',
 }
 
 if (!config.STORAGE_PUBLIC_URL) {

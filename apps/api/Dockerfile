@@ -41,6 +41,7 @@ COPY --from=builder --chown=supplify:nodejs /app/apps/api/db/migrations ./apps/a
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/migrate.js ./apps/api/scripts/migrate.js
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/run-migration.js ./apps/api/scripts/run-migration.js
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts/lib ./apps/api/scripts/lib
+# Railway runtime defaults (api.env per env) + in-process cron config (CRONS_ENABLED, CRON_*)
 COPY --from=builder --chown=supplify:nodejs /app/deploy/railway ./deploy/railway
 
 # Writable local upload root (STORAGE_DRIVER=local). Mount a Railway volume here for persistence.

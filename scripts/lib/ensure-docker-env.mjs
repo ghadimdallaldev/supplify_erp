@@ -42,7 +42,7 @@ function portInUse(port) {
         '-Command',
         `(Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0`,
       ],
-      { encoding: 'utf8', shell: true }
+      { encoding: 'utf8' }
     )
     return r.stdout?.trim() === 'True'
   }
@@ -60,6 +60,25 @@ function ourContainerOnPort(port, containerName) {
   })
   if (r.status !== 0) return false
   return new RegExp(`:${port}->`).test(r.stdout || '')
+}
+
+/** Windows often runs a local PostgreSQL service on 5432 (IPv4) while Docker binds ::5432 — localhost hits the wrong server. */
+function nativePostgresOnPort(port) {
+  if (process.platform !== 'win32') return false
+  const r = spawnSync(
+    'powershell',
+    [
+      '-NoProfile',
+      '-Command',
+      `Get-Process -Id (Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue).OwningProcess -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ProcessName`,
+    ],
+    { encoding: 'utf8' }
+  )
+  if (r.status !== 0) return false
+  return (r.stdout || '')
+    .split(/\r?\n/)
+    .map((s) => s.trim().toLowerCase())
+    .includes('postgres')
 }
 
 /**
@@ -82,8 +101,14 @@ export function ensureDockerEnv() {
   let changed = false
 
   const pgPort = parseInt(vars.POSTGRES_PORT || '5432', 10)
-  if (portInUse(pgPort) && !ourContainerOnPort(pgPort, CONTAINER_POSTGRES)) {
-    console.log(`Port ${pgPort} is busy — using 5433 for Postgres (saved in docker/.env).`)
+  const pgPortBlocked =
+    (portInUse(pgPort) && !ourContainerOnPort(pgPort, CONTAINER_POSTGRES)) ||
+    nativePostgresOnPort(pgPort)
+  if (pgPortBlocked && pgPort !== 5433) {
+    const reason = nativePostgresOnPort(pgPort)
+      ? `Local PostgreSQL is using port ${pgPort} (conflicts with Docker on Windows)`
+      : `Port ${pgPort} is busy`
+    console.log(`${reason} — using 5433 for Docker Postgres (saved in docker/.env).`)
     patchEnvVar(vars, 'POSTGRES_PORT', '5433')
     changed = true
   }
@@ -107,11 +132,18 @@ export function ensureDockerEnv() {
 
   const publishedPg = getDockerHostPort(CONTAINER_POSTGRES, 5432)
   if (publishedPg && vars.POSTGRES_PORT !== publishedPg) {
-    console.log(
-      `Aligning docker/.env POSTGRES_PORT=${publishedPg} with running ${CONTAINER_POSTGRES}.`
-    )
-    patchEnvVar(vars, 'POSTGRES_PORT', publishedPg)
-    changed = true
+    if (nativePostgresOnPort(parseInt(publishedPg, 10))) {
+      console.log(
+        `supplify-postgres is still on host port ${publishedPg} but docker/.env expects ${vars.POSTGRES_PORT}. ` +
+          'Run: npm run local:infra'
+      )
+    } else {
+      console.log(
+        `Aligning docker/.env POSTGRES_PORT=${publishedPg} with running ${CONTAINER_POSTGRES}.`
+      )
+      patchEnvVar(vars, 'POSTGRES_PORT', publishedPg)
+      changed = true
+    }
   }
 
   if (changed) {

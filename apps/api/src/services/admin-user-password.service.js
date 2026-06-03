@@ -184,6 +184,24 @@ export async function adminResetUserPassword({
     temporary: Boolean(temporary),
   })
 
+  if (temporary && newPassword) {
+    const { sendTemplateEmail } = await import('./email/email.service.js')
+    sendTemplateEmail({
+      to: target.email,
+      template: 'auth.password_changed',
+      data: {
+        message: `A temporary password was set for your Supplify account.\n\nTemporary password: ${newPassword}\n\nSign in and change it immediately.`,
+        temporaryPassword: newPassword,
+        recipientName: target.display_name,
+      },
+      eventType: 'auth.password_changed',
+      eventKey: `auth:password_reset:${target.id}:${Date.now()}`,
+      skipDedup: true,
+    }).catch((err) => {
+      logger.warn('Password reset email failed', { error: err.message, userId: target.id })
+    })
+  }
+
   return {
     userId: target.id,
     email: target.email,

@@ -13,7 +13,13 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getRestaurantIdByEmail } from '../lib/tenant.js'
 import { assertPresignedFileUrl } from '../lib/sanitize-upload.js'
-import { notifyStaffPtoRequest, notifyStaffSwapRequest } from '../services/notification.service.js'
+import {
+  notifyStaffPtoRequest,
+  notifyStaffSwapRequest,
+  notifyStaffAnnouncement,
+  notifyStaffDocumentUploaded,
+  notifyStaffShiftEvent,
+} from '../services/notification.service.js'
 import {
   fetchStaffPortalDashboard,
   fetchStaffPortalTimeEntries,
@@ -1138,6 +1144,14 @@ router.post('/shifts', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
       error: null,
       requestId: req.requestId,
     })
+
+    if (shiftRow.staff_id && (shiftRow.status === 'PUBLISHED' || !payload.status)) {
+      notifyStaffShiftEvent(shiftRow.staff_id, restaurantId, {
+        title: 'Shift assigned',
+        message: `You have a new shift on ${shiftRow.shift_date} (${shiftRow.starts_at} – ${shiftRow.ends_at}).`,
+        shiftId: shiftRow.id,
+      }).catch(() => {})
+    }
   } catch (error) {
     logger.error('Failed to create staff shift', { error: error.message })
     if (error instanceof ZodError) {
@@ -2117,6 +2131,12 @@ router.post(
         error: null,
         requestId: req.requestId,
       })
+
+      notifyStaffAnnouncement(restaurantId, {
+        title: payload.title,
+        message: payload.body,
+        announcementId: rows[0].id,
+      }).catch(() => {})
     } catch (error) {
       logger.error('Failed to create announcement', { error: error.message })
       res.status(400).json({
@@ -2301,6 +2321,12 @@ router.post('/documents', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
       error: null,
       requestId: req.requestId,
     })
+
+    notifyStaffDocumentUploaded(restaurantId, {
+      title: payload.title || 'New document',
+      message: `A new document "${payload.title || payload.docType}" was uploaded for ${docRow.staff_name || 'a team member'}.`,
+      documentId: docRow.id,
+    }).catch(() => {})
   } catch (error) {
     logger.error('Failed to create staff document', { error: error.message })
     res.status(400).json({

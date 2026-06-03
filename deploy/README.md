@@ -22,6 +22,8 @@ Legacy: `deploy-staging.sh` remains for servers already on staging compose files
 
 Each script bootstraps Docker, creates `deploy/env/.env.<env>`, builds images, starts infra (Postgres, Redis, MinIO, Keycloak), runs migrations + tenant role backfill + **system role sync** (`sync-system-roles.mjs`) + Keycloak realm init, then starts the app behind nginx.
 
+The **migrate** service applies all pending SQL files under `apps/api/db/migrations/` (including restaurant-operations migrations **0133–0135**). Set `CRONS_ENABLED=true` in `deploy/env/.env.*` so in-process jobs (expiry + reorder reminders) run in the backend container.
+
 ## Local full stack (developer machine)
 
 ```bash

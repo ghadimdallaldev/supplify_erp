@@ -9,6 +9,7 @@ import { config, allowE2eRoutes } from './config/env.js'
 import { isRailwayRuntime } from './config/load-railway-env.js'
 import { isLikelyPublicRedisUrl } from './config/resolve-redis-url.js'
 import { validateProductionConfig } from './lib/validate-config.js'
+import { logEmailBootMode } from './services/email/email.service.js'
 import { logger } from './lib/logger.js'
 import { createSessionStore } from './lib/session-store.js'
 import { requestContext } from './middlewares/requestContext.js'
@@ -62,9 +63,11 @@ import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
 import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
 import { runFulfillmentExceptionChecks } from './jobs/fulfillment-exceptions.job.js'
+import { runOperationalRemindersJob } from './jobs/operational-reminders.job.js'
 import { promotionsRoutes } from './routes/promotions.routes.js'
 import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
 import { runDeactivateExpiredPromotionsJob } from './jobs/promotions-expiry.job.js'
+import { runDriverLocationRetentionJob } from './jobs/driver-location-retention.job.js'
 import { runFreeSandboxExpiryJob } from './jobs/free-sandbox-expiry.job.js'
 import { disputesRoutes } from './routes/disputes.routes.js'
 import { creditNotesRoutes } from './routes/credit-notes.routes.js'
@@ -91,6 +94,7 @@ import {
 } from './lib/memory-monitor.js'
 
 validateProductionConfig()
+logEmailBootMode()
 
 if (config.REDIS_URL && isLikelyPublicRedisUrl(config.REDIS_URL)) {
   logger.warn({
@@ -561,6 +565,26 @@ server.listen(PORT, HOST, () => {
   runFulfillmentCron()
   trackInterval(runFulfillmentCron, fulfillmentIntervalMs)
   logger.info('Fulfillment exceptions job started', { intervalMs: fulfillmentIntervalMs })
+
+  const operationalRemindersIntervalMs = config.CRON_OPERATIONAL_REMINDERS_INTERVAL_MS
+  const runOperationalRemindersCron = () =>
+    runCronJob(CRON_JOBS.OPERATIONAL_REMINDERS, () => runOperationalRemindersJob()).catch((err) =>
+      logger.error('Operational reminders job failed:', err)
+    )
+  runOperationalRemindersCron()
+  trackInterval(runOperationalRemindersCron, operationalRemindersIntervalMs)
+  logger.info('Operational reminders job started', { intervalMs: operationalRemindersIntervalMs })
+
+  const driverLocationRetentionIntervalMs = 24 * 60 * 60 * 1000
+  const runDriverLocationRetentionCron = () =>
+    runCronJob(CRON_JOBS.DRIVER_LOCATION_RETENTION, () => runDriverLocationRetentionJob()).catch(
+      (err) => logger.error('Driver location retention job failed:', err)
+    )
+  runDriverLocationRetentionCron()
+  trackInterval(runDriverLocationRetentionCron, driverLocationRetentionIntervalMs)
+  logger.info('Driver location retention job started', {
+    intervalMs: driverLocationRetentionIntervalMs,
+  })
 })
 
 export default app

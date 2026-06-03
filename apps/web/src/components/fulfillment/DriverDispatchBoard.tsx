@@ -17,11 +17,12 @@ import {
   useGetDriversQuery,
   useAssignDriverToOrderMutation,
   useReassignDriverOnOrderMutation,
-  useUpdateOrderMutation,
+  useUpdateOrderDeliveryStatusMutation,
   useSubmitOrderProofOfDeliveryMutation,
 } from '../../services/api'
 import { usePermissions } from '../../hooks/usePermissions'
 import { DispatchOrderRow } from './DispatchOrderRow'
+import { DeliveryTrackingDrawer } from './DeliveryTrackingDrawer'
 import type { DispatchBoardData, DispatchSummaryStats } from './fulfillmentDispatchUtils'
 
 type Props = {
@@ -62,14 +63,18 @@ export function DriverDispatchBoard({
   const [failureReason, setFailureReason] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [createRouteOpen, setCreateRouteOpen] = useState(false)
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
 
   const [assignDriver, { isLoading: assigning }] = useAssignDriverToOrderMutation()
   const [reassignDriver, { isLoading: reassigning }] = useReassignDriverOnOrderMutation()
-  const [updateOrder, { isLoading: updatingStatus }] = useUpdateOrderMutation()
+  const [updateDeliveryStatus, { isLoading: updatingStatus }] =
+    useUpdateOrderDeliveryStatusMutation()
   const [submitPod, { isLoading: submittingPod }] = useSubmitOrderProofOfDeliveryMutation()
 
   const driverLabel = (d: { full_name?: string; fullName?: string }) =>
     d.full_name ?? d.fullName ?? 'Driver'
+
+  const openTracking = (orderId: string) => setTrackingOrderId(orderId)
 
   const handleAssign = async () => {
     if (!assignOrder || !selectedDriverId) return
@@ -102,16 +107,9 @@ export function DriverDispatchBoard({
 
   const advanceStatus = async (order: DispatchOrderCard, next: string) => {
     try {
-      await updateOrder({
-        id: order.id,
-        data: {
-          delivery_status: next as
-            | 'assigned'
-            | 'picked_up'
-            | 'out_for_delivery'
-            | 'delivered'
-            | 'rescheduled',
-        },
+      await updateDeliveryStatus({
+        orderId: order.id,
+        status: next as 'picked_up' | 'out_for_delivery' | 'delivered' | 'rescheduled',
       }).unwrap()
       if (next === 'delivered') {
         setPodOrder(order)
@@ -126,9 +124,10 @@ export function DriverDispatchBoard({
   const handleFail = async () => {
     if (!failOrder) return
     try {
-      await updateOrder({
-        id: failOrder.id,
-        data: { delivery_status: 'failed', failure_reason: failureReason },
+      await updateDeliveryStatus({
+        orderId: failOrder.id,
+        status: 'failed',
+        failure_reason: failureReason,
       }).unwrap()
       toast.success('Marked as failed')
       setFailOrder(null)
@@ -142,10 +141,29 @@ export function DriverDispatchBoard({
   const handlePodSubmit = async () => {
     if (!podOrder) return
     try {
+      let latitude: number | undefined
+      let longitude: number | undefined
+      if (navigator.geolocation) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10_000,
+              maximumAge: 60_000,
+            })
+          })
+          latitude = pos.coords.latitude
+          longitude = pos.coords.longitude
+        } catch {
+          /* POD allowed without GPS */
+        }
+      }
       await submitPod({
         orderId: podOrder.id,
         recipient_name: recipientName || undefined,
         notes: proofNotes || undefined,
+        latitude,
+        longitude,
       }).unwrap()
       toast.success('Proof of delivery saved')
       setPodOrder(null)
@@ -279,6 +297,7 @@ export function DriverDispatchBoard({
                 <DispatchOrderRow
                   key={order.id}
                   order={order}
+                  onViewTracking={openTracking}
                   selectable={canPlanRoutes}
                   selected={selectedIds.has(order.id)}
                   onToggleSelect={() => toggleSelect(order)}
@@ -303,6 +322,7 @@ export function DriverDispatchBoard({
                   key={order.id}
                   order={order}
                   showDriver
+                  onViewTracking={openTracking}
                   selectable={canPlanRoutes}
                   selected={selectedIds.has(order.id)}
                   onToggleSelect={() => toggleSelect(order)}
@@ -345,7 +365,12 @@ export function DriverDispatchBoard({
 
           <DispatchColumn title="Out for delivery" count={data.out_for_delivery.length}>
             {data.out_for_delivery.map((order) => (
-              <DispatchOrderRow key={order.id} order={order} showDriver>
+              <DispatchOrderRow
+                key={order.id}
+                order={order}
+                showDriver
+                onViewTracking={openTracking}
+              >
                 {canManage && (
                   <div className="flex flex-wrap gap-2">
                     {order.assignment?.status === 'rescheduled' && (
@@ -410,7 +435,12 @@ export function DriverDispatchBoard({
 
           <DispatchColumn title="Delivered today" count={data.delivered_today.length}>
             {data.delivered_today.map((order) => (
-              <DispatchOrderRow key={order.id} order={order} showDriver>
+              <DispatchOrderRow
+                key={order.id}
+                order={order}
+                showDriver
+                onViewTracking={openTracking}
+              >
                 <Badge
                   variant="outline"
                   className={
@@ -553,6 +583,14 @@ export function DriverDispatchBoard({
           </Dialog>
         </>
       )}
+
+      <DeliveryTrackingDrawer
+        orderId={trackingOrderId}
+        open={!!trackingOrderId}
+        onOpenChange={(open) => {
+          if (!open) setTrackingOrderId(null)
+        }}
+      />
     </div>
   )
 }

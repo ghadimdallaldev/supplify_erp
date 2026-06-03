@@ -7,6 +7,11 @@ import {
 } from '../lib/billing/billing-service.js'
 import { getBillingGateway } from '../lib/billing/gateway-registry.js'
 import { invalidateTenantSubscriptionCache } from '../lib/subscription.js'
+import {
+  notifyBillingRenewed,
+  notifyBillingPaymentFailed,
+  notifyBillingAccountLocked,
+} from '../services/notification.service.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -58,6 +63,11 @@ async function attemptAutoRenewal(subscription) {
       if (!locked) return
       await markSubscriptionPastDue(client, subscription.id)
     })
+    notifyBillingPaymentFailed({
+      tenantId: subscription.tenant_id,
+      tenantType: subscription.tenant_type,
+      reason: 'no payment method on file',
+    }).catch(() => {})
     return { failed: true, reason: 'no_payment_method' }
   }
 
@@ -102,6 +112,11 @@ async function attemptAutoRenewal(subscription) {
       invalidateTenantSubscriptionCache(subscription.tenant_id, subscription.tenant_type).catch(
         () => {}
       )
+      notifyBillingRenewed({
+        tenantId: subscription.tenant_id,
+        tenantType: subscription.tenant_type,
+        periodEnd: periodEnd?.toISOString?.()?.slice(0, 10) || String(periodEnd),
+      }).catch(() => {})
       return { renewed: true }
     }
     return { skipped: true, reason: 'already_renewed' }
@@ -112,6 +127,11 @@ async function attemptAutoRenewal(subscription) {
     if (!locked) return
     await markSubscriptionPastDue(client, subscription.id)
   })
+  notifyBillingPaymentFailed({
+    tenantId: subscription.tenant_id,
+    tenantType: subscription.tenant_type,
+    reason: chargeResult.failureCode || 'payment declined',
+  }).catch(() => {})
   return { failed: true, reason: chargeResult.failureCode }
 }
 
@@ -192,7 +212,14 @@ export async function runSubscriptionBillingJob() {
         return true
       })
 
-      if (didLock) locked++
+      if (didLock) {
+        locked++
+        notifyBillingAccountLocked({
+          tenantId: sub.tenant_id,
+          tenantType: sub.tenant_type,
+          reason: 'payment overdue grace period expired',
+        }).catch(() => {})
+      }
     }
 
     logger.info('Subscription billing job complete', { renewed, locked, pastDue })

@@ -3,7 +3,13 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "apps/api/Dockerfile",
-    "watchPatterns": ["apps/api/**", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]
+    "watchPatterns": [
+      "apps/api/**",
+      "deploy/railway/**",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml"
+    ]
   },
   "deploy": {
     "startCommand": "node apps/api/src/server.js",
