@@ -7,6 +7,15 @@ vi.mock('./logger.js', () => ({
 vi.mock('../config/env.js', () => ({
   config: { ADMIN_OVERVIEW_DEBUG: false },
 }))
+vi.mock('./admin-operational-metrics.js', () => ({
+  buildAdminOperationalOverviewCounters: vi.fn().mockResolvedValue({
+    emailFailed24h: 0,
+    emailSkipped24h: 0,
+    openFulfillmentIssues: 0,
+    staleGpsDeliveries: 0,
+    expiredInventoryLots: 0,
+  }),
+}))
 
 import { query } from './db.js'
 import { buildAdminOverviewMetrics, safeOverviewQuery } from './admin-overview-metrics.js'

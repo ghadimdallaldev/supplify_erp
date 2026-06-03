@@ -3,7 +3,10 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ALL_FEATURE_KEYS } from '../lib/feature-keys.js'
 
-vi.mock('../lib/db.js', () => ({ query: vi.fn() }))
+vi.mock('../lib/db.js', () => ({
+  query: vi.fn(),
+  pool: { totalCount: 2, idleCount: 1, waitingCount: 0 },
+}))
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
@@ -46,6 +49,18 @@ const mockBuildAdminActivityFeed = vi.fn()
 vi.mock('../lib/admin-activity-feed.js', () => ({
   buildAdminActivityFeed: (...args) => mockBuildAdminActivityFeed(...args),
   normalizeActivityEvent: (row) => row,
+}))
+const mockBuildAdminOperationalSummary = vi.fn()
+const mockListAdminEmailDeliveryLogs = vi.fn()
+const mockBuildTenantOperationalSnapshot = vi.fn()
+const mockGetAdminEmailHealthFailures = vi.fn()
+vi.mock('../lib/admin-operational-metrics.js', () => ({
+  buildAdminOperationalSummary: (...args) => mockBuildAdminOperationalSummary(...args),
+  listAdminEmailDeliveryLogs: (...args) => mockListAdminEmailDeliveryLogs(...args),
+  listAdminFulfillmentIssues: vi.fn().mockResolvedValue({ total: 0, issues: [] }),
+  listAdminActiveDeliveries: vi.fn().mockResolvedValue({ deliveries: [] }),
+  buildTenantOperationalSnapshot: (...args) => mockBuildTenantOperationalSnapshot(...args),
+  getAdminEmailHealthFailures: (...args) => mockGetAdminEmailHealthFailures(...args),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -812,6 +827,66 @@ describe('Admin Dashboard Routes', () => {
       expect(mockBuildAdminActivityFeed).toHaveBeenCalledWith(
         expect.objectContaining({ days: '7' })
       )
+    })
+  })
+
+  describe('GET /operational-summary', () => {
+    it('returns operational summary for admin', async () => {
+      mockBuildAdminOperationalSummary.mockResolvedValueOnce({
+        email: { failed24h: 2, enabled: true },
+        warnings: [{ id: 'email-high-failures', severity: 'warning', message: '2 failed' }],
+      })
+      const res = await request(app).get('/api/admin-dashboard/operational-summary').expect(200)
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.summary.email.failed24h).toBe(2)
+    })
+  })
+
+  describe('GET /operational/email-logs', () => {
+    it('returns redacted email logs without secrets', async () => {
+      mockListAdminEmailDeliveryLogs.mockResolvedValueOnce({
+        total: 1,
+        limit: 50,
+        offset: 0,
+        logs: [
+          {
+            id: '1',
+            recipientRedacted: 'se***@example.com',
+            status: 'failed',
+            eventType: 'test',
+          },
+        ],
+      })
+      const res = await request(app).get('/api/admin-dashboard/operational/email-logs').expect(200)
+      expect(res.body.data.logs[0].recipientRedacted).toMatch(/\*\*\*/)
+      expect(JSON.stringify(res.body)).not.toContain('SMTP_PASS')
+    })
+  })
+
+  describe('GET /tenants/:tenantType/:id/operational-snapshot', () => {
+    it('returns supplier snapshot without GPS history', async () => {
+      mockBuildTenantOperationalSnapshot.mockResolvedValueOnce({
+        tenantId: 's1',
+        tenantType: 'SUPPLIER',
+        supplier: { driverCount: 1, gpsToday: { live: 0, stale: 0, noGps: 0, failed: 0 } },
+      })
+      const res = await request(app)
+        .get('/api/admin-dashboard/tenants/SUPPLIER/s1/operational-snapshot')
+        .expect(200)
+      expect(res.body.data.snapshot.supplier.driverCount).toBe(1)
+      expect(JSON.stringify(res.body)).not.toMatch(/driver_location_ping/)
+    })
+  })
+
+  describe('GET /health email failures', () => {
+    it('includes emailFailures from delivery log', async () => {
+      mockGetAdminEmailHealthFailures.mockResolvedValueOnce([
+        { id: '1', recipientRedacted: 'a***@b.com', eventType: 'x', status: 'failed' },
+      ])
+      query.mockResolvedValue({ rows: [] })
+      const res = await request(app).get('/api/admin-dashboard/health').expect(200)
+      expect(res.body.data.emailFailures).toHaveLength(1)
+      expect(res.body.data.emailFailures[0].recipientRedacted).toBeDefined()
     })
   })
 

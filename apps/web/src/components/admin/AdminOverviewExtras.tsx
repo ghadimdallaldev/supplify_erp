@@ -40,6 +40,7 @@ export function AdminOverviewExtras({
   lastUpdated?: Date | null
 }) {
   const alerts = (overview?.alerts || {}) as Record<string, number>
+  const operational = (overview?.operational || {}) as Record<string, number>
   const { data: dealInsights } = useGetAdminDealInsightsQuery()
   const { data: pendingDealsData } = useGetAdminPendingDealsQuery()
   const { data: healthData } = useGetAdminHealthQuery()
@@ -119,6 +120,47 @@ export function AdminOverviewExtras({
     })
   }
 
+  const emailFailed = Number(operational.emailFailed24h || 0)
+  if (emailFailed >= 5) {
+    attentionItems.push({
+      id: 'email-failures',
+      label: `${emailFailed} failed emails in 24h`,
+      detail: 'Review delivery logs in Operations',
+      severity: 'warning',
+      tab: 'operations',
+    })
+  }
+
+  const openFulfillment = Number(operational.openFulfillmentIssues || 0)
+  if (openFulfillment >= 10) {
+    attentionItems.push({
+      id: 'fulfillment-issues',
+      label: `${openFulfillment} open fulfillment issues`,
+      severity: 'warning',
+      tab: 'operations',
+    })
+  }
+
+  const staleGps = Number(operational.staleGpsDeliveries || 0)
+  if (staleGps >= 10) {
+    attentionItems.push({
+      id: 'stale-gps',
+      label: `${staleGps} deliveries with stale GPS`,
+      severity: 'info',
+      tab: 'operations',
+    })
+  }
+
+  const expiredLots = Number(operational.expiredInventoryLots || 0)
+  if (expiredLots >= 20) {
+    attentionItems.push({
+      id: 'expired-lots',
+      label: `${expiredLots} expired inventory lots`,
+      severity: 'warning',
+      tab: 'operations',
+    })
+  }
+
   const severityStyles = {
     danger: 'border-red-200 bg-red-50 text-red-800',
     warning: 'border-amber-200 bg-amber-50 text-amber-800',
@@ -130,6 +172,7 @@ export function AdminOverviewExtras({
     { label: 'Manage tenants', tab: 'tenants', icon: Users },
     { label: 'Subscriptions', tab: 'subscriptions', icon: CreditCard },
     { label: 'Limit overrides', tab: 'limits', icon: Shield },
+    { label: 'Operations', tab: 'operations', icon: HeartPulse },
     { label: 'Health check', tab: 'health', icon: HeartPulse },
     { label: 'Audit logs', tab: 'audit', icon: AlertCircle },
   ]

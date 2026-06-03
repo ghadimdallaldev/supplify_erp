@@ -20,4 +20,20 @@ test.describe('Admin API RBAC', () => {
     const res = await request.get(`${apiURL}/api/admin-dashboard/plans`)
     expect(res.status()).toBe(401)
   })
+
+  test('GET /api/admin-dashboard/operational-summary without auth returns 401', async ({
+    request,
+  }) => {
+    test.skip(!apiReachable(), 'API not running at apiURL')
+    const res = await request.get(`${apiURL}/api/admin-dashboard/operational-summary`)
+    expect(res.status()).toBe(401)
+  })
+
+  test('GET /api/admin-dashboard/operational/email-logs without auth returns 401', async ({
+    request,
+  }) => {
+    test.skip(!apiReachable(), 'API not running at apiURL')
+    const res = await request.get(`${apiURL}/api/admin-dashboard/operational/email-logs`)
+    expect(res.status()).toBe(401)
+  })
 })

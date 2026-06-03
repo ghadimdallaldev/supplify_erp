@@ -4,8 +4,8 @@
     "builder": "DOCKERFILE",
     "dockerfilePath": "deploy/railway/keycloak/Dockerfile",
     "buildArgs": {
-      "REALM_EXPORT_FILE": "deploy/keycloak/realm-export.json",
-      "REALM_IMPORT_FILENAME": "Supplify-realm.json",
+      "REALM_EXPORT_FILE": "deploy/keycloak/realm-export.preprod.json",
+      "REALM_IMPORT_FILENAME": "supplify-preprod-realm.json",
       "KC_PRODUCTION": "false"
     },
     "watchPatterns": ["deploy/keycloak/**", "deploy/railway/keycloak/**"]

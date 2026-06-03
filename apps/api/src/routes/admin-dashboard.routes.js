@@ -60,6 +60,14 @@ import {
 import { isLimitKeyApplicable } from '../lib/limit-resolution.js'
 import { buildAdminOverviewMetrics } from '../lib/admin-overview-metrics.js'
 import { buildAdminActivityFeed } from '../lib/admin-activity-feed.js'
+import {
+  buildAdminOperationalSummary,
+  listAdminEmailDeliveryLogs,
+  listAdminFulfillmentIssues,
+  listAdminActiveDeliveries,
+  buildTenantOperationalSnapshot,
+  getAdminEmailHealthFailures,
+} from '../lib/admin-operational-metrics.js'
 import { adminResetUserPassword, listAdminUsers } from '../services/admin-user-password.service.js'
 import { adminDashboardPermissionGuard, requireAnyPermission } from '../lib/route-permissions.js'
 import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
@@ -2405,6 +2413,36 @@ router.delete('/tenants/:tenantType/:id/override-limit/:overrideId', async (req,
   }
 })
 
+// Get tenant operational snapshot (read-only diagnostics)
+router.get('/tenants/:tenantType/:id/operational-snapshot', async (req, res) => {
+  try {
+    const { tenantType, id } = req.params
+    if (!['RESTAURANT', 'SUPPLIER'].includes(tenantType)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: 'tenantType must be RESTAURANT or SUPPLIER' },
+        requestId: req.requestId,
+      })
+    }
+    const snapshot = await buildTenantOperationalSnapshot(id, tenantType)
+    res.json({
+      ok: true,
+      data: { snapshot },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Get tenant operational snapshot error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get tenant operational snapshot' },
+      requestId: req.requestId,
+    })
+  }
+})
+
 // Get tenant entitlements (plan, limits, overrides, usage) for admin tenant detail
 router.get('/tenants/:tenantType/:id/entitlements', async (req, res) => {
   try {
@@ -3137,13 +3175,96 @@ router.get('/tenants/restaurants/:id/usage', async (req, res) => {
 })
 
 // ========================================
+// OPERATIONAL VISIBILITY (admin support / monitoring)
+// ========================================
+router.get('/operational-summary', async (req, res) => {
+  try {
+    const summary = await buildAdminOperationalSummary()
+    res.json({
+      ok: true,
+      data: { summary },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Operational summary error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to get operational summary' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/operational/email-logs', async (req, res) => {
+  try {
+    const result = await listAdminEmailDeliveryLogs(req.query)
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Operational email logs error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list email delivery logs' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/operational/fulfillment-issues', async (req, res) => {
+  try {
+    const result = await listAdminFulfillmentIssues(req.query)
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Operational fulfillment issues error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list fulfillment issues' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/operational/active-deliveries', async (req, res) => {
+  try {
+    const limit = req.query.limit
+    const result = await listAdminActiveDeliveries({ limit })
+    res.json({
+      ok: true,
+      data: result,
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Operational active deliveries error:', error)
+    res.status(500).json({
+      ok: false,
+      data: null,
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to list active deliveries' },
+      requestId: req.requestId,
+    })
+  }
+})
+
+// ========================================
 // HEALTH (Phase C1)
 // ========================================
 router.get('/health', async (req, res) => {
   try {
     let jobFailures = []
     let webhookFailures = []
-    let emailFailures = []
     let recentErrors = []
     let dbPool = null
 
@@ -3160,6 +3281,8 @@ router.get('/health', async (req, res) => {
     } catch (e) {
       if (e.code !== '42P01') throw e
     }
+
+    const emailFailures = await getAdminEmailHealthFailures({ limit: 20 })
 
     if (pool && typeof pool.totalCount === 'number') {
       dbPool = { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount }

@@ -65,6 +65,19 @@ describe('AdminOverviewExtras', () => {
     expect(screen.getByText(/Updated 03:42 PM/i)).toBeInTheDocument()
   })
 
+  it('shows operational email failure attention item', () => {
+    render(
+      <AdminOverviewExtras
+        overview={{
+          alerts: {},
+          operational: { emailFailed24h: 6, openFulfillmentIssues: 0 },
+        }}
+        onNavigateTab={vi.fn()}
+      />
+    )
+    expect(screen.getByText(/6 failed emails in 24h/i)).toBeInTheDocument()
+  })
+
   it('tolerates non-array pending deals payload', () => {
     vi.mocked(useGetAdminPendingDealsQuery).mockReturnValue({
       data: { deals: { id: 'bad-shape' } as unknown as [] },

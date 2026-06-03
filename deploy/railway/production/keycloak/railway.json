@@ -4,14 +4,14 @@
     "builder": "DOCKERFILE",
     "dockerfilePath": "deploy/railway/keycloak/Dockerfile",
     "buildArgs": {
-      "REALM_EXPORT_FILE": "deploy/keycloak/realm-export.json",
-      "REALM_IMPORT_FILENAME": "Supplify-realm.json",
-      "KC_PRODUCTION": "false"
+      "REALM_EXPORT_FILE": "deploy/keycloak/realm-export.prod.json",
+      "REALM_IMPORT_FILENAME": "supplify-prod-realm.json",
+      "KC_PRODUCTION": "true"
     },
     "watchPatterns": ["deploy/keycloak/**", "deploy/railway/keycloak/**"]
   },
   "deploy": {
-    "startCommand": "/opt/keycloak/bin/kc.sh start-dev --import-realm",
+    "startCommand": "/opt/keycloak/bin/kc.sh start --import-realm",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",

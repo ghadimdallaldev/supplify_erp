@@ -16,7 +16,12 @@ Base path: `/api/admin-dashboard`. All require auth + role ADMIN + ADMIN_ACCESS.
 | GET    | /platform-settings                                  | Platform settings (`freeSandboxDays`, default 7)                                                                   |
 | PATCH  | /platform-settings                                  | Update `freeSandboxDays` (3–7 only)                                                                                |
 | GET    | /usage/:tenantId                                    | Usage meters (?tenantType, ?period)                                                                                |
-| GET    | /health                                             | System health (recent errors, dbPool)                                                                              |
+| GET    | /health                                             | System health (recent errors, dbPool, email failures 24h)                                                          |
+| GET    | /operational-summary                                | Platform operational rollup (email, expiry, GPS, fulfillment, warnings)                                            |
+| GET    | /operational/email-logs                             | Paginated email delivery log (?tenantId, ?status, ?eventType, ?since, limit, offset)                               |
+| GET    | /operational/fulfillment-issues                     | Paginated open fulfillment issues                                                                                  |
+| GET    | /operational/active-deliveries                      | Active deliveries with GPS state badge (no coordinates/history)                                                    |
+| GET    | /tenants/:tenantType/:id/operational-snapshot       | Per-tenant read-only operational diagnostics                                                                       |
 | GET    | /financial-overview                                 | GMV, outstanding, overdue, revenue by plan, top tenants                                                            |
 | GET    | /audit-logs                                         | Audit logs (?tenantId, ?actionType, limit, offset)                                                                 |
 | POST   | /impersonate                                        | Start impersonation (`tenantId`, `tenantType`, optional `acknowledgeSuspended`); sets cookie; returns `redirectTo` |

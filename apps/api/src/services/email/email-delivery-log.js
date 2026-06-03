@@ -77,7 +77,7 @@ export async function finalizeEmailDelivery({
   }
 }
 
-function redactEmail(email) {
+export function redactEmail(email) {
   if (!email || typeof email !== 'string') return '[none]'
   const [local, domain] = email.split('@')
   if (!domain) return '[redacted]'

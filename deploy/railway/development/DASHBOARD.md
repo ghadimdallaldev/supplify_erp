@@ -42,6 +42,11 @@ GPS tracking works without this key (fallback link still works).
 2. Redeploy **API** and **Web** (API loads `development/api.env`; web rebuild picks `development/web.env`).
 3. No extra dashboard vars for GPS unless you enable map embed (above) or server-side `GOOGLE_MAPS_API_KEY` on API.
 
+## Keycloak (automatic realm import)
+
+Build from `deploy/railway/development/keycloak/railway.json` — realm **Supplify** imports on first boot (`--import-realm`).  
+Set `KEYCLOAK_ADMIN_PASSWORD` on **Keycloak** and **API** (same value). See [`../keycloak/RAILWAY_SETUP.md`](../keycloak/RAILWAY_SETUP.md).
+
 ## Wrong values that break login (not 502)
 
 | Variable                  | Wrong          | Right                           |
