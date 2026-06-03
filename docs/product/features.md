@@ -101,13 +101,14 @@ Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admi
 
 ## Fulfillment & supplier inventory
 
-| Feature            | Web route                | API prefix                      | Notes                      |
-| ------------------ | ------------------------ | ------------------------------- | -------------------------- |
-| Fulfillment        | `/app/fulfillment`       | `/api/orders` (supplier status) | Pick/pack/ship workflow    |
-| Supplier inventory | `/app/inventory`         | `/api/inventory`                | Stock levels, reservations |
-| Supplier settings  | `/app/supplier-settings` | `/api/suppliers`                | Onboarding / profile       |
+| Feature                | Web route                      | API prefix                                                                   | Notes                                                                                                                  |
+| ---------------------- | ------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Fulfillment            | `/app/fulfillment`             | `/api/fulfillment/*`, `/api/orders/:id/tracking`, `/api/orders/:id/location` | Driver dispatch, routes, GPS tracking (supplier); see [fulfillment-logistics.md](../features/fulfillment-logistics.md) |
+| Order GPS (restaurant) | Order detail `/app/orders/:id` | `GET /api/orders/:id/tracking`                                               | `RestaurantOrderTrackingPanel`; sanitized payload; manual QA **GPS-R01–R10**                                           |
+| Supplier inventory     | `/app/inventory`               | `/api/inventory`                                                             | Stock levels, reservations                                                                                             |
+| Supplier settings      | `/app/supplier-settings`       | `/api/suppliers`                                                             | Onboarding / profile                                                                                                   |
 
-**Verify:** Supplier login → Fulfillment → advance order status. Tests: `inventory.routes.test.js`.
+**Verify:** Supplier login → Fulfillment → dispatch + **View tracking**; driver ping → Live badge. Restaurant → in-flight order detail → tracking panel. Tests: `delivery-tracking-payload.test.js`, `restaurant-tracking-payload.test.js`, `orders-driver-tracking.test.js`, `driver-location.service.test.js`; manual **GPS-S\***, **GPS-R\***, **DRV-GPS\***.
 
 ## Restaurant operations
 

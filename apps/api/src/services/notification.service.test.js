@@ -13,8 +13,8 @@ vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
 }))
 
-vi.mock('./mailer.service.js', () => ({
-  sendMail: vi.fn().mockResolvedValue({ messageId: 'test-message-id' }),
+vi.mock('./email/email.service.js', () => ({
+  sendTemplateEmail: vi.fn().mockResolvedValue({ sent: true, provider: 'smtp' }),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -44,7 +44,7 @@ describe('Notification Service', () => {
 
   describe('sendNotification', () => {
     it('creates a notification and sends email when enabled', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
       const { emitNotificationNew } = await import('../lib/socket.js')
       const { getEntitlements } = await import('../lib/subscription.js')
       getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_and_email' } })
@@ -71,7 +71,7 @@ describe('Notification Service', () => {
       })
 
       expect(notification).toBeDefined()
-      expect(sendMail).toHaveBeenCalledWith(
+      expect(sendTemplateEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'owner@test.com',
           subject: 'New Order Received',
@@ -136,7 +136,7 @@ describe('Notification Service', () => {
     })
 
     it('does NOT send email when tenant is on Free plan', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
       const { getEntitlements } = await import('../lib/subscription.js')
 
       getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
@@ -164,14 +164,14 @@ describe('Notification Service', () => {
         message: 'Order placed',
       })
 
-      expect(sendMail).not.toHaveBeenCalled()
+      expect(sendTemplateEmail).not.toHaveBeenCalled()
     })
 
     it('sends email when tenant is on Silver plan', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
       const { getEntitlements } = await import('../lib/subscription.js')
 
-      sendMail.mockResolvedValue({ messageId: 'msg-1' })
+      sendTemplateEmail.mockResolvedValue({ sent: true })
       getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_and_email' } })
 
       queryMock
@@ -195,11 +195,13 @@ describe('Notification Service', () => {
         message: 'Order placed',
       })
 
-      expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: 'owner@test.com' }))
+      expect(sendTemplateEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'owner@test.com' })
+      )
     })
 
     it('defaults to in_app_only when entitlements fetch fails', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
       const { getEntitlements } = await import('../lib/subscription.js')
 
       getEntitlements.mockRejectedValue(new Error('DB error'))
@@ -225,13 +227,13 @@ describe('Notification Service', () => {
         message: 'Order placed',
       })
 
-      expect(sendMail).not.toHaveBeenCalled()
+      expect(sendTemplateEmail).not.toHaveBeenCalled()
     })
   })
 
   describe('notifyGuestReservationConfirmation', () => {
     it('emails guest when email is provided', async () => {
-      const { sendMail } = await import('./mailer.service.js')
+      const { sendTemplateEmail } = await import('./email/email.service.js')
 
       const result = await notifyGuestReservationConfirmation(
         {
@@ -244,7 +246,7 @@ describe('Notification Service', () => {
         'Golden Fork'
       )
 
-      expect(sendMail).toHaveBeenCalled()
+      expect(sendTemplateEmail).toHaveBeenCalled()
       expect(result.email).toBe(true)
     })
 

@@ -26,6 +26,7 @@ COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 
 # Railway: Vite vars from deploy/railway/<env>/web.env (override with Docker build args if set)
+# Set RAILWAY_DEPLOY_ENV=preprod|production on Railway web builds for non-dev env files.
 ARG RAILWAY_DEPLOY_ENV=development
 RUN cp "deploy/railway/${RAILWAY_DEPLOY_ENV}/web.env" apps/web/.env.production
 

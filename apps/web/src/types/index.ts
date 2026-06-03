@@ -202,6 +202,78 @@ export interface DriverRecord {
   linked_user_name?: string | null
 }
 
+export interface RestaurantOrderTrackingResponse {
+  orderId: string
+  orderReference?: string
+  orderStatus?: string | null
+  trackingEnabled: boolean
+  reason?: string
+  etaAvailable: boolean
+  delivery?: {
+    status: string
+    label: string
+    assignedAt?: string | null
+    pickedUpAt?: string | null
+    deliveredAt?: string | null
+  } | null
+  driver?: { name?: string; phone?: string } | null
+  tracking?: DeliveryTrackingInfo | null
+}
+
+export interface SupplierOrderTrackingResponse {
+  orderId: string
+  orderRef?: string
+  orderStatus?: string | null
+  restaurantName?: string | null
+  trackingEnabled: boolean
+  etaAvailable?: boolean
+  routeId?: string | null
+  routeStopId?: string | null
+  routeNumber?: string | null
+  assignment?: {
+    id: string
+    status: string
+    driverId?: string
+    driverName?: string
+    driverPhone?: string
+    driverPhoneVisible?: boolean
+  } | null
+  tracking?: DeliveryTrackingInfo | null
+  latestLocation?: DeliveryTrackingInfo['latestLocation']
+  lastUpdatedLabel?: string | null
+}
+
+export type OrderTrackingResponse = RestaurantOrderTrackingResponse | SupplierOrderTrackingResponse
+
+export function isRestaurantOrderTracking(
+  data: OrderTrackingResponse | undefined
+): data is RestaurantOrderTrackingResponse {
+  return Boolean(data && 'orderReference' in data)
+}
+
+export function isSupplierOrderTracking(
+  data: OrderTrackingResponse | undefined
+): data is SupplierOrderTrackingResponse {
+  return Boolean(data && !isRestaurantOrderTracking(data))
+}
+
+export interface DeliveryTrackingInfo {
+  enabled: boolean
+  hasLocation: boolean
+  lastSeenAt: string | null
+  isStale: boolean
+  staleAfterSeconds?: number
+  latestLocation: {
+    latitude: number
+    longitude: number
+    accuracyMeters?: number | null
+    speedMps?: number | null
+    headingDegrees?: number | null
+    recordedAt: string
+  } | null
+  lastUpdatedLabel?: string | null
+}
+
 export interface DispatchOrderCard {
   id: string
   status: string
@@ -228,6 +300,15 @@ export interface DispatchOrderCard {
       vehicle_plate?: string | null
     }
   } | null
+  tracking?: DeliveryTrackingInfo | null
+  /** @deprecated Prefer `tracking` */
+  driver_last_seen?: {
+    recordedAt?: string
+    lastUpdatedLabel?: string
+    latitude?: number
+    longitude?: number
+    isStale?: boolean
+  } | null
 }
 
 export interface DeliveryRouteStop {
@@ -243,6 +324,7 @@ export interface DeliveryRouteStop {
   itemCount: number
   notes?: string | null
   assignmentStatus?: string | null
+  tracking?: DeliveryTrackingInfo | null
 }
 
 export interface DeliveryRouteSummary {
@@ -263,6 +345,7 @@ export interface DeliveryRouteSummary {
 
 export interface DeliveryRouteDetail extends Omit<DeliveryRouteSummary, 'stops'> {
   stops: DeliveryRouteStop[]
+  tracking?: DeliveryTrackingInfo | null
   startedAt?: string | null
   completedAt?: string | null
 }

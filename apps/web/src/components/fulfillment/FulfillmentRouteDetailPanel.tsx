@@ -13,13 +13,15 @@ import {
 } from '../../services/api'
 import { usePermissions } from '../../hooks/usePermissions'
 import { formatOrderRef } from './fulfillmentDispatchUtils'
+import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
 
 type Props = {
   route: DeliveryRouteDetail
   onClose: () => void
+  onViewTracking?: (orderId: string) => void
 }
 
-export function FulfillmentRouteDetailPanel({ route, onClose }: Props) {
+export function FulfillmentRouteDetailPanel({ route, onClose, onViewTracking }: Props) {
   const { can } = usePermissions()
   const canManage = can('FULFILLMENT_MANAGE')
 
@@ -130,9 +132,25 @@ export function FulfillmentRouteDetailPanel({ route, onClose }: Props) {
               {stop.addressLine && (
                 <p className="text-xs text-[var(--text-muted)] mt-1">{stop.addressLine}</p>
               )}
-              <Badge variant="outline" className="mt-2">
-                {formatDeliveryStatus(stop.status)}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <Badge variant="outline">{formatDeliveryStatus(stop.status)}</Badge>
+                {stop.tracking && (
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    {getGpsStatusLabel(stop.tracking)}
+                  </span>
+                )}
+              </div>
+              {onViewTracking && (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 mt-1 text-xs"
+                  onClick={() => onViewTracking(stop.orderId)}
+                >
+                  View tracking
+                </Button>
+              )}
             </div>
             {editable && (
               <div className="flex flex-wrap gap-1 shrink-0">

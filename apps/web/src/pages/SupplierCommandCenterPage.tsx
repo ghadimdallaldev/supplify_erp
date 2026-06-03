@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   useGetSupplierCommandCenterQuery,
   useCreateReorderReminderDraftMutation,
+  useGetSupplierAtRiskOrdersQuery,
 } from '../services/api'
 import { Skeleton } from '../components/ui/skeleton'
 import { Button } from '../components/ui/button'
@@ -90,6 +91,7 @@ function formatOrderDate(iso: string | undefined) {
 export function SupplierCommandCenterPage() {
   const { data, isLoading, isError, error, refetch, isFetching } =
     useGetSupplierCommandCenterQuery()
+  const { data: atRiskData } = useGetSupplierAtRiskOrdersQuery()
   const [createDraft, { isLoading: drafting }] = useCreateReorderReminderDraftMutation()
   const [reminderDraft, setReminderDraft] = useState<ReminderDraft | null>(null)
 
@@ -225,13 +227,54 @@ export function SupplierCommandCenterPage() {
             icon={Package}
             href="/app/orders"
           />
-          <KpiCard
-            testId="kpi-deliveries-pending"
-            label="Deliveries pending"
-            value={kpis?.deliveriesPendingToday ?? 0}
-            icon={Truck}
-            href="/app/fulfillment"
-          />
+          <div className="space-y-2">
+            <KpiCard
+              testId="kpi-deliveries-pending"
+              label="Deliveries pending"
+              value={kpis?.deliveriesPendingToday ?? 0}
+              icon={Truck}
+              href="/app/fulfillment"
+            />
+            {previews?.deliveryGpsSummary && (
+              <div
+                data-testid="delivery-gps-summary"
+                className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2.5 text-xs"
+              >
+                <p className="font-semibold text-[var(--text-muted)] mb-1.5">GPS today</p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[var(--text)]">
+                  <span>
+                    <span className="text-[var(--mint)] font-bold">
+                      {previews.deliveryGpsSummary.live ?? 0}
+                    </span>{' '}
+                    Live
+                  </span>
+                  <span>
+                    <span className="text-amber-600 font-bold">
+                      {previews.deliveryGpsSummary.stale ?? 0}
+                    </span>{' '}
+                    Stale
+                  </span>
+                  <span>
+                    <span className="font-bold">{previews.deliveryGpsSummary.noGps ?? 0}</span> No
+                    GPS
+                  </span>
+                  <span>
+                    <span className="text-[var(--red)] font-bold">
+                      {previews.deliveryGpsSummary.failed ?? 0}
+                    </span>{' '}
+                    Failed
+                  </span>
+                </div>
+                <Link
+                  to="/app/fulfillment?tab=tracking"
+                  className="mt-2 inline-flex items-center gap-1 text-[var(--brand-mid)] font-semibold hover:underline"
+                >
+                  Open tracking
+                  <ArrowRight className="h-3 w-3" aria-hidden />
+                </Link>
+              </div>
+            )}
+          </div>
           <KpiCard
             testId="kpi-unpaid-balance"
             label="Unpaid balance"
@@ -435,6 +478,33 @@ export function SupplierCommandCenterPage() {
             </div>
           )}
         </section>
+
+        {(atRiskData?.atRisk?.length ?? 0) > 0 && (
+          <section
+            data-testid="at-risk-expected-orders"
+            className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5"
+          >
+            <h2 className="text-[15px] font-extrabold mb-2.5 flex items-center gap-2 text-[var(--text)]">
+              <AlertTriangle size={16} className="text-amber-600" />
+              At-risk expected orders today
+            </h2>
+            <ul className="text-sm space-y-2">
+              {atRiskData.atRisk.map(
+                (r: {
+                  cadenceId: string
+                  restaurantName: string
+                  label: string
+                  dayName: string
+                }) => (
+                  <li key={r.cadenceId} className="border-b border-[var(--app-border)] pb-2">
+                    <span className="font-semibold">{r.restaurantName}</span> — usually orders{' '}
+                    {r.label} on {r.dayName}s but has not ordered yet.
+                  </li>
+                )
+              )}
+            </ul>
+          </section>
+        )}
 
         <section
           data-testid="preview-boosted-deals"

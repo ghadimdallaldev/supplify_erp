@@ -49,8 +49,8 @@ If `verify:tier-matrix` reports **FAILURES**, add a new corrective migration (`U
 
 ## Manual demo script
 
-Presenter path: [DEMO_SCRIPT.md](./DEMO_SCRIPT.md)  
-Full checklist: [MANUAL_TEST_CHECKLIST.md](./MANUAL_TEST_CHECKLIST.md)
+Presenter path: [DEMO_SCRIPT.md](./DEMO_SCRIPT.md) (includes restaurant + supplier GPS demo steps)  
+Full checklist: [MANUAL_TEST_CHECKLIST.md](./MANUAL_TEST_CHECKLIST.md) — delivery GPS: **§6.6.1**, **§7.4.1**, **§7.4.2**
 
 | Block                 | Status      | Notes                       |
 | --------------------- | ----------- | --------------------------- |

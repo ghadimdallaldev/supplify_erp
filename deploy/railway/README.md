@@ -22,6 +22,20 @@ Each folder: `api.env`, `web.env`, `secrets.env.example`, `keycloak.env`.
 4. **Keycloak** service → paste `development/keycloak.env` + secrets from `secrets.env.example` in Raw Editor.
 5. Clear any dashboard **`PORT`** override on API (let Railway inject `PORT`).
 6. Push to git → redeploy all services.
+7. After deploy, run **`pnpm db:migrate`** against that environment’s Postgres (see [DEPLOYMENT_RAILWAY_ENVIRONMENTS.md](../../DEPLOYMENT_RAILWAY_ENVIRONMENTS.md) § H). Restaurant ops + GPS need migrations **0133–0137** applied once per environment.
+
+## Email (Railway)
+
+Non-secret email settings load from `deploy/railway/<env>/api.env` (`EMAIL_*`, `SMTP_HOST`, etc.).
+
+**Dashboard secret (once):** `SMTP_PASS` — see `secrets.env.example`.
+
+| Environment    | Default behavior                            |
+| -------------- | ------------------------------------------- |
+| development    | `EMAIL_LOG_ONLY=true` (log only)            |
+| preprod / prod | SMTP host in git + `SMTP_PASS` in dashboard |
+
+Test: `pnpm --filter @supplify/api email:test`
 
 ## Changing URLs
 

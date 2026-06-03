@@ -13,13 +13,13 @@ Previously many events only notified the single `contact_email` user; team membe
 
 ## Channels
 
-| Channel  | When                                                                                                             |
-| -------- | ---------------------------------------------------------------------------------------------------------------- |
-| In-app   | `notification_log` + header bell; foreground **toast** + optional **browser** banner via `useNotificationAlerts` |
-| Realtime | Socket.IO `notification_new` and `entitlements_refresh` on shared app socket (sub-second foreground alerts)      |
-| Email    | Plan tier + `email_enabled` + per-category `notify_*` toggle                                                     |
-| WhatsApp | Tier + toggle; often a `wa.me` link in metadata                                                                  |
-| Web Push | `push_enabled` + VAPID; see [push-notifications.md](./push-notifications.md)                                     |
+| Channel  | When                                                                                                                    |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| In-app   | `notification_log` + header bell; foreground **toast** + optional **browser** banner via `useNotificationAlerts`        |
+| Realtime | Socket.IO `notification_new` and `entitlements_refresh` on shared app socket (sub-second foreground alerts)             |
+| Email    | Plan tier + `email_enabled` + per-category `notify_*` toggle; HTML templates via [`email-system.md`](./email-system.md) |
+| WhatsApp | Tier + toggle; often a `wa.me` link in metadata                                                                         |
+| Web Push | `push_enabled` + VAPID; see [push-notifications.md](./push-notifications.md)                                            |
 
 ## Order events
 
@@ -43,4 +43,5 @@ Settings → Notifications: `notify_order_new`, `notify_order_cancelled`, `notif
 ## Reference
 
 - [NOTIFICATIONS_SUMMARY.md](../product/NOTIFICATIONS_SUMMARY.md)
+- [email-system.md](./email-system.md)
 - [push-notifications.md](./push-notifications.md)

@@ -94,17 +94,21 @@ Docker builds use `pnpm --filter @supplify/api...` and `pnpm --filter @supplify/
 
 See `apps/api/.env.<env>.example` and [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md).
 
-| Variable                              | dev                 | preprod            | prod            |
-| ------------------------------------- | ------------------- | ------------------ | --------------- |
-| `APP_ENV`                             | `dev`               | `preprod`          | `prod`          |
-| `DATABASE_URL`                        | dev plugin          | preprod plugin     | prod plugin     |
-| `CORS_ORIGIN` / `PUBLIC_FRONTEND_URL` | localhost + dev URL | preprod URL only   | prod URL only   |
-| `SESSION_SECRET`                      | dev-only            | strong 32+         | strong 32+      |
-| `KEYCLOAK_REALM`                      | `supplify-dev`      | `supplify-preprod` | `supplify-prod` |
-| `STORAGE_DRIVER`                      | `local`             | `s3`               | `s3`            |
-| `PAYMENTS_MODE`                       | `mock`              | `test`             | `live`          |
-| `ENABLE_DEBUG_ROUTES`                 | `true`              | `false`            | `false`         |
-| `REDIS_URL`                           | recommended         | recommended        | recommended     |
+| Variable                              | dev                 | preprod            | prod             |
+| ------------------------------------- | ------------------- | ------------------ | ---------------- |
+| `APP_ENV`                             | `dev`               | `preprod`          | `prod`           |
+| `DATABASE_URL`                        | dev plugin          | preprod plugin     | prod plugin      |
+| `CORS_ORIGIN` / `PUBLIC_FRONTEND_URL` | localhost + dev URL | preprod URL only   | prod URL only    |
+| `SESSION_SECRET`                      | dev-only            | strong 32+         | strong 32+       |
+| `KEYCLOAK_REALM`                      | `supplify-dev`      | `supplify-preprod` | `supplify-prod`  |
+| `STORAGE_DRIVER`                      | `local`             | `s3`               | `s3`             |
+| `PAYMENTS_MODE`                       | `mock`              | `test`             | `live`           |
+| `ENABLE_DEBUG_ROUTES`                 | `true`              | `false`            | `false`          |
+| `REDIS_URL`                           | recommended         | recommended        | recommended      |
+| `EMAIL_LOG_ONLY`                      | `true` (log only)   | `false`            | `false`          |
+| `SMTP_PASS`                           | dashboard secret    | dashboard secret   | dashboard secret |
+
+Non-secret email settings (`EMAIL_*`, `SMTP_HOST`, etc.) load from `deploy/railway/<env>/api.env` on deploy. Set **`SMTP_PASS`** once per API service in the Railway Raw Editor (see `secrets.env.example`). See [docs/features/email-system.md](docs/features/email-system.md).
 
 ## G. Required frontend variables (summary)
 
@@ -125,8 +129,9 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 4. Deploy API: Root Directory **empty**, config `/apps/api/railway.json`, Dockerfile `apps/api/Dockerfile`, health check `/health`.
 5. Deploy Web: Root Directory **empty**, config `/apps/web/railway.json`, Dockerfile `apps/web/Dockerfile`, build args from `apps/web/.env.<env>.example`.
 6. Commit defaults live in `deploy/railway/<environment>/` (API + web load on deploy). Paste secrets from `deploy/railway/<environment>/secrets.env.example` into each service’s Railway Raw Editor once (`DATABASE_URL`, `REDIS_URL`, session keys, Keycloak secret).
-7. Run migrations manually: `pnpm db:migrate` with that environment’s `DATABASE_URL`.
-8. Verify `GET /health` and `GET /ready` on API (`redis.connected` should be `true` when Redis is wired); open web app and sign in via Keycloak.
+7. Run migrations manually: `pnpm db:migrate` with that environment’s `DATABASE_URL`.  
+   **Restaurant operations features** (expiry, shortage chat, ordering lists, reorder reminders) require migrations **0133–0135** (`0133_restaurant_inventory_lots.sql`, `0134_order_fulfillment_issues.sql`, `0135_reorder_cadence_and_quick_list_branch.sql`). **Email dedup** requires migration **0136** (`0136_email_delivery_log.sql`). `RUN_MIGRATIONS_ON_START=false` in committed `api.env` — migrations are never auto-applied on Railway deploy.
+8. Verify `GET /health` and `GET /ready` on API (`redis.connected` should be `true` when Redis is wired); open web app and sign in via Keycloak. Confirm `CRONS_ENABLED=true` in `deploy/railway/<env>/api.env` (loaded on deploy) so the operational reminders job runs daily (default `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS=86400000`). For email, confirm API boot logs show `Email service initialized` with the expected provider; preprod/prod require `SMTP_PASS` in dashboard secrets when `EMAIL_LOG_ONLY=false`.
 
 ## I. Redis (cache + Socket.IO)
 
@@ -140,12 +145,12 @@ Redis is **optional** — the API starts without it and uses an in-memory cache 
 
 ### Local development
 
-**Docker stack** (`pnpm dev:docker` or root `docker-compose.yml`): Redis is already defined as service `redis`. The API gets `REDIS_URL=redis://redis:6379` automatically.
+**Docker stack** (`pnpm dev:docker` or root `docker-compose.yml`): Redis is already defined as service `redis`. The API gets `REDIS_URL=redis://redis:6379` automatically. **Mailpit** captures email at http://localhost:8025 (SMTP port 1025).
 
 **Native API** (`pnpm dev` with infra containers):
 
 ```bash
-pnpm local:infra   # starts postgres, redis, minio, keycloak
+pnpm local:infra   # starts postgres, redis, mailpit, minio, keycloak
 ```
 
 In `apps/api/.env` (or `.env.local`):
@@ -261,7 +266,9 @@ API blocks `PAYMENTS_MODE=mock` when `APP_ENV=prod` or `preprod`.
 - [ ] `REDIS_URL` set on API (Redis plugin per environment); `/health` shows `redis.connected: true`
 - [ ] `GET /health` returns `{ status, service, env }` without secrets
 - [ ] Frontend build with prod `VITE_*` vars
-- [ ] Migrations applied; admin created securely
+- [ ] Migrations applied (`pnpm db:migrate`); incl. **0133–0135** for restaurant operations features
+- [ ] `CRONS_ENABLED=true` on API (operational reminders job; default 24 h interval)
+- [ ] Admin created securely
 - [ ] Backups and rollback plan documented
 
 ## P. Rollback notes

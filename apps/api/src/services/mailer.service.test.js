@@ -19,7 +19,13 @@ vi.mock('nodemailer', () => ({
 
 const mockConfig = {
   NODE_ENV: 'test',
+  EMAIL_ENABLED: true,
+  EMAIL_LOG_ONLY: false,
+  EMAIL_PROVIDER: '',
   SENDGRID_API_KEY: '',
+  EMAIL_API_KEY: '',
+  EMAIL_FROM_ADDRESS: '',
+  EMAIL_FROM_NAME: 'Supplify',
   SENDGRID_FROM_EMAIL: '',
   SENDGRID_FROM_NAME: 'Supplify',
   SMTP_HOST: '',
@@ -28,6 +34,7 @@ const mockConfig = {
   SMTP_USER: '',
   SMTP_PASS: '',
   SMTP_SECURE: false,
+  EMAIL_REPLY_TO: '',
 }
 
 vi.mock('../config/env.js', () => ({

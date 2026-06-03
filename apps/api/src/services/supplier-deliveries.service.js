@@ -1,4 +1,6 @@
 import { query } from '../lib/db.js'
+import { getLatestLocationsForDrivers, isGpsTrackingEnabled } from './driver-location.service.js'
+import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
 
 /**
  * Daily delivery board with filters and area grouping.
@@ -81,17 +83,42 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     params
   )
 
-  const orders = rows.map((r) => ({
-    orderId: r.order_id,
-    orderStatus: r.order_status,
-    restaurantName: r.restaurant_name,
-    deliveryArea: r.delivery_area,
-    deliveryStatus: normalizeDeliveryStatus(r.delivery_status),
-    driverId: r.driver_id,
-    driverName: r.driver_name,
-    hasPod: r.has_pod,
-    scheduledAt: r.scheduled_at,
-  }))
+  const driverIds = [...new Set(rows.map((r) => r.driver_id).filter(Boolean))]
+  const locationMap = isGpsTrackingEnabled()
+    ? await getLatestLocationsForDrivers(driverIds)
+    : new Map()
+
+  const orders = rows.map((r) => {
+    const locRow = r.driver_id ? locationMap.get(r.driver_id) : null
+    const tracking = buildTrackingPayload({
+      orderId: r.order_id,
+      locationRow: locRow
+        ? {
+            latitude: locRow.latitude,
+            longitude: locRow.longitude,
+            accuracyMeters: locRow.accuracyMeters,
+            speedMps: locRow.speedMps,
+            headingDegrees: locRow.headingDegrees,
+            recordedAt: locRow.recordedAt,
+            orderId: locRow.orderId,
+          }
+        : null,
+      allowDriverFallback: true,
+    })
+    return {
+      orderId: r.order_id,
+      orderStatus: r.order_status,
+      restaurantName: r.restaurant_name,
+      deliveryArea: r.delivery_area,
+      deliveryStatus: normalizeDeliveryStatus(r.delivery_status),
+      driverId: r.driver_id,
+      driverName: r.driver_name,
+      hasPod: r.has_pod,
+      scheduledAt: r.scheduled_at,
+      tracking,
+      driverLastSeen: buildDriverLastSeenAlias(tracking),
+    }
+  })
 
   const byArea = {}
   for (const order of orders) {

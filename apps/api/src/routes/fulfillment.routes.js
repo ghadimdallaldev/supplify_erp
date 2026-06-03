@@ -22,6 +22,11 @@ import {
   getDriverActiveRoute,
 } from '../services/delivery-routes.service.js'
 import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
+import {
+  getLatestLocationsForDrivers,
+  isGpsTrackingEnabled,
+} from '../services/driver-location.service.js'
+import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
 
 const router = express.Router()
 
@@ -432,7 +437,7 @@ router.get('/dispatch', async (req, res) => {
           AND dr.status IN ('PLANNED', 'IN_PROGRESS')
         LIMIT 1
       ) ar ON true
-      WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'COMPLETED')
+      WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')
         ${placedSinceClause}
         ${whFilter.clause}
     `
@@ -486,13 +491,42 @@ router.get('/dispatch', async (req, res) => {
       delivered_today: deliveredToday.length >= bucketLimit,
     }
 
+    const allRows = [...unassigned, ...assigned, ...outForDelivery, ...deliveredToday]
+    const driverIds = [...new Set(allRows.map((r) => r.driver_id).filter(Boolean))]
+    const locationMap = isGpsTrackingEnabled()
+      ? await getLatestLocationsForDrivers(driverIds)
+      : new Map()
+
+    const mapWithLocation = (row) => {
+      const card = mapDispatchOrder(row)
+      const locRow = row.driver_id ? locationMap.get(row.driver_id) : null
+      const allowFallback = ['picked_up', 'out_for_delivery'].includes(row.assignment_status)
+      card.tracking = buildTrackingPayload({
+        orderId: row.id,
+        locationRow: locRow
+          ? {
+              latitude: locRow.latitude,
+              longitude: locRow.longitude,
+              accuracyMeters: locRow.accuracyMeters,
+              speedMps: locRow.speedMps,
+              headingDegrees: locRow.headingDegrees,
+              recordedAt: locRow.recordedAt,
+              orderId: locRow.orderId,
+            }
+          : null,
+        allowDriverFallback: allowFallback,
+      })
+      card.driver_last_seen = buildDriverLastSeenAlias(card.tracking)
+      return card
+    }
+
     res.json({
       ok: true,
       data: {
-        pending: unassigned.map(mapDispatchOrder),
-        assigned: assigned.map(mapDispatchOrder),
-        out_for_delivery: outForDelivery.map(mapDispatchOrder),
-        delivered_today: deliveredToday.map(mapDispatchOrder),
+        pending: unassigned.map(mapWithLocation),
+        assigned: assigned.map(mapWithLocation),
+        out_for_delivery: outForDelivery.map(mapWithLocation),
+        delivered_today: deliveredToday.map(mapWithLocation),
         windowDays: days,
         bucketLimit,
         truncated,

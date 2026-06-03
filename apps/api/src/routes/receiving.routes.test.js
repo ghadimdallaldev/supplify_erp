@@ -69,3 +69,34 @@ describe('receiving.routes pending-orders', () => {
     expect(params[1]).toContain('COMPLETED')
   })
 })
+
+describe('receiving.routes pending-orders/supplier', () => {
+  let app
+  let db
+
+  beforeEach(async () => {
+    const mod = await import('../lib/db.js')
+    db = mod
+    db.query.mockReset()
+    app = express()
+    app.use((req, res, next) => {
+      req.requestId = 'test'
+      req.userData = { id: 'user-s', email: 'supplier@test.com', role: 'SUPPLIER' }
+      next()
+    })
+    app.use('/api/receiving', receivingRoutes)
+  })
+
+  it('includes DELIVERED and legacy COMPLETED in supplier pending query', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ id: 'sup-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'order-legacy' }] })
+
+    const res = await request(app).get('/api/receiving/pending-orders/supplier').expect(200)
+
+    expect(res.body.data.orders).toHaveLength(1)
+    const params = db.query.mock.calls[1][1]
+    expect(params[1]).toContain('DELIVERED')
+    expect(params[1]).toContain('COMPLETED')
+  })
+})

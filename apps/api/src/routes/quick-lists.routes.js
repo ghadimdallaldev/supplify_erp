@@ -35,6 +35,8 @@ const quickListsFeatureGate = requireFeature(
 const createQuickListSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
+  supplierId: z.string().uuid().optional(),
+  branchId: z.string().uuid().optional(),
   items: z
     .array(
       z.object({
@@ -52,6 +54,7 @@ const updateQuickListSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   supplierId: z.string().uuid().optional(),
+  branchId: z.string().uuid().optional().nullable(),
 })
 
 const scheduleQuickListSchema = z
@@ -93,6 +96,7 @@ const addItemSchema = z.object({
   supplierId: z.string().uuid(),
   quantity: z.number().positive(),
   notes: z.string().optional(),
+  defaultUnit: z.string().optional(),
 })
 
 async function respondLimitExceeded(req, res, limitCheck, limitKey, restaurantId) {
@@ -142,6 +146,21 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
       throw new ValidationError('Restaurant not found')
     }
 
+    const supplierFilter = req.query.supplier_id || req.query.supplierId
+    const branchFilter = req.query.branch_id || req.query.branchId
+    const params = [restaurantId]
+    let where = 'ql.restaurant_id = $1'
+    if (supplierFilter) {
+      params.push(supplierFilter)
+      where += ` AND (ql.supplier_id = $${params.length} OR EXISTS (
+        SELECT 1 FROM quick_list_item qli2 WHERE qli2.quick_list_id = ql.id AND qli2.supplier_id = $${params.length}
+      ))`
+    }
+    if (branchFilter) {
+      params.push(branchFilter)
+      where += ` AND ql.branch_id = $${params.length}`
+    }
+
     const { rows } = await query(
       `
       SELECT 
@@ -149,11 +168,11 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
         (COUNT(qli.id))::int AS item_count
       FROM quick_list ql
       LEFT JOIN quick_list_item qli ON qli.quick_list_id = ql.id
-      WHERE ql.restaurant_id = $1
+      WHERE ${where}
       GROUP BY ql.id
       ORDER BY ql.created_at DESC
     `,
-      [restaurantId]
+      params
     )
 
     // Fetch items for each list
@@ -324,11 +343,17 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
         rows: [quickList],
       } = await client.query(
         `
-        INSERT INTO quick_list (restaurant_id, name, description)
-        VALUES ($1, $2, $3)
+        INSERT INTO quick_list (restaurant_id, supplier_id, branch_id, name, description)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING *
       `,
-        [restaurantId, data.name, data.description || null]
+        [
+          restaurantId,
+          data.supplierId || null,
+          data.branchId || null,
+          data.name,
+          data.description || null,
+        ]
       )
 
       // Create items
@@ -352,15 +377,22 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
           rows: [quickListItem],
         } = await client.query(
           `
-          INSERT INTO quick_list_item (quick_list_id, product_id, supplier_id, quantity, notes)
-          VALUES ($1, $2, $3, $4, $5)
+          INSERT INTO quick_list_item (quick_list_id, product_id, supplier_id, quantity, notes, default_unit)
+          VALUES ($1, $2, $3, $4, $5, $6)
           ON CONFLICT (quick_list_id, product_id) DO UPDATE SET
             quantity = EXCLUDED.quantity,
             notes = EXCLUDED.notes,
             updated_at = now()
           RETURNING *
         `,
-          [quickList.id, item.productId, item.supplierId, item.quantity, item.notes || null]
+          [
+            quickList.id,
+            item.productId,
+            item.supplierId,
+            item.quantity,
+            item.notes || null,
+            item.defaultUnit || null,
+          ]
         )
 
         items.push(quickListItem)
@@ -604,15 +636,23 @@ router.post('/:id/items', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asy
 
     const { rows } = await query(
       `
-      INSERT INTO quick_list_item (quick_list_id, product_id, supplier_id, quantity, notes)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO quick_list_item (quick_list_id, product_id, supplier_id, quantity, notes, default_unit)
+      VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (quick_list_id, product_id) DO UPDATE SET
         quantity = EXCLUDED.quantity,
         notes = EXCLUDED.notes,
+        default_unit = EXCLUDED.default_unit,
         updated_at = now()
       RETURNING *
     `,
-      [id, data.productId, data.supplierId, data.quantity, data.notes || null]
+      [
+        id,
+        data.productId,
+        data.supplierId,
+        data.quantity,
+        data.notes || null,
+        data.defaultUnit || null,
+      ]
     )
 
     logger.info('Item added to quick list', {

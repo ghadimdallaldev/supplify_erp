@@ -3,7 +3,13 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "apps/web/Dockerfile",
-    "watchPatterns": ["apps/web/**", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]
+    "watchPatterns": [
+      "apps/web/**",
+      "deploy/railway/**",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml"
+    ]
   },
   "deploy": {
     "healthcheckPath": "/health",

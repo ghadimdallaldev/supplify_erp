@@ -158,52 +158,70 @@ Valid Product,SKU2,abc`
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ active_deals: 1, total_views: 5, total_clicks: 2 }] })
         .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce(count(0))
 
       const { getSupplierCommandCenter } = await import('./supplier-command-center.service.js')
       const data = await getSupplierCommandCenter('supplier-1')
       expect(data.kpis.ordersToPrepareToday).toBe(3)
       expect(data.kpis.deliveriesPendingToday).toBe(2)
       expect(Array.isArray(data.todaysPriorities)).toBe(true)
+      expect(data.previews.deliveryGpsSummary).toMatchObject({
+        active: expect.any(Number),
+        live: expect.any(Number),
+        stale: expect.any(Number),
+        noGps: expect.any(Number),
+        failed: expect.any(Number),
+      })
     })
   })
 
   describe('getSupplierDeliveryBoard', () => {
     it('groups orders by delivery area', async () => {
       vi.mocked(db.query).mockReset()
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            order_id: 'o1',
-            order_status: 'PROCESSING',
-            restaurant_name: 'A',
-            delivery_area: 'Downtown',
-            assignment_id: null,
-            delivery_status: 'pending',
-            driver_id: null,
-            driver_name: null,
-            has_pod: false,
-            scheduled_at: new Date(),
-          },
-          {
-            order_id: 'o2',
-            order_status: 'SHIPPED',
-            restaurant_name: 'B',
-            delivery_area: 'Downtown',
-            assignment_id: 'da1',
-            delivery_status: 'out_for_delivery',
-            driver_id: 'd1',
-            driver_name: 'Driver',
-            has_pod: false,
-            scheduled_at: new Date(),
-          },
-        ],
-      })
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              order_id: 'o1',
+              order_status: 'PROCESSING',
+              restaurant_name: 'A',
+              delivery_area: 'Downtown',
+              assignment_id: null,
+              delivery_status: 'pending',
+              driver_id: null,
+              driver_name: null,
+              has_pod: false,
+              scheduled_at: new Date(),
+            },
+            {
+              order_id: 'o2',
+              order_status: 'SHIPPED',
+              restaurant_name: 'B',
+              delivery_area: 'Downtown',
+              assignment_id: 'da1',
+              delivery_status: 'out_for_delivery',
+              driver_id: 'd1',
+              driver_name: 'Driver',
+              has_pod: false,
+              scheduled_at: new Date(),
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
 
       const { getSupplierDeliveryBoard } = await import('./supplier-deliveries.service.js')
       const board = await getSupplierDeliveryBoard('supplier-1')
       expect(board.orders.length).toBe(2)
       expect(board.stats.total).toBe(2)
       expect(board.routeSummary.some((r) => r.area === 'Downtown')).toBe(true)
+      for (const order of board.orders) {
+        expect(order).toHaveProperty('tracking')
+        expect(order.tracking).toMatchObject({
+          enabled: expect.any(Boolean),
+          hasLocation: expect.any(Boolean),
+        })
+      }
     })
   })
 })

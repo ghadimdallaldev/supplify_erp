@@ -18,9 +18,10 @@ vi.mock('../../services/api', () => ({
   useGetDriversQuery: () => ({
     data: { drivers: [{ id: 'd1', fullName: 'Alex Driver' }] },
   }),
+  useGetOrderTrackingQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useAssignDriverToOrderMutation: () => [vi.fn(), { isLoading: false }],
   useReassignDriverOnOrderMutation: () => [vi.fn(), { isLoading: false }],
-  useUpdateOrderMutation: () => [vi.fn(), { isLoading: false }],
+  useUpdateOrderDeliveryStatusMutation: () => [vi.fn(), { isLoading: false }],
   useSubmitOrderProofOfDeliveryMutation: () => [vi.fn(), { isLoading: false }],
   useCreateFulfillmentRouteMutation: () => [vi.fn(), { isLoading: false }],
 }))
@@ -34,6 +35,18 @@ const order: DispatchOrderCard = {
   item_count: 4,
   delivery_area: 'Downtown',
   assignment: null,
+  tracking: {
+    enabled: true,
+    hasLocation: true,
+    lastSeenAt: '2026-06-03T10:00:00.000Z',
+    isStale: false,
+    latestLocation: {
+      latitude: 33.89,
+      longitude: 35.5,
+      recordedAt: '2026-06-03T10:00:00.000Z',
+    },
+    lastUpdatedLabel: '2 minutes ago',
+  },
 }
 
 const boardData = {
@@ -124,5 +137,16 @@ describe('DriverDispatchBoard UI', () => {
     renderBoard(<DriverDispatchBoard data={null} summary={summary} isError onRetry={vi.fn()} />)
     expect(screen.getByTestId('dispatch-board-error')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
+  })
+
+  it('shows GPS status and view tracking on dispatch cards', () => {
+    renderBoard(
+      <DriverDispatchBoard data={boardData} summary={summary} isLoading={false} isError={false} />
+    )
+    const cards = screen.getAllByTestId('dispatch-order-order-12345678-abcd')
+    expect(cards[0].querySelector('[data-testid="dispatch-gps-status"]')).toHaveTextContent(/Live/i)
+    expect(
+      screen.getAllByTestId('dispatch-view-tracking-order-12345678-abcd').length
+    ).toBeGreaterThan(0)
   })
 })

@@ -49,6 +49,8 @@ vi.mock('../lib/audit.js', () => ({
 
 vi.mock('../services/notification.service.js', () => ({
   notifyDealApproved: vi.fn().mockResolvedValue(undefined),
+  notifyDealRejected: vi.fn().mockResolvedValue(undefined),
+  notifyDealSubmitted: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../services/deal-promotions.service.js', () => ({

@@ -2,7 +2,7 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { normalizeDaysOfWeek } from '../lib/quick-list-schedule.js'
 import { evaluateScheduledOrderLimit, incrementUsage } from '../lib/subscription.js'
-import { notifyScheduledOrderEvent } from './notification.service.js'
+import { notifyScheduledOrderEvent, notifyOrderStatusChange } from './notification.service.js'
 
 const DUE_LISTS_BATCH_SIZE = 50
 
@@ -103,8 +103,19 @@ export async function executeScheduledOrders() {
 
           try {
             if (quickList.auto_create_order) {
-              await createOrderFromQuickList(quickList, client)
+              const orders = await createOrderFromQuickList(quickList, client)
               outcome = 'executed'
+              if (orders?.length) {
+                postCommitNotifications.push({
+                  quickList,
+                  notifyType: 'EXECUTED',
+                  createdOrders: orders,
+                })
+              } else {
+                postCommitNotifications.push({ quickList, notifyType: 'EXECUTED' })
+              }
+            } else {
+              postCommitNotifications.push({ quickList, notifyType: 'REMINDER' })
             }
             batchExecuted++
           } catch (error) {
@@ -123,11 +134,8 @@ export async function executeScheduledOrders() {
             [outcome, errorMessage, ledgerId]
           )
 
-          if (outcome === 'executed' || outcome === 'reminder') {
-            postCommitNotifications.push({
-              quickList,
-              notifyType: outcome === 'executed' ? 'EXECUTED' : 'REMINDER',
-            })
+          if (outcome === 'failed') {
+            // no notification
           }
         }
 
@@ -144,9 +152,15 @@ export async function executeScheduledOrders() {
       errors += batchResult.errors
       skipped += batchResult.skipped
 
-      for (const { quickList, notifyType } of batchResult.postCommitNotifications ?? []) {
+      for (const entry of batchResult.postCommitNotifications ?? []) {
+        const { quickList, notifyType, createdOrders } = entry
         try {
           await notifyScheduledOrderEvent(quickList, notifyType)
+          if (createdOrders?.length) {
+            for (const order of createdOrders) {
+              await notifyOrderStatusChange(order, 'PLACED')
+            }
+          }
         } catch (notifyError) {
           logger.warn('Failed to send scheduled order notification', {
             error: notifyError.message,

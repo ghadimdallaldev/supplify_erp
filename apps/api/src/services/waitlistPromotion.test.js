@@ -37,8 +37,8 @@ vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }))
 
-vi.mock('./mailer.service.js', () => ({
-  sendMail: vi.fn().mockResolvedValue(true),
+vi.mock('./email/email.service.js', () => ({
+  sendTemplateEmail: vi.fn().mockResolvedValue({ sent: true }),
 }))
 
 vi.mock('../lib/whatsapp.js', () => ({

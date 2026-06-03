@@ -124,6 +124,21 @@ Run once after deploy (Railway one-off command or local with production `DATABAS
 pnpm db:migrate
 ```
 
+Restaurant-operations features require migrations **0133–0135** (and any later pending files). **Email dedup** requires **0136** (`0136_email_delivery_log.sql`). The API Docker image includes all migration SQL; Railway does not run them on container start (`RUN_MIGRATIONS_ON_START=false`). EC2 Docker deploy scripts run migrations automatically via the `migrate` compose service.
+
+Committed Railway API defaults (`deploy/railway/<env>/api.env`, copied into the image) set `CRONS_ENABLED=true` for in-process jobs including operational reminders.
+
+### Email (transactional notifications)
+
+Non-secret email settings load from `deploy/railway/<env>/api.env` on deploy (`EMAIL_*`, `SMTP_HOST`, etc.). Set **`SMTP_PASS`** once in the Railway Raw Editor per API service (see `deploy/railway/<env>/secrets.env.example`).
+
+| Environment    | Default                                                    |
+| -------------- | ---------------------------------------------------------- |
+| development    | `EMAIL_LOG_ONLY=true` (safe log-only)                      |
+| preprod / prod | `EMAIL_LOG_ONLY=false` — requires `SMTP_PASS` in dashboard |
+
+API startup validates: when `EMAIL_ENABLED=true` and `EMAIL_LOG_ONLY=false`, you must configure `SMTP_HOST`+`SMTP_PASS` or `SENDGRID_API_KEY`. Test with `pnpm --filter @supplify/api email:test`. See [docs/features/email-system.md](docs/features/email-system.md).
+
 ## 3. Web service
 
 ### Railway settings

@@ -2,7 +2,7 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
 import { config } from '../config/env.js'
-import { sendMail } from './mailer.service.js'
+import { sendTemplateEmail } from './email/email.service.js'
 import { buildWhatsAppUrl } from '../lib/whatsapp.js'
 import {
   getRestaurantSlotAvailability,
@@ -54,8 +54,16 @@ export async function notifyGuestWaitlistOffer(waitlistEntry, restaurantName) {
 
   if (customerEmail) {
     try {
-      await sendMail({ to: customerEmail, subject: title, text: message })
-      results.email = true
+      const result = await sendTemplateEmail({
+        to: customerEmail,
+        template: 'reservation.waitlist_offer',
+        subject: title,
+        data: { message, title, tenantName: venue, ctaUrl: acceptUrl, ctaLabel: 'Accept table' },
+        eventType: 'reservation.waitlist_offer',
+        eventKey: `waitlist:offer:${waitlistEntry.id}:${waitlistEntry.offer_token}`,
+        entityId: waitlistEntry.id,
+      })
+      results.email = Boolean(result.sent || result.logOnly || result.preview)
     } catch (error) {
       logger.error('Waitlist offer email failed', { error: error.message })
     }

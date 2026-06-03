@@ -688,7 +688,8 @@ Product created with image
   - `ACKNOWLEDGED` - Supplier acknowledged order
   - `PROCESSING` - Being picked/packed
   - `SHIPPED` - In transit to restaurant
-  - `COMPLETED` - Order finalized and delivered
+  - `DELIVERED` - Driver or supplier marked delivered (restaurant receiving next)
+  - `COMPLETED` - Legacy / finalized lifecycle status (receiving may still apply)
   - `CANCELLED` - Order cancelled
 
 #### ✅ Action Buttons (Supplier Only)
@@ -697,7 +698,8 @@ Product created with image
   - "Acknowledge" → `ACKNOWLEDGED`
   - "Start Processing" → `PROCESSING`
   - "Mark as Shipped" → `SHIPPED`
-  - "Complete Order" → `COMPLETED` _(triggers auto-invoice)_
+  - Driver **Delivered** (driver portal) or supplier deliver action → `DELIVERED`
+  - "Complete Order" → `COMPLETED` _(legacy; prefer `DELIVERED` + receiving)_
   - **"Decline"** → `CANCELLED` — opens a dialog; **reason required** (min 3 characters). Sets `cancelled_by = 'SUPPLIER'` and `cancel_reason`. Restaurant users see **Declined by supplier** and the reason.
 
 ### API Endpoints:
@@ -923,11 +925,21 @@ VOID (cancelled)
 #### ✅ Fulfillment Dashboard
 
 - Tabbed interface:
-  1. Waves - Delivery waves
-  2. Pick Lists - Packing lists
-  3. Routes - Delivery routes
-  4. Delivery Tracking - Live tracking
-  5. Exceptions - Delivery issues
+  1. **Driver Dispatch** — kanban assign / picked up / out for delivery / delivered today
+  2. Pick Lists — packing lists
+  3. Routes — delivery routes + per-stop GPS label
+  4. **Delivery Tracking** — board with GPS column, **View tracking** drawer (30s poll)
+  5. Exceptions — delivery issues
+- **Command center** — **GPS today** widget (live / stale / no GPS / failed)
+- **Order detail** — `OrderDeliveryTrackingPanel` (supplier only)
+
+#### ✅ GPS / live tracking (Gold+ with drivers)
+
+- Driver browser pings during active assignment (`POST /api/orders/:id/location`)
+- Standard `tracking` object on dispatch cards, delivery board, routes, `GET /api/orders/:id/tracking`
+- States: Live, GPS stale, No GPS yet, Tracking off — configurable stale threshold (`GPS_STALE_AFTER_SECONDS`)
+- Latest ping only (no trail); no ETA; map embed optional via `VITE_GOOGLE_MAPS_API_KEY`
+- Driver deliver sets order **`DELIVERED`** (restaurant receiving separate)
 
 #### ✅ Order Integration
 
@@ -938,10 +950,14 @@ VOID (cancelled)
 
 ### API Endpoints:
 
-- `GET /api/fulfillment/waves` - Get delivery waves
-- `GET /api/fulfillment/pick-lists` - Get pick lists
-- `GET /api/fulfillment/routes` - Get delivery routes
-- `GET /api/fulfillment/tracking` - Get tracking data
+- `GET /api/fulfillment/dispatch` — dispatch board + `tracking` per card
+- `GET /api/fulfillment/pick-lists` — pick lists
+- `GET /api/fulfillment/routes` — routes + per-stop `tracking`
+- `GET /api/supplier/deliveries/board` — delivery board with `tracking`
+- `GET /api/orders/:id/tracking` — supplier operational tracking (restaurant gets sanitized payload)
+- `POST /api/orders/:id/location` — driver GPS ingest
+
+See [fulfillment-logistics.md](../features/fulfillment-logistics.md).
 
 ---
 

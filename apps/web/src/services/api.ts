@@ -64,6 +64,8 @@ import type {
   DispatchOrderCard,
   DeliveryRouteSummary,
   DeliveryRouteDetail,
+  DeliveryTrackingInfo,
+  OrderTrackingResponse,
 } from '../types'
 
 import { getApiBase } from '../lib/env'
@@ -597,6 +599,8 @@ export const api = createApi({
         recipient_name?: string
         notes?: string
         file_key?: string
+        latitude?: number
+        longitude?: number
       }
     >({
       query: ({ orderId, ...body }) => ({
@@ -756,6 +760,43 @@ export const api = createApi({
         body: { status, notes, failure_reason },
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
+    }),
+    sendDriverLocation: builder.mutation<
+      {
+        trackingEnabled: boolean
+        stored?: boolean
+        latestLocation?: {
+          latitude: number
+          longitude: number
+          recordedAt: string
+        } | null
+      },
+      {
+        orderId: string
+        latitude: number
+        longitude: number
+        accuracyMeters?: number
+        speedMps?: number
+        headingDegrees?: number
+        recordedAt?: string
+      }
+    >({
+      query: ({ orderId, ...body }) => ({
+        url: `/api/orders/${orderId}/location`,
+        method: 'POST',
+        body: {
+          latitude: body.latitude,
+          longitude: body.longitude,
+          accuracyMeters: body.accuracyMeters,
+          speedMps: body.speedMps,
+          headingDegrees: body.headingDegrees,
+          recordedAt: body.recordedAt,
+        },
+      }),
+    }),
+    getOrderTracking: builder.query<OrderTrackingResponse, string>({
+      query: (orderId) => `/api/orders/${orderId}/tracking`,
+      providesTags: (_r, _e, orderId) => [{ type: 'Order', id: orderId }],
     }),
 
     // Supplier endpoints
@@ -1206,6 +1247,47 @@ export const api = createApi({
       query: () => '/api/restaurant-inventory/reorder-suggestions',
       providesTags: ['RestaurantInventory'],
     }),
+    getExpiryLots: builder.query<
+      any,
+      { status?: string; supplierId?: string; storageLocation?: string; categoryId?: string }
+    >({
+      query: (params) => ({
+        url: '/api/restaurant-inventory/expiry',
+        params,
+      }),
+      providesTags: ['RestaurantInventory'],
+    }),
+    getExpirySummary: builder.query<any, void>({
+      query: () => '/api/restaurant-inventory/expiry/summary',
+      providesTags: ['RestaurantInventory'],
+    }),
+    createExpiryLot: builder.mutation<any, Record<string, unknown>>({
+      query: (body) => ({
+        url: '/api/restaurant-inventory/expiry',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
+    updateExpiryLot: builder.mutation<any, { lotId: string; data: Record<string, unknown> }>({
+      query: ({ lotId, data }) => ({
+        url: `/api/restaurant-inventory/expiry/${lotId}`,
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
+    deleteExpiryLot: builder.mutation<any, string>({
+      query: (lotId) => ({
+        url: `/api/restaurant-inventory/expiry/${lotId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['RestaurantInventory'],
+    }),
+    getReorderReminders: builder.query<any, void>({
+      query: () => '/api/restaurant-inventory/reorder-reminders',
+      providesTags: ['RestaurantInventory'],
+    }),
     // Receiving endpoints
     getPendingOrdersForReceiving: builder.query<any, void>({
       query: () => '/api/receiving/pending-orders',
@@ -1484,6 +1566,44 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }],
+    }),
+    getOrderFulfillmentIssues: builder.query<any, string>({
+      query: (orderId) => `/api/supplier/orders/${orderId}/fulfillment-issues`,
+      providesTags: (_r, _e, id) => [{ type: 'Order', id }],
+    }),
+    reportOrderShortage: builder.mutation<any, { orderId: string; body: Record<string, unknown> }>({
+      query: ({ orderId, body }) => ({
+        url: `/api/supplier/orders/${orderId}/fulfillment-issues/shortage`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }, 'Chat'],
+    }),
+    suggestOrderSubstitutionIssue: builder.mutation<
+      any,
+      { orderId: string; body: Record<string, unknown> }
+    >({
+      query: ({ orderId, body }) => ({
+        url: `/api/supplier/orders/${orderId}/fulfillment-issues/substitution`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }, 'Chat'],
+    }),
+    openOrderFulfillmentChat: builder.mutation<
+      any,
+      { orderId: string; body: Record<string, unknown> }
+    >({
+      query: ({ orderId, body }) => ({
+        url: `/api/supplier/orders/${orderId}/fulfillment-issues/open-chat`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orderId }) => [{ type: 'Order', id: orderId }, 'Chat'],
+    }),
+    getSupplierAtRiskOrders: builder.query<any, void>({
+      query: () => '/api/supplier/reorder-cadence/at-risk',
+      providesTags: ['Order'],
     }),
 
     // Notification endpoints
@@ -3539,6 +3659,8 @@ export const {
   useAssignDriverToOrderMutation,
   useReassignDriverOnOrderMutation,
   useUpdateOrderDeliveryStatusMutation,
+  useSendDriverLocationMutation,
+  useGetOrderTrackingQuery,
   useSubmitOrderProofOfDeliveryMutation,
   useResolveFulfillmentExceptionMutation,
   useIgnoreFulfillmentExceptionMutation,
@@ -3598,6 +3720,17 @@ export const {
   useAdjustRestaurantInventoryMutation,
   useGetRestaurantWasteAnalyticsQuery,
   useGetReorderSuggestionsQuery,
+  useGetExpiryLotsQuery,
+  useGetExpirySummaryQuery,
+  useCreateExpiryLotMutation,
+  useUpdateExpiryLotMutation,
+  useDeleteExpiryLotMutation,
+  useGetReorderRemindersQuery,
+  useGetOrderFulfillmentIssuesQuery,
+  useReportOrderShortageMutation,
+  useSuggestOrderSubstitutionIssueMutation,
+  useOpenOrderFulfillmentChatMutation,
+  useGetSupplierAtRiskOrdersQuery,
   useGetPendingOrdersForReceivingQuery,
   useGetReceivingHistoryQuery,
   useCreateReceivingReportMutation,

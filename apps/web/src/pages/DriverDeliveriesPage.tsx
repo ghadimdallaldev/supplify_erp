@@ -16,6 +16,7 @@ import { formatDeliveryStatus } from '../lib/deliveryStatusLabels'
 import { formatOrderRef } from '../components/fulfillment/fulfillmentDispatchUtils'
 import { formatPrice } from '../utils/format'
 import toast from 'react-hot-toast'
+import { useDriverLocationTracking } from '../hooks/useDriverLocationTracking'
 
 const DRIVER_STATUSES = [
   { value: 'out_for_delivery', label: 'Out for delivery' },
@@ -40,6 +41,13 @@ export function DriverDeliveriesPage() {
 
   const orders = data?.orders ?? []
   const activeRoute = routeData?.route ?? null
+
+  const trackableDeliveries = orders
+    .filter((o) => ['assigned', 'picked_up', 'out_for_delivery'].includes(o.deliveryStatus))
+    .map((o) => ({ orderId: o.orderId, deliveryStatus: o.deliveryStatus }))
+
+  const { trackingActive, gpsError, permissionDenied, trackableCount } =
+    useDriverLocationTracking(trackableDeliveries)
 
   const handleRouteStopStatus = async (
     stopId: string,
@@ -96,6 +104,15 @@ export function DriverDeliveriesPage() {
             <Truck className="h-6 w-6 shrink-0 text-[var(--brand-mid)]" aria-hidden />
             <h1 className="truncate text-xl font-semibold text-[var(--text)]">My deliveries</h1>
           </div>
+          {trackableCount > 0 && (
+            <Badge
+              variant={trackingActive ? 'default' : 'outline'}
+              data-testid="driver-gps-tracking-badge"
+              className="shrink-0 text-xs"
+            >
+              {trackingActive ? 'Tracking active' : 'GPS waiting'}
+            </Badge>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -107,6 +124,16 @@ export function DriverDeliveriesPage() {
             Refresh
           </Button>
         </div>
+
+        {(gpsError || permissionDenied) && (
+          <p
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+            data-testid="driver-gps-error"
+            role="alert"
+          >
+            {gpsError || 'Location permission denied. Enable GPS to share live tracking.'}
+          </p>
+        )}
 
         {isLoading && (
           <div className="space-y-3" data-testid="driver-deliveries-loading" aria-busy="true">

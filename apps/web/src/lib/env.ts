@@ -28,6 +28,18 @@ export const enableMockPayments = import.meta.env.VITE_ENABLE_MOCK_PAYMENTS === 
 
 export const enableTestData = import.meta.env.VITE_ENABLE_TEST_DATA === 'true'
 
+export const gpsTrackingEnabled = import.meta.env.VITE_GPS_TRACKING_ENABLED !== 'false'
+
+export const gpsUpdateIntervalSeconds = Number(
+  import.meta.env.VITE_GPS_UPDATE_INTERVAL_SECONDS ?? 15
+)
+
+export const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''
+
+export const mapboxAccessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN ?? ''
+
+export const mapProvider = import.meta.env.VITE_MAP_PROVIDER ?? 'google'
+
 /** Dev-only fallback when Vite proxy is used (no VITE_API_URL). */
 export const DEV_API_ORIGIN = 'http://localhost:4000'
 

@@ -22,6 +22,7 @@
     "lint:fix": "eslint src/**/*.js --fix",
     "format": "prettier --write \"src/**/*.{js,json}\"",
     "db:migrate": "node scripts/migrate.js",
+    "email:test": "node scripts/email-test.js",
     "db:seed": "node scripts/seed.js",
     "seed:prodlike": "node scripts/prodlike.seed.js",
     "seed:accounts": "node scripts/seed-accounts-for-prodlike.js",

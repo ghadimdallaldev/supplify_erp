@@ -4,6 +4,9 @@ import {
   useGetDashboardStatsQuery,
   useGetOrdersQuery,
   useGetReorderSuggestionsQuery,
+  useGetExpirySummaryQuery,
+  useGetReorderRemindersQuery,
+  useGetSupplierAtRiskOrdersQuery,
   useGetInvoiceAnalyticsQuery,
   useGetQuickListsQuery,
   useAddItemToQuickListMutation,
@@ -295,6 +298,18 @@ export function DashboardPage() {
   const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
     skip: !isRestaurant || !smartReorderEnabled,
+  })
+  const inventoryMgmtEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.inventory_management
+  )
+  const { data: expirySummaryData } = useGetExpirySummaryQuery(undefined, {
+    skip: !isRestaurant || !inventoryMgmtEnabled,
+  })
+  const { data: reorderRemindersData } = useGetReorderRemindersQuery(undefined, {
+    skip: !isRestaurant || !smartReorderEnabled,
+  })
+  const { data: atRiskData } = useGetSupplierAtRiskOrdersQuery(undefined, {
+    skip: !isSupplier || !smartReorderEnabled,
   })
   const { data: quickListsData } = useGetQuickListsQuery(undefined, {
     skip: !isRestaurant,
@@ -1076,6 +1091,127 @@ export function DashboardPage() {
           ) : null}
         </SectionCard>
       </div>
+
+      {(isRestaurant && inventoryMgmtEnabled && expirySummaryData?.summary) ||
+      (isRestaurant && smartReorderEnabled && (reorderRemindersData?.reminders?.length ?? 0) > 0) ||
+      (isSupplier && (atRiskData?.atRisk?.length ?? 0) > 0) ? (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: DASHBOARD_GRID_GAP,
+            marginTop: DASHBOARD_STACK_GAP,
+          }}
+        >
+          {isRestaurant && inventoryMgmtEnabled && expirySummaryData?.summary ? (
+            <SectionCard
+              title="Inventory expiry"
+              action={
+                <Link
+                  to="/app/inventory?tab=expiry"
+                  style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
+                >
+                  View all →
+                </Link>
+              }
+            >
+              <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Expiring soon</div>
+                  <div style={{ fontWeight: 800, fontSize: 20 }}>
+                    {expirySummaryData.summary.expiringSoonCount ?? 0}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Expired</div>
+                  <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--danger, #b91c1c)' }}>
+                    {expirySummaryData.summary.expiredCount ?? 0}
+                  </div>
+                </div>
+              </div>
+              {(expirySummaryData.summary.topNearestExpiry?.length ?? 0) > 0 && (
+                <ul style={{ marginTop: 12, padding: 0, listStyle: 'none', fontSize: 12 }}>
+                  {expirySummaryData.summary.topNearestExpiry
+                    .slice(0, 5)
+                    .map((lot: { id: string; itemName: string; expiryDate: string }) => (
+                      <li
+                        key={lot.id}
+                        style={{ padding: '4px 0', borderTop: '1px solid var(--app-border)' }}
+                      >
+                        {lot.itemName} — {new Date(lot.expiryDate).toLocaleDateString()}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </SectionCard>
+          ) : null}
+
+          {isRestaurant &&
+          smartReorderEnabled &&
+          (reorderRemindersData?.reminders?.length ?? 0) > 0 ? (
+            <SectionCard
+              title="Suggested reorder reminders"
+              action={
+                <Link
+                  to="/app/quick-lists"
+                  style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
+                >
+                  Ordering lists →
+                </Link>
+              }
+            >
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 12 }}>
+                {reorderRemindersData.reminders
+                  .slice(0, 5)
+                  .map(
+                    (r: { id: string; label: string; supplierName: string; dayName: string }) => (
+                      <li
+                        key={r.id}
+                        style={{ padding: '6px 0', borderBottom: '1px solid var(--app-border)' }}
+                      >
+                        You usually order {r.label} on {r.dayName}s.
+                      </li>
+                    )
+                  )}
+              </ul>
+            </SectionCard>
+          ) : null}
+
+          {isSupplier && (atRiskData?.atRisk?.length ?? 0) > 0 ? (
+            <SectionCard
+              title="At-risk expected orders"
+              action={
+                <Link
+                  to="/app/supplier/command-center"
+                  style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
+                >
+                  Command center →
+                </Link>
+              }
+            >
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 12 }}>
+                {atRiskData.atRisk
+                  .slice(0, 5)
+                  .map(
+                    (r: {
+                      cadenceId: string
+                      restaurantName: string
+                      label: string
+                      dayName: string
+                    }) => (
+                      <li
+                        key={r.cadenceId}
+                        style={{ padding: '6px 0', borderBottom: '1px solid var(--app-border)' }}
+                      >
+                        {r.restaurantName} — usually orders {r.label} on {r.dayName}s.
+                      </li>
+                    )
+                  )}
+              </ul>
+            </SectionCard>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Calendar row */}
       <div

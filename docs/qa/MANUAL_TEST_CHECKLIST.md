@@ -11,7 +11,8 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 1. **Record results:** Pass / Fail / Blocked / N/A in **Pass?**; add tester name, date, build/branch, and notes in the sign-off table.
 2. **Test matrix:** Parts 0–3 must run before anything else on a wiped database. Parts 4–12 can run in parallel across personas once accounts exist.
 3. **Deep links:** Many routes work when typed in the address bar even if not in the sidebar — test those once per persona.
-4. **Billing stub card:** `4242424242424242` (any future expiry/CVC) when `BILLING_GATEWAY=stub`.
+4. **Delivery GPS:** Restaurant **§6.6.1** (`GPS-R01–R10`); supplier **§7.4.1** (`GPS-S01–S09`); driver **§7.4.2** (`DRV-GPS1–3`). Spec: [fulfillment-logistics.md](../features/fulfillment-logistics.md).
+5. **Billing stub card:** `4242424242424242` (any future expiry/CVC) when `BILLING_GATEWAY=stub`.
 
 ---
 
@@ -539,6 +540,23 @@ Hidden without RBAC permission or feature gate.
 | RECV-02 | Order timeline tab (DELIVERED, not yet received)                                | Delivery step completed; **Confirm receipt** current (not “Order placed” in progress) |       |
 | RECV-03 | Supplier order detail after SHIPPED                                             | Button reads **Mark Delivered** (not “Complete Order”); sets `DELIVERED`              |       |
 
+### 6.6.1 Restaurant delivery GPS (`GPS_ALLOW_RESTAURANT_LIVE_TRACKING`)
+
+Prereq: supplier assigned driver; active assignment; API `GPS_ALLOW_RESTAURANT_LIVE_TRACKING=true` (default).
+
+| ID      | Steps                                                               | Expected                                                               | Pass? |
+| ------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----- |
+| GPS-R01 | Order detail (no driver yet)                                        | “Delivery tracking will appear once the supplier assigns a driver.”    |       |
+| GPS-R02 | After driver assigned, before first ping                            | “Driver assigned. Waiting for the first GPS update.”                   |       |
+| GPS-R03 | Driver en route (recent ping)                                       | Live message + map or **Open in Google Maps** fallback; badge **Live** |       |
+| GPS-R04 | Stale ping (or lower `GPS_STALE_AFTER_SECONDS` in dev)              | Stale copy with last update time                                       |       |
+| GPS-R05 | `GPS_ALLOW_RESTAURANT_LIVE_TRACKING=false` (API restart)            | “Live tracking is not enabled for this order.”                         |       |
+| GPS-R06 | `GPS_RESTAURANT_SHOW_DRIVER_PHONE=false` (default)                  | No driver phone on panel or API payload                                |       |
+| GPS-R07 | Order delivered (`DELIVERED`)                                       | “Delivered. You can now receive the order.” + **Receive order** CTA    |       |
+| GPS-R08 | Timeline tab                                                        | Driver milestones without duplicating core order status rows           |       |
+| GPS-R09 | Wrong restaurant tenant → `GET /api/orders/:id/tracking` (devtools) | 404 — cannot read another restaurant’s tracking                        |       |
+| GPS-R10 | Receiving after GPS deliver                                         | Receiving still manual — GPS does not auto-receive (RECV-01/02)        |       |
+
 ## 6.8 Reservations (`/app/reservations`)
 
 | ID      | Steps                                                        | Expected                                                         | Pass? |
@@ -692,16 +710,40 @@ Hidden without RBAC permission or feature gate.
 
 ## 7.4 Fulfillment (`/app/fulfillment`) — requires `fulfillment_tools` feature
 
-| ID      | Steps                                              | Expected                       | Pass? |
-| ------- | -------------------------------------------------- | ------------------------------ | ----- |
-| SUP-17  | Free account → navigate to `/app/fulfillment`      | 403 or paywall                 |       |
-| SUP-18  | Gold+ → Tab: Driver dispatch (`driver_management`) | Assign driver / dispatch list  |       |
-| SUP-18a | Silver → Fulfillment → Driver dispatch             | Tab hidden or 403              |       |
-| SUP-19  | Tab: Pick lists                                    | Generate pick list from orders |       |
-| SUP-20  | Tab: Routes                                        | Route planning UI              |       |
-| SUP-21  | Tab: Delivery tracking                             | Status updates                 |       |
-| SUP-22  | Tab: Exceptions                                    | Log/resolve exception          |       |
-| SUP-23  | Proof of delivery capture                          | Notes/signature fields save    |       |
+| ID      | Steps                                              | Expected                                                              | Pass? |
+| ------- | -------------------------------------------------- | --------------------------------------------------------------------- | ----- |
+| SUP-17  | Free account → navigate to `/app/fulfillment`      | 403 or paywall                                                        |       |
+| SUP-18  | Gold+ → Tab: Driver dispatch (`driver_management`) | Assign driver / dispatch list                                         |       |
+| SUP-18a | Silver → Fulfillment → Driver dispatch             | Tab hidden or 403                                                     |       |
+| SUP-19  | Tab: Pick lists                                    | Generate pick list from orders                                        |       |
+| SUP-20  | Tab: Routes                                        | Route planning UI                                                     |       |
+| SUP-21  | Tab: Delivery tracking                             | Table with GPS column; **View tracking** opens drawer; refreshes ~30s |       |
+| SUP-22  | Tab: Exceptions                                    | Log/resolve exception                                                 |       |
+| SUP-23  | Proof of delivery capture                          | Notes/signature fields save                                           |       |
+
+### 7.4.1 Delivery GPS tracking (Gold+, `driver_management` + `GPS_TRACKING_ENABLED`)
+
+Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENABLED=true`; optional `VITE_GOOGLE_MAPS_API_KEY` for map embed.
+
+| ID      | Steps                                                            | Expected                                                                    | Pass? |
+| ------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------- | ----- |
+| GPS-S01 | Command center → deliveries KPI area                             | **GPS today** widget: Live / Stale / No GPS / Failed; link to fulfillment   |       |
+| GPS-S02 | Fulfillment → Driver dispatch → assign driver → out for delivery | Each card shows GPS badge: Live, Stale, No GPS yet, or Tracking off         |       |
+| GPS-S03 | Dispatch card → **View tracking**                                | Drawer: restaurant, driver, status, map or coordinate fallback, no fake ETA |       |
+| GPS-S04 | Fulfillment → **Delivery tracking** tab                          | GPS column; **View tracking** per row                                       |       |
+| GPS-S05 | Fulfillment → Routes → open route → stop row                     | Per-stop GPS label; **View tracking** for that order                        |       |
+| GPS-S06 | Supplier order detail (active delivery)                          | `OrderDeliveryTrackingPanel` with map/fallback; supplier-only               |       |
+| GPS-S07 | Driver marks delivered → dispatch **Delivered today**            | Last known GPS may still show; terminal orders not on active tracking tab   |       |
+| GPS-S08 | Set `GPS_STALE_AFTER_SECONDS` low (dev) + old ping               | Badge shows **GPS stale** / Stale label                                     |       |
+| GPS-S09 | `GPS_TRACKING_ENABLED=false` (API restart)                       | Tracking off / disabled states; no server errors                            |       |
+
+### 7.4.2 Driver portal GPS (`/app/driver/deliveries` or driver role)
+
+| ID       | Steps                                                  | Expected                                                                      | Pass? |
+| -------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- | ----- |
+| DRV-GPS1 | Log in as linked driver; open active assignment        | GPS badge (Live / waiting); browser location permission if prompted           |       |
+| DRV-GPS2 | Advance to out_for_delivery; wait or simulate location | Supplier dispatch shows **Live**; restaurant order detail updates (poll)      |       |
+| DRV-GPS3 | Mark delivered                                         | Order `DELIVERED`; driver stops sending pings; restaurant sees delivered copy |       |
 
 ## 7.5 Supplier inventory (`/app/inventory`) — requires `inventory_management` feature
 

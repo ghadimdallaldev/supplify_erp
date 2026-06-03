@@ -27,6 +27,22 @@ x-api-environment: &api-environment
   REDIS_URL: redis://redis:6379
   WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost}
   WEB_ORIGINS: ${WEB_ORIGINS:-http://localhost,http://localhost:5173,http://localhost:8081}
+  CRONS_ENABLED: ${CRONS_ENABLED:-true}
+  # CRON_OPERATIONAL_REMINDERS_INTERVAL_MS=86400000
+  EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+  EMAIL_LOG_ONLY: ${EMAIL_LOG_ONLY:-false}
+  EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Supplify}
+  EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@supplify.local}
+  EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+  EMAIL_TEST_TO: ${EMAIL_TEST_TO:-}
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  SMTP_FROM: ${SMTP_FROM:-noreply@supplify.local}
+  STAFF_PORTAL_BASE_URL: ${STAFF_PORTAL_BASE_URL:-http://localhost}
 
 services:
   postgres:
@@ -60,6 +76,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+    networks:
+      - supplify
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: supplify-mailpit
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
     restart: unless-stopped
     networks:
       - supplify
@@ -204,6 +230,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mailpit:
+        condition: service_started
       minio-init:
         condition: service_completed_successfully
       keycloak-init:

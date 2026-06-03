@@ -14,9 +14,10 @@ vi.mock('../../hooks/usePermissions', () => ({
 
 vi.mock('../../services/api', () => ({
   useGetDriversQuery: () => ({ data: { drivers: [] } }),
+  useGetOrderTrackingQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useAssignDriverToOrderMutation: () => [vi.fn(), { isLoading: false }],
   useReassignDriverOnOrderMutation: () => [vi.fn(), { isLoading: false }],
-  useUpdateOrderMutation: () => [vi.fn(), { isLoading: false }],
+  useUpdateOrderDeliveryStatusMutation: () => [vi.fn(), { isLoading: false }],
   useSubmitOrderProofOfDeliveryMutation: () => [vi.fn(), { isLoading: false }],
   useCreateFulfillmentRouteMutation: () => [vi.fn(), { isLoading: false }],
 }))

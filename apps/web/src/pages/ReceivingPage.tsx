@@ -161,6 +161,9 @@ export function ReceivingPage() {
             actual_unit_price: formData[`price_${item.id}`] || item.unit_price,
             quality_status: formData[`quality_${item.id}`] || 'ACCEPTED',
             notes: formData[`notes_${item.id}`] || '',
+            expiryDate: formData[`expiry_${item.id}`] || undefined,
+            batchLotNumber: formData[`batch_${item.id}`] || undefined,
+            storageLocation: formData[`storage_${item.id}`] || undefined,
           }
         }),
         deliveryNotes: formData.deliveryNotes,
@@ -739,6 +742,34 @@ function ReceivingDialog({
                               id={`notes_${item.id}`}
                               onChange={(e) =>
                                 setFormData({ ...formData, [`notes_${item.id}`]: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`expiry_${item.id}`}>Expiry date (optional)</Label>
+                            <Input
+                              id={`expiry_${item.id}`}
+                              type="date"
+                              onChange={(e) =>
+                                setFormData({ ...formData, [`expiry_${item.id}`]: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`batch_${item.id}`}>Batch / lot #</Label>
+                            <Input
+                              id={`batch_${item.id}`}
+                              onChange={(e) =>
+                                setFormData({ ...formData, [`batch_${item.id}`]: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`storage_${item.id}`}>Storage location</Label>
+                            <Input
+                              id={`storage_${item.id}`}
+                              onChange={(e) =>
+                                setFormData({ ...formData, [`storage_${item.id}`]: e.target.value })
                               }
                             />
                           </div>

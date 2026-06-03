@@ -589,8 +589,8 @@ export function QuickListsPage() {
             />
           )}
         <PageHeader
-          title="Quick Lists"
-          description="Save product sets and automate recurring orders on a schedule."
+          title="Ordering Lists"
+          description="Save supplier-specific lists for fast reorders and schedules."
           actions={
             <Button
               onClick={() => setShowCreateDialog(true)}

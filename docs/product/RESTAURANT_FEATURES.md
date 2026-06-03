@@ -792,11 +792,17 @@ Display History:
 #### ✅ Order Tracking
 
 - View order status
-- Status transitions: PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → COMPLETED
+- Status transitions: PLACED → ACKNOWLEDGED → PROCESSING → SHIPPED → **DELIVERED** (driver/supplier deliver) → receiving → RECEIVED\_\*
+- **Live delivery tracking** (when enabled): `RestaurantOrderTrackingPanel` on order detail — driver assignment status, GPS state (Live / Stale / No GPS / Off), map or Google Maps fallback, **ETA not available yet**
+- **Receive order** CTA when delivered (links to receiving; GPS does not auto-receive)
+- Driver milestones on timeline (assigned, picked up, out for delivery) when tracking data available
+- Sanitized API: `GET /api/orders/:id/tracking` — no route stops, no GPS history, driver phone hidden by default
 - View order details
 - Order items with prices
 - **Draft Orders**: Create orders as DRAFT before placing
 - **Packing Slip**: Download packing slip data (JSON format, PDF planned)
+
+See [fulfillment-logistics.md](../features/fulfillment-logistics.md) and [receiving-delivered-flow.md](../features/receiving-delivered-flow.md).
 
 #### ✅ Order Reminders
 

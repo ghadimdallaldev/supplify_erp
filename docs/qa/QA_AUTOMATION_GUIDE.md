@@ -121,6 +121,15 @@ GitHub Actions was removed from this repo. Run before deploy or in your own pipe
 
 E2E (Playwright) is not part of the default check; run `pnpm e2e:playwright` locally when Docker infra is up. See [tests/README.md](../../tests/README.md).
 
+## Delivery GPS / tracking (targeted runs)
+
+```bash
+pnpm --filter @supplify/api test:api src/lib/delivery-tracking-payload.test.js src/lib/restaurant-tracking-payload.test.js src/routes/orders-driver-tracking.test.js src/services/driver-location.service.test.js
+pnpm --filter @supplify/web test:run -- deliveryTrackingLabels DeliveryTrackingMap DriverDispatchBoard FulfillmentTrackingTab RestaurantOrderTrackingPanel restaurantTrackingMessages orderTimeline
+```
+
+Manual regression: [MANUAL_TEST_CHECKLIST.md](./MANUAL_TEST_CHECKLIST.md) §6.6.1, §7.4.1, §7.4.2. Feature spec: [fulfillment-logistics.md](../features/fulfillment-logistics.md).
+
 ## Related docs
 
 - [API test suite stabilization](../API_TEST_SUITE_STABILIZATION.md) — baseline failures, fixes, risks

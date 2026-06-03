@@ -5,7 +5,8 @@ import { formatPrice } from '../../utils/format'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import type { DispatchOrderCard } from '../../types'
 import { formatOrderRef, formatScheduledAt } from './fulfillmentDispatchUtils'
-import { MapPin, Package, Phone, Truck } from 'lucide-react'
+import { MapPin, Package, Phone, Truck, Navigation } from 'lucide-react'
+import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
 
 type Props = {
   order: DispatchOrderCard
@@ -16,6 +17,7 @@ type Props = {
   selected?: boolean
   onToggleSelect?: () => void
   selectDisabledReason?: string
+  onViewTracking?: (orderId: string) => void
 }
 
 function deliveryStatusVariant(
@@ -38,11 +40,14 @@ export function DispatchOrderRow({
   selected,
   onToggleSelect,
   selectDisabledReason,
+  onViewTracking,
 }: Props) {
   const driver = order.assignment?.driver
   const assignmentStatus = order.assignment?.status ?? order.delivery_status ?? 'pending'
   const area = order.delivery_area?.trim()
   const areaLabel = area || 'Area not set'
+  const tracking = order.tracking ?? null
+  const gpsLabel = getGpsStatusLabel(tracking)
 
   return (
     <article
@@ -73,6 +78,13 @@ export function DispatchOrderRow({
               data-testid="dispatch-order-status"
             >
               {formatDeliveryStatus(assignmentStatus)}
+            </Badge>
+            <Badge
+              variant={tracking?.isStale ? 'outline' : 'secondary'}
+              data-testid="dispatch-gps-status"
+              className="text-[10px]"
+            >
+              {gpsLabel}
             </Badge>
           </div>
 
@@ -128,6 +140,19 @@ export function DispatchOrderRow({
 
         <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:items-end">
           {actions}
+          {onViewTracking && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="whitespace-nowrap"
+              data-testid={`dispatch-view-tracking-${order.id}`}
+              onClick={() => onViewTracking(order.id)}
+            >
+              <Navigation className="h-3.5 w-3.5 mr-1" aria-hidden />
+              View tracking
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="whitespace-nowrap" asChild>
             <Link to={`/app/orders/${order.id}`}>View order</Link>
           </Button>

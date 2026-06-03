@@ -49,9 +49,18 @@ Set secrets only in Railway — never commit real values.
 
 See [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md) for where file bytes are stored, the presign → PUT flow, and Railway volume / R2 setup.
 
-| `EMAIL_PROVIDER` | API | optional | `sendgrid` | |
-| `SENDGRID_API_KEY` | API | preprod, prod | key | Or `SMTP_HOST` |
-| `SMTP_*` | API | optional | — | SMTP fallback |
+| `EMAIL_ENABLED` | API | all | `true`/`false` | Master switch (default `true`) |
+| `EMAIL_LOG_ONLY` | API | dev | `true`/`false` | Log only, no network send (Railway dev default) |
+| `EMAIL_PROVIDER` | API | optional | `smtp`/`sendgrid` | Transport selection |
+| `EMAIL_FROM_NAME` | API | all | `Supplify` | From display name |
+| `EMAIL_FROM_ADDRESS` | API | preprod, prod | `noreply@…` | From email (falls back to `SENDGRID_FROM_EMAIL` / `SMTP_FROM`) |
+| `EMAIL_REPLY_TO` | API | optional | email | Optional reply-to header |
+| `EMAIL_TEST_TO` | API | dev | email | Default recipient for `pnpm email:test` |
+| `SENDGRID_API_KEY` | API | preprod, prod | key | SendGrid API (legacy); or use SMTP |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | API | preprod, prod | — | Primary transport (Resend recommended); `SMTP_PASS` only in Railway secrets |
+| `MAILPIT_SMTP_PORT` / `MAILPIT_UI_PORT` | Docker local | dev | `1025` / `8025` | Mailpit fake SMTP in root `docker-compose.yml`; UI at http://localhost:8025 |
+
+See [docs/features/email-system.md](docs/features/email-system.md) for templates, dedup, and coverage matrix.
 | `PAYMENTS_MODE` | API | all | `mock`/`test`/`live` | **mock blocked in preprod/prod** |
 | `BILLING_GATEWAY` | API | optional | `stub` | Overrides mode mapping |
 | `PAYMENTS_PROVIDER` | API | live | `stripe` | Future provider id |
@@ -72,28 +81,57 @@ See [docs/operations/STORAGE_UPLOADS.md](docs/operations/STORAGE_UPLOADS.md) for
 | `SEED_DEMO_DATA` | API | dev | `true` | Never true in prod |
 | `E2E_SECRET` | API | dev only | secret | With `ENABLE_DEBUG_ROUTES` |
 | `REDIS_URL` | API | optional | `redis://...` | Cache |
+| `CRONS_ENABLED` | API | optional | `true` | In-process scheduled jobs; set `false` on read-only replicas |
+| `CRON_SCHEDULED_ORDERS_INTERVAL_MS` | API | optional | `300000` (dev), `3600000` (prod) | Quick list auto-order poll interval |
+| `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS` | API | optional | `86400000` (24 h) | Inventory expiry + reorder cadence reminder job |
+
+See [docs/operations/CRON_JOBS.md](docs/operations/CRON_JOBS.md) for the full job inventory.
+
+### Delivery GPS / live tracking (API)
+
+| Variable                             | Used by | Default  | Notes                                      |
+| ------------------------------------ | ------- | -------- | ------------------------------------------ |
+| `GPS_TRACKING_ENABLED`               | API     | `true`   | Master switch for ingest + tracking reads  |
+| `GPS_STALE_AFTER_SECONDS`            | API     | `300`    | Stale threshold on `tracking.isStale`      |
+| `GPS_UPDATE_INTERVAL_SECONDS`        | API     | `15`     | Driver client poll hint                    |
+| `GPS_MIN_ACCURACY_METERS`            | API     | `100`    | Low-accuracy ping filtering                |
+| `GPS_LOCATION_RETENTION_DAYS`        | API     | `90`     | Retention policy (cron TBD)                |
+| `GPS_ALLOW_RESTAURANT_LIVE_TRACKING` | API     | `true`   | Restaurant `GET /api/orders/:id/tracking`  |
+| `GPS_RESTAURANT_SHOW_DRIVER_NAME`    | API     | `true`   | Include driver name in restaurant payload  |
+| `GPS_RESTAURANT_SHOW_DRIVER_PHONE`   | API     | `false`  | Hide driver phone unless enabled           |
+| `GPS_ALLOW_DRIVER_BACKGROUND_HINT`   | API     | `true`   | Driver UX hint                             |
+| `MAP_PROVIDER`                       | API     | `google` | Map provider for server-side embed helpers |
+| `GOOGLE_MAPS_API_KEY`                | API     | —        | Optional server map key                    |
+| `MAPBOX_ACCESS_TOKEN`                | API     | —        | Optional Mapbox                            |
+
+Spec: [docs/features/fulfillment-logistics.md](docs/features/fulfillment-logistics.md).
 
 Legacy aliases still supported: `S3_*` → `STORAGE_*`, `API_PUBLIC_URL` = `PUBLIC_API_URL`.
 
 ## Frontend (Web / Vite)
 
-| Variable                    | Used by | Required in   | Example              | Notes               |
-| --------------------------- | ------- | ------------- | -------------------- | ------------------- |
-| `VITE_APP_ENV`              | Web     | all           | `dev`                | Build-time          |
-| `VITE_API_URL`              | Web     | preprod, prod | `https://api...`     | Empty = dev proxy   |
-| `VITE_PUBLIC_FRONTEND_URL`  | Web     | optional      | `https://app...`     |                     |
-| `VITE_AUTH_PROVIDER`        | Web     | optional      | `keycloak`           |                     |
-| `VITE_KEYCLOAK_URL`         | Web     | all           | URL                  |                     |
-| `VITE_KEYCLOAK_REALM`       | Web     | all           | `supplify-dev`       | Match API realm     |
-| `VITE_KEYCLOAK_CLIENT_ID`   | Web     | all           | `supplify-web`       |                     |
-| `VITE_PAYMENTS_MODE`        | Web     | all           | `mock`/`test`/`live` | UI gating           |
-| `VITE_PAYMENTS_PUBLIC_KEY`  | Web     | live          | pk\_...              | Provider public key |
-| `VITE_SENTRY_DSN`           | Web     | optional      | URL                  |                     |
-| `VITE_SENTRY_ENVIRONMENT`   | Web     | optional      | `dev`                |                     |
-| `VITE_ENABLE_DEBUG_UI`      | Web     | dev           | `true`               | Debug panels        |
-| `VITE_ENABLE_DEMO_BANNERS`  | Web     | dev/preprod   | `true`               |                     |
-| `VITE_ENABLE_MOCK_PAYMENTS` | Web     | dev           | `true`               |                     |
-| `VITE_ENABLE_TEST_DATA`     | Web     | dev           | `true`               |                     |
+| Variable                           | Used by | Required in   | Example              | Notes                             |
+| ---------------------------------- | ------- | ------------- | -------------------- | --------------------------------- |
+| `VITE_APP_ENV`                     | Web     | all           | `dev`                | Build-time                        |
+| `VITE_API_URL`                     | Web     | preprod, prod | `https://api...`     | Empty = dev proxy                 |
+| `VITE_PUBLIC_FRONTEND_URL`         | Web     | optional      | `https://app...`     |                                   |
+| `VITE_AUTH_PROVIDER`               | Web     | optional      | `keycloak`           |                                   |
+| `VITE_KEYCLOAK_URL`                | Web     | all           | URL                  |                                   |
+| `VITE_KEYCLOAK_REALM`              | Web     | all           | `supplify-dev`       | Match API realm                   |
+| `VITE_KEYCLOAK_CLIENT_ID`          | Web     | all           | `supplify-web`       |                                   |
+| `VITE_PAYMENTS_MODE`               | Web     | all           | `mock`/`test`/`live` | UI gating                         |
+| `VITE_PAYMENTS_PUBLIC_KEY`         | Web     | live          | pk\_...              | Provider public key               |
+| `VITE_SENTRY_DSN`                  | Web     | optional      | URL                  |                                   |
+| `VITE_SENTRY_ENVIRONMENT`          | Web     | optional      | `dev`                |                                   |
+| `VITE_ENABLE_DEBUG_UI`             | Web     | dev           | `true`               | Debug panels                      |
+| `VITE_ENABLE_DEMO_BANNERS`         | Web     | dev/preprod   | `true`               |                                   |
+| `VITE_ENABLE_MOCK_PAYMENTS`        | Web     | dev           | `true`               |                                   |
+| `VITE_ENABLE_TEST_DATA`            | Web     | dev           | `true`               |                                   |
+| `VITE_GPS_TRACKING_ENABLED`        | Web     | optional      | `true`               | Tracking panels / driver UI       |
+| `VITE_GPS_UPDATE_INTERVAL_SECONDS` | Web     | optional      | `15`                 | Driver location poll hint         |
+| `VITE_GOOGLE_MAPS_API_KEY`         | Web     | optional      | —                    | Map embed; fallback link if unset |
+| `VITE_MAPBOX_ACCESS_TOKEN`         | Web     | optional      | —                    | Mapbox (link fallback)            |
+| `VITE_MAP_PROVIDER`                | Web     | optional      | `google`             | Map provider                      |
 
 Access in code: `apps/web/src/lib/env.ts`.
 

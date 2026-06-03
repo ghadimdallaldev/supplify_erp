@@ -1,6 +1,8 @@
 import { query } from '../lib/db.js'
 import { getSupplierReceivables } from './supplier-receivables.service.js'
 import { getReorderIntelligence } from './supplier-reorder-intelligence.service.js'
+import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
+import { isGpsTrackingEnabled } from '../lib/delivery-tracking-payload.js'
 
 const OPEN_INVOICE_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
 
@@ -54,6 +56,7 @@ export async function getSupplierCommandCenter(supplierId) {
     needsAttention: priorities,
     previews: {
       deliveries: await getDeliveryPreview(supplierId),
+      deliveryGpsSummary: await getDeliveryGpsSummary(supplierId),
       receivables: {
         unpaidTotal: receivables.summary.unpaidTotal,
         overdueTotal: receivables.summary.overdueTotal,
@@ -191,6 +194,75 @@ async function getBoostedDealsSummary(supplierId) {
     }
   } catch {
     return { activeBoostedDeals: 0, totalViews: 0, totalClicks: 0 }
+  }
+}
+
+async function getDeliveryGpsSummary(supplierId) {
+  if (!isGpsTrackingEnabled()) {
+    return { active: 0, live: 0, stale: 0, noGps: 0, failed: 0 }
+  }
+
+  const { rows } = await query(
+    `
+    SELECT
+      da.order_id,
+      da.driver_id,
+      da.status AS assignment_status,
+      dll.recorded_at,
+      dll.order_id AS loc_order_id,
+      dll.latitude,
+      dll.longitude
+    FROM driver_assignments da
+    JOIN customer_order o ON o.id = da.order_id
+    JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
+    LEFT JOIN driver_latest_location dll ON dll.driver_id = da.driver_id
+    WHERE da.supplier_id = $1
+      AND da.status IN ('assigned', 'picked_up', 'out_for_delivery')
+      AND o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED')
+      AND COALESCE(o.placed_at, o.created_at) >= date_trunc('day', now())
+    `,
+    [supplierId]
+  )
+
+  let live = 0
+  let stale = 0
+  let noGps = 0
+  const failedRows = await query(
+    `
+    SELECT COUNT(DISTINCT da.order_id)::int AS count
+    FROM driver_assignments da
+    WHERE da.supplier_id = $1
+      AND da.status = 'failed'
+      AND da.failed_at >= date_trunc('day', now())
+    `,
+    [supplierId]
+  )
+  const failed = failedRows.rows[0]?.count ?? 0
+
+  for (const row of rows) {
+    const tracking = buildTrackingPayload({
+      orderId: row.order_id,
+      locationRow: row.latitude
+        ? {
+            latitude: row.latitude,
+            longitude: row.longitude,
+            recordedAt: row.recorded_at,
+            orderId: row.loc_order_id,
+          }
+        : null,
+      allowDriverFallback: true,
+    })
+    if (!tracking.hasLocation) noGps += 1
+    else if (tracking.isStale) stale += 1
+    else live += 1
+  }
+
+  return {
+    active: rows.length,
+    live,
+    stale,
+    noGps,
+    failed,
   }
 }
 

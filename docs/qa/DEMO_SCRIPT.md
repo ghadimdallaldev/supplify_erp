@@ -36,9 +36,10 @@ Use **Gold** or prodlike restaurant with active subscription.
 2. **Catalog:** `/app/products` — browse, search, open product
 3. **Cart / order:** add to cart → `/app/cart` → place order → success
 4. **Orders:** `/app/orders` — new order visible; try **search**; open detail
-5. **Receiving:** mark delivered order as received (`/app/receiving`) if status allows
-6. **Quick list (optional):** `/app/quick-lists` — one list visible per plan
-7. **Waitlist (Gold+, optional):** cancel reservation → guest on waitlist gets offer link → `/reserve/waitlist/:token/accept`
+5. **Order tracking (optional):** open in-flight order detail → `RestaurantOrderTrackingPanel` (status + GPS line; map or Google Maps link)
+6. **Receiving:** mark delivered order as received (`/app/receiving`) if status allows — use **Receive order** on tracking panel or Receiving page
+7. **Quick list (optional):** `/app/quick-lists` — one list visible per plan
+8. **Waitlist (Gold+, optional):** cancel reservation → guest on waitlist gets offer link → `/reserve/waitlist/:token/accept`
 
 ## 3. Supplier core (10 min)
 
@@ -47,8 +48,10 @@ Use **Gold** or prodlike supplier.
 1. Dashboard
 2. **Products:** add or edit a product (if permitted)
 3. **Orders:** incoming order → advance status (confirm / ship / deliver as UI allows)
-4. **Fulfillment:** `/app/fulfillment` — dispatch board loads (Gold+)
-5. **Chat:** `/app/chat` — open thread; send message; **second browser** sees it within ~1s (Socket.IO). Optional: typing indicator, notification toast on dashboard.
+4. **Fulfillment:** `/app/fulfillment` — dispatch board loads (Gold+); GPS badges on cards; **View tracking** drawer
+5. **Command center (optional):** `/app/supplier/command-center` — **GPS today** counts under deliveries KPI
+6. **Driver (optional):** driver login → `/app/driver/deliveries` — allow location; supplier dispatch shows **Live**
+7. **Chat:** `/app/chat` — open thread; send message; **second browser** sees it within ~1s (Socket.IO). Optional: typing indicator, notification toast on dashboard.
 
 ## 4. Plans & billing (5 min)
 
@@ -74,5 +77,6 @@ Restaurant **Silver+** with `supplier_deals`:
 
 ---
 
-Full regression: [MANUAL_TEST_CHECKLIST.md](./MANUAL_TEST_CHECKLIST.md)  
-Billing detail: [MANUAL_TEST_CHECKLIST_BILLING_ACTIVATION.md](./MANUAL_TEST_CHECKLIST_BILLING_ACTIVATION.md)
+Full regression: [MANUAL_TEST_CHECKLIST.md](./MANUAL_TEST_CHECKLIST.md) (delivery GPS: **§6.6.1**, **§7.4.1**, **DRV-GPS\***)  
+Billing detail: [MANUAL_TEST_CHECKLIST_BILLING_ACTIVATION.md](./MANUAL_TEST_CHECKLIST_BILLING_ACTIVATION.md)  
+Feature spec: [fulfillment-logistics.md](../features/fulfillment-logistics.md)

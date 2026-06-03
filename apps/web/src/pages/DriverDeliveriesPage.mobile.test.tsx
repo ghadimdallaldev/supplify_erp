@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { DriverDeliveriesPage } from '../pages/DriverDeliveriesPage'
@@ -46,7 +46,19 @@ vi.mock('../services/api', () => ({
   }),
   useUpdateOrderDeliveryStatusMutation: () => [vi.fn(), { isLoading: false }],
   useUpdateFulfillmentRouteStopMutation: () => [vi.fn()],
+  useSendDriverLocationMutation: () => [vi.fn(), { isLoading: false }],
 }))
+
+beforeEach(() => {
+  Object.defineProperty(global.navigator, 'geolocation', {
+    value: {
+      watchPosition: vi.fn(),
+      clearWatch: vi.fn(),
+      getCurrentPosition: vi.fn(),
+    },
+    configurable: true,
+  })
+})
 
 describe('DriverDeliveriesPage mobile', () => {
   it('renders assigned deliveries with touch-friendly actions at narrow width', () => {

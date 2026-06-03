@@ -187,6 +187,7 @@ services:
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       REDIS_URL: redis://redis:6379
+      CRONS_ENABLED: ${CRONS_ENABLED:-true}
     depends_on:
       postgres:
         condition: service_healthy
