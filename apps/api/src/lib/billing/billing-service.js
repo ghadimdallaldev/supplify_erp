@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import { query, withTransaction } from '../db.js'
 import { logger } from '../logger.js'
+import { getCache, setCache } from '../cache.js'
 import { getBillingGateway } from './gateway-registry.js'
 import {
   GRACE_PERIOD_DAYS,
@@ -33,10 +34,20 @@ async function recordBillingEvent(
   )
 }
 
+const BILLING_SUB_CACHE_TTL_SECONDS = 60
+
+function billingSubCacheKey(tenantId, tenantType) {
+  return `billingSub:${tenantId}:${tenantType}`
+}
+
 /**
  * Latest subscription row for tenant (any non-cancelled status).
  */
 export async function getSubscriptionForBilling(tenantId, tenantType) {
+  const cacheKey = billingSubCacheKey(tenantId, tenantType)
+  const cached = await getCache(cacheKey)
+  if (cached !== null) return cached === 'null' ? null : cached
+
   const { rows } = await query(
     `SELECT s.*, sp.code AS plan_code, sp.price_per_month, sp.price_per_year
      FROM subscription s
@@ -47,7 +58,9 @@ export async function getSubscriptionForBilling(tenantId, tenantType) {
      LIMIT 1`,
     [tenantId, tenantType]
   )
-  return rows[0] || null
+  const row = rows[0] || null
+  await setCache(cacheKey, row ?? 'null', BILLING_SUB_CACHE_TTL_SECONDS).catch(() => {})
+  return row
 }
 
 export function computeBillingAccessState(subscription) {

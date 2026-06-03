@@ -2,7 +2,7 @@ import { Pool } from 'pg'
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import { summarizeQuery } from './log-helpers.js'
-import { recordPoolWaitIfNeeded } from '../middlewares/request-timing.js'
+import { recordPoolWaitIfNeeded, recordQueryMs } from '../middlewares/request-timing.js'
 
 // Create connection pool (hosted: DATABASE_SSL=true; rejectUnauthorized defaults false for Railway)
 // min:2 keeps two physical connections warm so Railway requests never wait for a cold TCP handshake.
@@ -23,7 +23,48 @@ if (config.DATABASE_STATEMENT_TIMEOUT) {
 }
 export const pool = new Pool(poolConfig)
 
+let keepaliveTimer = null
+
+/**
+ * Warm pool connections after listen so first user request avoids cold TCP/TLS handshake.
+ */
+export async function warmupPool() {
+  if (process.env.NODE_ENV === 'test') return
+  try {
+    const target = Math.max(1, poolConfig.min || 1)
+    await Promise.all(Array.from({ length: target }, () => pool.query('SELECT 1 AS warm')))
+    logger.info({
+      event: 'db.pool.warmup',
+      connections: target,
+      idle: pool.idleCount,
+      total: pool.totalCount,
+    })
+  } catch (error) {
+    logger.warn({ event: 'db.pool.warmup.failed', error: error.message })
+  }
+}
+
+/** Lightweight keepalive to prevent Railway/proxy from closing idle connections. */
+export function startPoolKeepalive() {
+  if (process.env.NODE_ENV === 'test') return
+  const intervalMs = config.DB_POOL_KEEPALIVE_MS
+  if (!intervalMs || intervalMs < 1000) return
+  if (keepaliveTimer) return
+  keepaliveTimer = setInterval(() => {
+    pool.query('SELECT 1').catch(() => {})
+  }, intervalMs)
+  keepaliveTimer.unref?.()
+}
+
+export function stopPoolKeepalive() {
+  if (keepaliveTimer) {
+    clearInterval(keepaliveTimer)
+    keepaliveTimer = null
+  }
+}
+
 export async function closePool() {
+  stopPoolKeepalive()
   await pool.end()
 }
 
@@ -58,6 +99,7 @@ export async function query(text, params = [], req = null) {
   try {
     const result = await pool.query(text, params)
     const duration = Date.now() - start
+    if (req?._perf) recordQueryMs(req, duration)
     if (duration > 500) {
       logger.warn({
         event: 'db.query.slow',

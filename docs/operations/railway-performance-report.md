@@ -234,3 +234,49 @@ Added `manualChunks` to group `@radix-ui`, `lucide-react`, `react-router`, `@red
 3. Confirm migrations **0138** and **0139** applied (`RUN_MIGRATIONS_ON_START=true` or one-off `pnpm db:migrate`).
 4. Same region for API + Postgres; min 1 API replica; `NODE_ENV=production`, `DATABASE_SSL=true`.
 5. Watch logs for `http.request.slow_breakdown` after deploy to validate stage times.
+
+---
+
+## Phase 4: Cold vs warm first-open (2026-06-03)
+
+**HAR (V3):** First API hits ~2–2.4s TTFB; repeat calls ~1.2–1.6s. Static assets fast; gap is server wait + cold pool/middleware/SQL.
+
+### Root causes
+
+1. **Cold DB pool** — first request after idle still pays TCP/TLS + auth despite `min: 2` if process just started or connections dropped.
+2. **Uncached middleware rows** — `getRolesForUser` and `getSubscriptionForBilling` hit Postgres every request; permissions/subscription partially cached only.
+3. **Heavy list SQL on first open** — products list aggregated all `inventory` rows; count duplicated inventory join; categories/tags uncached; staff documents unbounded; my-pricing unbounded.
+4. **No queryMs in slow logs** — hard to separate handler SQL from middleware.
+
+### Fixes applied
+
+| Area            | Change                                                                                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Slow logs       | Canonical fields: `authMs`, `userLookupMs`, `tenantLookupMs`, `rbacMs`, `subscriptionMs`, `featureFlagMs`, `dbCheckoutMs`, `handlerMs`, `queryMs`, `serializationMs`, `totalMs` |
+| DB pool         | `warmupPool()` on boot (`SELECT 1` × min connections); optional `DB_POOL_KEEPALIVE_MS` (default 4m)                                                                             |
+| Caches          | `getRolesForUser` 120s + per-request memo; `getSubscriptionForBilling` 60s; product categories/tags 60s tenant-scoped                                                           |
+| Products        | Cap `limit` 100; skip inventory aggregate unless `inStock`; lighter count query; restaurant pricing enrich uses `tenantId`                                                      |
+| Pricing / staff | my-pricing `LIMIT 500`; staff documents `LIMIT 100`                                                                                                                             |
+| Indexes         | [`0140_railway_cold_path_indexes.sql`](../apps/api/db/migrations/0140_railway_cold_path_indexes.sql)                                                                            |
+| Frontend        | Sidebar hover/focus route chunk prefetch; Layout prefetch Products/Reservations at 500ms; RTK `keepUnusedDataFor: 120` for categories/tags                                      |
+
+### Expected first-open (warm pool + Redis + migrations 0138–0140)
+
+| Scenario                                 | Target                |
+| ---------------------------------------- | --------------------- |
+| First API after deploy (pool warmed)     | 300–800ms typical GET |
+| First API after long idle (keepalive on) | 400–900ms             |
+| Heavy reports / large pricing list       | &lt; 1.5s             |
+| Repeat navigation (chunk + RTK cache)    | &lt; 500ms perceived  |
+
+### Railway actions (Phase 4)
+
+1. Apply migration **0140** with 0138–0139.
+2. Optional: `DB_POOL_KEEPALIVE_MS=240000` (default) — disable with `0` if undesired.
+3. Same region + private `DATABASE_URL`; min 1 API replica; Redis for middleware caches.
+4. Compare HAR first vs second hit on `/api/orders`, `/api/products`, Staff/Disputes/Inventory pages after deploy.
+5. Inspect `http.request.slow_breakdown` for high `queryMs` vs `authMs` / `subscriptionMs`.
+
+### Tests
+
+Targeted vitest: request-timing, rbac, permissions, billing, products routes, notifications — run in CI after merge.
