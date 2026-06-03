@@ -124,7 +124,7 @@ Run once after deploy (Railway one-off command or local with production `DATABAS
 pnpm db:migrate
 ```
 
-Restaurant-operations features require migrations **0133–0135** (and any later pending files). **Email dedup** requires **0136** (`0136_email_delivery_log.sql`). The API Docker image includes all migration SQL; Railway does not run them on container start (`RUN_MIGRATIONS_ON_START=false`). EC2 Docker deploy scripts run migrations automatically via the `migrate` compose service.
+Restaurant-operations features require migrations **0133–0137** (and any later pending files). **Email dedup** requires **0136** (`0136_email_delivery_log.sql`). Railway API services use `RUN_MIGRATIONS_ON_START=true` in `deploy/railway/<env>/api.env` so SQL runs after listen on deploy. EC2 Docker deploy scripts also run migrations via the `migrate` compose service.
 
 Committed Railway API defaults (`deploy/railway/<env>/api.env`, copied into the image) set `CRONS_ENABLED=true` for in-process jobs including operational reminders.
 
@@ -169,7 +169,9 @@ See `apps/web/.env.railway.example` for local Vite development.
 
 ## 4. Keycloak (optional)
 
-Keycloak is **not** bundled in the Railway templates. Options:
+Each environment has a Railway Keycloak service that **builds** `deploy/railway/keycloak/Dockerfile` and runs `--import-realm` (realm JSON baked in; no manual Admin import). See [`deploy/railway/keycloak/RAILWAY_SETUP.md`](deploy/railway/keycloak/RAILWAY_SETUP.md).
+
+Options if not using Railway Docker Keycloak:
 
 - Run Keycloak on a separate Railway service or VM using `deploy/keycloak/realm-export.json`
 - Use a managed IdP and map claims to Supplify roles
