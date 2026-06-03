@@ -8,7 +8,7 @@ import {
   isFeatureKeyAllowed,
 } from './feature-keys.js'
 
-const FF_CACHE_TTL = 60 // seconds
+const FF_CACHE_TTL = 180 // seconds
 
 /** @returns {boolean} */
 export function evaluatePlanFeatureValue(featureValue) {

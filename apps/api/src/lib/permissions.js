@@ -11,8 +11,8 @@ import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
 
 export { PERMISSION_KEYS }
 
-const PERMISSION_CACHE_TTL_SECONDS = 300
-const ROLES_CACHE_TTL_SECONDS = 120
+const PERMISSION_CACHE_TTL_SECONDS = 120
+const ROLES_CACHE_TTL_SECONDS = 180
 
 export function permissionCacheKey(userId, tenantId, tenantType) {
   return `perms:${userId}:${tenantId}:${tenantType}`

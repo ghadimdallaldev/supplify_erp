@@ -313,3 +313,50 @@ Targeted vitest: request-timing, rbac, permissions, billing, products routes, no
 ### Tests
 
 `limit-resolution.test.js` (batch limits), `subscription.test.js` (getEntitlements overrides), `subscriptions.routes.test.js`.
+
+---
+
+## Phase 6: Idle / warm-cache expiry (2026-06-03)
+
+**Symptom:** APIs fast while active; after ~30–90s idle, next load slower again, then fast after use.
+
+### Root cause
+
+1. **Postgres pool `idleTimeoutMillis` was 30s** — idle clients removed; next request paid reconnect/TLS.
+2. **Keepalive interval default 4 minutes** — too slow for short idle gaps on Railway.
+3. **Short backend TTLs** — subscription cache **30s**, entitlements **90s**, billing/features **60s** expired during brief pauses.
+4. **RTK default `refetchOnFocus`** — tab focus after idle refetched entitlements/me even when cache valid.
+
+### Fixes applied
+
+| Area        | Change                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| DB pool     | `idleTimeoutMillis` default **10 min**; TCP `keepAlive: true`; env `DATABASE_POOL_IDLE_TIMEOUT_MS`                              |
+| Keepalive   | `DB_KEEPALIVE_ENABLED=true`, `DB_KEEPALIVE_INTERVAL_SECONDS=60` (production default); logs failures only                        |
+| Backend TTL | Subscription 180s; entitlements 300s; user/tenant/org billing 180–300s; features 180s; prefs/catalog 180–300s; permissions 120s |
+| Perf logs   | `IDLE_PERF_LOG_MS` → `http.request.perf_sample` with `cacheHits` / `cacheMisses` / `dbConnectMs`                                |
+| Frontend    | `getMe` / entitlements / billing: 10 min RTK cache, `refetchOnFocus: false`; Layout shell prefetch entitlements                 |
+| Diagnostics | `noteCacheMiss` on entitlements; `dbConnectMs` when pool opens connection during request                                        |
+
+### Expected after idle
+
+| Idle gap    | Behavior                                                            |
+| ----------- | ------------------------------------------------------------------- |
+| 30s–5min    | APIs stay **~300–800ms** (warm pool + cache hits)                   |
+| Tab refocus | No automatic entitlements refetch unless reconnect invalidates tags |
+
+### Railway env (recommended)
+
+```env
+DB_KEEPALIVE_ENABLED=true
+DB_KEEPALIVE_INTERVAL_SECONDS=60
+DATABASE_POOL_IDLE_TIMEOUT_MS=600000
+IDLE_PERF_LOG_MS=500
+REDIS_URL=${{Redis.REDIS_URL}}
+```
+
+Min **1 API replica** (no scale-to-zero); API + Postgres **same region**; private `DATABASE_URL`.
+
+### Tests
+
+`db.keepalive.test.js`, `request-timing.test.js`, `subscription.test.js`, `subscriptions.routes.test.js`.

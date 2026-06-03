@@ -47,11 +47,11 @@ router.get('/entitlements', requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']), as
       })
     }
 
-    let entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
+    let entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType, req)
     if (!entitlements) {
       // getTenantSubscription ensures Free row when missing; one retry avoids duplicate work
       await getTenantSubscription(tenant.tenantId, tenant.tenantType)
-      entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType)
+      entitlements = await getEntitlements(tenant.tenantId, tenant.tenantType, req)
     }
     if (!entitlements) {
       // Last resort: return synthetic Free so UI always shows something; backend will still enforce limits
