@@ -3,7 +3,7 @@ import { logger } from './logger.js'
 import { resolveAllFeaturesForTenant } from './feature-flags.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { getCache, setCache, deleteCache } from './cache.js'
-import { startStage, mark } from '../middlewares/request-timing.js'
+import { startStage, mark, noteCacheHit, noteCacheMiss } from '../middlewares/request-timing.js'
 import {
   RESTAURANT_LIMIT_KEYS,
   SUPPLIER_LIMIT_KEYS,
@@ -40,9 +40,9 @@ function getEnforcementPlanLimits(subscription, tenantType) {
 }
 
 /** Cache TTL for subscription data (seconds). Short enough to absorb burst traffic while staying fresh. */
-const SUBSCRIPTION_CACHE_TTL = 30
+const SUBSCRIPTION_CACHE_TTL = 180
 /** Full entitlements payload (plan, limits, features, usage) — hot path on every app shell load. */
-const ENTITLEMENTS_CACHE_TTL = 90
+const ENTITLEMENTS_CACHE_TTL = 300
 
 /** Build a consistent cache key for a tenant subscription. */
 function subscriptionCacheKey(tenantId, tenantType) {
@@ -755,10 +755,14 @@ async function getUsageSnapshot(tenantId, tenantType) {
  * @param {string} tenantType - 'RESTAURANT' | 'SUPPLIER'
  * @returns {Promise<Object|null>} Entitlements object or null if no subscription
  */
-export async function getEntitlements(tenantId, tenantType) {
+export async function getEntitlements(tenantId, tenantType, req = null) {
   const cacheKey = entitlementsCacheKey(tenantId, tenantType)
   const cached = await getCache(cacheKey)
-  if (cached !== null) return cached
+  if (cached !== null) {
+    noteCacheHit(req, 'entitlements')
+    return cached
+  }
+  noteCacheMiss(req, 'entitlements')
 
   const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
   const subscription = await getTenantSubscription(billingTenantId, tenantType, {

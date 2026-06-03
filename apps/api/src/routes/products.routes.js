@@ -26,7 +26,7 @@ import { writeAuditLog } from '../lib/audit.js'
 import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
 import { getCache, setCache } from '../lib/cache.js'
 
-const CATALOG_META_CACHE_TTL_SECONDS = 60
+const CATALOG_META_CACHE_TTL_SECONDS = 300
 
 const router = express.Router()
 

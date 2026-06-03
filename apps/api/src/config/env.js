@@ -221,10 +221,17 @@ export const config = {
   MEMORY_WARN_RSS_MB: envInt(process.env.MEMORY_WARN_RSS_MB, 512),
   MEMORY_LOG_INTERVAL_MS: envInt(process.env.MEMORY_LOG_INTERVAL_MS, 5 * 60 * 1000),
   DATABASE_POOL_MAX: envInt(process.env.DATABASE_POOL_MAX, 20),
+  /** How long idle pool clients stay open before removal (default 10 min). */
+  DATABASE_POOL_IDLE_TIMEOUT_MS: envInt(process.env.DATABASE_POOL_IDLE_TIMEOUT_MS, 10 * 60 * 1000),
   /** Log structured slow-request breakdown when total pipeline exceeds this (ms). */
   SLOW_REQUEST_MS: envInt(process.env.SLOW_REQUEST_MS, 800),
-  /** Periodic SELECT 1 to keep pooled connections alive on Railway (0 = disabled). */
-  DB_POOL_KEEPALIVE_MS: envInt(process.env.DB_POOL_KEEPALIVE_MS, 4 * 60 * 1000),
+  /** Log perf sample (with cacheHits) when total exceeds this; 0 = off. Use 500 to debug idle. */
+  IDLE_PERF_LOG_MS: envInt(process.env.IDLE_PERF_LOG_MS, 0),
+  /** Lightweight SELECT 1 on interval to keep Railway/Postgres connections warm. */
+  DB_KEEPALIVE_ENABLED: envBool(process.env.DB_KEEPALIVE_ENABLED, isProductionNode),
+  DB_KEEPALIVE_INTERVAL_SECONDS: envInt(process.env.DB_KEEPALIVE_INTERVAL_SECONDS, 60),
+  /** Legacy override: interval in ms (if >= 1000, replaces DB_KEEPALIVE_INTERVAL_SECONDS). */
+  DB_POOL_KEEPALIVE_MS: envInt(process.env.DB_POOL_KEEPALIVE_MS, 0),
   CRONS_ENABLED: envBool(process.env.CRONS_ENABLED, true),
   CRON_SCHEDULED_ORDERS_INTERVAL_MS: envInt(
     process.env.CRON_SCHEDULED_ORDERS_INTERVAL_MS,

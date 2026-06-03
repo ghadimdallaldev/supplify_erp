@@ -1,7 +1,7 @@
 import { query } from './db.js'
 import { getCache, setCache } from './cache.js'
 
-const ORG_BILLING_CACHE_TTL_SECONDS = 120
+const ORG_BILLING_CACHE_TTL_SECONDS = 300
 
 function orgBillingCacheKey(tenantId, tenantType) {
   return `orgbill:${tenantType}:${tenantId}`

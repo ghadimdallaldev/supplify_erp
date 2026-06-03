@@ -34,7 +34,7 @@ async function recordBillingEvent(
   )
 }
 
-const BILLING_SUB_CACHE_TTL_SECONDS = 60
+const BILLING_SUB_CACHE_TTL_SECONDS = 180
 
 function billingSubCacheKey(tenantId, tenantType) {
   return `billingSub:${tenantId}:${tenantType}`

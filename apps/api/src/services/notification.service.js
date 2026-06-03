@@ -211,7 +211,7 @@ function mapPreferencesRow(row) {
   return Object.fromEntries(entries)
 }
 
-const NOTIFICATION_PREFS_CACHE_TTL = 60
+const NOTIFICATION_PREFS_CACHE_TTL = 180
 
 function notificationPrefsCacheKey(userId, userType) {
   return `prefs:${userId}:${userType}`

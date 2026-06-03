@@ -265,7 +265,9 @@ export const api = createApi({
     getMe: builder.query<User, void>({
       query: () => '/auth/me',
       providesTags: ['User'],
-      keepUnusedDataFor: 300,
+      keepUnusedDataFor: 600,
+      refetchOnFocus: false,
+      refetchOnMountOrArgChange: false,
     }),
     getInviteSession: builder.query<
       { id: string; email: string; displayName: string } | null,
@@ -3107,8 +3109,10 @@ export const api = createApi({
     getEntitlements: builder.query<{ entitlements: Entitlements }, void>({
       query: () => '/api/subscriptions/entitlements',
       providesTags: ['Subscription'],
-      keepUnusedDataFor: 5 * 60,
+      keepUnusedDataFor: 10 * 60,
       refetchOnMountOrArgChange: false,
+      refetchOnFocus: false,
+      refetchOnReconnect: true,
     }),
     getSubscriptionUsage: builder.query<UsageMeter & { meterType: string }, string>({
       query: (meterType) => `/api/subscriptions/usage/${meterType}`,
@@ -3154,7 +3158,9 @@ export const api = createApi({
     getBillingStatus: builder.query<BillingStatus, void>({
       query: () => '/api/billing/status',
       providesTags: ['Billing', 'Subscription'],
-      keepUnusedDataFor: 300,
+      keepUnusedDataFor: 600,
+      refetchOnFocus: false,
+      refetchOnMountOrArgChange: false,
     }),
     getBillingPaymentMethods: builder.query<{ paymentMethods: BillingPaymentMethod[] }, void>({
       query: () => '/api/billing/payment-methods',
