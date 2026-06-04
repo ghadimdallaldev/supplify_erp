@@ -612,6 +612,8 @@ export async function sendNotification({
       emitNotificationNew({ ...notification, user_id: userId })
     }
 
+    await invalidateUserNotificationsListCache(userId, userType).catch(() => {})
+
     return notification
   } catch (error) {
     logger.error('Failed to send notification', {
@@ -637,6 +639,31 @@ export async function markNotificationAsRead(notificationId) {
   )
 }
 
+const NOTIFICATION_LIST_CACHE_TTL_SECONDS = 25
+
+const NOTIFICATION_LIST_COLUMNS = `
+  id, user_id, user_type, title, message, notification_type, notification_category,
+  reference_id, reference_type, metadata, is_read, read_at, created_at
+`.trim()
+
+export function notificationListCacheKey(userId, userType, limit, offset, unreadOnly) {
+  return `notif:list:${userId}:${userType}:${limit}:${offset}:${unreadOnly ? '1' : '0'}`
+}
+
+export async function invalidateUserNotificationsListCache(userId, userType = null) {
+  if (!userId) return
+  const userTypes = userType ? [userType] : ['RESTAURANT', 'SUPPLIER', 'ADMIN', 'PENDING']
+  const limits = [25, 50]
+  const keys = []
+  for (const type of userTypes) {
+    for (const limit of limits) {
+      keys.push(notificationListCacheKey(userId, type, limit, 0, false))
+      keys.push(notificationListCacheKey(userId, type, limit, 0, true))
+    }
+  }
+  await Promise.all(keys.map((key) => deleteCache(key).catch(() => {})))
+}
+
 /**
  * Get user's notifications
  */
@@ -645,6 +672,12 @@ export async function getUserNotifications(
   userType,
   { limit = 50, offset = 0, unreadOnly = false }
 ) {
+  const cacheKey = notificationListCacheKey(userId, userType, limit, offset, unreadOnly)
+  const cached = await getCache(cacheKey)
+  if (cached && typeof cached === 'object' && Array.isArray(cached.notifications)) {
+    return cached
+  }
+
   let whereClause = 'user_id = $1 AND user_type = $2'
   const params = [userId, userType]
   let paramIndex = 3
@@ -653,9 +686,9 @@ export async function getUserNotifications(
     whereClause += ` AND is_read = false`
   }
 
-  const { rows } = await query(
+  const listQuery = query(
     `
-    SELECT *
+    SELECT ${NOTIFICATION_LIST_COLUMNS}
     FROM notification_log
     WHERE ${whereClause}
     ORDER BY created_at DESC
@@ -664,20 +697,24 @@ export async function getUserNotifications(
     [...params, limit, offset]
   )
 
-  // Get unread count
-  const { rows: countRows } = await query(
+  const countQuery = query(
     `
-    SELECT COUNT(*) as count
+    SELECT COUNT(*)::int AS count
     FROM notification_log
     WHERE user_id = $1 AND user_type = $2 AND is_read = false
   `,
     [userId, userType]
   )
 
-  return {
+  const [{ rows }, { rows: countRows }] = await Promise.all([listQuery, countQuery])
+
+  const result = {
     notifications: rows,
-    unreadCount: parseInt(countRows[0].count, 10),
+    unreadCount: countRows[0]?.count ?? 0,
   }
+
+  await setCache(cacheKey, result, NOTIFICATION_LIST_CACHE_TTL_SECONDS).catch(() => {})
+  return result
 }
 
 export async function sendWhatsAppMessage(phone, message) {
