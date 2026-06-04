@@ -6,6 +6,10 @@
     # Leaving Host unset lets nginx default it to $proxy_host (the API host from proxy_pass),
     # so the edge routes to the API. X-Forwarded-Host carries the original web host so the
     # API can build first-party callback URLs (see callbackOrigin in auth.routes.js).
+    #
+    # Buffers: /auth/callback sets two large JWT cookies (access_token + refresh_token).
+    # The combined Set-Cookie headers exceed nginx's default proxy_buffer_size, which
+    # surfaces as "upstream sent too big header" => 502 Bad Gateway. Enlarge the buffers.
     location /auth/ {
         proxy_pass ${API_UPSTREAM}/auth/;
         proxy_http_version 1.1;
@@ -14,6 +18,9 @@
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
+        proxy_buffer_size 16k;
+        proxy_buffers 8 16k;
+        proxy_busy_buffers_size 32k;
         proxy_read_timeout 120s;
     }
 
@@ -25,6 +32,9 @@
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
+        proxy_buffer_size 16k;
+        proxy_buffers 8 16k;
+        proxy_busy_buffers_size 32k;
         proxy_read_timeout 120s;
     }
 
